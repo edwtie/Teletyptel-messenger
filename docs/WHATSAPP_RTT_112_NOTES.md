@@ -36,6 +36,27 @@ Risks:
 - dependency on a commercial chat platform
 - dependency on internet availability and WhatsApp service availability
 
+## Consequences Of WhatsApp Dominance
+
+Many deaf and hard-of-hearing users use WhatsApp because it is already where family, friends, colleagues and local groups are. That makes practical sense: it is familiar, widespread and easy to use.
+
+But there are consequences when everyday communication moves almost completely to a commercial messenger:
+
+- RTT becomes invisible because normal messaging feels "good enough" for many daily situations.
+- Live typed conversation is replaced by delayed send-and-wait messaging.
+- Official accessibility features become split across different apps instead of being part of normal communication.
+- Emergency access still needs separate official tools such as 112NL or SMS 112.
+- Users may assume that because everyone uses WhatsApp, it can also handle urgent or official communication, even when it cannot.
+- Public services, care providers and organizations may also default to WhatsApp instead of choosing standards-based accessible communication.
+- Communication becomes dependent on one commercial platform's policy, outages, account rules and device support.
+- Data protection and archiving can be unclear for organizations, newsrooms and public-service channels.
+
+The product lesson is not "people should stop using WhatsApp". The lesson is:
+
+> When one closed messenger becomes the default, important communication features that do not fit its model can disappear from everyday awareness.
+
+TabMessenger should therefore make live text, verified channels and accessible conversation feel normal again.
+
 ## Dutch Official Route: 112NL
 
 In the Netherlands, the official 112NL app exists for people who need help reaching the emergency room when calling is difficult.
