@@ -25,6 +25,12 @@ Expected test ending:
 All RTT tests passed.
 ```
 
+These tests exercise the shared `Tiedragon.XmppMessenger.Core` library. The
+same library is used by the WinForms demo, AI bot console, fake XMPP server
+smoke path and real-server smoke tool. That means the server checks below are
+not separate sample scripts; they validate the library's XMPP stream, TLS/SASL,
+resource binding, registration, roster and message code.
+
 ## Run The Web Chat Demo
 
 Start the PHP relay:
@@ -153,6 +159,15 @@ C:\wamp64\bin\teletyptel\RealServerSmoke\Tiedragon.XmppMessenger.RealServerSmoke
   --cert-sha256 <printed fingerprint>
 ```
 
+This WAMP binary smoke runs `Tiedragon.XmppMessenger.RealServerSmoke`, which
+uses the compiled `Tiedragon.XmppMessenger.Core` library from the published
+output. The expected result is the same as the source-tree command below:
+
+```text
+PASS TLS certificate accepted for configured host.
+PASS Two-account chat message delivered.
+```
+
 ## Run The STARTTLS Fake XMPP Server
 
 Start the local protocol harness:
@@ -186,6 +201,11 @@ PASS Registration accepted for edward@localhost.
 PASS Registration accepted for anna@localhost.
 PASS Two-account chat message delivered.
 ```
+
+This is the main local server validation. `FakeServer` supplies the controlled
+STARTTLS/XMPP endpoint; `RealServerSmoke` connects through the real client
+library and proves that the client can register accounts, negotiate TLS/SASL,
+bind a resource and deliver a normal chat message between two accounts.
 
 ## Optional MySQL Account Profile
 

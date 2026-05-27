@@ -57,6 +57,10 @@ cloud_notify
 Use the real-server smoke tool when a Prosody/Openfire profile and two accounts
 are available:
 
+`Tiedragon.XmppMessenger.RealServerSmoke` is intentionally built on top of the
+same `Tiedragon.XmppMessenger.Core` library that applications use. A passing
+smoke therefore validates the library behavior, not only the command-line tool.
+
 TLS and hostname-only smoke:
 
 ```powershell
