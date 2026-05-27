@@ -264,4 +264,6 @@ The repository has fake-server tests for stream negotiation, SASL, bind, roster,
 presence, normal chat, stream management, RTT and MUC. The real-server smoke
 tool can now exercise the same MUC discovery/join/groupchat path against
 Prosody, ejabberd, Openfire or another standards-compliant server when test
-accounts and a conference service are available.
+accounts and a conference service are available. The final interoperability
+checkbox remains open until that command has been run against a real Prosody or
+ejabberd instance and its output has been recorded here.
