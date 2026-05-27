@@ -57,6 +57,7 @@
     xmppSocket: null,
     account: null,
     provider: null,
+    clientInstance: loadClientInstance(),
     activeTabId: "chat",
     sequence: 0,
     previousText: "",
@@ -158,6 +159,39 @@
     return window.matchMedia?.("(prefers-color-scheme: light)").matches ? "light" : "dark";
   }
 
+  function loadClientInstance() {
+    const key = "teletyptel.clientInstance";
+    const saved = sessionStorage.getItem(key);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed.id === "string" && parsed.id) {
+          return parsed;
+        }
+      } catch {
+        sessionStorage.removeItem(key);
+      }
+    }
+
+    const id = createShortId();
+    const instance = {
+      id,
+      resourceSuffix: id.slice(0, 6)
+    };
+    sessionStorage.setItem(key, JSON.stringify(instance));
+    return instance;
+  }
+
+  function createShortId() {
+    const bytes = new Uint8Array(8);
+    if (globalThis.crypto?.getRandomValues) {
+      globalThis.crypto.getRandomValues(bytes);
+      return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+    }
+
+    return Math.random().toString(16).slice(2, 10) + Date.now().toString(16).slice(-6);
+  }
+
   function toggleTheme() {
     applyTheme(state.theme === "dark" ? "light" : "dark");
   }
@@ -212,7 +246,7 @@
 
   function applyAccountProfile(account) {
     el.displayNameInput.value = account.displayName ?? el.displayNameInput.value;
-    el.jidInput.value = account.jid ?? el.jidInput.value;
+    el.jidInput.value = createUniqueJid(account.jid ?? el.jidInput.value);
     el.peerInput.value = account.peer ?? el.peerInput.value;
     el.phoneInput.value = account.phoneNumber ?? "";
     el.providerInput.value = account.providerId ?? "";
@@ -546,6 +580,7 @@
       type,
       text,
       xml,
+      clientId: state.clientInstance.id,
       from: currentFromJid(),
       to: currentToJid()
     };
@@ -575,7 +610,7 @@
     }
 
     const bare = jid.split("/")[0];
-    if (jid === currentFromJid() || bare === currentFromJid().split("/")[0]) {
+    if (jid === currentFromJid()) {
       return currentSenderName();
     }
 
@@ -583,7 +618,9 @@
       return "AI agent";
     }
 
-    return bare.split("@")[0] || jid;
+    const local = bare.split("@")[0] || jid;
+    const resource = jid.includes("/") ? jid.split("/").slice(1).join("/") : "";
+    return resource ? `${local}/${resource}` : local;
   }
 
   function applyRelayEnvelope(envelope) {
@@ -592,6 +629,11 @@
     }
 
     appendDebug("relay-in", envelope.type === "rtt" ? envelope.xml : JSON.stringify(envelope));
+
+    if (envelope.clientId && envelope.clientId === state.clientInstance.id) {
+      appendDebug("relay-skip", "Ignored own echoed envelope");
+      return;
+    }
 
     if (envelope.type === "message") {
       state.remoteText = "";
@@ -610,7 +652,7 @@
   function addMessage(direction, text, status, from = null) {
     const conversation = activeConversation();
     conversation.messages.push({
-      id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
+      id: globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : String(Date.now() + Math.random()),
       direction,
       from,
       text,
@@ -810,6 +852,26 @@
 
   function createMessageStanza(text) {
     return `<message xmlns="jabber:client" type="chat" from="${escapeXml(el.jidInput.value)}" to="${escapeXml(el.peerInput.value)}"><body>${escapeXml(text)}</body></message>`;
+  }
+
+  function createUniqueJid(jid) {
+    const value = String(jid ?? "").trim();
+    if (!value) {
+      return `guest@localhost/web-${state.clientInstance.resourceSuffix}`;
+    }
+
+    const slash = value.indexOf("/");
+    if (slash < 0) {
+      return `${value}/web-${state.clientInstance.resourceSuffix}`;
+    }
+
+    const bare = value.slice(0, slash);
+    const resource = value.slice(slash + 1) || "web";
+    if (resource.endsWith(`-${state.clientInstance.resourceSuffix}`)) {
+      return value;
+    }
+
+    return `${bare}/${resource}-${state.clientInstance.resourceSuffix}`;
   }
 
   function domainFromJid(jid) {
