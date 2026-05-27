@@ -33,6 +33,27 @@ resource binding, registration, roster and message code.
 
 ## Build The Release Zip
 
+Package requirements:
+
+- Windows PowerShell 5.1 or PowerShell 7;
+- .NET 10 SDK on the build machine;
+- repository checkout with `php`, `docs`, `samples`, `tools` and `src`;
+- internet access for NuGet restore the first time, unless packages are already
+  restored locally;
+- no WAMP installation is required to create the zip.
+
+The zip recipe uses these source folders:
+
+- `php/public` for browser HTML, CSS, JavaScript, language files and smileys;
+- `php/lib` for PHP server-side helper code;
+- `php/rtt-websocket-server.php` for the local relay;
+- `php/schema.sql` and `php/config.example.php` for MySQL setup;
+- `tools/Tiedragon.XmppMessenger.FakeServer`;
+- `tools/Tiedragon.XmppMessenger.RealServerSmoke`;
+- `samples/Tiedragon.XmppMessenger.AiBotConsole`;
+- `samples/Tiedragon.XmppMessenger.WebSocketConsole`;
+- root documentation and release notes.
+
 Create the WAMP-ready zip with:
 
 ```powershell
@@ -52,6 +73,27 @@ The zip is written to:
 ```text
 artifacts\teletyptel-0.1.0-alpha1-web-demo.zip
 ```
+
+After extracting the zip, the target machine needs:
+
+- WAMP or another Apache/PHP/MySQL stack for `wamp\www\teletyptel`;
+- PHP 8.1 or newer for the WebSocket relay;
+- a browser for `public/chat.html`;
+- .NET runtime 10 for the published tools under `wamp\bin\teletyptel`, unless
+  the package is rebuilt later as self-contained.
+
+The package script fails when required files are missing. In particular it
+checks for `lib\Database.php`, `public\api\account.php`, the relay script and
+the published `.exe`/`.dll` files for the smoke tools.
+
+Optional parameters:
+
+```powershell
+.\scripts\package-alpha1.ps1 -Version 0.1.0-alpha1 -Configuration Release
+```
+
+Use `-Configuration Debug` only for local developer diagnostics, not public
+release assets.
 
 ## Run The Web Chat Demo
 

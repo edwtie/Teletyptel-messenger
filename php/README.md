@@ -74,9 +74,11 @@ The release zip is generated from the repository root with:
 .\scripts\package-alpha1.ps1
 ```
 
-That script includes `public`, `lib`, `schema.sql`, `config.example.php`, the
-relay server and the published .NET test tools under a WAMP-style folder
-layout.
+That script needs PowerShell and the .NET 10 SDK on the build machine. It
+includes `public`, `lib`, `schema.sql`, `config.example.php`, the relay server
+and the published .NET test tools under a WAMP-style folder layout. The target
+machine needs WAMP or another Apache/PHP/MySQL stack, PHP 8.1 or newer for the
+relay and .NET runtime 10 for the published smoke tools.
 
 The fuller web chat client lives at:
 

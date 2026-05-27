@@ -3,6 +3,17 @@ param(
     [string]$Configuration = "Release"
 )
 
+# Requirements:
+# - Windows PowerShell 5.1 or PowerShell 7.
+# - .NET 10 SDK for dotnet publish.
+# - Repository checkout with php, docs, samples, tools and src.
+# - NuGet packages restored locally, or internet access for first restore.
+#
+# Output:
+# - artifacts/teletyptel-<version>-web-demo.zip
+# - WAMP-style layout with web/PHP files under wamp/www/teletyptel and
+#   published .NET smoke tools under wamp/bin/teletyptel.
+
 $ErrorActionPreference = "Stop"
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
