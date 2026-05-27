@@ -163,7 +163,7 @@
     state.theme = theme === "light" ? "light" : "dark";
     document.body.dataset.theme = state.theme;
     localStorage.setItem("teletyptel.theme", state.theme);
-    el.themeButton.textContent = state.theme === "dark" ? "Light" : "Dark";
+    el.themeButton.textContent = state.theme === "dark" ? "Theme: Light" : "Theme: Dark";
     el.themeButton.setAttribute(
       "aria-label",
       state.theme === "dark" ? "Switch to light mode" : "Switch to dark mode");

@@ -1,4 +1,4 @@
-const CACHE_NAME = "tiedragon-xmpp-webclient-v2";
+const CACHE_NAME = "tiedragon-xmpp-webclient-v3";
 const ASSETS = [
   "chat.html",
   "chat-client.css",
@@ -9,6 +9,7 @@ const ASSETS = [
 ];
 
 self.addEventListener("install", (event) => {
+  self.skipWaiting();
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS)));
 });
 
@@ -18,6 +19,7 @@ self.addEventListener("activate", (event) => {
       keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
     ))
   );
+  event.waitUntil(self.clients.claim());
 });
 
 self.addEventListener("fetch", (event) => {

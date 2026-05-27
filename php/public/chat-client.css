@@ -57,6 +57,11 @@ button:disabled {
   opacity: .45;
 }
 
+.theme-button {
+  min-width: 112px;
+  font-weight: 700;
+}
+
 input,
 textarea {
   width: 100%;
