@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="1040" viewBox="0 0 1400 1040" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="1160" viewBox="0 0 1400 1160" role="img" aria-labelledby="title desc">
   <title id="title">Tiedragon Teletyptel 2.0 architecture</title>
-  <desc id="desc">Light architecture diagram showing clients, web application, PHP edge services, storage, protocol core and future production services.</desc>
+  <desc id="desc">Light architecture diagram showing clients, web application, PHP edge services, storage, protocol core, XMPP extensions and future production services.</desc>
   <defs>
     <style>
       .bg { fill: #f7f9fc; }
@@ -31,23 +31,25 @@
     </marker>
   </defs>
 
-  <rect class="bg" x="0" y="0" width="1400" height="1040" />
+  <rect class="bg" x="0" y="0" width="1400" height="1160" />
   <text class="title" x="50" y="58">Tiedragon Teletyptel 2.0 Architecture</text>
-  <text class="subtitle" x="52" y="86">Open XMPP messenger with XEP-0301 real-time text, web/mobile UI, PHP relay/API, MySQL account profiles and .lng localization.</text>
+  <text class="subtitle" x="52" y="86">Open XMPP messenger with RFC 6120/6121 core, XMPP extensions, web/mobile UI, PHP relay/API, MySQL account profiles and .lng localization.</text>
 
   <rect class="lane" x="42" y="112" width="1316" height="130" />
   <rect class="lane" x="42" y="264" width="1316" height="178" />
   <rect class="lane" x="42" y="464" width="1316" height="164" />
   <rect class="lane" x="42" y="650" width="1316" height="138" />
-  <rect class="lane" x="42" y="810" width="1316" height="118" />
-  <rect class="lane" x="42" y="950" width="1316" height="58" />
+  <rect class="lane" x="42" y="810" width="1316" height="142" />
+  <rect class="lane" x="42" y="974" width="1316" height="118" />
+  <rect class="lane" x="42" y="1114" width="1316" height="34" />
 
   <text class="lane-title" x="62" y="138">CLIENTS</text>
   <text class="lane-title" x="62" y="290">WEB APPLICATION</text>
   <text class="lane-title" x="62" y="490">PHP EDGE LAYER</text>
   <text class="lane-title" x="62" y="676">CORE LIBRARIES AND PROTOCOL</text>
-  <text class="lane-title" x="62" y="836">FUTURE PRODUCTION SERVICES</text>
-  <text class="lane-title" x="62" y="976">LEGEND</text>
+  <text class="lane-title" x="62" y="836">XMPP EXTENSIONS</text>
+  <text class="lane-title" x="62" y="1000">FUTURE PRODUCTION SERVICES</text>
+  <text class="lane-title" x="62" y="1136">LEGEND</text>
 
   <g id="clients">
     <rect class="box blue" x="78" y="154" width="250" height="66" />
@@ -113,8 +115,8 @@
     <text class="small" x="102" y="755">RFC 6120/6121, JID, stanzas</text>
 
     <rect class="box green" x="425" y="704" width="295" height="58" />
-    <text class="label" x="449" y="735">XEP-0301 RTT Engine</text>
-    <text class="small" x="449" y="755">RttPacket, composer, deltas, sync</text>
+    <text class="label" x="449" y="735">Extension Engine</text>
+    <text class="small" x="449" y="755">XEP modules, RTT, receipts, state</text>
 
     <rect class="box gold" x="772" y="704" width="250" height="58" />
     <text class="label" x="796" y="735">LngPdk Direction</text>
@@ -125,18 +127,44 @@
     <text class="small" x="1098" y="755">smoke, validators, demos</text>
   </g>
 
+  <g id="extensions">
+    <rect class="box green" x="78" y="858" width="190" height="58" />
+    <text class="label" x="98" y="884">XEP-0301</text>
+    <text class="small" x="98" y="904">Real-time text</text>
+
+    <rect class="box blue" x="298" y="858" width="190" height="58" />
+    <text class="label" x="318" y="884">XEP-0085</text>
+    <text class="small" x="318" y="904">Chat states</text>
+
+    <rect class="box blue" x="518" y="858" width="190" height="58" />
+    <text class="label" x="538" y="884">XEP-0184</text>
+    <text class="small" x="538" y="904">Delivery receipts</text>
+
+    <rect class="box gold" x="738" y="858" width="190" height="58" />
+    <text class="label" x="758" y="884">XEP-0198</text>
+    <text class="small" x="758" y="904">Stream management</text>
+
+    <rect class="box gold" x="958" y="858" width="160" height="58" />
+    <text class="label" x="978" y="884">XEP-0313</text>
+    <text class="small" x="978" y="904">MAM history</text>
+
+    <rect class="box violet" x="1148" y="858" width="150" height="58" />
+    <text class="label" x="1168" y="884">More XEPs</text>
+    <text class="small" x="1168" y="904">MUC, upload, OMEMO</text>
+  </g>
+
   <g id="future">
-    <rect class="box violet" x="78" y="862" width="255" height="42" />
-    <text class="label" x="102" y="890">Prosody / ejabberd</text>
+    <rect class="box violet" x="78" y="1026" width="255" height="42" />
+    <text class="label" x="102" y="1054">Prosody / ejabberd</text>
 
-    <rect class="box violet" x="387" y="862" width="255" height="42" />
-    <text class="label" x="411" y="890">XMPP Federation</text>
+    <rect class="box violet" x="387" y="1026" width="255" height="42" />
+    <text class="label" x="411" y="1054">XMPP Federation</text>
 
-    <rect class="box violet" x="696" y="862" width="255" height="42" />
-    <text class="label" x="720" y="890">WebRTC / Jingle</text>
+    <rect class="box violet" x="696" y="1026" width="255" height="42" />
+    <text class="label" x="720" y="1054">WebRTC / Jingle</text>
 
-    <rect class="box violet" x="1005" y="862" width="294" height="42" />
-    <text class="label" x="1029" y="890">Provider Tabs / Services</text>
+    <rect class="box violet" x="1005" y="1026" width="294" height="42" />
+    <text class="label" x="1029" y="1054">Provider Tabs / Services</text>
   </g>
 
   <path class="arrow" d="M203 220 L203 315" />
@@ -154,16 +182,23 @@
   <path class="arrow" d="M226 596 C310 644 468 661 572 704" />
   <path class="arrow-soft" d="M560 596 C650 645 795 658 897 704" />
 
-  <path class="arrow-soft" d="M226 762 L206 862" />
-  <path class="arrow-soft" d="M572 762 L515 862" />
-  <path class="arrow-soft" d="M897 762 L824 862" />
-  <path class="arrow-soft" d="M1186 762 L1152 862" />
+  <path class="arrow" d="M572 762 L173 858" />
+  <path class="arrow" d="M572 762 L393 858" />
+  <path class="arrow" d="M572 762 L613 858" />
+  <path class="arrow" d="M572 762 L833 858" />
+  <path class="arrow-soft" d="M572 762 L1038 858" />
+  <path class="arrow-soft" d="M572 762 L1223 858" />
+
+  <path class="arrow-soft" d="M226 762 L206 1026" />
+  <path class="arrow-soft" d="M572 916 L515 1026" />
+  <path class="arrow-soft" d="M1223 916 L824 1026" />
+  <path class="arrow-soft" d="M1186 762 L1152 1026" />
 
   <g id="legend">
-    <rect class="badge" x="92" y="984" width="74" height="22" />
-    <text class="badge-text" x="112" y="1000">NOW</text>
-    <text class="hint" x="184" y="1000">Solid arrows show the current local demo flow.</text>
-    <line class="arrow-soft" x1="520" y1="994" x2="610" y2="994" />
-    <text class="hint" x="630" y="1000">Dashed arrows show planned production and packaging paths.</text>
+    <rect class="badge" x="92" y="1124" width="74" height="18" />
+    <text class="badge-text" x="112" y="1138">NOW</text>
+    <text class="hint" x="184" y="1138">Solid arrows show the current local demo flow and implemented extension direction.</text>
+    <line class="arrow-soft" x1="650" y1="1132" x2="740" y2="1132" />
+    <text class="hint" x="760" y="1138">Dashed arrows show planned production and packaging paths.</text>
   </g>
 </svg>
