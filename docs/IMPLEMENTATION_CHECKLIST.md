@@ -188,9 +188,9 @@ item is implemented, tested and documented.
 - [x] Groupchat message parser.
 - [x] Direct invitation serializer.
 - [x] `XmppStreamClient` join helper.
-- [ ] Room discovery/items helper.
-- [ ] Room configuration forms.
-- [ ] Moderation/admin flows.
+- [x] Room discovery/items helper.
+- [x] Room configuration forms.
+- [x] Moderation/admin flows.
 - [ ] Interoperability smoke with Prosody/ejabberd MUC.
 
 ## XEP-0363 - HTTP File Upload

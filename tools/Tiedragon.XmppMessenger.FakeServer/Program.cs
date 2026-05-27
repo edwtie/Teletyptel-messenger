@@ -273,6 +273,7 @@ sealed class FakeXmppSession(TcpClient client, FakeXmppServerState state)
 
         var id = (string?)element.Attribute("id") ?? string.Empty;
         var type = (string?)element.Attribute("type") ?? string.Empty;
+        var to = (string?)element.Attribute("to") ?? string.Empty;
         var payload = element.Elements().SingleOrDefault();
 
         if (payload?.Name == XName.Get("query", "jabber:iq:register"))
@@ -330,6 +331,82 @@ sealed class FakeXmppSession(TcpClient client, FakeXmppServerState state)
                 </iq>
                 """, cancellationToken);
             return;
+        }
+
+        if (payload?.Name == XName.Get("query", "http://jabber.org/protocol/disco#items") && type == "get")
+        {
+            if (to.Contains("@conference.", StringComparison.OrdinalIgnoreCase))
+            {
+                await WriteAsync($"""
+                    <iq xmlns="jabber:client" type="result" id="{Escape(id)}">
+                      <query xmlns="http://jabber.org/protocol/disco#items">
+                        <item jid="{Escape(to)}/Edward" name="Edward"/>
+                        <item jid="{Escape(to)}/Anna" name="Anna"/>
+                      </query>
+                    </iq>
+                    """, cancellationToken);
+                return;
+            }
+
+            await WriteAsync($"""
+                <iq xmlns="jabber:client" type="result" id="{Escape(id)}">
+                  <query xmlns="http://jabber.org/protocol/disco#items">
+                    <item jid="team@conference.{Escape(state.Domain)}" name="Team room"/>
+                    <item jid="support@conference.{Escape(state.Domain)}" name="Support"/>
+                  </query>
+                </iq>
+                """, cancellationToken);
+            return;
+        }
+
+        if (payload?.Name == XName.Get("query", "http://jabber.org/protocol/muc#owner"))
+        {
+            if (type == "get")
+            {
+                await WriteAsync($"""
+                    <iq xmlns="jabber:client" type="result" id="{Escape(id)}">
+                      <query xmlns="http://jabber.org/protocol/muc#owner">
+                        <x xmlns="jabber:x:data" type="form">
+                          <field var="FORM_TYPE" type="hidden">
+                            <value>http://jabber.org/protocol/muc#roomconfig</value>
+                          </field>
+                          <field var="muc#roomconfig_roomname">
+                            <value>Team room</value>
+                          </field>
+                        </x>
+                      </query>
+                    </iq>
+                    """, cancellationToken);
+                return;
+            }
+
+            if (type == "set")
+            {
+                await WriteAsync($"<iq xmlns=\"jabber:client\" type=\"result\" id=\"{Escape(id)}\"/>", cancellationToken);
+                return;
+            }
+        }
+
+        if (payload?.Name == XName.Get("query", "http://jabber.org/protocol/muc#admin"))
+        {
+            if (type == "get")
+            {
+                await WriteAsync($"""
+                    <iq xmlns="jabber:client" type="result" id="{Escape(id)}">
+                      <query xmlns="http://jabber.org/protocol/muc#admin">
+                        <item affiliation="member" jid="anna@{Escape(state.Domain)}" nick="Anna"/>
+                        <item affiliation="owner" jid="edward@{Escape(state.Domain)}" nick="Edward"/>
+                      </query>
+                    </iq>
+                    """, cancellationToken);
+                return;
+            }
+
+            if (type == "set")
+            {
+                await WriteAsync($"<iq xmlns=\"jabber:client\" type=\"result\" id=\"{Escape(id)}\"/>", cancellationToken);
+                return;
+            }
         }
 
         if (payload?.Name == XName.Get("request", "urn:xmpp:http:upload:0") && type == "get")

@@ -409,6 +409,29 @@ public sealed class XmppStreamClient : IAsyncDisposable
             result.Payload);
     }
 
+    public async Task<XmppServiceDiscoveryItems> RequestServiceDiscoveryItemsAsync(
+        XmppAddress? to,
+        TimeSpan timeout,
+        string? node = null,
+        string id = "disco-items-1",
+        CancellationToken cancellationToken = default)
+    {
+        var result = await SendIqAndWaitAsync(
+            XmppServiceDiscovery.CreateItemsRequest(id, to, node),
+            timeout,
+            cancellationToken).ConfigureAwait(false);
+
+        if (XmppServiceDiscovery.TryParseItemsResult(result, out var items) && items is not null)
+        {
+            return items;
+        }
+
+        throw new XmppProtocolException(
+            XmppProtocolErrorKind.IqError,
+            "The service discovery response was not a valid disco#items result.",
+            result.Payload);
+    }
+
     public async Task<XmppRegistrationInfo> RequestRegistrationInfoAsync(
         XmppAddress? to,
         TimeSpan timeout,
@@ -527,6 +550,122 @@ public sealed class XmppStreamClient : IAsyncDisposable
     {
         return SendElementAsync(
             XmppMultiUserChat.CreateJoinPresence(room, nickname, password, historyMaxChars),
+            cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<XmppMucRoom>> RequestMultiUserChatRoomsAsync(
+        XmppAddress service,
+        TimeSpan timeout,
+        string id = "muc-rooms-1",
+        CancellationToken cancellationToken = default)
+    {
+        var result = await SendIqAndWaitAsync(
+            XmppMultiUserChat.CreateRoomDiscoveryRequest(id, service),
+            timeout,
+            cancellationToken).ConfigureAwait(false);
+
+        if (XmppMultiUserChat.TryParseRoomDiscoveryResult(result, out var rooms) && rooms is not null)
+        {
+            return rooms;
+        }
+
+        throw new XmppProtocolException(
+            XmppProtocolErrorKind.IqError,
+            "The MUC room discovery response was not a valid disco#items result.",
+            result.Payload);
+    }
+
+    public async Task<IReadOnlyList<XmppMucRoomItem>> RequestMultiUserChatRoomItemsAsync(
+        XmppAddress room,
+        TimeSpan timeout,
+        string id = "muc-room-items-1",
+        CancellationToken cancellationToken = default)
+    {
+        var result = await SendIqAndWaitAsync(
+            XmppMultiUserChat.CreateRoomItemsRequest(id, room),
+            timeout,
+            cancellationToken).ConfigureAwait(false);
+
+        if (XmppMultiUserChat.TryParseRoomItemsResult(result, out var items) && items is not null)
+        {
+            return items;
+        }
+
+        throw new XmppProtocolException(
+            XmppProtocolErrorKind.IqError,
+            "The MUC room items response was not a valid disco#items result.",
+            result.Payload);
+    }
+
+    public async Task<XmppDataForm> RequestMultiUserChatConfigurationFormAsync(
+        XmppAddress room,
+        TimeSpan timeout,
+        string id = "muc-config-1",
+        CancellationToken cancellationToken = default)
+    {
+        var result = await SendIqAndWaitAsync(
+            XmppMultiUserChat.CreateConfigurationFormRequest(id, room),
+            timeout,
+            cancellationToken).ConfigureAwait(false);
+
+        if (XmppMultiUserChat.TryParseConfigurationForm(result, out var form) && form is not null)
+        {
+            return form;
+        }
+
+        throw new XmppProtocolException(
+            XmppProtocolErrorKind.IqError,
+            "The MUC configuration response was not a valid owner data form.",
+            result.Payload);
+    }
+
+    public Task SubmitMultiUserChatConfigurationAsync(
+        XmppAddress room,
+        IEnumerable<XmppDataFormSubmitField> fields,
+        TimeSpan timeout,
+        string id = "muc-config-submit-1",
+        CancellationToken cancellationToken = default)
+    {
+        return SendIqAndWaitAsync(
+            XmppMultiUserChat.CreateConfigurationSubmitRequest(id, room, fields),
+            timeout,
+            cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<XmppMucAdminItem>> RequestMultiUserChatAdminItemsAsync(
+        XmppAddress room,
+        TimeSpan timeout,
+        string? affiliation = null,
+        string? role = null,
+        string id = "muc-admin-1",
+        CancellationToken cancellationToken = default)
+    {
+        var result = await SendIqAndWaitAsync(
+            XmppMultiUserChat.CreateAdminListRequest(id, room, affiliation, role),
+            timeout,
+            cancellationToken).ConfigureAwait(false);
+
+        if (XmppMultiUserChat.TryParseAdminItemsResult(result, out var items) && items is not null)
+        {
+            return items;
+        }
+
+        throw new XmppProtocolException(
+            XmppProtocolErrorKind.IqError,
+            "The MUC admin response was not a valid admin item list.",
+            result.Payload);
+    }
+
+    public Task SetMultiUserChatAdminItemsAsync(
+        XmppAddress room,
+        IEnumerable<XmppMucAdminItem> items,
+        TimeSpan timeout,
+        string id = "muc-admin-set-1",
+        CancellationToken cancellationToken = default)
+    {
+        return SendIqAndWaitAsync(
+            XmppMultiUserChat.CreateAdminSetRequest(id, room, items),
+            timeout,
             cancellationToken);
     }
 

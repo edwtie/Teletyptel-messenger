@@ -4,8 +4,9 @@
 
 ### Added
 
-- XEP-0045 Multi-User Chat helpers for room join/leave presence, groupchat
-  messages and direct invitations.
+- XEP-0045 Multi-User Chat helpers for room discovery, room items,
+  join/leave presence, groupchat messages, direct invitations, room
+  configuration forms and admin role/affiliation flows.
 - XEP-0363 HTTP File Upload support for slot requests, HTTPS slot parsing,
   PUT execution, allowed-header filtering, server `max-file-size` discovery and
   OOB message-link creation.

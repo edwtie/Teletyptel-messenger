@@ -77,6 +77,19 @@ Real-server setup guide:
 | XEP-0352 | Client state indication. |
 | XEP-0363 | HTTP file upload. |
 
+## XEP-0045 Multi-User Chat
+
+Teletyptel implements the MUC client helper layer in separable pieces:
+
+1. Discover available rooms from a conference service with XEP-0030 `disco#items`.
+2. Discover room occupants/items with `disco#items` on the room JID.
+3. Join and leave rooms with MUC presence.
+4. Send and parse `groupchat` messages.
+5. Request, parse, submit or cancel owner room-configuration data forms.
+6. Request or set admin items for affiliation and role flows such as member lists, bans and kicks.
+
+The fake XMPP server returns sample room discovery, room items, configuration form and admin list responses for smoke testing. Real Prosody/ejabberd interoperability is tracked separately because permission models and enabled modules differ per deployment.
+
 ## XEP-0363 HTTP File Upload
 
 Teletyptel implements the client side in the same sequence as the standard:

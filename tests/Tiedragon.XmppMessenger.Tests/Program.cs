@@ -111,6 +111,9 @@ var tests = new (string Name, Action Test)[]
     ("XMPP message archive parses forwarded result", XmppMessageArchiveParsesForwardedResult),
     ("XMPP message archive parses fin result set", XmppMessageArchiveParsesFinResultSet),
     ("XMPP multi-user chat serializes join and group message", XmppMultiUserChatSerializesJoinAndGroupMessage),
+    ("XMPP multi-user chat discovers rooms and items", XmppMultiUserChatDiscoversRoomsAndItems),
+    ("XMPP multi-user chat handles configuration forms", XmppMultiUserChatHandlesConfigurationForms),
+    ("XMPP multi-user chat handles admin items", XmppMultiUserChatHandlesAdminItems),
     ("XMPP HTTP file upload serializes request and parses slot", XmppHttpFileUploadSerializesRequestAndParsesSlot),
     ("XMPP HTTP file upload discovers max file size", XmppHttpFileUploadDiscoversMaxFileSize),
     ("XMPP HTTP file upload executes PUT", XmppHttpFileUploadExecutesPut),
@@ -2912,6 +2915,126 @@ static void XmppMultiUserChatSerializesJoinAndGroupMessage()
     Equal("team@conference.example.org", parsed!.Room!.Bare);
     Equal("Anna", parsed.Nickname);
     Equal("Hoi", parsed.Body);
+}
+
+static void XmppMultiUserChatDiscoversRoomsAndItems()
+{
+    var service = XmppAddress.Parse("conference.example.org");
+    var room = XmppAddress.Parse("team@conference.example.org");
+    var discoveryRequest = XmppMultiUserChat.CreateRoomDiscoveryRequest("muc-rooms-1", service).ToXml();
+    Equal("get", discoveryRequest.Attribute("type")?.Value);
+    Equal("conference.example.org", discoveryRequest.Attribute("to")?.Value);
+    Equal(XmppServiceDiscovery.ItemsNamespace, discoveryRequest.Elements().Single().Name.NamespaceName);
+
+    True(XmppIq.TryParse("""
+        <iq xmlns="jabber:client" type="result" id="muc-rooms-1">
+          <query xmlns="http://jabber.org/protocol/disco#items">
+            <item jid="team@conference.example.org" name="Team room"/>
+            <item jid="support@conference.example.org" name="Support"/>
+          </query>
+        </iq>
+        """, out var roomsIq));
+    True(XmppMultiUserChat.TryParseRoomDiscoveryResult(roomsIq!, out var rooms));
+    Equal(2, rooms!.Count);
+    Equal("team@conference.example.org", rooms[0].Jid.Bare);
+    Equal("Team room", rooms[0].Name);
+
+    var itemsRequest = XmppMultiUserChat.CreateRoomItemsRequest("muc-items-1", room).ToXml();
+    Equal("team@conference.example.org", itemsRequest.Attribute("to")?.Value);
+    True(XmppIq.TryParse("""
+        <iq xmlns="jabber:client" type="result" id="muc-items-1">
+          <query xmlns="http://jabber.org/protocol/disco#items">
+            <item jid="team@conference.example.org/Edward" name="Edward"/>
+            <item jid="team@conference.example.org/Anna" name="Anna"/>
+          </query>
+        </iq>
+        """, out var itemsIq));
+    True(XmppMultiUserChat.TryParseRoomItemsResult(itemsIq!, out var items));
+    Equal(2, items!.Count);
+    Equal("team@conference.example.org/Edward", items[0].Jid!.Full);
+}
+
+static void XmppMultiUserChatHandlesConfigurationForms()
+{
+    var room = XmppAddress.Parse("team@conference.example.org");
+    var request = XmppMultiUserChat.CreateConfigurationFormRequest("config-1", room).ToXml();
+    Equal("get", request.Attribute("type")?.Value);
+    Equal("team@conference.example.org", request.Attribute("to")?.Value);
+    Equal(XmppMultiUserChat.OwnerNamespaceName, request.Elements().Single().Name.NamespaceName);
+
+    True(XmppIq.TryParse("""
+        <iq xmlns="jabber:client" type="result" id="config-1">
+          <query xmlns="http://jabber.org/protocol/muc#owner">
+            <x xmlns="jabber:x:data" type="form">
+              <field var="FORM_TYPE" type="hidden">
+                <value>http://jabber.org/protocol/muc#roomconfig</value>
+              </field>
+              <field var="muc#roomconfig_roomname">
+                <value>Team room</value>
+              </field>
+            </x>
+          </query>
+        </iq>
+        """, out var formIq));
+    True(XmppMultiUserChat.TryParseConfigurationForm(formIq!, out var form));
+    Equal("form", form!.Type);
+    Equal("http://jabber.org/protocol/muc#roomconfig", form.FormType);
+    Equal("Team room", form.GetFirstValue("muc#roomconfig_roomname"));
+
+    var submit = XmppMultiUserChat.CreateConfigurationSubmitRequest(
+        "config-submit-1",
+        room,
+        [
+            new XmppDataFormSubmitField("FORM_TYPE", ["http://jabber.org/protocol/muc#roomconfig"]),
+            new XmppDataFormSubmitField("muc#roomconfig_roomname", ["Team room"])
+        ]).ToXml().ToString(SaveOptions.DisableFormatting);
+    True(submit.Contains("type=\"submit\"", StringComparison.Ordinal));
+    True(submit.Contains("muc#roomconfig_roomname", StringComparison.Ordinal));
+    True(submit.Contains("Team room", StringComparison.Ordinal));
+
+    var cancel = XmppMultiUserChat.CreateConfigurationCancelRequest("config-cancel-1", room)
+        .ToXml()
+        .ToString(SaveOptions.DisableFormatting);
+    True(cancel.Contains("type=\"cancel\"", StringComparison.Ordinal));
+}
+
+static void XmppMultiUserChatHandlesAdminItems()
+{
+    var room = XmppAddress.Parse("team@conference.example.org");
+    var memberList = XmppMultiUserChat.CreateAdminListRequest("admin-1", room, affiliation: "member")
+        .ToXml()
+        .ToString(SaveOptions.DisableFormatting);
+    True(memberList.Contains("http://jabber.org/protocol/muc#admin", StringComparison.Ordinal));
+    True(memberList.Contains("affiliation=\"member\"", StringComparison.Ordinal));
+
+    var ban = XmppMultiUserChat.CreateBanUserRequest(
+        "ban-1",
+        room,
+        XmppAddress.Parse("bad@example.org"),
+        "Spam").ToXml().ToString(SaveOptions.DisableFormatting);
+    True(ban.Contains("affiliation=\"outcast\"", StringComparison.Ordinal));
+    True(ban.Contains("jid=\"bad@example.org\"", StringComparison.Ordinal));
+    True(ban.Contains("<reason", StringComparison.Ordinal));
+
+    var kick = XmppMultiUserChat.CreateKickOccupantRequest("kick-1", room, "BadNick", "Spam")
+        .ToXml()
+        .ToString(SaveOptions.DisableFormatting);
+    True(kick.Contains("role=\"none\"", StringComparison.Ordinal));
+    True(kick.Contains("nick=\"BadNick\"", StringComparison.Ordinal));
+
+    True(XmppIq.TryParse("""
+        <iq xmlns="jabber:client" type="result" id="admin-1">
+          <query xmlns="http://jabber.org/protocol/muc#admin">
+            <item affiliation="member" jid="anna@example.org" nick="Anna"/>
+            <item affiliation="owner" jid="edward@example.org" nick="Edward"/>
+          </query>
+        </iq>
+        """, out var adminIq));
+    True(XmppMultiUserChat.TryParseAdminItemsResult(adminIq!, out var items));
+    Equal(2, items!.Count);
+    Equal("anna@example.org", items[0].Jid!.Bare);
+    Equal("member", items[0].Affiliation);
+    Equal("Anna", items[0].Nick);
 }
 
 static void XmppHttpFileUploadSerializesRequestAndParsesSlot()

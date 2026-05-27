@@ -6,6 +6,8 @@ public static class XmppServiceDiscovery
 {
     public const string InfoNamespace = "http://jabber.org/protocol/disco#info";
 
+    public const string ItemsNamespace = "http://jabber.org/protocol/disco#items";
+
     public const string DataFormNamespace = "jabber:x:data";
 
     public static bool SupportsRealTimeText(XmppServiceDiscoveryInfo info)
@@ -17,6 +19,17 @@ public static class XmppServiceDiscovery
     public static XmppIq CreateInfoRequest(string id, XmppAddress? to = null, string? node = null)
     {
         var query = new XElement(XName.Get("query", InfoNamespace));
+        if (!string.IsNullOrWhiteSpace(node))
+        {
+            query.SetAttributeValue("node", node);
+        }
+
+        return new XmppIq(XmppIqType.Get, id, query, To: to);
+    }
+
+    public static XmppIq CreateItemsRequest(string id, XmppAddress? to = null, string? node = null)
+    {
+        var query = new XElement(XName.Get("query", ItemsNamespace));
         if (!string.IsNullOrWhiteSpace(node))
         {
             query.SetAttributeValue("node", node);
@@ -63,8 +76,36 @@ public static class XmppServiceDiscovery
         return true;
     }
 
-    private static XmppDataForm ParseDataForm(XElement element)
+    public static bool TryParseItemsResult(XmppIq iq, out XmppServiceDiscoveryItems? items)
     {
+        items = null;
+
+        if (iq.Type != XmppIqType.Result || iq.Payload?.Name != XName.Get("query", ItemsNamespace))
+        {
+            return false;
+        }
+
+        var entries = iq.Payload.Elements(XName.Get("item", ItemsNamespace))
+            .Select(element => new XmppServiceDiscoveryItem(
+                Jid: XmppAddress.TryParse((string?)element.Attribute("jid"), out var jid) && jid is not null ? jid : null,
+                Node: (string?)element.Attribute("node"),
+                Name: (string?)element.Attribute("name")))
+            .Where(item => item.Jid is not null || !string.IsNullOrWhiteSpace(item.Node))
+            .ToArray();
+
+        items = new XmppServiceDiscoveryItems(
+            Node: (string?)iq.Payload.Attribute("node"),
+            Items: entries);
+        return true;
+    }
+
+    public static XmppDataForm ParseDataForm(XElement element)
+    {
+        if (element.Name != XName.Get("x", DataFormNamespace))
+        {
+            throw new ArgumentException("The element is not a jabber:x:data form.", nameof(element));
+        }
+
         var fields = element.Elements(XName.Get("field", DataFormNamespace))
             .Select(field => (
                 Name: (string?)field.Attribute("var"),
@@ -80,6 +121,15 @@ public static class XmppServiceDiscovery
         return new XmppDataForm((string?)element.Attribute("type"), fields);
     }
 }
+
+public sealed record XmppServiceDiscoveryItems(
+    string? Node,
+    IReadOnlyList<XmppServiceDiscoveryItem> Items);
+
+public sealed record XmppServiceDiscoveryItem(
+    XmppAddress? Jid,
+    string? Node = null,
+    string? Name = null);
 
 public sealed record XmppServiceDiscoveryInfo
 {

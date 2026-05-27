@@ -44,8 +44,8 @@ Alpha 1 currently provides:
 - C# XMPP core for JIDs, stream negotiation, TLS/SASL, bind, roster,
   presence, chat, service discovery, stream management, registration,
   receipts, carbons, archive query models and XEP-0301 RTT
-- protocol scaffolding for MUC group chat, HTTP file upload slots, OMEMO wire
-  stanzas and Jingle RTP signaling
+- protocol helpers for MUC room discovery/config/admin, HTTP file upload slots,
+  OMEMO wire stanzas and Jingle RTP signaling
 - local fake XMPP server with mandatory STARTTLS
 - real-server smoke tool for TLS, hostname validation, XEP-0077 and
   two-account chat
@@ -155,8 +155,9 @@ The first XMPP model layer is `Tiedragon.XmppMessenger.Core.Xmpp`:
 - model feature flags such as roster, presence, stream management and RTT
 - serialize first RFC 6120/6121 stanzas: chat messages, presence and roster IQ
 - parse first incoming RFC 6120/6121 stanzas back into typed models
-- create and parse first higher-level XEP stanzas for MUC, HTTP upload, OMEMO
-  device/encrypted wrappers and Jingle session signaling
+- create and parse first higher-level XEP stanzas for MUC room discovery,
+  configuration/admin flows, HTTP upload, OMEMO device/encrypted wrappers and
+  Jingle session signaling
 
 The higher-level XEP helpers are protocol foundations, not finished product
 features yet. OMEMO still needs real key agreement, session storage and payload
