@@ -89,11 +89,19 @@ the published `.exe`/`.dll` files for the smoke tools.
 Optional parameters:
 
 ```powershell
-.\scripts\package-alpha1.ps1 -Version 0.1.0-alpha1 -Configuration Release
+.\scripts\package-alpha1.ps1 -Version 0.1.0-alpha1 -Configuration Release -Target All
 ```
+
+Supported targets:
+
+- `Windows` builds the WAMP layout only;
+- `Linux` builds the Linux x64 layout only;
+- `All` builds both layouts in one zip.
 
 Use `-Configuration Debug` only for local developer diagnostics, not public
 release assets.
+
+Linux setup is documented separately: [Linux Setup](LINUX_SETUP.md).
 
 ## Run The Web Chat Demo
 

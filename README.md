@@ -21,6 +21,7 @@ still using normal platform primitives such as TLS, XML and WebSocket APIs.
 - Alpha 1 release notes: [Release Notes](docs/RELEASE_NOTES_ALPHA1.md)
 - Changelog: [CHANGELOG.md](CHANGELOG.md)
 - Real server and fake server setup: [Real Server Setup](docs/REAL_SERVER_SETUP.md)
+- Linux deployment/setup: [Linux Setup](docs/LINUX_SETUP.md)
 - XSF readiness checklist: [XSF Software Directory Preparation](docs/XSF_SOFTWARE_DIRECTORY.md)
 
 ## Architecture
