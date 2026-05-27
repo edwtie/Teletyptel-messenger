@@ -1,175 +1,169 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="900" viewBox="0 0 1400 900" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="1040" viewBox="0 0 1400 1040" role="img" aria-labelledby="title desc">
   <title id="title">Tiedragon Teletyptel 2.0 architecture</title>
-  <desc id="desc">Architecture diagram showing web, mobile, PHP, MySQL, XMPP core, real-time text, localization and future server integration.</desc>
+  <desc id="desc">Light architecture diagram showing clients, web application, PHP edge services, storage, protocol core and future production services.</desc>
   <defs>
     <style>
       .bg { fill: #f7f9fc; }
-      .title { font: 700 34px "Segoe UI", Arial, sans-serif; fill: #0f2f66; }
-      .subtitle { font: 400 16px "Segoe UI", Arial, sans-serif; fill: #52657a; }
-      .lane-title { font: 700 15px "Segoe UI", Arial, sans-serif; fill: #244669; text-transform: uppercase; letter-spacing: .06em; }
-      .box { fill: #ffffff; stroke: #9fb7d4; stroke-width: 2; rx: 10; }
-      .box-blue { fill: #eaf3ff; stroke: #4c8eda; }
-      .box-green { fill: #eaf8ef; stroke: #32a267; }
-      .box-gold { fill: #fff7df; stroke: #d69b21; }
-      .box-red { fill: #fff0f0; stroke: #d45c5c; }
-      .box-dark { fill: #14345f; stroke: #0b2344; }
-      .box-dark-text { fill: #ffffff; }
+      .title { font: 700 34px "Segoe UI", Arial, sans-serif; fill: #0b326e; }
+      .subtitle { font: 400 16px "Segoe UI", Arial, sans-serif; fill: #42566e; }
+      .lane { fill: #ffffff; stroke: #d3dfed; stroke-width: 1.5; rx: 14; }
+      .lane-title { font: 700 14px "Segoe UI", Arial, sans-serif; fill: #274a73; letter-spacing: .08em; }
+      .box { fill: #ffffff; stroke: #92afd0; stroke-width: 2; rx: 10; }
+      .blue { fill: #eaf4ff; stroke: #3b82d6; }
+      .green { fill: #ebf8f0; stroke: #23a05e; }
+      .gold { fill: #fff7df; stroke: #d69b21; }
+      .red { fill: #fff0f0; stroke: #d45c5c; }
+      .violet { fill: #f2f0ff; stroke: #7268cc; }
       .label { font: 700 18px "Segoe UI", Arial, sans-serif; fill: #10243c; }
-      .small { font: 400 13px "Segoe UI", Arial, sans-serif; fill: #41556b; }
-      .small-strong { font: 700 13px "Segoe UI", Arial, sans-serif; fill: #244669; }
-      .dark-small { font: 400 13px "Segoe UI", Arial, sans-serif; fill: #d9e9ff; }
-      .arrow { stroke: #2f5f9d; stroke-width: 3; fill: none; marker-end: url(#arrowHead); }
-      .arrow-soft { stroke: #7b93b2; stroke-width: 2.5; fill: none; marker-end: url(#arrowHeadSoft); stroke-dasharray: 8 7; }
-      .line { stroke: #cad7e7; stroke-width: 1.5; }
-      .badge { fill: #0f6ecb; rx: 5; }
-      .badge-text { font: 700 12px "Segoe UI", Arial, sans-serif; fill: #ffffff; }
+      .small { font: 400 13px "Segoe UI", Arial, sans-serif; fill: #40556c; }
+      .hint { font: 400 12px "Segoe UI", Arial, sans-serif; fill: #657991; }
+      .arrow { stroke: #2f65a7; stroke-width: 3; fill: none; marker-end: url(#arrowHead); }
+      .arrow-soft { stroke: #7f98b8; stroke-width: 2.5; fill: none; marker-end: url(#arrowHeadSoft); stroke-dasharray: 8 7; }
+      .divider { stroke: #d3dfed; stroke-width: 1.5; }
+      .badge { fill: #e7f1ff; stroke: #3b82d6; stroke-width: 1.5; rx: 7; }
+      .badge-text { font: 700 12px "Segoe UI", Arial, sans-serif; fill: #0b326e; }
     </style>
     <marker id="arrowHead" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
-      <path d="M2,2 L10,6 L2,10 Z" fill="#2f5f9d" />
+      <path d="M2,2 L10,6 L2,10 Z" fill="#2f65a7" />
     </marker>
     <marker id="arrowHeadSoft" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
-      <path d="M2,2 L10,6 L2,10 Z" fill="#7b93b2" />
+      <path d="M2,2 L10,6 L2,10 Z" fill="#7f98b8" />
     </marker>
   </defs>
 
-  <rect class="bg" x="0" y="0" width="1400" height="900" />
+  <rect class="bg" x="0" y="0" width="1400" height="1040" />
   <text class="title" x="50" y="58">Tiedragon Teletyptel 2.0 Architecture</text>
-  <text class="subtitle" x="52" y="88">Open XMPP messenger with XEP-0301 real-time text, web/mobile UI, PHP relay/API, MySQL account profile and .lng localization.</text>
+  <text class="subtitle" x="52" y="86">Open XMPP messenger with XEP-0301 real-time text, web/mobile UI, PHP relay/API, MySQL account profiles and .lng localization.</text>
 
-  <line class="line" x1="50" y1="122" x2="1350" y2="122" />
-  <line class="line" x1="50" y1="258" x2="1350" y2="258" />
-  <line class="line" x1="50" y1="438" x2="1350" y2="438" />
-  <line class="line" x1="50" y1="632" x2="1350" y2="632" />
-  <line class="line" x1="50" y1="788" x2="1350" y2="788" />
+  <rect class="lane" x="42" y="112" width="1316" height="130" />
+  <rect class="lane" x="42" y="264" width="1316" height="178" />
+  <rect class="lane" x="42" y="464" width="1316" height="164" />
+  <rect class="lane" x="42" y="650" width="1316" height="138" />
+  <rect class="lane" x="42" y="810" width="1316" height="118" />
+  <rect class="lane" x="42" y="950" width="1316" height="58" />
 
-  <text class="lane-title" x="54" y="113">Clients</text>
-  <text class="lane-title" x="54" y="249">Web Application</text>
-  <text class="lane-title" x="54" y="429">PHP Edge Layer</text>
-  <text class="lane-title" x="54" y="623">Core Libraries And Protocol</text>
-  <text class="lane-title" x="54" y="779">Future Production Services</text>
+  <text class="lane-title" x="62" y="138">CLIENTS</text>
+  <text class="lane-title" x="62" y="290">WEB APPLICATION</text>
+  <text class="lane-title" x="62" y="490">PHP EDGE LAYER</text>
+  <text class="lane-title" x="62" y="676">CORE LIBRARIES AND PROTOCOL</text>
+  <text class="lane-title" x="62" y="836">FUTURE PRODUCTION SERVICES</text>
+  <text class="lane-title" x="62" y="976">LEGEND</text>
 
   <g id="clients">
-    <rect class="box box-blue" x="92" y="145" width="260" height="78" />
-    <text class="label" x="118" y="177">Desktop Browser</text>
-    <text class="small" x="118" y="199">Local web client on localhost</text>
+    <rect class="box blue" x="78" y="154" width="250" height="66" />
+    <text class="label" x="102" y="183">Desktop Browser</text>
+    <text class="small" x="102" y="205">Local web client on localhost</text>
 
-    <rect class="box box-blue" x="410" y="145" width="260" height="78" />
-    <text class="label" x="436" y="177">Android WebView</text>
-    <text class="small" x="436" y="199">Same web UI packaged later</text>
+    <rect class="box blue" x="390" y="154" width="250" height="66" />
+    <text class="label" x="414" y="183">Android WebView</text>
+    <text class="small" x="414" y="205">Same web UI packaged later</text>
 
-    <rect class="box box-blue" x="728" y="145" width="260" height="78" />
-    <text class="label" x="754" y="177">iOS WebView</text>
-    <text class="small" x="754" y="199">Same web UI packaged later</text>
+    <rect class="box blue" x="702" y="154" width="250" height="66" />
+    <text class="label" x="726" y="183">iOS WebView</text>
+    <text class="small" x="726" y="205">Same web UI packaged later</text>
 
-    <rect class="box box-green" x="1046" y="145" width="260" height="78" />
-    <text class="label" x="1072" y="177">Assistive Input</text>
-    <text class="small" x="1072" y="199">Captions, RTT, future speech/sign</text>
+    <rect class="box green" x="1014" y="154" width="286" height="66" />
+    <text class="label" x="1038" y="183">Assistive Input</text>
+    <text class="small" x="1038" y="205">Captions, RTT, future speech/sign</text>
   </g>
 
   <g id="webapp">
-    <rect class="box box-dark" x="92" y="300" width="360" height="110" />
-    <text class="label box-dark-text" x="118" y="333">php/public/chat.html</text>
-    <text class="dark-small" x="118" y="358">Chat timeline, RTT draft bubbles</text>
-    <text class="dark-small" x="118" y="380">Accounts, contacts, provider tabs</text>
-    <text class="dark-small" x="118" y="402">Dark/light theme and smileys</text>
+    <rect class="box blue" x="78" y="315" width="310" height="96" />
+    <text class="label" x="102" y="346">php/public/chat.html</text>
+    <text class="small" x="102" y="370">Chat timeline, RTT draft bubbles</text>
+    <text class="small" x="102" y="392">Accounts, contacts, provider tabs</text>
 
-    <rect class="box box-gold" x="520" y="300" width="270" height="110" />
-    <text class="label" x="546" y="333">.lng Localization</text>
-    <text class="small" x="546" y="358">lang/ned.lng</text>
-    <text class="small" x="546" y="380">lang/eng.lng</text>
-    <text class="small" x="546" y="402">preferredLanguage from profile</text>
+    <rect class="box gold" x="438" y="315" width="250" height="96" />
+    <text class="label" x="462" y="346">.lng Localization</text>
+    <text class="small" x="462" y="370">lang/ned.lng, lang/eng.lng</text>
+    <text class="small" x="462" y="392">preferredLanguage from profile</text>
 
-    <rect class="box box-green" x="858" y="300" width="270" height="110" />
-    <text class="label" x="884" y="333">Account Profile</text>
-    <text class="small" x="884" y="358">JID, display name, peer</text>
-    <text class="small" x="884" y="380">password option, provider id</text>
-    <text class="small" x="884" y="402">local fallback plus MySQL</text>
+    <rect class="box green" x="738" y="315" width="282" height="96" />
+    <text class="label" x="762" y="346">Account Profile</text>
+    <text class="small" x="762" y="370">JID, display name, peer, password option</text>
+    <text class="small" x="762" y="392">local fallback plus MySQL</text>
 
-    <rect class="box box-blue" x="1190" y="300" width="145" height="110" />
-    <text class="label" x="1214" y="333">PWA Cache</text>
-    <text class="small" x="1214" y="358">service-worker</text>
-    <text class="small" x="1214" y="380">offline assets</text>
+    <rect class="box blue" x="1070" y="315" width="230" height="96" />
+    <text class="label" x="1094" y="346">PWA Cache</text>
+    <text class="small" x="1094" y="370">service-worker</text>
+    <text class="small" x="1094" y="392">offline app and language files</text>
   </g>
 
   <g id="php">
-    <rect class="box box-blue" x="92" y="478" width="290" height="108" />
-    <text class="label" x="118" y="510">PHP WebSocket Relay</text>
-    <text class="small" x="118" y="535">rtt-websocket-server.php</text>
-    <text class="small" x="118" y="557">JSON RTT and RFC 7395 xmpp</text>
+    <rect class="box blue" x="78" y="514" width="295" height="82" />
+    <text class="label" x="102" y="545">PHP WebSocket Relay</text>
+    <text class="small" x="102" y="569">JSON RTT and RFC 7395 xmpp</text>
 
-    <rect class="box box-green" x="442" y="478" width="290" height="108" />
-    <text class="label" x="468" y="510">PHP Account API</text>
-    <text class="small" x="468" y="535">public/api/account.php</text>
-    <text class="small" x="468" y="557">GET/POST account profile</text>
+    <rect class="box green" x="425" y="514" width="270" height="82" />
+    <text class="label" x="449" y="545">PHP Account API</text>
+    <text class="small" x="449" y="569">GET/POST account profile</text>
 
-    <rect class="box box-gold" x="792" y="478" width="250" height="108" />
-    <text class="label" x="818" y="510">MySQL / MariaDB</text>
-    <text class="small" x="818" y="535">account_profiles</text>
-    <text class="small" x="818" y="557">teletyptel database</text>
+    <rect class="box gold" x="747" y="514" width="250" height="82" />
+    <text class="label" x="771" y="545">MySQL / MariaDB</text>
+    <text class="small" x="771" y="569">teletyptel.account_profiles</text>
 
-    <rect class="box box-red" x="1102" y="478" width="230" height="108" />
-    <text class="label" x="1128" y="510">Local Config</text>
-    <text class="small" x="1128" y="535">php/config.php</text>
-    <text class="small" x="1128" y="557">ignored by Git</text>
+    <rect class="box red" x="1049" y="514" width="250" height="82" />
+    <text class="label" x="1073" y="545">Local Config</text>
+    <text class="small" x="1073" y="569">php/config.php, ignored by Git</text>
   </g>
 
   <g id="core">
-    <rect class="box box-blue" x="92" y="670" width="310" height="78" />
-    <text class="label" x="118" y="702">C# XMPP Core</text>
-    <text class="small" x="118" y="724">RFC 6120/6121 models, JID, stanzas</text>
+    <rect class="box blue" x="78" y="704" width="295" height="58" />
+    <text class="label" x="102" y="735">C# XMPP Core</text>
+    <text class="small" x="102" y="755">RFC 6120/6121, JID, stanzas</text>
 
-    <rect class="box box-green" x="462" y="670" width="310" height="78" />
-    <text class="label" x="488" y="702">XEP-0301 RTT Engine</text>
-    <text class="small" x="488" y="724">RttPacket, composer, deltas, sync</text>
+    <rect class="box green" x="425" y="704" width="295" height="58" />
+    <text class="label" x="449" y="735">XEP-0301 RTT Engine</text>
+    <text class="small" x="449" y="755">RttPacket, composer, deltas, sync</text>
 
-    <rect class="box box-gold" x="832" y="670" width="250" height="78" />
-    <text class="label" x="858" y="702">LngPdk Direction</text>
-    <text class="small" x="858" y="724">Package format for UI resources</text>
+    <rect class="box gold" x="772" y="704" width="250" height="58" />
+    <text class="label" x="796" y="735">LngPdk Direction</text>
+    <text class="small" x="796" y="755">Package format for UI resources</text>
 
-    <rect class="box box-blue" x="1142" y="670" width="190" height="78" />
-    <text class="label" x="1168" y="702">Tests / Tools</text>
-    <text class="small" x="1168" y="724">smoke, validators, demos</text>
+    <rect class="box blue" x="1074" y="704" width="225" height="58" />
+    <text class="label" x="1098" y="735">Tests / Tools</text>
+    <text class="small" x="1098" y="755">smoke, validators, demos</text>
   </g>
 
   <g id="future">
-    <rect class="box box-dark" x="92" y="818" width="270" height="52" />
-    <text class="label box-dark-text" x="118" y="850">Prosody / ejabberd</text>
+    <rect class="box violet" x="78" y="862" width="255" height="42" />
+    <text class="label" x="102" y="890">Prosody / ejabberd</text>
 
-    <rect class="box box-dark" x="432" y="818" width="270" height="52" />
-    <text class="label box-dark-text" x="458" y="850">XMPP Federation</text>
+    <rect class="box violet" x="387" y="862" width="255" height="42" />
+    <text class="label" x="411" y="890">XMPP Federation</text>
 
-    <rect class="box box-dark" x="772" y="818" width="270" height="52" />
-    <text class="label box-dark-text" x="798" y="850">WebRTC / Jingle</text>
+    <rect class="box violet" x="696" y="862" width="255" height="42" />
+    <text class="label" x="720" y="890">WebRTC / Jingle</text>
 
-    <rect class="box box-dark" x="1112" y="818" width="220" height="52" />
-    <text class="label box-dark-text" x="1138" y="850">Provider Tabs</text>
+    <rect class="box violet" x="1005" y="862" width="294" height="42" />
+    <text class="label" x="1029" y="890">Provider Tabs / Services</text>
   </g>
 
-  <path class="arrow" d="M222 223 L222 298" />
-  <path class="arrow" d="M540 223 L270 300" />
-  <path class="arrow" d="M858 223 L318 300" />
-  <path class="arrow-soft" d="M1176 223 L1030 300" />
+  <path class="arrow" d="M203 220 L203 315" />
+  <path class="arrow-soft" d="M515 220 C515 250 233 270 233 315" />
+  <path class="arrow-soft" d="M827 220 C827 252 233 268 233 315" />
+  <path class="arrow-soft" d="M1157 220 C1157 248 926 276 879 315" />
 
-  <path class="arrow" d="M270 410 L220 478" />
-  <path class="arrow" d="M990 410 L610 478" />
-  <path class="arrow" d="M1000 478 L1000 410" />
-  <path class="arrow" d="M732 532 L792 532" />
-  <path class="arrow-soft" d="M1102 532 L1042 532" />
+  <path class="arrow" d="M226 411 L226 514" />
+  <path class="arrow" d="M879 411 L560 514" />
+  <path class="arrow" d="M695 555 L747 555" />
+  <path class="arrow-soft" d="M1049 555 L997 555" />
+  <path class="arrow-soft" d="M879 514 L879 411" />
 
-  <path class="arrow" d="M220 586 L247 670" />
-  <path class="arrow" d="M237 586 L616 670" />
-  <path class="arrow-soft" d="M587 586 L957 670" />
+  <path class="arrow" d="M226 596 L226 704" />
+  <path class="arrow" d="M226 596 C310 644 468 661 572 704" />
+  <path class="arrow-soft" d="M560 596 C650 645 795 658 897 704" />
 
-  <path class="arrow-soft" d="M247 748 L227 818" />
-  <path class="arrow-soft" d="M617 748 L567 818" />
-  <path class="arrow-soft" d="M987 748 L907 818" />
-  <path class="arrow-soft" d="M1237 748 L1222 818" />
+  <path class="arrow-soft" d="M226 762 L206 862" />
+  <path class="arrow-soft" d="M572 762 L515 862" />
+  <path class="arrow-soft" d="M897 762 L824 862" />
+  <path class="arrow-soft" d="M1186 762 L1152 862" />
 
   <g id="legend">
-    <rect class="badge" x="50" y="845" width="76" height="24" />
-    <text class="badge-text" x="65" y="862">NOW</text>
-    <text class="small" x="138" y="862">Solid arrows are current local demo flow.</text>
-    <line class="arrow-soft" x1="390" y1="856" x2="470" y2="856" />
-    <text class="small" x="488" y="862">Dashed arrows are planned production path.</text>
+    <rect class="badge" x="92" y="984" width="74" height="22" />
+    <text class="badge-text" x="112" y="1000">NOW</text>
+    <text class="hint" x="184" y="1000">Solid arrows show the current local demo flow.</text>
+    <line class="arrow-soft" x1="520" y1="994" x2="610" y2="994" />
+    <text class="hint" x="630" y="1000">Dashed arrows show planned production and packaging paths.</text>
   </g>
 </svg>
