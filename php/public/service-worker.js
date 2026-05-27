@@ -1,11 +1,13 @@
-const CACHE_NAME = "tiedragon-xmpp-webclient-v15";
+const CACHE_NAME = "tiedragon-xmpp-webclient-v16";
 const ASSETS = [
   "chat.html",
   "chat-client.css",
   "chat-client.js",
   "manifest.webmanifest",
   "config/account-profile.json",
-  "config/providers/example-provider.json"
+  "config/providers/example-provider.json",
+  "lang/eng.lng",
+  "lang/ned.lng"
 ];
 
 self.addEventListener("install", (event) => {

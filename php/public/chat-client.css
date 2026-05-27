@@ -68,6 +68,7 @@ button:disabled {
 }
 
 input,
+select,
 textarea {
   width: 100%;
   border: 1px solid var(--line);
@@ -607,6 +608,7 @@ body[data-theme="light"] .account-status {
 }
 
 body[data-theme="light"] input,
+body[data-theme="light"] select,
 body[data-theme="light"] textarea,
 body[data-theme="light"] .debug-log,
 body[data-theme="light"] .smiley {
@@ -679,6 +681,7 @@ body[data-theme="dark"] .account-status {
 }
 
 body[data-theme="dark"] input,
+body[data-theme="dark"] select,
 body[data-theme="dark"] textarea {
   background: #101820;
   color: var(--text);

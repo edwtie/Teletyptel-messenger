@@ -15,20 +15,20 @@
         <div class="brand-mark">TX</div>
         <div>
           <h1>Tiedragon XMPP</h1>
-          <span id="connectionSummary">Disconnected</span>
+          <span id="connectionSummary" data-i18n="status.disconnected">Disconnected</span>
         </div>
       </div>
       <div class="top-actions" role="toolbar" aria-label="Connection actions">
         <button id="themeButton" class="theme-button" type="button" title="Switch light/dark mode" aria-label="Switch light/dark mode">Theme: Dark</button>
-        <button id="connectButton" type="button">Connect</button>
-        <button id="disconnectButton" type="button" disabled>Disconnect</button>
+        <button id="connectButton" type="button" data-i18n="button.connect">Connect</button>
+        <button id="disconnectButton" type="button" disabled data-i18n="button.disconnect">Disconnect</button>
       </div>
     </header>
 
     <main class="client-grid">
       <aside class="conversation-list" aria-label="Conversations">
         <div class="section-heading">
-          <span>Conversations</span>
+          <span data-i18n="section.conversations">Conversations</span>
           <button id="addConversationButton" type="button" title="Add conversation">+</button>
         </div>
         <div id="conversationItems" class="conversation-items"></div>
@@ -43,7 +43,7 @@
             <span id="activeConversationMeta">Local PHP relay</span>
           </div>
           <div class="mode-switch" role="tablist" aria-label="Transport mode">
-            <button id="relayModeButton" type="button" class="selected">Relay</button>
+            <button id="relayModeButton" type="button" class="selected" data-i18n="mode.relay">Relay</button>
             <button id="xmppModeButton" type="button">RFC 7395</button>
           </div>
         </div>
@@ -68,33 +68,33 @@
 
         <form id="composerForm" class="composer">
           <div class="composer-tools" role="toolbar" aria-label="Message tools">
-            <button id="resetRttButton" type="button">Reset RTT</button>
+            <button id="resetRttButton" type="button" data-i18n="button.reset_rtt">Reset RTT</button>
             <label class="toggle">
               <input id="rttToggle" type="checkbox" checked>
-              <span>Live RTT</span>
+              <span data-i18n="option.live_rtt">Live RTT</span>
             </label>
             <label class="toggle">
               <input id="smileyToggle" type="checkbox" checked>
-              <span>Smilies</span>
+              <span data-i18n="option.smilies">Smilies</span>
             </label>
           </div>
-          <textarea id="messageInput" rows="4" spellcheck="true" placeholder="Type a message"></textarea>
+          <textarea id="messageInput" rows="4" spellcheck="true" placeholder="Type a message" data-i18n-placeholder="placeholder.message"></textarea>
           <div class="send-row">
-            <span id="composerState">Enter sends, Shift+Enter inserts a line</span>
-            <button id="sendButton" type="submit">Send</button>
+            <span id="composerState" data-i18n="composer.relay_state">Enter sends, Shift+Enter inserts a line</span>
+            <button id="sendButton" type="submit" data-i18n="button.send">Send</button>
           </div>
         </form>
       </section>
 
       <aside class="detail-panel" aria-label="Connection and debug">
         <section class="settings-section">
-          <h2>Connection</h2>
+          <h2 data-i18n="section.connection">Connection</h2>
           <label>
-            Relay WebSocket
+            <span data-i18n="label.relay_websocket">Relay WebSocket</span>
             <input id="relayUrlInput" value="ws://127.0.0.1:8787">
           </label>
           <label>
-            Display name
+            <span data-i18n="label.display_name">Display name</span>
             <input id="displayNameInput" value="Edward">
           </label>
           <label>
@@ -102,35 +102,42 @@
             <input id="jidInput" value="edward@localhost/web">
           </label>
           <label>
-            Password
+            <span data-i18n="label.password">Password</span>
             <input id="passwordInput" type="password" autocomplete="current-password" value="">
           </label>
           <label class="toggle">
             <input id="rememberPasswordToggle" type="checkbox">
-            <span>Remember password locally</span>
+            <span data-i18n="option.remember_password">Remember password locally</span>
           </label>
           <label>
-            Peer
+            <span data-i18n="label.peer">Peer</span>
             <input id="peerInput" value="relay@localhost">
           </label>
           <label>
-            Phone
+            <span data-i18n="label.phone">Phone</span>
             <input id="phoneInput" value="">
           </label>
           <label>
-            Provider
+            <span data-i18n="label.language">Language</span>
+            <select id="languageInput">
+              <option value="ned">Nederlands</option>
+              <option value="eng">English</option>
+            </select>
+          </label>
+          <label>
+            <span data-i18n="label.provider">Provider</span>
             <input id="providerInput" value="example-provider" readonly>
           </label>
-          <div id="accountStatus" class="account-status">Default account profile</div>
+          <div id="accountStatus" class="account-status" data-i18n="account.default_profile">Default account profile</div>
           <div class="button-row">
-            <button id="saveAccountButton" type="button">Save account</button>
-            <button id="resetAccountButton" type="button">Reset</button>
+            <button id="saveAccountButton" type="button" data-i18n="button.save_account">Save account</button>
+            <button id="resetAccountButton" type="button" data-i18n="button.reset">Reset</button>
           </div>
         </section>
 
         <section class="settings-section">
-          <h2>Provider</h2>
-          <div id="providerSummary" class="provider-summary">Loading provider manifest...</div>
+          <h2 data-i18n="section.provider">Provider</h2>
+          <div id="providerSummary" class="provider-summary" data-i18n="provider.loading">Loading provider manifest...</div>
           <div id="capabilityList" class="capability-list"></div>
         </section>
 
@@ -141,15 +148,15 @@
             <input id="xmppUrlInput" value="ws://127.0.0.1:8787">
           </label>
           <div class="button-row">
-            <button id="xmppOpenButton" type="button">Open stream</button>
-            <button id="xmppCloseButton" type="button" disabled>Close</button>
+            <button id="xmppOpenButton" type="button" data-i18n="button.open_stream">Open stream</button>
+            <button id="xmppCloseButton" type="button" disabled data-i18n="button.close">Close</button>
           </div>
         </section>
 
         <section class="settings-section grow">
           <div class="section-heading">
-            <h2>Debug XML</h2>
-            <button id="clearLogButton" type="button">Clear</button>
+            <h2 data-i18n="section.debug_xml">Debug XML</h2>
+            <button id="clearLogButton" type="button" data-i18n="button.clear">Clear</button>
           </div>
           <pre id="debugLog" class="debug-log"></pre>
         </section>

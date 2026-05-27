@@ -51,6 +51,7 @@
   const smileyBasePath = "smileys/";
   const accountStorageKey = "teletyptel.accountProfile";
   const accountApiPath = "api/account.php";
+  const languageBasePath = "lang/";
 
   const state = {
     mode: "relay",
@@ -59,6 +60,8 @@
     xmppSocket: null,
     account: null,
     provider: null,
+    translations: new Map(),
+    languageCode: "eng",
     clientInstance: loadClientInstance(),
     activeTabId: "chat",
     sequence: 0,
@@ -112,6 +115,7 @@
     rememberPasswordToggle: byId("rememberPasswordToggle"),
     peerInput: byId("peerInput"),
     phoneInput: byId("phoneInput"),
+    languageInput: byId("languageInput"),
     providerInput: byId("providerInput"),
     accountStatus: byId("accountStatus"),
     saveAccountButton: byId("saveAccountButton"),
@@ -130,7 +134,7 @@
   renderTabs();
   renderConversations();
   renderActiveConversation();
-  setConnectionStatus("Disconnected", "warn");
+  setConnectionStatus(t("status.disconnected", "Disconnected"), "warn");
   loadPlatformConfig();
   registerServiceWorker();
 
@@ -153,6 +157,7 @@
     el.jidInput.addEventListener("change", renderActiveConversation);
     el.passwordInput.addEventListener("input", updateAccountPasswordStatus);
     el.rememberPasswordToggle.addEventListener("change", updateAccountPasswordStatus);
+    el.languageInput.addEventListener("change", () => loadLanguage(el.languageInput.value));
     el.xmppOpenButton.addEventListener("click", connectXmppWebSocket);
     el.xmppCloseButton.addEventListener("click", closeXmppWebSocket);
     el.clearLogButton.addEventListener("click", () => {
@@ -228,8 +233,8 @@
     el.relayModeButton.classList.toggle("selected", mode === "relay");
     el.xmppModeButton.classList.toggle("selected", mode === "xmpp");
     el.composerState.textContent = mode === "relay"
-      ? "Enter sends, Shift+Enter inserts a line"
-      : "RFC 7395 mode sends XML message stanzas";
+      ? t("composer.relay_state", "Enter sends, Shift+Enter inserts a line")
+      : t("composer.xmpp_state", "RFC 7395 mode sends XML message stanzas");
   }
 
   async function loadPlatformConfig() {
@@ -240,16 +245,104 @@
       state.account = account;
       applyAccountProfile(account);
       await loadDatabaseAccount(account.accountId);
+      await loadLanguage(state.account.preferredLanguage ?? "eng");
       const provider = await fetchJson(`config/providers/${encodeURIComponent(state.account.providerId)}.json`);
       state.provider = provider;
       renderProvider();
       renderTabs();
       appendDebug("config", `Loaded provider ${provider.providerId}`);
     } catch (error) {
-      el.providerSummary.textContent = "Provider manifest unavailable.";
+      el.providerSummary.textContent = t("provider.unavailable", "Provider manifest unavailable.");
       appendDebug("config-error", error.message);
+      await loadLanguage(state.account?.preferredLanguage ?? "eng");
       renderTabs();
     }
+  }
+
+  async function loadLanguage(code) {
+    const normalized = normalizeLanguageCode(code);
+    state.languageCode = normalized;
+    el.languageInput.value = normalized;
+
+    try {
+      const text = await fetchText(`${languageBasePath}${encodeURIComponent(normalized)}.lng`);
+      state.translations = parseLng(text);
+      applyTranslations();
+      appendDebug("lng", `Loaded ${normalized}`);
+    } catch (error) {
+      if (normalized !== "eng") {
+        appendDebug("lng-error", `${normalized}: ${error.message}`);
+        await loadLanguage("eng");
+        return;
+      }
+
+      appendDebug("lng-error", error.message);
+    }
+  }
+
+  async function fetchText(url) {
+    const response = await fetch(url, { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error(`${url} returned ${response.status}`);
+    }
+
+    return response.text();
+  }
+
+  function parseLng(text) {
+    const map = new Map();
+    for (const rawLine of text.split(/\r?\n/)) {
+      const line = rawLine.trim();
+      if (!line || line.startsWith("#")) {
+        continue;
+      }
+
+      const equals = line.indexOf("=");
+      if (equals <= 0) {
+        continue;
+      }
+
+      map.set(line.slice(0, equals).trim(), line.slice(equals + 1).trim());
+    }
+
+    return map;
+  }
+
+  function t(key, fallback = key) {
+    return state.translations.get(key) ?? fallback;
+  }
+
+  function applyTranslations() {
+    document.title = t("app.title", document.title);
+    for (const node of document.querySelectorAll("[data-i18n]")) {
+      node.textContent = t(node.dataset.i18n, node.textContent);
+    }
+
+    for (const node of document.querySelectorAll("[data-i18n-placeholder]")) {
+      node.setAttribute("placeholder", t(node.dataset.i18nPlaceholder, node.getAttribute("placeholder") ?? ""));
+    }
+
+    applyTheme(state.theme);
+    setMode(state.mode);
+    if (state.provider) {
+      renderProvider();
+    }
+
+    renderTabs();
+    renderConversations();
+    renderActiveConversation();
+    if (state.account) {
+      updateAccountStatus(accountStatusPrefix());
+    }
+  }
+
+  function normalizeLanguageCode(code) {
+    const value = String(code ?? "").toLowerCase();
+    if (value === "nl" || value === "nld" || value === "ned") {
+      return "ned";
+    }
+
+    return "eng";
   }
 
   async function loadDatabaseAccount(accountId) {
@@ -297,6 +390,7 @@
     el.rememberPasswordToggle.checked = account.rememberPassword === true;
     el.peerInput.value = account.peer ?? el.peerInput.value;
     el.phoneInput.value = account.phoneNumber ?? "";
+    el.languageInput.value = normalizeLanguageCode(account.preferredLanguage ?? "eng");
     el.providerInput.value = account.providerId ?? "";
     el.relayUrlInput.value = account.relayWebSocket ?? el.relayUrlInput.value;
     el.xmppUrlInput.value = account.xmppWebSocket ?? el.xmppUrlInput.value;
@@ -342,7 +436,7 @@
       phoneNumber: el.phoneInput.value.trim(),
       providerId: el.providerInput.value.trim() || state.account?.providerId || "example-provider",
       accessibilityProfileId: state.account?.accessibilityProfileId ?? "default-live-text",
-      preferredLanguage: state.account?.preferredLanguage ?? "nl",
+      preferredLanguage: el.languageInput.value,
       relayWebSocket: el.relayUrlInput.value.trim(),
       xmppWebSocket: el.xmppUrlInput.value.trim(),
       peer: el.peerInput.value.trim()
@@ -355,7 +449,7 @@
     state.account = { ...state.account, ...profile, savedLocally: true };
     el.jidInput.value = createUniqueJid(profile.jid);
     updateRelayConversationMeta();
-    updateAccountStatus("Local account saved");
+    updateAccountStatus(t("account.local_saved", "Local account saved"));
     appendDebug("account", `Saved ${el.jidInput.value}`);
     saveDatabaseAccount(profile);
   }
@@ -380,10 +474,10 @@
         ...payload.account,
         savedInDatabase: true
       };
-      updateAccountStatus("Database account saved");
+      updateAccountStatus(t("account.database_saved", "Database account saved"));
       appendDebug("account-db", `Saved ${payload.account.jid}`);
     } catch (error) {
-      updateAccountStatus("Local account saved; database unavailable");
+      updateAccountStatus(t("account.local_database_unavailable", "Local account saved; database unavailable"));
       appendDebug("account-db-error", error.message);
     }
   }
@@ -391,26 +485,28 @@
   function resetAccountProfile() {
     localStorage.removeItem(accountStorageKey);
     sessionStorage.removeItem("teletyptel.clientInstance");
-    updateAccountStatus("Account reset; reload to restore defaults");
+    updateAccountStatus(t("account.reset_reload", "Account reset; reload to restore defaults"));
     appendDebug("account", "Local account profile cleared");
     location.reload();
   }
 
   function updateAccountStatus(text) {
     const passwordState = passwordStatusText();
-    el.accountStatus.textContent = `${text} - ${el.jidInput.value || "no JID"} - ${passwordState}`;
+    el.accountStatus.textContent = `${text} - ${el.jidInput.value || t("account.no_jid", "no JID")} - ${passwordState}`;
   }
 
   function updateAccountPasswordStatus() {
-    updateAccountStatus(localStorage.getItem(accountStorageKey) ? "Local account saved" : "Default account profile");
+    updateAccountStatus(accountStatusPrefix());
   }
 
   function passwordStatusText() {
     if (!el.passwordInput.value) {
-      return "no password";
+      return t("account.no_password", "no password");
     }
 
-    return el.rememberPasswordToggle.checked ? "password saved locally" : "password only this session";
+    return el.rememberPasswordToggle.checked
+      ? t("account.password_saved", "password saved locally")
+      : t("account.password_session", "password only this session");
   }
 
   function updateRelayConversationMeta() {
@@ -426,16 +522,18 @@
 
   function accountStatusPrefix() {
     if (state.account?.savedInDatabase) {
-      return "Database account loaded";
+      return t("account.database_loaded", "Database account loaded");
     }
 
-    return localStorage.getItem(accountStorageKey) ? "Local account saved" : "Default account profile";
+    return localStorage.getItem(accountStorageKey)
+      ? t("account.local_saved", "Local account saved")
+      : t("account.default_profile", "Default account profile");
   }
 
   function renderProvider() {
     const provider = state.provider;
     if (!provider) {
-      el.providerSummary.textContent = "No provider manifest loaded.";
+      el.providerSummary.textContent = t("provider.none", "No provider manifest loaded.");
       el.capabilityList.replaceChildren();
       return;
     }
@@ -463,9 +561,9 @@
       providerName: state.provider.name
     })) ?? [];
     return [
-      { id: "chat", title: "Chat", type: "builtin" },
-      { id: "contacts", title: "Contacts", type: "builtin" },
-      { id: "accessibility", title: "Accessibility", type: "builtin" },
+      { id: "chat", title: t("tab.chat", "Chat"), type: "builtin" },
+      { id: "contacts", title: t("tab.contacts", "Contacts"), type: "builtin" },
+      { id: "accessibility", title: t("tab.accessibility", "Accessibility"), type: "builtin" },
       ...providerTabs
     ];
   }
@@ -514,12 +612,12 @@
   function renderBuiltinTab(tab) {
     const card = createProviderCard();
     if (tab.id === "contacts") {
-      card.appendChild(createTextBlock("Contacts", "Contacts will use XMPP roster and provider address book adapters."));
+      card.appendChild(createTextBlock(t("tab.contacts", "Contacts"), t("tab.contacts_text", "Contacts will use XMPP roster and provider address book adapters.")));
     } else if (tab.id === "accessibility") {
-      card.appendChild(createTextBlock("Accessibility", "Live RTT, captions, speech and provider bridges stay opt-in and visible."));
+      card.appendChild(createTextBlock(t("tab.accessibility", "Accessibility"), t("tab.accessibility_text", "Live RTT, captions, speech and provider bridges stay opt-in and visible.")));
       renderCapabilities(card, ["rtt:publish", "caption:local", "caption:share"]);
     } else {
-      card.appendChild(createTextBlock(tab.title, "Built-in Teletyptel tab."));
+      card.appendChild(createTextBlock(tab.title, t("tab.builtin_text", "Built-in Teletyptel tab.")));
     }
 
     el.tabPanelBody.appendChild(card);
@@ -596,11 +694,11 @@
 
     const socket = new WebSocket(el.relayUrlInput.value.trim());
     state.relaySocket = socket;
-    setConnectionStatus("Connecting relay", "warn");
+    setConnectionStatus(t("status.connecting_relay", "Connecting relay"), "warn");
     appendDebug("relay", "Connecting " + el.relayUrlInput.value.trim());
 
     socket.addEventListener("open", () => {
-      setConnectionStatus("Relay connected", "good");
+      setConnectionStatus(t("status.relay_connected", "Relay connected"), "good");
       el.connectButton.disabled = true;
       el.disconnectButton.disabled = false;
       sendRttReset();
@@ -615,14 +713,14 @@
     });
 
     socket.addEventListener("close", () => {
-      setConnectionStatus("Relay disconnected", "warn");
+      setConnectionStatus(t("status.relay_disconnected", "Relay disconnected"), "warn");
       el.connectButton.disabled = false;
       el.disconnectButton.disabled = true;
       state.relaySocket = null;
     });
 
     socket.addEventListener("error", () => {
-      setConnectionStatus("Relay error", "danger");
+      setConnectionStatus(t("status.relay_error", "Relay error"), "danger");
     });
   }
 

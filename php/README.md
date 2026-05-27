@@ -52,6 +52,16 @@ Provider manifests define tabs and capabilities such as `phone:sms`,
 configuration only; secrets and production provider credentials must stay out
 of public web assets.
 
+UI text is loaded from web `.lng` files:
+
+```text
+php/public/lang/eng.lng
+php/public/lang/ned.lng
+```
+
+The language selector writes `preferredLanguage` into the account profile, so a
+saved MySQL account can restore the UI language on the next load.
+
 ## MySQL Account Storage
 
 The web client can save the local account profile to MySQL through:
