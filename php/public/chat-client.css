@@ -488,10 +488,14 @@ textarea {
   .topbar,
   .conversation-list,
   .detail-panel,
-    .composer,
+  .composer,
   .remote-draft,
   .app-tabs {
     background: #ffffff;
+  }
+
+  .remote-draft p {
+    color: #102033;
   }
 
   .provider-card {
@@ -515,4 +519,132 @@ textarea {
     background: #edf4ff;
     color: #0f172a;
   }
+}
+
+body[data-theme="light"] {
+  --bg: #eef2f7;
+  --panel: #ffffff;
+  --panel-strong: #edf3fb;
+  --line: #c9d4e2;
+  --text: #111827;
+  --muted: #53657c;
+  --bubble-self: #ddf8ea;
+  --bubble-peer: #f5f7fb;
+  color-scheme: light;
+}
+
+body[data-theme="light"],
+body[data-theme="light"] .chat-panel {
+  background: #eef2f7;
+}
+
+body[data-theme="light"] .topbar,
+body[data-theme="light"] .conversation-list,
+body[data-theme="light"] .detail-panel,
+body[data-theme="light"] .composer,
+body[data-theme="light"] .remote-draft,
+body[data-theme="light"] .app-tabs {
+  background: #ffffff;
+}
+
+body[data-theme="light"] .remote-draft p {
+  color: #102033;
+}
+
+body[data-theme="light"] .provider-card {
+  background: #ffffff;
+}
+
+body[data-theme="light"] .capability {
+  background: #edf4ff;
+  color: #0f172a;
+}
+
+body[data-theme="light"] input,
+body[data-theme="light"] textarea,
+body[data-theme="light"] .debug-log,
+body[data-theme="light"] .smiley {
+  background: #ffffff;
+  color: #111827;
+}
+
+body[data-theme="light"] button {
+  background: #edf4ff;
+  color: #0f172a;
+}
+
+body[data-theme="light"] button:hover:not(:disabled),
+body[data-theme="light"] button.selected {
+  background: var(--accent-strong);
+  color: #ffffff;
+}
+
+body[data-theme="dark"] {
+  --bg: #111827;
+  --panel: #1f2937;
+  --panel-strong: #263244;
+  --line: #4b5563;
+  --text: #f9fafb;
+  --muted: #b6c2d1;
+  --bubble-self: #144f3a;
+  --bubble-peer: #273242;
+  color-scheme: dark;
+}
+
+body[data-theme="dark"],
+body[data-theme="dark"] .chat-panel {
+  background: #0f1724;
+}
+
+body[data-theme="dark"] .topbar,
+body[data-theme="dark"] .conversation-list,
+body[data-theme="dark"] .detail-panel,
+body[data-theme="dark"] .composer,
+body[data-theme="dark"] .remote-draft,
+body[data-theme="dark"] .app-tabs {
+  background: #151f2d;
+}
+
+body[data-theme="dark"] .app-tabs {
+  background: #111b2a;
+}
+
+body[data-theme="dark"] .remote-draft {
+  background: #18253a;
+}
+
+body[data-theme="dark"] .remote-draft p {
+  color: #dbeafe;
+}
+
+body[data-theme="dark"] .provider-card {
+  background: #1a2637;
+}
+
+body[data-theme="dark"] .capability {
+  background: #132034;
+  color: #dbeafe;
+}
+
+body[data-theme="dark"] input,
+body[data-theme="dark"] textarea {
+  background: #101820;
+  color: var(--text);
+}
+
+body[data-theme="dark"] .debug-log,
+body[data-theme="dark"] .smiley {
+  background: #0b1220;
+  color: #d5e4f7;
+}
+
+body[data-theme="dark"] button {
+  background: #16243a;
+  color: var(--text);
+}
+
+body[data-theme="dark"] button:hover:not(:disabled),
+body[data-theme="dark"] button.selected {
+  background: var(--accent-strong);
+  color: #ffffff;
 }

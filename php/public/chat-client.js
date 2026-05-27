@@ -51,6 +51,7 @@
 
   const state = {
     mode: "relay",
+    theme: loadTheme(),
     relaySocket: null,
     xmppSocket: null,
     account: null,
@@ -73,6 +74,7 @@
   const el = {
     appTabs: byId("appTabs"),
     connectionSummary: byId("connectionSummary"),
+    themeButton: byId("themeButton"),
     connectButton: byId("connectButton"),
     disconnectButton: byId("disconnectButton"),
     addConversationButton: byId("addConversationButton"),
@@ -113,6 +115,7 @@
   };
 
   bindEvents();
+  applyTheme(state.theme);
   renderTabs();
   renderConversations();
   renderActiveConversation();
@@ -121,6 +124,7 @@
   registerServiceWorker();
 
   function bindEvents() {
+    el.themeButton.addEventListener("click", toggleTheme);
     el.connectButton.addEventListener("click", connectRelay);
     el.disconnectButton.addEventListener("click", disconnectAll);
     el.addConversationButton.addEventListener("click", addConversation);
@@ -140,6 +144,32 @@
 
   function byId(id) {
     return document.getElementById(id);
+  }
+
+  function loadTheme() {
+    const saved = localStorage.getItem("teletyptel.theme");
+    if (saved === "light" || saved === "dark") {
+      return saved;
+    }
+
+    return window.matchMedia?.("(prefers-color-scheme: light)").matches ? "light" : "dark";
+  }
+
+  function toggleTheme() {
+    applyTheme(state.theme === "dark" ? "light" : "dark");
+  }
+
+  function applyTheme(theme) {
+    state.theme = theme === "light" ? "light" : "dark";
+    document.body.dataset.theme = state.theme;
+    localStorage.setItem("teletyptel.theme", state.theme);
+    el.themeButton.textContent = state.theme === "dark" ? "Light" : "Dark";
+    el.themeButton.setAttribute(
+      "aria-label",
+      state.theme === "dark" ? "Switch to light mode" : "Switch to dark mode");
+    document.querySelector('meta[name="theme-color"]')?.setAttribute(
+      "content",
+      state.theme === "dark" ? "#111827" : "#eef2f7");
   }
 
   function setMode(mode) {

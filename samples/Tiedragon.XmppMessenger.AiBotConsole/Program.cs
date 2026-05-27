@@ -87,6 +87,9 @@ static async Task ReceiveLoopAsync(
             if (envelope.Type == "message")
             {
                 remoteState.AcceptFinalBody(envelope.Text);
+                Console.WriteLine($"Human final message: {remoteState.Text}");
+                await receivedTexts.WriteAsync(remoteState.Text + Environment.NewLine, cancellationToken);
+                continue;
             }
             else
             {
