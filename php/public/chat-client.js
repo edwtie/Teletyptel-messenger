@@ -2071,7 +2071,19 @@
 
   function registerServiceWorker() {
     if ("serviceWorker" in navigator && location.protocol !== "file:") {
-      navigator.serviceWorker.register("service-worker.js").catch(() => {});
+      let reloadedForServiceWorker = false;
+      navigator.serviceWorker.addEventListener("controllerchange", () => {
+        if (reloadedForServiceWorker) {
+          return;
+        }
+
+        reloadedForServiceWorker = true;
+        location.reload();
+      });
+
+      navigator.serviceWorker.register("service-worker.js")
+        .then((registration) => registration.update())
+        .catch(() => {});
     }
   }
 })();

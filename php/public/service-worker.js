@@ -1,8 +1,9 @@
-const CACHE_NAME = "tiedragon-xmpp-webclient-v16";
+const CACHE_NAME = "tiedragon-xmpp-webclient-v17";
+const BUILD_VERSION = "20260527-call-buttons";
 const ASSETS = [
   "chat.html",
-  "chat-client.css",
-  "chat-client.js",
+  `chat-client.css?v=${BUILD_VERSION}`,
+  `chat-client.js?v=${BUILD_VERSION}`,
   "manifest.webmanifest",
   "config/account-profile.json",
   "config/providers/example-provider.json",
@@ -29,7 +30,43 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  event.respondWith(
-    caches.match(event.request).then((cached) => cached || fetch(event.request))
-  );
+  event.respondWith(networkFirst(event.request));
 });
+
+async function networkFirst(request) {
+  const cache = await caches.open(CACHE_NAME);
+  try {
+    const response = await fetch(request);
+    if (response.ok && shouldCache(request)) {
+      await cache.put(request, response.clone());
+    }
+
+    return response;
+  } catch {
+    const cached = await cache.match(request, { ignoreSearch: true });
+    if (cached) {
+      return cached;
+    }
+
+    if (request.mode === "navigate") {
+      const shell = await cache.match("chat.html");
+      if (shell) {
+        return shell;
+      }
+    }
+
+    throw new Error("Offline and no cached response available.");
+  }
+}
+
+function shouldCache(request) {
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin) {
+    return false;
+  }
+
+  return request.mode === "navigate"
+    || ["style", "script", "manifest"].includes(request.destination)
+    || url.pathname.includes("/lang/")
+    || url.pathname.includes("/config/");
+}
