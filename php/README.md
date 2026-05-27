@@ -1,0 +1,97 @@
+# PHP WebSocket RTT/RFC7395 Relay
+
+This is a small dependency-free PHP relay for local XEP-0301 real-time text and
+RFC 7395 WebSocket experiments.
+
+It is not the final XMPP server layer. It exists so the RTT engine and WebSocket
+transport can be tested before the messenger connects to a real XMPP server.
+
+Protocol and safety notes: [../docs/RTT_RELAY.md](../docs/RTT_RELAY.md).
+
+## Start
+
+Install PHP 8.1 or newer and run:
+
+```bash
+php php/rtt-websocket-server.php
+```
+
+Then open:
+
+```text
+php/public/index.html
+```
+
+Open the page in two browser windows, connect both to:
+
+```text
+ws://127.0.0.1:8787
+```
+
+Typing in one window broadcasts RTT JSON to the other window.
+
+The fuller web chat client lives at:
+
+```text
+php/public/chat.html
+```
+
+It uses the same relay for RTT chat, includes RFC 7395 test controls and is the
+preferred UI direction for later Android/iOS WebView packaging.
+
+The web client also loads its local platform configuration from:
+
+```text
+php/public/config/account-profile.json
+php/public/config/providers/example-provider.json
+```
+
+`account-profile.json` fills the local display name, JID, peer and provider id.
+Provider manifests define tabs and capabilities such as `phone:sms`,
+`caption:local`, `chat:none` and `profile:read`. These files are demo
+configuration only; secrets and production provider credentials must stay out
+of public web assets.
+
+For RFC 7395 tests, connect with the `xmpp` WebSocket subprotocol. The relay
+responds with the same subprotocol, accepts RFC 7395 `<open/>` and `<close/>`
+frames and relays `<message/>`, `<presence/>` and `<iq/>` frames to other
+clients connected in RFC 7395 mode.
+
+## Message Shape
+
+The relay accepts JSON messages like:
+
+```json
+{
+  "type": "rtt",
+  "text": "Hello",
+  "xml": "<rtt xmlns=\"urn:xmpp:rtt:0\" event=\"reset\" seq=\"0\"><t p=\"0\">Hello</t></rtt>"
+}
+```
+
+The `xml` field is the XEP-0301-style payload. The `text` field is included only
+for the browser demo.
+
+## Limits
+
+- local demo relay only
+- no TLS
+- no authentication
+- no full XMPP server semantics
+- text frames only
+- payload limit: 65535 bytes
+
+The production path remains XMPP/XEP-0301. This relay is a practical bridge for
+early UI and protocol experiments.
+
+## Validate
+
+Before release, run:
+
+```powershell
+.\php\validate-rtt-relay.ps1
+.\php\smoke-rfc7395-relay.ps1
+```
+
+This checks the PHP syntax and verifies RFC 7395 `xmpp` subprotocol negotiation
+with an `<open/>` response.

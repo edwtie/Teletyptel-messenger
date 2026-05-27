@@ -1,0 +1,9 @@
+{
+  "name": "Teletyptel 2.0",
+  "doap": "https://www.tiedragon.com/teletyptel/doap.rdf",
+  "platforms": [],
+  "url": null,
+  "categories": [
+    "client"
+  ]
+}

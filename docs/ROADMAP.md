@@ -2,12 +2,17 @@
 
 ## Alpha 1 - XMPP Core Chat
 
+- XMPP address/JID model and validation
+- connection settings with TLS defaults
+- stream options and feature flags
 - XMPP account login
 - TLS connection
 - roster/contact list
 - one-to-one chat
 - presence: online, away, offline
 - reconnect using stream management
+- web client shell
+- local account/provider/tab model documentation
 
 Protocols:
 
@@ -23,6 +28,8 @@ Protocols:
 - message carbons for multi-device sync
 - server-side message archive
 - real-time text
+- provider manifest loader
+- static web tabs for provider/support/captions
 
 Protocols:
 
@@ -39,6 +46,7 @@ Protocols:
 - image sharing
 - notification polish
 - first tester build
+- first SMS/caption provider adapter prototype
 
 Protocols:
 

@@ -1,0 +1,31 @@
+# Tiedragon XMPP Messenger language file
+# Format: key=value
+
+app.title=Tiedragon XMPP Messenger
+label.name=Name
+label.jid=JID
+label.xmpp_host=XMPP host
+label.xmpp_port=Port
+label.password=Password
+label.websocket=WebSocket
+label.conversation=Conversation
+label.message=Message
+label.rtt_status=RTT status
+option.rtt_live=RTT live
+option.tls=TLS
+button.connect=Connect
+button.disconnect=Disconnect
+button.xmpp_login=XMPP login
+button.reset=Reset
+status.disconnected=Disconnected
+status.connecting=Connecting...
+status.connected=Connected
+status.connection_failed=Connection failed
+status.invalid_port=Invalid XMPP port
+placeholder.local=Type a message and press Enter...
+placeholder.remote=Remote live text appears here...
+log.rtt_disabled=RTT live disabled; sending normal message snapshots after Enter.
+log.message_sent=Message snapshot sent.
+log.message_received=Message snapshot received.
+log.rtt_out_of_sync=Remote RTT stream out of sync; restored from envelope text snapshot.
+log.xmpp_login_ok=XMPP login OK: {0} via {1}.

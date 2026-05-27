@@ -20,13 +20,13 @@ Important lessons:
 - users need confidence that the service will remain available
 - accessibility should be designed for everyone, not only as a small special-purpose product
 
-## Product Lesson For TabMessenger
+## Product Lesson For Teletyptel 2.0
 
-TabMessenger should not claim to replace 112, 911 or official emergency calling.
+Teletyptel 2.0 should not claim to replace 112, 911 or official emergency calling.
 
 Better positioning:
 
-> TabMessenger can support verified emergency information channels and accessible communication around incidents, while official emergency calling remains with the responsible public emergency services.
+> Teletyptel 2.0 can support verified emergency information channels and accessible communication around incidents, while official emergency calling remains with the responsible public emergency services.
 
 Possible future direction:
 
@@ -52,3 +52,4 @@ The product should avoid becoming a narrow tool for one small group only. Real-t
 - NU.nl, 21 June 2012: https://www.nu.nl/tech/2841037/overheid-steunt-doventelefonie-na-faillissement.html
 - Doof.nl, 21 June 2012: https://www.doof.nl/algemeen/telefoondienst-voor-doven-en-slechthorenden-veiliggesteld-27905/
 - ED.nl report about 112 access disruption: https://www.ed.nl/binnenland/doven-kunnen-112-al-twee-maanden-niet-bereiken~a9178723/
+

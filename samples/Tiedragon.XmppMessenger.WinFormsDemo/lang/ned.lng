@@ -1,0 +1,31 @@
+# Tiedragon XMPP Messenger taalbestand
+# Format: key=value
+
+app.title=Tiedragon XMPP Messenger
+label.name=Naam
+label.jid=JID
+label.xmpp_host=XMPP host
+label.xmpp_port=Poort
+label.password=Wachtwoord
+label.websocket=WebSocket
+label.conversation=Gesprek
+label.message=Bericht
+label.rtt_status=RTT status
+option.rtt_live=RTT live
+option.tls=TLS
+button.connect=Verbinden
+button.disconnect=Verbinding verbreken
+button.xmpp_login=XMPP login
+button.reset=Herstel
+status.disconnected=Niet verbonden
+status.connecting=Verbinden...
+status.connected=Verbonden
+status.connection_failed=Verbinden mislukt
+status.invalid_port=Ongeldige XMPP poort
+placeholder.local=Typ een bericht en druk op Enter...
+placeholder.remote=Live tekst van de ander verschijnt hier...
+log.rtt_disabled=RTT live uit; gewone berichten worden na Enter verzonden.
+log.message_sent=Berichtsnapshot verzonden.
+log.message_received=Berichtsnapshot ontvangen.
+log.rtt_out_of_sync=Remote RTT-stream niet synchroon; hersteld uit tekstsnapshot.
+log.xmpp_login_ok=XMPP login OK: {0} via {1}.

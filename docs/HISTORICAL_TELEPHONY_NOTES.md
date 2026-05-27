@@ -49,9 +49,9 @@ Modern replacement:
 | Telephone audio path | WebRTC audio/video transport |
 | Dedicated hardware protocol | Open internet protocol |
 
-## Lesson For TabMessenger
+## Lesson For Teletyptel 2.0
 
-TabMessenger should keep the useful principle and avoid the outdated form.
+Teletyptel 2.0 should keep the useful principle and avoid the outdated form.
 
 Keep:
 
@@ -70,7 +70,7 @@ Avoid:
 
 Modern translation:
 
-| Earlier tool | Modern TabMessenger equivalent |
+| Earlier tool | Modern Teletyptel 2.0 equivalent |
 | --- | --- |
 | Text telephone | XMPP chat and RTT |
 | TeleToets keyboard | Smartphone/desktop keyboard and live text editor |
@@ -80,4 +80,5 @@ Modern translation:
 
 ## Strategic Sentence
 
-TabMessenger should not recreate old text telephony. It should bring the useful parts of text telephony into mainstream mobile communication.
+Teletyptel 2.0 should not recreate old text telephony. It should bring the useful parts of text telephony into mainstream mobile communication.
+

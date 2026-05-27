@@ -1,6 +1,6 @@
 # Signal And Matrix Comparison
 
-Signal and Matrix are important references for TabMessenger. They solve parts of the same communication problem, but with different trade-offs.
+Signal and Matrix are important references for Teletyptel 2.0. They solve parts of the same communication problem, but with different trade-offs.
 
 ## Signal
 
@@ -15,7 +15,7 @@ Strengths:
 - open-source clients and protocol libraries
 - simple user experience
 
-Limitations for the TabMessenger idea:
+Limitations for the Teletyptel 2.0 idea:
 
 - not federated like XMPP or Matrix
 - users depend on Signal's service network
@@ -44,7 +44,7 @@ Strengths:
 - strong fit for teams and organizations
 - active work on MatrixRTC and Element Call for real-time communication
 
-Limitations for the TabMessenger idea:
+Limitations for the Teletyptel 2.0 idea:
 
 - can feel complex for normal users
 - homeserver identity and room concepts can be harder to explain than ordinary chat
@@ -99,3 +99,4 @@ Do not build on Signal as the main platform because Signal is not a federated/op
 - MatrixRTC overview: https://element.io/blog/exploring-matrixrtc-real-time-communication-in-rooms/
 - Matrix VoIP FAQ: https://matrix.org/docs/older/faq/
 - Matrix JavaScript SDK VoIP guide: https://matrix-org-matrix-js-sdk.mintlify.app/guides/voip-calling
+

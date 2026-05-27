@@ -8,3 +8,6 @@ obj/
 artifacts/
 packages/
 TestResults/
+*-cdx.json
+archive-teletyptel/
+php/*screenshot*.png

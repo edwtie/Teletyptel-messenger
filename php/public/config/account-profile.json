@@ -1,0 +1,12 @@
+{
+  "accountId": "local-edward",
+  "jid": "edward@localhost/web",
+  "displayName": "Edward",
+  "phoneNumber": "",
+  "providerId": "example-provider",
+  "accessibilityProfileId": "default-live-text",
+  "preferredLanguage": "nl",
+  "relayWebSocket": "ws://127.0.0.1:8787",
+  "xmppWebSocket": "ws://127.0.0.1:8787",
+  "peer": "relay@localhost"
+}

@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#111827">
+  <title>Tiedragon XMPP Web Client</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="chat-client.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark">TX</div>
+        <div>
+          <h1>Tiedragon XMPP</h1>
+          <span id="connectionSummary">Disconnected</span>
+        </div>
+      </div>
+      <div class="top-actions" role="toolbar" aria-label="Connection actions">
+        <button id="connectButton" type="button">Connect</button>
+        <button id="disconnectButton" type="button" disabled>Disconnect</button>
+      </div>
+    </header>
+
+    <main class="client-grid">
+      <aside class="conversation-list" aria-label="Conversations">
+        <div class="section-heading">
+          <span>Conversations</span>
+          <button id="addConversationButton" type="button" title="Add conversation">+</button>
+        </div>
+        <div id="conversationItems" class="conversation-items"></div>
+      </aside>
+
+      <section class="chat-panel" aria-label="Chat">
+        <nav id="appTabs" class="app-tabs" aria-label="Teletyptel tabs"></nav>
+
+        <div class="chat-header">
+          <div>
+            <h2 id="activeConversationName">Relay room</h2>
+            <span id="activeConversationMeta">Local PHP relay</span>
+          </div>
+          <div class="mode-switch" role="tablist" aria-label="Transport mode">
+            <button id="relayModeButton" type="button" class="selected">Relay</button>
+            <button id="xmppModeButton" type="button">RFC 7395</button>
+          </div>
+        </div>
+
+        <div id="messageTimeline" class="message-timeline" aria-live="polite"></div>
+
+        <section id="tabPanel" class="tab-panel" hidden>
+          <div class="tab-panel-header">
+            <div>
+              <h2 id="tabPanelTitle">Tab</h2>
+              <span id="tabPanelMeta"></span>
+            </div>
+            <button id="closeTabPanelButton" type="button">Back to chat</button>
+          </div>
+          <div id="tabPanelBody" class="tab-panel-body"></div>
+        </section>
+
+        <div id="remoteDraft" class="remote-draft" hidden>
+          <span id="remoteDraftName">Remote</span>
+          <p id="remoteDraftText"></p>
+        </div>
+
+        <form id="composerForm" class="composer">
+          <div class="composer-tools" role="toolbar" aria-label="Message tools">
+            <button id="resetRttButton" type="button">Reset RTT</button>
+            <label class="toggle">
+              <input id="rttToggle" type="checkbox" checked>
+              <span>Live RTT</span>
+            </label>
+            <label class="toggle">
+              <input id="smileyToggle" type="checkbox" checked>
+              <span>Smilies</span>
+            </label>
+          </div>
+          <textarea id="messageInput" rows="4" spellcheck="true" placeholder="Type a message"></textarea>
+          <div class="send-row">
+            <span id="composerState">Enter sends, Shift+Enter inserts a line</span>
+            <button id="sendButton" type="submit">Send</button>
+          </div>
+        </form>
+      </section>
+
+      <aside class="detail-panel" aria-label="Connection and debug">
+        <section class="settings-section">
+          <h2>Connection</h2>
+          <label>
+            Relay WebSocket
+            <input id="relayUrlInput" value="ws://127.0.0.1:8787">
+          </label>
+          <label>
+            Display name
+            <input id="displayNameInput" value="Edward">
+          </label>
+          <label>
+            JID
+            <input id="jidInput" value="edward@localhost/web">
+          </label>
+          <label>
+            Peer
+            <input id="peerInput" value="relay@localhost">
+          </label>
+          <label>
+            Phone
+            <input id="phoneInput" value="">
+          </label>
+          <label>
+            Provider
+            <input id="providerInput" value="example-provider" readonly>
+          </label>
+        </section>
+
+        <section class="settings-section">
+          <h2>Provider</h2>
+          <div id="providerSummary" class="provider-summary">Loading provider manifest...</div>
+          <div id="capabilityList" class="capability-list"></div>
+        </section>
+
+        <section class="settings-section">
+          <h2>RFC 7395</h2>
+          <label>
+            XMPP WebSocket
+            <input id="xmppUrlInput" value="ws://127.0.0.1:8787">
+          </label>
+          <div class="button-row">
+            <button id="xmppOpenButton" type="button">Open stream</button>
+            <button id="xmppCloseButton" type="button" disabled>Close</button>
+          </div>
+        </section>
+
+        <section class="settings-section grow">
+          <div class="section-heading">
+            <h2>Debug XML</h2>
+            <button id="clearLogButton" type="button">Clear</button>
+          </div>
+          <pre id="debugLog" class="debug-log"></pre>
+        </section>
+      </aside>
+    </main>
+  </div>
+
+  <script src="chat-client.js"></script>
+</body>
+</html>

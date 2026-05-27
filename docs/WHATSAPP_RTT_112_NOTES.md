@@ -2,7 +2,7 @@
 
 WhatsApp is strong for everyday social messaging, but it is not a complete replacement for official telecommunication and emergency-access functions.
 
-This matters for TabMessenger because the product idea is not just "another chat app". The goal is clearer, more readable and more accessible communication for everyone.
+This matters for Teletyptel 2.0 because the product idea is not just "another chat app". The goal is clearer, more readable and more accessible communication for everyone.
 
 ## Gap 1: WhatsApp Does Not Provide Telecom RTT
 
@@ -55,7 +55,7 @@ The product lesson is not "people should stop using WhatsApp". The lesson is:
 
 > When one closed messenger becomes the default, important communication features that do not fit its model can disappear from everyday awareness.
 
-TabMessenger should therefore make live text, verified channels and accessible conversation feel normal again.
+Teletyptel 2.0 should therefore make live text, verified channels and accessible conversation feel normal again.
 
 ## Dutch Official Route: 112NL
 
@@ -68,15 +68,15 @@ Officially described functions include:
 - location sharing when permission is given
 - chat translation in the preferred language
 
-This is the correct type of official route for emergency access. TabMessenger must not claim to replace it.
+This is the correct type of official route for emergency access. Teletyptel 2.0 must not claim to replace it.
 
-## Product Lesson For TabMessenger
+## Product Lesson For Teletyptel 2.0
 
-TabMessenger should not market itself as an emergency-calling replacement.
+Teletyptel 2.0 should not market itself as an emergency-calling replacement.
 
 Better positioning:
 
-> TabMessenger can make everyday and organizational communication more readable through chat, real-time text, captions, transcripts and verified information channels. Official emergency access remains with national emergency services and their official apps.
+> Teletyptel 2.0 can make everyday and organizational communication more readable through chat, real-time text, captions, transcripts and verified information channels. Official emergency access remains with national emergency services and their official apps.
 
 ## Design Direction
 
@@ -95,3 +95,4 @@ Use these lessons:
 - Politie 112NL app information: https://www.politie.nl/informatie/informatie-over-de-112nl-app.html
 - Apple RTT/TTY support: https://support.apple.com/en-mide/111776
 - Android RTT support: https://support.google.com/messages/answer/9042284
+

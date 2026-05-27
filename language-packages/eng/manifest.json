@@ -1,0 +1,14 @@
+{
+  "format": 1,
+  "key": "tiedragon-xmpp-messenger-eng",
+  "id": "tiedragon-xmpp-messenger-eng",
+  "product": "Tiedragon XMPP Messenger",
+  "producer": "Tiedragon",
+  "softwareId": "tiedragon.xmppmessenger",
+  "languageCode": "eng",
+  "displayName": "English",
+  "nativeName": "English",
+  "appMinVersion": "0.1.0",
+  "packageVersion": "2026.05.26.001",
+  "author": "Tiedragon"
+}

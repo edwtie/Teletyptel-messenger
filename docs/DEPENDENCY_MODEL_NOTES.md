@@ -39,13 +39,31 @@ The long-term lesson is different:
 - a product should not depend on special hardware when open software and mainstream devices can solve the same problem for more people
 - accessibility features should move into everyday communication tools instead of staying locked in separate devices
 
-For TabMessenger this means:
+For Teletyptel 2.0 this means:
 
 > Do not build a modern TeleToets as a closed device. Build the communication layer for the devices people already use: iOS, Android and later desktop/web.
 
+## Protocol Dependency Rule
+
+The XMPP protocol layer is not outsourced to a third-party XMPP client library.
+Teletyptel 2.0 should own the RFC 6120 stream flow, TLS/SASL negotiation,
+stanza models and XEP-0301 real-time text behavior.
+
+This does not mean rewriting every low-level primitive. Normal platform
+building blocks are welcome:
+
+- .NET networking and TLS primitives;
+- browser WebSocket and DOM APIs;
+- XML, JSON and cryptography libraries;
+- provider SDKs at adapter boundaries.
+
+The boundary is protocol ownership. If a dependency decides how XMPP login,
+stream restart, RTT payloads or stanza dispatch work, it belongs outside the
+core or must be replaced by typed Teletyptel code.
+
 ## Product Principle
 
-TabMessenger should be useful for everyone, not only reimbursed as a care tool.
+Teletyptel 2.0 should be useful for everyone, not only reimbursed as a care tool.
 
 This means:
 

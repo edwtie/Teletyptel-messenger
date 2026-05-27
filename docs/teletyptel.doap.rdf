@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Project xmlns="http://usefulinc.com/ns/doap#"
+         xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+  <name>Teletyptel 2.0</name>
+  <shortdesc xml:lang="en">Accessible XMPP client with real-time text.</shortdesc>
+  <description xml:lang="en">Teletyptel 2.0 is a web-based XMPP client for accessible realtime communication. It combines standard chat with XEP-0301 real-time text and is designed for future Android and iOS packaging.</description>
+  <homepage rdf:resource="https://www.tiedragon.com/teletyptel" />
+  <programming-language>JavaScript</programming-language>
+  <programming-language>C#</programming-language>
+  <programming-language>PHP</programming-language>
+  <os>Web</os>
+  <os>Android</os>
+  <os>iOS</os>
+  <category rdf:resource="https://xmpp.org/software/clients/" />
+  <implements rdf:resource="https://xmpp.org/extensions/xep-0301.html" />
+</Project>

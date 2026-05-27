@@ -1,0 +1,21 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Tiedragon.LngPdk\Tiedragon.LngPdk.csproj" />
+    <ProjectReference Include="..\..\src\Tiedragon.XmppMessenger.Core\Tiedragon.XmppMessenger.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="lang\*.lng" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="LanguagePackages\*.lngpdk" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+</Project>

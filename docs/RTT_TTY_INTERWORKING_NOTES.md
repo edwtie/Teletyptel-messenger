@@ -9,7 +9,7 @@ Source:
 
 This document explains the transition from legacy TTY/PSTN text communication to IP-based RTT in IMS/LTE environments.
 
-It is important for TabMessenger because it confirms the core product direction:
+It is important for Teletyptel 2.0 because it confirms the core product direction:
 
 > Modern text communication should move from fragile audio-tone/telephone-era technology to IP-based real-time text with better quality, lower latency and richer conversation modes.
 
@@ -24,7 +24,7 @@ RTT is not just normal chat. The document describes RTT as:
 - text editing support such as newline and erase-last-character with remote effect
 - possible simultaneous use with audio, and optionally video
 
-This matches the TabMessenger idea:
+This matches the Teletyptel 2.0 idea:
 
 - chat should be readable live
 - audio/video and text should coexist
@@ -38,7 +38,7 @@ Important lesson:
 
 > Audio-tone text transmission is fragile in packet networks. Modern communication should use native IP text protocols where possible.
 
-For TabMessenger:
+For Teletyptel 2.0:
 
 - do not emulate legacy TTY tones
 - do not depend on audio-tone detection
@@ -48,9 +48,9 @@ For TabMessenger:
 
 The document discusses interworking units that convert between legacy TTY and modern RTT.
 
-That is useful historically, but it is not the first TabMessenger product goal.
+That is useful historically, but it is not the first Teletyptel 2.0 product goal.
 
-TabMessenger should focus first on native IP communication:
+Teletyptel 2.0 should focus first on native IP communication:
 
 - RTT-to-RTT
 - chat-to-chat
@@ -68,7 +68,7 @@ The source mentions terminal accessibility needs such as:
 - tactile alerting
 - possible external alerting devices
 
-TabMessenger should translate this into modern app behavior:
+Teletyptel 2.0 should translate this into modern app behavior:
 
 - sound notifications
 - vibration/haptics
@@ -95,7 +95,7 @@ XMPP has a direct RTT path through:
 
 - XEP-0301: In-Band Real Time Text
 
-The telecom/IMS world has its own RTT architecture. TabMessenger should not copy IMS, but the quality requirements are still useful:
+The telecom/IMS world has its own RTT architecture. Teletyptel 2.0 should not copy IMS, but the quality requirements are still useful:
 
 - low latency
 - reliable text delivery
@@ -105,8 +105,8 @@ The telecom/IMS world has its own RTT architecture. TabMessenger should not copy
 
 ## Open Questions
 
-- Which mobile XMPP libraries support XEP-0301 well enough?
-- If library support is weak, should TabMessenger implement XEP-0301 directly?
+- Which mobile platform primitives are needed for the web, Android and iOS clients?
+- Which XEP-0301 behavior must be shared between all Teletyptel 2.0 clients?
 - How should RTT appear in the UI: inline draft stream, separate live panel or combined transcript?
 - How should RTT interact with normal message send?
 - Should RTT be on by default per contact, per room or per call?
@@ -115,4 +115,5 @@ The telecom/IMS world has its own RTT architecture. TabMessenger should not copy
 
 ## Strategic Sentence
 
-TabMessenger should carry forward the useful idea of TTY and text telephony, but implement it as native IP real-time text for modern mobile communication.
+Teletyptel 2.0 should carry forward the useful idea of TTY and text telephony, but implement it as native IP real-time text for modern mobile communication.
+
