@@ -1,8 +1,12 @@
 {
   "name": "Teletyptel 2.0",
-  "doap": "https://www.tiedragon.com/teletyptel/doap.rdf",
-  "platforms": [],
-  "url": null,
+  "doap": null,
+  "platforms": [
+    "Web",
+    "Android",
+    "iOS"
+  ],
+  "url": "https://github.com/edwtie/Tiedragon.XmppMessenger",
   "categories": [
     "client"
   ]

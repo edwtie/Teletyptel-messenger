@@ -6,7 +6,8 @@ public repository and repeatable real-server smoke result.
 
 ## Target Entry
 
-Preferred entry with DOAP:
+Future entry with DOAP, after the public Teletyptel project page and DOAP file
+are published:
 
 ```json
 {
@@ -20,7 +21,7 @@ Preferred entry with DOAP:
 }
 ```
 
-Fallback entry without DOAP:
+Initial public entry without DOAP:
 
 ```json
 {
@@ -31,15 +32,17 @@ Fallback entry without DOAP:
     "Android",
     "iOS"
   ],
-  "url": "https://www.tiedragon.com/teletyptel",
+  "url": "https://github.com/edwtie/Tiedragon.XmppMessenger",
   "categories": [
     "client"
   ]
 }
 ```
 
-The DOAP entry is preferred because xmpp.org can source the project URL and
-platform metadata from the DOAP file.
+The DOAP entry is preferred later because xmpp.org can source the project URL
+and platform metadata from the DOAP file. The initial entry uses the public
+GitHub repository so the project can be reviewed before the final project page
+is online.
 
 ## Public Description
 
@@ -67,11 +70,12 @@ Implemented or planned standards for the public entry:
 ## Submit Checklist
 
 - [ ] Public Teletyptel 2.0 project page exists.
-- [ ] Public source repository exists.
+- [x] Public source repository exists.
 - [ ] Public README explains accessible realtime text direction.
 - [ ] Public license is present.
 - [ ] DOAP file is published at the final URL.
-- [ ] XSF entry uses the final DOAP URL.
+- [x] Initial XSF entry uses the public GitHub repository URL.
+- [ ] Future XSF entry uses the final DOAP URL.
 - [ ] `lint_software_list.py software.json` passes in an xmpp.org fork.
 - [ ] Real-server smoke test has passed with two accounts.
 - [ ] Alpha 1 build is downloadable or runnable from public instructions.
