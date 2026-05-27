@@ -24,7 +24,7 @@ item is implemented, tested and documented.
 - [ ] Language key completeness validator for web `.lng` and packaged LngPdk resources.
 - [ ] Account authentication/session model; current Alpha 2 profile API is not login security.
 - [ ] Password handling hardening; current local profile password option is a prototype setting.
-- [ ] Real XMPP server two-account chat smoke test.
+- [x] Real XMPP server two-account chat smoke test.
 - [ ] Roster/contact model backed by XMPP instead of local demo state.
 - [ ] Replace demo relay semantics with standards-based XMPP production routing.
 - [ ] Mobile WebView packaging smoke test for Android and iOS.
@@ -69,7 +69,7 @@ item is implemented, tested and documented.
 - [x] Presence subscription workflow.
 - [x] Roster set/remove workflow.
 - [x] Normal chat send/receive fake-server scenario.
-- [ ] Real server two-account chat smoke test with `Tiedragon.XmppMessenger.RealServerSmoke`.
+- [x] Real server two-account chat smoke test with `Tiedragon.XmppMessenger.RealServerSmoke`.
 
 ## RFC 7395 - XMPP Over WebSocket
 
@@ -186,6 +186,7 @@ item is implemented, tested and documented.
 - [x] Debug console for raw XML trace.
 - [x] Local Prosody/Openfire smoke setup notes.
 - [x] Real-server smoke tool for TLS, hostname validation and two-account chat.
+- [x] Real-server smoke tool can create temporary XEP-0077 in-band registration accounts with `--register`.
 
 ## Accessibility Agent
 

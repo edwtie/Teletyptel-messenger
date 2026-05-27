@@ -48,6 +48,7 @@ var tests = new (string Name, Action Test)[]
     ("XMPP negotiation plan follows RFC 6120 order", XmppNegotiationPlanFollowsRfc6120Order),
     ("XMPP negotiation plan blocks missing required TLS", XmppNegotiationPlanBlocksMissingRequiredTls),
     ("XMPP stream reader handles chunked features", XmppStreamReaderHandlesChunkedFeatures),
+    ("XMPP stream reader skips XML declaration", XmppStreamReaderSkipsXmlDeclaration),
     ("XMPP stream reader returns multiple stanzas", XmppStreamReaderReturnsMultipleStanzas),
     ("XMPP stream reader handles self closing element", XmppStreamReaderHandlesSelfClosingElement),
     ("XMPP stream reader reports stream close", XmppStreamReaderReportsStreamClose),
@@ -690,6 +691,22 @@ static void XmppStreamReaderHandlesChunkedFeatures()
     True(features.StartTlsRequired);
 }
 
+static void XmppStreamReaderSkipsXmlDeclaration()
+{
+    var reader = new XmppStreamReader();
+    reader.Append("""
+        <?xml version='1.0'?>
+        <stream:stream xmlns="jabber:client" xmlns:stream="http://etherx.jabber.org/streams" from="example.org" version="1.0">
+        <stream:features/>
+        """);
+
+    var nodes = reader.ReadAvailable();
+
+    Equal(2, nodes.Count);
+    Equal(XmppStreamNodeType.StreamOpened, nodes[0].Type);
+    Equal(XmppStreamNodeType.Features, nodes[1].Type);
+}
+
 static void XmppStreamReaderReturnsMultipleStanzas()
 {
     var reader = new XmppStreamReader();
@@ -924,6 +941,14 @@ static async Task RunXmppStreamClientRunsTlsSaslBindCommandsAsync()
         var restartedStream = await ReadTextAsync(serverStream, buffer);
         sawRestartedStream = restartedStream.Contains("<stream:stream", StringComparison.Ordinal)
             && restartedStream.Contains("to=\"example.org\"", StringComparison.Ordinal);
+        await WriteTextAsync(serverStream, """
+            <stream:stream xmlns="jabber:client" xmlns:stream="http://etherx.jabber.org/streams" from="example.org" version="1.0">
+            <stream:features>
+              <mechanisms xmlns="urn:ietf:params:xml:ns:xmpp-sasl">
+                <mechanism>PLAIN</mechanism>
+              </mechanisms>
+            </stream:features>
+            """);
 
         var auth = await ReadTextAsync(serverStream, buffer);
         sawAuth = auth.Contains("<auth", StringComparison.Ordinal)
@@ -935,7 +960,8 @@ static async Task RunXmppStreamClientRunsTlsSaslBindCommandsAsync()
             && saslRestartedStream.Contains("to=\"example.org\"", StringComparison.Ordinal);
 
         await WriteTextAsync(serverStream, """
-            <stream:features xmlns:stream="http://etherx.jabber.org/streams">
+            <stream:stream xmlns="jabber:client" xmlns:stream="http://etherx.jabber.org/streams" from="example.org" version="1.0">
+            <stream:features>
               <bind xmlns="urn:ietf:params:xml:ns:xmpp-bind"><required/></bind>
             </stream:features>
             """);
@@ -1219,7 +1245,8 @@ static async Task RunXmppStreamClientLoginPerformsAuthAndBindAsync()
 
         await ReadTextAsync(serverStream, buffer);
         await WriteTextAsync(serverStream, """
-            <stream:features xmlns:stream="http://etherx.jabber.org/streams">
+            <stream:stream xmlns="jabber:client" xmlns:stream="http://etherx.jabber.org/streams" from="example.org" version="1.0">
+            <stream:features>
               <bind xmlns="urn:ietf:params:xml:ns:xmpp-bind"><required/></bind>
             </stream:features>
             """);

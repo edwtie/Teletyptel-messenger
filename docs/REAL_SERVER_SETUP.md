@@ -122,6 +122,30 @@ Result on 2026-05-27:
 - `PASS Hostname mismatch rejected.`
 - two-account chat skipped because no real accounts were supplied.
 
+Verified public two-account smoke target:
+
+```powershell
+dotnet run --project tools/Tiedragon.XmppMessenger.RealServerSmoke -- `
+  --host rans0m.net `
+  --port 5222 `
+  --account1 user-a@rans0m.net/desktop `
+  --password1 secret `
+  --account2 user-b@rans0m.net/desktop `
+  --password2 secret `
+  --bad-host wrong.example.org `
+  --timeout-seconds 60
+```
+
+Result on 2026-05-27:
+
+- `PASS TLS certificate accepted for configured host.`
+- `PASS Hostname mismatch rejected.`
+- `PASS Two-account chat message delivered.`
+
+Temporary accounts can be created on servers that allow XEP-0077 in-band
+registration by adding `--register`. Public servers can rate-limit or reject
+registration attempts; that is expected behavior and should not be bypassed.
+
 ## Openfire Direction
 
 Openfire can be used as a second smoke target after Prosody:

@@ -749,6 +749,7 @@ public sealed class XmppStreamClient : IAsyncDisposable
             _stream = await _tlsStreamUpgrader.UpgradeAsync(_stream, _settings.Host, cancellationToken).ConfigureAwait(false);
             _writer = new XmppStreamWriter(_stream);
             _tlsActive = true;
+            _reader.Reset();
             await WriteOpenStreamAsync(cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is not XmppProtocolException)
@@ -763,6 +764,7 @@ public sealed class XmppStreamClient : IAsyncDisposable
     private async Task RestartStreamAfterAuthenticationAsync(CancellationToken cancellationToken)
     {
         _authenticated = true;
+        _reader.Reset();
         await WriteOpenStreamAsync(cancellationToken).ConfigureAwait(false);
     }
 

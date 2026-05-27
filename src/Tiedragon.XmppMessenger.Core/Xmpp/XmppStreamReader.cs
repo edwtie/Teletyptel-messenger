@@ -13,13 +13,19 @@ public sealed class XmppStreamReader
         _buffer.Append(text);
     }
 
+    public void Reset()
+    {
+        _buffer.Clear();
+        _streamOpened = false;
+    }
+
     public IReadOnlyList<XmppStreamNode> ReadAvailable()
     {
         var nodes = new List<XmppStreamNode>();
 
         while (true)
         {
-            TrimLeadingWhitespace();
+            TrimLeadingNonStreamPreamble();
 
             if (_buffer.Length == 0)
             {
@@ -239,6 +245,26 @@ public sealed class XmppStreamReader
         if (count > 0)
         {
             _buffer.Remove(0, count);
+        }
+    }
+
+    private void TrimLeadingNonStreamPreamble()
+    {
+        while (true)
+        {
+            TrimLeadingWhitespace();
+            if (!StartsWith("<?"))
+            {
+                return;
+            }
+
+            var endInstruction = IndexOf("?>", 2);
+            if (endInstruction < 0)
+            {
+                return;
+            }
+
+            _buffer.Remove(0, endInstruction + 2);
         }
     }
 
