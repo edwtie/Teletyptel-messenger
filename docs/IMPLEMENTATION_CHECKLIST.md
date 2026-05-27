@@ -3,6 +3,32 @@
 This checklist tracks protocol and product progress. Use `[x]` only when the
 item is implemented, tested and documented.
 
+## Alpha 2 - Web, Accounts And Localization
+
+- [x] Teletyptel architecture diagram linked from the README.
+- [x] XMPP core, RFC 7395 and XEP extensions shown as separate architecture layers.
+- [x] Web client light/dark theme switch.
+- [x] Web client account profile controls for JID, display name, peer, password option and language.
+- [x] Local browser profile fallback for account settings.
+- [x] PHP account API for loading and saving account profiles.
+- [x] MySQL/MariaDB schema for account profiles.
+- [x] WAMP/MySQL local setup documented.
+- [x] Account API smoke-tested against local MariaDB.
+- [x] Web `.lng` loader with English and Dutch language files.
+- [x] `preferredLanguage` saved through the account profile API.
+- [x] Legacy smiley catalog and web rendering support.
+- [x] AI bot console demo for live RTT testing.
+- [x] Critical `.lng` versus LngPdk risk notes documented.
+- [x] LngPdk production direction documented separately from loose `.lng` fallback.
+- [ ] LngPdk package serving and verification in the web/mobile clients.
+- [ ] Language key completeness validator for web `.lng` and packaged LngPdk resources.
+- [ ] Account authentication/session model; current Alpha 2 profile API is not login security.
+- [ ] Password handling hardening; current local profile password option is a prototype setting.
+- [ ] Real XMPP server two-account chat smoke test.
+- [ ] Roster/contact model backed by XMPP instead of local demo state.
+- [ ] Replace demo relay semantics with standards-based XMPP production routing.
+- [ ] Mobile WebView packaging smoke test for Android and iOS.
+
 ## RFC 6120 - XMPP Core
 
 - [x] JID/address parsing.
