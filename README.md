@@ -11,6 +11,10 @@ third-party XMPP library. Teletyptel 2.0 should own its RFC 6120 stream flow,
 TLS/SASL negotiation, stanza models and XEP-0301 real-time text behavior while
 still using normal platform primitives such as TLS, XML and WebSocket APIs.
 
+## Architecture
+
+![Tiedragon Teletyptel 2.0 architecture](docs/TELETYPTEL_ARCHITECTURE.svg)
+
 The project goal is a modern messenger with:
 
 - one-to-one chat

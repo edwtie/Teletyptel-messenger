@@ -1,0 +1,175 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="900" viewBox="0 0 1400 900" role="img" aria-labelledby="title desc">
+  <title id="title">Tiedragon Teletyptel 2.0 architecture</title>
+  <desc id="desc">Architecture diagram showing web, mobile, PHP, MySQL, XMPP core, real-time text, localization and future server integration.</desc>
+  <defs>
+    <style>
+      .bg { fill: #f7f9fc; }
+      .title { font: 700 34px "Segoe UI", Arial, sans-serif; fill: #0f2f66; }
+      .subtitle { font: 400 16px "Segoe UI", Arial, sans-serif; fill: #52657a; }
+      .lane-title { font: 700 15px "Segoe UI", Arial, sans-serif; fill: #244669; text-transform: uppercase; letter-spacing: .06em; }
+      .box { fill: #ffffff; stroke: #9fb7d4; stroke-width: 2; rx: 10; }
+      .box-blue { fill: #eaf3ff; stroke: #4c8eda; }
+      .box-green { fill: #eaf8ef; stroke: #32a267; }
+      .box-gold { fill: #fff7df; stroke: #d69b21; }
+      .box-red { fill: #fff0f0; stroke: #d45c5c; }
+      .box-dark { fill: #14345f; stroke: #0b2344; }
+      .box-dark-text { fill: #ffffff; }
+      .label { font: 700 18px "Segoe UI", Arial, sans-serif; fill: #10243c; }
+      .small { font: 400 13px "Segoe UI", Arial, sans-serif; fill: #41556b; }
+      .small-strong { font: 700 13px "Segoe UI", Arial, sans-serif; fill: #244669; }
+      .dark-small { font: 400 13px "Segoe UI", Arial, sans-serif; fill: #d9e9ff; }
+      .arrow { stroke: #2f5f9d; stroke-width: 3; fill: none; marker-end: url(#arrowHead); }
+      .arrow-soft { stroke: #7b93b2; stroke-width: 2.5; fill: none; marker-end: url(#arrowHeadSoft); stroke-dasharray: 8 7; }
+      .line { stroke: #cad7e7; stroke-width: 1.5; }
+      .badge { fill: #0f6ecb; rx: 5; }
+      .badge-text { font: 700 12px "Segoe UI", Arial, sans-serif; fill: #ffffff; }
+    </style>
+    <marker id="arrowHead" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M2,2 L10,6 L2,10 Z" fill="#2f5f9d" />
+    </marker>
+    <marker id="arrowHeadSoft" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M2,2 L10,6 L2,10 Z" fill="#7b93b2" />
+    </marker>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1400" height="900" />
+  <text class="title" x="50" y="58">Tiedragon Teletyptel 2.0 Architecture</text>
+  <text class="subtitle" x="52" y="88">Open XMPP messenger with XEP-0301 real-time text, web/mobile UI, PHP relay/API, MySQL account profile and .lng localization.</text>
+
+  <line class="line" x1="50" y1="122" x2="1350" y2="122" />
+  <line class="line" x1="50" y1="258" x2="1350" y2="258" />
+  <line class="line" x1="50" y1="438" x2="1350" y2="438" />
+  <line class="line" x1="50" y1="632" x2="1350" y2="632" />
+  <line class="line" x1="50" y1="788" x2="1350" y2="788" />
+
+  <text class="lane-title" x="54" y="113">Clients</text>
+  <text class="lane-title" x="54" y="249">Web Application</text>
+  <text class="lane-title" x="54" y="429">PHP Edge Layer</text>
+  <text class="lane-title" x="54" y="623">Core Libraries And Protocol</text>
+  <text class="lane-title" x="54" y="779">Future Production Services</text>
+
+  <g id="clients">
+    <rect class="box box-blue" x="92" y="145" width="260" height="78" />
+    <text class="label" x="118" y="177">Desktop Browser</text>
+    <text class="small" x="118" y="199">Local web client on localhost</text>
+
+    <rect class="box box-blue" x="410" y="145" width="260" height="78" />
+    <text class="label" x="436" y="177">Android WebView</text>
+    <text class="small" x="436" y="199">Same web UI packaged later</text>
+
+    <rect class="box box-blue" x="728" y="145" width="260" height="78" />
+    <text class="label" x="754" y="177">iOS WebView</text>
+    <text class="small" x="754" y="199">Same web UI packaged later</text>
+
+    <rect class="box box-green" x="1046" y="145" width="260" height="78" />
+    <text class="label" x="1072" y="177">Assistive Input</text>
+    <text class="small" x="1072" y="199">Captions, RTT, future speech/sign</text>
+  </g>
+
+  <g id="webapp">
+    <rect class="box box-dark" x="92" y="300" width="360" height="110" />
+    <text class="label box-dark-text" x="118" y="333">php/public/chat.html</text>
+    <text class="dark-small" x="118" y="358">Chat timeline, RTT draft bubbles</text>
+    <text class="dark-small" x="118" y="380">Accounts, contacts, provider tabs</text>
+    <text class="dark-small" x="118" y="402">Dark/light theme and smileys</text>
+
+    <rect class="box box-gold" x="520" y="300" width="270" height="110" />
+    <text class="label" x="546" y="333">.lng Localization</text>
+    <text class="small" x="546" y="358">lang/ned.lng</text>
+    <text class="small" x="546" y="380">lang/eng.lng</text>
+    <text class="small" x="546" y="402">preferredLanguage from profile</text>
+
+    <rect class="box box-green" x="858" y="300" width="270" height="110" />
+    <text class="label" x="884" y="333">Account Profile</text>
+    <text class="small" x="884" y="358">JID, display name, peer</text>
+    <text class="small" x="884" y="380">password option, provider id</text>
+    <text class="small" x="884" y="402">local fallback plus MySQL</text>
+
+    <rect class="box box-blue" x="1190" y="300" width="145" height="110" />
+    <text class="label" x="1214" y="333">PWA Cache</text>
+    <text class="small" x="1214" y="358">service-worker</text>
+    <text class="small" x="1214" y="380">offline assets</text>
+  </g>
+
+  <g id="php">
+    <rect class="box box-blue" x="92" y="478" width="290" height="108" />
+    <text class="label" x="118" y="510">PHP WebSocket Relay</text>
+    <text class="small" x="118" y="535">rtt-websocket-server.php</text>
+    <text class="small" x="118" y="557">JSON RTT and RFC 7395 xmpp</text>
+
+    <rect class="box box-green" x="442" y="478" width="290" height="108" />
+    <text class="label" x="468" y="510">PHP Account API</text>
+    <text class="small" x="468" y="535">public/api/account.php</text>
+    <text class="small" x="468" y="557">GET/POST account profile</text>
+
+    <rect class="box box-gold" x="792" y="478" width="250" height="108" />
+    <text class="label" x="818" y="510">MySQL / MariaDB</text>
+    <text class="small" x="818" y="535">account_profiles</text>
+    <text class="small" x="818" y="557">teletyptel database</text>
+
+    <rect class="box box-red" x="1102" y="478" width="230" height="108" />
+    <text class="label" x="1128" y="510">Local Config</text>
+    <text class="small" x="1128" y="535">php/config.php</text>
+    <text class="small" x="1128" y="557">ignored by Git</text>
+  </g>
+
+  <g id="core">
+    <rect class="box box-blue" x="92" y="670" width="310" height="78" />
+    <text class="label" x="118" y="702">C# XMPP Core</text>
+    <text class="small" x="118" y="724">RFC 6120/6121 models, JID, stanzas</text>
+
+    <rect class="box box-green" x="462" y="670" width="310" height="78" />
+    <text class="label" x="488" y="702">XEP-0301 RTT Engine</text>
+    <text class="small" x="488" y="724">RttPacket, composer, deltas, sync</text>
+
+    <rect class="box box-gold" x="832" y="670" width="250" height="78" />
+    <text class="label" x="858" y="702">LngPdk Direction</text>
+    <text class="small" x="858" y="724">Package format for UI resources</text>
+
+    <rect class="box box-blue" x="1142" y="670" width="190" height="78" />
+    <text class="label" x="1168" y="702">Tests / Tools</text>
+    <text class="small" x="1168" y="724">smoke, validators, demos</text>
+  </g>
+
+  <g id="future">
+    <rect class="box box-dark" x="92" y="818" width="270" height="52" />
+    <text class="label box-dark-text" x="118" y="850">Prosody / ejabberd</text>
+
+    <rect class="box box-dark" x="432" y="818" width="270" height="52" />
+    <text class="label box-dark-text" x="458" y="850">XMPP Federation</text>
+
+    <rect class="box box-dark" x="772" y="818" width="270" height="52" />
+    <text class="label box-dark-text" x="798" y="850">WebRTC / Jingle</text>
+
+    <rect class="box box-dark" x="1112" y="818" width="220" height="52" />
+    <text class="label box-dark-text" x="1138" y="850">Provider Tabs</text>
+  </g>
+
+  <path class="arrow" d="M222 223 L222 298" />
+  <path class="arrow" d="M540 223 L270 300" />
+  <path class="arrow" d="M858 223 L318 300" />
+  <path class="arrow-soft" d="M1176 223 L1030 300" />
+
+  <path class="arrow" d="M270 410 L220 478" />
+  <path class="arrow" d="M990 410 L610 478" />
+  <path class="arrow" d="M1000 478 L1000 410" />
+  <path class="arrow" d="M732 532 L792 532" />
+  <path class="arrow-soft" d="M1102 532 L1042 532" />
+
+  <path class="arrow" d="M220 586 L247 670" />
+  <path class="arrow" d="M237 586 L616 670" />
+  <path class="arrow-soft" d="M587 586 L957 670" />
+
+  <path class="arrow-soft" d="M247 748 L227 818" />
+  <path class="arrow-soft" d="M617 748 L567 818" />
+  <path class="arrow-soft" d="M987 748 L907 818" />
+  <path class="arrow-soft" d="M1237 748 L1222 818" />
+
+  <g id="legend">
+    <rect class="badge" x="50" y="845" width="76" height="24" />
+    <text class="badge-text" x="65" y="862">NOW</text>
+    <text class="small" x="138" y="862">Solid arrows are current local demo flow.</text>
+    <line class="arrow-soft" x1="390" y1="856" x2="470" y2="856" />
+    <text class="small" x="488" y="862">Dashed arrows are planned production path.</text>
+  </g>
+</svg>
