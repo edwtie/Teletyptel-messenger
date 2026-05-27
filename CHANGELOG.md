@@ -40,6 +40,8 @@
 
 - Smiley images in the live RTT draft no longer reload and flicker on every
   typed character.
+- Receiving a final message no longer rebuilds the full timeline, so existing
+  smileys stay stable while new text arrives.
 
 ## 0.1.0-alpha1 - 2026-05-27
 

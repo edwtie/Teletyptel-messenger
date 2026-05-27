@@ -1426,7 +1426,7 @@
 
   function addMessage(direction, text, status, from = null, attachment = null) {
     const conversation = activeConversation();
-    conversation.messages.push({
+    const message = {
       id: globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : String(Date.now() + Math.random()),
       direction,
       from,
@@ -1434,9 +1434,25 @@
       attachment,
       status,
       timestamp: new Date()
-    });
+    };
 
-    renderActiveConversation();
+    conversation.messages.push(message);
+    appendMessageToTimeline(message);
+  }
+
+  function appendMessageToTimeline(message) {
+    const existingDraft = message.direction === "peer"
+      ? el.messageTimeline.querySelector('[data-remote-draft="true"]')
+      : null;
+
+    if (existingDraft) {
+      updateMessageElement(existingDraft, message);
+      el.messageTimeline.scrollTop = el.messageTimeline.scrollHeight;
+      return;
+    }
+
+    el.messageTimeline.appendChild(createMessageElement(message));
+    el.messageTimeline.scrollTop = el.messageTimeline.scrollHeight;
   }
 
   function addConversation() {
@@ -1539,6 +1555,8 @@
     item.className = "message " + message.direction + (message.draft ? " draft" : "");
     if (message.draft) {
       item.dataset.remoteDraft = "true";
+    } else {
+      delete item.dataset.remoteDraft;
     }
 
     const meta = document.createElement("div");
@@ -1570,6 +1588,9 @@
     const body = item.querySelector(".message-body");
     if (body) {
       renderRichText(body, message.text);
+      if (message.attachment) {
+        body.appendChild(createAttachmentElement(message.attachment));
+      }
     }
   }
 
