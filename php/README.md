@@ -30,6 +30,44 @@ ws://127.0.0.1:8787
 
 Typing in one window broadcasts RTT JSON to the other window.
 
+## WAMP Layout
+
+For WAMP, place the browser/PHP files under Apache and keep .NET binaries
+outside the web root:
+
+```text
+C:\wamp64\www\teletyptel\        PHP project root
+C:\wamp64\www\teletyptel\public\ browser files
+C:\wamp64\www\teletyptel\lib\    PHP server library files
+C:\wamp64\bin\teletyptel\        published .NET test tools
+```
+
+Copy these files into `C:\wamp64\www\teletyptel`:
+
+```text
+php/public
+php/rtt-websocket-server.php
+php/schema.sql
+php/config.example.php as config.php
+php/lib
+```
+
+Open:
+
+```text
+http://localhost/teletyptel/public/chat.html
+```
+
+Start the WebSocket relay separately from a terminal:
+
+```powershell
+$php = (Get-ChildItem C:\wamp64\bin\php\php*\php.exe | Sort-Object FullName -Descending | Select-Object -First 1).FullName
+& $php C:\wamp64\www\teletyptel\rtt-websocket-server.php
+```
+
+Apache serves the page, but the relay is a long-running CLI process listening
+on `ws://127.0.0.1:8787`.
+
 The fuller web chat client lives at:
 
 ```text
