@@ -579,6 +579,16 @@ body[data-theme="light"] button.selected {
   color: #ffffff;
 }
 
+body[data-theme="light"] .conversation-item.selected {
+  background: #dbeafe;
+  border-color: #2563eb;
+  color: #0f172a;
+}
+
+body[data-theme="light"] .conversation-item.selected span {
+  color: #36516d;
+}
+
 body[data-theme="dark"] {
   --bg: #111827;
   --panel: #1f2937;
