@@ -2902,6 +2902,11 @@ static void XmppMultiUserChatSerializesJoinAndGroupMessage()
     True(join.ToString(SaveOptions.DisableFormatting).Contains("http://jabber.org/protocol/muc", StringComparison.Ordinal));
     True(join.ToString(SaveOptions.DisableFormatting).Contains("maxchars=\"0\"", StringComparison.Ordinal));
 
+    var leave = XmppMultiUserChat.CreateLeavePresence(room, "Edward");
+    Equal("presence", leave.Name.LocalName);
+    Equal("unavailable", leave.Attribute("type")?.Value);
+    Equal("team@conference.example.org/Edward", leave.Attribute("to")?.Value);
+
     var group = XmppMultiUserChat.CreateGroupMessage(room, "Hallo groep", "muc-1");
     Equal("groupchat", group.Attribute("type")?.Value);
     Equal("team@conference.example.org", group.Attribute("to")?.Value);

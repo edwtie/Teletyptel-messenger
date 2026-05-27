@@ -30,6 +30,7 @@ carbons
 mam
 smacks
 websocket
+muc
 ```
 
 Useful optional modules:
@@ -47,6 +48,8 @@ cloud_notify
 - Initial presence is sent.
 - Roster request returns.
 - Two accounts can exchange normal chat messages.
+- Two accounts can discover a MUC service, join a room and exchange a
+  groupchat message.
 - XEP-0301 RTT message payload is sent with body fallback.
 - XEP-0030 disco#info returns feature list.
 - XEP-0115 capabilities presence is accepted.
@@ -146,6 +149,37 @@ Result on 2026-05-27:
 - `PASS Hostname mismatch rejected.`
 - `PASS Two-account chat message delivered.`
 
+Full TLS, hostname, two-account chat and MUC smoke:
+
+```powershell
+dotnet run --project tools/Tiedragon.XmppMessenger.RealServerSmoke -- `
+  --host xmpp.example.org `
+  --port 5222 `
+  --account1 user-a@example.org/desktop `
+  --password1 secret `
+  --account2 user-b@example.org/desktop `
+  --password2 secret `
+  --bad-host wrong.example.org `
+  --muc-service conference.example.org `
+  --muc-room team@conference.example.org `
+  --muc-nick1 EdwardSmoke `
+  --muc-nick2 AnnaSmoke `
+  --timeout-seconds 60
+```
+
+The MUC smoke performs these extra checks:
+
+- `disco#info` verifies the conference service advertises
+  `http://jabber.org/protocol/muc`;
+- `disco#items` reads available rooms from the service;
+- `disco#items` reads room occupants/items when `--muc-room` is supplied;
+- both accounts join the room with `history maxchars=0`;
+- account 1 sends a `groupchat` message and account 2 must receive it.
+
+Add `--muc-admin` only when account 1 is room owner or admin. That also requests
+the owner configuration form and the admin member list. Public rooms often reject
+those privileged IQs for normal occupants, which is correct server behavior.
+
 Temporary accounts can be created on servers that allow XEP-0077 in-band
 registration by adding `--register`. Public servers can rate-limit or reject
 registration attempts; that is expected behavior and should not be bypassed.
@@ -203,10 +237,31 @@ Implemented fake-server behavior:
 - empty roster result;
 - basic disco#info result;
 - direct one-to-one chat relay to an online local session.
+- MUC conference discovery, room discovery/items, join self-presence, groupchat
+  room broadcast, owner configuration form and admin item query.
+
+Local fake-server MUC smoke:
+
+```powershell
+dotnet run --project tools/Tiedragon.XmppMessenger.RealServerSmoke -- `
+  --host 127.0.0.1 `
+  --port 55222 `
+  --account1 edward@localhost/desktop `
+  --password1 secret `
+  --account2 anna@localhost/desktop `
+  --password2 secret `
+  --bad-host wrong.example.org `
+  --cert-sha256 <fingerprint printed by the fake server> `
+  --muc-service conference.localhost `
+  --muc-room team@conference.localhost `
+  --muc-admin `
+  --timeout-seconds 40
+```
 
 ## Current Status
 
 The repository has fake-server tests for stream negotiation, SASL, bind, roster,
-presence, normal chat, stream management and RTT. The remaining real-server
-items now have an automated smoke tool, but still need an installed server
-profile and credentials before they can be checked as complete.
+presence, normal chat, stream management, RTT and MUC. The real-server smoke
+tool can now exercise the same MUC discovery/join/groupchat path against
+Prosody, ejabberd, Openfire or another standards-compliant server when test
+accounts and a conference service are available.

@@ -48,7 +48,7 @@ Alpha 1 currently provides:
   OMEMO wire stanzas and Jingle RTP signaling
 - local fake XMPP server with mandatory STARTTLS
 - real-server smoke tool for TLS, hostname validation, XEP-0077 and
-  two-account chat
+  two-account chat plus XEP-0045 MUC service/room smoke
 
 The longer-term project goal is a modern messenger with:
 
@@ -123,9 +123,9 @@ dotnet run --project tools/Tiedragon.XmppMessenger.FakeServer -- `
 ```
 
 The fake server requires STARTTLS and supports XEP-0077, SASL PLAIN,
-resource binding, empty roster and direct one-to-one chat relay. For local
-self-signed certificates, pass the printed SHA-256 fingerprint to the smoke
-tool with `--cert-sha256`.
+resource binding, empty roster, direct one-to-one chat relay and a small MUC
+conference path. For local self-signed certificates, pass the printed SHA-256
+fingerprint to the smoke tool with `--cert-sha256`.
 
 ```text
 src/Tiedragon.XmppMessenger.Core

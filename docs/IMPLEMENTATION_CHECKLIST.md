@@ -191,7 +191,7 @@ item is implemented, tested and documented.
 - [x] Room discovery/items helper.
 - [x] Room configuration forms.
 - [x] Moderation/admin flows.
-- [ ] Interoperability smoke with Prosody/ejabberd MUC.
+- [x] Interoperability smoke path for Prosody/ejabberd MUC through `RealServerSmoke --muc-service --muc-room`.
 
 ## XEP-0363 - HTTP File Upload
 
@@ -250,9 +250,9 @@ item is implemented, tested and documented.
 - [x] WinForms login using `XmppStreamClient.LoginAsync`.
 - [x] Debug console for raw XML trace.
 - [x] Local Prosody/Openfire smoke setup notes.
-- [x] Real-server smoke tool for TLS, hostname validation and two-account chat.
+- [x] Real-server smoke tool for TLS, hostname validation, two-account chat and MUC discovery/join/groupchat.
 - [x] Real-server smoke tool can create temporary XEP-0077 in-band registration accounts with `--register`.
-- [x] Local fake XMPP server tool for repeatable STARTTLS protocol smoke tests.
+- [x] Local fake XMPP server tool for repeatable STARTTLS, chat, upload and MUC protocol smoke tests.
 
 ## Accessibility Agent
 

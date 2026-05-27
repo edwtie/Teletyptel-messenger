@@ -58,6 +58,17 @@ try
     {
         Console.WriteLine("SKIP Two-account chat: pass --account2 and --password2.");
     }
+
+    if (options.MucService is not null)
+    {
+        Console.WriteLine($"MUC smoke: service {options.MucService.Bare}");
+        await VerifyMultiUserChatAsync(options, cancellation.Token);
+        Console.WriteLine("PASS Multi-user chat smoke completed.");
+    }
+    else
+    {
+        Console.WriteLine("SKIP Multi-user chat: pass --muc-service and optionally --muc-room.");
+    }
 }
 catch (Exception ex)
 {
@@ -256,6 +267,201 @@ static async Task VerifyTwoAccountChatAsync(SmokeOptions options, CancellationTo
             return;
         }
     }
+}
+
+static async Task VerifyMultiUserChatAsync(SmokeOptions options, CancellationToken cancellationToken)
+{
+    var tlsUpgrader = new SmokeTlsStreamUpgrader(options.CertificateSha256);
+    await using var sender = CreateClient(options, options.Account1, tlsUpgrader);
+
+    await sender.LoginAsync(
+        options.Account1.LocalPart ?? options.Account1.Bare,
+        options.Password1,
+        cancellationToken: cancellationToken);
+    await sender.SendInitialPresenceAsync(cancellationToken: cancellationToken);
+
+    var service = options.MucService!;
+    var info = await sender.RequestServiceDiscoveryInfoAsync(
+        service,
+        options.Timeout,
+        id: "muc-service-info",
+        cancellationToken: cancellationToken);
+    if (!IsMultiUserChatService(info))
+    {
+        throw new InvalidOperationException(
+            $"Service '{service.Bare}' did not advertise XEP-0045 MUC support.");
+    }
+
+    Console.WriteLine($"PASS MUC service advertises {XmppMultiUserChat.NamespaceName}.");
+
+    var rooms = await sender.RequestMultiUserChatRoomsAsync(
+        service,
+        options.Timeout,
+        id: "muc-service-rooms",
+        cancellationToken: cancellationToken);
+    Console.WriteLine($"PASS MUC room discovery returned {rooms.Count} room(s).");
+
+    if (options.MucRoom is null)
+    {
+        Console.WriteLine("SKIP MUC room join/groupchat: pass --muc-room.");
+        return;
+    }
+
+    if (string.IsNullOrEmpty(options.Password2))
+    {
+        throw new InvalidOperationException(
+            "MUC room join/groupchat smoke requires --account2 and --password2.");
+    }
+
+    var roomItems = await sender.RequestMultiUserChatRoomItemsAsync(
+        options.MucRoom,
+        options.Timeout,
+        id: "muc-room-items",
+        cancellationToken: cancellationToken);
+    Console.WriteLine($"PASS MUC room item discovery returned {roomItems.Count} item(s).");
+
+    await using var receiver = CreateClient(options, options.Account2, tlsUpgrader);
+    await receiver.LoginAsync(
+        options.Account2.LocalPart ?? options.Account2.Bare,
+        options.Password2,
+        cancellationToken: cancellationToken);
+    await receiver.SendInitialPresenceAsync(cancellationToken: cancellationToken);
+
+    var nick1 = options.MucNick1 ?? DefaultNick(options.Account1, "teletyptel-a");
+    var nick2 = options.MucNick2 ?? DefaultNick(options.Account2, "teletyptel-b");
+
+    await sender.SendMultiUserChatJoinAsync(options.MucRoom, nick1, historyMaxChars: 0, cancellationToken: cancellationToken);
+    await WaitForMucSelfPresenceAsync(sender, options.MucRoom, nick1, cancellationToken);
+    await receiver.SendMultiUserChatJoinAsync(options.MucRoom, nick2, historyMaxChars: 0, cancellationToken: cancellationToken);
+    await WaitForMucSelfPresenceAsync(receiver, options.MucRoom, nick2, cancellationToken);
+    Console.WriteLine($"PASS Two accounts joined {options.MucRoom.Bare} as {nick1} and {nick2}.");
+
+    var text = "Teletyptel MUC smoke " + DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+    await sender.SendMultiUserChatMessageAsync(
+        options.MucRoom,
+        text,
+        id: "muc-smoke-message",
+        cancellationToken: cancellationToken);
+    var group = await WaitForMucGroupMessageAsync(receiver, options.MucRoom, text, nick1, cancellationToken);
+    Console.WriteLine($"PASS MUC groupchat delivered from {group.From?.Full ?? group.Nickname ?? "unknown"}.");
+
+    if (options.MucAdmin)
+    {
+        var form = await sender.RequestMultiUserChatConfigurationFormAsync(
+            options.MucRoom,
+            options.Timeout,
+            id: "muc-owner-config",
+            cancellationToken: cancellationToken);
+        Console.WriteLine($"PASS MUC owner configuration form returned {form.Fields.Count} field(s).");
+
+        var adminItems = await sender.RequestMultiUserChatAdminItemsAsync(
+            options.MucRoom,
+            options.Timeout,
+            affiliation: "member",
+            id: "muc-admin-members",
+            cancellationToken: cancellationToken);
+        Console.WriteLine($"PASS MUC admin member query returned {adminItems.Count} item(s).");
+    }
+    else
+    {
+        Console.WriteLine("SKIP MUC owner/admin checks: pass --muc-admin when account1 owns the room.");
+    }
+
+    await sender.SendMultiUserChatLeaveAsync(options.MucRoom, nick1, cancellationToken);
+    await receiver.SendMultiUserChatLeaveAsync(options.MucRoom, nick2, cancellationToken);
+}
+
+static XmppStreamClient CreateClient(
+    SmokeOptions options,
+    XmppAddress account,
+    IXmppTlsStreamUpgrader tlsUpgrader)
+{
+    var clientOptions = new XmppStreamOptions(
+        XmppStreamOptions.Default.PreferredLanguage,
+        XmppStreamOptions.Default.Resource,
+        options.Timeout,
+        XmppStreamOptions.Default.KeepAliveInterval);
+    return new XmppStreamClient(
+        new XmppConnectionSettings(account, options.Host, options.Port, requireTls: true),
+        clientOptions,
+        tlsUpgrader);
+}
+
+static bool IsMultiUserChatService(XmppServiceDiscoveryInfo info)
+{
+    return info.Supports(XmppMultiUserChat.NamespaceName)
+        || info.Identities.Any(identity =>
+            string.Equals(identity.Category, "conference", StringComparison.OrdinalIgnoreCase));
+}
+
+static async Task WaitForMucSelfPresenceAsync(
+    XmppStreamClient client,
+    XmppAddress room,
+    string nick,
+    CancellationToken cancellationToken)
+{
+    var occupant = XmppMultiUserChat.ToOccupantJid(room, nick);
+    while (true)
+    {
+        var stanza = await client.ReadNextStanzaAsync(cancellationToken);
+        if (stanza.Presence?.From is null
+            || !string.Equals(stanza.Presence.From.Full, occupant.Full, StringComparison.OrdinalIgnoreCase))
+        {
+            continue;
+        }
+
+        if (stanza.Presence.Type == XmppPresenceType.Error)
+        {
+            throw new InvalidOperationException("MUC join failed: " + stanza.Element);
+        }
+
+        return;
+    }
+}
+
+static async Task<XmppGroupChatMessage> WaitForMucGroupMessageAsync(
+    XmppStreamClient client,
+    XmppAddress room,
+    string body,
+    string? expectedNick,
+    CancellationToken cancellationToken)
+{
+    while (true)
+    {
+        var stanza = await client.ReadNextStanzaAsync(cancellationToken);
+        if (!XmppMultiUserChat.TryParseGroupMessage(stanza.Element, out var group)
+            || group is null
+            || !string.Equals(group.Room?.Bare, room.Bare, StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(group.Body, body, StringComparison.Ordinal))
+        {
+            continue;
+        }
+
+        if (!string.IsNullOrWhiteSpace(expectedNick)
+            && !string.Equals(group.Nickname, expectedNick, StringComparison.OrdinalIgnoreCase))
+        {
+            continue;
+        }
+
+        return group;
+    }
+}
+
+static string DefaultNick(XmppAddress account, string fallback)
+{
+    var source = account.LocalPart;
+    if (string.IsNullOrWhiteSpace(source))
+    {
+        source = fallback;
+    }
+
+    var builder = new StringBuilder(source.Length);
+    foreach (var ch in source)
+    {
+        builder.Append(char.IsWhiteSpace(ch) || ch == '/' ? '-' : ch);
+    }
+
+    return builder.Length == 0 ? fallback : builder.ToString();
 }
 
 static async Task WriteTextAsync(Stream stream, string text, CancellationToken cancellationToken)
@@ -512,7 +718,12 @@ sealed record SmokeOptions(
     string? BadHost,
     bool Register,
     string? CertificateSha256,
-    TimeSpan Timeout)
+    TimeSpan Timeout,
+    XmppAddress? MucService,
+    XmppAddress? MucRoom,
+    string? MucNick1,
+    string? MucNick2,
+    bool MucAdmin)
 {
     public static SmokeOptions? Parse(string[] args)
     {
@@ -527,7 +738,8 @@ sealed record SmokeOptions(
             }
 
             var name = key[2..];
-            if (string.Equals(name, "register", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(name, "register", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(name, "muc-admin", StringComparison.OrdinalIgnoreCase))
             {
                 flags.Add(name);
                 continue;
@@ -562,6 +774,14 @@ sealed record SmokeOptions(
         values.TryGetValue("password2", out var password2);
         values.TryGetValue("bad-host", out var badHost);
         values.TryGetValue("cert-sha256", out var certSha256);
+        var mucService = values.TryGetValue("muc-service", out var mucServiceText)
+            ? XmppAddress.Parse(mucServiceText)
+            : null;
+        var mucRoom = values.TryGetValue("muc-room", out var mucRoomText)
+            ? XmppAddress.Parse(mucRoomText)
+            : null;
+        values.TryGetValue("muc-nick1", out var mucNick1);
+        values.TryGetValue("muc-nick2", out var mucNick2);
 
         return new SmokeOptions(
             host,
@@ -573,7 +793,12 @@ sealed record SmokeOptions(
             badHost,
             flags.Contains("register"),
             certSha256,
-            timeout);
+            timeout,
+            mucService,
+            mucRoom,
+            mucNick1,
+            mucNick2,
+            flags.Contains("muc-admin"));
     }
 
     public static void PrintUsage()
@@ -587,6 +812,8 @@ sealed record SmokeOptions(
                 --account2 anna@example.org/desktop \
                 --password2 secret \
                 --bad-host wrong.example.org \
+                --muc-service conference.example.org \
+                --muc-room team@conference.example.org \
                 --register
 
             Optional:
@@ -594,6 +821,11 @@ sealed record SmokeOptions(
               --timeout-seconds 30
               --register
               --cert-sha256 <pinned certificate fingerprint for local self-signed smoke>
+              --muc-service <conference service JID for XEP-0045 discovery>
+              --muc-room <room JID for join and groupchat roundtrip>
+              --muc-nick1 <nickname for account1>
+              --muc-nick2 <nickname for account2>
+              --muc-admin <also request owner configuration and admin member list>
             """);
     }
 }

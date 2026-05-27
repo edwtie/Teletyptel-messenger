@@ -16,6 +16,9 @@
   ICE-UDP transport placeholder.
 - `XmppStreamClient` helper methods for the new upload, OMEMO, MUC and Jingle
   protocol flows.
+- Real-server smoke MUC options for XEP-0045 service discovery, room discovery,
+  two-account room join, groupchat delivery and optional owner/admin checks.
+- Local fake-server MUC conference path for repeatable smoke runs.
 - Local web file upload endpoint and chat attachment cards for Alpha relay
   testing.
 

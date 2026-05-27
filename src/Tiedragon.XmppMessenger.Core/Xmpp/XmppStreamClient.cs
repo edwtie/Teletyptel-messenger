@@ -553,6 +553,27 @@ public sealed class XmppStreamClient : IAsyncDisposable
             cancellationToken);
     }
 
+    public Task SendMultiUserChatLeaveAsync(
+        XmppAddress room,
+        string nickname,
+        CancellationToken cancellationToken = default)
+    {
+        return SendElementAsync(
+            XmppMultiUserChat.CreateLeavePresence(room, nickname),
+            cancellationToken);
+    }
+
+    public Task SendMultiUserChatMessageAsync(
+        XmppAddress room,
+        string body,
+        string? id = null,
+        CancellationToken cancellationToken = default)
+    {
+        return SendElementAsync(
+            XmppMultiUserChat.CreateGroupMessage(room, body, id),
+            cancellationToken);
+    }
+
     public async Task<IReadOnlyList<XmppMucRoom>> RequestMultiUserChatRoomsAsync(
         XmppAddress service,
         TimeSpan timeout,

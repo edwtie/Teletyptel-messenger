@@ -85,6 +85,7 @@ static async Task HandleClientAsync(
 sealed class FakeXmppServerState(string domain, X509Certificate2 certificate)
 {
     private readonly ConcurrentDictionary<string, FakeXmppSession> _sessionsByBareJid = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, FakeXmppSession>> _rooms = new(StringComparer.OrdinalIgnoreCase);
 
     public string Domain { get; } = domain;
 
@@ -114,12 +115,54 @@ sealed class FakeXmppServerState(string domain, X509Certificate2 certificate)
         {
             _sessionsByBareJid.TryRemove(session.BareJid, out _);
         }
+
+        foreach (var room in _rooms.Values)
+        {
+            foreach (var occupant in room)
+            {
+                if (ReferenceEquals(occupant.Value, session))
+                {
+                    room.TryRemove(occupant.Key, out _);
+                }
+            }
+        }
     }
 
     public bool TryGetSession(string jid, out FakeXmppSession? session)
     {
         var bare = BareJid(jid);
         return _sessionsByBareJid.TryGetValue(bare, out session);
+    }
+
+    public void JoinRoom(string roomJid, string nick, FakeXmppSession session)
+    {
+        var room = _rooms.GetOrAdd(roomJid, _ => new ConcurrentDictionary<string, FakeXmppSession>(StringComparer.OrdinalIgnoreCase));
+        room[nick] = session;
+    }
+
+    public void LeaveRoom(string roomJid, string nick)
+    {
+        if (_rooms.TryGetValue(roomJid, out var room))
+        {
+            room.TryRemove(nick, out _);
+        }
+    }
+
+    public IReadOnlyList<(string Nick, FakeXmppSession Session)> GetRoomOccupants(string roomJid)
+    {
+        return _rooms.TryGetValue(roomJid, out var room)
+            ? room.Select(occupant => (occupant.Key, occupant.Value)).ToArray()
+            : [];
+    }
+
+    public string? GetRoomNick(string roomJid, FakeXmppSession session)
+    {
+        if (!_rooms.TryGetValue(roomJid, out var room))
+        {
+            return null;
+        }
+
+        return room.FirstOrDefault(occupant => ReferenceEquals(occupant.Value, session)).Key;
     }
 
     private static string BareJid(string jid)
@@ -199,6 +242,7 @@ sealed class FakeXmppSession(TcpClient client, FakeXmppServerState state)
                 await HandleMessageAsync(element, cancellationToken);
                 break;
             case "presence":
+                await HandlePresenceAsync(element, cancellationToken);
                 break;
         }
     }
@@ -309,6 +353,21 @@ sealed class FakeXmppSession(TcpClient client, FakeXmppServerState state)
 
         if (payload?.Name == XName.Get("query", "http://jabber.org/protocol/disco#info") && type == "get")
         {
+            if (IsMucAddress(to))
+            {
+                var identityType = to.Contains('@', StringComparison.Ordinal) ? "text" : "service";
+                var identityName = to.Contains('@', StringComparison.Ordinal) ? "Team room" : "Tiedragon Fake Conference";
+                await WriteAsync($"""
+                    <iq xmlns="jabber:client" type="result" id="{Escape(id)}">
+                      <query xmlns="http://jabber.org/protocol/disco#info">
+                        <identity category="conference" type="{identityType}" name="{identityName}"/>
+                        <feature var="http://jabber.org/protocol/muc"/>
+                      </query>
+                    </iq>
+                    """, cancellationToken);
+                return;
+            }
+
             await WriteAsync($"""
                 <iq xmlns="jabber:client" type="result" id="{Escape(id)}">
                   <query xmlns="http://jabber.org/protocol/disco#info">
@@ -498,6 +557,53 @@ sealed class FakeXmppSession(TcpClient client, FakeXmppServerState state)
         }
     }
 
+    private async Task HandlePresenceAsync(XElement element, CancellationToken cancellationToken)
+    {
+        if (!_tlsActive)
+        {
+            return;
+        }
+
+        var to = (string?)element.Attribute("to");
+        if (string.IsNullOrWhiteSpace(to) || !IsMucAddress(to))
+        {
+            return;
+        }
+
+        var room = ToBareJid(to);
+        var nick = ResourcePart(to);
+        if (string.IsNullOrWhiteSpace(nick))
+        {
+            return;
+        }
+
+        var type = (string?)element.Attribute("type");
+        if (string.Equals(type, "unavailable", StringComparison.Ordinal))
+        {
+            state.LeaveRoom(room, nick);
+            var unavailable = new XElement(XName.Get("presence", "jabber:client"),
+                new XAttribute("from", room + "/" + nick),
+                new XAttribute("to", FullJid ?? BareJid ?? string.Empty),
+                new XAttribute("type", "unavailable"));
+            await SendAsync(unavailable.ToString(SaveOptions.DisableFormatting), cancellationToken);
+            return;
+        }
+
+        state.JoinRoom(room, nick, this);
+        var mucUser = XName.Get("x", "http://jabber.org/protocol/muc#user");
+        var item = XName.Get("item", "http://jabber.org/protocol/muc#user");
+        var status = XName.Get("status", "http://jabber.org/protocol/muc#user");
+        var reply = new XElement(XName.Get("presence", "jabber:client"),
+            new XAttribute("from", room + "/" + nick),
+            new XAttribute("to", FullJid ?? BareJid ?? string.Empty),
+            new XElement(mucUser,
+                new XElement(item,
+                    new XAttribute("affiliation", "member"),
+                    new XAttribute("role", "participant")),
+                new XElement(status, new XAttribute("code", "110"))));
+        await SendAsync(reply.ToString(SaveOptions.DisableFormatting), cancellationToken);
+    }
+
     private async Task HandleMessageAsync(XElement element, CancellationToken cancellationToken)
     {
         if (!_tlsActive)
@@ -508,6 +614,22 @@ sealed class FakeXmppSession(TcpClient client, FakeXmppServerState state)
         var to = (string?)element.Attribute("to");
         if (string.IsNullOrWhiteSpace(to))
         {
+            return;
+        }
+
+        if (string.Equals((string?)element.Attribute("type"), "groupchat", StringComparison.Ordinal)
+            && IsMucAddress(to))
+        {
+            var room = ToBareJid(to);
+            var nick = state.GetRoomNick(room, this) ?? _username ?? "anonymous";
+            foreach (var occupant in state.GetRoomOccupants(room))
+            {
+                var outgoing = new XElement(element);
+                outgoing.SetAttributeValue("from", room + "/" + nick);
+                outgoing.SetAttributeValue("to", occupant.Session.FullJid ?? occupant.Session.BareJid);
+                await occupant.Session.SendAsync(outgoing.ToString(SaveOptions.DisableFormatting), cancellationToken);
+            }
+
             return;
         }
 
@@ -768,6 +890,24 @@ sealed class FakeXmppSession(TcpClient client, FakeXmppServerState state)
         }
 
         return -1;
+    }
+
+    private static bool IsMucAddress(string jid)
+    {
+        return jid.StartsWith("conference.", StringComparison.OrdinalIgnoreCase)
+            || jid.Contains("@conference.", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string ToBareJid(string jid)
+    {
+        var slash = jid.IndexOf('/');
+        return slash >= 0 ? jid[..slash] : jid;
+    }
+
+    private static string? ResourcePart(string jid)
+    {
+        var slash = jid.IndexOf('/');
+        return slash >= 0 && slash + 1 < jid.Length ? jid[(slash + 1)..] : null;
     }
 
     private static string StreamError(string condition, string text)
