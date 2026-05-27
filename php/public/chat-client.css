@@ -495,7 +495,7 @@ textarea {
     --selection-bg: #dbeafe;
     --selection-border: #2563eb;
     --selection-text: #0f172a;
-    --selection-muted: #36516d;
+    --selection-muted: #eef6ff;
   }
 
   body,
@@ -551,7 +551,7 @@ body[data-theme="light"] {
   --selection-bg: #dbeafe;
   --selection-border: #2563eb;
   --selection-text: #0f172a;
-  --selection-muted: #36516d;
+  --selection-muted: #eef6ff;
   color-scheme: light;
 }
 
