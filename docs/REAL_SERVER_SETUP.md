@@ -57,6 +57,19 @@ cloud_notify
 Use the real-server smoke tool when a Prosody/Openfire profile and two accounts
 are available:
 
+TLS and hostname-only smoke:
+
+```powershell
+dotnet run --project tools/Tiedragon.XmppMessenger.RealServerSmoke -- `
+  --host xmpp.example.org `
+  --port 5222 `
+  --account1 edward@example.org/desktop `
+  --password1 secret `
+  --bad-host wrong.example.org
+```
+
+Full TLS, hostname and two-account chat smoke:
+
 ```powershell
 dotnet run --project tools/Tiedragon.XmppMessenger.RealServerSmoke -- `
   --host xmpp.example.org `
@@ -73,7 +86,13 @@ The tool performs three checks:
 - accepts the TLS certificate for the configured host;
 - rejects the same endpoint when the certificate is validated with
   `--bad-host`;
-- logs in with two accounts and waits for a normal chat message to arrive.
+- logs in with two accounts and waits for a normal chat message to arrive when
+  `--account2` and `--password2` are supplied.
+
+`--bad-host` must be a DNS name that is not present in the server certificate.
+The tool still connects to `--host`; only the TLS validation target changes.
+That makes the negative test deterministic: the same endpoint must pass for the
+real host and fail for the wrong host.
 
 For a local self-signed server, first install the test CA/certificate in the
 current user's trust store. The smoke is meant to verify the normal .NET
