@@ -61,6 +61,7 @@
     previousText: "",
     remoteText: "",
     remoteFrom: "",
+    remoteDraftUpdatedAt: null,
     conversations: [
       {
         id: "relay",
@@ -594,14 +595,15 @@
     if (envelope.type === "message") {
       state.remoteText = "";
       state.remoteFrom = envelopeFrom(envelope);
-      renderRemoteDraft();
+      state.remoteDraftUpdatedAt = null;
       addMessage("peer", envelope.text ?? "", "received", state.remoteFrom);
       return;
     }
 
     state.remoteText = envelope.text ?? "";
     state.remoteFrom = envelopeFrom(envelope);
-    renderRemoteDraft();
+    state.remoteDraftUpdatedAt = new Date();
+    renderActiveConversation();
   }
 
   function addMessage(direction, text, status, from = null) {
@@ -666,34 +668,37 @@
     el.messageTimeline.replaceChildren();
 
     for (const message of conversation.messages) {
-      const item = document.createElement("article");
-      item.className = "message " + message.direction;
-      const meta = document.createElement("div");
-      meta.className = "message-meta";
-      const sender = message.direction === "self"
-        ? currentSenderName()
-        : displayNameForJid(message.from);
-      meta.textContent = `${sender} - ${message.status} - ${formatTime(message.timestamp)}`;
-      const body = document.createElement("div");
-      body.className = "message-body";
-      renderRichText(body, message.text);
-      item.append(meta, body);
-      el.messageTimeline.appendChild(item);
+      el.messageTimeline.appendChild(createMessageElement(message));
+    }
+
+    if (state.remoteText) {
+      el.messageTimeline.appendChild(createMessageElement({
+        direction: "peer",
+        from: state.remoteFrom,
+        text: state.remoteText,
+        status: "typing",
+        timestamp: state.remoteDraftUpdatedAt ?? new Date(),
+        draft: true
+      }));
     }
 
     el.messageTimeline.scrollTop = el.messageTimeline.scrollHeight;
   }
 
-  function renderRemoteDraft() {
-    if (!state.remoteText) {
-      el.remoteDraft.hidden = true;
-      el.remoteDraftText.textContent = "";
-      return;
-    }
-
-    el.remoteDraft.hidden = false;
-    el.remoteDraftName.textContent = `${displayNameForJid(state.remoteFrom)} typing`;
-    el.remoteDraftText.textContent = state.remoteText;
+  function createMessageElement(message) {
+    const item = document.createElement("article");
+    item.className = "message " + message.direction + (message.draft ? " draft" : "");
+    const meta = document.createElement("div");
+    meta.className = "message-meta";
+    const sender = message.direction === "self"
+      ? currentSenderName()
+      : displayNameForJid(message.from);
+    meta.textContent = `${sender} - ${message.status} - ${formatTime(message.timestamp)}`;
+    const body = document.createElement("div");
+    body.className = "message-body";
+    renderRichText(body, message.text);
+    item.append(meta, body);
+    return item;
   }
 
   function renderRichText(container, text) {

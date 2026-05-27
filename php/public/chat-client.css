@@ -289,6 +289,10 @@ textarea {
   margin-left: auto;
 }
 
+.message.draft .message-body {
+  border-style: dashed;
+}
+
 .message-body {
   border: 1px solid #3f536d;
   border-radius: var(--radius);
