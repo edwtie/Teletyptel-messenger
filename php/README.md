@@ -62,6 +62,12 @@ php/public/lang/ned.lng
 The language selector writes `preferredLanguage` into the account profile, so a
 saved MySQL account can restore the UI language on the next load.
 
+These loose `.lng` files are intentionally simple, but they are not signed
+LngPdk packages. Treat them as a web-demo and fallback layer until LngPdk
+packages are served and verified by the web/mobile clients.
+
+Critical notes: [../docs/LOCALIZATION_CRITICAL_NOTES.md](../docs/LOCALIZATION_CRITICAL_NOTES.md).
+
 ## MySQL Account Storage
 
 The web client can save the local account profile to MySQL through:

@@ -10,6 +10,7 @@ The project should grow as a protocol library first and an app second.
 | IM layer | RFC 6121 chat, presence, roster | `src/Tiedragon.XmppMessenger.Core/Xmpp` for now | Can move to a separate package when larger. |
 | Extension layer | XEP helpers such as RTT, receipts, chat states | `src/Tiedragon.XmppMessenger.Core/Rtt` and XMPP helpers | Keep each XEP isolated and testable. |
 | Localization | LngPdk package reading/building | `src/Tiedragon.LngPdk` | Independent from XMPP protocol. |
+| Web localization fallback | Loose `.lng` files for the web demo | `php/public/lang` | Development/fallback only; not a verified package boundary. |
 | Accessibility agent | Speech, captions, translation, voice relay and later sign-language experiments | Future accessibility/agent packages | Must stay outside RFC 6120 core. |
 | Samples | WinForms demo, console clients, browser relay | `samples`, `php` | May use core, never define protocol behavior. |
 | Tools | Package/build helper tools | `tools` | No runtime dependency from core to tools. |
@@ -68,6 +69,19 @@ surface stabilizes.
 - Async APIs must accept `CancellationToken`.
 - Library code must not show message boxes or write directly to WinForms UI.
 - Tests should cover both pure model behavior and fake-server network behavior.
+
+## Localization Boundary
+
+Loose `.lng` files are useful for the web demo, but they are not equivalent to
+signed LngPdk packages. They have no manifest, signature, version channel or
+asset relationship model.
+
+Production language resources should move toward LngPdk packages. Until then,
+the web client must treat `php/public/lang/*.lng` as development/fallback input
+only.
+
+Critical notes:
+[LOCALIZATION_CRITICAL_NOTES.md](LOCALIZATION_CRITICAL_NOTES.md).
 
 ## XMPP Core Ownership
 

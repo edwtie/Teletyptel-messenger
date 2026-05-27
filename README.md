@@ -15,6 +15,10 @@ still using normal platform primitives such as TLS, XML and WebSocket APIs.
 
 ![Tiedragon Teletyptel 2.0 architecture](docs/TELETYPTEL_ARCHITECTURE.svg)
 
+Localization note: the current web `.lng` files are a development/fallback
+layer. They are not the same trust boundary as signed LngPdk packages. See
+[Localization Critical Notes](docs/LOCALIZATION_CRITICAL_NOTES.md).
+
 The project goal is a modern messenger with:
 
 - one-to-one chat
@@ -112,6 +116,9 @@ The localization layer is the independent `Tiedragon.LngPdk` library:
 - keep the XMPP core independent from package storage and UI translation logic
 - use fallback keys when a translation is missing
 - keep WinForms demo labels, buttons, placeholders and status text out of code
+
+The web client also has loose `.lng` files under `php/public/lang` for fast
+iteration. Those files should not be treated as verified production packages.
 
 ## Build
 
