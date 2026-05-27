@@ -36,6 +36,11 @@
 - Web file upload currently stores files locally under the PHP public upload
   directory; browser-to-real-XMPP XEP-0363 wiring still needs UI integration.
 
+### Fixed
+
+- Smiley images in the live RTT draft no longer reload and flicker on every
+  typed character.
+
 ## 0.1.0-alpha1 - 2026-05-27
 
 First public alpha evaluation release.

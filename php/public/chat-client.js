@@ -180,6 +180,7 @@
     el.peerInput.addEventListener("change", updateRelayConversationMeta);
     el.displayNameInput.addEventListener("change", renderActiveConversation);
     el.jidInput.addEventListener("change", renderActiveConversation);
+    el.smileyToggle.addEventListener("change", renderActiveConversation);
     el.passwordInput.addEventListener("input", updateAccountPasswordStatus);
     el.rememberPasswordToggle.addEventListener("change", updateAccountPasswordStatus);
     el.languageInput.addEventListener("change", () => loadLanguage(el.languageInput.value));
@@ -956,7 +957,7 @@
     state.remoteText = envelope.text ?? "";
     state.remoteFrom = envelopeFrom(envelope);
     state.remoteDraftUpdatedAt = new Date();
-    renderActiveConversation();
+    updateRemoteDraftMessage();
   }
 
   async function startCall(mediaKind) {
@@ -1503,15 +1504,46 @@
     el.messageTimeline.scrollTop = el.messageTimeline.scrollHeight;
   }
 
+  function updateRemoteDraftMessage() {
+    const existing = el.messageTimeline.querySelector('[data-remote-draft="true"]');
+    if (!state.remoteText) {
+      existing?.remove();
+      return;
+    }
+
+    const conversation = activeConversation();
+    el.activeConversationName.textContent = conversation.name;
+    el.activeConversationMeta.textContent = conversation.meta;
+
+    const message = {
+      direction: "peer",
+      from: state.remoteFrom,
+      text: state.remoteText,
+      status: "typing",
+      timestamp: state.remoteDraftUpdatedAt ?? new Date(),
+      draft: true
+    };
+
+    if (!existing) {
+      el.messageTimeline.appendChild(createMessageElement(message));
+      el.messageTimeline.scrollTop = el.messageTimeline.scrollHeight;
+      return;
+    }
+
+    updateMessageElement(existing, message);
+    el.messageTimeline.scrollTop = el.messageTimeline.scrollHeight;
+  }
+
   function createMessageElement(message) {
     const item = document.createElement("article");
     item.className = "message " + message.direction + (message.draft ? " draft" : "");
+    if (message.draft) {
+      item.dataset.remoteDraft = "true";
+    }
+
     const meta = document.createElement("div");
     meta.className = "message-meta";
-    const sender = message.direction === "self"
-      ? currentSenderName()
-      : displayNameForJid(message.from);
-    meta.textContent = `${sender} - ${message.status} - ${formatTime(message.timestamp)}`;
+    meta.textContent = messageMetaText(message);
     const body = document.createElement("div");
     body.className = "message-body";
     renderRichText(body, message.text);
@@ -1520,6 +1552,32 @@
     }
     item.append(meta, body);
     return item;
+  }
+
+  function updateMessageElement(item, message) {
+    item.className = "message " + message.direction + (message.draft ? " draft" : "");
+    if (message.draft) {
+      item.dataset.remoteDraft = "true";
+    } else {
+      delete item.dataset.remoteDraft;
+    }
+
+    const meta = item.querySelector(".message-meta");
+    if (meta) {
+      meta.textContent = messageMetaText(message);
+    }
+
+    const body = item.querySelector(".message-body");
+    if (body) {
+      renderRichText(body, message.text);
+    }
+  }
+
+  function messageMetaText(message) {
+    const sender = message.direction === "self"
+      ? currentSenderName()
+      : displayNameForJid(message.from);
+    return `${sender} - ${message.status} - ${formatTime(message.timestamp)}`;
   }
 
   function createAttachmentElement(attachment) {
@@ -1735,29 +1793,85 @@
   }
 
   function renderRichText(container, text) {
-    container.replaceChildren();
+    text = String(text ?? "");
+    const mode = el.smileyToggle.checked ? "smiley" : "plain";
+    if (container.dataset.richText === text && container.dataset.richTextMode === mode) {
+      return;
+    }
+
+    container.dataset.richText = text;
+    container.dataset.richTextMode = mode;
     if (!el.smileyToggle.checked) {
       container.textContent = text;
       return;
     }
 
+    const existing = Array.from(container.childNodes);
+    const nextNodes = [];
+    let index = 0;
     for (const token of tokenizeSmilies(text)) {
       if (token.kind === "text") {
-        container.appendChild(document.createTextNode(token.text));
+        nextNodes.push(reuseTextNode(existing[index], token.text));
       } else {
-        container.appendChild(createSmileyImage(token));
+        nextNodes.push(reuseSmileyNode(existing[index], token));
       }
+
+      index++;
     }
+
+    patchChildren(container, nextNodes);
+  }
+
+  function patchChildren(container, nextNodes) {
+    for (let index = 0; index < nextNodes.length; index++) {
+      const nextNode = nextNodes[index];
+      const currentNode = container.childNodes[index] ?? null;
+      if (currentNode === nextNode) {
+        continue;
+      }
+
+      container.insertBefore(nextNode, currentNode);
+    }
+
+    while (container.childNodes.length > nextNodes.length) {
+      container.removeChild(container.lastChild);
+    }
+  }
+
+  function reuseTextNode(node, text) {
+    if (node?.nodeType === Node.TEXT_NODE) {
+      if (node.textContent !== text) {
+        node.textContent = text;
+      }
+
+      return node;
+    }
+
+    return document.createTextNode(text);
+  }
+
+  function reuseSmileyNode(node, token) {
+    if (node instanceof HTMLElement
+      && node.dataset.smileyCode === token.text
+      && node.dataset.smileyName === token.smiley.name) {
+      return node;
+    }
+
+    return createSmileyImage(token);
   }
 
   function createSmileyImage(token) {
     const fallback = document.createElement("span");
     fallback.className = "smiley";
+    fallback.dataset.smileyCode = token.text;
+    fallback.dataset.smileyName = token.smiley.name;
     fallback.title = `${token.smiley.name} (${token.smiley.fileName})`;
     fallback.textContent = token.text;
 
     const image = document.createElement("img");
     image.className = "smiley-image";
+    image.dataset.smileyCode = token.text;
+    image.dataset.smileyName = token.smiley.name;
     image.src = smileyBasePath + encodeURIComponent(token.smiley.fileName);
     image.alt = token.text;
     image.title = `${token.smiley.name} (${token.smiley.fileName})`;
