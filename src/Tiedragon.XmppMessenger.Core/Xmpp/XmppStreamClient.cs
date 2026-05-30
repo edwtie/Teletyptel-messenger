@@ -653,6 +653,96 @@ public sealed class XmppStreamClient : IAsyncDisposable
             result.Payload);
     }
 
+    public async Task<XmppPubSubSubscription> SubscribePubSubNodeAsync(
+        string node,
+        XmppAddress service,
+        XmppAddress subscriber,
+        TimeSpan timeout,
+        string id = "pubsub-subscribe-1",
+        CancellationToken cancellationToken = default)
+    {
+        var result = await SendIqAndWaitAsync(
+            XmppPubSub.CreateSubscribeRequest(id, node, subscriber, service),
+            timeout,
+            cancellationToken).ConfigureAwait(false);
+
+        if (XmppPubSub.TryParseSubscriptionResult(result, out var subscription) && subscription is not null)
+        {
+            return subscription;
+        }
+
+        throw new XmppProtocolException(
+            XmppProtocolErrorKind.IqError,
+            "The PubSub response was not a valid subscription result.",
+            result.Payload);
+    }
+
+    public Task UnsubscribePubSubNodeAsync(
+        string node,
+        XmppAddress service,
+        XmppAddress subscriber,
+        TimeSpan timeout,
+        string? subscriptionId = null,
+        string id = "pubsub-unsubscribe-1",
+        CancellationToken cancellationToken = default)
+    {
+        return SendIqAndWaitAsync(
+            XmppPubSub.CreateUnsubscribeRequest(id, node, subscriber, subscriptionId, service),
+            timeout,
+            cancellationToken);
+    }
+
+    public Task CreatePubSubNodeAsync(
+        string node,
+        XmppAddress service,
+        TimeSpan timeout,
+        string id = "pubsub-create-1",
+        CancellationToken cancellationToken = default)
+    {
+        return SendIqAndWaitAsync(
+            XmppPubSub.CreateCreateNodeRequest(id, node, service),
+            timeout,
+            cancellationToken);
+    }
+
+    public Task PublishAnnouncementAsync(
+        XmppAnnouncement announcement,
+        XmppAddress service,
+        TimeSpan timeout,
+        string node = XmppPubSubAnnouncements.DefaultNode,
+        string id = "announcement-publish-1",
+        CancellationToken cancellationToken = default)
+    {
+        return SendIqAndWaitAsync(
+            XmppPubSubAnnouncements.CreatePublishRequest(id, announcement, node, service),
+            timeout,
+            cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<XmppAnnouncement>> RequestAnnouncementsAsync(
+        XmppAddress service,
+        TimeSpan timeout,
+        string node = XmppPubSubAnnouncements.DefaultNode,
+        int? maxItems = null,
+        string id = "announcement-items-1",
+        CancellationToken cancellationToken = default)
+    {
+        var result = await SendIqAndWaitAsync(
+            XmppPubSubAnnouncements.CreateItemsRequest(id, service, node, maxItems),
+            timeout,
+            cancellationToken).ConfigureAwait(false);
+
+        if (XmppPubSubAnnouncements.TryParseItems(result, out var announcements, node))
+        {
+            return announcements;
+        }
+
+        throw new XmppProtocolException(
+            XmppProtocolErrorKind.IqError,
+            "The announcement response was not a valid XEP-0060 items result.",
+            result.Payload);
+    }
+
     public Task PublishConferenceBookmarkAsync(
         XmppConferenceBookmark bookmark,
         TimeSpan timeout,

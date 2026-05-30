@@ -13,7 +13,7 @@ that core.
 | XEP-0124 | BOSH | HTTP binding session and request body model. | Client done; hosted smoke is release validation |
 | XEP-0206 | XMPP over BOSH | XMPP profile for BOSH including stream restart. | Client done; hosted smoke is release validation |
 | XEP-0157 | Contact Addresses for XMPP Services | Discover abuse, admin, security, status and support contact URIs. | Done; LocalServer advertises server-info and smoke prints contacts |
-| XEP-0060 | Publish-Subscribe | Generic PubSub nodes for announcements, service news and the base model used by PEP. | Partial; generic PEP/PubSub helpers exist, full announcement subscription/node management is planned |
+| XEP-0060 | Publish-Subscribe | Generic PubSub nodes for announcements, service news and the base model used by PEP. | Core helper and provider News tab seed done; live server subscription smoke remains |
 | XEP-0163 | Personal Eventing Protocol | Generic PEP/PubSub publish, retrieve, retract and notifications. | Done; public-server smoke is release validation |
 | XEP-0080 | User Location | Publish explicit, permission-gated location such as GPS coordinates and accuracy. | Protocol done; UI consent/provider flow and real-server PEP smoke remain |
 | XEP-0084 | User Avatar | Publish and retrieve contact avatars via PEP/PubSub. | Done; public-server smoke is release validation |

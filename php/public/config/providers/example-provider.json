@@ -6,8 +6,23 @@
   "homepage": "https://example.org",
   "capabilities": [
     "phone:sms",
-    "caption:local"
+    "caption:local",
+    "pubsub:announcements"
   ],
+  "announcements": {
+    "node": "urn:tiedragon:teletyptel:announcements",
+    "items": [
+      {
+        "id": "alpha2-total-conversation",
+        "title": "Total Conversation alpha",
+        "summary": "Live text, audio and video are tested as one conversation.",
+        "category": "release",
+        "priority": "normal",
+        "published": "2026-05-30T00:00:00Z",
+        "link": "https://example.org/teletyptel/news/alpha2"
+      }
+    ]
+  },
   "tabs": [
     {
       "id": "support",

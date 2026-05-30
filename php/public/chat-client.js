@@ -1576,6 +1576,7 @@
       { id: "chat", title: t("tab.chat", "Chat"), type: "builtin" },
       { id: "contacts", title: t("tab.contacts", "Contacts"), type: "builtin" },
       { id: "accessibility", title: t("tab.accessibility", "Accessibility"), type: "builtin" },
+      ...(state.provider?.announcements ? [{ id: "news", title: t("tab.news", "News"), type: "builtin" }] : []),
       { id: "checklist", title: t("tab.checklist", "Checklist"), type: "builtin" },
       ...providerTabs
     ];
@@ -1628,6 +1629,8 @@
       renderContactsTab(card);
     } else if (tab.id === "accessibility") {
       renderAccessibilityTab(card);
+    } else if (tab.id === "news") {
+      renderNewsTab(card);
     } else if (tab.id === "checklist") {
       renderChecklistTab(card);
     } else {
@@ -1730,6 +1733,66 @@
     card.appendChild(locationPanel);
   }
 
+  function renderNewsTab(card) {
+    const announcements = state.provider?.announcements;
+    const items = Array.isArray(announcements?.items) ? announcements.items : [];
+    card.appendChild(createTextBlock(
+      t("tab.news", "News"),
+      t("tab.news_text", "Provider announcements through XEP-0060 PubSub.")));
+    card.appendChild(createDefinitionList([
+      [t("news.node", "Node"), announcements?.node ?? "urn:tiedragon:teletyptel:announcements"],
+      [t("news.items", "Items"), String(items.length)]
+    ]));
+
+    const list = document.createElement("div");
+    list.className = "announcement-list";
+    if (!items.length) {
+      const empty = document.createElement("p");
+      empty.className = "announcement-empty";
+      empty.textContent = t("news.empty", "No announcements.");
+      list.appendChild(empty);
+      card.appendChild(list);
+      return;
+    }
+
+    for (const announcement of items) {
+      const item = document.createElement("article");
+      item.className = "announcement-item";
+
+      const title = document.createElement("strong");
+      title.textContent = announcement.title ?? announcement.id ?? t("tab.news", "News");
+
+      const meta = document.createElement("span");
+      meta.className = "announcement-meta";
+      meta.textContent = [
+        announcement.category,
+        announcement.priority,
+        announcement.published ? new Date(announcement.published).toLocaleString() : null
+      ].filter(Boolean).join(" - ");
+
+      const summary = document.createElement("p");
+      summary.textContent = announcement.summary ?? "";
+      item.append(title);
+      if (meta.textContent) {
+        item.appendChild(meta);
+      }
+
+      item.appendChild(summary);
+      if (announcement.link) {
+        const link = document.createElement("a");
+        link.href = announcement.link;
+        link.target = "_blank";
+        link.rel = "noreferrer";
+        link.textContent = t("news.link", "Open");
+        item.appendChild(link);
+      }
+
+      list.appendChild(item);
+    }
+
+    card.appendChild(list);
+  }
+
   function createActionButton(text, handler) {
     const button = document.createElement("button");
     button.type = "button";
@@ -1759,6 +1822,7 @@
       [true, "XEP-0084", t("checklist.avatars", "Account avatar, contact avatar cache and avatar presence")],
       [true, "XEP-0191", t("checklist.blocking", "Block and unblock contacts, with blocked chat, RTT and calls filtered")],
       [true, "XEP-0080", t("checklist.location", "Opt-in browser location sharing with XEP-0080 and PIDF-LO export")],
+      [true, "XEP-0060", t("checklist.pubsub_news", "Provider news and announcements through PubSub")],
       [true, "ProtoXEP RTT Sync", t("checklist.jingle_rtt_sync", "Jingle co-session real-time text datachannel with XEP-0301 fallback")],
       [false, "Roster", t("checklist.roster", "Replace demo contact list with real XMPP roster-backed contacts")],
       [false, "OMEMO", t("checklist.omemo", "Finish encryption sessions, trust model and interoperability smoke")],

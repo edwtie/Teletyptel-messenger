@@ -69,6 +69,8 @@ Normal app flow:
 | `XmppPersistentPrivateData` | XEP-0223 PEP/PubSub private-data storage with persistent whitelist publish-options and notification trust checks. |
 | `XmppBookmarks` | XEP-0402 PEP-native bookmarks plus XEP-0048/XEP-0049 legacy bookmark compatibility. |
 | `XmppMucSelfPing` | XEP-0410 ping helper for confirming whether the current MUC occupant session is still joined. |
+| `XmppPubSub` | XEP-0060 generic PubSub subscribe, unsubscribe, create/delete node and subscription-result helpers. |
+| `XmppPubSubAnnouncements` | Teletyptel provider announcement model on XEP-0060 with Atom entry publish, retrieve and event parsing. |
 | `XmppJingle` | XEP-0166/0167/0176/0320 call signaling, RTP payloads, ICE candidates, DTLS fingerprints and session-info states. Use `XmppExternalServiceDiscovery` for XEP-0215 STUN/TURN discovery before production calls. |
 | `XmppJingleMessageInitiation` | XEP-0353 message-based call setup helpers for `propose`, `ringing`, `proceed`, `reject`, `retract` and `finish`. |
 | `XmppSocks5Bytestreams` | XEP-0065 SOCKS5 Bytestreams disco checks, proxy address query, streamhost negotiation, activation and destination-address hashing. |

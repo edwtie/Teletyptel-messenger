@@ -215,7 +215,7 @@ item is implemented, tested and documented.
 - [x] XEP-0115 Entity Capabilities.
 - [x] XEP-0156 Alternative Connection Method discovery.
 - [x] XEP-0157 Contact Addresses for XMPP Services.
-- [ ] XEP-0060 general PubSub announcement/news node model and subscription UI.
+- [x] XEP-0060 general PubSub announcement/news node model and provider news UI seed.
 - [x] XEP-0084 User Avatars protocol helpers.
 - [x] XEP-0398/XEP-0153 vCard avatar compatibility.
 - [x] XEP-0245 `/me` command.
@@ -225,7 +225,8 @@ item is implemented, tested and documented.
 - [ ] Public release and user-facing setup guide before any XEP-0479 compliance claim.
 - [x] XEP-0368 direct TLS SRV discovery for Advanced Core Client.
 - [x] XEP-0163 generic PEP/PubSub publishing for Advanced Core Client.
-- [ ] XEP-0060 service/provider announcements separate from personal PEP nodes.
+- [x] XEP-0060 service/provider announcements separate from personal PEP nodes.
+- [ ] Live server XEP-0060 announcement subscription smoke with the deployment PubSub service.
 - [ ] Real hosted RFC 7395/WSS endpoint and XEP-0156 deployment guide for Web Client.
 - [x] XEP-0124/XEP-0206 BOSH body/session/restart helpers for optional Web Client fallback.
 - [x] XEP-0124/XEP-0206 full HTTP long-polling client and real-server BOSH smoke path.

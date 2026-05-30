@@ -112,10 +112,14 @@ Planned Teletyptel announcement model:
 - UI presents them as news/mededelingen, status notices or provider service
   updates, not as unsolicited chat spam.
 
-Current implementation status: the core already has generic PEP/PubSub publish,
-retrieve, retract, delete and event-notification helpers used by avatars,
-location, bookmarks and private data. Full generic XEP-0060 subscription,
-node-management and announcement UI remain planned work.
+Current implementation status: `XmppPubSub` adds explicit XEP-0060 subscribe,
+unsubscribe, create-node, delete-node and subscription-result helpers.
+`XmppPubSubAnnouncements` defines the Teletyptel announcement node
+`urn:tiedragon:teletyptel:announcements`, serializes Atom entries and parses
+items or pushed PubSub event notifications. The web provider manifest can seed
+a News tab with provider announcements. A live public-server subscription smoke
+remains release validation because PubSub service names and access policies vary
+by deployment.
 
 ## XEP-0308 Last Message Correction
 

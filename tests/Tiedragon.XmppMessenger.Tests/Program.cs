@@ -77,6 +77,7 @@ var tests = new (string Name, Action Test)[]
     ("XMPP stream client requests service discovery", XmppStreamClientRequestsServiceDiscovery),
     ("XMPP stream client requests external services", XmppStreamClientRequestsExternalServices),
     ("XMPP stream client publishes personal events", XmppStreamClientPublishesPersonalEvents),
+    ("XMPP stream client handles PubSub announcements", XmppStreamClientHandlesPubSubAnnouncements),
     ("XMPP stream client handles private XML storage", XmppStreamClientHandlesPrivateXmlStorage),
     ("XMPP stream client handles persistent private data", XmppStreamClientHandlesPersistentPrivateData),
     ("XMPP stream client handles user avatar requests", XmppStreamClientHandlesUserAvatarRequests),
@@ -143,6 +144,8 @@ var tests = new (string Name, Action Test)[]
     ("XMPP user avatar handles metadata notifications and disable", XmppUserAvatarHandlesMetadataNotificationsAndDisable),
     ("XMPP personal eventing serializes requests", XmppPersonalEventingSerializesRequests),
     ("XMPP personal eventing parses notifications", XmppPersonalEventingParsesNotifications),
+    ("XMPP PubSub serializes subscription requests", XmppPubSubSerializesSubscriptionRequests),
+    ("XMPP announcements serialize and parse Atom entries", XmppAnnouncementsSerializeAndParseAtomEntries),
     ("XMPP private XML storage serializes and parses", XmppPrivateXmlStorageSerializesAndParses),
     ("XMPP persistent private data serializes and parses", XmppPersistentPrivateDataSerializesAndParses),
     ("XMPP conference bookmarks serialize and parse", XmppConferenceBookmarksSerializeAndParse),
@@ -2276,6 +2279,139 @@ static async Task RunXmppStreamClientPublishesPersonalEventsAsync()
         Equal("urn:xmpp:mood", items.Node);
         Equal("current", items.Items.Single().Id);
         Equal("mood", items.Items.Single().Payloads.Single().Name.LocalName);
+    }
+    finally
+    {
+        listener.Stop();
+    }
+}
+
+static void XmppStreamClientHandlesPubSubAnnouncements()
+{
+    RunXmppStreamClientHandlesPubSubAnnouncementsAsync().GetAwaiter().GetResult();
+}
+
+static async Task RunXmppStreamClientHandlesPubSubAnnouncementsAsync()
+{
+    var listener = new TcpListener(IPAddress.Loopback, 0);
+    listener.Start();
+    var endpoint = (IPEndPoint)listener.LocalEndpoint;
+    var sawCreate = false;
+    var sawSubscribe = false;
+    var sawPublish = false;
+    var sawItems = false;
+
+    var serverTask = Task.Run(async () =>
+    {
+        using var serverClient = await listener.AcceptTcpClientAsync();
+        await using var serverStream = serverClient.GetStream();
+        var buffer = new byte[8192];
+
+        await ReadTextAsync(serverStream, buffer);
+        await WriteTextAsync(serverStream, """
+            <stream:stream xmlns="jabber:client" xmlns:stream="http://etherx.jabber.org/streams" from="example.org" version="1.0">
+            <stream:features/>
+            """);
+
+        var create = await ReadTextAsync(serverStream, buffer);
+        sawCreate = create.Contains("id=\"pubsub-create-1\"", StringComparison.Ordinal)
+            && create.Contains("to=\"pubsub.example.org\"", StringComparison.Ordinal)
+            && create.Contains("<create", StringComparison.Ordinal)
+            && create.Contains(XmppPubSubAnnouncements.DefaultNode, StringComparison.Ordinal);
+        await WriteTextAsync(serverStream, """
+            <iq xmlns="jabber:client" type="result" id="pubsub-create-1"/>
+            """);
+
+        var subscribe = await ReadTextAsync(serverStream, buffer);
+        sawSubscribe = subscribe.Contains("id=\"pubsub-subscribe-1\"", StringComparison.Ordinal)
+            && subscribe.Contains("<subscribe", StringComparison.Ordinal)
+            && subscribe.Contains("jid=\"user@example.org/desktop\"", StringComparison.Ordinal);
+        await WriteTextAsync(serverStream, """
+            <iq xmlns="jabber:client" type="result" id="pubsub-subscribe-1">
+              <pubsub xmlns="http://jabber.org/protocol/pubsub">
+                <subscription node="urn:tiedragon:teletyptel:announcements" jid="user@example.org/desktop" subscription="subscribed" subid="sub-1"/>
+              </pubsub>
+            </iq>
+            """);
+
+        var publish = await ReadTextAsync(serverStream, buffer);
+        sawPublish = publish.Contains("id=\"announcement-publish-1\"", StringComparison.Ordinal)
+            && publish.Contains("xmlns=\"http://www.w3.org/2005/Atom\"", StringComparison.Ordinal)
+            && publish.Contains("Total Conversation alpha", StringComparison.Ordinal);
+        await WriteTextAsync(serverStream, """
+            <iq xmlns="jabber:client" type="result" id="announcement-publish-1"/>
+            """);
+
+        var items = await ReadTextAsync(serverStream, buffer);
+        sawItems = items.Contains("id=\"announcement-items-1\"", StringComparison.Ordinal)
+            && items.Contains("type=\"get\"", StringComparison.Ordinal)
+            && items.Contains("max_items=\"2\"", StringComparison.Ordinal);
+        await WriteTextAsync(serverStream, """
+            <iq xmlns="jabber:client" type="result" id="announcement-items-1">
+              <pubsub xmlns="http://jabber.org/protocol/pubsub">
+                <items node="urn:tiedragon:teletyptel:announcements">
+                  <item id="alpha2">
+                    <entry xmlns="http://www.w3.org/2005/Atom" xml:lang="en">
+                      <id>alpha2</id>
+                      <title>Alpha 2</title>
+                      <summary>PubSub announcements are available.</summary>
+                      <updated>2026-05-30T12:00:00Z</updated>
+                      <category term="release"/>
+                      <category scheme="urn:tiedragon:teletyptel:announcement-priority" term="normal"/>
+                    </entry>
+                  </item>
+                </items>
+              </pubsub>
+            </iq>
+            """);
+
+        await ReadTextAsync(serverStream, buffer);
+    });
+
+    try
+    {
+        var service = XmppAddress.Parse("pubsub.example.org");
+        var account = XmppAddress.Parse("user@example.org/desktop");
+        var settings = new XmppConnectionSettings(
+            account,
+            IPAddress.Loopback.ToString(),
+            endpoint.Port,
+            requireTls: false);
+        await using var client = new XmppStreamClient(settings);
+        await client.ConnectAndReadFeaturesAsync();
+
+        await client.CreatePubSubNodeAsync(XmppPubSubAnnouncements.DefaultNode, service, TimeSpan.FromSeconds(5));
+        var subscription = await client.SubscribePubSubNodeAsync(
+            XmppPubSubAnnouncements.DefaultNode,
+            service,
+            account,
+            TimeSpan.FromSeconds(5));
+        await client.PublishAnnouncementAsync(
+            new XmppAnnouncement(
+                Id: "alpha2",
+                Title: "Total Conversation alpha",
+                Summary: "Live text, audio and video are tested as one conversation.",
+                Category: "release",
+                Priority: "normal",
+                Updated: new DateTimeOffset(2026, 5, 30, 12, 0, 0, TimeSpan.Zero)),
+            service,
+            TimeSpan.FromSeconds(5));
+        var announcements = await client.RequestAnnouncementsAsync(
+            service,
+            TimeSpan.FromSeconds(5),
+            maxItems: 2);
+        await client.DisconnectAsync();
+        await serverTask;
+
+        True(sawCreate);
+        True(sawSubscribe);
+        True(sawPublish);
+        True(sawItems);
+        Equal("subscribed", subscription.State);
+        Equal("sub-1", subscription.SubscriptionId);
+        Equal("Alpha 2", announcements.Single().Title);
+        Equal("release", announcements.Single().Category);
+        Equal("normal", announcements.Single().Priority);
     }
     finally
     {
@@ -4650,6 +4786,131 @@ static void XmppPersonalEventingParsesNotifications()
 
     True(notification.ForNode("urn:xmpp:tune").Single().IsPurge);
     True(notification.ForNode("urn:xmpp:activity").Single().IsDelete);
+}
+
+static void XmppPubSubSerializesSubscriptionRequests()
+{
+    var service = XmppAddress.Parse("pubsub.example.org");
+    var jid = XmppAddress.Parse("anna@example.org/desktop");
+
+    var subscribe = XmppPubSub.CreateSubscribeRequest(
+        "sub1",
+        XmppPubSubAnnouncements.DefaultNode,
+        jid,
+        service);
+    var subscribeXml = subscribe.ToXml().ToString(SaveOptions.DisableFormatting);
+    Equal(XmppIqType.Set, subscribe.Type);
+    Equal("pubsub.example.org", subscribe.To!.Bare);
+    True(subscribeXml.Contains("<subscribe", StringComparison.Ordinal));
+    True(subscribeXml.Contains("jid=\"anna@example.org/desktop\"", StringComparison.Ordinal));
+    True(subscribeXml.Contains(XmppPubSubAnnouncements.DefaultNode, StringComparison.Ordinal));
+
+    var unsubscribe = XmppPubSub.CreateUnsubscribeRequest(
+        "unsub1",
+        XmppPubSubAnnouncements.DefaultNode,
+        jid,
+        "subscription-1",
+        service);
+    var unsubscribeXml = unsubscribe.ToXml().ToString(SaveOptions.DisableFormatting);
+    True(unsubscribeXml.Contains("<unsubscribe", StringComparison.Ordinal));
+    True(unsubscribeXml.Contains("subid=\"subscription-1\"", StringComparison.Ordinal));
+
+    var create = XmppPubSub.CreateCreateNodeRequest("create1", XmppPubSubAnnouncements.DefaultNode, service);
+    var createXml = create.ToXml().ToString(SaveOptions.DisableFormatting);
+    True(createXml.Contains("<create", StringComparison.Ordinal));
+    True(createXml.Contains("to=\"pubsub.example.org\"", StringComparison.Ordinal));
+
+    True(XmppIq.TryParse("""
+        <iq xmlns="jabber:client" type="result" id="sub1">
+          <pubsub xmlns="http://jabber.org/protocol/pubsub">
+            <subscription node="urn:tiedragon:teletyptel:announcements" jid="anna@example.org/desktop" subscription="subscribed" subid="subscription-1"/>
+          </pubsub>
+        </iq>
+        """, out var result));
+    True(XmppPubSub.TryParseSubscriptionResult(result!, out var subscription));
+    Equal(XmppPubSubAnnouncements.DefaultNode, subscription!.Node);
+    Equal("anna@example.org/desktop", subscription.Jid.Full);
+    Equal("subscribed", subscription.State);
+    Equal("subscription-1", subscription.SubscriptionId);
+
+    var info = new XmppServiceDiscoveryInfo(
+        null,
+        [new XmppServiceIdentity("pubsub", "service")],
+        [XmppPubSub.SubscribeFeature, XmppPubSub.CreateNodesFeature]);
+    True(XmppPubSub.SupportsPubSub(info));
+}
+
+static void XmppAnnouncementsSerializeAndParseAtomEntries()
+{
+    var announcement = new XmppAnnouncement(
+        Id: "alpha2-total-conversation",
+        Title: "Total Conversation alpha",
+        Summary: "Live text, audio and video are tested as one conversation.",
+        Link: new Uri("https://example.org/teletyptel/news/alpha2"),
+        Language: "en",
+        Category: "release",
+        Priority: "normal",
+        Published: new DateTimeOffset(2026, 5, 30, 12, 0, 0, TimeSpan.Zero));
+
+    var publish = XmppPubSubAnnouncements.CreatePublishRequest(
+        "announcement-publish",
+        announcement,
+        service: XmppAddress.Parse("pubsub.example.org"));
+    var publishXml = publish.ToXml().ToString(SaveOptions.DisableFormatting);
+    Equal("pubsub.example.org", publish.To!.Bare);
+    True(publishXml.Contains("item id=\"alpha2-total-conversation\"", StringComparison.Ordinal));
+    True(publishXml.Contains("xmlns=\"http://www.w3.org/2005/Atom\"", StringComparison.Ordinal));
+    True(publishXml.Contains("xml:lang=\"en\"", StringComparison.Ordinal));
+    True(publishXml.Contains("scheme=\"urn:tiedragon:teletyptel:announcement-priority\" term=\"normal\"", StringComparison.Ordinal));
+
+    True(XmppPubSubAnnouncements.TryParseAtomEntry(publish.Payload!.Descendants().Single(element =>
+        element.Name == XName.Get("entry", XmppPubSubAnnouncements.AtomNamespaceName)), out var parsed));
+    Equal(announcement.Id, parsed!.Id);
+    Equal(announcement.Title, parsed.Title);
+    Equal(announcement.Summary, parsed.Summary);
+    Equal(announcement.Link, parsed.Link);
+    Equal(announcement.Category, parsed.Category);
+    Equal(announcement.Priority, parsed.Priority);
+
+    True(XmppIq.TryParse("""
+        <iq xmlns="jabber:client" type="result" id="announcement-items">
+          <pubsub xmlns="http://jabber.org/protocol/pubsub">
+            <items node="urn:tiedragon:teletyptel:announcements">
+              <item id="alpha2-total-conversation">
+                <entry xmlns="http://www.w3.org/2005/Atom" xml:lang="en">
+                  <id>alpha2-total-conversation</id>
+                  <title>Total Conversation alpha</title>
+                  <summary>Live text, audio and video are tested as one conversation.</summary>
+                  <updated>2026-05-30T12:00:00Z</updated>
+                  <category term="release"/>
+                  <category scheme="urn:tiedragon:teletyptel:announcement-priority" term="normal"/>
+                </entry>
+              </item>
+            </items>
+          </pubsub>
+        </iq>
+        """, out var iq));
+    True(XmppPubSubAnnouncements.TryParseItems(iq!, out var announcements));
+    Equal("Total Conversation alpha", announcements.Single().Title);
+
+    var notification = XElement.Parse("""
+        <message xmlns="jabber:client" type="headline" from="pubsub.example.org" to="edward@example.org/web">
+          <event xmlns="http://jabber.org/protocol/pubsub#event">
+            <items node="urn:tiedragon:teletyptel:announcements">
+              <item id="alpha2-total-conversation">
+                <entry xmlns="http://www.w3.org/2005/Atom">
+                  <id>alpha2-total-conversation</id>
+                  <title>Total Conversation alpha</title>
+                  <summary>Live text, audio and video are tested as one conversation.</summary>
+                  <updated>2026-05-30T12:00:00Z</updated>
+                </entry>
+              </item>
+            </items>
+          </event>
+        </message>
+        """);
+    True(XmppPubSubAnnouncements.TryParseNotification(notification, out var pushed));
+    Equal("alpha2-total-conversation", pushed.Single().Id);
 }
 
 static void XmppPrivateXmlStorageSerializesAndParses()
