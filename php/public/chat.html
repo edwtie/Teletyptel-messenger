@@ -5,6 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#111827">
   <title>Tiedragon XMPP Web Client</title>
+  <script>
+    if (location.protocol === "file:") {
+      const localUrl = new URL("http://127.0.0.1:8090/chat.html");
+      localUrl.search = location.search;
+      localUrl.hash = location.hash;
+      location.replace(localUrl.toString());
+    }
+  </script>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="chat-client.css?v=20260531-login-start">
 </head>

@@ -128,10 +128,12 @@ Start the PHP relay:
 php php/rtt-websocket-server.php
 ```
 
-Open the full Alpha 1 web client in two browser windows:
+Open the full Alpha 1 web client in two browser windows through localhost.
+Do not open `php/public/chat.html` directly from `C:\...`; the login and
+account API require HTTP/PHP.
 
 ```text
-php/public/chat.html
+http://127.0.0.1:8090/chat.html
 ```
 
 When the web client is served through PHP or WAMP, use separate browser

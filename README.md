@@ -314,10 +314,11 @@ experiments. This is not the final XMPP server layer; it is a local test bridge.
 php php/rtt-websocket-server.php
 ```
 
-Then open `php/public/chat.html` in two browser windows and connect both to:
+Serve `php/public` through localhost and open the client from HTTP, not from
+`C:\...` or `file:///...`. Direct file opening cannot call the PHP account API.
 
 ```text
-ws://127.0.0.1:8787
+http://127.0.0.1:8090/chat.html
 ```
 
 For two real browser-side test accounts, open two profiles:
@@ -325,6 +326,12 @@ For two real browser-side test accounts, open two profiles:
 ```text
 http://127.0.0.1:8090/chat.html?profile=edward
 http://127.0.0.1:8090/chat.html?profile=tester
+```
+
+Connect both windows to:
+
+```text
+ws://127.0.0.1:8787
 ```
 
 Each profile stores its own local account settings, JID and generated browser

@@ -80,10 +80,11 @@ and the published .NET test tools under a WAMP-style folder layout. The target
 machine needs WAMP or another Apache/PHP/MySQL stack, PHP 8.1 or newer for the
 relay and .NET runtime 10 for the published smoke tools.
 
-The fuller web chat client lives at:
+The fuller web chat client must be opened through localhost, not directly from
+`C:\...` or `file:///...`, because login uses the PHP account API:
 
 ```text
-php/public/chat.html
+http://localhost/teletyptel/public/chat.html
 ```
 
 It uses the same relay for RTT chat, includes RFC 7395 test controls and is the
