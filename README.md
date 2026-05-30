@@ -130,6 +130,7 @@ Important XMPP extensions:
 - XEP-0045 - Multi-User Chat
 - XEP-0048 - Bookmarks
 - XEP-0049 - Private XML Storage
+- XEP-0060 - Publish-Subscribe
 - XEP-0065 - SOCKS5 Bytestreams
 - XEP-0077 - In-Band Registration
 - XEP-0080 - User Location

@@ -77,6 +77,7 @@ Server response flow:
 | XEP-0045 | Multi-user chat. |
 | XEP-0048 | Legacy bookmark storage for MUC room bookmarks. |
 | XEP-0049 | Private XML storage for namespaced account data and legacy bookmark compatibility. |
+| XEP-0060 | Publish-Subscribe for generic nodes, announcements, service news and the foundation used by PEP. |
 | XEP-0153 | vCard-based avatar update hash in presence. |
 | XEP-0163 | Personal Eventing Protocol for publish/retrieve/retract on personal PubSub nodes. |
 | XEP-0080 | User location through permission-gated PEP/PubSub events. |
@@ -94,6 +95,27 @@ Server response flow:
 | XEP-0363 | HTTP file upload. |
 | XEP-0402 | PEP-native MUC room bookmarks. |
 | XEP-0410 | MUC self-ping. |
+
+## XEP-0060 Publish-Subscribe
+
+XEP-0060 is the general PubSub foundation. XEP-0163 PEP is the personal-eventing
+profile built on top of PubSub, but Teletyptel should also track XEP-0060
+explicitly because provider/server announcements are not always personal events.
+
+Planned Teletyptel announcement model:
+
+- server or provider publishes items to a well-known node such as
+  `urn:tiedragon:teletyptel:announcements`;
+- items contain Atom-like title, summary, link, language, category and priority
+  metadata;
+- clients can retrieve recent items and subscribe when the server allows it;
+- UI presents them as news/mededelingen, status notices or provider service
+  updates, not as unsolicited chat spam.
+
+Current implementation status: the core already has generic PEP/PubSub publish,
+retrieve, retract, delete and event-notification helpers used by avatars,
+location, bookmarks and private data. Full generic XEP-0060 subscription,
+node-management and announcement UI remain planned work.
 
 ## XEP-0308 Last Message Correction
 
