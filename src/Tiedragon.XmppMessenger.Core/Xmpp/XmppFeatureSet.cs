@@ -6,7 +6,8 @@ public sealed record XmppFeatureSet(
     bool RealTimeText,
     bool ChatStateNotifications,
     bool DeliveryReceipts,
-    bool StreamManagement)
+    bool StreamManagement,
+    bool ClientStateIndication)
 {
     public static XmppFeatureSet Alpha1Default { get; } = new(
         Roster: true,
@@ -14,10 +15,16 @@ public sealed record XmppFeatureSet(
         RealTimeText: false,
         ChatStateNotifications: false,
         DeliveryReceipts: false,
-        StreamManagement: true);
+        StreamManagement: true,
+        ClientStateIndication: false);
 
     public XmppFeatureSet WithRealTimeText(bool enabled)
     {
         return this with { RealTimeText = enabled };
+    }
+
+    public XmppFeatureSet WithClientStateIndication(bool enabled)
+    {
+        return this with { ClientStateIndication = enabled };
     }
 }

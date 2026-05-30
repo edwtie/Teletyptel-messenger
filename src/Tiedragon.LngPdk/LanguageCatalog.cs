@@ -14,7 +14,12 @@ public sealed class LanguageCatalog
     public static LanguageCatalog FromText(string text)
     {
         var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        MergeText(values, text, overwrite: true);
+        return new LanguageCatalog(values);
+    }
 
+    private static void MergeText(Dictionary<string, string> values, string? text, bool overwrite)
+    {
         foreach (var rawLine in (text ?? string.Empty).Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
         {
             var line = rawLine.Trim();
@@ -31,48 +36,58 @@ public sealed class LanguageCatalog
 
             var key = line[..separatorIndex].Trim();
             var value = line[(separatorIndex + 1)..].Trim();
-            if (key.Length > 0)
+            if (key.Length > 0 && (overwrite || !values.ContainsKey(key)))
             {
                 values[key] = value;
             }
         }
-
-        return new LanguageCatalog(values);
     }
 
     public static LanguageCatalog Load(string languageCode, string? baseDirectory = null)
     {
         baseDirectory ??= AppContext.BaseDirectory;
+        var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        if (!languageCode.Equals("eng", StringComparison.OrdinalIgnoreCase) &&
+            LanguagePackageReader.TryReadLanguage(baseDirectory, "eng", out var fallbackPackageText))
+        {
+            MergeText(values, fallbackPackageText, overwrite: false);
+        }
+
+        var fallbackPath = Path.Combine(baseDirectory, "lang", "eng.lng");
+        if (!languageCode.Equals("eng", StringComparison.OrdinalIgnoreCase) && File.Exists(fallbackPath))
+        {
+            MergeText(values, File.ReadAllText(fallbackPath), overwrite: false);
+        }
+
+        var legacyFallbackPath = Path.Combine(baseDirectory, "lang", "en.lng");
+        if (!languageCode.Equals("eng", StringComparison.OrdinalIgnoreCase) && File.Exists(legacyFallbackPath))
+        {
+            MergeText(values, File.ReadAllText(legacyFallbackPath), overwrite: false);
+        }
+
         if (LanguagePackageReader.TryReadLanguage(baseDirectory, languageCode, out var packageText))
         {
-            return FromText(packageText);
+            MergeText(values, packageText, overwrite: true);
         }
 
         var path = Path.Combine(baseDirectory, "lang", $"{languageCode}.lng");
         if (File.Exists(path))
         {
-            return FromText(File.ReadAllText(path));
+            MergeText(values, File.ReadAllText(path), overwrite: true);
         }
 
-        if (!languageCode.Equals("eng", StringComparison.OrdinalIgnoreCase) &&
-            LanguagePackageReader.TryReadLanguage(baseDirectory, "eng", out var fallbackPackageText))
+        if (values.Count == 0 && File.Exists(fallbackPath))
         {
-            return FromText(fallbackPackageText);
+            MergeText(values, File.ReadAllText(fallbackPath), overwrite: true);
         }
 
-        var fallbackPath = Path.Combine(baseDirectory, "lang", "eng.lng");
-        if (File.Exists(fallbackPath))
+        if (values.Count == 0 && File.Exists(legacyFallbackPath))
         {
-            return FromText(File.ReadAllText(fallbackPath));
+            MergeText(values, File.ReadAllText(legacyFallbackPath), overwrite: true);
         }
 
-        var legacyFallbackPath = Path.Combine(baseDirectory, "lang", "en.lng");
-        if (File.Exists(legacyFallbackPath))
-        {
-            return FromText(File.ReadAllText(legacyFallbackPath));
-        }
-
-        return FromText(string.Empty);
+        return new LanguageCatalog(values);
     }
 
     public string Get(string key, string? fallback = null)

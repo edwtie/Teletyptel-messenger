@@ -3,8 +3,10 @@ using Tiedragon.XmppMessenger.Core.Accessibility;
 using Tiedragon.XmppMessenger.Core.Messaging;
 using Tiedragon.XmppMessenger.Core.Rtt;
 using Tiedragon.XmppMessenger.Core.Xmpp;
+using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
+using System.Security.Cryptography;
 using System.Text;
 using System.Xml.Linq;
 
@@ -35,11 +37,15 @@ var tests = new (string Name, Action Test)[]
     ("XMPP address rejects invalid JID", XmppAddressRejectsInvalidJid),
     ("XMPP address handles RFC 7622 edge cases", XmppAddressHandlesRfc7622EdgeCases),
     ("XMPP connection defaults require TLS", XmppConnectionDefaultsRequireTls),
+    ("XMPP direct TLS creates SRV endpoints", XmppDirectTlsCreatesSrvEndpoints),
+    ("XMPP direct TLS discovery queries SRV records", XmppDirectTlsDiscoveryQueriesSrvRecords),
+    ("XMPP direct TLS settings use endpoint", XmppDirectTlsSettingsUseEndpoint),
     ("XMPP feature set can enable RTT", XmppFeatureSetCanEnableRtt),
     ("XMPP stream header creates client stream", XmppStreamHeaderCreatesClientStream),
     ("XMPP stream features parse STARTTLS and SASL", XmppStreamFeaturesParseStartTlsAndSasl),
     ("XMPP stream features parse bind and session", XmppStreamFeaturesParseBindAndSession),
     ("XMPP stream features parse stream management", XmppStreamFeaturesParseStreamManagement),
+    ("XMPP stream features parse client state indication", XmppStreamFeaturesParseClientStateIndication),
     ("XMPP SASL PLAIN creates auth element", XmppSaslPlainCreatesAuthElement),
     ("XMPP SASL selector prefers SCRAM SHA256", XmppSaslSelectorPrefersScramSha256),
     ("XMPP SASL SCRAM SHA1 matches RFC vector", XmppSaslScramSha1MatchesRfcVector),
@@ -55,23 +61,35 @@ var tests = new (string Name, Action Test)[]
     ("XMPP stream writer writes open stream and stanza", XmppStreamWriterWritesOpenStreamAndStanza),
     ("XMPP WebSocket frame serializes open and close", XmppWebSocketFrameSerializesOpenAndClose),
     ("XMPP WebSocket stream sends RFC 7395 open frame", XmppWebSocketStreamSendsRfc7395OpenFrame),
+    ("XMPP BOSH serializes session and restart", XmppBoshSerializesSessionAndRestart),
+    ("XMPP BOSH parses session and terminate", XmppBoshParsesSessionAndTerminate),
+    ("XMPP BOSH client logs in and long polls", XmppBoshClientLogsInAndLongPolls),
     ("XMPP stream client connects and reads features", XmppStreamClientConnectsAndReadsFeatures),
     ("XMPP stream client returns negotiation decision", XmppStreamClientReturnsNegotiationDecision),
+    ("XMPP stream client opens direct TLS before stream", XmppStreamClientOpensDirectTlsBeforeStream),
     ("XMPP stream client runs TLS SASL bind commands", XmppStreamClientRunsTlsSaslBindCommands),
     ("XMPP stream client authenticates SCRAM", XmppStreamClientAuthenticatesScram),
     ("XMPP stream client authenticates best mechanism", XmppStreamClientAuthenticatesBestMechanism),
     ("XMPP stream client login performs auth and bind", XmppStreamClientLoginPerformsAuthAndBind),
     ("XMPP stream client requests roster", XmppStreamClientRequestsRoster),
     ("XMPP stream client sets and removes roster items", XmppStreamClientSetsAndRemovesRosterItems),
+    ("XMPP stream client handles blocking commands", XmppStreamClientHandlesBlockingCommands),
     ("XMPP stream client requests service discovery", XmppStreamClientRequestsServiceDiscovery),
+    ("XMPP stream client requests external services", XmppStreamClientRequestsExternalServices),
+    ("XMPP stream client publishes personal events", XmppStreamClientPublishesPersonalEvents),
+    ("XMPP stream client handles private XML storage", XmppStreamClientHandlesPrivateXmlStorage),
+    ("XMPP stream client handles persistent private data", XmppStreamClientHandlesPersistentPrivateData),
+    ("XMPP stream client handles user avatar requests", XmppStreamClientHandlesUserAvatarRequests),
     ("XMPP stream client enables stream management and tracks acks", XmppStreamClientEnablesStreamManagementAndTracksAcks),
     ("XMPP stream client resumes stream management", XmppStreamClientResumesStreamManagement),
+    ("XMPP stream client sends client state indication", XmppStreamClientSendsClientStateIndication),
     ("XMPP stream client sends initial presence", XmppStreamClientSendsInitialPresence),
     ("XMPP stream client sends presence subscription", XmppStreamClientSendsPresenceSubscription),
     ("XMPP stream client sends and receives normal chat", XmppStreamClientSendsAndReceivesNormalChat),
     ("XMPP stream client preserves multiple stanzas from one read", XmppStreamClientPreservesMultipleStanzasFromOneRead),
     ("XMPP stream client enables message carbons", XmppStreamClientEnablesMessageCarbons),
     ("XMPP incoming stanza classifies message presence IQ", XmppIncomingStanzaClassifiesMessagePresenceIq),
+    ("XMPP incoming stanza exposes personal event", XmppIncomingStanzaExposesPersonalEvent),
     ("XMPP IQ tracker completes result", XmppIqTrackerCompletesResult),
     ("XMPP IQ tracker reports error", XmppIqTrackerReportsError),
     ("XMPP protocol exception carries kind", XmppProtocolExceptionCarriesKind),
@@ -82,6 +100,8 @@ var tests = new (string Name, Action Test)[]
     ("RTT conversation manager tracks per contact state", RttConversationManagerTracksPerContactState),
     ("XMPP incoming stanza exposes real time text", XmppIncomingStanzaExposesRealTimeText),
     ("XMPP chat message serializes stanza", XmppChatMessageSerializesStanza),
+    ("XMPP message correction serializes and parses", XmppMessageCorrectionSerializesAndParses),
+    ("XMPP incoming stanza exposes message correction", XmppIncomingStanzaExposesMessageCorrection),
     ("XMPP presence serializes away stanza", XmppPresenceSerializesAwayStanza),
     ("XMPP presence serializes subscription stanza", XmppPresenceSerializesSubscriptionStanza),
     ("XMPP roster get serializes IQ", XmppRosterGetSerializesIq),
@@ -90,7 +110,13 @@ var tests = new (string Name, Action Test)[]
     ("XMPP service discovery serializes info request", XmppServiceDiscoverySerializesInfoRequest),
     ("XMPP service discovery parses info result", XmppServiceDiscoveryParsesInfoResult),
     ("XMPP service discovery checks RTT capability", XmppServiceDiscoveryChecksRttCapability),
+    ("XMPP service discovery checks PEP capability", XmppServiceDiscoveryChecksPepCapability),
+    ("XMPP external service discovery serializes and parses services", XmppExternalServiceDiscoverySerializesAndParsesServices),
+    ("XMPP external service discovery handles credentials and pushes", XmppExternalServiceDiscoveryHandlesCredentialsAndPushes),
+    ("XMPP service contact addresses parse serverinfo form", XmppServiceContactAddressesParseServerInfoForm),
+    ("XMPP service contact addresses create serverinfo form", XmppServiceContactAddressesCreateServerInfoForm),
     ("XMPP in-band registration serializes requests", XmppInBandRegistrationSerializesRequests),
+    ("XMPP in-band registration serializes data form request", XmppInBandRegistrationSerializesDataFormRequest),
     ("XMPP in-band registration parses info result", XmppInBandRegistrationParsesInfoResult),
     ("XMPP stream features parse in-band registration", XmppStreamFeaturesParseInBandRegistration),
     ("XMPP stream client requests registration info", XmppStreamClientRequestsRegistrationInfo),
@@ -101,29 +127,76 @@ var tests = new (string Name, Action Test)[]
     ("XMPP me command preserves protocol body", XmppMeCommandPreservesProtocolBody),
     ("XMPP vCard temp serializes get and set", XmppVCardTempSerializesGetAndSet),
     ("XMPP vCard temp parses result", XmppVCardTempParsesResult),
+    ("XMPP vCard avatar serializes presence update", XmppVCardAvatarSerializesPresenceUpdate),
+    ("XMPP vCard avatar converts legacy photo", XmppVCardAvatarConvertsLegacyPhoto),
+    ("XMPP stream client publishes vCard avatar", XmppStreamClientPublishesVCardAvatar),
+    ("XMPP user location serializes and parses", XmppUserLocationSerializesAndParses),
+    ("XMPP user location detects server support", XmppUserLocationDetectsServerSupport),
+    ("XMPP user location handles PEP notifications", XmppUserLocationHandlesPepNotifications),
+    ("XMPP stream client handles user location requests", XmppStreamClientHandlesUserLocationRequests),
+    ("XMPP emergency location exports PIDF-LO", XmppEmergencyLocationExportsPidfLo),
+    ("XMPP user avatar serializes data and metadata", XmppUserAvatarSerializesDataAndMetadata),
+    ("XMPP user avatar parses data and metadata", XmppUserAvatarParsesDataAndMetadata),
+    ("XMPP user avatar handles metadata notifications and disable", XmppUserAvatarHandlesMetadataNotificationsAndDisable),
+    ("XMPP personal eventing serializes requests", XmppPersonalEventingSerializesRequests),
+    ("XMPP personal eventing parses notifications", XmppPersonalEventingParsesNotifications),
+    ("XMPP private XML storage serializes and parses", XmppPrivateXmlStorageSerializesAndParses),
+    ("XMPP persistent private data serializes and parses", XmppPersistentPrivateDataSerializesAndParses),
+    ("XMPP conference bookmarks serialize and parse", XmppConferenceBookmarksSerializeAndParse),
+    ("XMPP conference bookmarks parse notifications", XmppConferenceBookmarksParseNotifications),
     ("XMPP push notifications serialize enable and disable", XmppPushNotificationsSerializeEnableAndDisable),
     ("XMPP chat state serializes and parses", XmppChatStateSerializesAndParses),
     ("XMPP delivery receipt request serializes and parses", XmppDeliveryReceiptRequestSerializesAndParses),
     ("XMPP delivery receipt received serializes and parses", XmppDeliveryReceiptReceivedSerializesAndParses),
     ("XMPP message carbons enable serializes IQ", XmppMessageCarbonsEnableSerializesIq),
     ("XMPP message carbons parse forwarded received", XmppMessageCarbonsParseForwardedReceived),
+    ("XMPP blocking command serializes and parses block list", XmppBlockingCommandSerializesAndParsesBlockList),
+    ("XMPP blocking command parses pushes", XmppBlockingCommandParsesPushes),
     ("XMPP incoming stanza exposes carbon", XmppIncomingStanzaExposesCarbon),
     ("XMPP message archive query serializes paging", XmppMessageArchiveQuerySerializesPaging),
     ("XMPP message archive parses forwarded result", XmppMessageArchiveParsesForwardedResult),
+    ("XMPP message archive parses forwarded MUC result", XmppMessageArchiveParsesForwardedMucResult),
     ("XMPP message archive parses fin result set", XmppMessageArchiveParsesFinResultSet),
     ("XMPP multi-user chat serializes join and group message", XmppMultiUserChatSerializesJoinAndGroupMessage),
+    ("XMPP multi-user chat serializes message correction", XmppMultiUserChatSerializesMessageCorrection),
     ("XMPP multi-user chat discovers rooms and items", XmppMultiUserChatDiscoversRoomsAndItems),
     ("XMPP multi-user chat handles configuration forms", XmppMultiUserChatHandlesConfigurationForms),
     ("XMPP multi-user chat handles admin items", XmppMultiUserChatHandlesAdminItems),
+    ("XMPP MUC self-ping serializes and classifies", XmppMucSelfPingSerializesAndClassifies),
     ("XMPP HTTP file upload serializes request and parses slot", XmppHttpFileUploadSerializesRequestAndParsesSlot),
+    ("XMPP HTTP file upload only allows loopback HTTP", XmppHttpFileUploadOnlyAllowsLoopbackHttp),
     ("XMPP HTTP file upload discovers max file size", XmppHttpFileUploadDiscoversMaxFileSize),
+    ("XMPP HTTP file upload handles purpose and retry details", XmppHttpFileUploadHandlesPurposeAndRetryDetails),
     ("XMPP HTTP file upload executes PUT", XmppHttpFileUploadExecutesPut),
     ("XMPP HTTP file upload creates message attachment", XmppHttpFileUploadCreatesMessageAttachment),
+    ("XMPP SOCKS5 bytestreams serializes requests", XmppSocks5BytestreamsSerializesRequests),
+    ("XMPP SOCKS5 bytestreams computes destination address", XmppSocks5BytestreamsComputesDestinationAddress),
+    ("XMPP SOCKS5 bytestreams opens local streamhost and exchanges bytes", XmppSocks5BytestreamsOpensLocalStreamHostAndExchangesBytes),
+    ("XMPP in-band bytestreams serializes open data and close", XmppInBandBytestreamsSerializesOpenDataAndClose),
+    ("XMPP Jingle IBB transport serializes fallback offer", XmppJingleIbbTransportSerializesFallbackOffer),
     ("XMPP OMEMO serializes encrypted message and parses devices", XmppOmemoSerializesEncryptedMessageAndParsesDevices),
+    ("XMPP OMEMO parses bundle and current wire message", XmppOmemoParsesBundleAndCurrentWireMessage),
+    ("XMPP OMEMO encrypts and decrypts payload", XmppOmemoEncryptsAndDecryptsPayload),
+    ("XMPP OMEMO trust store tracks fingerprints", XmppOmemoTrustStoreTracksFingerprints),
+    ("XMPP OMEMO session store keeps opaque ratchet state", XmppOmemoSessionStoreKeepsOpaqueRatchetState),
+    ("XMPP OMEMO local device publishes bundle and consumes prekeys", XmppOmemoLocalDevicePublishesBundleAndConsumesPreKeys),
+    ("XMPP OMEMO encrypted local device file protects private keys", XmppOmemoEncryptedLocalDeviceFileProtectsPrivateKeys),
+    ("XMPP OMEMO Windows secret vault protects key-store passphrase", XmppOmemoWindowsSecretVaultProtectsKeyStorePassphrase),
+    ("XMPP OMEMO Linux Secret Service vault keeps secrets out of arguments", XmppOmemoLinuxSecretServiceVaultKeepsSecretsOutOfArguments),
+    ("XMPP OMEMO secret vault factory selects native provider", XmppOmemoSecretVaultFactorySelectsNativeProvider),
+    ("XMPP OMEMO requires production Signal Protocol backend", XmppOmemoRequiresProductionSignalProtocolBackend),
+    ("XMPP OMEMO X3DH validates keys and derives secret", XmppOmemoX3DhValidatesKeysAndDerivesSecret),
+    ("XMPP OMEMO X3DH agreement matches initiator and responder", XmppOmemoX3DhAgreementMatchesInitiatorAndResponder),
+    ("XMPP OMEMO X3DH gates signed pre-key verification", XmppOmemoX3DhGatesSignedPreKeyVerification),
     ("XMPP Jingle serializes session initiate and parse", XmppJingleSerializesSessionInitiateAndParse),
+    ("XMPP Jingle message initiation serializes call setup", XmppJingleMessageInitiationSerializesCallSetup),
+    ("XMPP Jingle message initiation parses call lifecycle", XmppJingleMessageInitiationParsesCallLifecycle),
     ("XMPP Jingle serializes ICE candidates and DTLS fingerprints", XmppJingleSerializesIceCandidatesAndDtlsFingerprints),
     ("XMPP Jingle serializes transport-info candidates", XmppJingleSerializesTransportInfoCandidates),
     ("XMPP Jingle serializes session-info call states", XmppJingleSerializesSessionInfoCallStates),
+    ("XMPP Jingle parses existing client interop fixture", XmppJingleParsesExistingClientInteropFixture),
+    ("XMPP Jingle file transfer serializes S5B offer", XmppJingleFileTransferSerializesS5bOffer),
+    ("XMPP Jingle file transfer parses received and checksum info", XmppJingleFileTransferParsesReceivedAndChecksumInfo),
     ("XMPP stream management state tracks counts", XmppStreamManagementStateTracksCounts),
     ("XMPP chat message parses stanza", XmppChatMessageParsesStanza),
     ("XMPP presence parses stanza", XmppPresenceParsesStanza),
@@ -476,6 +549,104 @@ static void XmppConnectionDefaultsRequireTls()
     Equal("example.org", settings.Host);
     Equal(5222, settings.Port);
     True(settings.RequireTls);
+    False(settings.DirectTls);
+    Equal("example.org", settings.TlsServerName);
+}
+
+static void XmppDirectTlsCreatesSrvEndpoints()
+{
+    Equal("_xmpps-client._tcp.xn--bcher-kva.example", XmppDirectTls.CreateDirectTlsSrvName("bücher.example"));
+    Equal("_xmpp-client._tcp.example.org", XmppDirectTls.CreateStartTlsSrvName("example.org"));
+
+    var direct = new[]
+    {
+        new XmppSrvRecord(
+            XmppDirectTls.DirectTlsService,
+            "xmpps2.example.org.",
+            Port: 5223,
+            Priority: 20,
+            Weight: 10),
+        new XmppSrvRecord(
+            XmppDirectTls.DirectTlsService,
+            "xmpps1.example.org.",
+            Port: 5223,
+            Priority: 10,
+            Weight: 0)
+    };
+    var startTls = new[]
+    {
+        new XmppSrvRecord(
+            XmppDirectTls.StartTlsService,
+            "starttls.example.org.",
+            Port: 5222,
+            Priority: 10,
+            Weight: 20)
+    };
+
+    var endpoints = XmppDirectTls.CreateClientEndpoints(direct, startTls);
+
+    Equal(3, endpoints.Count);
+    True(endpoints[0].DirectTls);
+    Equal("xmpps1.example.org", endpoints[0].Host);
+    False(endpoints[1].DirectTls);
+    Equal("starttls.example.org", endpoints[1].Host);
+    True(endpoints[2].DirectTls);
+    Equal(20, endpoints[2].Priority);
+
+    endpoints = XmppDirectTls.CreateClientEndpoints(
+        [new XmppSrvRecord(XmppDirectTls.DirectTlsService, ".", 0, 0, 0)],
+        [],
+        fallbackDomain: "example.org");
+    Equal(1, endpoints.Count);
+    False(endpoints[0].DirectTls);
+    Equal("example.org", endpoints[0].Host);
+    Equal(XmppConnectionSettings.ClientPort, endpoints[0].Port);
+}
+
+static void XmppDirectTlsDiscoveryQueriesSrvRecords()
+{
+    var resolver = new FakeSrvResolver();
+    resolver.Records[XmppDirectTls.CreateDirectTlsSrvName("example.org")] =
+    [
+        new XmppSrvRecord(
+            XmppDirectTls.DirectTlsService,
+            "xmpps.example.org.",
+            Port: 5223,
+            Priority: 0,
+            Weight: 0)
+    ];
+
+    var endpoints = XmppDirectTls.DiscoverClientEndpointsAsync(
+        "example.org",
+        resolver,
+        includeStartTlsFallback: false).GetAwaiter().GetResult();
+
+    Equal(2, resolver.Queries.Count);
+    Equal("_xmpps-client._tcp.example.org", resolver.Queries[0]);
+    Equal("_xmpp-client._tcp.example.org", resolver.Queries[1]);
+    Equal(1, endpoints.Count);
+    True(endpoints[0].DirectTls);
+    Equal("xmpps.example.org", endpoints[0].Host);
+}
+
+static void XmppDirectTlsSettingsUseEndpoint()
+{
+    var endpoint = new XmppClientConnectionEndpoint(
+        Host: "xmpps.example.org",
+        Port: 5223,
+        DirectTls: true,
+        Priority: 0,
+        Weight: 0,
+        Service: XmppDirectTls.DirectTlsService);
+    var settings = XmppConnectionSettings.FromEndpoint(
+        XmppAddress.Parse("edward@example.org/desktop"),
+        endpoint);
+
+    Equal("xmpps.example.org", settings.Host);
+    Equal(5223, settings.Port);
+    True(settings.RequireTls);
+    True(settings.DirectTls);
+    Equal("example.org", settings.TlsServerName);
 }
 
 static void XmppFeatureSetCanEnableRtt()
@@ -556,6 +727,27 @@ static void XmppStreamFeaturesParseStreamManagement()
 
     True(XmppStreamFeatureSet.TryParse(xml, out var features));
     True(features.StreamManagementOffered);
+}
+
+static void XmppStreamFeaturesParseClientStateIndication()
+{
+    var xml = """
+        <stream:features xmlns:stream="http://etherx.jabber.org/streams">
+          <csi xmlns="urn:xmpp:csi:0"/>
+        </stream:features>
+        """;
+
+    True(XmppStreamFeatureSet.TryParse(xml, out var features));
+    True(features.ClientStateIndicationOffered);
+
+    var active = XmppClientStateIndication.CreateActive();
+    var inactive = XmppClientStateIndication.CreateInactive();
+
+    Equal("active", active.Name.LocalName);
+    Equal(XmppClientStateIndication.NamespaceName, active.Name.NamespaceName);
+    Equal("inactive", inactive.Name.LocalName);
+    True(XmppClientStateIndication.TryParse(inactive, out var state));
+    Equal(XmppClientState.Inactive, state);
 }
 
 static void XmppSaslPlainCreatesAuthElement()
@@ -838,6 +1030,233 @@ static void XmppWebSocketStreamSendsRfc7395OpenFrame()
     True(transport.Sent[2].Contains("<close", StringComparison.Ordinal));
 }
 
+static void XmppBoshSerializesSessionAndRestart()
+{
+    var session = XmppBosh.CreateSessionRequest(
+        rid: 1001,
+        to: "example.org",
+        wait: 60,
+        hold: 1,
+        language: "nl",
+        route: "xmpp:example.org:5222",
+        secure: true);
+    var sessionXml = session.ToString(SaveOptions.DisableFormatting);
+
+    Equal("body", session.Name.LocalName);
+    Equal(XmppBosh.NamespaceName, session.Name.NamespaceName);
+    Equal("1001", session.Attribute("rid")?.Value);
+    Equal("example.org", session.Attribute("to")?.Value);
+    Equal(XmppBosh.ContentType, session.Attribute("content")?.Value);
+    Equal("1.6", session.Attribute("ver")?.Value);
+    Equal("1.0", session.Attribute(XName.Get("version", XmppBosh.XmppNamespaceName))?.Value);
+    Equal("nl", session.Attribute(XNamespace.Xml + "lang")?.Value);
+    Equal("xmpp:example.org:5222", session.Attribute("route")?.Value);
+    Equal("true", session.Attribute("secure")?.Value);
+    True(sessionXml.Contains("urn:xmpp:xbosh", StringComparison.Ordinal));
+
+    var auth = XmppSaslPlain.CreateAuthElement("edward@example.org", "edward", "secret");
+    var request = XmppBosh.CreateRequest(1002, "sid-1", [auth]);
+    Equal("sid-1", request.Attribute("sid")?.Value);
+    Equal("auth", request.Elements().Single().Name.LocalName);
+
+    var restart = XmppBosh.CreateRestartRequest(1003, "sid-1", "en");
+    Equal("true", restart.Attribute(XName.Get("restart", XmppBosh.XmppNamespaceName))?.Value);
+    Equal("en", restart.Attribute(XNamespace.Xml + "lang")?.Value);
+}
+
+static void XmppBoshParsesSessionAndTerminate()
+{
+    var xml = """
+        <body xmlns="http://jabber.org/protocol/httpbind"
+              xmlns:xmpp="urn:xmpp:xbosh"
+              sid="sid-1"
+              authid="auth-1"
+              from="example.org"
+              wait="60"
+              hold="1"
+              requests="2"
+              inactivity="30"
+              polling="5"
+              secure="true"
+              ver="1.6"
+              xmpp:version="1.0">
+          <stream:features xmlns:stream="http://etherx.jabber.org/streams">
+            <mechanisms xmlns="urn:ietf:params:xml:ns:xmpp-sasl">
+              <mechanism>PLAIN</mechanism>
+            </mechanisms>
+          </stream:features>
+        </body>
+        """;
+
+    True(XmppBosh.TryParseSessionResponse(XElement.Parse(xml), out var session));
+    Equal("sid-1", session!.Sid);
+    Equal("example.org", session.From);
+    Equal("auth-1", session.AuthId);
+    Equal(60, session.Wait);
+    Equal(1, session.Hold);
+    Equal(2, session.Requests);
+    Equal(30, session.Inactivity);
+    Equal(5, session.Polling);
+    True(session.Secure!.Value);
+    Equal("features", session.Payloads.Single().Name.LocalName);
+
+    True(XmppBosh.TryParseBody("""
+        <body xmlns="http://jabber.org/protocol/httpbind"
+              type="terminate"
+              condition="remote-stream-error"
+              sid="sid-1"/>
+        """, out var terminated));
+    True(XmppBosh.IsTerminate(terminated!));
+    Equal("remote-stream-error", terminated!.Condition);
+}
+
+static void XmppBoshClientLogsInAndLongPolls()
+{
+    var handler = new SequenceHttpHandler(
+        (request, xml) =>
+        {
+            Equal(HttpMethod.Post, request.Method);
+            Equal("text/xml; charset=utf-8", request.Content!.Headers.ContentType!.ToString());
+            True(xml.Contains("rid=\"10\"", StringComparison.Ordinal));
+            True(xml.Contains("to=\"example.org\"", StringComparison.Ordinal));
+            True(xml.Contains("xmpp:version=\"1.0\"", StringComparison.Ordinal));
+            return SequenceHttpHandler.XmlResponse("""
+                <body xmlns="http://jabber.org/protocol/httpbind" sid="sid-1" authid="auth-1" wait="60" hold="1" requests="2">
+                  <stream:features xmlns:stream="http://etherx.jabber.org/streams">
+                    <mechanisms xmlns="urn:ietf:params:xml:ns:xmpp-sasl">
+                      <mechanism>PLAIN</mechanism>
+                    </mechanisms>
+                  </stream:features>
+                </body>
+                """);
+        },
+        (_, xml) =>
+        {
+            True(xml.Contains("rid=\"11\"", StringComparison.Ordinal));
+            True(xml.Contains("<auth", StringComparison.Ordinal));
+            True(xml.Contains("PLAIN", StringComparison.Ordinal));
+            return SequenceHttpHandler.XmlResponse("""
+                <body xmlns="http://jabber.org/protocol/httpbind">
+                  <success xmlns="urn:ietf:params:xml:ns:xmpp-sasl"/>
+                </body>
+                """);
+        },
+        (_, xml) =>
+        {
+            True(xml.Contains("rid=\"12\"", StringComparison.Ordinal));
+            True(xml.Contains("restart=\"true\"", StringComparison.Ordinal));
+            return SequenceHttpHandler.XmlResponse("""
+                <body xmlns="http://jabber.org/protocol/httpbind">
+                  <stream:features xmlns:stream="http://etherx.jabber.org/streams">
+                    <bind xmlns="urn:ietf:params:xml:ns:xmpp-bind"/>
+                  </stream:features>
+                </body>
+                """);
+        },
+        (_, xml) =>
+        {
+            True(xml.Contains("rid=\"13\"", StringComparison.Ordinal));
+            True(xml.Contains("<bind", StringComparison.Ordinal));
+            return SequenceHttpHandler.XmlResponse("""
+                <body xmlns="http://jabber.org/protocol/httpbind">
+                  <iq xmlns="jabber:client" type="result" id="bosh-bind-1">
+                    <bind xmlns="urn:ietf:params:xml:ns:xmpp-bind">
+                      <jid>edward@example.org/web</jid>
+                    </bind>
+                  </iq>
+                </body>
+                """);
+        },
+        (_, xml) =>
+        {
+            True(xml.Contains("rid=\"14\"", StringComparison.Ordinal));
+            True(xml.Contains("disco#info", StringComparison.Ordinal));
+            return SequenceHttpHandler.XmlResponse("""
+                <body xmlns="http://jabber.org/protocol/httpbind">
+                  <iq xmlns="jabber:client" type="result" id="bosh-disco-1">
+                    <query xmlns="http://jabber.org/protocol/disco#info">
+                      <identity category="server" type="im"/>
+                      <feature var="urn:xmpp:rtt:0"/>
+                    </query>
+                  </iq>
+                </body>
+                """);
+        },
+        (_, xml) =>
+        {
+            True(xml.Contains("rid=\"15\"", StringComparison.Ordinal));
+            True(xml.Contains("<inactive", StringComparison.Ordinal));
+            True(xml.Contains("urn:xmpp:csi:0", StringComparison.Ordinal));
+            return SequenceHttpHandler.XmlResponse("""
+                <body xmlns="http://jabber.org/protocol/httpbind"/>
+                """);
+        },
+        (_, xml) =>
+        {
+            True(xml.Contains("rid=\"16\"", StringComparison.Ordinal));
+            True(xml.Contains("<active", StringComparison.Ordinal));
+            True(xml.Contains("urn:xmpp:csi:0", StringComparison.Ordinal));
+            return SequenceHttpHandler.XmlResponse("""
+                <body xmlns="http://jabber.org/protocol/httpbind"/>
+                """);
+        },
+        (_, xml) =>
+        {
+            True(xml.Contains("rid=\"17\"", StringComparison.Ordinal));
+            True(!xml.Contains("<message", StringComparison.Ordinal));
+            return SequenceHttpHandler.XmlResponse("""
+                <body xmlns="http://jabber.org/protocol/httpbind">
+                  <message xmlns="jabber:client" from="anna@example.org/web" to="edward@example.org/web" type="chat">
+                    <body>Hoi via BOSH</body>
+                  </message>
+                </body>
+                """);
+        },
+        (_, xml) =>
+        {
+            True(xml.Contains("rid=\"18\"", StringComparison.Ordinal));
+            True(xml.Contains("type=\"terminate\"", StringComparison.Ordinal));
+            return SequenceHttpHandler.XmlResponse("""
+                <body xmlns="http://jabber.org/protocol/httpbind" type="terminate" condition="success"/>
+                """);
+        });
+    using var http = new HttpClient(handler);
+    var client = new XmppBoshClient(
+        new Uri("https://example.org/http-bind"),
+        "example.org",
+        http,
+        language: "nl",
+        initialRid: 10);
+    try
+    {
+        var login = client.LoginAsync(
+            XmppAddress.Parse("edward@example.org/web"),
+            "secret",
+            TimeSpan.FromSeconds(5)).GetAwaiter().GetResult();
+        Equal("edward@example.org/web", login.BoundJid.Full);
+        Equal(XmppSaslPlain.Mechanism, login.SaslMechanism);
+        True(login.TlsActive);
+
+        var disco = client.SendIqAndWaitAsync(
+            XmppServiceDiscovery.CreateInfoRequest("bosh-disco-1", XmppAddress.Parse("example.org")),
+            TimeSpan.FromSeconds(5)).GetAwaiter().GetResult();
+        True(XmppServiceDiscovery.TryParseInfoResult(disco, out var info));
+        True(info!.Supports(RttPacket.NamespaceName));
+
+        client.SendInactiveClientStateAsync().GetAwaiter().GetResult();
+        client.SendActiveClientStateAsync().GetAwaiter().GetResult();
+        var stanza = client.ReadNextStanzaAsync().GetAwaiter().GetResult();
+        Equal("Hoi via BOSH", stanza.Message!.Body);
+
+        client.TerminateAsync().GetAwaiter().GetResult();
+        Equal(9, handler.Requests.Count);
+    }
+    finally
+    {
+        client.DisposeAsync().AsTask().GetAwaiter().GetResult();
+    }
+}
+
 static void XmppStreamClientConnectsAndReadsFeatures()
 {
     RunXmppStreamClientConnectsAndReadsFeaturesAsync(requireTls: false).GetAwaiter().GetResult();
@@ -846,6 +1265,11 @@ static void XmppStreamClientConnectsAndReadsFeatures()
 static void XmppStreamClientReturnsNegotiationDecision()
 {
     RunXmppStreamClientConnectsAndReadsFeaturesAsync(requireTls: true).GetAwaiter().GetResult();
+}
+
+static void XmppStreamClientOpensDirectTlsBeforeStream()
+{
+    RunXmppStreamClientOpensDirectTlsBeforeStreamAsync().GetAwaiter().GetResult();
 }
 
 static async Task RunXmppStreamClientConnectsAndReadsFeaturesAsync(bool requireTls)
@@ -910,6 +1334,66 @@ static async Task RunXmppStreamClientConnectsAndReadsFeaturesAsync(bool requireT
 
         True(serverSawOpenStream);
         True(serverSawCloseStream);
+    }
+    finally
+    {
+        listener.Stop();
+    }
+}
+
+static async Task RunXmppStreamClientOpensDirectTlsBeforeStreamAsync()
+{
+    var listener = new TcpListener(IPAddress.Loopback, 0);
+    listener.Start();
+
+    var endpoint = (IPEndPoint)listener.LocalEndpoint;
+    var serverSawOpenStream = false;
+    var tlsUpgrader = new FakeTlsStreamUpgrader(() => { });
+
+    var serverTask = Task.Run(async () =>
+    {
+        using var serverClient = await listener.AcceptTcpClientAsync();
+        await using var serverStream = serverClient.GetStream();
+        var buffer = new byte[8192];
+        var openStream = await ReadTextAsync(serverStream, buffer);
+        serverSawOpenStream = openStream.Contains("<stream:stream", StringComparison.Ordinal)
+            && openStream.Contains("to=\"example.org\"", StringComparison.Ordinal);
+
+        await WriteTextAsync(serverStream, """
+            <stream:stream xmlns="jabber:client" xmlns:stream="http://etherx.jabber.org/streams" from="example.org" version="1.0">
+            <stream:features>
+              <mechanisms xmlns="urn:ietf:params:xml:ns:xmpp-sasl">
+                <mechanism>PLAIN</mechanism>
+              </mechanisms>
+            </stream:features>
+            """);
+
+        await ReadTextAsync(serverStream, buffer);
+    });
+
+    try
+    {
+        var settings = new XmppConnectionSettings(
+            XmppAddress.Parse("edward@example.org/desktop"),
+            IPAddress.Loopback.ToString(),
+            endpoint.Port,
+            requireTls: true,
+            directTls: true);
+        var options = new XmppStreamOptions(
+            preferredLanguage: "nl",
+            resource: "desktop",
+            connectTimeout: TimeSpan.FromSeconds(5),
+            keepAliveInterval: TimeSpan.FromSeconds(30));
+
+        await using var client = new XmppStreamClient(settings, options, tlsUpgrader);
+        var result = await client.ConnectAndPlanAsync();
+        True(serverSawOpenStream);
+        Equal(XmppStreamNegotiationStep.Authenticate, result.NextStep);
+        Equal(1, tlsUpgrader.Options.Count);
+        Equal("example.org", tlsUpgrader.Options[0].TargetHost);
+        True(tlsUpgrader.Options[0].UseXmppClientAlpn);
+        await client.DisconnectAsync();
+        await serverTask;
     }
     finally
     {
@@ -1445,6 +1929,101 @@ static async Task RunXmppStreamClientSetsAndRemovesRosterItemsAsync()
     }
 }
 
+static void XmppStreamClientHandlesBlockingCommands()
+{
+    RunXmppStreamClientHandlesBlockingCommandsAsync().GetAwaiter().GetResult();
+}
+
+static async Task RunXmppStreamClientHandlesBlockingCommandsAsync()
+{
+    var listener = new TcpListener(IPAddress.Loopback, 0);
+    listener.Start();
+    var endpoint = (IPEndPoint)listener.LocalEndpoint;
+    var sawList = false;
+    var sawBlock = false;
+    var sawUnblock = false;
+    var sawUnblockAll = false;
+
+    var serverTask = Task.Run(async () =>
+    {
+        using var serverClient = await listener.AcceptTcpClientAsync();
+        await using var serverStream = serverClient.GetStream();
+        var buffer = new byte[8192];
+
+        await ReadTextAsync(serverStream, buffer);
+        await WriteTextAsync(serverStream, """
+            <stream:stream xmlns="jabber:client" xmlns:stream="http://etherx.jabber.org/streams" from="example.org" version="1.0">
+            <stream:features/>
+            """);
+
+        var list = await ReadTextAsync(serverStream, buffer);
+        sawList = list.Contains("type=\"get\"", StringComparison.Ordinal)
+            && list.Contains("urn:xmpp:blocking", StringComparison.Ordinal)
+            && list.Contains("<blocklist", StringComparison.Ordinal);
+        await WriteTextAsync(serverStream, """
+            <iq xmlns="jabber:client" type="result" id="blocklist-1">
+              <blocklist xmlns="urn:xmpp:blocking">
+                <item jid="spam@example.org"/>
+              </blocklist>
+            </iq>
+            """);
+
+        var block = await ReadTextAsync(serverStream, buffer);
+        sawBlock = block.Contains("type=\"set\"", StringComparison.Ordinal)
+            && block.Contains("<block", StringComparison.Ordinal)
+            && block.Contains("jid=\"anna@example.org\"", StringComparison.Ordinal);
+        await WriteTextAsync(serverStream, """
+            <iq xmlns="jabber:client" type="result" id="block-1"/>
+            """);
+
+        var unblock = await ReadTextAsync(serverStream, buffer);
+        sawUnblock = unblock.Contains("type=\"set\"", StringComparison.Ordinal)
+            && unblock.Contains("<unblock", StringComparison.Ordinal)
+            && unblock.Contains("jid=\"anna@example.org\"", StringComparison.Ordinal);
+        await WriteTextAsync(serverStream, """
+            <iq xmlns="jabber:client" type="result" id="unblock-1"/>
+            """);
+
+        var unblockAll = await ReadTextAsync(serverStream, buffer);
+        sawUnblockAll = unblockAll.Contains("type=\"set\"", StringComparison.Ordinal)
+            && unblockAll.Contains("<unblock", StringComparison.Ordinal)
+            && !unblockAll.Contains("<item", StringComparison.Ordinal);
+        await WriteTextAsync(serverStream, """
+            <iq xmlns="jabber:client" type="result" id="unblock-all-1"/>
+            """);
+
+        await ReadTextAsync(serverStream, buffer);
+    });
+
+    try
+    {
+        var settings = new XmppConnectionSettings(
+            XmppAddress.Parse("user@example.org/desktop"),
+            IPAddress.Loopback.ToString(),
+            endpoint.Port,
+            requireTls: false);
+        await using var client = new XmppStreamClient(settings);
+        await client.ConnectAndReadFeaturesAsync();
+        var blocked = await client.RequestBlockedUsersAsync(TimeSpan.FromSeconds(5));
+        await client.BlockUserAsync(XmppAddress.Parse("anna@example.org"), TimeSpan.FromSeconds(5));
+        await client.UnblockUserAsync(XmppAddress.Parse("anna@example.org"), TimeSpan.FromSeconds(5));
+        await client.UnblockAllUsersAsync(TimeSpan.FromSeconds(5));
+        await client.DisconnectAsync();
+        await serverTask;
+
+        Equal(1, blocked.Count);
+        Equal("spam@example.org", blocked[0].Bare);
+        True(sawList);
+        True(sawBlock);
+        True(sawUnblock);
+        True(sawUnblockAll);
+    }
+    finally
+    {
+        listener.Stop();
+    }
+}
+
 static void XmppStreamClientRequestsServiceDiscovery()
 {
     RunXmppStreamClientRequestsServiceDiscoveryAsync().GetAwaiter().GetResult();
@@ -1506,6 +2085,759 @@ static async Task RunXmppStreamClientRequestsServiceDiscoveryAsync()
         Equal("client", info.Identities.Single().Category);
         True(info.Supports("urn:xmpp:rtt:0"));
         True(info.Supports("urn:xmpp:receipts"));
+    }
+    finally
+    {
+        listener.Stop();
+    }
+}
+
+static void XmppStreamClientRequestsExternalServices()
+{
+    RunXmppStreamClientRequestsExternalServicesAsync().GetAwaiter().GetResult();
+}
+
+static async Task RunXmppStreamClientRequestsExternalServicesAsync()
+{
+    var listener = new TcpListener(IPAddress.Loopback, 0);
+    listener.Start();
+    var endpoint = (IPEndPoint)listener.LocalEndpoint;
+    var sawServicesRequest = false;
+    var sawCredentialsRequest = false;
+
+    var serverTask = Task.Run(async () =>
+    {
+        using var serverClient = await listener.AcceptTcpClientAsync();
+        await using var serverStream = serverClient.GetStream();
+        var buffer = new byte[8192];
+
+        await ReadTextAsync(serverStream, buffer);
+        await WriteTextAsync(serverStream, """
+            <stream:stream xmlns="jabber:client" xmlns:stream="http://etherx.jabber.org/streams" from="example.org" version="1.0">
+            <stream:features/>
+            """);
+
+        var servicesRequest = await ReadTextAsync(serverStream, buffer);
+        sawServicesRequest = servicesRequest.Contains("type=\"get\"", StringComparison.Ordinal)
+            && servicesRequest.Contains("urn:xmpp:extdisco:2", StringComparison.Ordinal)
+            && servicesRequest.Contains("<services", StringComparison.Ordinal)
+            && servicesRequest.Contains("type=\"turn\"", StringComparison.Ordinal);
+
+        await WriteTextAsync(serverStream, """
+            <iq xmlns="jabber:client" type="result" id="extdisco-1">
+              <services xmlns="urn:xmpp:extdisco:2" type="turn">
+                <service type="turn" host="turn.example.org" port="3478" transport="udp" restricted="true"/>
+              </services>
+            </iq>
+            """);
+
+        var credentialsRequest = await ReadTextAsync(serverStream, buffer);
+        sawCredentialsRequest = credentialsRequest.Contains("type=\"get\"", StringComparison.Ordinal)
+            && credentialsRequest.Contains("<credentials", StringComparison.Ordinal)
+            && credentialsRequest.Contains("turn.example.org", StringComparison.Ordinal);
+
+        await WriteTextAsync(serverStream, """
+            <iq xmlns="jabber:client" type="result" id="extdisco-credentials-1">
+              <credentials xmlns="urn:xmpp:extdisco:2">
+                <service type="turn" host="turn.example.org" port="3478"
+                         transport="udp" username="user" password="secret"/>
+              </credentials>
+            </iq>
+            """);
+
+        await ReadTextAsync(serverStream, buffer);
+    });
+
+    try
+    {
+        var settings = new XmppConnectionSettings(
+            XmppAddress.Parse("user@example.org/desktop"),
+            IPAddress.Loopback.ToString(),
+            endpoint.Port,
+            requireTls: false);
+        await using var client = new XmppStreamClient(settings);
+        await client.ConnectAndReadFeaturesAsync();
+        var services = await client.RequestExternalServicesAsync(
+            XmppAddress.Parse("example.org"),
+            TimeSpan.FromSeconds(5),
+            XmppExternalServiceDiscovery.TurnServiceType);
+        var credentials = await client.RequestExternalServiceCredentialsAsync(
+            XmppAddress.Parse("example.org"),
+            new XmppExternalServiceIdentity("turn.example.org", "turn", 3478),
+            TimeSpan.FromSeconds(5));
+        await client.DisconnectAsync();
+        await serverTask;
+
+        True(sawServicesRequest);
+        True(sawCredentialsRequest);
+        Equal("turn", services.Type);
+        True(services.Services.Single().RequiresCredentials);
+        Equal("user", credentials.Services.Single().Username);
+        Equal("secret", credentials.Services.Single().Password);
+    }
+    finally
+    {
+        listener.Stop();
+    }
+}
+
+static void XmppStreamClientPublishesPersonalEvents()
+{
+    RunXmppStreamClientPublishesPersonalEventsAsync().GetAwaiter().GetResult();
+}
+
+static async Task RunXmppStreamClientPublishesPersonalEventsAsync()
+{
+    var listener = new TcpListener(IPAddress.Loopback, 0);
+    listener.Start();
+    var endpoint = (IPEndPoint)listener.LocalEndpoint;
+    var sawPublish = false;
+    var sawItems = false;
+    var sawRetract = false;
+
+    var serverTask = Task.Run(async () =>
+    {
+        using var serverClient = await listener.AcceptTcpClientAsync();
+        await using var serverStream = serverClient.GetStream();
+        var buffer = new byte[8192];
+
+        await ReadTextAsync(serverStream, buffer);
+        await WriteTextAsync(serverStream, """
+            <stream:stream xmlns="jabber:client" xmlns:stream="http://etherx.jabber.org/streams" from="example.org" version="1.0">
+            <stream:features/>
+            """);
+
+        var publish = await ReadTextAsync(serverStream, buffer);
+        sawPublish = publish.Contains("id=\"pep-publish-1\"", StringComparison.Ordinal)
+            && publish.Contains("node=\"urn:xmpp:mood\"", StringComparison.Ordinal)
+            && publish.Contains("<happy", StringComparison.Ordinal);
+        await WriteTextAsync(serverStream, """
+            <iq xmlns="jabber:client" type="result" id="pep-publish-1"/>
+            """);
+
+        var items = await ReadTextAsync(serverStream, buffer);
+        sawItems = items.Contains("id=\"pep-items-1\"", StringComparison.Ordinal)
+            && items.Contains("type=\"get\"", StringComparison.Ordinal)
+            && items.Contains("max_items=\"1\"", StringComparison.Ordinal);
+        await WriteTextAsync(serverStream, """
+            <iq xmlns="jabber:client" type="result" id="pep-items-1">
+              <pubsub xmlns="http://jabber.org/protocol/pubsub">
+                <items node="urn:xmpp:mood">
+                  <item id="current">
+                    <mood xmlns="http://jabber.org/protocol/mood">
+                      <happy/>
+                    </mood>
+                  </item>
+                </items>
+              </pubsub>
+            </iq>
+            """);
+
+        var retract = await ReadTextAsync(serverStream, buffer);
+        sawRetract = retract.Contains("id=\"pep-retract-1\"", StringComparison.Ordinal)
+            && retract.Contains("notify=\"true\"", StringComparison.Ordinal)
+            && retract.Contains("item id=\"current\"", StringComparison.Ordinal);
+        await WriteTextAsync(serverStream, """
+            <iq xmlns="jabber:client" type="result" id="pep-retract-1"/>
+            """);
+
+        await ReadTextAsync(serverStream, buffer);
+    });
+
+    try
+    {
+        var settings = new XmppConnectionSettings(
+            XmppAddress.Parse("user@example.org/desktop"),
+            IPAddress.Loopback.ToString(),
+            endpoint.Port,
+            requireTls: false);
+        await using var client = new XmppStreamClient(settings);
+        await client.ConnectAndReadFeaturesAsync();
+
+        var payload = new XElement(
+            XName.Get("mood", "http://jabber.org/protocol/mood"),
+            new XElement(XName.Get("happy", "http://jabber.org/protocol/mood")));
+        await client.PublishPersonalEventAsync("urn:xmpp:mood", "current", payload, TimeSpan.FromSeconds(5));
+        var items = await client.RequestPersonalEventItemsAsync(
+            "urn:xmpp:mood",
+            XmppAddress.Parse("user@example.org"),
+            TimeSpan.FromSeconds(5),
+            maxItems: 1);
+        await client.RetractPersonalEventAsync("urn:xmpp:mood", "current", TimeSpan.FromSeconds(5));
+        await client.DisconnectAsync();
+        await serverTask;
+
+        True(sawPublish);
+        True(sawItems);
+        True(sawRetract);
+        Equal("urn:xmpp:mood", items.Node);
+        Equal("current", items.Items.Single().Id);
+        Equal("mood", items.Items.Single().Payloads.Single().Name.LocalName);
+    }
+    finally
+    {
+        listener.Stop();
+    }
+}
+
+static void XmppStreamClientHandlesPrivateXmlStorage()
+{
+    RunXmppStreamClientHandlesPrivateXmlStorageAsync().GetAwaiter().GetResult();
+}
+
+static async Task RunXmppStreamClientHandlesPrivateXmlStorageAsync()
+{
+    var listener = new TcpListener(IPAddress.Loopback, 0);
+    listener.Start();
+    var endpoint = (IPEndPoint)listener.LocalEndpoint;
+    var sawGet = false;
+    var sawSet = false;
+
+    var serverTask = Task.Run(async () =>
+    {
+        using var serverClient = await listener.AcceptTcpClientAsync();
+        await using var serverStream = serverClient.GetStream();
+        var buffer = new byte[8192];
+
+        await ReadTextAsync(serverStream, buffer);
+        await WriteTextAsync(serverStream, """
+            <stream:stream xmlns="jabber:client" xmlns:stream="http://etherx.jabber.org/streams" from="example.org" version="1.0">
+            <stream:features/>
+            """);
+
+        var get = await ReadTextAsync(serverStream, buffer);
+        sawGet = get.Contains("id=\"private-xml-1\"", StringComparison.Ordinal)
+            && get.Contains("type=\"get\"", StringComparison.Ordinal)
+            && get.Contains("jabber:iq:private", StringComparison.Ordinal)
+            && get.Contains("urn:tiedragon:private:test", StringComparison.Ordinal);
+        await WriteTextAsync(serverStream, """
+            <iq xmlns="jabber:client" type="result" id="private-xml-1">
+              <query xmlns="jabber:iq:private">
+                <settings xmlns="urn:tiedragon:private:test">
+                  <theme>dark</theme>
+                </settings>
+              </query>
+            </iq>
+            """);
+
+        var set = await ReadTextAsync(serverStream, buffer);
+        sawSet = set.Contains("id=\"private-xml-set-1\"", StringComparison.Ordinal)
+            && set.Contains("type=\"set\"", StringComparison.Ordinal)
+            && set.Contains("<theme", StringComparison.Ordinal)
+            && set.Contains(">light<", StringComparison.Ordinal);
+        await WriteTextAsync(serverStream, """
+            <iq xmlns="jabber:client" type="result" id="private-xml-set-1"/>
+            """);
+
+        await ReadTextAsync(serverStream, buffer);
+    });
+
+    try
+    {
+        var settings = new XmppConnectionSettings(
+            XmppAddress.Parse("user@example.org/desktop"),
+            IPAddress.Loopback.ToString(),
+            endpoint.Port,
+            requireTls: false);
+        await using var client = new XmppStreamClient(settings);
+        await client.ConnectAndReadFeaturesAsync();
+
+        var payloadName = XName.Get("settings", "urn:tiedragon:private:test");
+        var payload = await client.RequestPrivateXmlAsync(payloadName, TimeSpan.FromSeconds(5));
+        await client.SetPrivateXmlAsync(
+            new XElement(
+                payloadName,
+                new XElement(XName.Get("theme", payloadName.NamespaceName), "light")),
+            TimeSpan.FromSeconds(5));
+        await client.DisconnectAsync();
+        await serverTask;
+
+        True(sawGet);
+        True(sawSet);
+        Equal("dark", payload.Element(XName.Get("theme", payloadName.NamespaceName))?.Value);
+    }
+    finally
+    {
+        listener.Stop();
+    }
+}
+
+static void XmppStreamClientHandlesPersistentPrivateData()
+{
+    RunXmppStreamClientHandlesPersistentPrivateDataAsync().GetAwaiter().GetResult();
+}
+
+static async Task RunXmppStreamClientHandlesPersistentPrivateDataAsync()
+{
+    var listener = new TcpListener(IPAddress.Loopback, 0);
+    listener.Start();
+    var endpoint = (IPEndPoint)listener.LocalEndpoint;
+    var sawStore = false;
+    var sawItems = false;
+
+    var serverTask = Task.Run(async () =>
+    {
+        using var serverClient = await listener.AcceptTcpClientAsync();
+        await using var serverStream = serverClient.GetStream();
+        var buffer = new byte[8192];
+
+        await ReadTextAsync(serverStream, buffer);
+        await WriteTextAsync(serverStream, """
+            <stream:stream xmlns="jabber:client" xmlns:stream="http://etherx.jabber.org/streams" from="example.org" version="1.0">
+            <stream:features/>
+            """);
+
+        var store = await ReadTextAsync(serverStream, buffer);
+        sawStore = store.Contains("id=\"private-pubsub-store-1\"", StringComparison.Ordinal)
+            && store.Contains("node=\"urn:tiedragon:teletyptel:settings\"", StringComparison.Ordinal)
+            && store.Contains("pubsub#persist_items", StringComparison.Ordinal)
+            && store.Contains("pubsub#access_model", StringComparison.Ordinal)
+            && store.Contains(">whitelist<", StringComparison.Ordinal);
+        await WriteTextAsync(serverStream, """
+            <iq xmlns="jabber:client" type="result" id="private-pubsub-store-1"/>
+            """);
+
+        var items = await ReadTextAsync(serverStream, buffer);
+        sawItems = items.Contains("id=\"private-pubsub-items-1\"", StringComparison.Ordinal)
+            && items.Contains("type=\"get\"", StringComparison.Ordinal)
+            && items.Contains("item id=\"current\"", StringComparison.Ordinal);
+        await WriteTextAsync(serverStream, """
+            <iq xmlns="jabber:client" type="result" id="private-pubsub-items-1">
+              <pubsub xmlns="http://jabber.org/protocol/pubsub">
+                <items node="urn:tiedragon:teletyptel:settings">
+                  <item id="current">
+                    <settings xmlns="urn:tiedragon:teletyptel:settings">
+                      <theme>dark</theme>
+                    </settings>
+                  </item>
+                </items>
+              </pubsub>
+            </iq>
+            """);
+
+        await ReadTextAsync(serverStream, buffer);
+    });
+
+    try
+    {
+        var settings = new XmppConnectionSettings(
+            XmppAddress.Parse("user@example.org/desktop"),
+            IPAddress.Loopback.ToString(),
+            endpoint.Port,
+            requireTls: false);
+        await using var client = new XmppStreamClient(settings);
+        await client.ConnectAndReadFeaturesAsync();
+
+        var payload = new XElement(
+            XName.Get("settings", "urn:tiedragon:teletyptel:settings"),
+            new XElement(XName.Get("theme", "urn:tiedragon:teletyptel:settings"), "dark"));
+        await client.StorePersistentPrivateDataAsync(
+            "urn:tiedragon:teletyptel:settings",
+            payload,
+            TimeSpan.FromSeconds(5),
+            itemId: "current");
+        var storedItems = await client.RequestPersistentPrivateDataAsync(
+            "urn:tiedragon:teletyptel:settings",
+            TimeSpan.FromSeconds(5),
+            itemId: "current");
+        await client.DisconnectAsync();
+        await serverTask;
+
+        True(sawStore);
+        True(sawItems);
+        Equal("current", storedItems.Single().Id);
+        Equal("dark", storedItems.Single().Payloads.Single().Element(XName.Get("theme", "urn:tiedragon:teletyptel:settings"))?.Value);
+    }
+    finally
+    {
+        listener.Stop();
+    }
+}
+
+static void XmppStreamClientHandlesUserAvatarRequests()
+{
+    RunXmppStreamClientHandlesUserAvatarRequestsAsync().GetAwaiter().GetResult();
+}
+
+static async Task RunXmppStreamClientHandlesUserAvatarRequestsAsync()
+{
+    var listener = new TcpListener(IPAddress.Loopback, 0);
+    listener.Start();
+    var endpoint = (IPEndPoint)listener.LocalEndpoint;
+    var sawDataPublish = false;
+    var sawMetadataPublish = false;
+    var sawMetadataRequest = false;
+    var sawDataRequest = false;
+    const string avatarId = "a9993e364706816aba3e25717850c26c9cd0d89d";
+
+    var serverTask = Task.Run(async () =>
+    {
+        using var serverClient = await listener.AcceptTcpClientAsync();
+        await using var serverStream = serverClient.GetStream();
+        var buffer = new byte[8192];
+
+        await ReadTextAsync(serverStream, buffer);
+        await WriteTextAsync(serverStream, """
+            <stream:stream xmlns="jabber:client" xmlns:stream="http://etherx.jabber.org/streams" from="example.org" version="1.0">
+            <stream:features/>
+            """);
+
+        var dataPublish = await ReadTextAsync(serverStream, buffer);
+        sawDataPublish = dataPublish.Contains("node=\"urn:xmpp:avatar:data\"", StringComparison.Ordinal)
+            && dataPublish.Contains("item id=\"" + avatarId + "\"", StringComparison.Ordinal);
+        await WriteTextAsync(serverStream, """
+            <iq xmlns="jabber:client" type="result" id="avatar-data-publish-1"/>
+            """);
+
+        var metadataPublish = await ReadTextAsync(serverStream, buffer);
+        sawMetadataPublish = metadataPublish.Contains("node=\"urn:xmpp:avatar:metadata\"", StringComparison.Ordinal)
+            && metadataPublish.Contains("type=\"image/png\"", StringComparison.Ordinal);
+        await WriteTextAsync(serverStream, """
+            <iq xmlns="jabber:client" type="result" id="avatar-metadata-publish-1"/>
+            """);
+
+        var metadataRequest = await ReadTextAsync(serverStream, buffer);
+        sawMetadataRequest = metadataRequest.Contains("type=\"get\"", StringComparison.Ordinal)
+            && metadataRequest.Contains("node=\"urn:xmpp:avatar:metadata\"", StringComparison.Ordinal);
+        await WriteTextAsync(serverStream, $$"""
+            <iq xmlns="jabber:client" type="result" id="avatar-metadata-1">
+              <pubsub xmlns="http://jabber.org/protocol/pubsub">
+                <items node="urn:xmpp:avatar:metadata">
+                  <item id="{{avatarId}}">
+                    <metadata xmlns="urn:xmpp:avatar:metadata">
+                      <info bytes="3" id="{{avatarId}}" type="image/png" width="64" height="64"/>
+                    </metadata>
+                  </item>
+                </items>
+              </pubsub>
+            </iq>
+            """);
+
+        var dataRequest = await ReadTextAsync(serverStream, buffer);
+        sawDataRequest = dataRequest.Contains("type=\"get\"", StringComparison.Ordinal)
+            && dataRequest.Contains("node=\"urn:xmpp:avatar:data\"", StringComparison.Ordinal)
+            && dataRequest.Contains("item id=\"" + avatarId + "\"", StringComparison.Ordinal);
+        await WriteTextAsync(serverStream, $$"""
+            <iq xmlns="jabber:client" type="result" id="avatar-data-1">
+              <pubsub xmlns="http://jabber.org/protocol/pubsub">
+                <items node="urn:xmpp:avatar:data">
+                  <item id="{{avatarId}}">
+                    <data xmlns="urn:xmpp:avatar:data">YWJj</data>
+                  </item>
+                </items>
+              </pubsub>
+            </iq>
+            """);
+
+        await ReadTextAsync(serverStream, buffer);
+    });
+
+    try
+    {
+        var settings = new XmppConnectionSettings(
+            XmppAddress.Parse("user@example.org/desktop"),
+            IPAddress.Loopback.ToString(),
+            endpoint.Port,
+            requireTls: false);
+        await using var client = new XmppStreamClient(settings);
+        await client.ConnectAndReadFeaturesAsync();
+
+        var imageData = Encoding.ASCII.GetBytes("abc");
+        var publishedId = await client.PublishUserAvatarDataAsync(imageData, TimeSpan.FromSeconds(5));
+        await client.PublishUserAvatarMetadataAsync([XmppUserAvatar.CreatePngInfo(imageData, width: 64, height: 64)], TimeSpan.FromSeconds(5));
+        var metadata = await client.RequestUserAvatarMetadataAsync(XmppAddress.Parse("user@example.org"), TimeSpan.FromSeconds(5));
+        var data = await client.RequestUserAvatarDataAsync(XmppAddress.Parse("user@example.org"), publishedId, TimeSpan.FromSeconds(5));
+        await client.DisconnectAsync();
+        await serverTask;
+
+        True(sawDataPublish);
+        True(sawMetadataPublish);
+        True(sawMetadataRequest);
+        True(sawDataRequest);
+        Equal(avatarId, publishedId);
+        Equal(avatarId, metadata.RequiredPng!.Id);
+        Equal("YWJj", data.Base64Data);
+    }
+    finally
+    {
+        listener.Stop();
+    }
+}
+
+static void XmppUserLocationSerializesAndParses()
+{
+    var timestamp = new DateTimeOffset(2026, 5, 29, 16, 30, 0, TimeSpan.Zero);
+    var location = new XmppUserLocationData(
+        Latitude: 52.0907m,
+        Longitude: 5.1214m,
+        Accuracy: 8.5m,
+        Altitude: 2.1m,
+        AltitudeAccuracy: 1.2m,
+        Bearing: 123.4m,
+        Speed: 0.4m,
+        Country: "Nederland",
+        CountryCode: "NL",
+        Locality: "Utrecht",
+        Text: "Bij de balie",
+        Timestamp: timestamp,
+        TimeZoneOffset: "+02:00",
+        Uri: new Uri("geo:52.0907,5.1214"),
+        Language: "nl",
+        Source: "browser-gps");
+
+    var publish = XmppUserLocation.CreatePublishRequest("location-publish-1", location);
+    Equal(XmppIqType.Set, publish.Type);
+    var xml = publish.ToXml().ToString(SaveOptions.DisableFormatting);
+    True(xml.Contains("node=\"http://jabber.org/protocol/geoloc\"", StringComparison.Ordinal));
+    True(xml.Contains("<lat>52.0907</lat>", StringComparison.Ordinal));
+    True(xml.Contains("<lon>5.1214</lon>", StringComparison.Ordinal));
+    True(xml.Contains("<timestamp>2026-05-29T16:30:00Z</timestamp>", StringComparison.Ordinal));
+    True(!xml.Contains("browser-gps", StringComparison.Ordinal));
+
+    True(XmppUserLocation.TryParseElement(publish.Payload!
+        .Descendants(XName.Get("geoloc", XmppUserLocation.NamespaceName))
+        .Single(), out var parsed));
+    Equal((decimal?)52.0907m, parsed!.Latitude);
+    Equal((decimal?)5.1214m, parsed.Longitude);
+    Equal((decimal?)8.5m, parsed.Accuracy);
+    Equal("Utrecht", parsed.Locality);
+    Equal("geo:52.0907,5.1214", parsed.Uri!.OriginalString);
+    True(!parsed.IsStale(TimeSpan.FromMinutes(5), timestamp.AddMinutes(1)));
+    True(parsed.IsStale(TimeSpan.FromMinutes(5), timestamp.AddMinutes(10)));
+
+    Throws<ArgumentOutOfRangeException>(() =>
+        XmppUserLocation.CreateElement(new XmppUserLocationData(Latitude: 91m, Longitude: 5m)));
+}
+
+static void XmppUserLocationDetectsServerSupport()
+{
+    var supported = new XmppServiceDiscoveryInfo(
+        Node: null,
+        Identities: [new XmppServiceIdentity("pubsub", "pep")],
+        Features:
+        [
+            XmppPersonalEventing.PublishFeature,
+            XmppPersonalEventing.AutoCreateFeature,
+            XmppPersonalEventing.RetrieveItemsFeature,
+            XmppUserLocation.NotificationFeature
+        ]);
+
+    var support = XmppUserLocation.EvaluateSupport(supported);
+    True(support.CanPublish);
+    True(support.CanRetrieve);
+    True(support.CanNotify);
+    True(XmppUserLocation.SupportsPublishing(supported));
+    True(XmppUserLocation.SupportsRetrieval(supported));
+    True(XmppUserLocation.SupportsNotifications(supported));
+
+    var noPepServer = new XmppServiceDiscoveryInfo(
+        Node: null,
+        Identities: [new XmppServiceIdentity("server", "im")],
+        Features:
+        [
+            XmppPersonalEventing.PublishFeature,
+            XmppPersonalEventing.AutoCreateFeature,
+            XmppPersonalEventing.RetrieveItemsFeature
+        ]);
+
+    var noPepSupport = XmppUserLocation.EvaluateSupport(noPepServer);
+    True(!noPepSupport.CanPublish);
+    True(!noPepSupport.CanRetrieve);
+    True(!noPepSupport.CanNotify);
+
+    var noAutoCreate = new XmppServiceDiscoveryInfo(
+        Node: null,
+        Identities: [new XmppServiceIdentity("pubsub", "pep")],
+        Features: [XmppPersonalEventing.PublishFeature]);
+
+    True(!XmppUserLocation.SupportsPublishing(noAutoCreate));
+}
+
+static void XmppUserLocationHandlesPepNotifications()
+{
+    True(XmppIq.TryParse("""
+        <iq xmlns="jabber:client" type="result" id="location-items-1">
+          <pubsub xmlns="http://jabber.org/protocol/pubsub">
+            <items node="http://jabber.org/protocol/geoloc">
+              <item id="current">
+                <geoloc xmlns="http://jabber.org/protocol/geoloc">
+                  <lat>52.0907</lat>
+                  <lon>5.1214</lon>
+                  <accuracy>7</accuracy>
+                  <timestamp>2026-05-29T16:30:00Z</timestamp>
+                  <text>Utrecht testlocatie</text>
+                </geoloc>
+              </item>
+            </items>
+          </pubsub>
+        </iq>
+        """, out var iq));
+    True(XmppUserLocation.TryParseItemsResult(iq!, out var location));
+    Equal("Utrecht testlocatie", location!.Text);
+    Equal((decimal?)7m, location.Accuracy);
+
+    var message = XElement.Parse("""
+        <message xmlns="jabber:client" type="headline" from="edward@example.org" to="tester@example.org/desktop">
+          <event xmlns="http://jabber.org/protocol/pubsub#event">
+            <items node="http://jabber.org/protocol/geoloc">
+              <item id="current">
+                <geoloc xmlns="http://jabber.org/protocol/geoloc">
+                  <lat>52.0907</lat>
+                  <lon>5.1214</lon>
+                </geoloc>
+              </item>
+            </items>
+          </event>
+        </message>
+        """);
+    True(XmppUserLocation.TryParseNotification(message, out var notification));
+    Equal("edward@example.org", notification!.From!.Bare);
+    Equal("current", notification.ItemId);
+    True(notification.Location!.HasCoordinates);
+
+    var clear = XmppUserLocation.CreateClearPublishRequest("location-clear-1");
+    True(clear.ToXml().ToString(SaveOptions.DisableFormatting)
+        .Contains("<geoloc xmlns=\"http://jabber.org/protocol/geoloc\" />", StringComparison.Ordinal));
+
+    var retractMessage = XElement.Parse("""
+        <message xmlns="jabber:client" type="headline" from="edward@example.org">
+          <event xmlns="http://jabber.org/protocol/pubsub#event">
+            <items node="http://jabber.org/protocol/geoloc">
+              <retract id="current"/>
+            </items>
+          </event>
+        </message>
+        """);
+    True(XmppUserLocation.TryParseNotification(retractMessage, out var retracted));
+    True(retracted!.IsCleared);
+}
+
+static void XmppStreamClientHandlesUserLocationRequests()
+{
+    RunXmppStreamClientHandlesUserLocationRequestsAsync().GetAwaiter().GetResult();
+}
+
+static void XmppEmergencyLocationExportsPidfLo()
+{
+    var location = new XmppUserLocationData(
+        Latitude: 52.0907m,
+        Longitude: 5.1214m,
+        Accuracy: 12.5m,
+        Text: "112 accessibility test location",
+        Timestamp: new DateTimeOffset(2026, 5, 29, 17, 0, 0, TimeSpan.Zero),
+        Source: "browser-geolocation");
+    var xml = XmppEmergencyLocation.CreatePidfLoXml(
+        "pres:user@example.org",
+        location,
+        new XmppEmergencyLocationOptions
+        {
+            RetentionExpiry = new DateTimeOffset(2026, 5, 29, 18, 0, 0, TimeSpan.Zero)
+        });
+
+    True(xml.Contains("urn:ietf:params:xml:ns:pidf", StringComparison.Ordinal));
+    True(xml.Contains("urn:ietf:params:xml:ns:pidf:geopriv10", StringComparison.Ordinal));
+    True(xml.Contains("http://www.opengis.net/gml", StringComparison.Ordinal));
+    True(xml.Contains("52.0907 5.1214", StringComparison.Ordinal));
+    True(xml.Contains("12.5", StringComparison.Ordinal));
+    True(xml.Contains("2026-05-29T17:00:00Z", StringComparison.Ordinal));
+    True(!xml.Contains("browser-geolocation", StringComparison.Ordinal));
+
+    Throws<ArgumentException>(() =>
+        XmppEmergencyLocation.CreatePidfLoXml("pres:user@example.org", new XmppUserLocationData(Text: "no coordinates")));
+}
+
+static async Task RunXmppStreamClientHandlesUserLocationRequestsAsync()
+{
+    var listener = new TcpListener(IPAddress.Loopback, 0);
+    listener.Start();
+    var endpoint = (IPEndPoint)listener.LocalEndpoint;
+    var sawPublish = false;
+    var sawRequest = false;
+    var sawClear = false;
+
+    var serverTask = Task.Run(async () =>
+    {
+        using var serverClient = await listener.AcceptTcpClientAsync();
+        await using var serverStream = serverClient.GetStream();
+        var buffer = new byte[8192];
+
+        await ReadTextAsync(serverStream, buffer);
+        await WriteTextAsync(serverStream, """
+            <stream:stream xmlns="jabber:client" xmlns:stream="http://etherx.jabber.org/streams" from="example.org" version="1.0">
+            <stream:features/>
+            """);
+
+        var publish = await ReadTextAsync(serverStream, buffer);
+        sawPublish = publish.Contains("id=\"location-publish-1\"", StringComparison.Ordinal)
+            && publish.Contains("node=\"http://jabber.org/protocol/geoloc\"", StringComparison.Ordinal)
+            && publish.Contains("<lat", StringComparison.Ordinal)
+            && publish.Contains("<lon", StringComparison.Ordinal);
+        await WriteTextAsync(serverStream, """
+            <iq xmlns="jabber:client" type="result" id="location-publish-1"/>
+            """);
+
+        var request = await ReadTextAsync(serverStream, buffer);
+        sawRequest = request.Contains("id=\"location-items-1\"", StringComparison.Ordinal)
+            && request.Contains("type=\"get\"", StringComparison.Ordinal)
+            && request.Contains("max_items=\"1\"", StringComparison.Ordinal)
+            && request.Contains("node=\"http://jabber.org/protocol/geoloc\"", StringComparison.Ordinal);
+        await WriteTextAsync(serverStream, """
+            <iq xmlns="jabber:client" type="result" id="location-items-1">
+              <pubsub xmlns="http://jabber.org/protocol/pubsub">
+                <items node="http://jabber.org/protocol/geoloc">
+                  <item id="current">
+                    <geoloc xmlns="http://jabber.org/protocol/geoloc">
+                      <lat>52.0907</lat>
+                      <lon>5.1214</lon>
+                      <accuracy>8</accuracy>
+                    </geoloc>
+                  </item>
+                </items>
+              </pubsub>
+            </iq>
+            """);
+
+        var clear = await ReadTextAsync(serverStream, buffer);
+        sawClear = clear.Contains("id=\"location-clear-1\"", StringComparison.Ordinal)
+            && clear.Contains("node=\"http://jabber.org/protocol/geoloc\"", StringComparison.Ordinal)
+            && clear.Contains("<geoloc", StringComparison.Ordinal);
+        await WriteTextAsync(serverStream, """
+            <iq xmlns="jabber:client" type="result" id="location-clear-1"/>
+            """);
+
+        await ReadTextAsync(serverStream, buffer);
+    });
+
+    try
+    {
+        var settings = new XmppConnectionSettings(
+            XmppAddress.Parse("user@example.org/desktop"),
+            IPAddress.Loopback.ToString(),
+            endpoint.Port,
+            requireTls: false);
+        await using var client = new XmppStreamClient(settings);
+        await client.ConnectAndReadFeaturesAsync();
+
+        await client.PublishUserLocationAsync(
+            new XmppUserLocationData(
+                Latitude: 52.0907m,
+                Longitude: 5.1214m,
+                Accuracy: 8m,
+                Text: "Explicit test share",
+                Timestamp: new DateTimeOffset(2026, 5, 29, 16, 30, 0, TimeSpan.Zero)),
+            TimeSpan.FromSeconds(5));
+        var location = await client.RequestUserLocationAsync(
+            XmppAddress.Parse("user@example.org"),
+            TimeSpan.FromSeconds(5));
+        await client.ClearUserLocationAsync(TimeSpan.FromSeconds(5));
+        await client.DisconnectAsync();
+        await serverTask;
+
+        True(sawPublish);
+        True(sawRequest);
+        True(sawClear);
+        Equal((decimal?)52.0907m, location!.Latitude);
+        Equal((decimal?)5.1214m, location.Longitude);
     }
     finally
     {
@@ -1654,6 +2986,69 @@ static async Task RunXmppStreamClientResumesStreamManagementAsync()
         await client.DisconnectAsync();
         await serverTask;
         True(sawResume);
+    }
+    finally
+    {
+        listener.Stop();
+    }
+}
+
+static void XmppStreamClientSendsClientStateIndication()
+{
+    RunXmppStreamClientSendsClientStateIndicationAsync().GetAwaiter().GetResult();
+}
+
+static async Task RunXmppStreamClientSendsClientStateIndicationAsync()
+{
+    var listener = new TcpListener(IPAddress.Loopback, 0);
+    listener.Start();
+    var endpoint = (IPEndPoint)listener.LocalEndpoint;
+    var sawInactive = false;
+    var sawActive = false;
+
+    var serverTask = Task.Run(async () =>
+    {
+        using var serverClient = await listener.AcceptTcpClientAsync();
+        await using var serverStream = serverClient.GetStream();
+        var buffer = new byte[8192];
+
+        await ReadTextAsync(serverStream, buffer);
+        await WriteTextAsync(serverStream, """
+            <stream:stream xmlns="jabber:client" xmlns:stream="http://etherx.jabber.org/streams" from="example.org" version="1.0">
+            <stream:features>
+              <csi xmlns="urn:xmpp:csi:0"/>
+            </stream:features>
+            """);
+
+        var inactive = await ReadTextAsync(serverStream, buffer);
+        sawInactive = inactive.Contains("<inactive", StringComparison.Ordinal)
+            && inactive.Contains("urn:xmpp:csi:0", StringComparison.Ordinal);
+
+        var active = await ReadTextAsync(serverStream, buffer);
+        sawActive = active.Contains("<active", StringComparison.Ordinal)
+            && active.Contains("urn:xmpp:csi:0", StringComparison.Ordinal);
+
+        await ReadTextAsync(serverStream, buffer);
+    });
+
+    try
+    {
+        var settings = new XmppConnectionSettings(
+            XmppAddress.Parse("user@example.org/desktop"),
+            IPAddress.Loopback.ToString(),
+            endpoint.Port,
+            requireTls: false);
+        await using var client = new XmppStreamClient(settings);
+        var features = await client.ConnectAndReadFeaturesAsync();
+        True(features.ClientStateIndicationOffered);
+
+        await client.SendInactiveClientStateAsync();
+        await client.SendActiveClientStateAsync();
+        await client.DisconnectAsync();
+        await serverTask;
+
+        True(sawInactive);
+        True(sawActive);
     }
     finally
     {
@@ -1952,6 +3347,24 @@ static async Task<string> ReadTextAsync(Stream stream, byte[] buffer)
     return Encoding.UTF8.GetString(buffer, 0, count);
 }
 
+static async Task<byte[]> ReadExactBytesAsync(Stream stream, int count)
+{
+    var buffer = new byte[count];
+    var offset = 0;
+    while (offset < count)
+    {
+        var read = await stream.ReadAsync(buffer.AsMemory(offset, count - offset));
+        if (read == 0)
+        {
+            throw new EndOfStreamException("Stream closed before enough bytes were read.");
+        }
+
+        offset += read;
+    }
+
+    return buffer;
+}
+
 static async Task WriteTextAsync(Stream stream, string text)
 {
     await stream.WriteAsync(Encoding.UTF8.GetBytes(text));
@@ -1976,6 +3389,29 @@ static void XmppIncomingStanzaClassifiesMessagePresenceIq()
     var iq = XmppIncomingStanza.FromElement(XmppIq.RosterGet("r1").ToXml());
     True(iq.IsIq);
     Equal("r1", iq.Iq!.Id);
+}
+
+static void XmppIncomingStanzaExposesPersonalEvent()
+{
+    var stanza = XmppIncomingStanza.FromElement(XElement.Parse("""
+        <message xmlns="jabber:client" type="headline" from="anna@example.org/home" to="edward@example.org/desktop">
+          <event xmlns="http://jabber.org/protocol/pubsub#event">
+            <items node="urn:xmpp:mood">
+              <item id="current">
+                <mood xmlns="http://jabber.org/protocol/mood">
+                  <happy/>
+                </mood>
+              </item>
+            </items>
+          </event>
+        </message>
+        """));
+
+    True(stanza.IsMessage);
+    True(stanza.IsPersonalEvent);
+    Equal(XmppMessageType.Headline, stanza.PersonalEvent!.Type);
+    Equal("anna@example.org", stanza.PersonalEvent.From!.Bare);
+    Equal("urn:xmpp:mood", stanza.PersonalEvent.Nodes.Single().Node);
 }
 
 static void XmppIqTrackerCompletesResult()
@@ -2136,6 +3572,44 @@ static void XmppChatMessageSerializesStanza()
     Equal("Hallo Anna", xml.Element(xml.Name.Namespace + "body")?.Value);
 }
 
+static void XmppMessageCorrectionSerializesAndParses()
+{
+    var message = XmppChatMessage.CreateCorrection(
+        XmppAddress.Parse("anna@example.org/phone"),
+        "Hallo Anna, verbeterd",
+        "original-1",
+        id: "edit-1");
+
+    var xml = message.ToXml();
+    var replace = xml.Element(XName.Get("replace", XmppMessageCorrection.NamespaceName));
+
+    Equal("edit-1", xml.Attribute("id")?.Value);
+    Equal("Hallo Anna, verbeterd", xml.Element(xml.Name.Namespace + "body")?.Value);
+    Equal("original-1", replace?.Attribute("id")?.Value);
+    True(XmppMessageCorrection.TryGetReplaceId(xml, out var replaceId));
+    Equal("original-1", replaceId);
+
+    True(XmppChatMessage.TryParse(xml, out var parsed));
+    Equal("Hallo Anna, verbeterd", parsed!.Body);
+    Equal("original-1", parsed.ReplaceId);
+}
+
+static void XmppIncomingStanzaExposesMessageCorrection()
+{
+    var xml = XElement.Parse("""
+        <message xmlns="jabber:client" from="anna@example.org/phone" to="edward@example.org/desktop" type="chat" id="edit-2">
+          <body>Verbeterde tekst</body>
+          <replace xmlns="urn:xmpp:message-correct:0" id="original-2"/>
+        </message>
+        """);
+
+    var stanza = XmppIncomingStanza.FromElement(xml);
+
+    True(stanza.IsMessage);
+    Equal("Verbeterde tekst", stanza.Message!.Body);
+    Equal("original-2", stanza.Message.ReplaceId);
+}
+
 static void XmppPresenceSerializesAwayStanza()
 {
     var presence = new XmppPresence(
@@ -2227,6 +3701,7 @@ static void XmppServiceDiscoveryParsesInfoResult()
             <identity category="server" type="im" name="Example XMPP"/>
             <feature var="urn:xmpp:rtt:0"/>
             <feature var="urn:xmpp:receipts"/>
+            <feature var="jabber:iq:private"/>
             <x xmlns="jabber:x:data" type="result">
               <field var="FORM_TYPE" type="hidden">
                 <value>urn:xmpp:http:upload:0</value>
@@ -2245,6 +3720,7 @@ static void XmppServiceDiscoveryParsesInfoResult()
     Equal("im", info.Identities.Single().Type);
     True(info.Supports("urn:xmpp:rtt:0"));
     True(info.Supports("urn:xmpp:receipts"));
+    True(XmppServiceDiscovery.SupportsPrivateXmlStorage(info));
     Equal("urn:xmpp:http:upload:0", info.DataForms.Single().FormType);
     Equal("5242880", info.DataForms.Single().GetFirstValue("max-file-size"));
 }
@@ -2257,6 +3733,197 @@ static void XmppServiceDiscoveryChecksRttCapability()
         Features: [RttPacket.NamespaceName]);
 
     True(XmppServiceDiscovery.SupportsRealTimeText(info));
+}
+
+static void XmppServiceDiscoveryChecksPepCapability()
+{
+    var info = new XmppServiceDiscoveryInfo(
+        Node: null,
+        Identities: [new XmppServiceIdentity("pubsub", "pep")],
+        Features:
+        [
+            XmppPersonalEventing.PublishFeature,
+            XmppPersonalEventing.AutoCreateFeature,
+            XmppPersonalEventing.RetrieveItemsFeature
+        ]);
+
+    True(XmppPersonalEventing.SupportsPersonalEventing(info));
+    True(XmppPersonalEventing.SupportsPublishing(info));
+    Equal("urn:xmpp:mood+notify", XmppPersonalEventing.CreateNotificationFeature("urn:xmpp:mood"));
+}
+
+static void XmppExternalServiceDiscoverySerializesAndParsesServices()
+{
+    var request = XmppExternalServiceDiscovery.CreateServicesRequest(
+        "extdisco-1",
+        XmppAddress.Parse("example.org"),
+        XmppExternalServiceDiscovery.TurnServiceType).ToXml();
+    var payload = request.Elements().Single();
+
+    Equal("get", request.Attribute("type")?.Value);
+    Equal("example.org", request.Attribute("to")?.Value);
+    Equal("services", payload.Name.LocalName);
+    Equal(XmppExternalServiceDiscovery.NamespaceName, payload.Name.NamespaceName);
+    Equal("turn", payload.Attribute("type")?.Value);
+
+    True(XmppIq.TryParse("""
+        <iq xmlns="jabber:client" type="result" id="extdisco-1">
+          <services xmlns="urn:xmpp:extdisco:2">
+            <service type="stun" host="stun.example.org" port="3478" transport="udp"/>
+            <service type="turn" host="turn.example.org" port="5349" transport="tcp"
+                     username="u" password="p" restricted="true"
+                     expires="2026-05-29T10:00:00Z" name="Example TURN">
+              <x xmlns="jabber:x:data" type="result">
+                <field var="FORM_TYPE" type="hidden">
+                  <value>urn:xmpp:extdisco:2</value>
+                </field>
+                <field var="region">
+                  <value>eu-west</value>
+                </field>
+              </x>
+            </service>
+          </services>
+        </iq>
+        """, out var iq));
+    True(XmppExternalServiceDiscovery.TryParseServicesResult(iq!, out var services));
+    Equal(2, services!.Services.Count);
+
+    var stun = services.Services[0];
+    True(stun.IsStun);
+    Equal("stun.example.org", stun.Host);
+    Equal(3478, stun.Port);
+    Equal("udp", stun.Transport);
+
+    var turn = services.Services[1];
+    True(turn.IsTurn);
+    Equal("turn.example.org", turn.Host);
+    Equal(5349, turn.Port);
+    Equal("tcp", turn.Transport);
+    Equal("u", turn.Username);
+    Equal("p", turn.Password);
+    Equal("Example TURN", turn.Name);
+    Equal(true, turn.Restricted);
+    False(turn.RequiresCredentials);
+    Equal(new DateTimeOffset(2026, 5, 29, 10, 0, 0, TimeSpan.Zero), turn.Expires);
+    Equal("urn:xmpp:extdisco:2", turn.DataForms!.Single().FormType);
+    Equal("eu-west", turn.DataForms!.Single().GetFirstValue("region"));
+
+    var advertised = new XmppServiceDiscoveryInfo(null, [], [XmppExternalServiceDiscovery.NamespaceName]);
+    True(XmppExternalServiceDiscovery.SupportsExternalServiceDiscovery(advertised));
+}
+
+static void XmppExternalServiceDiscoveryHandlesCredentialsAndPushes()
+{
+    var credentialsRequest = XmppExternalServiceDiscovery.CreateCredentialsRequest(
+        "credentials-1",
+        new XmppExternalServiceIdentity("turn.example.org", "turn", 3478),
+        XmppAddress.Parse("example.org")).ToXml();
+    var service = credentialsRequest.Descendants(XName.Get("service", XmppExternalServiceDiscovery.NamespaceName)).Single();
+
+    Equal("credentials", credentialsRequest.Elements().Single().Name.LocalName);
+    Equal("turn.example.org", service.Attribute("host")?.Value);
+    Equal("turn", service.Attribute("type")?.Value);
+    Equal("3478", service.Attribute("port")?.Value);
+
+    True(XmppIq.TryParse("""
+        <iq xmlns="jabber:client" type="result" id="credentials-1">
+          <credentials xmlns="urn:xmpp:extdisco:2">
+            <service type="turn" host="turn.example.org" port="3478"
+                     username="short" password="term" expires="2026-05-29T10:10:00Z"/>
+          </credentials>
+        </iq>
+        """, out var credentialsIq));
+    True(XmppExternalServiceDiscovery.TryParseCredentialsResult(credentialsIq!, out var credentials));
+    Equal("short", credentials!.Services.Single().Username);
+    Equal("term", credentials.Services.Single().Password);
+
+    True(XmppIq.TryParse("""
+        <iq xmlns="jabber:client" type="set" id="push-1" from="example.org" to="user@example.org/web">
+          <services xmlns="urn:xmpp:extdisco:2" type="turn">
+            <service action="modify" type="turn" host="turn.example.org" restricted="1"/>
+            <service action="delete" type="turn" host="old.example.org"/>
+          </services>
+        </iq>
+        """, out var pushIq));
+    True(XmppExternalServiceDiscovery.TryParseServicesPush(pushIq!, out var push));
+    Equal("turn", push!.Type);
+    Equal("modify", push.Services[0].Action);
+    True(push.Services[0].RequiresCredentials);
+    Equal("delete", push.Services[1].Action);
+
+    var ack = XmppExternalServiceDiscovery.CreateServicesPushAcknowledgement(pushIq!).ToXml();
+    Equal("result", ack.Attribute("type")?.Value);
+    Equal("push-1", ack.Attribute("id")?.Value);
+    Equal("example.org", ack.Attribute("to")?.Value);
+}
+
+static void XmppServiceContactAddressesParseServerInfoForm()
+{
+    var xml = """
+        <iq xmlns="jabber:client" type="result" id="serverinfo-1">
+          <query xmlns="http://jabber.org/protocol/disco#info">
+            <identity category="server" type="im" name="Example XMPP"/>
+            <x xmlns="jabber:x:data" type="result">
+              <field var="FORM_TYPE" type="hidden">
+                <value>http://jabber.org/network/serverinfo</value>
+              </field>
+              <field var="abuse-addresses">
+                <value>mailto:abuse@example.org</value>
+                <value>xmpp:abuse@example.org</value>
+              </field>
+              <field var="admin-addresses">
+                <value>mailto:xmpp@example.org</value>
+                <value>xmpp:admins@example.org</value>
+              </field>
+              <field var="feedback-addresses">
+                <value>https://example.org/feedback</value>
+                <value>xmpp:feedback@example.org</value>
+              </field>
+              <field var="sales-addresses">
+                <value>xmpp:sales@example.org</value>
+              </field>
+              <field var="security-addresses">
+                <value>xmpp:security@example.org</value>
+              </field>
+              <field var="status-addresses">
+                <value>https://status.example.org</value>
+              </field>
+              <field var="support-addresses">
+                <value>https://example.org/support</value>
+                <value>xmpp:support@example.org</value>
+              </field>
+            </x>
+          </query>
+        </iq>
+        """;
+
+    True(XmppIq.TryParse(xml, out var iq));
+    True(XmppServiceDiscovery.TryParseInfoResult(iq!, out var info));
+    True(XmppServiceContactAddresses.TryGetContactAddresses(info!, out var addresses));
+
+    Equal(11, addresses.Count);
+    Equal("mailto:abuse@example.org", addresses[0].Uri.OriginalString);
+    Equal(XmppServiceContactAddressKind.Abuse, addresses[0].Kind);
+    Equal("xmpp:security@example.org", XmppServiceContactAddresses.GetAddresses(info!, XmppServiceContactAddressKind.Security).Single().OriginalString);
+    Equal("https://status.example.org", XmppServiceContactAddresses.GetAddresses(info!, XmppServiceContactAddressKind.Status).Single().OriginalString);
+}
+
+static void XmppServiceContactAddressesCreateServerInfoForm()
+{
+    var form = XmppServiceContactAddresses.CreateDataForm(
+    [
+        new XmppServiceContactAddress(XmppServiceContactAddressKind.Admin, new Uri("mailto:xmpp@example.org")),
+        new XmppServiceContactAddress(XmppServiceContactAddressKind.Security, new Uri("xmpp:security@example.org")),
+        new XmppServiceContactAddress(XmppServiceContactAddressKind.Status, new Uri("https://status.example.org"))
+    ]);
+
+    var parsed = XmppServiceDiscovery.ParseDataForm(form);
+
+    Equal("result", parsed.Type);
+    Equal(XmppServiceContactAddresses.FormType, parsed.FormType);
+    Equal("mailto:xmpp@example.org", parsed.GetFirstValue(XmppServiceContactAddresses.AdminField));
+    Equal("xmpp:security@example.org", parsed.GetFirstValue(XmppServiceContactAddresses.SecurityField));
+    Equal("https://status.example.org", parsed.GetFirstValue(XmppServiceContactAddresses.StatusField));
 }
 
 static void XmppInBandRegistrationSerializesRequests()
@@ -2284,6 +3951,67 @@ static void XmppInBandRegistrationSerializesRequests()
 
     var remove = XmppInBandRegistration.CreateRemoveRequest("remove-1", to).ToXml();
     Equal("remove", remove.Descendants(XName.Get("remove", "jabber:iq:register")).Single().Name.LocalName);
+}
+
+static void XmppInBandRegistrationSerializesDataFormRequest()
+{
+    var to = XmppAddress.Parse("example.org");
+    var registrationQuery = XElement.Parse("""
+        <query xmlns="jabber:iq:register">
+          <x xmlns="jabber:x:data" type="form">
+            <field var="FORM_TYPE" type="hidden">
+              <value>jabber:iq:register</value>
+            </field>
+            <field var="username" type="text-single">
+              <required/>
+            </field>
+            <field var="password" type="text-private">
+              <required/>
+            </field>
+            <field var="captcha-fallback-text" type="fixed">
+              <value>Open the web page.</value>
+            </field>
+            <field var="challenge" type="hidden">
+              <value>challenge-1</value>
+            </field>
+            <field var="ocr" type="text-single">
+              <required/>
+            </field>
+          </x>
+        </query>
+        """);
+
+    var request = XmppInBandRegistration.CreateDataFormRegistrationRequest(
+        "reg-captcha",
+        registrationQuery,
+        new Dictionary<string, string>
+        {
+            ["username"] = "edward",
+            ["password"] = "secret",
+            ["ocr"] = "abc123"
+        },
+        to).ToXml();
+    var query = request.Elements().Single();
+    var form = query.Element(XName.Get("x", "jabber:x:data"))!;
+
+    Equal("set", request.Attribute("type")?.Value);
+    Equal("submit", form.Attribute("type")?.Value);
+    False(query.Elements(XName.Get("username", "jabber:iq:register")).Any());
+    False(query.Elements(XName.Get("password", "jabber:iq:register")).Any());
+    Equal("edward", form.Elements(XName.Get("field", "jabber:x:data"))
+        .Single(field => field.Attribute("var")?.Value == "username")
+        .Element(XName.Get("value", "jabber:x:data"))?.Value);
+    Equal("secret", form.Elements(XName.Get("field", "jabber:x:data"))
+        .Single(field => field.Attribute("var")?.Value == "password")
+        .Element(XName.Get("value", "jabber:x:data"))?.Value);
+    Equal("abc123", form.Elements(XName.Get("field", "jabber:x:data"))
+        .Single(field => field.Attribute("var")?.Value == "ocr")
+        .Element(XName.Get("value", "jabber:x:data"))?.Value);
+    Equal("challenge-1", form.Elements(XName.Get("field", "jabber:x:data"))
+        .Single(field => field.Attribute("var")?.Value == "challenge")
+        .Element(XName.Get("value", "jabber:x:data"))?.Value);
+    False(form.Elements(XName.Get("field", "jabber:x:data"))
+        .Any(field => field.Attribute("var")?.Value == "captcha-fallback-text"));
 }
 
 static void XmppInBandRegistrationParsesInfoResult()
@@ -2476,6 +4204,7 @@ static void XmppAlternativeConnectionDiscoveryParsesXmlAndJson()
     var xmlMethods = XmppAlternativeConnectionDiscovery.ParseXmlHostMeta(xml);
     Equal(2, xmlMethods.Count);
     Equal("wss://example.org/xmpp-websocket", XmppAlternativeConnectionDiscovery.WebSocketUris(xmlMethods).Single().ToString());
+    Equal("https://example.org/http-bind", XmppAlternativeConnectionDiscovery.BoshUris(xmlMethods).Single().ToString());
 
     var json = """
         {
@@ -2490,6 +4219,7 @@ static void XmppAlternativeConnectionDiscoveryParsesXmlAndJson()
     var jsonMethods = XmppAlternativeConnectionDiscovery.ParseJsonHostMeta(json);
     Equal(2, jsonMethods.Count);
     Equal("wss://chat.example.net/ws", XmppAlternativeConnectionDiscovery.WebSocketUris(jsonMethods).Single().ToString());
+    Equal("https://chat.example.net/bosh", XmppAlternativeConnectionDiscovery.BoshUris(jsonMethods).Single().ToString());
 }
 
 static void XmppMeCommandPreservesProtocolBody()
@@ -2558,6 +4288,544 @@ static void XmppVCardTempParsesResult()
     Equal("2000-02-03", vCard.Birthday);
     Equal("image/jpeg", vCard.Photo!.ContentType);
     Equal("YW5uYQ==", vCard.Photo.Base64Data);
+}
+
+static void XmppVCardAvatarSerializesPresenceUpdate()
+{
+    var bytes = Encoding.ASCII.GetBytes("abc");
+    const string expectedHash = "a9993e364706816aba3e25717850c26c9cd0d89d";
+    Equal(expectedHash, XmppVCardAvatar.ComputePhotoHash(bytes));
+
+    var presence = new XmppPresence(VCardAvatarUpdate: XmppVCardAvatarUpdate.FromImageData(bytes));
+    var xml = presence.ToXml().ToString(SaveOptions.DisableFormatting);
+    True(xml.Contains("vcard-temp:x:update", StringComparison.Ordinal));
+    True(xml.Contains(expectedHash, StringComparison.Ordinal));
+
+    True(XmppPresence.TryParse(xml, out var parsed));
+    Equal(expectedHash, parsed!.VCardAvatarUpdate!.PhotoHash);
+
+    var disabled = new XmppPresence(VCardAvatarUpdate: XmppVCardAvatarUpdate.Disabled);
+    True(XmppPresence.TryParse(disabled.ToXml(), out var disabledParsed));
+    True(disabledParsed!.VCardAvatarUpdate!.IsDisabled);
+}
+
+static void XmppVCardAvatarConvertsLegacyPhoto()
+{
+    var bytes = Encoding.ASCII.GetBytes("abc");
+    const string expectedHash = "a9993e364706816aba3e25717850c26c9cd0d89d";
+    var vCard = XmppVCardAvatar.CreateVCard(bytes, fullName: "Anna Example", nickname: "Anna");
+
+    Equal("Anna Example", vCard.FullName);
+    Equal("Anna", vCard.Nickname);
+    Equal("image/png", vCard.Photo!.ContentType);
+    Equal("YWJj", vCard.Photo.Base64Data);
+
+    True(XmppVCardAvatar.TryCreateUserAvatarData(vCard.Photo, out var data));
+    True(XmppVCardAvatar.TryCreateUserAvatarInfo(vCard.Photo, out var info, width: 64, height: 64));
+    Equal(expectedHash, data!.Id);
+    Equal(expectedHash, info!.Id);
+    Equal(3u, info.Bytes);
+    Equal((ushort?)64, info.Width);
+    Equal((ushort?)64, info.Height);
+
+    var disco = new XmppServiceDiscoveryInfo(
+        Node: null,
+        Identities: [],
+        Features: [XmppVCardAvatar.PepVCardConversionFeature]);
+    True(XmppVCardAvatar.SupportsPepVCardConversion(disco));
+}
+
+static void XmppStreamClientPublishesVCardAvatar()
+{
+    RunXmppStreamClientPublishesVCardAvatarAsync().GetAwaiter().GetResult();
+}
+
+static async Task RunXmppStreamClientPublishesVCardAvatarAsync()
+{
+    var listener = new TcpListener(IPAddress.Loopback, 0);
+    listener.Start();
+    var endpoint = (IPEndPoint)listener.LocalEndpoint;
+    var sawVCardSet = false;
+    var sawPresenceUpdate = false;
+    const string expectedHash = "a9993e364706816aba3e25717850c26c9cd0d89d";
+
+    var serverTask = Task.Run(async () =>
+    {
+        using var serverClient = await listener.AcceptTcpClientAsync();
+        await using var serverStream = serverClient.GetStream();
+        var buffer = new byte[8192];
+
+        await ReadTextAsync(serverStream, buffer);
+        await WriteTextAsync(serverStream, """
+            <stream:stream xmlns="jabber:client" xmlns:stream="http://etherx.jabber.org/streams" from="example.org" version="1.0">
+            <stream:features/>
+            """);
+
+        var vCardSet = await ReadTextAsync(serverStream, buffer);
+        sawVCardSet = vCardSet.Contains("type=\"set\"", StringComparison.Ordinal)
+            && vCardSet.Contains("vcard-temp", StringComparison.Ordinal)
+            && vCardSet.Contains("<BINVAL>YWJj</BINVAL>", StringComparison.Ordinal);
+        await WriteTextAsync(serverStream, """
+            <iq xmlns="jabber:client" type="result" id="vcard-avatar-set-1"/>
+            """);
+
+        var presence = await ReadTextAsync(serverStream, buffer);
+        sawPresenceUpdate = presence.Contains("vcard-temp:x:update", StringComparison.Ordinal)
+            && presence.Contains(expectedHash, StringComparison.Ordinal);
+
+        await ReadTextAsync(serverStream, buffer);
+    });
+
+    try
+    {
+        var settings = new XmppConnectionSettings(
+            XmppAddress.Parse("user@example.org/desktop"),
+            IPAddress.Loopback.ToString(),
+            endpoint.Port,
+            requireTls: false);
+        await using var client = new XmppStreamClient(settings);
+        await client.ConnectAndReadFeaturesAsync();
+        var hash = await client.PublishVCardAvatarAsync(Encoding.ASCII.GetBytes("abc"), TimeSpan.FromSeconds(5));
+        await client.DisconnectAsync();
+        await serverTask;
+
+        Equal(expectedHash, hash);
+        True(sawVCardSet);
+        True(sawPresenceUpdate);
+    }
+    finally
+    {
+        listener.Stop();
+    }
+}
+
+static void XmppUserAvatarSerializesDataAndMetadata()
+{
+    var avatarBytes = Encoding.ASCII.GetBytes("abc");
+    const string expectedId = "a9993e364706816aba3e25717850c26c9cd0d89d";
+    Equal(expectedId, XmppUserAvatar.ComputeId(avatarBytes));
+
+    var dataPublish = XmppUserAvatar.CreateDataPublish("avatar-data-1", avatarBytes);
+    Equal(XmppIqType.Set, dataPublish.Type);
+    var dataPublishXml = dataPublish.ToXml().ToString(SaveOptions.DisableFormatting);
+    True(dataPublishXml.Contains("node=\"urn:xmpp:avatar:data\"", StringComparison.Ordinal));
+    True(dataPublishXml.Contains("item id=\"" + expectedId + "\"", StringComparison.Ordinal));
+    Equal("YWJj", dataPublish.Payload!.Descendants(XName.Get("data", XmppUserAvatar.DataNamespaceName)).Single().Value);
+
+    var info = XmppUserAvatar.CreatePngInfo(avatarBytes, width: 64, height: 32);
+    var metadataPublish = XmppUserAvatar.CreateMetadataPublish("avatar-metadata-1", [info]);
+    Equal(XmppIqType.Set, metadataPublish.Type);
+    var metadataPublishXml = metadataPublish.ToXml().ToString(SaveOptions.DisableFormatting);
+    True(metadataPublishXml.Contains("node=\"urn:xmpp:avatar:metadata\"", StringComparison.Ordinal));
+    True(metadataPublishXml.Contains("type=\"image/png\"", StringComparison.Ordinal));
+    True(metadataPublishXml.Contains("bytes=\"3\"", StringComparison.Ordinal));
+    True(metadataPublishXml.Contains("height=\"32\"", StringComparison.Ordinal));
+    True(metadataPublishXml.Contains("width=\"64\"", StringComparison.Ordinal));
+
+    var request = XmppUserAvatar.CreateDataRequest(
+        "avatar-retrieve-1",
+        XmppAddress.Parse("anna@example.org"),
+        expectedId);
+    Equal("anna@example.org", request.To!.Bare);
+    True(request.ToXml().ToString(SaveOptions.DisableFormatting).Contains("item id=\"" + expectedId + "\"", StringComparison.Ordinal));
+}
+
+static void XmppUserAvatarParsesDataAndMetadata()
+{
+    const string expectedId = "a9993e364706816aba3e25717850c26c9cd0d89d";
+
+    True(XmppIq.TryParse($$"""
+        <iq xmlns="jabber:client" type="result" id="retrieve1">
+          <pubsub xmlns="http://jabber.org/protocol/pubsub">
+            <items node="urn:xmpp:avatar:data">
+              <item id="{{expectedId}}">
+                <data xmlns="urn:xmpp:avatar:data">
+                  YWJj
+                </data>
+              </item>
+            </items>
+          </pubsub>
+        </iq>
+        """, out var dataIq));
+    True(XmppUserAvatar.TryParseData(dataIq!, out var data));
+    Equal(expectedId, data!.Id);
+    Equal("YWJj", data.Base64Data);
+    Equal("abc", Encoding.ASCII.GetString(data.ToByteArray()));
+
+    True(XmppIq.TryParse($$"""
+        <iq xmlns="jabber:client" type="result" id="metadata1">
+          <pubsub xmlns="http://jabber.org/protocol/pubsub">
+            <items node="urn:xmpp:avatar:metadata">
+              <item id="{{expectedId}}">
+                <metadata xmlns="urn:xmpp:avatar:metadata">
+                  <info bytes="3" height="32" id="{{expectedId}}" type="image/png" width="64"/>
+                  <info bytes="4" height="16" id="5c77e89bbcfccdf9458c85ccebc91d2045a0528e" type="image/gif" url="https://example.org/avatar.gif" width="16"/>
+                </metadata>
+              </item>
+            </items>
+          </pubsub>
+        </iq>
+        """, out var metadataIq));
+    True(XmppUserAvatar.TryParseMetadata(metadataIq!, out var metadata));
+    Equal(2, metadata!.Infos.Count);
+    Equal(expectedId, metadata.RequiredPng!.Id);
+    Equal((uint)3, metadata.RequiredPng.Bytes);
+    Equal((ushort)64, metadata.RequiredPng.Width);
+    Equal((ushort)32, metadata.RequiredPng.Height);
+    Equal("https://example.org/avatar.gif", metadata.Infos[1].Url!.AbsoluteUri);
+}
+
+static void XmppUserAvatarHandlesMetadataNotificationsAndDisable()
+{
+    const string expectedId = "a9993e364706816aba3e25717850c26c9cd0d89d";
+    var pointer = XmppUserAvatar.CreatePointerElement(
+    [
+        new XElement(
+            XName.Get("x", "https://example.org/avatar-pointer"),
+            new XElement(XName.Get("profile", "https://example.org/avatar-pointer"), "edward"))
+    ],
+        id: expectedId,
+        contentType: XmppUserAvatar.RequiredContentType,
+        bytes: 3,
+        width: 64,
+        height: 64);
+    var metadata = XmppUserAvatar.CreateMetadataElement(
+        [new XmppUserAvatarInfo(expectedId, XmppUserAvatar.RequiredContentType, 3, Width: 64, Height: 64)],
+        [pointer]);
+    True(metadata.Elements(XName.Get("pointer", XmppUserAvatar.MetadataNamespaceName)).Single()
+        .Elements(XName.Get("x", "https://example.org/avatar-pointer"))
+        .Any());
+
+    var message = XElement.Parse($$"""
+        <message xmlns="jabber:client" to="romeo@example.org/home" from="juliet@example.org">
+          <event xmlns="http://jabber.org/protocol/pubsub#event">
+            <items node="urn:xmpp:avatar:metadata">
+              <item id="{{expectedId}}">
+                <metadata xmlns="urn:xmpp:avatar:metadata">
+                  <info bytes="3" height="64" id="{{expectedId}}" type="image/png" width="64"/>
+                </metadata>
+              </item>
+            </items>
+          </event>
+        </message>
+        """);
+    True(XmppUserAvatar.TryParseMetadataNotification(message, out var notification));
+    Equal(expectedId, notification!.RequiredPng!.Id);
+
+    var disable = XmppUserAvatar.CreateDisableMetadataPublish("avatar-disable-1");
+    Equal(XmppIqType.Set, disable.Type);
+    True(disable.ToXml().ToString(SaveOptions.DisableFormatting).Contains("<metadata xmlns=\"urn:xmpp:avatar:metadata\" />", StringComparison.Ordinal));
+
+    var disableMessage = XElement.Parse("""
+        <message xmlns="jabber:client" to="romeo@example.org/home" from="juliet@example.org">
+          <event xmlns="http://jabber.org/protocol/pubsub#event">
+            <items node="urn:xmpp:avatar:metadata">
+              <item>
+                <metadata xmlns="urn:xmpp:avatar:metadata"/>
+              </item>
+            </items>
+          </event>
+        </message>
+        """);
+    True(XmppUserAvatar.TryParseMetadataNotification(disableMessage, out var disabled));
+    True(disabled!.IsDisabled);
+}
+
+static void XmppPersonalEventingSerializesRequests()
+{
+    var payload = new XElement(
+        XName.Get("mood", "http://jabber.org/protocol/mood"),
+        new XElement(XName.Get("happy", "http://jabber.org/protocol/mood")));
+
+    var publish = XmppPersonalEventing.CreatePublishRequest("pep1", "urn:xmpp:mood", "current", payload);
+    var publishXml = publish.ToXml().ToString(SaveOptions.DisableFormatting);
+    Equal(XmppIqType.Set, publish.Type);
+    True(publish.To is null);
+    True(publishXml.Contains("node=\"urn:xmpp:mood\"", StringComparison.Ordinal));
+    True(publishXml.Contains("item id=\"current\"", StringComparison.Ordinal));
+    True(publishXml.Contains("<happy", StringComparison.Ordinal));
+
+    var items = XmppPersonalEventing.CreateItemsRequest(
+        "pep2",
+        "urn:xmpp:mood",
+        XmppAddress.Parse("anna@example.org"),
+        maxItems: 2);
+    var itemsXml = items.ToXml().ToString(SaveOptions.DisableFormatting);
+    Equal("anna@example.org", items.To!.Bare);
+    True(itemsXml.Contains("type=\"get\"", StringComparison.Ordinal));
+    True(itemsXml.Contains("max_items=\"2\"", StringComparison.Ordinal));
+
+    var retract = XmppPersonalEventing.CreateRetractRequest("pep3", "urn:xmpp:mood", "current");
+    var retractXml = retract.ToXml().ToString(SaveOptions.DisableFormatting);
+    True(retractXml.Contains("<retract", StringComparison.Ordinal));
+    True(retractXml.Contains("notify=\"true\"", StringComparison.Ordinal));
+    True(retractXml.Contains("item id=\"current\"", StringComparison.Ordinal));
+
+    var delete = XmppPersonalEventing.CreateDeleteNodeRequest("pep4", "urn:xmpp:mood");
+    Equal(XmppPersonalEventing.PubSubOwnerNamespaceName, delete.Payload!.Name.NamespaceName);
+}
+
+static void XmppPersonalEventingParsesNotifications()
+{
+    var message = XElement.Parse("""
+        <message xmlns="jabber:client" type="headline" from="anna@example.org/home" to="edward@example.org/desktop">
+          <event xmlns="http://jabber.org/protocol/pubsub#event">
+            <items node="urn:xmpp:mood">
+              <item id="current">
+                <mood xmlns="http://jabber.org/protocol/mood">
+                  <happy/>
+                </mood>
+              </item>
+              <retract id="old"/>
+            </items>
+            <purge node="urn:xmpp:tune"/>
+            <delete node="urn:xmpp:activity"/>
+          </event>
+        </message>
+        """);
+
+    True(XmppPersonalEventing.TryParseNotification(message, out var notification));
+    Equal(XmppMessageType.Headline, notification!.Type);
+    Equal("anna@example.org", notification.From!.Bare);
+    Equal("edward@example.org", notification.To!.Bare);
+    Equal(3, notification.Nodes.Count);
+
+    var mood = notification.ForNode("urn:xmpp:mood").Single();
+    Equal("current", mood.Items.Single().Id);
+    Equal("mood", mood.Items.Single().Payloads.Single().Name.LocalName);
+    Equal("old", mood.RetractedItemIds.Single());
+
+    True(notification.ForNode("urn:xmpp:tune").Single().IsPurge);
+    True(notification.ForNode("urn:xmpp:activity").Single().IsDelete);
+}
+
+static void XmppPrivateXmlStorageSerializesAndParses()
+{
+    var settingsName = XName.Get("settings", "urn:tiedragon:private:test");
+    var get = XmppPrivateXmlStorage.CreateGetRequest("private-get", settingsName)
+        .ToXml()
+        .ToString(SaveOptions.DisableFormatting);
+    True(get.Contains("type=\"get\"", StringComparison.Ordinal));
+    True(get.Contains("jabber:iq:private", StringComparison.Ordinal));
+    True(get.Contains("settings", StringComparison.Ordinal));
+    True(get.Contains("urn:tiedragon:private:test", StringComparison.Ordinal));
+
+    var setPayload = new XElement(
+        settingsName,
+        new XElement(XName.Get("theme", settingsName.NamespaceName), "dark"),
+        new XElement(XName.Get("fontSize", settingsName.NamespaceName), "16"));
+    var set = XmppPrivateXmlStorage.CreateSetRequest("private-set", setPayload)
+        .ToXml()
+        .ToString(SaveOptions.DisableFormatting);
+    True(set.Contains("type=\"set\"", StringComparison.Ordinal));
+    True(set.Contains("<theme", StringComparison.Ordinal));
+    True(set.Contains(">dark<", StringComparison.Ordinal));
+
+    True(XmppIq.TryParse("""
+        <iq xmlns="jabber:client" type="result" id="private-get">
+          <query xmlns="jabber:iq:private">
+            <settings xmlns="urn:tiedragon:private:test">
+              <theme>dark</theme>
+              <fontSize>16</fontSize>
+            </settings>
+          </query>
+        </iq>
+        """, out var iq));
+    True(XmppPrivateXmlStorage.TryParseResult(iq!, settingsName, out var payload));
+    Equal("dark", payload!.Element(XName.Get("theme", settingsName.NamespaceName))?.Value);
+    Equal("16", payload.Element(XName.Get("fontSize", settingsName.NamespaceName))?.Value);
+
+    True(XmppPrivateXmlStorage.TryParseResult(iq!, out var payloads));
+    Equal(1, payloads!.Count);
+    Equal(settingsName, payloads.Single().Name);
+}
+
+static void XmppPersistentPrivateDataSerializesAndParses()
+{
+    const string node = "urn:tiedragon:teletyptel:settings";
+    var payloadName = XName.Get("settings", node);
+    var payload = new XElement(
+        payloadName,
+        new XElement(XName.Get("theme", node), "dark"),
+        new XElement(XName.Get("language", node), "nl"));
+    var store = XmppPersistentPrivateData.CreateStoreRequest(
+        "private-store",
+        node,
+        payload,
+        itemId: "current");
+    var storeXml = store.ToXml().ToString(SaveOptions.DisableFormatting);
+
+    Equal(XmppIqType.Set, store.Type);
+    True(storeXml.Contains("node=\"urn:tiedragon:teletyptel:settings\"", StringComparison.Ordinal));
+    True(storeXml.Contains("item id=\"current\"", StringComparison.Ordinal));
+    True(storeXml.Contains("pubsub#persist_items", StringComparison.Ordinal));
+    True(storeXml.Contains("pubsub#access_model", StringComparison.Ordinal));
+    True(storeXml.Contains(">whitelist<", StringComparison.Ordinal));
+
+    var info = new XmppServiceDiscoveryInfo(
+        Node: null,
+        Identities: [new XmppServiceIdentity("pubsub", "pep")],
+        Features: [XmppPersistentPrivateData.PublishOptionsFeature]);
+    True(XmppPersistentPrivateData.SupportsPersistentPrivateData(info));
+    Equal(node + "+notify", XmppPersistentPrivateData.CreateNotificationFeature(node));
+
+    var itemsRequest = XmppPersistentPrivateData.CreateItemsRequest(
+        "private-items",
+        node,
+        XmppAddress.Parse("edward@example.org"),
+        itemId: "current");
+    Equal("edward@example.org", itemsRequest.To!.Bare);
+    True(itemsRequest.ToXml().ToString(SaveOptions.DisableFormatting).Contains("item id=\"current\"", StringComparison.Ordinal));
+
+    True(XmppIq.TryParse("""
+        <iq xmlns="jabber:client" type="result" id="private-items">
+          <pubsub xmlns="http://jabber.org/protocol/pubsub">
+            <items node="urn:tiedragon:teletyptel:settings">
+              <item id="current">
+                <settings xmlns="urn:tiedragon:teletyptel:settings">
+                  <theme>dark</theme>
+                  <language>nl</language>
+                </settings>
+              </item>
+            </items>
+          </pubsub>
+        </iq>
+        """, out var iq));
+    True(XmppPersistentPrivateData.TryParseItemsResult(iq!, node, out var items));
+    var parsedItems = items!;
+    Equal("current", parsedItems.Single().Id);
+    Equal("nl", parsedItems.Single().Payloads.Single().Element(XName.Get("language", node))?.Value);
+
+    var trustedMessage = XElement.Parse("""
+        <message xmlns="jabber:client" from="edward@example.org/laptop" to="edward@example.org/phone" type="headline">
+          <event xmlns="http://jabber.org/protocol/pubsub#event">
+            <items node="urn:tiedragon:teletyptel:settings">
+              <item id="current">
+                <settings xmlns="urn:tiedragon:teletyptel:settings">
+                  <theme>light</theme>
+                </settings>
+              </item>
+            </items>
+          </event>
+        </message>
+        """);
+    True(XmppPersistentPrivateData.TryParseNotification(
+        trustedMessage,
+        XmppAddress.Parse("edward@example.org/phone"),
+        node,
+        out var notification));
+    Equal("edward@example.org", notification!.From!.Bare);
+    Equal("light", notification.Items.Single().Payloads.Single().Element(XName.Get("theme", node))?.Value);
+
+    var untrustedMessage = XElement.Parse("""
+        <message xmlns="jabber:client" from="mallory@example.net" to="edward@example.org/phone" type="headline">
+          <event xmlns="http://jabber.org/protocol/pubsub#event">
+            <items node="urn:tiedragon:teletyptel:settings">
+              <item id="current">
+                <settings xmlns="urn:tiedragon:teletyptel:settings"/>
+              </item>
+            </items>
+          </event>
+        </message>
+        """);
+    False(XmppPersistentPrivateData.TryParseNotification(
+        untrustedMessage,
+        XmppAddress.Parse("edward@example.org/phone"),
+        node,
+        out _));
+}
+
+static void XmppConferenceBookmarksSerializeAndParse()
+{
+    var room = XmppAddress.Parse("team@conference.example.org");
+    var bookmark = new XmppConferenceBookmark(
+        room,
+        Name: "Team room",
+        AutoJoin: true,
+        Nickname: "Edward",
+        Extensions:
+        [
+            new XElement(XName.Get("group", "urn:tiedragon:bookmarks:demo"), "Support")
+        ]);
+
+    var publish = XmppBookmarks.CreatePublishConferenceRequest("bm1", bookmark)
+        .ToXml()
+        .ToString(SaveOptions.DisableFormatting);
+    True(publish.Contains("node=\"urn:xmpp:bookmarks:1\"", StringComparison.Ordinal));
+    True(publish.Contains("item id=\"team@conference.example.org\"", StringComparison.Ordinal));
+    True(publish.Contains("<conference", StringComparison.Ordinal));
+    True(publish.Contains("xmlns=\"urn:xmpp:bookmarks:1\"", StringComparison.Ordinal));
+    True(publish.Contains("pubsub#persist_items", StringComparison.Ordinal));
+    True(publish.Contains("pubsub#access_model", StringComparison.Ordinal));
+
+    True(XmppIq.TryParse("""
+        <iq xmlns="jabber:client" type="result" id="bm-get">
+          <pubsub xmlns="http://jabber.org/protocol/pubsub">
+            <items node="urn:xmpp:bookmarks:1">
+              <item id="team@conference.example.org">
+                <conference xmlns="urn:xmpp:bookmarks:1" name="Team room" autojoin="true">
+                  <nick>Edward</nick>
+                  <extensions>
+                    <group xmlns="urn:tiedragon:bookmarks:demo">Support</group>
+                  </extensions>
+                </conference>
+              </item>
+            </items>
+          </pubsub>
+        </iq>
+        """, out var bookmarksIq));
+    True(XmppBookmarks.TryParseBookmarksResult(bookmarksIq!, out var bookmarks));
+    var parsedBookmark = bookmarks!.Single();
+    Equal("team@conference.example.org", parsedBookmark.Room.Bare);
+    Equal("Team room", parsedBookmark.Name);
+    Equal("Edward", parsedBookmark.Nickname);
+    True(parsedBookmark.AutoJoin);
+    Equal("group", parsedBookmark.Extensions.Single().Name.LocalName);
+
+    var legacySet = XmppBookmarks.CreateLegacyBookmarksSetRequest("legacy-set", [bookmark])
+        .ToXml()
+        .ToString(SaveOptions.DisableFormatting);
+    True(legacySet.Contains("jabber:iq:private", StringComparison.Ordinal));
+    True(legacySet.Contains("storage:bookmarks", StringComparison.Ordinal));
+    True(legacySet.Contains("jid=\"team@conference.example.org\"", StringComparison.Ordinal));
+
+    True(XmppIq.TryParse("""
+        <iq xmlns="jabber:client" type="result" id="legacy-get">
+          <query xmlns="jabber:iq:private">
+            <storage xmlns="storage:bookmarks">
+              <conference name="Team room" autojoin="1" jid="team@conference.example.org">
+                <nick>Edward</nick>
+              </conference>
+            </storage>
+          </query>
+        </iq>
+        """, out var legacyIq));
+    True(XmppBookmarks.TryParseLegacyBookmarksResult(legacyIq!, out var legacyBookmarks));
+    var parsedLegacyBookmark = legacyBookmarks!.Single();
+    Equal("team@conference.example.org", parsedLegacyBookmark.Room.Bare);
+    True(parsedLegacyBookmark.AutoJoin);
+}
+
+static void XmppConferenceBookmarksParseNotifications()
+{
+    var message = XElement.Parse("""
+        <message xmlns="jabber:client" type="headline" from="edward@example.org" to="edward@example.org/desktop">
+          <event xmlns="http://jabber.org/protocol/pubsub#event">
+            <items node="urn:xmpp:bookmarks:1">
+              <item id="team@conference.example.org">
+                <conference xmlns="urn:xmpp:bookmarks:1" name="Team room" autojoin="true">
+                  <nick>Edward</nick>
+                </conference>
+              </item>
+              <retract id="old@conference.example.org"/>
+            </items>
+          </event>
+        </message>
+        """);
+
+    True(XmppBookmarks.TryParseBookmarkNotification(message, out var notification));
+    Equal("team@conference.example.org", notification!.Bookmarks.Single().Room.Bare);
+    Equal("old@conference.example.org", notification.RetractedRooms.Single().Bare);
 }
 
 static void XmppPushNotificationsSerializeEnableAndDisable()
@@ -2672,6 +4940,75 @@ static void XmppMessageCarbonsParseForwardedReceived()
     Equal("anna@example.org/phone", carbon.ForwardedMessage.From!.Full);
 }
 
+static void XmppBlockingCommandSerializesAndParsesBlockList()
+{
+    var listXml = XmppBlockingCommand.CreateBlockListRequest("blocklist-1")
+        .ToXml()
+        .ToString(SaveOptions.DisableFormatting);
+    True(listXml.Contains("type=\"get\"", StringComparison.Ordinal));
+    True(listXml.Contains("<blocklist xmlns=\"urn:xmpp:blocking\" />", StringComparison.Ordinal));
+
+    var blockXml = XmppBlockingCommand.CreateBlockRequest(
+            "block-1",
+            [XmppAddress.Parse("spam@example.org"), XmppAddress.Parse("bad@example.net/mobile")])
+        .ToXml()
+        .ToString(SaveOptions.DisableFormatting);
+    True(blockXml.Contains("<block xmlns=\"urn:xmpp:blocking\">", StringComparison.Ordinal));
+    True(blockXml.Contains("jid=\"spam@example.org\"", StringComparison.Ordinal));
+    True(blockXml.Contains("jid=\"bad@example.net/mobile\"", StringComparison.Ordinal));
+
+    var unblockAllXml = XmppBlockingCommand.CreateUnblockAllRequest("unblock-all-1")
+        .ToXml()
+        .ToString(SaveOptions.DisableFormatting);
+    True(unblockAllXml.Contains("<unblock xmlns=\"urn:xmpp:blocking\" />", StringComparison.Ordinal));
+
+    True(XmppIq.TryParse("""
+        <iq xmlns="jabber:client" type="result" id="blocklist-1">
+          <blocklist xmlns="urn:xmpp:blocking">
+            <item jid="spam@example.org"/>
+            <item jid="bad@example.net/mobile"/>
+            <item/>
+          </blocklist>
+        </iq>
+        """, out var iq));
+    True(XmppBlockingCommand.TryParseBlockListResult(iq!, out var blocked));
+    Equal(2, blocked.Count);
+    Equal("spam@example.org", blocked[0].Bare);
+    Equal("bad@example.net/mobile", blocked[1].Full);
+    True(XmppBlockingCommand.SupportsBlocking(new XmppServiceDiscoveryInfo(null, [], [XmppBlockingCommand.NamespaceName])));
+}
+
+static void XmppBlockingCommandParsesPushes()
+{
+    True(XmppIq.TryParse("""
+        <iq xmlns="jabber:client" type="set" id="block-push-1" from="example.org" to="user@example.org/desktop">
+          <block xmlns="urn:xmpp:blocking">
+            <item jid="spam@example.org"/>
+          </block>
+        </iq>
+        """, out var blockIq));
+    True(XmppBlockingCommand.TryParsePush(blockIq!, out var blockPush));
+    Equal(XmppBlockingAction.Block, blockPush!.Action);
+    Equal("spam@example.org", blockPush.Jids.Single().Bare);
+    False(blockPush.UnblocksAll);
+
+    True(XmppIq.TryParse("""
+        <iq xmlns="jabber:client" type="set" id="unblock-push-1" from="example.org" to="user@example.org/desktop">
+          <unblock xmlns="urn:xmpp:blocking"/>
+        </iq>
+        """, out var unblockIq));
+    True(XmppBlockingCommand.TryParsePush(unblockIq!, out var unblockPush));
+    Equal(XmppBlockingAction.Unblock, unblockPush!.Action);
+    Equal(0, unblockPush.Jids.Count);
+    True(unblockPush.UnblocksAll);
+
+    var ack = XmppBlockingCommand.CreatePushAcknowledgement(
+        "block-push-1",
+        XmppAddress.Parse("example.org")).ToXml();
+    Equal("result", ack.Attribute("type")?.Value);
+    Equal("example.org", ack.Attribute("to")?.Value);
+}
+
 static void XmppIncomingStanzaExposesCarbon()
 {
     var xml = XElement.Parse("""
@@ -2740,6 +5077,30 @@ static void XmppMessageArchiveParsesForwardedResult()
     Equal("Archived hello", archived.Message.Body);
     Equal("anna@example.org/phone", archived.Message.From!.Full);
     Equal(DateTimeOffset.Parse("2026-05-27T10:15:00Z"), archived.DelayStamp);
+}
+
+static void XmppMessageArchiveParsesForwardedMucResult()
+{
+    var xml = XElement.Parse("""
+        <message xmlns="jabber:client" from="team@conference.example.org">
+          <result xmlns="urn:xmpp:mam:2" queryid="q-muc" id="muc-archive-1">
+            <forwarded xmlns="urn:xmpp:forward:0">
+              <delay xmlns="urn:xmpp:delay" stamp="2026-05-30T00:15:00Z"/>
+              <message xmlns="jabber:client" type="groupchat" from="team@conference.example.org/Edward" id="muc-message-1">
+                <body>Archived group hello</body>
+              </message>
+            </forwarded>
+          </result>
+        </message>
+        """);
+
+    True(XmppMessageArchive.TryParseGroupResult(xml, out var archived));
+    Equal("muc-archive-1", archived!.Id);
+    Equal("q-muc", archived.QueryId);
+    Equal("Archived group hello", archived.Message.Body);
+    Equal("team@conference.example.org", archived.Message.Room!.Bare);
+    Equal("Edward", archived.Message.Nickname);
+    Equal(DateTimeOffset.Parse("2026-05-30T00:15:00Z"), archived.DelayStamp);
 }
 
 static void XmppMessageArchiveParsesFinResultSet()
@@ -2981,6 +5342,34 @@ static void XmppMultiUserChatSerializesJoinAndGroupMessage()
     Equal("Hoi", parsed.Body);
 }
 
+static void XmppMultiUserChatSerializesMessageCorrection()
+{
+    var room = XmppAddress.Parse("team@conference.example.org");
+    var group = XmppMultiUserChat.CreateGroupMessage(
+        room,
+        "Hallo groep, verbeterd",
+        id: "muc-edit-1",
+        replaceId: "muc-original-1");
+    var replace = group.Element(XName.Get("replace", XmppMessageCorrection.NamespaceName));
+
+    Equal("groupchat", group.Attribute("type")?.Value);
+    Equal("muc-edit-1", group.Attribute("id")?.Value);
+    Equal("muc-original-1", replace?.Attribute("id")?.Value);
+
+    var incoming = XElement.Parse("""
+        <message xmlns="jabber:client" type="groupchat" from="team@conference.example.org/Anna" to="edward@example.org/desktop" id="muc-edit-2">
+          <body>Verbeterde groepstekst</body>
+          <replace xmlns="urn:xmpp:message-correct:0" id="muc-original-2"/>
+        </message>
+        """);
+
+    True(XmppMultiUserChat.TryParseGroupMessage(incoming, out var parsed));
+    Equal("team@conference.example.org", parsed!.Room!.Bare);
+    Equal("Anna", parsed.Nickname);
+    Equal("Verbeterde groepstekst", parsed.Body);
+    Equal("muc-original-2", parsed.ReplaceId);
+}
+
 static void XmppMultiUserChatDiscoversRoomsAndItems()
 {
     var service = XmppAddress.Parse("conference.example.org");
@@ -3101,6 +5490,42 @@ static void XmppMultiUserChatHandlesAdminItems()
     Equal("Anna", items[0].Nick);
 }
 
+static void XmppMucSelfPingSerializesAndClassifies()
+{
+    var room = XmppAddress.Parse("team@conference.example.org");
+    var ping = XmppMucSelfPing.CreatePingRequest(
+        "ping-1",
+        room,
+        "Edward",
+        XmppAddress.Parse("edward@example.org/desktop")).ToXml();
+
+    Equal("team@conference.example.org/Edward", ping.Attribute("to")?.Value);
+    Equal("edward@example.org/desktop", ping.Attribute("from")?.Value);
+    Equal("ping", ping.Elements().Single().Name.LocalName);
+    Equal(XmppMucSelfPing.PingNamespaceName, ping.Elements().Single().Name.NamespaceName);
+
+    True(XmppIq.TryParse("""
+        <iq xmlns="jabber:client" type="result" id="ping-1" from="team@conference.example.org/Edward"/>
+        """, out var resultIq));
+    True(XmppMucSelfPing.TryParsePingResponse(resultIq!, out var joined, out var noError));
+    Equal(XmppMucSelfPingStatus.Joined, joined);
+    True(noError is null);
+
+    True(XmppIq.TryParse("""
+        <iq xmlns="jabber:client" type="error" id="ping-1" from="team@conference.example.org/Edward">
+          <error type="cancel">
+            <item-not-found xmlns="urn:ietf:params:xml:ns:xmpp-stanzas"/>
+          </error>
+        </iq>
+        """, out var errorIq));
+    True(XmppMucSelfPing.TryParsePingResponse(errorIq!, out var missing, out var stanzaError));
+    Equal(XmppMucSelfPingStatus.NotJoined, missing);
+    Equal("item-not-found", stanzaError!.Condition);
+
+    var info = new XmppServiceDiscoveryInfo(null, [], [XmppMucSelfPing.OptimizationFeature]);
+    True(XmppMucSelfPing.SupportsSelfPingOptimization(info));
+}
+
 static void XmppHttpFileUploadSerializesRequestAndParsesSlot()
 {
     var iq = XmppHttpFileUpload.CreateSlotRequest(
@@ -3138,6 +5563,30 @@ static void XmppHttpFileUploadSerializesRequestAndParsesSlot()
     True(XmppHttpFileUpload.SupportsHttpUpload(new XmppServiceDiscoveryInfo(null, [], [XmppHttpFileUpload.NamespaceName])));
 }
 
+static void XmppHttpFileUploadOnlyAllowsLoopbackHttp()
+{
+    True(XmppIq.TryParse("""
+        <iq xmlns="jabber:client" type="result" id="slot-loopback">
+          <slot xmlns="urn:xmpp:http:upload:0">
+            <put url="http://127.0.0.1:8088/u/foto.jpg"/>
+            <get url="http://127.0.0.1:8088/u/foto.jpg"/>
+          </slot>
+        </iq>
+        """, out var loopbackIq));
+    True(XmppHttpFileUpload.TryParseSlotResult(loopbackIq!, out var loopbackSlot));
+    Equal("http://127.0.0.1:8088/u/foto.jpg", loopbackSlot!.PutUrl.ToString());
+
+    True(XmppIq.TryParse("""
+        <iq xmlns="jabber:client" type="result" id="slot-remote-http">
+          <slot xmlns="urn:xmpp:http:upload:0">
+            <put url="http://upload.example.org/u/foto.jpg"/>
+            <get url="http://upload.example.org/u/foto.jpg"/>
+          </slot>
+        </iq>
+        """, out var remoteHttpIq));
+    False(XmppHttpFileUpload.TryParseSlotResult(remoteHttpIq!, out _));
+}
+
 static void XmppHttpFileUploadDiscoversMaxFileSize()
 {
     var result = XmppIq.TryParse("""
@@ -3172,6 +5621,44 @@ static void XmppHttpFileUploadDiscoversMaxFileSize()
     catch (ArgumentOutOfRangeException)
     {
     }
+}
+
+static void XmppHttpFileUploadHandlesPurposeAndRetryDetails()
+{
+    var expireBefore = DateTimeOffset.Parse("2026-05-28T12:34:56Z", CultureInfo.InvariantCulture);
+    var xml = XmppHttpFileUpload.CreateSlotRequest(
+            "slot-ephemeral",
+            XmppAddress.Parse("upload.example.org"),
+            "secret.txt",
+            42,
+            "text/plain",
+            XmppHttpUploadPurpose.Ephemeral,
+            expireBefore)
+        .ToXml()
+        .ToString(SaveOptions.DisableFormatting);
+
+    True(xml.Contains("<ephemeral", StringComparison.Ordinal));
+    True(xml.Contains("expire-before=\"2026-05-28T12:34:56Z\"", StringComparison.Ordinal));
+    Throws<ArgumentException>(() => XmppHttpFileUpload.CreateSlotRequest(
+        "slot-bad-ephemeral",
+        XmppAddress.Parse("upload.example.org"),
+        "secret.txt",
+        42,
+        "text/plain",
+        XmppHttpUploadPurpose.Ephemeral));
+
+    True(XmppIq.TryParse("""
+        <iq xmlns="jabber:client" type="error" id="slot-retry">
+          <request xmlns="urn:xmpp:http:upload:0" filename="secret.txt" size="42"/>
+          <error type="wait">
+            <resource-constraint xmlns="urn:ietf:params:xml:ns:xmpp-stanzas"/>
+            <retry xmlns="urn:xmpp:http:upload:0" stamp="2026-05-28T12:35:56Z"/>
+          </error>
+        </iq>
+        """, out var iq));
+
+    True(XmppHttpFileUpload.TryParseRetry(iq!, out var retryAt));
+    Equal(DateTimeOffset.Parse("2026-05-28T12:35:56Z", CultureInfo.InvariantCulture), retryAt!.Value);
 }
 
 static void XmppHttpFileUploadExecutesPut()
@@ -3222,25 +5709,245 @@ static void XmppHttpFileUploadCreatesMessageAttachment()
     Equal("foto.jpg", parsed.OutOfBandDescription!);
 }
 
+static void XmppSocks5BytestreamsSerializesRequests()
+{
+    var proxy = XmppAddress.Parse("streamer.example.org");
+    var target = XmppAddress.Parse("anna@example.org/phone");
+    var host = new XmppSocks5StreamHost(proxy, "203.0.113.55", 7777);
+    var query = XmppSocks5Bytestreams.CreateProxyAddressRequest("s5b-proxy-1", proxy);
+    Equal("get", query.ToXml().Attribute("type")!.Value);
+    True(query.ToXml().ToString(SaveOptions.DisableFormatting).Contains(XmppSocks5Bytestreams.NamespaceName, StringComparison.Ordinal));
+
+    var request = XmppSocks5Bytestreams.CreateBytestreamRequest("s5b-1", target, "sid-123", [host]);
+    var requestXml = request.ToXml().ToString(SaveOptions.DisableFormatting);
+    True(requestXml.Contains("sid=\"sid-123\"", StringComparison.Ordinal));
+    True(requestXml.Contains("streamhost", StringComparison.Ordinal));
+    True(XmppSocks5Bytestreams.TryParseBytestreamRequest(request, out var parsedRequest));
+    Equal("sid-123", parsedRequest!.StreamId);
+    Equal("tcp", parsedRequest.Mode);
+    Equal(1, parsedRequest.StreamHosts.Count);
+    Equal(7777, parsedRequest.StreamHosts[0].Port!.Value);
+
+    var used = XmppSocks5Bytestreams.CreateStreamHostUsedResult("s5b-1", XmppAddress.Parse("edward@example.org/web"), proxy);
+    True(XmppSocks5Bytestreams.TryParseStreamHostUsedResult(used, out var usedHost));
+    Equal("streamer.example.org", usedHost!.Bare);
+
+    var activation = XmppSocks5Bytestreams.CreateActivationRequest("s5b-activate-1", proxy, "sid-123", target);
+    var activationXml = activation.ToXml().ToString(SaveOptions.DisableFormatting);
+    True(activationXml.Contains("activate", StringComparison.Ordinal));
+    True(XmppSocks5Bytestreams.TryParseActivationRequest(activation, out var parsedActivation));
+    Equal("sid-123", parsedActivation!.StreamId);
+    Equal(target.Full, parsedActivation.Target.Full);
+}
+
+static void XmppSocks5BytestreamsComputesDestinationAddress()
+{
+    var destination = XmppSocks5Bytestreams.ComputeDestinationAddress(
+        "vj3hs98y",
+        XmppAddress.Parse("romeo@montague.lit/orchard"),
+        XmppAddress.Parse("juliet@capulet.lit/balcony"));
+
+    Equal(40, destination.Length);
+    Equal("972b7bf47291ca609517f67f86b5081086052dad", destination);
+
+    var info = new XmppServiceDiscoveryInfo(
+        null,
+        [new XmppServiceIdentity("proxy", "bytestreams", "File Transfer Relay")],
+        [XmppSocks5Bytestreams.NamespaceName]);
+    True(XmppSocks5Bytestreams.SupportsSocks5Bytestreams(info));
+    True(XmppSocks5Bytestreams.IsBytestreamProxy(info));
+}
+
+static void XmppSocks5BytestreamsOpensLocalStreamHostAndExchangesBytes()
+{
+    RunXmppSocks5BytestreamsOpensLocalStreamHostAndExchangesBytesAsync().GetAwaiter().GetResult();
+}
+
+static async Task RunXmppSocks5BytestreamsOpensLocalStreamHostAndExchangesBytesAsync()
+{
+    var listener = new TcpListener(IPAddress.Loopback, 0);
+    listener.Start();
+
+    var endpoint = (IPEndPoint)listener.LocalEndpoint;
+    var requester = XmppAddress.Parse("romeo@montague.lit/orchard");
+    var target = XmppAddress.Parse("juliet@capulet.lit/balcony");
+    var destination = XmppSocks5Bytestreams.ComputeDestinationAddress("sid-123", requester, target);
+    var clientPayload = Encoding.UTF8.GetBytes("hello through xep-0065");
+    var serverReply = Encoding.UTF8.GetBytes("socks5-ok");
+    string? requestedDestination = null;
+    var sawZeroDestinationPort = false;
+
+    var serverTask = Task.Run(async () =>
+    {
+        using var serverClient = await listener.AcceptTcpClientAsync();
+        await using var serverStream = serverClient.GetStream();
+
+        var greeting = await ReadExactBytesAsync(serverStream, 3);
+        Equal((byte)0x05, greeting[0]);
+        Equal((byte)0x01, greeting[1]);
+        Equal((byte)0x00, greeting[2]);
+        await serverStream.WriteAsync(new byte[] { 0x05, 0x00 });
+
+        var requestPrefix = await ReadExactBytesAsync(serverStream, 5);
+        Equal((byte)0x05, requestPrefix[0]);
+        Equal((byte)0x01, requestPrefix[1]);
+        Equal((byte)0x00, requestPrefix[2]);
+        Equal((byte)0x03, requestPrefix[3]);
+
+        var addressAndPort = await ReadExactBytesAsync(serverStream, requestPrefix[4] + 2);
+        requestedDestination = Encoding.ASCII.GetString(addressAndPort, 0, requestPrefix[4]);
+        sawZeroDestinationPort = addressAndPort[^2] == 0x00 && addressAndPort[^1] == 0x00;
+
+        var response = new byte[7 + requestPrefix[4]];
+        response[0] = 0x05;
+        response[1] = 0x00;
+        response[2] = 0x00;
+        response[3] = 0x03;
+        response[4] = requestPrefix[4];
+        Encoding.ASCII.GetBytes(requestedDestination).CopyTo(response, 5);
+        response[^2] = 0x00;
+        response[^1] = 0x00;
+        await serverStream.WriteAsync(response);
+
+        var received = await ReadExactBytesAsync(serverStream, clientPayload.Length);
+        True(clientPayload.SequenceEqual(received));
+        await serverStream.WriteAsync(serverReply);
+    });
+
+    try
+    {
+        var streamHost = new XmppSocks5StreamHost(
+            XmppAddress.Parse("proxy.example.org"),
+            IPAddress.Loopback.ToString(),
+            endpoint.Port);
+        await using var connection = await XmppSocks5BytestreamSocket.ConnectAsync(
+            streamHost,
+            destination,
+            TimeSpan.FromSeconds(5));
+
+        await connection.Stream.WriteAsync(clientPayload);
+        await connection.Stream.FlushAsync();
+        var reply = await ReadExactBytesAsync(connection.Stream, serverReply.Length);
+        True(serverReply.SequenceEqual(reply));
+        await serverTask;
+    }
+    finally
+    {
+        listener.Stop();
+    }
+
+    Equal(destination, requestedDestination);
+    True(sawZeroDestinationPort);
+}
+
+static void XmppInBandBytestreamsSerializesOpenDataAndClose()
+{
+    var target = XmppAddress.Parse("juliet@capulet.com/balcony");
+    var open = XmppInBandBytestreams.CreateOpenRequest("ibb-open-1", target, "ch3d9s71", 2048);
+    var openXml = open.ToXml().ToString(SaveOptions.DisableFormatting);
+    True(openXml.Contains("http://jabber.org/protocol/ibb", StringComparison.Ordinal));
+    True(openXml.Contains("block-size=\"2048\"", StringComparison.Ordinal));
+    True(openXml.Contains("sid=\"ch3d9s71\"", StringComparison.Ordinal));
+    True(XmppInBandBytestreams.TryParseOpenRequest(open, out var parsedOpen));
+    Equal("ch3d9s71", parsedOpen!.SessionId);
+    Equal("iq", parsedOpen.Stanza);
+
+    var payload = Encoding.UTF8.GetBytes("Teletyptel file bytes");
+    var dataIq = XmppInBandBytestreams.CreateDataIq("ibb-data-1", target, "ch3d9s71", 0, payload, blockSize: 2048);
+    True(XmppInBandBytestreams.TryParseDataIq(dataIq, out var parsedDataIq));
+    Equal("ch3d9s71", parsedDataIq!.SessionId);
+    Equal((ushort)0, parsedDataIq.Sequence);
+    True(payload.SequenceEqual(parsedDataIq.Bytes));
+
+    var message = XmppInBandBytestreams.CreateDataMessage(target, "ch3d9s71", 1, payload, "ibb-message-1");
+    True(message.ToString(SaveOptions.DisableFormatting).Contains("seq=\"1\"", StringComparison.Ordinal));
+    True(XmppInBandBytestreams.TryParseDataMessage(message, out var parsedMessageData));
+    Equal((ushort)1, parsedMessageData!.Sequence);
+    True(payload.SequenceEqual(parsedMessageData.Bytes));
+
+    var close = XmppInBandBytestreams.CreateCloseRequest("ibb-close-1", target, "ch3d9s71");
+    True(XmppInBandBytestreams.TryParseCloseRequest(close, out var parsedClose));
+    Equal("ch3d9s71", parsedClose!.SessionId);
+
+    Throws<ArgumentOutOfRangeException>(() =>
+        XmppInBandBytestreams.CreateDataIq("ibb-too-large", target, "ch3d9s71", 2, new byte[3], blockSize: 2));
+}
+
+static void XmppJingleIbbTransportSerializesFallbackOffer()
+{
+    var initiator = XmppAddress.Parse("romeo@montague.lit/orchard");
+    var responder = XmppAddress.Parse("juliet@capulet.lit/balcony");
+    var transport = new XmppJingleInBandBytestreamTransport("ch3d9s71", 4096);
+    var file = new XmppJingleFile(
+        "fallback.txt",
+        Size: 21,
+        MediaType: "text/plain",
+        Hashes: [new XmppJingleFileHash("sha-256", "Mb5I5OB9L0yDyGZqjOmCwXlZs8Y=")]);
+    var content = XmppJingleFileTransfer.CreateFileContent(
+        "file-offer",
+        file,
+        transport.ToXml());
+    var iq = XmppJingle.CreateSessionInitiate(
+        "jft-ibb-1",
+        responder,
+        "a73sjjvkla37jfea",
+        "initiator",
+        [content],
+        initiator.Full);
+    var xml = iq.ToXml().ToString(SaveOptions.DisableFormatting);
+
+    True(xml.Contains(XmppJingleFileTransfer.NamespaceName, StringComparison.Ordinal));
+    True(xml.Contains(XmppJingleInBandBytestreams.NamespaceName, StringComparison.Ordinal));
+    True(xml.Contains("block-size=\"4096\"", StringComparison.Ordinal));
+    True(XmppJingle.TryParse(iq, out var session));
+    True(XmppJingleInBandBytestreams.TryParseTransport(session!.Contents.Single(), out var parsedTransport));
+    Equal("ch3d9s71", parsedTransport!.SessionId);
+    Equal(4096, parsedTransport.BlockSize);
+    Equal("iq", parsedTransport.Stanza);
+
+    var open = XmppJingleInBandBytestreams.CreateOpenRequestFromTransport(
+        "ibb-open-1",
+        responder,
+        parsedTransport);
+    True(XmppInBandBytestreams.TryParseOpenRequest(open, out var parsedOpen));
+    Equal(parsedTransport.SessionId, parsedOpen!.SessionId);
+    Equal(parsedTransport.BlockSize, parsedOpen.BlockSize);
+
+    var messageTransport = new XmppJingleInBandBytestreamTransport("message-sid", 512, "message");
+    True(messageTransport.ToXml().ToString(SaveOptions.DisableFormatting).Contains("stanza=\"message\"", StringComparison.Ordinal));
+    True(XmppJingleInBandBytestreams.SupportsJingleInBandBytestreams(new XmppServiceDiscoveryInfo(
+        null,
+        [],
+        [XmppJingleInBandBytestreams.NamespaceName])));
+}
+
 static void XmppOmemoSerializesEncryptedMessageAndParsesDevices()
 {
+    var recipient = XmppAddress.Parse("anna@example.org/phone");
     var message = XmppOmemo.CreateEncryptedMessage(
-        XmppAddress.Parse("anna@example.org/phone"),
+        recipient,
         123,
-        [new XmppOmemoKeyTransport(456, "cipher", IsPreKey: true)],
+        [new XmppOmemoKeyTransport(456, "cipher", IsPreKey: true, RecipientJid: XmppAddress.Parse("anna@example.org"))],
         "payload",
         "omemo-1");
     var xml = message.ToString(SaveOptions.DisableFormatting);
 
     True(xml.Contains("urn:xmpp:omemo:2", StringComparison.Ordinal));
     True(xml.Contains("sid=\"123\"", StringComparison.Ordinal));
+    True(xml.Contains("keys jid=\"anna@example.org\"", StringComparison.Ordinal));
     True(xml.Contains("rid=\"456\"", StringComparison.Ordinal));
 
     True(XmppOmemo.TryParseEncryptedMessage(message, out var encrypted));
     Equal((uint)123, encrypted!.SenderDeviceId);
     Equal((uint)456, encrypted.Keys[0].RecipientDeviceId);
     True(encrypted.Keys[0].IsPreKey);
+    Equal("anna@example.org", encrypted.Keys[0].RecipientJid!.Bare);
     Equal("payload", encrypted.Payload);
+
+    var bundleRequest = XmppOmemo.CreateBundleRequest("bundle-1", recipient, 456);
+    var bundleRequestXml = bundleRequest.ToXml().ToString(SaveOptions.DisableFormatting);
+    True(bundleRequestXml.Contains("node=\"urn:xmpp:omemo:2:bundles\"", StringComparison.Ordinal));
+    True(bundleRequestXml.Contains("item id=\"456\"", StringComparison.Ordinal));
 
     True(XmppIq.TryParse("""
         <iq xmlns="jabber:client" type="result" id="devices-1">
@@ -3260,6 +5967,668 @@ static void XmppOmemoSerializesEncryptedMessageAndParsesDevices()
     Equal(2, devices.Count);
     Equal((uint)123, devices[0]);
     Equal((uint)456, devices[1]);
+}
+
+static void XmppOmemoParsesBundleAndCurrentWireMessage()
+{
+    var bundle = new XmppOmemoBundle(
+        SignedPreKeyPublic: Convert.ToBase64String([1, 2, 3, 4]),
+        SignedPreKeyId: 77,
+        SignedPreKeySignature: Convert.ToBase64String([5, 6, 7, 8]),
+        IdentityKey: Convert.ToBase64String([9, 10, 11, 12]),
+        PreKeys:
+        [
+            new XmppOmemoPreKey(10, Convert.ToBase64String([13, 14, 15, 16])),
+            new XmppOmemoPreKey(11, Convert.ToBase64String([17, 18, 19, 20]))
+        ]);
+    var publish = XmppOmemo.CreateBundlePublish("bundle-publish-1", 456, bundle);
+    var publishXml = publish.ToXml().ToString(SaveOptions.DisableFormatting);
+
+    True(publishXml.Contains("node=\"urn:xmpp:omemo:2:bundles\"", StringComparison.Ordinal));
+    True(publishXml.Contains("item id=\"456\"", StringComparison.Ordinal));
+    True(publishXml.Contains("signedPreKeyId=\"77\"", StringComparison.Ordinal));
+
+    True(XmppIq.TryParse("""
+        <iq xmlns="jabber:client" type="result" id="bundle-1">
+          <pubsub xmlns="http://jabber.org/protocol/pubsub">
+            <items node="urn:xmpp:omemo:2:bundles">
+              <item id="456">
+                <bundle xmlns="urn:xmpp:omemo:2">
+                  <signedPreKeyPublic signedPreKeyId="77">AQIDBA==</signedPreKeyPublic>
+                  <signedPreKeySignature>BQYHCA==</signedPreKeySignature>
+                  <identityKey>CQoLDA==</identityKey>
+                  <prekeys>
+                    <preKeyPublic preKeyId="10">DQ4PEA==</preKeyPublic>
+                    <preKeyPublic preKeyId="11">ERITFA==</preKeyPublic>
+                  </prekeys>
+                </bundle>
+              </item>
+            </items>
+          </pubsub>
+        </iq>
+        """, out var bundleIq));
+    True(XmppOmemo.TryParseBundle(bundleIq!, out var parsedBundle));
+    Equal((uint)77, parsedBundle!.SignedPreKeyId);
+    Equal("CQoLDA==", parsedBundle.IdentityKey);
+    Equal(2, parsedBundle.PreKeys.Count);
+    Equal((uint)11, parsedBundle.PreKeys[1].Id);
+
+    var currentMessage = XElement.Parse("""
+        <message xmlns="jabber:client" from="anna@example.org/phone" to="edward@example.org/web" id="omemo-current-1" type="chat">
+          <encrypted xmlns="urn:xmpp:omemo:2">
+            <header sid="123">
+              <keys jid="edward@example.org">
+                <key rid="456" prekey="true">BASE64-RATCHET-KEY-FOR-WEB</key>
+                <key rid="789">BASE64-RATCHET-KEY-FOR-PHONE</key>
+              </keys>
+            </header>
+            <payload>BASE64-AEAD-PAYLOAD</payload>
+          </encrypted>
+        </message>
+        """);
+    True(XmppOmemo.TryParseEncryptedMessage(currentMessage, out var encrypted));
+    Equal((uint)123, encrypted!.SenderDeviceId);
+    Equal(2, encrypted.Keys.Count);
+    Equal("edward@example.org", encrypted.Keys[0].RecipientJid!.Bare);
+    True(encrypted.Keys[0].IsPreKey);
+    False(encrypted.Keys[1].IsPreKey);
+    Equal("BASE64-AEAD-PAYLOAD", encrypted.Payload);
+}
+
+static void XmppOmemoEncryptsAndDecryptsPayload()
+{
+    byte[] key =
+    [
+        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+        0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+        0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
+        0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f
+    ];
+    byte[] nonce = [0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2a, 0x2b];
+    var cipher = XmppOmemoPayloadCrypto.Encrypt(
+        Encoding.UTF8.GetBytes("geheim bericht"),
+        key,
+        nonce,
+        Encoding.UTF8.GetBytes("omemo-associated-data"));
+
+    True(XmppOmemo.IsValidBase64(cipher.Payload));
+    True(XmppOmemo.IsValidBase64(cipher.PayloadSecret));
+    False(cipher.Payload.Contains("geheim", StringComparison.Ordinal));
+
+    var decrypted = XmppOmemoPayloadCrypto.DecryptToString(
+        cipher,
+        associatedData: Encoding.UTF8.GetBytes("omemo-associated-data"));
+    Equal("geheim bericht", decrypted);
+}
+
+static void XmppOmemoTrustStoreTracksFingerprints()
+{
+    var owner = XmppAddress.Parse("anna@example.org");
+    var fingerprint = XmppOmemoTrust.ComputeFingerprintFromText("identity-key-material");
+    True(fingerprint.Contains(' '));
+
+    var store = new XmppOmemoTrustStore();
+    Equal(XmppOmemoTrustState.Unknown, store.GetTrust(owner, 123, fingerprint));
+
+    store.SetTrust(owner, 123, fingerprint, XmppOmemoTrustState.Trusted);
+    Equal(XmppOmemoTrustState.Trusted, store.GetTrust(owner, 123, fingerprint));
+    Equal(XmppOmemoTrustState.Unknown, store.GetTrust(owner, 123, fingerprint + " CHANGED"));
+
+    store.SetTrust(owner, 123, fingerprint, XmppOmemoTrustState.Distrusted);
+    Equal(XmppOmemoTrustState.Distrusted, store.GetTrust(owner, 123, fingerprint));
+    Equal(1, store.List().Count);
+}
+
+static void XmppOmemoSessionStoreKeepsOpaqueRatchetState()
+{
+    RunXmppOmemoSessionStoreKeepsOpaqueRatchetStateAsync().GetAwaiter().GetResult();
+}
+
+static async Task RunXmppOmemoSessionStoreKeepsOpaqueRatchetStateAsync()
+{
+    var store = new XmppOmemoInMemorySessionStore();
+    var key = new XmppOmemoSessionKey(
+        XmppAddress.Parse("edward@example.org"),
+        123,
+        XmppAddress.Parse("tester@example.org"),
+        456);
+    byte[] state = [1, 2, 3, 4];
+
+    await store.SaveAsync(new XmppOmemoStoredSession(
+        key,
+        "AABB CCDD",
+        state,
+        new DateTimeOffset(2026, 5, 28, 12, 0, 0, TimeSpan.Zero)));
+
+    state[0] = 99;
+    var loaded = await store.LoadAsync(key);
+    True(loaded is not null);
+    Equal(1, loaded!.OpaqueState[0]);
+    Equal("AABB CCDD", loaded.RemoteIdentityFingerprint);
+
+    loaded.OpaqueState[1] = 88;
+    var loadedAgain = await store.LoadAsync(key);
+    Equal(2, loadedAgain!.OpaqueState[1]);
+
+    await store.SaveAsync(new XmppOmemoStoredSession(
+        new XmppOmemoSessionKey(
+            XmppAddress.Parse("edward@example.org"),
+            123,
+            XmppAddress.Parse("anna@example.org"),
+            789),
+        "1122 3344",
+        [5, 6, 7, 8],
+        new DateTimeOffset(2026, 5, 28, 12, 1, 0, TimeSpan.Zero)));
+
+    var sessions = await store.ListAsync(XmppAddress.Parse("edward@example.org"), 123);
+    Equal(2, sessions.Count);
+    Equal("anna@example.org", sessions[0].Key.RemoteAccount.Bare);
+    Equal("tester@example.org", sessions[1].Key.RemoteAccount.Bare);
+
+    True(await store.DeleteAsync(key));
+    False(await store.DeleteAsync(key));
+    True(await store.LoadAsync(key) is null);
+}
+
+static void XmppOmemoLocalDevicePublishesBundleAndConsumesPreKeys()
+{
+    var store = new XmppOmemoLocalDeviceStore();
+    var device = XmppOmemoLocalDevice.Create(
+        deviceId: 42,
+        signedPreKeySignature: Convert.ToBase64String([9, 8, 7, 6]),
+        signedPreKeyId: 77,
+        firstOneTimePreKeyId: 1000,
+        oneTimePreKeyCount: 3);
+
+    store.AddOrUpdate(device);
+    Equal(1, store.ListDeviceIds().Count);
+    Equal((uint)42, store.ListDeviceIds()[0]);
+
+    var publishRequests = store.CreatePublishRequests("local-omemo", 42);
+    Equal(2, publishRequests.Count);
+    var devicesXml = publishRequests[0].ToXml().ToString(SaveOptions.DisableFormatting);
+    True(devicesXml.Contains("node=\"urn:xmpp:omemo:2:devices\"", StringComparison.Ordinal));
+    True(devicesXml.Contains("device id=\"42\"", StringComparison.Ordinal));
+
+    var bundleXml = publishRequests[1].ToXml().ToString(SaveOptions.DisableFormatting);
+    True(bundleXml.Contains("node=\"urn:xmpp:omemo:2:bundles\"", StringComparison.Ordinal));
+    True(bundleXml.Contains("item id=\"42\"", StringComparison.Ordinal));
+    True(bundleXml.Contains("signedPreKeyId=\"77\"", StringComparison.Ordinal));
+    True(XmppOmemoBundle.TryParse(
+        publishRequests[1].Payload!.Descendants(XName.Get("bundle", XmppOmemo.NamespaceName)).Single(),
+        out var parsedBundle));
+    Equal((uint)77, parsedBundle!.SignedPreKeyId);
+    Equal(3, parsedBundle.PreKeys.Count);
+
+    var limitedBundle = store.GetDevice(42).ToBundle(maxOneTimePreKeys: 2);
+    Equal(2, limitedBundle.PreKeys.Count);
+    Equal((uint)1000, limitedBundle.PreKeys[0].Id);
+    Equal((uint)1001, limitedBundle.PreKeys[1].Id);
+
+    var consumed = store.ConsumeOneTimePreKey(42, 1001);
+    Equal((uint)1001, consumed.PreKeyId!.Value);
+    var afterConsume = store.GetDevice(42).ToBundle();
+    Equal(2, afterConsume.PreKeys.Count);
+    False(afterConsume.PreKeys.Any(preKey => preKey.Id == 1001));
+
+    store.ReplenishOneTimePreKeys(42, firstPreKeyId: 2000, count: 2);
+    var replenished = store.GetDevice(42).ToBundle();
+    Equal(4, replenished.PreKeys.Count);
+    True(replenished.PreKeys.Any(preKey => preKey.Id == 2000));
+    True(replenished.PreKeys.Any(preKey => preKey.Id == 2001));
+
+    var missing = Throws<KeyNotFoundException>(() => store.ConsumeOneTimePreKey(42, 1001));
+    True(missing.Message.Contains("one-time pre-key 1001", StringComparison.Ordinal));
+
+    var duplicate = Throws<InvalidOperationException>(() => store.ReplenishOneTimePreKeys(42, firstPreKeyId: 2000, count: 1));
+    True(duplicate.Message.Contains("Duplicate OMEMO one-time pre-key id 2000", StringComparison.Ordinal));
+}
+
+static void XmppOmemoEncryptedLocalDeviceFileProtectsPrivateKeys()
+{
+    RunXmppOmemoEncryptedLocalDeviceFileProtectsPrivateKeysAsync().GetAwaiter().GetResult();
+}
+
+static async Task RunXmppOmemoEncryptedLocalDeviceFileProtectsPrivateKeysAsync()
+{
+    var path = Path.Combine(
+        Path.GetTempPath(),
+        "tiedragon-omemo-local-device-" + Guid.NewGuid().ToString("N") + ".json");
+    try
+    {
+        var store = new XmppOmemoLocalDeviceStore();
+        var device = XmppOmemoLocalDevice.Create(
+            deviceId: 77,
+            signedPreKeySignature: Convert.ToBase64String([1, 3, 3, 7]),
+            signedPreKeyId: 55,
+            firstOneTimePreKeyId: 900,
+            oneTimePreKeyCount: 2);
+        store.AddOrUpdate(device);
+
+        await XmppOmemoEncryptedLocalDeviceFile.SaveAsync(
+            path,
+            store,
+            "correct horse battery staple",
+            iterations: 100_000);
+
+        var encryptedJson = await File.ReadAllTextAsync(path);
+        True(encryptedJson.Contains("pbkdf2-sha256", StringComparison.Ordinal));
+        False(encryptedJson.Contains(device.IdentityKeyPair.PrivateKey, StringComparison.Ordinal));
+        False(encryptedJson.Contains(device.SignedPreKeyPair.PrivateKey, StringComparison.Ordinal));
+        False(encryptedJson.Contains(device.OneTimePreKeyPairs[0].PrivateKey, StringComparison.Ordinal));
+        False(encryptedJson.Contains(device.SignedPreKeySignature, StringComparison.Ordinal));
+
+        var loaded = await XmppOmemoEncryptedLocalDeviceFile.LoadAsync(path, "correct horse battery staple");
+        var loadedDevice = loaded.GetDevice(77);
+        Equal(device.IdentityKeyPair.PublicKey, loadedDevice.IdentityKeyPair.PublicKey);
+        Equal(device.IdentityKeyPair.PrivateKey, loadedDevice.IdentityKeyPair.PrivateKey);
+        Equal(device.SignedPreKeyPair.PrivateKey, loadedDevice.SignedPreKeyPair.PrivateKey);
+        Equal((uint)900, loadedDevice.OneTimePreKeyPairs[0].PreKeyId!.Value);
+        Equal(device.OneTimePreKeyPairs[0].PrivateKey, loadedDevice.OneTimePreKeyPairs[0].PrivateKey);
+
+        var wrongPassphrase = Throws<CryptographicException>(() =>
+            XmppOmemoEncryptedLocalDeviceFile.LoadAsync(path, "wrong horse battery staple").GetAwaiter().GetResult());
+        True(!string.IsNullOrWhiteSpace(wrongPassphrase.Message));
+
+        var shortPassphrase = Throws<ArgumentException>(() =>
+            XmppOmemoEncryptedLocalDeviceFile.SaveAsync(path, store, "short").GetAwaiter().GetResult());
+        True(shortPassphrase.Message.Contains("passphrase", StringComparison.OrdinalIgnoreCase));
+    }
+    finally
+    {
+        if (File.Exists(path))
+        {
+            File.Delete(path);
+        }
+
+        if (File.Exists(path + ".tmp"))
+        {
+            File.Delete(path + ".tmp");
+        }
+    }
+}
+
+static void XmppOmemoWindowsSecretVaultProtectsKeyStorePassphrase()
+{
+    RunXmppOmemoWindowsSecretVaultProtectsKeyStorePassphraseAsync().GetAwaiter().GetResult();
+}
+
+static async Task RunXmppOmemoWindowsSecretVaultProtectsKeyStorePassphraseAsync()
+{
+    var directory = Path.Combine(
+        Path.GetTempPath(),
+        "tiedragon-omemo-vault-" + Guid.NewGuid().ToString("N"));
+    try
+    {
+        var vault = new XmppOmemoWindowsDpapiSecretVault(directory);
+        if (!vault.IsAvailable)
+        {
+            var platform = Throws<PlatformNotSupportedException>(() =>
+                vault.SaveSecretAsync("omemo/account", "correct horse battery staple").GetAwaiter().GetResult());
+            True(platform.Message.Contains("Windows DPAPI", StringComparison.Ordinal));
+            return;
+        }
+
+        const string passphrase = "correct horse battery staple";
+        await vault.SaveSecretAsync("omemo/account", passphrase);
+        var files = Directory.GetFiles(directory, "*.json");
+        Equal(1, files.Length);
+
+        var vaultJson = await File.ReadAllTextAsync(files[0]);
+        True(vaultJson.Contains(XmppOmemoWindowsDpapiSecretVault.ProviderName, StringComparison.Ordinal));
+        False(vaultJson.Contains(passphrase, StringComparison.Ordinal));
+        False(vaultJson.Contains("omemo/account", StringComparison.Ordinal));
+
+        Equal(passphrase, await vault.LoadSecretAsync("omemo/account"));
+        True(await vault.LoadSecretAsync("omemo/other") is null);
+
+        var store = new XmppOmemoLocalDeviceStore();
+        var device = XmppOmemoLocalDevice.Create(
+            deviceId: 88,
+            signedPreKeySignature: Convert.ToBase64String([4, 3, 2, 1]),
+            oneTimePreKeyCount: 1);
+        store.AddOrUpdate(device);
+
+        var devicePath = Path.Combine(directory, "devices.json");
+        await XmppOmemoEncryptedLocalDeviceFile.SaveWithVaultAsync(
+            devicePath,
+            store,
+            vault,
+            "omemo/device-file",
+            passphrase,
+            iterations: 100_000);
+        var loadedStore = await XmppOmemoEncryptedLocalDeviceFile.LoadWithVaultAsync(
+            devicePath,
+            vault,
+            "omemo/device-file");
+        Equal(device.IdentityKeyPair.PrivateKey, loadedStore.GetDevice(88).IdentityKeyPair.PrivateKey);
+
+        True(await vault.DeleteSecretAsync("omemo/device-file"));
+        var missing = Throws<InvalidOperationException>(() =>
+            XmppOmemoEncryptedLocalDeviceFile.LoadWithVaultAsync(devicePath, vault, "omemo/device-file").GetAwaiter().GetResult());
+        True(missing.Message.Contains("passphrase", StringComparison.OrdinalIgnoreCase));
+
+        True(await vault.DeleteSecretAsync("omemo/account"));
+        False(await vault.DeleteSecretAsync("omemo/account"));
+    }
+    finally
+    {
+        if (Directory.Exists(directory))
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+}
+
+static void XmppOmemoLinuxSecretServiceVaultKeepsSecretsOutOfArguments()
+{
+    RunXmppOmemoLinuxSecretServiceVaultKeepsSecretsOutOfArgumentsAsync().GetAwaiter().GetResult();
+}
+
+static async Task RunXmppOmemoLinuxSecretServiceVaultKeepsSecretsOutOfArgumentsAsync()
+{
+    var runner = new RecordingSecretCommandRunner();
+    var vault = new XmppOmemoLinuxSecretServiceVault(runner, requireLinux: false);
+    const string secret = "correct horse battery staple";
+
+    await vault.SaveSecretAsync("omemo/account", secret);
+    Equal("secret-tool", runner.Calls[0].FileName);
+    Equal("store", runner.Calls[0].Arguments[0]);
+    True(runner.Calls[0].Arguments.Contains("--label"));
+    True(runner.Calls[0].Arguments.Contains("Tiedragon OMEMO key-store passphrase"));
+    True(runner.Calls[0].Arguments.Contains("application"));
+    True(runner.Calls[0].Arguments.Contains("tiedragon-xmpp-messenger"));
+    True(runner.Calls[0].Arguments.Contains("purpose"));
+    True(runner.Calls[0].Arguments.Contains("omemo-key-store"));
+    True(runner.Calls[0].Arguments.Contains("name"));
+    True(runner.Calls[0].Arguments.Contains("omemo/account"));
+    Equal(secret, runner.Calls[0].StandardInput);
+    False(runner.Calls[0].Arguments.Contains(secret));
+
+    runner.NextResult = new XmppOmemoSecretCommandResult(0, secret + Environment.NewLine, string.Empty);
+    Equal(secret, await vault.LoadSecretAsync("omemo/account"));
+    Equal("lookup", runner.Calls[1].Arguments[0]);
+    True(runner.Calls[1].StandardInput is null);
+
+    runner.NextResult = new XmppOmemoSecretCommandResult(1, string.Empty, "not found");
+    True(await vault.LoadSecretAsync("omemo/missing") is null);
+
+    runner.NextResult = new XmppOmemoSecretCommandResult(0, string.Empty, string.Empty);
+    True(await vault.DeleteSecretAsync("omemo/account"));
+    Equal("clear", runner.Calls[3].Arguments[0]);
+
+    var unavailable = new XmppOmemoLinuxSecretServiceVault(
+        new RecordingSecretCommandRunner(isAvailable: false),
+        requireLinux: false);
+    var missingCommand = Throws<PlatformNotSupportedException>(() =>
+        unavailable.SaveSecretAsync("omemo/account", secret).GetAwaiter().GetResult());
+    True(missingCommand.Message.Contains("secret-tool", StringComparison.Ordinal));
+}
+
+static void XmppOmemoSecretVaultFactorySelectsNativeProvider()
+{
+    var vault = XmppOmemoSecretVaultFactory.CreateDefault(Path.GetTempPath());
+    True(vault is XmppOmemoWindowsDpapiSecretVault
+        || vault is XmppOmemoLinuxSecretServiceVault
+        || vault is XmppOmemoMacOSKeychainSecretVault
+        || vault is XmppOmemoUnavailableSecretVault);
+
+    if (OperatingSystem.IsWindows())
+    {
+        True(vault is XmppOmemoWindowsDpapiSecretVault);
+    }
+}
+
+static void XmppOmemoRequiresProductionSignalProtocolBackend()
+{
+    var unavailable = XmppOmemoUnavailableSessionBackend.Instance;
+    Equal("unavailable", unavailable.Name);
+    False(unavailable.IsProductionReady);
+
+    var guardException = Throws<InvalidOperationException>(
+        () => XmppOmemoProductionGuard.RequireProductionBackend(unavailable));
+    True(guardException.Message.Contains("Signal Protocol", StringComparison.Ordinal));
+
+    var backendException = Throws<NotSupportedException>(
+        () => unavailable.EnsureSessionAsync(CreateOmemoSessionSetupRequest()).GetAwaiter().GetResult());
+    True(backendException.Message.Contains("X3DH", StringComparison.Ordinal));
+
+    var production = new FakeProductionOmemoBackend();
+    XmppOmemoProductionGuard.RequireProductionBackend(production);
+
+    var setup = production.EnsureSessionAsync(CreateOmemoSessionSetupRequest()).GetAwaiter().GetResult();
+    Equal(XmppOmemoTrust.ComputeFingerprintFromBase64("CQoLDA=="), setup.RemoteIdentityFingerprint);
+    True(setup.UsedPreKey);
+
+    var payloadSecret = Enumerable.Range(0, XmppOmemoPayloadCrypto.PayloadKeySize + XmppOmemoPayloadCrypto.NonceSize)
+        .Select(value => (byte)value)
+        .ToArray();
+    var encrypted = production.EncryptPayloadSecretAsync(new XmppOmemoRatchetEncryptRequest(
+        XmppAddress.Parse("edward@example.org"),
+        123,
+        XmppAddress.Parse("anna@example.org"),
+        456,
+        payloadSecret)).GetAwaiter().GetResult();
+    Equal((uint)456, encrypted.KeyTransport.RecipientDeviceId);
+    True(encrypted.KeyTransport.IsPreKey);
+    True(XmppOmemo.IsValidBase64(encrypted.KeyTransport.CipherText));
+
+    var decrypted = production.DecryptPayloadSecretAsync(new XmppOmemoRatchetDecryptRequest(
+        XmppAddress.Parse("edward@example.org"),
+        123,
+        XmppAddress.Parse("anna@example.org"),
+        456,
+        encrypted.KeyTransport)).GetAwaiter().GetResult();
+    Equal(Convert.ToBase64String(payloadSecret), Convert.ToBase64String(decrypted.PayloadSecret));
+}
+
+static void XmppOmemoX3DhValidatesKeysAndDerivesSecret()
+{
+    var plan = XmppOmemoX3Dh.CreateDhPlan(useOneTimePreKey: true);
+    Equal(4, plan.Count);
+    Equal("DH4", plan[3].Name);
+    Equal("OPK_B", plan[3].BobKey);
+
+    var noOneTimePreKeyPlan = XmppOmemoX3Dh.CreateDhPlan(useOneTimePreKey: false);
+    Equal(3, noOneTimePreKeyPlan.Count);
+
+    var bundle = new XmppOmemoBundle(
+        SignedPreKeyPublic: "AQIDBA==",
+        SignedPreKeyId: 77,
+        SignedPreKeySignature: "BQYHCA==",
+        IdentityKey: "CQoLDA==",
+        PreKeys:
+        [
+            new XmppOmemoPreKey(10, "DQ4PEA=="),
+            new XmppOmemoPreKey(11, "ERITFA==")
+        ]);
+    var validation = XmppOmemoX3Dh.ValidateBundle(bundle);
+    True(validation.IsUsable);
+    True(validation.HasOneTimePreKeys);
+    Equal(0, validation.Issues.Count);
+
+    var invalidValidation = XmppOmemoX3Dh.ValidateBundle(bundle with
+    {
+        IdentityKey = "not-base64",
+        PreKeys = [new XmppOmemoPreKey(10, "AQID"), new XmppOmemoPreKey(10, "also-not-base64")]
+    });
+    False(invalidValidation.IsUsable);
+    True(invalidValidation.Issues.Any(issue => issue.Contains("identityKey", StringComparison.Ordinal)));
+    True(invalidValidation.Issues.Any(issue => issue.Contains("duplicate preKeyId 10", StringComparison.Ordinal)));
+
+    var associatedData = XmppOmemoX3Dh.CreateAssociatedData(
+        "AQIDBA==",
+        "BQYHCA==",
+        "alice@example.org",
+        "bob@example.org");
+    Equal("AQIDBAUGBwhhbGljZUBleGFtcGxlLm9yZwpib2JAZXhhbXBsZS5vcmc=", Convert.ToBase64String(associatedData));
+
+    byte[] dh1 = [0x10, 0x11, 0x12, 0x13];
+    byte[] dh2 = [0x20, 0x21, 0x22, 0x23];
+    byte[] dh3 = [0x30, 0x31, 0x32, 0x33];
+    byte[] dh4 = [0x40, 0x41, 0x42, 0x43];
+    var threeDhSecret = XmppOmemoX3Dh.DeriveSharedSecret([dh1, dh2, dh3]);
+    var fourDhSecret = XmppOmemoX3Dh.DeriveSharedSecret([dh1, dh2, dh3, dh4]);
+    Equal(32, threeDhSecret.Length);
+    Equal(32, fourDhSecret.Length);
+    False(Convert.ToBase64String(threeDhSecret) == Convert.ToBase64String(fourDhSecret));
+    Equal(Convert.ToBase64String(fourDhSecret), Convert.ToBase64String(XmppOmemoX3Dh.DeriveSharedSecret([dh1, dh2, dh3, dh4])));
+
+    var x448Secret = XmppOmemoX3Dh.DeriveSharedSecret(
+        [dh1, dh2, dh3, dh4],
+        new XmppOmemoX3DhParameters(XmppOmemoX3DhCurve.X448, XmppOmemoX3DhHash.Sha512, "Tiedragon Teletyptel OMEMO X448 test"));
+    Equal(32, x448Secret.Length);
+    False(Convert.ToBase64String(fourDhSecret) == Convert.ToBase64String(x448Secret));
+}
+
+static void XmppOmemoX3DhAgreementMatchesInitiatorAndResponder()
+{
+    var aliceIdentity = XmppOmemoX3DhAgreement.GenerateIdentityKeyPair();
+    var aliceEphemeral = XmppOmemoX3DhAgreement.GenerateEphemeralKeyPair();
+    var bobIdentity = XmppOmemoX3DhAgreement.GenerateIdentityKeyPair();
+    var bobSignedPreKey = XmppOmemoX3DhAgreement.GenerateSignedPreKeyPair();
+    var bobOneTimePreKey = XmppOmemoX3DhAgreement.GenerateOneTimePreKeyPair(7001);
+
+    var bobBundle = new XmppOmemoBundle(
+        bobSignedPreKey.PublicKey,
+        SignedPreKeyId: 77,
+        SignedPreKeySignature: Convert.ToBase64String([1, 2, 3, 4]),
+        bobIdentity.PublicKey,
+        [new XmppOmemoPreKey(7001, bobOneTimePreKey.PublicKey)]);
+
+    var aliceAgreement = XmppOmemoX3DhAgreement.InitiatorAgree(new XmppOmemoX3DhInitiatorAgreementRequest(
+        XmppAddress.Parse("alice@example.org"),
+        aliceIdentity,
+        aliceEphemeral,
+        XmppAddress.Parse("bob@example.org"),
+        bobBundle,
+        RemoteOneTimePreKeyId: 7001));
+
+    var bobAgreement = XmppOmemoX3DhAgreement.ResponderAgree(new XmppOmemoX3DhResponderAgreementRequest(
+        XmppAddress.Parse("bob@example.org"),
+        bobIdentity,
+        bobSignedPreKey,
+        XmppAddress.Parse("alice@example.org"),
+        aliceIdentity.PublicKey,
+        aliceEphemeral.PublicKey,
+        bobOneTimePreKey,
+        OneTimePreKeyId: 7001));
+
+    Equal((uint)7001, aliceAgreement.OneTimePreKeyId!.Value);
+    Equal((uint)7001, bobAgreement.OneTimePreKeyId!.Value);
+    Equal(4, aliceAgreement.DhPlan.Count);
+    Equal("DH4", aliceAgreement.DhPlan[3].Name);
+    Equal(Convert.ToBase64String(aliceAgreement.SharedSecret), Convert.ToBase64String(bobAgreement.SharedSecret));
+    Equal(Convert.ToBase64String(aliceAgreement.AssociatedData), Convert.ToBase64String(bobAgreement.AssociatedData));
+
+    var bobBundleWithoutOneTimePreKey = bobBundle with { PreKeys = [] };
+    var aliceThreeDh = XmppOmemoX3DhAgreement.InitiatorAgree(new XmppOmemoX3DhInitiatorAgreementRequest(
+        XmppAddress.Parse("alice@example.org"),
+        aliceIdentity,
+        aliceEphemeral,
+        XmppAddress.Parse("bob@example.org"),
+        bobBundleWithoutOneTimePreKey));
+    var bobThreeDh = XmppOmemoX3DhAgreement.ResponderAgree(new XmppOmemoX3DhResponderAgreementRequest(
+        XmppAddress.Parse("bob@example.org"),
+        bobIdentity,
+        bobSignedPreKey,
+        XmppAddress.Parse("alice@example.org"),
+        aliceIdentity.PublicKey,
+        aliceEphemeral.PublicKey));
+
+    Equal(3, aliceThreeDh.DhPlan.Count);
+    Equal(Convert.ToBase64String(aliceThreeDh.SharedSecret), Convert.ToBase64String(bobThreeDh.SharedSecret));
+    False(Convert.ToBase64String(aliceAgreement.SharedSecret) == Convert.ToBase64String(aliceThreeDh.SharedSecret));
+
+    var mismatch = Throws<InvalidOperationException>(() =>
+        XmppOmemoX3DhAgreement.ResponderAgree(new XmppOmemoX3DhResponderAgreementRequest(
+            XmppAddress.Parse("bob@example.org"),
+            bobIdentity,
+            bobSignedPreKey,
+            XmppAddress.Parse("alice@example.org"),
+            aliceIdentity.PublicKey,
+            aliceEphemeral.PublicKey,
+            bobOneTimePreKey,
+            OneTimePreKeyId: 7002)));
+    True(mismatch.Message.Contains("one-time pre-key id", StringComparison.Ordinal));
+}
+
+static void XmppOmemoX3DhGatesSignedPreKeyVerification()
+{
+    var aliceIdentity = XmppOmemoX3DhAgreement.GenerateIdentityKeyPair();
+    var aliceEphemeral = XmppOmemoX3DhAgreement.GenerateEphemeralKeyPair();
+    var bobIdentity = XmppOmemoX3DhAgreement.GenerateIdentityKeyPair();
+    var bobSignedPreKey = XmppOmemoX3DhAgreement.GenerateSignedPreKeyPair();
+    var bobOneTimePreKey = XmppOmemoX3DhAgreement.GenerateOneTimePreKeyPair(7001);
+    var signature = Convert.ToBase64String([8, 7, 6, 5]);
+
+    var bobBundle = new XmppOmemoBundle(
+        bobSignedPreKey.PublicKey,
+        SignedPreKeyId: 77,
+        signature,
+        bobIdentity.PublicKey,
+        [new XmppOmemoPreKey(7001, bobOneTimePreKey.PublicKey)]);
+
+    var unavailable = Throws<InvalidOperationException>(() =>
+        XmppOmemoX3DhAgreement.InitiatorAgree(new XmppOmemoX3DhInitiatorAgreementRequest(
+            XmppAddress.Parse("alice@example.org"),
+            aliceIdentity,
+            aliceEphemeral,
+            XmppAddress.Parse("bob@example.org"),
+            bobBundle,
+            RemoteOneTimePreKeyId: 7001,
+            RequireSignedPreKeyVerification: true)));
+    True(unavailable.Message.Contains("signed pre-key verification failed", StringComparison.Ordinal));
+
+    var rejectingVerifier = new RecordingSignedPreKeyVerifier(isValid: false);
+    var rejected = Throws<InvalidOperationException>(() =>
+        XmppOmemoX3DhAgreement.InitiatorAgree(new XmppOmemoX3DhInitiatorAgreementRequest(
+            XmppAddress.Parse("alice@example.org"),
+            aliceIdentity,
+            aliceEphemeral,
+            XmppAddress.Parse("bob@example.org"),
+            bobBundle,
+            RemoteOneTimePreKeyId: 7001,
+            RequireSignedPreKeyVerification: true,
+            SignedPreKeyVerifier: rejectingVerifier)));
+    True(rejected.Message.Contains("test signature rejected", StringComparison.Ordinal));
+    Equal("bob@example.org", rejectingVerifier.LastRequest!.Owner.Bare);
+
+    var acceptingVerifier = new RecordingSignedPreKeyVerifier(isValid: true);
+    var agreement = XmppOmemoX3DhAgreement.InitiatorAgree(new XmppOmemoX3DhInitiatorAgreementRequest(
+        XmppAddress.Parse("alice@example.org"),
+        aliceIdentity,
+        aliceEphemeral,
+        XmppAddress.Parse("bob@example.org"),
+        bobBundle,
+        RemoteOneTimePreKeyId: 7001,
+        RequireSignedPreKeyVerification: true,
+        SignedPreKeyVerifier: acceptingVerifier));
+
+    True(agreement.SignedPreKeyVerification is not null);
+    True(agreement.SignedPreKeyVerification!.IsVerified);
+    Equal("recording-signed-pre-key", agreement.SignedPreKeyVerification.VerifierName);
+    Equal("bob@example.org", acceptingVerifier.LastRequest!.Owner.Bare);
+    Equal(bobIdentity.PublicKey, acceptingVerifier.LastRequest.IdentityKey);
+    Equal((uint)77, acceptingVerifier.LastRequest.SignedPreKeyId);
+    Equal(bobSignedPreKey.PublicKey, acceptingVerifier.LastRequest.SignedPreKeyPublic);
+    Equal(signature, acceptingVerifier.LastRequest.SignedPreKeySignature);
+}
+
+static XmppOmemoSessionSetupRequest CreateOmemoSessionSetupRequest()
+{
+    return new XmppOmemoSessionSetupRequest(
+        XmppAddress.Parse("edward@example.org"),
+        123,
+        XmppAddress.Parse("anna@example.org"),
+        456,
+        new XmppOmemoBundle(
+            SignedPreKeyPublic: "AQIDBA==",
+            SignedPreKeyId: 77,
+            SignedPreKeySignature: "BQYHCA==",
+            IdentityKey: "CQoLDA==",
+            PreKeys: [new XmppOmemoPreKey(10, "DQ4PEA==")]),
+        XmppOmemoTrustState.Trusted);
 }
 
 static void XmppJingleSerializesSessionInitiateAndParse()
@@ -3286,6 +6655,95 @@ static void XmppJingleSerializesSessionInitiateAndParse()
     Equal("session-initiate", session.Action);
     Equal(1, session.Contents.Count);
     Equal("audio", session.Contents[0].Name);
+}
+
+static void XmppJingleMessageInitiationSerializesCallSetup()
+{
+    const string sessionId = "ca3cf894-5325-482f-a412-a6e9f832298d";
+    var propose = XmppJingleMessageInitiation.CreateAudioVideoCallProposeMessage(
+        XmppAddress.Parse("juliet@capulet.example"),
+        sessionId,
+        messageId: "msg-1",
+        from: XmppAddress.Parse("romeo@montague.example/orchard"));
+    var xml = propose.ToString(SaveOptions.DisableFormatting);
+
+    True(xml.Contains("urn:xmpp:jingle-message:0", StringComparison.Ordinal));
+    True(xml.Contains("<propose", StringComparison.Ordinal));
+    True(xml.Contains("id=\"ca3cf894-5325-482f-a412-a6e9f832298d\"", StringComparison.Ordinal));
+    True(xml.Contains("media=\"audio\"", StringComparison.Ordinal));
+    True(xml.Contains("media=\"video\"", StringComparison.Ordinal));
+    True(xml.Contains("<store", StringComparison.Ordinal));
+
+    True(XmppJingleMessageInitiation.TryParse(propose, out var parsed));
+    Equal(XmppJingleMessageInitiation.ProposeAction, parsed!.Action);
+    Equal(sessionId, parsed.SessionId);
+    Equal("romeo@montague.example", parsed.From!.Bare);
+    Equal("juliet@capulet.example", parsed.To!.Bare);
+    Equal(2, parsed.Descriptions.Count);
+    True(parsed.HasStoreHint);
+
+    var info = new XmppServiceDiscoveryInfo(
+        Node: null,
+        Identities: [],
+        Features:
+        [
+            XmppJingle.RtpNamespaceName,
+            XmppJingle.RtpAudioFeature,
+            XmppJingle.RtpVideoFeature
+        ]);
+    True(XmppJingle.SupportsRtpAudio(info));
+    True(XmppJingle.SupportsRtpVideo(info));
+}
+
+static void XmppJingleMessageInitiationParsesCallLifecycle()
+{
+    const string oldSession = "ca3cf894-5325-482f-a412-a6e9f832298d";
+    const string newSession = "989a46a6-f202-4910-a7c3-83c6ba3f3947";
+    var ringing = XmppJingleMessageInitiation.CreateRingingMessage(
+        XmppAddress.Parse("romeo@montague.example/orchard"),
+        oldSession,
+        from: XmppAddress.Parse("juliet@capulet.example/phone"));
+    True(XmppJingleMessageInitiation.TryParse(ringing, out var ringingEvent));
+    Equal(XmppJingleMessageInitiation.RingingAction, ringingEvent!.Action);
+
+    var proceed = XmppJingleMessageInitiation.CreateProceedMessage(
+        XmppAddress.Parse("romeo@montague.example/orchard"),
+        oldSession,
+        from: XmppAddress.Parse("juliet@capulet.example/phone"));
+    True(XmppJingleMessageInitiation.TryParse(proceed, out var proceedEvent));
+    Equal(XmppJingleMessageInitiation.ProceedAction, proceedEvent!.Action);
+
+    var reject = XmppJingleMessageInitiation.CreateRejectMessage(
+        XmppAddress.Parse("juliet@capulet.example"),
+        "fecbea35-08d3-404f-9ec7-2b57c566fa74",
+        "expired",
+        "Tie-Break",
+        tieBreak: true);
+    True(XmppJingleMessageInitiation.TryParse(reject, out var rejectEvent));
+    Equal(XmppJingleMessageInitiation.RejectAction, rejectEvent!.Action);
+    True(rejectEvent.IsTieBreak);
+    Equal("expired", rejectEvent.Reason!.Condition);
+
+    var finish = XmppJingleMessageInitiation.CreateFinishMessage(
+        XmppAddress.Parse("juliet@capulet.example"),
+        oldSession,
+        "expired",
+        "Session migrated",
+        migratedTo: newSession);
+    True(XmppJingleMessageInitiation.TryParse(finish, out var finishEvent));
+    Equal(XmppJingleMessageInitiation.FinishAction, finishEvent!.Action);
+    Equal(newSession, finishEvent.MigratedTo);
+    Equal("expired", finishEvent.Reason!.Condition);
+
+    var retract = XmppJingleMessageInitiation.CreateRetractMessage(
+        XmppAddress.Parse("juliet@capulet.example"),
+        oldSession,
+        text: "Retracted");
+    True(XmppJingleMessageInitiation.TryParse(retract, out var retractEvent));
+    Equal(XmppJingleMessageInitiation.RetractAction, retractEvent!.Action);
+    Equal("cancel", retractEvent.Reason!.Condition);
+
+    Equal(newSession, XmppJingleMessageInitiation.GetTieBreakWinner(oldSession, newSession));
 }
 
 static void XmppJingleSerializesIceCandidatesAndDtlsFingerprints()
@@ -3432,6 +6890,202 @@ static void XmppJingleSerializesSessionInfoCallStates()
     Equal("busy", terminated.Reason.Text);
 }
 
+static void XmppJingleParsesExistingClientInteropFixture()
+{
+    const string sessionInitiateXml = """
+        <iq xmlns="jabber:client" type="set" id="dino-a1" from="anna@example.net/dino" to="edward@example.org/web">
+          <jingle xmlns="urn:xmpp:jingle:1" action="session-initiate" sid="dino-sid-1" initiator="anna@example.net/dino">
+            <content creator="initiator" name="audio" senders="both">
+              <description xmlns="urn:xmpp:jingle:apps:rtp:1" media="audio" ssrc="18273645">
+                <payload-type id="111" name="opus" clockrate="48000" channels="2">
+                  <parameter name="minptime" value="10" />
+                  <parameter name="useinbandfec" value="1" />
+                </payload-type>
+                <rtcp-mux />
+                <extmap xmlns="urn:xmpp:jingle:apps:rtp:rtp-hdrext:0" id="1" uri="urn:ietf:params:rtp-hdrext:ssrc-audio-level" />
+              </description>
+              <transport xmlns="urn:xmpp:jingle:transports:ice-udp:1" ufrag="dinoAudioUfrag" pwd="dinoAudioPassword">
+                <fingerprint xmlns="urn:xmpp:jingle:apps:dtls:0" setup="actpass" hash="sha-256">
+                  AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99
+                </fingerprint>
+                <candidate component="1" foundation="1" generation="0" id="a-host-1" ip="192.0.2.12" network="1" port="54678" priority="2130706431" protocol="udp" type="host" />
+              </transport>
+            </content>
+            <content creator="initiator" name="video" senders="both">
+              <description xmlns="urn:xmpp:jingle:apps:rtp:1" media="video" ssrc="82736451">
+                <payload-type id="96" name="VP8" clockrate="90000" />
+                <payload-type id="97" name="rtx" clockrate="90000">
+                  <parameter name="apt" value="96" />
+                </payload-type>
+                <rtcp-mux />
+              </description>
+              <transport xmlns="urn:xmpp:jingle:transports:ice-udp:1" ufrag="dinoVideoUfrag" pwd="dinoVideoPassword">
+                <fingerprint xmlns="urn:xmpp:jingle:apps:dtls:0" setup="actpass" hash="sha-256">
+                  01:23:45:67:89:AB:CD:EF:01:23:45:67:89:AB:CD:EF:01:23:45:67:89:AB:CD:EF:01:23:45:67:89:AB:CD:EF
+                </fingerprint>
+                <candidate component="1" foundation="2" generation="0" id="v-tcp-1" ip="2001:db8::20" network="0" port="9" priority="1518280447" protocol="tcp" tcptype="passive" type="host" />
+              </transport>
+            </content>
+          </jingle>
+        </iq>
+        """;
+
+    True(XmppIq.TryParse(sessionInitiateXml, out var iq));
+    True(XmppJingle.TryParse(iq!, out var session));
+    Equal("session-initiate", session!.Action);
+    Equal("dino-sid-1", session.Sid);
+    Equal("anna@example.net/dino", session.Initiator);
+    Equal(2, session.Contents.Count);
+
+    var audio = session.Contents.Single(content => content.Name == "audio");
+    Equal("initiator", audio.Creator);
+    Equal("both", audio.Senders);
+    var audioPayloads = XmppJingle.ParsePayloadTypes(audio);
+    Equal(1, audioPayloads.Count);
+    Equal("opus", audioPayloads[0].Name);
+    Equal("1", audioPayloads[0].Parameters!["useinbandfec"]);
+    True(audio.Description!.Elements().Any(element => element.Name.LocalName == "rtcp-mux"));
+    True(XmppJingle.TryParseIceUdpTransport(audio, out var audioTransport));
+    Equal("dinoAudioUfrag", audioTransport!.Ufrag);
+    Equal(1, audioTransport.Candidates!.Count);
+    Equal("host", audioTransport.Candidates[0].Type);
+    Equal(1, audioTransport.Fingerprints!.Count);
+    Equal("actpass", audioTransport.Fingerprints[0].Setup);
+
+    var video = session.Contents.Single(content => content.Name == "video");
+    var videoPayloads = XmppJingle.ParsePayloadTypes(video);
+    Equal(2, videoPayloads.Count);
+    Equal("VP8", videoPayloads[0].Name);
+    Equal("rtx", videoPayloads[1].Name);
+    Equal("96", videoPayloads[1].Parameters!["apt"]);
+    True(XmppJingle.TryParseIceUdpTransport(video, out var videoTransport));
+    Equal("tcp", videoTransport!.Candidates![0].Protocol);
+    Equal("passive", videoTransport.Candidates[0].TcpType);
+
+    const string transportInfoXml = """
+        <iq xmlns="jabber:client" type="set" id="dino-trickle-1" from="anna@example.net/dino" to="edward@example.org/web">
+          <jingle xmlns="urn:xmpp:jingle:1" action="transport-info" sid="dino-sid-1" initiator="anna@example.net/dino">
+            <content creator="initiator" name="audio">
+              <transport xmlns="urn:xmpp:jingle:transports:ice-udp:1" ufrag="dinoAudioUfrag" pwd="dinoAudioPassword">
+                <candidate component="1" foundation="3" generation="0" id="a-srflx-1" ip="198.51.100.24" network="1" port="62000" priority="1694498815" protocol="udp" rel-addr="10.0.0.12" rel-port="54678" type="srflx" />
+              </transport>
+            </content>
+          </jingle>
+        </iq>
+        """;
+
+    True(XmppIq.TryParse(transportInfoXml, out var transportInfoIq));
+    True(XmppJingle.TryParse(transportInfoIq!, out var transportInfo));
+    Equal("transport-info", transportInfo!.Action);
+    True(XmppJingle.TryParseIceUdpTransport(transportInfo.Contents.Single(), out var trickleTransport));
+    var trickleCandidate = trickleTransport!.Candidates!.Single();
+    Equal("srflx", trickleCandidate.Type);
+    Equal("10.0.0.12", trickleCandidate.RelatedAddress);
+
+    const string sessionInfoXml = """
+        <iq xmlns="jabber:client" type="set" id="dino-mute-1" from="anna@example.net/dino" to="edward@example.org/web">
+          <jingle xmlns="urn:xmpp:jingle:1" action="session-info" sid="dino-sid-1" initiator="anna@example.net/dino" responder="edward@example.org/web">
+            <mute xmlns="urn:xmpp:jingle:apps:rtp:info:1" creator="initiator" name="video" />
+          </jingle>
+        </iq>
+        """;
+
+    True(XmppIq.TryParse(sessionInfoXml, out var sessionInfoIq));
+    True(XmppJingle.TryParse(sessionInfoIq!, out var sessionInfo));
+    Equal("session-info", sessionInfo!.Action);
+    Equal("mute", sessionInfo.SessionInfo!.Name.LocalName);
+    Equal("video", sessionInfo.SessionInfo.Attribute("name")?.Value);
+}
+
+static void XmppJingleFileTransferSerializesS5bOffer()
+{
+    var initiator = XmppAddress.Parse("romeo@montague.lit/orchard");
+    var responder = XmppAddress.Parse("juliet@capulet.lit/balcony");
+    var dstaddr = XmppJingleSocks5Bytestreams.ComputeDestinationAddress("vj3hs98y", initiator, responder);
+    var transport = new XmppJingleSocks5Transport(
+        "vj3hs98y",
+        dstaddr,
+        Candidates:
+        [
+            new XmppJingleSocks5Candidate(
+                "hft54dqy",
+                "192.168.4.1",
+                initiator,
+                5086,
+                8257636,
+                "direct"),
+            new XmppJingleSocks5Candidate(
+                "xmdh4b7i",
+                "streamer.shakespeare.lit",
+                XmppAddress.Parse("streamer.shakespeare.lit"),
+                7625,
+                7878787,
+                "proxy")
+        ]);
+    var file = new XmppJingleFile(
+        "test.txt",
+        Size: 6144,
+        MediaType: "text/plain",
+        Date: DateTimeOffset.Parse("2015-07-26T21:46:00+01:00", CultureInfo.InvariantCulture),
+        Description: "Tiny transfer",
+        Hashes: [new XmppJingleFileHash("sha-1", "w0mcJylzCn+AfvuGdqkty2+KP48=")]);
+    var content = XmppJingleFileTransfer.CreateFileContent(
+        "file-offer",
+        file,
+        transport.ToXml());
+    var iq = XmppJingle.CreateSessionInitiate(
+        "jft-1",
+        responder,
+        "jingle-sid-1",
+        "initiator",
+        [content],
+        initiator.Full);
+    var xml = iq.ToXml().ToString(SaveOptions.DisableFormatting);
+
+    True(xml.Contains(XmppJingleFileTransfer.NamespaceName, StringComparison.Ordinal));
+    True(xml.Contains(XmppJingleSocks5Bytestreams.NamespaceName, StringComparison.Ordinal));
+    True(xml.Contains("media-type", StringComparison.Ordinal));
+    True(xml.Contains("candidate", StringComparison.Ordinal));
+    True(xml.Contains("dstaddr=\"972b7bf47291ca609517f67f86b5081086052dad\"", StringComparison.Ordinal));
+
+    True(XmppJingle.TryParse(iq, out var session));
+    True(XmppJingleFileTransfer.TryParseFile(session!.Contents.Single(), out var parsedFile));
+    Equal("test.txt", parsedFile!.Name);
+    Equal(6144L, parsedFile.Size!.Value);
+    Equal("sha-1", parsedFile.Hashes![0].Algorithm);
+    True(XmppJingleSocks5Bytestreams.TryParseTransport(session.Contents.Single(), out var parsedTransport));
+    Equal("vj3hs98y", parsedTransport!.StreamId);
+    Equal("proxy", parsedTransport.Candidates![1].Type);
+}
+
+static void XmppJingleFileTransferParsesReceivedAndChecksumInfo()
+{
+    var received = XmppJingleFileTransfer.CreateReceivedInfo("initiator", "file-offer");
+    True(XmppJingleFileTransfer.TryParseReceivedInfo(received, out var receivedInfo));
+    Equal("received", receivedInfo!.Kind);
+    Equal("file-offer", receivedInfo.Name);
+
+    var checksum = XmppJingleFileTransfer.CreateChecksumInfo(
+        "initiator",
+        "file-offer",
+        [new XmppJingleFileHash("sha-256", "Mb5I5OB9L0yDyGZqjOmCwXlZs8Y=")]);
+    True(XmppJingleFileTransfer.TryParseChecksumInfo(checksum, out var checksumInfo));
+    Equal("checksum", checksumInfo!.Kind);
+    Equal("sha-256", checksumInfo.Hashes![0].Algorithm);
+
+    var usedTransport = new XmppJingleSocks5Transport(
+        "vj3hs98y",
+        CandidateUsed: new XmppJingleSocks5CandidateUsed("hft54dqy"));
+    True(XmppJingleSocks5Transport.TryParse(usedTransport.ToXml(), out var parsedUsed));
+    Equal("hft54dqy", parsedUsed!.CandidateUsed!.CandidateId);
+
+    var activatedTransport = new XmppJingleSocks5Transport(
+        "vj3hs98y",
+        Activated: new XmppJingleSocks5Activated("xmdh4b7i"));
+    True(XmppJingleSocks5Transport.TryParse(activatedTransport.ToXml(), out var parsedActivated));
+    Equal("xmdh4b7i", parsedActivated!.Activated!.CandidateId);
+}
+
 static T IsType<T>(object value)
 {
     if (value is T typed)
@@ -3466,12 +7120,54 @@ static void False(bool value)
     }
 }
 
+static T Throws<T>(Action action)
+    where T : Exception
+{
+    try
+    {
+        action();
+    }
+    catch (T ex)
+    {
+        return ex;
+    }
+
+    throw new InvalidOperationException($"Expected exception {typeof(T).Name}.");
+}
+
 sealed class FakeTlsStreamUpgrader(Action onUpgrade) : IXmppTlsStreamUpgrader
 {
+    public List<XmppTlsClientOptions> Options { get; } = [];
+
     public Task<Stream> UpgradeAsync(Stream stream, string targetHost, CancellationToken cancellationToken)
     {
+        return UpgradeAsync(stream, XmppTlsClientOptions.ForStartTls(targetHost), cancellationToken);
+    }
+
+    public Task<Stream> UpgradeAsync(Stream stream, XmppTlsClientOptions options, CancellationToken cancellationToken)
+    {
         onUpgrade();
+        Options.Add(options);
         return Task.FromResult(stream);
+    }
+}
+
+sealed class FakeSrvResolver : IXmppSrvResolver
+{
+    public Dictionary<string, IReadOnlyList<XmppSrvRecord>> Records { get; } =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    public List<string> Queries { get; } = [];
+
+    public Task<IReadOnlyList<XmppSrvRecord>> QuerySrvAsync(
+        string srvName,
+        CancellationToken cancellationToken = default)
+    {
+        Queries.Add(srvName);
+        return Task.FromResult(
+            Records.TryGetValue(srvName, out var records)
+                ? records
+                : Array.Empty<XmppSrvRecord>());
     }
 }
 
@@ -3505,6 +7201,160 @@ sealed class FakeWebSocketTransport : IXmppWebSocketTransport
     public ValueTask DisposeAsync()
     {
         return ValueTask.CompletedTask;
+    }
+}
+
+sealed class FakeProductionOmemoBackend : IXmppOmemoSessionBackend
+{
+    public string Name => "test-production-shape";
+
+    public bool IsProductionReady => true;
+
+    public XmppOmemoBackendCapability Capabilities =>
+        XmppOmemoBackendCapability.X3Dh
+        | XmppOmemoBackendCapability.DoubleRatchet
+        | XmppOmemoBackendCapability.PersistentSessionStore
+        | XmppOmemoBackendCapability.SignedPreKeyVerification
+        | XmppOmemoBackendCapability.OneTimePreKeyConsumption;
+
+    public Task<XmppOmemoSessionSetupResult> EnsureSessionAsync(
+        XmppOmemoSessionSetupRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        _ = cancellationToken;
+        if (request.TrustState != XmppOmemoTrustState.Trusted)
+        {
+            throw new InvalidOperationException("The remote OMEMO identity is not trusted.");
+        }
+
+        return Task.FromResult(new XmppOmemoSessionSetupResult(
+            request.RemoteAccount,
+            request.RemoteDeviceId,
+            XmppOmemoTrust.ComputeFingerprintFromBase64(request.RemoteBundle.IdentityKey),
+            UsedPreKey: true));
+    }
+
+    public Task<XmppOmemoRatchetEncryptResult> EncryptPayloadSecretAsync(
+        XmppOmemoRatchetEncryptRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        _ = cancellationToken;
+        return Task.FromResult(new XmppOmemoRatchetEncryptResult(
+            new XmppOmemoKeyTransport(
+                request.RemoteDeviceId,
+                Convert.ToBase64String(request.PayloadSecret),
+                IsPreKey: true,
+                request.RemoteAccount)));
+    }
+
+    public Task<XmppOmemoRatchetDecryptResult> DecryptPayloadSecretAsync(
+        XmppOmemoRatchetDecryptRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        _ = cancellationToken;
+        return Task.FromResult(new XmppOmemoRatchetDecryptResult(
+            Convert.FromBase64String(request.KeyTransport.CipherText)));
+    }
+}
+
+sealed class RecordingSignedPreKeyVerifier : IXmppOmemoSignedPreKeyVerifier
+{
+    private readonly bool _isValid;
+
+    public RecordingSignedPreKeyVerifier(bool isValid)
+    {
+        _isValid = isValid;
+    }
+
+    public string Name => "recording-signed-pre-key";
+
+    public bool IsAudited => true;
+
+    public XmppOmemoSignedPreKeyVerificationRequest? LastRequest { get; private set; }
+
+    public XmppOmemoSignedPreKeyVerification Verify(XmppOmemoSignedPreKeyVerificationRequest request)
+    {
+        LastRequest = request;
+        return _isValid
+            ? XmppOmemoSignedPreKeyVerification.Verified(Name)
+            : XmppOmemoSignedPreKeyVerification.Failed("test signature rejected", Name);
+    }
+}
+
+sealed class RecordingSecretCommandRunner : IXmppOmemoSecretCommandRunner
+{
+    private readonly bool _isAvailable;
+
+    public RecordingSecretCommandRunner(bool isAvailable = true)
+    {
+        _isAvailable = isAvailable;
+    }
+
+    public List<SecretCommandCall> Calls { get; } = [];
+
+    public XmppOmemoSecretCommandResult NextResult { get; set; } =
+        new(0, string.Empty, string.Empty);
+
+    public bool IsCommandAvailable(string fileName)
+    {
+        if (!string.Equals("secret-tool", fileName, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("Unexpected command lookup: " + fileName);
+        }
+
+        return _isAvailable;
+    }
+
+    public Task<XmppOmemoSecretCommandResult> RunAsync(
+        string fileName,
+        IReadOnlyList<string> arguments,
+        string? standardInput = null,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        Calls.Add(new SecretCommandCall(fileName, arguments.ToArray(), standardInput));
+        return Task.FromResult(NextResult);
+    }
+}
+
+sealed record SecretCommandCall(
+    string FileName,
+    IReadOnlyList<string> Arguments,
+    string? StandardInput);
+
+sealed class SequenceHttpHandler : HttpMessageHandler
+{
+    private readonly Queue<Func<HttpRequestMessage, string, HttpResponseMessage>> _responses;
+
+    public SequenceHttpHandler(params Func<HttpRequestMessage, string, HttpResponseMessage>[] responses)
+    {
+        _responses = new Queue<Func<HttpRequestMessage, string, HttpResponseMessage>>(responses);
+    }
+
+    public List<string> Requests { get; } = [];
+
+    public static HttpResponseMessage XmlResponse(string xml)
+    {
+        return new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(xml, Encoding.UTF8, "text/xml")
+        };
+    }
+
+    protected override async Task<HttpResponseMessage> SendAsync(
+        HttpRequestMessage request,
+        CancellationToken cancellationToken)
+    {
+        if (_responses.Count == 0)
+        {
+            throw new InvalidOperationException("Unexpected HTTP request: " + request.RequestUri);
+        }
+
+        var content = request.Content is null
+            ? string.Empty
+            : await request.Content.ReadAsStringAsync(cancellationToken);
+        Requests.Add(content);
+        return _responses.Dequeue()(request, content);
     }
 }
 

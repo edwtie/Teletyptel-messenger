@@ -102,8 +102,9 @@ php/public/uploads
 ```
 
 The chat then sends a normal relay message with attachment metadata. This is a
-local Alpha upload path for UI testing. It is not yet XEP-0363 HTTP File Upload
-against a production XMPP server component.
+local Alpha upload path for UI testing. XEP-0363 production upload is exercised
+through the .NET core helpers and `Tiedragon.XmppMessenger.RealServerSmoke`
+using a real upload service slot and HTTP PUT.
 
 The web client also loads its local platform configuration from:
 
@@ -112,7 +113,8 @@ php/public/config/account-profile.json
 php/public/config/providers/example-provider.json
 ```
 
-`account-profile.json` fills the local display name, JID, peer and provider id.
+`account-profile.json` fills first-run defaults such as display name, JID,
+XMPP server, peer and provider id.
 Provider manifests define tabs and capabilities such as `phone:sms`,
 `caption:local`, `chat:none` and `profile:read`. These files are demo
 configuration only; secrets and production provider credentials must stay out
@@ -134,9 +136,9 @@ packages are served and verified by the web/mobile clients.
 
 Critical notes: [../docs/LOCALIZATION_CRITICAL_NOTES.md](../docs/LOCALIZATION_CRITICAL_NOTES.md).
 
-## MySQL Account Storage
+## Server Account Storage
 
-The web client can save the local account profile to MySQL through:
+The web client stores account profiles on the PHP/MySQL server through:
 
 ```text
 php/public/api/account.php
@@ -164,9 +166,22 @@ TELETYPTEL_DB_USER
 TELETYPTEL_DB_PASSWORD
 ```
 
-The browser still keeps a local fallback profile. If MySQL is unavailable, the
-client continues to work locally and logs the database error in the debug panel.
-Passwords are only stored when the user enables "Remember password locally".
+The browser does not keep the account profile in `localStorage`. It keeps only a
+temporary browser-session account id when the user enables "Keep account for this
+browser session". The PHP API owns the account profile and stores only a password
+hash, not the plaintext password. If MySQL is unavailable, the first-run account
+gate remains open and the client will not enter the messenger.
+
+The account popup stores real server settings with the profile:
+
+```text
+XMPP domain
+XMPP host
+XMPP port
+TLS mode
+Relay WebSocket
+XMPP WebSocket
+```
 
 For RFC 7395 tests, connect with the `xmpp` WebSocket subprotocol. The relay
 responds with the same subprotocol, accepts RFC 7395 `<open/>` and `<close/>`
@@ -188,17 +203,32 @@ The relay accepts JSON messages like:
 The `xml` field is the XEP-0301-style payload. The `text` field is included only
 for the browser demo.
 
-## Limits
+## Current Boundaries
 
-- local demo relay only
-- no TLS
-- no authentication
-- no full XMPP server semantics
-- text frames only
-- payload limit: 65535 bytes
+The browser client now expects a server-side account profile. The PHP account
+API stores the profile in MySQL/MariaDB, keeps a password hash on the server and
+stores only a temporary session reference in the browser. Real XMPP server
+settings are part of that profile: domain, host, port, TLS mode, XMPP WebSocket
+and relay WebSocket.
 
-The production path remains XMPP/XEP-0301. This relay is a practical bridge for
-early UI and protocol experiments.
+The PHP relay is a web edge for development and local browser demos. It is no
+longer documented as the XMPP server. Server semantics are handled by
+`Tiedragon.XmppMessenger.LocalServer` for local STARTTLS smoke tests or by a
+real XMPP server such as Prosody, ejabberd or Openfire.
+
+- local RTT/RFC 7395 relay for browser UI and WebRTC/Jingle-shaped tests
+- binds to localhost by default
+- use Apache/Nginx/WAMP reverse proxy TLS before exposing any WebSocket endpoint
+- account profile login is handled by the PHP account API and MySQL/MariaDB
+- XMPP account login, roster, presence, MUC, upload slots and discovery belong
+  to LocalServer or the configured real XMPP server
+- WebSocket payload limit: 1048576 bytes per frame
+
+For real server work, use the account dialog to point the client at a real XMPP
+server and use the .NET smoke tools for STARTTLS, direct TLS, BOSH, file upload,
+service discovery, Jingle and OMEMO protocol checks. The production path remains
+XMPP/XEP-0301; the relay exists only to keep early UI and protocol experiments
+fast during development.
 
 ## Validate
 

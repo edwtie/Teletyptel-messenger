@@ -9,7 +9,8 @@ public sealed record XmppChatMessage(
     string? Id = null,
     XmppMessageType Type = XmppMessageType.Chat,
     Uri? OutOfBandUrl = null,
-    string? OutOfBandDescription = null)
+    string? OutOfBandDescription = null,
+    string? ReplaceId = null)
 {
     public const string OutOfBandNamespace = "jabber:x:oob";
 
@@ -31,6 +32,25 @@ public sealed record XmppChatMessage(
             OutOfBandDescription: description);
     }
 
+    public static XmppChatMessage CreateCorrection(
+        XmppAddress to,
+        string correctedBody,
+        string replaceId,
+        string? id = null,
+        XmppMessageType type = XmppMessageType.Chat)
+    {
+        ArgumentNullException.ThrowIfNull(to);
+        ArgumentNullException.ThrowIfNull(correctedBody);
+        ArgumentException.ThrowIfNullOrWhiteSpace(replaceId);
+
+        return new XmppChatMessage(
+            to,
+            correctedBody,
+            Id: id,
+            Type: type,
+            ReplaceId: replaceId);
+    }
+
     public static bool TryParse(XElement element, out XmppChatMessage? message)
     {
         message = null;
@@ -46,6 +66,7 @@ public sealed record XmppChatMessage(
         XmppAddress.TryParse((string?)element.Attribute("from"), out var from);
         var outOfBand = element.Element(XName.Get("x", OutOfBandNamespace));
         Uri.TryCreate(outOfBand?.Element(XName.Get("url", OutOfBandNamespace))?.Value, UriKind.Absolute, out var outOfBandUrl);
+        XmppMessageCorrection.TryGetReplaceId(element, out var replaceId);
 
         message = new XmppChatMessage(
             To: to,
@@ -54,7 +75,8 @@ public sealed record XmppChatMessage(
             Id: (string?)element.Attribute("id"),
             Type: type,
             OutOfBandUrl: outOfBandUrl,
-            OutOfBandDescription: outOfBand?.Element(XName.Get("desc", OutOfBandNamespace))?.Value);
+            OutOfBandDescription: outOfBand?.Element(XName.Get("desc", OutOfBandNamespace))?.Value,
+            ReplaceId: replaceId);
         return true;
     }
 
@@ -105,6 +127,11 @@ public sealed record XmppChatMessage(
             }
 
             element.Add(x);
+        }
+
+        if (!string.IsNullOrWhiteSpace(ReplaceId))
+        {
+            element.Add(XmppMessageCorrection.CreateReplace(ReplaceId));
         }
 
         return element;

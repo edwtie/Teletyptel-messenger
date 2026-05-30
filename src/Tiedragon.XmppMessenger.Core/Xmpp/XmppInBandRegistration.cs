@@ -71,6 +71,68 @@ public static class XmppInBandRegistration
         return new XmppIq(XmppIqType.Set, id, CreateQuery(request), to);
     }
 
+    public static XmppIq CreateDataFormRegistrationRequest(
+        string id,
+        XElement registrationInfoQuery,
+        IReadOnlyDictionary<string, string> submittedValues,
+        XmppAddress? to = null)
+    {
+        ArgumentNullException.ThrowIfNull(registrationInfoQuery);
+        ArgumentNullException.ThrowIfNull(submittedValues);
+
+        if (registrationInfoQuery.Name != XName.Get("query", XmppXmlNames.InBandRegistrationNamespace))
+        {
+            throw new ArgumentException("The element is not an in-band registration query.", nameof(registrationInfoQuery));
+        }
+
+        var form = registrationInfoQuery
+            .Descendants(XName.Get("x", XmppServiceDiscovery.DataFormNamespace))
+            .FirstOrDefault();
+        if (form is null)
+        {
+            throw new ArgumentException("The registration query does not contain a jabber:x:data form.", nameof(registrationInfoQuery));
+        }
+
+        var query = new XElement(XName.Get("query", XmppXmlNames.InBandRegistrationNamespace));
+        var submitForm = new XElement(
+            XName.Get("x", XmppServiceDiscovery.DataFormNamespace),
+            new XAttribute("type", "submit"));
+        foreach (var field in form.Elements(XName.Get("field", XmppServiceDiscovery.DataFormNamespace)))
+        {
+            var variable = field.Attribute("var")?.Value;
+            if (string.IsNullOrWhiteSpace(variable))
+            {
+                continue;
+            }
+
+            var type = field.Attribute("type")?.Value;
+            if (string.Equals(type, "fixed", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var submitField = new XElement(
+                XName.Get("field", XmppServiceDiscovery.DataFormNamespace),
+                new XAttribute("var", variable));
+            if (submittedValues.TryGetValue(variable, out var submittedValue))
+            {
+                submitField.Add(new XElement(XName.Get("value", XmppServiceDiscovery.DataFormNamespace), submittedValue));
+            }
+            else
+            {
+                foreach (var value in field.Elements(XName.Get("value", XmppServiceDiscovery.DataFormNamespace)))
+                {
+                    submitField.Add(new XElement(XName.Get("value", XmppServiceDiscovery.DataFormNamespace), value.Value));
+                }
+            }
+
+            submitForm.Add(submitField);
+        }
+
+        query.Add(submitForm);
+        return new XmppIq(XmppIqType.Set, id, query, to);
+    }
+
     public static XmppIq CreateSimpleRegistrationRequest(
         string id,
         string username,

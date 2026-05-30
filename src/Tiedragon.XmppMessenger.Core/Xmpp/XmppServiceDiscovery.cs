@@ -16,6 +16,12 @@ public static class XmppServiceDiscovery
         return info.Supports(Tiedragon.XmppMessenger.Core.Rtt.RttPacket.NamespaceName);
     }
 
+    public static bool SupportsPrivateXmlStorage(XmppServiceDiscoveryInfo info)
+    {
+        ArgumentNullException.ThrowIfNull(info);
+        return info.Supports(XmppPrivateXmlStorage.NamespaceName);
+    }
+
     public static XmppIq CreateInfoRequest(string id, XmppAddress? to = null, string? node = null)
     {
         var query = new XElement(XName.Get("query", InfoNamespace));

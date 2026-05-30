@@ -21,4 +21,8 @@ internal static class XmppXmlNames
     public const string SessionNamespace = "urn:ietf:params:xml:ns:xmpp-session";
 
     public const string StreamManagementNamespace = "urn:xmpp:sm:3";
+
+    public const string ClientStateIndicationNamespace = "urn:xmpp:csi:0";
+
+    public const string ExternalServiceDiscoveryNamespace = "urn:xmpp:extdisco:2";
 }

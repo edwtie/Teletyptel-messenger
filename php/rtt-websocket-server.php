@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 const HOST = '127.0.0.1';
 const DEFAULT_PORT = 8787;
-const MAX_PAYLOAD_BYTES = 65535;
+const MAX_PAYLOAD_BYTES = 1048576;
 
 $port = relayPort();
 
@@ -117,7 +117,7 @@ while (true) {
             if (!isAllowedRttMessage($message)) {
                 @fwrite($socket, encodeWebSocketFrame(json_encode([
                     'type' => 'error',
-                    'message' => 'Only JSON RTT, message or Jingle call snapshots are accepted.'
+                    'message' => 'Only JSON RTT, message, presence, client state, location or Jingle call snapshots are accepted.'
                 ], JSON_UNESCAPED_SLASHES)));
                 continue;
             }
@@ -256,11 +256,15 @@ function encodeWebSocketFrame(string $message, int $opcode = 0x1): string
         return $firstByte . chr($length) . $message;
     }
 
-    if ($length <= MAX_PAYLOAD_BYTES) {
+    if ($length <= 65535) {
         return $firstByte . chr(126) . pack('n', $length) . $message;
     }
 
-    throw new RuntimeException('Message is too large for this demo relay.');
+    if ($length <= MAX_PAYLOAD_BYTES) {
+        return $firstByte . chr(127) . pack('N2', 0, $length) . $message;
+    }
+
+    throw new RuntimeException('Message is too large for this relay.');
 }
 
 function isAllowedRttMessage(string $message): bool
@@ -276,12 +280,102 @@ function isAllowedRttMessage(string $message): bool
         return is_string($text) && strlen($text) <= MAX_PAYLOAD_BYTES;
     }
 
+    if ($type === 'presence') {
+        $presence = $json['presence'] ?? null;
+        if (!is_string($presence) || !in_array($presence, ['online', 'offline'], true)) {
+            return false;
+        }
+
+        foreach (['from', 'to', 'displayName', 'responseTo'] as $field) {
+            if (isset($json[$field]) && (!is_string($json[$field]) || strlen($json[$field]) > 255)) {
+                return false;
+            }
+        }
+
+        if (isset($json['probe']) && !is_bool($json['probe'])) {
+            return false;
+        }
+
+        return true;
+    }
+
     if ($type === 'rtt') {
         $xml = $json['xml'] ?? null;
         return is_string($xml)
             && strlen($xml) <= MAX_PAYLOAD_BYTES
             && str_contains($xml, '<rtt')
             && str_contains($xml, 'urn:xmpp:rtt:0');
+    }
+
+    if ($type === 'client-state') {
+        $clientState = $json['clientState'] ?? null;
+        $xml = $json['xml'] ?? null;
+        if (!is_string($clientState) || !in_array($clientState, ['active', 'inactive'], true)) {
+            return false;
+        }
+
+        if (!is_string($xml) || strlen($xml) > 512 || !str_contains($xml, 'urn:xmpp:csi:0')) {
+            return false;
+        }
+
+        if ($clientState === 'active' && !str_contains($xml, '<active')) {
+            return false;
+        }
+
+        if ($clientState === 'inactive' && !str_contains($xml, '<inactive')) {
+            return false;
+        }
+
+        foreach (['from', 'to', 'displayName', 'reason', 'sentAt'] as $field) {
+            if (isset($json[$field]) && (!is_string($json[$field]) || strlen($json[$field]) > 255)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    if ($type === 'location') {
+        $action = $json['locationAction'] ?? null;
+        if (!is_string($action) || !in_array($action, ['share', 'live', 'stop'], true)) {
+            return false;
+        }
+
+        foreach (['from', 'to', 'displayName', 'text', 'xml'] as $field) {
+            if (isset($json[$field]) && (!is_string($json[$field]) || strlen($json[$field]) > MAX_PAYLOAD_BYTES)) {
+                return false;
+            }
+        }
+
+        if ($action === 'stop') {
+            return !isset($json['location']) || $json['location'] === null;
+        }
+
+        if (!isset($json['location']) || !is_array($json['location'])) {
+            return false;
+        }
+
+        foreach (['lat', 'lon'] as $field) {
+            if (!isset($json['location'][$field]) || !is_numeric($json['location'][$field])) {
+                return false;
+            }
+        }
+
+        foreach (['accuracy', 'alt', 'altaccuracy', 'bearing', 'speed'] as $field) {
+            if (isset($json['location'][$field]) && $json['location'][$field] !== null && !is_numeric($json['location'][$field])) {
+                return false;
+            }
+        }
+
+        foreach (['timestamp', 'text'] as $field) {
+            if (isset($json['location'][$field]) && $json['location'][$field] !== null && (!is_string($json['location'][$field]) || strlen($json['location'][$field]) > 512)) {
+                return false;
+            }
+        }
+
+        return is_string($json['xml'] ?? null)
+            && str_contains($json['xml'], '<geoloc')
+            && str_contains($json['xml'], 'http://jabber.org/protocol/geoloc');
     }
 
     if ($type === 'jingle') {
@@ -363,7 +457,9 @@ function isAllowedXmppWebSocketFrame(string $message): bool
 
     return isXmppOpenFrame($trimmed)
         || isXmppCloseFrame($trimmed)
-        || preg_match('/^<(message|presence|iq)\b/i', $trimmed) === 1;
+        || preg_match('/^<(message|presence|iq)\b/i', $trimmed) === 1
+        || preg_match('/^<(active|inactive)\b/i', $trimmed) === 1
+            && str_contains($trimmed, 'urn:xmpp:csi:0');
 }
 
 function isXmppOpenFrame(string $message): bool

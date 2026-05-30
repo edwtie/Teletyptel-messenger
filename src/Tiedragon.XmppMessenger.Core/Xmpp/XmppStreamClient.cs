@@ -1,5 +1,7 @@
+using System.Globalization;
 using System.Net.Sockets;
 using System.Text;
+using System.Xml.Linq;
 
 namespace Tiedragon.XmppMessenger.Core.Xmpp;
 
@@ -54,6 +56,11 @@ public sealed class XmppStreamClient : IAsyncDisposable
 
         await _tcpClient.ConnectAsync(_settings.Host, _settings.Port, timeout.Token).ConfigureAwait(false);
         _stream = _tcpClient.GetStream();
+        if (_settings.DirectTls)
+        {
+            await UpgradeToDirectTlsAsync(timeout.Token).ConfigureAwait(false);
+        }
+
         _writer = new XmppStreamWriter(_stream);
 
         await WriteOpenStreamAsync(timeout.Token).ConfigureAwait(false);
@@ -61,12 +68,14 @@ public sealed class XmppStreamClient : IAsyncDisposable
         while (true)
         {
             var nodes = await ReadNodesAsync(timeout.Token).ConfigureAwait(false);
-            foreach (var node in nodes)
+            for (var index = 0; index < nodes.Count; index++)
             {
+                var node = nodes[index];
                 if (node.Type == XmppStreamNodeType.Features
                     && node.Element is not null
                     && XmppStreamFeatureSet.TryParse(node.Element, out var features))
                 {
+                    PreserveTrailingNodes(nodes, index);
                     var plan = new XmppStreamNegotiationPlan(
                         TlsActive: _tlsActive,
                         Authenticated: _authenticated,
@@ -306,8 +315,9 @@ public sealed class XmppStreamClient : IAsyncDisposable
         while (true)
         {
             var nodes = await ReadNodesAsync(cancellationToken).ConfigureAwait(false);
-            foreach (var node in nodes)
+            for (var index = 0; index < nodes.Count; index++)
             {
+                var node = nodes[index];
                 if (node.Element is null || !XmppIq.TryParse(node.Element, out var iq) || iq is null)
                 {
                     continue;
@@ -320,6 +330,7 @@ public sealed class XmppStreamClient : IAsyncDisposable
 
                 if (XmppResourceBinding.TryGetBoundJid(iq, out var jid) && jid is not null)
                 {
+                    PreserveTrailingNodes(nodes, index);
                     BoundJid = jid;
                     _resourceBound = true;
                     return jid;
@@ -387,6 +398,82 @@ public sealed class XmppStreamClient : IAsyncDisposable
         await SendIqAndWaitAsync(XmppIq.RosterRemove(id, jid), timeout, cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task<IReadOnlyList<XmppAddress>> RequestBlockedUsersAsync(
+        TimeSpan timeout,
+        string id = "blocklist-1",
+        CancellationToken cancellationToken = default)
+    {
+        var result = await SendIqAndWaitAsync(
+            XmppBlockingCommand.CreateBlockListRequest(id),
+            timeout,
+            cancellationToken).ConfigureAwait(false);
+
+        if (XmppBlockingCommand.TryParseBlockListResult(result, out var blocked))
+        {
+            return blocked;
+        }
+
+        throw new XmppProtocolException(
+            XmppProtocolErrorKind.IqError,
+            "The blocking command response was not a valid XEP-0191 blocklist result.",
+            result.Payload);
+    }
+
+    public async Task BlockUsersAsync(
+        IEnumerable<XmppAddress> jids,
+        TimeSpan timeout,
+        string id = "block-1",
+        CancellationToken cancellationToken = default)
+    {
+        await SendIqAndWaitAsync(
+            XmppBlockingCommand.CreateBlockRequest(id, jids),
+            timeout,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    public Task BlockUserAsync(
+        XmppAddress jid,
+        TimeSpan timeout,
+        string id = "block-1",
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(jid);
+        return BlockUsersAsync([jid], timeout, id, cancellationToken);
+    }
+
+    public async Task UnblockUsersAsync(
+        IEnumerable<XmppAddress> jids,
+        TimeSpan timeout,
+        string id = "unblock-1",
+        CancellationToken cancellationToken = default)
+    {
+        await SendIqAndWaitAsync(
+            XmppBlockingCommand.CreateUnblockRequest(id, jids),
+            timeout,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    public Task UnblockUserAsync(
+        XmppAddress jid,
+        TimeSpan timeout,
+        string id = "unblock-1",
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(jid);
+        return UnblockUsersAsync([jid], timeout, id, cancellationToken);
+    }
+
+    public async Task UnblockAllUsersAsync(
+        TimeSpan timeout,
+        string id = "unblock-all-1",
+        CancellationToken cancellationToken = default)
+    {
+        await SendIqAndWaitAsync(
+            XmppBlockingCommand.CreateUnblockAllRequest(id),
+            timeout,
+            cancellationToken).ConfigureAwait(false);
+    }
+
     public async Task<XmppServiceDiscoveryInfo> RequestServiceDiscoveryInfoAsync(
         XmppAddress? to,
         TimeSpan timeout,
@@ -431,6 +518,359 @@ public sealed class XmppStreamClient : IAsyncDisposable
             XmppProtocolErrorKind.IqError,
             "The service discovery response was not a valid disco#items result.",
             result.Payload);
+    }
+
+    public async Task<XmppExternalServices> RequestExternalServicesAsync(
+        XmppAddress? to,
+        TimeSpan timeout,
+        string? type = null,
+        string id = "extdisco-1",
+        CancellationToken cancellationToken = default)
+    {
+        var result = await SendIqAndWaitAsync(
+            XmppExternalServiceDiscovery.CreateServicesRequest(id, to, type),
+            timeout,
+            cancellationToken).ConfigureAwait(false);
+
+        if (XmppExternalServiceDiscovery.TryParseServicesResult(result, out var services) && services is not null)
+        {
+            return services;
+        }
+
+        throw new XmppProtocolException(
+            XmppProtocolErrorKind.IqError,
+            "The external service discovery response was not a valid extdisco services result.",
+            result.Payload);
+    }
+
+    public async Task<XmppExternalServices> RequestExternalServiceCredentialsAsync(
+        XmppAddress? to,
+        XmppExternalServiceIdentity service,
+        TimeSpan timeout,
+        string id = "extdisco-credentials-1",
+        CancellationToken cancellationToken = default)
+    {
+        var result = await SendIqAndWaitAsync(
+            XmppExternalServiceDiscovery.CreateCredentialsRequest(id, service, to),
+            timeout,
+            cancellationToken).ConfigureAwait(false);
+
+        if (XmppExternalServiceDiscovery.TryParseCredentialsResult(result, out var credentials) && credentials is not null)
+        {
+            return credentials;
+        }
+
+        throw new XmppProtocolException(
+            XmppProtocolErrorKind.IqError,
+            "The external service discovery response was not a valid extdisco credentials result.",
+            result.Payload);
+    }
+
+    public Task<XmppServiceDiscoveryInfo> RequestPersonalEventingInfoAsync(
+        TimeSpan timeout,
+        string id = "pep-disco-1",
+        CancellationToken cancellationToken = default)
+    {
+        return RequestServiceDiscoveryInfoAsync(
+            XmppAddress.Parse(_settings.Account.Bare),
+            timeout,
+            id: id,
+            cancellationToken: cancellationToken);
+    }
+
+    public async Task<XmppUserLocationSupport> RequestUserLocationSupportAsync(
+        TimeSpan timeout,
+        string id = "location-disco-1",
+        CancellationToken cancellationToken = default)
+    {
+        var info = await RequestPersonalEventingInfoAsync(timeout, id, cancellationToken)
+            .ConfigureAwait(false);
+        return XmppUserLocation.EvaluateSupport(info);
+    }
+
+    public Task PublishPersonalEventAsync(
+        string node,
+        string? itemId,
+        XElement payload,
+        TimeSpan timeout,
+        string id = "pep-publish-1",
+        CancellationToken cancellationToken = default)
+    {
+        return SendIqAndWaitAsync(
+            XmppPersonalEventing.CreatePublishRequest(id, node, itemId, payload),
+            timeout,
+            cancellationToken);
+    }
+
+    public Task RetractPersonalEventAsync(
+        string node,
+        string itemId,
+        TimeSpan timeout,
+        bool notify = true,
+        string id = "pep-retract-1",
+        CancellationToken cancellationToken = default)
+    {
+        return SendIqAndWaitAsync(
+            XmppPersonalEventing.CreateRetractRequest(id, node, itemId, notify),
+            timeout,
+            cancellationToken);
+    }
+
+    public Task DeletePersonalEventNodeAsync(
+        string node,
+        TimeSpan timeout,
+        string id = "pep-delete-1",
+        CancellationToken cancellationToken = default)
+    {
+        return SendIqAndWaitAsync(
+            XmppPersonalEventing.CreateDeleteNodeRequest(id, node),
+            timeout,
+            cancellationToken);
+    }
+
+    public async Task<XmppPersonalEventNodeItems> RequestPersonalEventItemsAsync(
+        string node,
+        XmppAddress? owner,
+        TimeSpan timeout,
+        string? itemId = null,
+        int? maxItems = null,
+        string id = "pep-items-1",
+        CancellationToken cancellationToken = default)
+    {
+        var result = await SendIqAndWaitAsync(
+            XmppPersonalEventing.CreateItemsRequest(id, node, owner, itemId, maxItems),
+            timeout,
+            cancellationToken).ConfigureAwait(false);
+
+        if (XmppPersonalEventing.TryParseItemsResult(result, out var items) && items is not null)
+        {
+            return items;
+        }
+
+        throw new XmppProtocolException(
+            XmppProtocolErrorKind.IqError,
+            "The personal eventing response was not a valid PubSub items result.",
+            result.Payload);
+    }
+
+    public Task PublishConferenceBookmarkAsync(
+        XmppConferenceBookmark bookmark,
+        TimeSpan timeout,
+        string id = "bookmark-publish-1",
+        bool addPublishOptions = true,
+        CancellationToken cancellationToken = default)
+    {
+        return SendIqAndWaitAsync(
+            XmppBookmarks.CreatePublishConferenceRequest(id, bookmark, addPublishOptions),
+            timeout,
+            cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<XmppConferenceBookmark>> RequestConferenceBookmarksAsync(
+        XmppAddress? owner,
+        TimeSpan timeout,
+        string id = "bookmarks-1",
+        int? maxItems = null,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await SendIqAndWaitAsync(
+            XmppBookmarks.CreateBookmarksRequest(id, owner, maxItems),
+            timeout,
+            cancellationToken).ConfigureAwait(false);
+
+        if (XmppBookmarks.TryParseBookmarksResult(result, out var bookmarks) && bookmarks is not null)
+        {
+            return bookmarks;
+        }
+
+        throw new XmppProtocolException(
+            XmppProtocolErrorKind.IqError,
+            "The bookmark response was not a valid XEP-0402 PubSub items result.",
+            result.Payload);
+    }
+
+    public Task RetractConferenceBookmarkAsync(
+        XmppAddress room,
+        TimeSpan timeout,
+        string id = "bookmark-retract-1",
+        bool notify = true,
+        CancellationToken cancellationToken = default)
+    {
+        return SendIqAndWaitAsync(
+            XmppBookmarks.CreateRetractConferenceRequest(id, room, notify),
+            timeout,
+            cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<XmppConferenceBookmark>> RequestLegacyConferenceBookmarksAsync(
+        TimeSpan timeout,
+        string id = "legacy-bookmarks-1",
+        CancellationToken cancellationToken = default)
+    {
+        var result = await SendIqAndWaitAsync(
+            XmppBookmarks.CreateLegacyBookmarksRequest(id),
+            timeout,
+            cancellationToken).ConfigureAwait(false);
+
+        if (XmppBookmarks.TryParseLegacyBookmarksResult(result, out var bookmarks) && bookmarks is not null)
+        {
+            return bookmarks;
+        }
+
+        throw new XmppProtocolException(
+            XmppProtocolErrorKind.IqError,
+            "The bookmark response was not a valid XEP-0048 private XML result.",
+            result.Payload);
+    }
+
+    public Task SetLegacyConferenceBookmarksAsync(
+        IEnumerable<XmppConferenceBookmark> bookmarks,
+        TimeSpan timeout,
+        string id = "legacy-bookmarks-set-1",
+        CancellationToken cancellationToken = default)
+    {
+        return SendIqAndWaitAsync(
+            XmppBookmarks.CreateLegacyBookmarksSetRequest(id, bookmarks),
+            timeout,
+            cancellationToken);
+    }
+
+    public async Task<XElement> RequestPrivateXmlAsync(
+        XName payloadName,
+        TimeSpan timeout,
+        string id = "private-xml-1",
+        CancellationToken cancellationToken = default)
+    {
+        var result = await SendIqAndWaitAsync(
+            XmppPrivateXmlStorage.CreateGetRequest(id, payloadName),
+            timeout,
+            cancellationToken).ConfigureAwait(false);
+
+        if (XmppPrivateXmlStorage.TryParseResult(result, payloadName, out var payload) && payload is not null)
+        {
+            return payload;
+        }
+
+        throw new XmppProtocolException(
+            XmppProtocolErrorKind.IqError,
+            "The private XML response was not a valid XEP-0049 result.",
+            result.Payload);
+    }
+
+    public Task SetPrivateXmlAsync(
+        XElement payload,
+        TimeSpan timeout,
+        string id = "private-xml-set-1",
+        CancellationToken cancellationToken = default)
+    {
+        return SendIqAndWaitAsync(
+            XmppPrivateXmlStorage.CreateSetRequest(id, payload),
+            timeout,
+            cancellationToken);
+    }
+
+    public Task StorePersistentPrivateDataAsync(
+        string node,
+        XElement payload,
+        TimeSpan timeout,
+        string? itemId = null,
+        string id = "private-pubsub-store-1",
+        CancellationToken cancellationToken = default)
+    {
+        return SendIqAndWaitAsync(
+            XmppPersistentPrivateData.CreateStoreRequest(id, node, payload, itemId),
+            timeout,
+            cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<XmppPersistentPrivateDataItem>> RequestPersistentPrivateDataAsync(
+        string node,
+        TimeSpan timeout,
+        XmppAddress? owner = null,
+        string? itemId = null,
+        int? maxItems = null,
+        string id = "private-pubsub-items-1",
+        CancellationToken cancellationToken = default)
+    {
+        var result = await SendIqAndWaitAsync(
+            XmppPersistentPrivateData.CreateItemsRequest(id, node, owner, itemId, maxItems),
+            timeout,
+            cancellationToken).ConfigureAwait(false);
+
+        if (XmppPersistentPrivateData.TryParseItemsResult(result, node, out var items) && items is not null)
+        {
+            return items;
+        }
+
+        throw new XmppProtocolException(
+            XmppProtocolErrorKind.IqError,
+            "The persistent private data response was not a valid XEP-0223 PubSub items result.",
+            result.Payload);
+    }
+
+    public Task PublishUserLocationAsync(
+        XmppUserLocationData location,
+        TimeSpan timeout,
+        string itemId = XmppUserLocation.CurrentItemId,
+        string id = "location-publish-1",
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(location);
+        XmppUserLocation.Validate(location);
+        return PublishPersonalEventAsync(
+            XmppUserLocation.NamespaceName,
+            itemId,
+            location.ToXml(),
+            timeout,
+            id,
+            cancellationToken);
+    }
+
+    public Task ClearUserLocationAsync(
+        TimeSpan timeout,
+        string itemId = XmppUserLocation.CurrentItemId,
+        string id = "location-clear-1",
+        CancellationToken cancellationToken = default)
+    {
+        return SendIqAndWaitAsync(
+            XmppUserLocation.CreateClearPublishRequest(id, itemId),
+            timeout,
+            cancellationToken);
+    }
+
+    public Task RetractUserLocationAsync(
+        TimeSpan timeout,
+        string itemId = XmppUserLocation.CurrentItemId,
+        bool notify = true,
+        string id = "location-retract-1",
+        CancellationToken cancellationToken = default)
+    {
+        return SendIqAndWaitAsync(
+            XmppUserLocation.CreateRetractRequest(id, itemId, notify),
+            timeout,
+            cancellationToken);
+    }
+
+    public async Task<XmppUserLocationData?> RequestUserLocationAsync(
+        XmppAddress contact,
+        TimeSpan timeout,
+        string? itemId = null,
+        string id = "location-items-1",
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(contact);
+        var items = await RequestPersonalEventItemsAsync(
+            XmppUserLocation.NamespaceName,
+            contact,
+            timeout,
+            itemId: itemId,
+            maxItems: 1,
+            id: id,
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+
+        return XmppUserLocation.TryParseNodeItems(items, out var location)
+            ? location
+            : null;
     }
 
     public async Task<XmppRegistrationInfo> RequestRegistrationInfoAsync(
@@ -502,10 +942,11 @@ public sealed class XmppStreamClient : IAsyncDisposable
         string? contentType = null,
         XmppHttpUploadPurpose purpose = XmppHttpUploadPurpose.Default,
         string id = "upload-slot-1",
+        DateTimeOffset? expireBefore = null,
         CancellationToken cancellationToken = default)
     {
         var result = await SendIqAndWaitAsync(
-            XmppHttpFileUpload.CreateSlotRequest(id, uploadService, fileName, size, contentType, purpose),
+            XmppHttpFileUpload.CreateSlotRequest(id, uploadService, fileName, size, contentType, purpose, expireBefore),
             timeout,
             cancellationToken).ConfigureAwait(false);
 
@@ -514,10 +955,268 @@ public sealed class XmppStreamClient : IAsyncDisposable
             return slot;
         }
 
+        if (XmppHttpFileUpload.TryParseFileTooLarge(result, out var maxFileSize))
+        {
+            var maxText = maxFileSize is null
+                ? "an unknown server maximum"
+                : $"{maxFileSize.Value} bytes";
+            throw new XmppProtocolException(
+                XmppProtocolErrorKind.IqError,
+                $"The HTTP upload service rejected the file because it exceeds {maxText}.",
+                result.Payload);
+        }
+
+        if (XmppHttpFileUpload.TryParseRetry(result, out var retryAt))
+        {
+            var retryText = retryAt is null
+                ? "later"
+                : retryAt.Value.ToString("u", CultureInfo.InvariantCulture);
+            throw new XmppProtocolException(
+                XmppProtocolErrorKind.IqError,
+                $"The HTTP upload service asked the client to retry {retryText}.",
+                result.Payload);
+        }
+
         throw new XmppProtocolException(
             XmppProtocolErrorKind.IqError,
             "The HTTP upload response was not a valid XEP-0363 slot result.",
             result.Payload);
+    }
+
+    public async Task<IReadOnlyList<XmppSocks5StreamHost>> RequestSocks5ProxyAddressAsync(
+        XmppAddress proxy,
+        TimeSpan timeout,
+        string id = "s5b-proxy-1",
+        CancellationToken cancellationToken = default)
+    {
+        var result = await SendIqAndWaitAsync(
+            XmppSocks5Bytestreams.CreateProxyAddressRequest(id, proxy),
+            timeout,
+            cancellationToken).ConfigureAwait(false);
+
+        if (XmppSocks5Bytestreams.TryParseProxyAddressResult(result, out var streamHosts))
+        {
+            return streamHosts;
+        }
+
+        throw new XmppProtocolException(
+            XmppProtocolErrorKind.IqError,
+            "The SOCKS5 bytestream proxy response was not valid.",
+            result.Payload);
+    }
+
+    public Task ActivateSocks5BytestreamAsync(
+        XmppAddress proxy,
+        string streamId,
+        XmppAddress target,
+        TimeSpan timeout,
+        string id = "s5b-activate-1",
+        CancellationToken cancellationToken = default)
+    {
+        return SendIqAndWaitAsync(
+            XmppSocks5Bytestreams.CreateActivationRequest(id, proxy, streamId, target),
+            timeout,
+            cancellationToken);
+    }
+
+    public Task<XmppIq> OpenInBandBytestreamAsync(
+        XmppAddress target,
+        string sessionId,
+        int blockSize,
+        TimeSpan timeout,
+        string stanza = "iq",
+        string id = "ibb-open-1",
+        CancellationToken cancellationToken = default)
+    {
+        return SendIqAndWaitAsync(
+            XmppInBandBytestreams.CreateOpenRequest(id, target, sessionId, blockSize, stanza),
+            timeout,
+            cancellationToken);
+    }
+
+    public Task<XmppIq> SendInBandBytestreamDataAsync(
+        XmppAddress target,
+        string sessionId,
+        ushort sequence,
+        byte[] data,
+        TimeSpan timeout,
+        int? blockSize = null,
+        string id = "ibb-data-1",
+        CancellationToken cancellationToken = default)
+    {
+        return SendIqAndWaitAsync(
+            XmppInBandBytestreams.CreateDataIq(id, target, sessionId, sequence, data, blockSize),
+            timeout,
+            cancellationToken);
+    }
+
+    public Task SendInBandBytestreamMessageDataAsync(
+        XmppAddress target,
+        string sessionId,
+        ushort sequence,
+        byte[] data,
+        string? id = null,
+        int? blockSize = null,
+        CancellationToken cancellationToken = default)
+    {
+        return SendElementAsync(
+            XmppInBandBytestreams.CreateDataMessage(target, sessionId, sequence, data, id, BoundJid, blockSize),
+            cancellationToken);
+    }
+
+    public Task<XmppIq> CloseInBandBytestreamAsync(
+        XmppAddress target,
+        string sessionId,
+        TimeSpan timeout,
+        string id = "ibb-close-1",
+        CancellationToken cancellationToken = default)
+    {
+        return SendIqAndWaitAsync(
+            XmppInBandBytestreams.CreateCloseRequest(id, target, sessionId),
+            timeout,
+            cancellationToken);
+    }
+
+    public async Task<XmppUserAvatarMetadata> RequestUserAvatarMetadataAsync(
+        XmppAddress contact,
+        TimeSpan timeout,
+        string id = "avatar-metadata-1",
+        CancellationToken cancellationToken = default)
+    {
+        var result = await SendIqAndWaitAsync(
+            XmppUserAvatar.CreateMetadataRequest(id, contact),
+            timeout,
+            cancellationToken).ConfigureAwait(false);
+
+        if (XmppUserAvatar.TryParseMetadata(result, out var metadata) && metadata is not null)
+        {
+            return metadata;
+        }
+
+        throw new XmppProtocolException(
+            XmppProtocolErrorKind.IqError,
+            "The avatar metadata response was not valid.",
+            result.Payload);
+    }
+
+    public async Task<XmppUserAvatarData> RequestUserAvatarDataAsync(
+        XmppAddress contact,
+        string avatarId,
+        TimeSpan timeout,
+        string id = "avatar-data-1",
+        CancellationToken cancellationToken = default)
+    {
+        var result = await SendIqAndWaitAsync(
+            XmppUserAvatar.CreateDataRequest(id, contact, avatarId),
+            timeout,
+            cancellationToken).ConfigureAwait(false);
+
+        if (XmppUserAvatar.TryParseData(result, out var data) && data is not null)
+        {
+            return data;
+        }
+
+        throw new XmppProtocolException(
+            XmppProtocolErrorKind.IqError,
+            "The avatar data response was not valid.",
+            result.Payload);
+    }
+
+    public async Task<string> PublishUserAvatarDataAsync(
+        byte[] pngData,
+        TimeSpan timeout,
+        string id = "avatar-data-publish-1",
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(pngData);
+
+        var avatarId = XmppUserAvatar.ComputeId(pngData);
+        await SendIqAndWaitAsync(
+            XmppUserAvatar.CreateDataPublish(id, pngData),
+            timeout,
+            cancellationToken).ConfigureAwait(false);
+        return avatarId;
+    }
+
+    public Task PublishUserAvatarMetadataAsync(
+        IEnumerable<XmppUserAvatarInfo> infos,
+        TimeSpan timeout,
+        string id = "avatar-metadata-publish-1",
+        CancellationToken cancellationToken = default)
+    {
+        return SendIqAndWaitAsync(
+            XmppUserAvatar.CreateMetadataPublish(id, infos),
+            timeout,
+            cancellationToken);
+    }
+
+    public Task DisableUserAvatarAsync(
+        TimeSpan timeout,
+        string id = "avatar-disable-1",
+        CancellationToken cancellationToken = default)
+    {
+        return SendIqAndWaitAsync(
+            XmppUserAvatar.CreateDisableMetadataPublish(id),
+            timeout,
+            cancellationToken);
+    }
+
+    public async Task<XmppVCardTemp> RequestVCardAsync(
+        XmppAddress? contact,
+        TimeSpan timeout,
+        string id = "vcard-get-1",
+        CancellationToken cancellationToken = default)
+    {
+        var result = await SendIqAndWaitAsync(
+            XmppVCardTemp.CreateGetRequest(id, contact),
+            timeout,
+            cancellationToken).ConfigureAwait(false);
+
+        if (XmppVCardTemp.TryParseResult(result, out var vCard) && vCard is not null)
+        {
+            return vCard;
+        }
+
+        throw new XmppProtocolException(
+            XmppProtocolErrorKind.IqError,
+            "The vCard response was not valid.",
+            result.Payload);
+    }
+
+    public Task PublishVCardAsync(
+        XmppVCardTemp vCard,
+        TimeSpan timeout,
+        string id = "vcard-set-1",
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(vCard);
+        return SendIqAndWaitAsync(
+            XmppVCardTemp.CreateSetRequest(id, vCard),
+            timeout,
+            cancellationToken);
+    }
+
+    public async Task<string> PublishVCardAvatarAsync(
+        byte[] imageData,
+        TimeSpan timeout,
+        string contentType = XmppUserAvatar.RequiredContentType,
+        bool sendPresenceUpdate = true,
+        string vCardId = "vcard-avatar-set-1",
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(imageData);
+
+        var vCard = XmppVCardAvatar.CreateVCard(imageData, contentType);
+        await PublishVCardAsync(vCard, timeout, vCardId, cancellationToken).ConfigureAwait(false);
+        var photoHash = XmppVCardAvatar.ComputePhotoHash(imageData);
+        if (sendPresenceUpdate)
+        {
+            await SendPresenceAsync(
+                new XmppPresence(VCardAvatarUpdate: new XmppVCardAvatarUpdate(photoHash)),
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        return photoHash;
     }
 
     public async Task<IReadOnlyList<uint>> RequestOmemoDeviceListAsync(
@@ -570,8 +1269,18 @@ public sealed class XmppStreamClient : IAsyncDisposable
         string? id = null,
         CancellationToken cancellationToken = default)
     {
+        return SendMultiUserChatMessageAsync(room, body, id, null, cancellationToken);
+    }
+
+    public Task SendMultiUserChatMessageAsync(
+        XmppAddress room,
+        string body,
+        string? id,
+        string? replaceId,
+        CancellationToken cancellationToken)
+    {
         return SendElementAsync(
-            XmppMultiUserChat.CreateGroupMessage(room, body, id),
+            XmppMultiUserChat.CreateGroupMessage(room, body, id, replaceId),
             cancellationToken);
     }
 
@@ -691,16 +1400,80 @@ public sealed class XmppStreamClient : IAsyncDisposable
             cancellationToken);
     }
 
+    public async Task<XmppMucSelfPingStatus> PingMultiUserChatSelfAsync(
+        XmppAddress room,
+        string nickname,
+        TimeSpan timeout,
+        string id = "muc-self-ping-1",
+        CancellationToken cancellationToken = default)
+    {
+        var result = await SendIqAndWaitAsync(
+            XmppMucSelfPing.CreatePingRequest(id, room, nickname, BoundJid),
+            timeout,
+            cancellationToken).ConfigureAwait(false);
+
+        if (XmppMucSelfPing.TryParsePingResponse(result, out var status, out _))
+        {
+            return status;
+        }
+
+        throw new XmppProtocolException(
+            XmppProtocolErrorKind.IqError,
+            "The MUC self-ping response was not valid.",
+            result.Payload);
+    }
+
     public Task SendJingleAsync(XmppIq jingleIq, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(jingleIq);
         return SendElementAsync(jingleIq.ToXml(), cancellationToken);
     }
 
+    public Task SendJingleMessageInitiationAsync(
+        XElement message,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(message);
+        if (!XmppJingleMessageInitiation.TryParse(message, out _))
+        {
+            throw new ArgumentException("The element is not a valid XEP-0353 Jingle Message Initiation stanza.", nameof(message));
+        }
+
+        return SendElementAsync(message, cancellationToken);
+    }
+
     public Task SendChatMessageAsync(XmppChatMessage message, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(message);
         return SendElementAsync(message.ToXml(), cancellationToken);
+    }
+
+    public Task SendMessageCorrectionAsync(
+        XmppAddress to,
+        string correctedBody,
+        string replaceId,
+        string? id = null,
+        XmppMessageType type = XmppMessageType.Chat,
+        CancellationToken cancellationToken = default)
+    {
+        return SendChatMessageAsync(
+            XmppChatMessage.CreateCorrection(to, correctedBody, replaceId, id, type),
+            cancellationToken);
+    }
+
+    public Task SendMultiUserChatCorrectionAsync(
+        XmppAddress room,
+        string correctedBody,
+        string replaceId,
+        string? id = null,
+        CancellationToken cancellationToken = default)
+    {
+        return SendMultiUserChatMessageAsync(
+            room,
+            correctedBody,
+            id,
+            replaceId,
+            cancellationToken);
     }
 
     public Task SendRealTimeTextAsync(XmppRealTimeTextMessage message, CancellationToken cancellationToken = default)
@@ -713,6 +1486,21 @@ public sealed class XmppStreamClient : IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(presence);
         return SendElementAsync(presence.ToXml(), cancellationToken);
+    }
+
+    public Task SendClientStateAsync(XmppClientState state, CancellationToken cancellationToken = default)
+    {
+        return SendElementAsync(XmppClientStateIndication.Create(state), cancellationToken);
+    }
+
+    public Task SendActiveClientStateAsync(CancellationToken cancellationToken = default)
+    {
+        return SendClientStateAsync(XmppClientState.Active, cancellationToken);
+    }
+
+    public Task SendInactiveClientStateAsync(CancellationToken cancellationToken = default)
+    {
+        return SendClientStateAsync(XmppClientState.Inactive, cancellationToken);
     }
 
     public Task SendInitialPresenceAsync(
@@ -779,8 +1567,9 @@ public sealed class XmppStreamClient : IAsyncDisposable
         while (true)
         {
             var nodes = await ReadNodesAsync(cancellationToken).ConfigureAwait(false);
-            foreach (var node in nodes)
+            for (var index = 0; index < nodes.Count; index++)
             {
+                var node = nodes[index];
                 if (node.Element is null)
                 {
                     continue;
@@ -788,6 +1577,7 @@ public sealed class XmppStreamClient : IAsyncDisposable
 
                 if (XmppStreamManagement.TryParseEnabled(node.Element, out var id, out var resumeSupported))
                 {
+                    PreserveTrailingNodes(nodes, index);
                     _streamManagement.Enable(id, resumeSupported);
                     return;
                 }
@@ -817,8 +1607,9 @@ public sealed class XmppStreamClient : IAsyncDisposable
         while (true)
         {
             var nodes = await ReadNodesAsync(cancellationToken).ConfigureAwait(false);
-            foreach (var node in nodes)
+            for (var index = 0; index < nodes.Count; index++)
             {
+                var node = nodes[index];
                 if (node.Element is null)
                 {
                     continue;
@@ -826,6 +1617,7 @@ public sealed class XmppStreamClient : IAsyncDisposable
 
                 if (XmppStreamManagement.TryParseResumed(node.Element, out var id, out var serverHandled))
                 {
+                    PreserveTrailingNodes(nodes, index);
                     _streamManagement.MarkResumed(serverHandled, id);
                     return;
                 }
@@ -925,6 +1717,13 @@ public sealed class XmppStreamClient : IAsyncDisposable
             throw new InvalidOperationException("The XMPP stream client is not connected.");
         }
 
+        if (_pendingNodes.Count > 0)
+        {
+            var pendingNodes = _pendingNodes.ToArray();
+            _pendingNodes.Clear();
+            return pendingNodes;
+        }
+
         var immediateNodes = _reader.ReadAvailable();
         if (immediateNodes.Count > 0)
         {
@@ -967,6 +1766,7 @@ public sealed class XmppStreamClient : IAsyncDisposable
         _tlsActive = false;
         _authenticated = false;
         _resourceBound = false;
+        ResetStreamReaderState();
         _streamManagement.Disable();
         BoundJid = null;
 
@@ -988,12 +1788,14 @@ public sealed class XmppStreamClient : IAsyncDisposable
         while (true)
         {
             var nodes = await ReadNodesAsync(cancellationToken).ConfigureAwait(false);
-            foreach (var node in nodes)
+            for (var index = 0; index < nodes.Count; index++)
             {
+                var node = nodes[index];
                 if (node.Type == XmppStreamNodeType.Features
                     && node.Element is not null
                     && XmppStreamFeatureSet.TryParse(node.Element, out var features))
                 {
+                    PreserveTrailingNodes(nodes, index);
                     return features;
                 }
 
@@ -1044,10 +1846,12 @@ public sealed class XmppStreamClient : IAsyncDisposable
 
         try
         {
-            _stream = await _tlsStreamUpgrader.UpgradeAsync(_stream, _settings.Host, cancellationToken).ConfigureAwait(false);
+            _stream = await _tlsStreamUpgrader
+                .UpgradeAsync(_stream, XmppTlsClientOptions.ForStartTls(_settings.TlsServerName), cancellationToken)
+                .ConfigureAwait(false);
             _writer = new XmppStreamWriter(_stream);
             _tlsActive = true;
-            _reader.Reset();
+            ResetStreamReaderState();
             await WriteOpenStreamAsync(cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is not XmppProtocolException)
@@ -1059,11 +1863,49 @@ public sealed class XmppStreamClient : IAsyncDisposable
         }
     }
 
+    private async Task UpgradeToDirectTlsAsync(CancellationToken cancellationToken)
+    {
+        if (_stream is null)
+        {
+            throw new InvalidOperationException("The XMPP stream is not connected.");
+        }
+
+        try
+        {
+            _stream = await _tlsStreamUpgrader
+                .UpgradeAsync(_stream, XmppTlsClientOptions.ForDirectTls(_settings.TlsServerName), cancellationToken)
+                .ConfigureAwait(false);
+            _tlsActive = true;
+            ResetStreamReaderState();
+        }
+        catch (Exception ex) when (ex is not XmppProtocolException)
+        {
+            throw new XmppProtocolException(
+                XmppProtocolErrorKind.DirectTlsFailure,
+                "The direct TLS connection failed.",
+                innerException: ex);
+        }
+    }
+
     private async Task RestartStreamAfterAuthenticationAsync(CancellationToken cancellationToken)
     {
         _authenticated = true;
-        _reader.Reset();
+        ResetStreamReaderState();
         await WriteOpenStreamAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    private void ResetStreamReaderState()
+    {
+        _reader.Reset();
+        _pendingNodes.Clear();
+    }
+
+    private void PreserveTrailingNodes(IReadOnlyList<XmppStreamNode> nodes, int processedIndex)
+    {
+        for (var index = processedIndex + 1; index < nodes.Count; index++)
+        {
+            _pendingNodes.Enqueue(nodes[index]);
+        }
     }
 
     private void EnsureWriter()

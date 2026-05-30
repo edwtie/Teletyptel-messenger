@@ -37,6 +37,17 @@ The status in the title bar changes when the relay is connected.
 
 Relay mode is the normal Alpha 1 demo path.
 
+## Mobile Lifecycle
+
+The browser client sends XEP-0352 active/inactive state automatically when the
+page becomes visible, hidden, focused, blurred, frozen or resumed. In relay mode
+this is visible as `client-state` traffic; in RFC 7395 mode it is sent as
+`<active/>` or `<inactive/>` with `urn:xmpp:csi:0`.
+
+Future Android, iOS and WebView2 shells can drive the same logic by calling
+`window.TeletyptelLifecycle.setActive()` and
+`window.TeletyptelLifecycle.setInactive()`.
+
 ## Light And Dark Mode
 
 Use the theme button in the top bar. The selected mode is saved in browser
@@ -71,19 +82,29 @@ The account panel lets you set:
 - language
 - optional password memory setting
 
-The profile is saved locally. When the MySQL API is configured, it can also be
-stored through `php/public/api/account.php`.
+The profile is stored through `php/public/api/account.php` when MySQL/MariaDB
+is configured. The browser keeps only a temporary browser-session account
+reference when that option is enabled.
 
 ## Privacy Notes
 
-Alpha 1 is a local demo. Do not use real passwords in the local relay demo. The
-password field is for testing account-profile behavior and later XMPP login
-flows.
+Alpha builds are for evaluation. The account API stores password hashes on the
+server, but do not use production passwords on a local WAMP/development install.
+Use dedicated test accounts for LocalServer, Prosody, ejabberd, Openfire or
+other XMPP smoke targets.
 
-## Current Limitations
+## Current Scope
 
 - No hosted public service yet.
-- No production authentication on the PHP relay.
-- No OMEMO encryption yet.
-- No group chat or file upload yet.
+- The PHP relay is a web edge for local UI, RTT, RFC 7395 and WebRTC/Jingle demo
+  testing; it is not the authoritative XMPP server.
+- LocalServer covers STARTTLS, SASL, bind, session, roster, presence, MUC,
+  XEP-0363 slot/PUT, vCard, blocking, stream management and client-state
+  smoke paths.
+- OMEMO protocol/key-storage helpers exist, but production end-to-end encryption
+  still needs an audited Signal Protocol backend and live interoperability
+  validation.
+- Group chat, file upload and calls have local/demo and smoke paths; public
+  release validation still needs hosted server accounts and interoperability
+  runs against existing clients.
 - No packaged Android/iOS app yet.

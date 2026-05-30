@@ -1,5 +1,5 @@
-const CACHE_NAME = "tiedragon-xmpp-webclient-v18";
-const BUILD_VERSION = "20260527-media-settings";
+const CACHE_NAME = "tiedragon-xmpp-webclient-v40";
+const BUILD_VERSION = "20260530-jingle-rtt-sync";
 const ASSETS = [
   "chat.html",
   `chat-client.css?v=${BUILD_VERSION}`,

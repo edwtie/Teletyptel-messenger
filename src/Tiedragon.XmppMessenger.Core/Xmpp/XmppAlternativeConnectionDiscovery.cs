@@ -77,6 +77,15 @@ public static class XmppAlternativeConnectionDiscovery
             .ToArray();
     }
 
+    public static IReadOnlyList<Uri> BoshUris(IEnumerable<XmppAlternativeConnectionMethod> methods)
+    {
+        ArgumentNullException.ThrowIfNull(methods);
+        return methods
+            .Where(method => method.Relation == BoshRelation)
+            .Select(method => method.Uri)
+            .ToArray();
+    }
+
     private static XmppAlternativeConnectionMethod? ParseXmlLink(XElement link)
     {
         var rel = (string?)link.Attribute("rel");

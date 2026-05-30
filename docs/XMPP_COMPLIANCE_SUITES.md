@@ -2,123 +2,184 @@
 
 Official reference:
 
-- https://xmpp.org/about/compliance-suites/
-- https://xmpp.org/extensions/attic/xep-0479-0.1.0.html
+- https://xmpp.org/extensions/xep-0479.html
 
-The XMPP Standards Foundation publishes compliance suites to group required
-specifications by application category. The currently referenced suite is
-XEP-0479: XMPP Compliance Suites 2023. The compliance page explains that suites
-define categories such as Core, Web, IM and Mobile, and levels such as Core and
-Advanced.
+Target document:
 
-This project should use the suites as an external checklist, next to its own
-implementation checklist.
+- XEP-0479: XMPP Compliance Suites 2023.
+- Version 0.1.0, published 2023-05-04.
+- Status: Experimental.
 
-## Core Compliance - Client Direction
+The XSF compliance suite is an external checklist. Teletyptel should not claim
+XEP-0479 compliance until the relevant items are implemented, tested against at
+least one real server or client where practical, documented and shipped in a
+usable release.
 
-Required for a normal client direction:
+## Claim Boundary
 
-| Feature | Provider | Project status |
-| --- | --- | --- |
-| Core features | RFC 6120 | Started |
-| TLS | RFC 7590 | Started |
-| Feature discovery | XEP-0030 | Started |
-| Feature broadcasts | XEP-0115 Entity Capabilities | Started |
+This document is a self-assessment list, not a public compliance certificate.
+Evidence can come from unit tests, local server smoke tests and real-server
+smoke tests, but the public claim should wait until the feature is also
+available in a tagged release with user-facing setup instructions.
 
-Advanced client direction:
+`Tiedragon.XmppMessenger.LocalServer` counts as local protocol evidence only.
+It is useful because it exercises the real client stack against a real
+STARTTLS/SASL/bind C2S flow, but it is intentionally scoped to localhost or a
+protected lab network. Production server compliance must be validated against a
+hardened deployment such as Prosody or ejabberd, plus the required modules for
+upload, MAM, PubSub/PEP, STUN/TURN discovery and BOSH/WebSocket where used.
 
-| Feature | Provider | Project status |
-| --- | --- | --- |
-| Direct TLS | XEP-0368 | Planned |
-| Event publishing | XEP-0163 PEP | Later |
+Status key:
 
-## Web Compliance
+- `Done`: implemented, tested and documented in this repository.
+- `Partial`: protocol or UI support exists, but live interop, mobile/provider
+  work or release documentation is still missing.
+- `Open`: not implemented yet.
+- `N/A`: not applicable to this client.
+
+## Current Real-Server Evidence
+
+Public-server smoke evidence is currently recorded against `conversations.im`
+with two Teletyptel test accounts loaded from local secret scripts. This is not
+a public compliance claim, but it is valid implementation evidence for the
+repository:
+
+- XEP-0368 direct TLS and hostname-negative TLS passed against
+  `xmpps.conversations.im:443`.
+- RFC 6120/6121 login, bind, roster and one-to-one chat passed.
+- XEP-0157 service contact discovery returned abuse, admin and support URIs.
+- XEP-0045 MUC discovery, room configuration, join and groupchat passed.
+- XEP-0363 upload discovery, `max-file-size`, slot request, HTTP PUT and
+  XEP-0066 attachment fallback passed.
+- XEP-0065 hosted SOCKS5 bytestream proxy discovery, target and initiator
+  SOCKS5 CONNECT, proxy activation and byte transfer passed.
+- XEP-0047 IBB fallback `disco#info`, `open`, ordered IQ `data`, `close` and
+  byte verification passed.
+- XEP-0124/XEP-0206 BOSH discovery, login, disco and long-poll chat passed.
+- XEP-0215 STUN discovery returned unrestricted STUN services.
+- XEP-0308 last-message correction delivered a corrected one-to-one message
+  with the original `replace` id intact.
+
+## Core Compliance Suite
+
+XEP-0479 Core Client requires the client-side items below. Advanced Client adds
+direct TLS discovery and generic event publishing.
+
+| XEP-0479 feature | Provider | Client level | Advanced client level | Teletyptel status | Next action |
+| --- | --- | --- | --- | --- | --- |
+| Core features | RFC 6120 | Required | Required | Done | Keep real-server login/chat smoke in release checklist. |
+| TLS | RFC 7590 | Required | Required | Done | Keep hostname validation and TLS policy docs current. |
+| Direct TLS | XEP-0368 | Not required | Required | Done | SRV lookup for `_xmpps-client._tcp`, endpoint planning, direct TLS connect, SNI and ALPN are implemented; public real-server smoke passed on `conversations.im`. |
+| Feature discovery | XEP-0030 | Required | Required | Done | Continue using discovery before optional features. |
+| Feature broadcasts | XEP-0115 | Required | Required | Done | Advertise stable capability sets per client profile. |
+| Server extensibility | XEP-0114 | N/A | N/A | N/A | Only relevant when shipping server components. |
+| Event publishing | XEP-0163 | Not required | Required | Done | Generic PEP/PubSub discovery, publish, retrieve, retract, delete, notification parsing and stream-client helpers are implemented; keep public-server PEP smoke in release validation. |
+
+Core Client technical coverage is close. The public product claim should still
+wait for a tagged release, user-facing setup guide and repeatable real-server
+smoke result.
+
+## Web Compliance Suite
 
 Web compliance builds on Core.
 
-| Feature | Provider | Project status |
-| --- | --- | --- |
-| Web connection mechanisms | RFC 7395 and/or XEP-0206 / XEP-0124 | Started |
-| Connection mechanism discovery | XEP-0156 | Started |
+| XEP-0479 feature | Provider | Client level | Advanced client level | Teletyptel status | Next action |
+| --- | --- | --- | --- | --- | --- |
+| Web connection mechanisms | RFC 7395 or XEP-0206/XEP-0124 | Required | Required | Done for RFC 7395 path; BOSH fallback client implemented and real-server BOSH smoke passed | Ship a production WSS endpoint for the browser client; BOSH has public-server evidence. |
+| Connection mechanism discovery | XEP-0156 | Required | Required | Done | Document host-meta setup for Windows/WAMP and Linux hosting. |
 
-The PHP/WebSocket relay now supports RFC 7395 transport smoke tests, but it is
-still not a full XMPP server.
+The PHP relay can exercise RFC 7395, but production Web compliance needs a real
+XMPP WebSocket service path, not only the local demo relay.
 
-## IM Compliance - Client Direction
+## IM Compliance Suite
 
 IM compliance builds on Core.
 
-| Feature | Provider | Project status |
-| --- | --- | --- |
-| IM and presence core | RFC 6121 | Started |
-| The `/me` command | XEP-0245 | Started |
-| vcard-temp | XEP-0054 | Started |
+| XEP-0479 feature | Provider | Client level | Advanced client level | Teletyptel status | Next action |
+| --- | --- | --- | --- | --- | --- |
+| Core IM and presence | RFC 6121 | Required | Required | Done | Keep two-account real-server chat smoke in release checklist. |
+| The `/me` command | XEP-0245 | Required | Required | Done | Keep body-compatible display behavior. |
+| User avatars | XEP-0084 | Not required | Required | Done | Wire helpers, metadata notifications, stream-client methods, browser avatar UI/cache and vCard compatibility are implemented; keep public-server PEP smoke as release validation. |
+| User avatar compatibility | XEP-0398 and XEP-0153 | Not required | Required | Done | Keep vCard PHOTO conversion and presence hash tests with avatar changes. |
+| vcard-temp | XEP-0054 | Required | Required | Done | Connect profile UI to real vCard get/set. |
+| Outbound message synchronization | XEP-0280 | Required | Required | Done | Add real multi-resource interop smoke. |
+| User blocking | XEP-0191 | Not required | Required | Done | Blocklist, block/unblock, unblock-all, push parsing, local server behavior, web contact context menu, hidden blocked contacts and real-server smoke path are implemented. |
+| Group chat | XEP-0045 and XEP-0249 | Required | Required | Done | Keep Prosody/ejabberd MUC smoke and direct invitation tests. |
+| Advanced group chat | XEP-0048, XEP-0313, XEP-0402 and XEP-0410 | Not required | Required | Done | XEP-0048/XEP-0402 bookmark helpers, XEP-0410 self-ping, MUC archive query path and public MUC archive smoke are implemented. |
+| Persistent private data via PubSub | XEP-0223 | Not required | Required | Done | Generic PEP/PubSub private-data store/retrieve helpers, stream-client methods, publish-options and notification trust checks are implemented. |
+| Private XML storage | XEP-0049 | Not required | Required | Done | Generic private XML get/set helper, parser and stream-client methods are implemented; legacy XEP-0048 bookmarks now use that layer. |
+| Stream management | XEP-0198 | Not required | Required | Done | Keep reconnect/resume tests on real unstable transport. |
+| Message acknowledgements | XEP-0184 | Not required | Required | Done | Wire receipts through the UI. |
+| History storage/retrieval | XEP-0313 | Not required | Required | Done | Protocol query/result parsing, one-to-one MAM smoke and MUC archive smoke are implemented against a public server. |
+| Chat states | XEP-0085 | Not required | Required | Done | Wire active/composing/paused through all clients. |
+| Message correction | XEP-0308 | Not required | Required | Done for one-to-one and MUC protocol; web edit flow has initial support | Serializer/parser, stream-client helpers, MUC helper, web edit flow and public two-account correction smoke are implemented; keep cross-client UI interop as release validation. |
+| File upload | XEP-0363 | Required | Required | Done | Protocol helpers, max-size discovery, slot parsing, HTTP PUT, OOB fallback, local UI upload and public-server slot/PUT smoke are implemented. |
+| Direct file transfer | XEP-0047, XEP-0065, XEP-0234, XEP-0260 and XEP-0261 | Not required | Required | Done for protocol and two-account server smoke | XEP-0065 IQ helpers, local SOCKS5 streamhost handshake/data smoke, public hosted S5B proxy discovery/activation byte-transfer smoke, XEP-0234 metadata, XEP-0260 S5B candidates and XEP-0047/XEP-0261 IBB fallback transfer smoke are implemented; keep installed-client interop as release validation. |
 
-Advanced IM direction:
+For a practical public client, the base IM Client target is more important than
+Advanced IM. XEP-0363 has public-server evidence. XEP-0191 is implemented, but
+server-blocking smoke remains release validation because deployment policy and
+module support vary per provider.
 
-| Feature | Provider | Project status |
-| --- | --- | --- |
-| User avatars | XEP-0084 | Later |
-| vCard avatar compatibility | XEP-0398 and XEP-0153 | Later |
-
-## Mobile Compliance
+## Mobile Compliance Suite
 
 Mobile compliance builds on Core.
 
-| Feature | Provider | Project status |
+| XEP-0479 feature | Provider | Client level | Advanced client level | Teletyptel status | Next action |
+| --- | --- | --- | --- | --- | --- |
+| Stream management | XEP-0198 | Required | Required | Done | Keep resume tests for unstable networks. |
+| Client state indication | XEP-0352 | Required | Required | Done at core and web lifecycle level | Add Android/iOS WebView lifecycle smoke tests. |
+| Third-party push notifications | XEP-0357 | Not required | Required | Partial | Helper exists; add real mobile provider integration later. |
+
+Mobile Client still needs Android/iOS WebView packaging and device lifecycle
+smoke tests before it can be claimed.
+
+## A/V Calling Compliance Suite
+
+The A/V suite is separate from normal chat and builds on the Jingle stack.
+
+| XEP-0479 feature | Provider | Client level | Advanced client level | Teletyptel status | Next action |
+| --- | --- | --- | --- | --- | --- |
+| Call setup | XEP-0167 and XEP-0353 | Required | Required | Done for protocol helpers | Run installed-client call setup smoke before a release claim. |
+| Transport | XEP-0176 | Required | Required | Done | Keep ICE candidate interop tests. |
+| Encryption | XEP-0320 | Required | Required | Done | Keep DTLS-SRTP fingerprint tests. |
+| STUN/TURN server discovery | XEP-0215 | Required | Required | Core and public STUN smoke path done | Run the RealServerSmoke `--external-services` command against the production TURN relay before production calls. |
+| Quality/performance improvements | XEP-0293, XEP-0294, XEP-0338 and XEP-0339 | Not required | Required | Open | Add after basic calls are interoperable. |
+
+The browser video demo proves the local WebRTC path, and the core now covers
+XEP-0353 call setup plus XEP-0167 RTP descriptions. A hosted XEP-0215 TURN
+credential run against the production relay service and an installed-client
+call smoke remain before a full A/V Client compliance claim is honest.
+
+## Specifications Of Note
+
+XEP-0479 also calls out useful specifications that are not always direct
+compliance requirements:
+
+| Area | Provider | Teletyptel status |
 | --- | --- | --- |
-| Stream management | XEP-0198 | Planned |
-| Client state indication | XEP-0352 | Planned |
-| Push notifications | XEP-0357 | Started |
+| Public account registration | XEP-0077 | Done for helper and real-server smoke path. |
+| Service contact addresses | XEP-0157 | Done for server-info data form parsing/creation. |
+| User avatars | XEP-0084 | Done: protocol helper layer, browser UI/cache, local server storage and vCard compatibility are implemented; public-server PEP smoke remains release validation. |
+| File link fallback | XEP-0066 | Done as HTTP upload message fallback. |
+| Stateless inline media sharing | XEP-0385 | Open. |
+| Consistent user colors | XEP-0392 | Open. |
+| Plaintext message styling | XEP-0393 | Open. |
+| Public channel search | XEP-0433 | Open. |
+| Message retraction | XEP-0424 | Open. |
+| Message moderation | XEP-0425 | Open. |
 
-## Important For This Project
+## Immediate Work Queue
 
-Minimum practical client target:
-
-- Core client direction.
-- IM client direction.
-- XEP-0301 real-time text as a project-specific priority.
-- XEP-0198 before serious mobile/unstable network scenarios.
-
-Do not claim compliance until the listed requirements are implemented, tested
-and documented.
-
-## Gap Against Compliance Suite
-
-Current known gaps:
-
-- XEP-0198 Stream Management real-server testing.
-- XEP-0352 Client State Indication.
-- XEP-0357 Push Notifications real-provider/mobile integration.
-
-RTT/XEP-0301 is not the main compliance-suite baseline, but it remains central
-to this product.
-
-## Core Client Self-Assessment
-
-| Requirement | Status | Evidence |
-| --- | --- | --- |
-| RFC 6120 streams | Started | Stream open/read/write, feature parser and local server tests. |
-| RFC 6120 TLS/SASL/bind | Started | STARTTLS plan, TLS upgrader hook, SCRAM/PLAIN and bind tests. |
-| RFC 7590 TLS policy | Started | TLS required by default and downgrade protection tests. |
-| RFC 7622 addresses | Started | Bare/full JID, IDN normalization and invalid JID tests. |
-| XEP-0030 discovery | Started | disco#info request/result and RTT feature checks. |
-| XEP-0115 capabilities | Started | Verification string/hash and presence payload tests. |
-| XEP-0156 alternatives | Started | host-meta XML/JSON parser for WebSocket/BOSH endpoints. |
-
-Core is not yet claimed compliant because real-server TLS hostname and account
-smoke tests are still open.
-
-## IM Client Self-Assessment
-
-| Requirement | Status | Evidence |
-| --- | --- | --- |
-| RFC 6121 chat | Started | Normal chat serialization, parsing and local server send/receive. |
-| RFC 6121 presence | Started | Presence, subscription and initial presence helpers. |
-| RFC 6121 roster | Started | Roster get/set/remove helpers and parser tests. |
-| XEP-0245 `/me` | Started | Body-preserving parser/display helper tests. |
-| XEP-0054 vcard-temp | Started | IQ get/set/result helpers for core vCard fields. |
-| XEP-0357 push | Started | Enable/disable IQ payload helpers. |
-
-IM is not yet claimed compliant because real two-account chat, UI login and
-server smoke coverage are still open.
+1. Prepare a usable release with server setup, WAMP package notes and public
+   demo instructions.
+2. Run XEP-0352 visibility/background smoke tests inside Android and iOS WebView
+   shells before any Mobile Client claim.
+3. Ship or document a production WSS endpoint for RFC 7395 Web Client use.
+4. Repeat direct file-transfer smoke with one installed XMPP client for
+   cross-client S5B/IBB interop evidence.
+5. Run hosted XEP-0215 TURN credential discovery against the production relay
+   and repeat call setup with an installed Jingle client before any A/V Client
+   claim.
+7. Keep XEP-0301 RTT as a Teletyptel product feature even though it is outside
+   the XEP-0479 baseline.

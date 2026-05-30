@@ -8,7 +8,8 @@ public sealed record XmppIncomingStanza(
     XmppPresence? Presence = null,
     XmppIq? Iq = null,
     XmppRealTimeTextMessage? RealTimeText = null,
-    XmppCarbonMessage? Carbon = null)
+    XmppCarbonMessage? Carbon = null,
+    XmppPersonalEventNotification? PersonalEvent = null)
 {
     public bool IsMessage => Element.Name == XName.Get("message", XmppXmlNames.ClientNamespace);
 
@@ -20,6 +21,8 @@ public sealed record XmppIncomingStanza(
 
     public bool IsCarbon => Carbon is not null;
 
+    public bool IsPersonalEvent => PersonalEvent is not null;
+
     public static XmppIncomingStanza FromElement(XElement element)
     {
         ArgumentNullException.ThrowIfNull(element);
@@ -29,7 +32,13 @@ public sealed record XmppIncomingStanza(
             XmppMessageCarbons.TryParse(element, out var carbon);
             XmppRealTimeTextMessage.TryParse(element, out var realTimeText);
             XmppChatMessage.TryParse(element, out var message);
-            return new XmppIncomingStanza(element, Message: message, RealTimeText: realTimeText, Carbon: carbon);
+            XmppPersonalEventing.TryParseNotification(element, out var personalEvent);
+            return new XmppIncomingStanza(
+                element,
+                Message: message,
+                RealTimeText: realTimeText,
+                Carbon: carbon,
+                PersonalEvent: personalEvent);
         }
 
         if (XmppPresence.TryParse(element, out var presence) && presence is not null)

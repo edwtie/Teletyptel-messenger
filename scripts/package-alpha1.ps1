@@ -69,9 +69,9 @@ Copy-Item -Force (Join-Path $repo "docs\LINUX_SETUP.md") $docsRoot
 Copy-Item -Force (Join-Path $repo "docs\REAL_SERVER_SETUP.md") $docsRoot
 Copy-Item -Force (Join-Path $repo "docs\RELEASE_NOTES_ALPHA1.md") $docsRoot
 
-function Publish-DotNetTools([string]$binRoot, [string]$runtime = "") {
+function Publish-DotNetTools([string]$binRoot, [object[]]$items, [string]$runtime = "") {
     New-Item -ItemType Directory -Force $binRoot | Out-Null
-    foreach ($item in $publishItems) {
+    foreach ($item in $items) {
         $output = Join-Path $binRoot $item.Name
         $arguments = @(
             "publish",
@@ -91,8 +91,8 @@ function Publish-DotNetTools([string]$binRoot, [string]$runtime = "") {
     }
 }
 
-function Add-LinuxLaunchers([string]$binRoot) {
-    foreach ($item in $publishItems) {
+function Add-LinuxLaunchers([string]$binRoot, [object[]]$items) {
+    foreach ($item in $items) {
         $toolRoot = Join-Path $binRoot $item.Name
         $dll = "Tiedragon.XmppMessenger.$($item.Name).dll"
         if ($item.Name -eq "AiBotConsole") {
@@ -118,11 +118,15 @@ $publishItems = @(
     @{ Project = "samples\Tiedragon.XmppMessenger.WebSocketConsole"; Name = "WebSocketConsole" }
 )
 
+$windowsPublishItems = $publishItems + @(
+    @{ Project = "samples\Tiedragon.XmppMessenger.WinFormsDemo"; Name = "WindowsApp" }
+)
+
 if ($Target -eq "Windows" -or $Target -eq "All") {
     $webRoot = Join-Path $stage "wamp\www\teletyptel"
     $binRoot = Join-Path $stage "wamp\bin\teletyptel"
     Copy-WebPayload $webRoot
-    Publish-DotNetTools $binRoot
+    Publish-DotNetTools $binRoot $windowsPublishItems
 }
 
 $requiredFiles = @()
@@ -131,8 +135,8 @@ if ($Target -eq "Linux" -or $Target -eq "All") {
     $linuxWebRoot = Join-Path $stage "linux\var\www\teletyptel"
     $linuxBinRoot = Join-Path $stage "linux\opt\teletyptel\bin"
     Copy-WebPayload $linuxWebRoot
-    Publish-DotNetTools $linuxBinRoot "linux-x64"
-    Add-LinuxLaunchers $linuxBinRoot
+    Publish-DotNetTools $linuxBinRoot $publishItems "linux-x64"
+    Add-LinuxLaunchers $linuxBinRoot $publishItems
 
     $systemdRoot = Join-Path $stage "linux\etc\systemd\system"
     New-Item -ItemType Directory -Force $systemdRoot | Out-Null
@@ -168,7 +172,9 @@ if ($Target -eq "Windows" -or $Target -eq "All") {
     "wamp\bin\teletyptel\RealServerSmoke\Tiedragon.XmppMessenger.RealServerSmoke.exe",
     "wamp\bin\teletyptel\RealServerSmoke\Tiedragon.XmppMessenger.Core.dll",
     "wamp\bin\teletyptel\AiBotConsole\Tiedragon.XmppMessenger.AiBotConsole.exe",
-    "wamp\bin\teletyptel\WebSocketConsole\Tiedragon.XmppMessenger.WebSocketConsole.exe"
+    "wamp\bin\teletyptel\WebSocketConsole\Tiedragon.XmppMessenger.WebSocketConsole.exe",
+    "wamp\bin\teletyptel\WindowsApp\Tiedragon.XmppMessenger.WinFormsDemo.exe",
+    "wamp\bin\teletyptel\WindowsApp\Tiedragon.XmppMessenger.Core.dll"
     )
 }
 

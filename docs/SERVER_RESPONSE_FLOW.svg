@@ -1,0 +1,210 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="1120" viewBox="0 0 1500 1120" role="img" aria-labelledby="title desc">
+  <title id="title">Teletyptel XMPP server response flow</title>
+  <desc id="desc">Diagram showing how an XMPP server responds to Teletyptel client requests: mandatory connection steps, feature discovery, chat, group chat, upload, bytestreams, BOSH, STUN/TURN and location support.</desc>
+  <defs>
+    <style>
+      .bg { fill: #f7f9fc; }
+      .title { font: 700 34px "Segoe UI", Arial, sans-serif; fill: #0b326e; }
+      .subtitle { font: 400 17px "Segoe UI", Arial, sans-serif; fill: #42566e; }
+      .lane { fill: #ffffff; stroke: #d3dfed; stroke-width: 1.5; rx: 14; }
+      .lane-title { font: 700 14px "Segoe UI", Arial, sans-serif; fill: #274a73; letter-spacing: .08em; }
+      .box { fill: #ffffff; stroke: #91aeca; stroke-width: 2; rx: 12; }
+      .client { fill: #eaf4ff; stroke: #347bd0; }
+      .ok { fill: #ebf8f0; stroke: #1f9a5b; }
+      .optional { fill: #fff7df; stroke: #d59a20; }
+      .fail { fill: #fff0f0; stroke: #d45c5c; }
+      .action { fill: #f1f4f9; stroke: #7d91ac; }
+      .label { font: 700 18px "Segoe UI", Arial, sans-serif; fill: #10243c; }
+      .small { font: 400 13px "Segoe UI", Arial, sans-serif; fill: #40556c; }
+      .mono { font: 600 12px Consolas, "Segoe UI", monospace; fill: #193b64; }
+      .note { font: 400 12px "Segoe UI", Arial, sans-serif; fill: #657991; }
+      .arrow { stroke: #2f65a7; stroke-width: 3; fill: none; marker-end: url(#arrowHead); }
+      .arrow-soft { stroke: #7f98b8; stroke-width: 2.4; fill: none; marker-end: url(#arrowHeadSoft); stroke-dasharray: 8 7; }
+      .arrow-warn { stroke: #c98112; stroke-width: 2.4; fill: none; marker-end: url(#arrowHeadWarn); stroke-dasharray: 7 6; }
+      .divider { stroke: #d3dfed; stroke-width: 1.5; }
+      .badge { fill: #e7f1ff; stroke: #3b82d6; stroke-width: 1.5; rx: 7; }
+      .badge-ok { fill: #dbf7e8; stroke: #1f9a5b; stroke-width: 1.5; rx: 7; }
+      .badge-warn { fill: #fff2ce; stroke: #d59a20; stroke-width: 1.5; rx: 7; }
+      .badge-text { font: 700 12px "Segoe UI", Arial, sans-serif; fill: #0b326e; }
+    </style>
+    <marker id="arrowHead" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M2,2 L10,6 L2,10 Z" fill="#2f65a7" />
+    </marker>
+    <marker id="arrowHeadSoft" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M2,2 L10,6 L2,10 Z" fill="#7f98b8" />
+    </marker>
+    <marker id="arrowHeadWarn" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M2,2 L10,6 L2,10 Z" fill="#c98112" />
+    </marker>
+  </defs>
+
+  <rect class="bg" width="1500" height="1120" />
+  <text class="title" x="48" y="58">How XMPP Servers Respond</text>
+  <text class="subtitle" x="50" y="88">Teletyptel first verifies the mandatory RFC 6120 path, then discovers optional XEP features and chooses the safest available fallback.</text>
+
+  <rect class="lane" x="38" y="118" width="1424" height="206" />
+  <rect class="lane" x="38" y="352" width="1424" height="292" />
+  <rect class="lane" x="38" y="672" width="1424" height="300" />
+  <rect class="lane" x="38" y="1000" width="1424" height="82" />
+
+  <text class="lane-title" x="60" y="146">MANDATORY CONNECTION PATH</text>
+  <text class="lane-title" x="60" y="380">DISCOVERED SERVER FEATURES</text>
+  <text class="lane-title" x="60" y="700">OPTIONAL FEATURE RESPONSES AND FALLBACKS</text>
+  <text class="lane-title" x="60" y="1028">LEGEND</text>
+
+  <g id="mandatory">
+    <rect class="box client" x="72" y="172" width="205" height="104" />
+    <text class="label" x="96" y="203">Connect</text>
+    <text class="mono" x="96" y="228">TCP 5222 or XEP-0368</text>
+    <text class="small" x="96" y="252">Open XMPP stream</text>
+
+    <rect class="box ok" x="330" y="172" width="232" height="104" />
+    <text class="label" x="354" y="203">TLS accepted</text>
+    <text class="mono" x="354" y="228">STARTTLS proceed</text>
+    <text class="small" x="354" y="252">or direct TLS + ALPN</text>
+
+    <rect class="box ok" x="615" y="172" width="228" height="104" />
+    <text class="label" x="639" y="203">SASL success</text>
+    <text class="mono" x="639" y="228">SCRAM / PLAIN</text>
+    <text class="small" x="639" y="252">stream restarts after auth</text>
+
+    <rect class="box ok" x="896" y="172" width="222" height="104" />
+    <text class="label" x="920" y="203">Resource bound</text>
+    <text class="mono" x="920" y="228">bind result</text>
+    <text class="small" x="920" y="252">full JID is known</text>
+
+    <rect class="box fail" x="1171" y="172" width="238" height="104" />
+    <text class="label" x="1195" y="203">Reject path</text>
+    <text class="mono" x="1195" y="228">bad host / not-authorized</text>
+    <text class="small" x="1195" y="252">stop; do not continue</text>
+
+    <path class="arrow" d="M277 224 L320 224" />
+    <path class="arrow" d="M562 224 L605 224" />
+    <path class="arrow" d="M843 224 L886 224" />
+    <path class="arrow-warn" d="M446 276 C570 322 1002 322 1212 276" />
+    <path class="arrow-warn" d="M729 276 C850 314 1118 314 1264 276" />
+  </g>
+
+  <g id="discovery">
+    <rect class="box client" x="72" y="416" width="248" height="122" />
+    <text class="label" x="96" y="447">Ask disco#info</text>
+    <text class="mono" x="96" y="472">XEP-0030</text>
+    <text class="small" x="96" y="496">server, services, contacts</text>
+    <text class="small" x="96" y="518">and full client resources</text>
+
+    <rect class="box ok" x="372" y="416" width="262" height="122" />
+    <text class="label" x="396" y="447">Feature list</text>
+    <text class="mono" x="396" y="472">features + identities</text>
+    <text class="small" x="396" y="496">muc, upload, extdisco</text>
+    <text class="small" x="396" y="518">pep, ibb, bosh, websocket</text>
+
+    <rect class="box optional" x="686" y="416" width="280" height="122" />
+    <text class="label" x="710" y="447">Optional support</text>
+    <text class="mono" x="710" y="472">advertised when enabled</text>
+    <text class="small" x="710" y="496">Teletyptel may enable UI</text>
+    <text class="small" x="710" y="518">or run feature smoke tests</text>
+
+    <rect class="box fail" x="1018" y="416" width="334" height="122" />
+    <text class="label" x="1042" y="447">Missing or refused feature</text>
+    <text class="mono" x="1042" y="472">service-unavailable / forbidden</text>
+    <text class="small" x="1042" y="496">hide control, warn user or choose fallback</text>
+    <text class="small" x="1042" y="518">never assume support without discovery</text>
+
+    <path class="arrow" d="M320 477 L362 477" />
+    <path class="arrow" d="M634 477 L676 477" />
+    <path class="arrow-warn" d="M826 538 C900 590 1080 590 1158 538" />
+
+    <rect class="box action" x="72" y="560" width="255" height="50" />
+    <text class="label" x="96" y="591">Roster and presence</text>
+
+    <rect class="box action" x="372" y="560" width="255" height="50" />
+    <text class="label" x="396" y="591">One-to-one chat</text>
+
+    <rect class="box action" x="686" y="560" width="255" height="50" />
+    <text class="label" x="710" y="591">Group chat</text>
+
+    <rect class="box action" x="986" y="560" width="255" height="50" />
+    <text class="label" x="1010" y="591">Files and calls</text>
+  </g>
+
+  <g id="optional">
+    <rect class="box client" x="72" y="736" width="244" height="92" />
+    <text class="label" x="96" y="767">Chat / presence</text>
+    <text class="mono" x="96" y="792">message, presence, roster</text>
+    <text class="small" x="96" y="814">required IM behavior</text>
+
+    <rect class="box ok" x="350" y="736" width="244" height="92" />
+    <text class="label" x="374" y="767">Delivered</text>
+    <text class="mono" x="374" y="792">message or presence stanza</text>
+    <text class="small" x="374" y="814">receipts/carbons when enabled</text>
+
+    <rect class="box client" x="628" y="736" width="244" height="92" />
+    <text class="label" x="652" y="767">MUC room</text>
+    <text class="mono" x="652" y="792">XEP-0045 join/config</text>
+    <text class="small" x="652" y="814">room may be restrictive</text>
+
+    <rect class="box ok" x="906" y="736" width="244" height="92" />
+    <text class="label" x="930" y="767">Room response</text>
+    <text class="mono" x="930" y="792">self-presence / groupchat</text>
+    <text class="small" x="930" y="814">or configure open room</text>
+
+    <rect class="box fail" x="1184" y="736" width="244" height="92" />
+    <text class="label" x="1208" y="767">Policy error</text>
+    <text class="mono" x="1208" y="792">registration-required</text>
+    <text class="small" x="1208" y="814">submit owner config if allowed</text>
+
+    <path class="arrow" d="M316 782 L340 782" />
+    <path class="arrow" d="M872 782 L896 782" />
+    <path class="arrow-warn" d="M1150 782 L1174 782" />
+
+    <rect class="box client" x="72" y="856" width="244" height="92" />
+    <text class="label" x="96" y="887">HTTP upload</text>
+    <text class="mono" x="96" y="912">XEP-0363 slot</text>
+    <text class="small" x="96" y="934">server returns PUT + GET URL</text>
+
+    <rect class="box optional" x="350" y="856" width="244" height="92" />
+    <text class="label" x="374" y="887">S5B proxy</text>
+    <text class="mono" x="374" y="912">XEP-0065</text>
+    <text class="small" x="374" y="934">streamhost, CONNECT, activate</text>
+
+    <rect class="box optional" x="628" y="856" width="244" height="92" />
+    <text class="label" x="652" y="887">IBB fallback</text>
+    <text class="mono" x="652" y="912">XEP-0047 open/data/close</text>
+    <text class="small" x="652" y="934">slow but works through XMPP</text>
+
+    <rect class="box optional" x="906" y="856" width="244" height="92" />
+    <text class="label" x="930" y="887">Media support</text>
+    <text class="mono" x="930" y="912">XEP-0215 STUN/TURN</text>
+    <text class="small" x="930" y="934">used by WebRTC/Jingle calls</text>
+
+    <rect class="box optional" x="1184" y="856" width="244" height="92" />
+    <text class="label" x="1208" y="887">PEP location</text>
+    <text class="mono" x="1208" y="912">XEP-0080 via XEP-0163</text>
+    <text class="small" x="1208" y="934">only after explicit consent</text>
+
+    <path class="arrow-soft" d="M316 902 L340 902" />
+    <path class="arrow-soft" d="M594 902 L618 902" />
+    <path class="arrow-soft" d="M872 902 L896 902" />
+    <path class="arrow-soft" d="M1150 902 L1174 902" />
+  </g>
+
+  <g id="legend">
+    <rect class="badge" x="72" y="1046" width="120" height="28" />
+    <text class="badge-text" x="92" y="1065">Client asks</text>
+
+    <rect class="badge-ok" x="220" y="1046" width="142" height="28" />
+    <text class="badge-text" x="240" y="1065">Positive result</text>
+
+    <rect class="badge-warn" x="390" y="1046" width="174" height="28" />
+    <text class="badge-text" x="410" y="1065">Optional/fallback</text>
+
+    <rect class="box fail" x="592" y="1037" width="168" height="44" />
+    <text class="badge-text" x="612" y="1065">Reject or missing</text>
+
+    <path class="arrow" d="M820 1060 L900 1060" />
+    <text class="note" x="918" y="1065">normal success flow</text>
+
+    <path class="arrow-warn" d="M1078 1060 L1158 1060" />
+    <text class="note" x="1176" y="1065">fallback or explicit warning</text>
+  </g>
+</svg>

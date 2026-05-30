@@ -6,22 +6,37 @@ public sealed class XmppTlsStreamUpgrader : IXmppTlsStreamUpgrader
 {
     public async Task<Stream> UpgradeAsync(Stream stream, string targetHost, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(stream);
+        return await UpgradeAsync(
+            stream,
+            XmppTlsClientOptions.ForStartTls(targetHost),
+            cancellationToken).ConfigureAwait(false);
+    }
 
-        if (string.IsNullOrWhiteSpace(targetHost))
-        {
-            throw new ArgumentException("Target host is required.", nameof(targetHost));
-        }
+    public async Task<Stream> UpgradeAsync(
+        Stream stream,
+        XmppTlsClientOptions options,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(stream);
+        ArgumentNullException.ThrowIfNull(options);
 
         var sslStream = new SslStream(stream, leaveInnerStreamOpen: false);
         try
         {
-            var options = new SslClientAuthenticationOptions
+            var authenticationOptions = new SslClientAuthenticationOptions
             {
-                TargetHost = targetHost
+                TargetHost = options.TargetHost
             };
 
-            await sslStream.AuthenticateAsClientAsync(options, cancellationToken).ConfigureAwait(false);
+            if (options.UseXmppClientAlpn)
+            {
+                authenticationOptions.ApplicationProtocols =
+                [
+                    new SslApplicationProtocol(XmppDirectTls.XmppClientAlpnProtocol)
+                ];
+            }
+
+            await sslStream.AuthenticateAsClientAsync(authenticationOptions, cancellationToken).ConfigureAwait(false);
             return sslStream;
         }
         catch

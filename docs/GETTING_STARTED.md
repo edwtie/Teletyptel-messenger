@@ -52,6 +52,7 @@ The zip recipe uses these source folders:
 - `tools/Tiedragon.XmppMessenger.RealServerSmoke`;
 - `samples/Tiedragon.XmppMessenger.AiBotConsole`;
 - `samples/Tiedragon.XmppMessenger.WebSocketConsole`;
+- `samples/Tiedragon.XmppMessenger.WinFormsDemo` for the Windows app package;
 - root documentation and release notes.
 
 Create the WAMP-ready zip with:
@@ -66,7 +67,8 @@ The package script publishes the .NET tools and verifies that the zip contains:
 - `wamp\www\teletyptel\lib\Database.php` for the PHP account API;
 - `wamp\www\teletyptel\rtt-websocket-server.php` for the local relay;
 - `wamp\bin\teletyptel\LocalServer` and `RealServerSmoke` binaries;
-- `wamp\bin\teletyptel\AiBotConsole` and `WebSocketConsole` binaries.
+- `wamp\bin\teletyptel\AiBotConsole`, `WebSocketConsole` and `WindowsApp`
+  binaries.
 
 The zip is written to:
 
@@ -132,6 +134,18 @@ Open the full Alpha 1 web client in two browser windows:
 php/public/chat.html
 ```
 
+When the web client is served through PHP or WAMP, use separate browser
+profiles for two different local accounts:
+
+```text
+http://127.0.0.1:8090/chat.html?profile=edward
+http://127.0.0.1:8090/chat.html?profile=tester
+```
+
+The `profile` value selects a separate local account store and a separate
+generated XMPP resource. You can also create the second window from the
+Connection panel with **Open second session**.
+
 Connect both windows to:
 
 ```text
@@ -140,6 +154,19 @@ ws://127.0.0.1:8787
 
 Type in one window. The other window should show live RTT text while typing and
 then a final message bubble after Enter.
+
+## Run The Windows App
+
+Start the same PHP relay, then run the WinForms client:
+
+```powershell
+dotnet run --project samples/Tiedragon.XmppMessenger.WinFormsDemo/Tiedragon.XmppMessenger.WinFormsDemo.csproj
+```
+
+The WAMP package publishes this client to `wamp\bin\teletyptel\WindowsApp`.
+
+Use `relay@localhost` as `Peer` for shared-room testing with browser windows.
+For directed one-to-one tests, enter the other participant's bare or full JID.
 
 ## Run Under WAMP On Windows
 
@@ -243,6 +270,9 @@ C:\wamp64\bin\teletyptel\RealServerSmoke\Tiedragon.XmppMessenger.RealServerSmoke
   --password1 secret `
   --account2 anna@localhost/desktop `
   --password2 secret `
+  --external-services `
+  --external-service localhost `
+  --external-service-type turn `
   --cert-sha256 <printed fingerprint>
 ```
 
@@ -252,12 +282,25 @@ output. The expected result is the same as the source-tree command below:
 
 ```text
 PASS TLS certificate accepted for configured host.
+PASS External service discovery smoke completed.
 PASS Two-account chat message delivered.
 ```
 
 ## Run The STARTTLS Local XMPP Server
 
-Start the local development XMPP server:
+For the repeatable server compliance smoke, let the script start the local
+server, read the printed certificate fingerprint and run the real client smoke
+against it:
+
+```powershell
+.\scripts\local-xmpp-server-smoke.ps1
+```
+
+The smoke covers STARTTLS, hostname rejection, SASL login, resource binding,
+roster, XEP-0157 service contacts, XEP-0191 blocking, XEP-0215 STUN/TURN
+discovery, XEP-0363 upload service discovery, direct chat and XEP-0045 MUC.
+
+To run the pieces manually, start the local development XMPP server:
 
 ```powershell
 dotnet run --project tools/Tiedragon.XmppMessenger.LocalServer -- `
@@ -277,6 +320,9 @@ dotnet run --project tools/Tiedragon.XmppMessenger.RealServerSmoke -- `
   --account2 anna@localhost/desktop `
   --password2 secret `
   --register `
+  --external-services `
+  --external-service localhost `
+  --external-service-type turn `
   --cert-sha256 <printed fingerprint>
 ```
 
@@ -286,13 +332,15 @@ Expected result:
 PASS TLS certificate accepted for configured host.
 PASS Registration accepted for edward@localhost.
 PASS Registration accepted for anna@localhost.
+PASS External service discovery smoke completed.
 PASS Two-account chat message delivered.
 ```
 
 This is the main local server validation. `LocalServer` supplies the controlled
 STARTTLS/XMPP endpoint; `RealServerSmoke` connects through the real client
 library and proves that the client can register accounts, negotiate TLS/SASL,
-bind a resource and deliver a normal chat message between two accounts.
+bind a resource, discover local STUN/TURN services and deliver a normal chat
+message between two accounts.
 
 ## Optional MySQL Account Profile
 

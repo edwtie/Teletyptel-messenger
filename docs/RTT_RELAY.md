@@ -4,8 +4,10 @@ The PHP relay is a local development bridge for XEP-0301 real-time text and RFC
 7395 WebSocket experiments. It exists so browser, WinForms and console clients
 can test live text behavior before they connect to a real XMPP server.
 
-This relay is not a full XMPP server. It has no accounts, roster, presence
-store, SASL, STARTTLS or federation. It does support two local WebSocket modes:
+This relay is not the XMPP server. Accounts, roster, presence storage, SASL,
+STARTTLS and federation belong to `Tiedragon.XmppMessenger.LocalServer` during
+local smoke tests or to the configured real XMPP server. The relay supports two
+local WebSocket modes:
 
 - JSON RTT demo mode for simple browser testing.
 - RFC 7395 test mode with the `xmpp` WebSocket subprotocol.
@@ -23,10 +25,10 @@ Use the relay for:
 
 Do not use the relay for:
 
-- production messaging
-- account login
-- roster, presence or archive behavior
-- TLS or certificate testing
+- production server routing
+- XMPP account login
+- authoritative roster, presence or archive behavior
+- TLS or certificate testing on the raw relay socket
 - federation or server-to-server XMPP
 
 ## JSON RTT Mode
@@ -83,26 +85,29 @@ The relay answers with a server-side `<open/>` frame and accepts `<message/>`,
 only to other clients connected in `xmpp` mode.
 
 This mode is for transport testing. It proves the WebSocket framing,
-subprotocol negotiation and XML frame path. It does not provide XMPP
-authentication or server semantics.
+subprotocol negotiation and XML frame path. It does not replace
+LocalServer/Prosody/ejabberd/Openfire for XMPP authentication or server
+semantics.
 
 ## Safety Boundary
 
 The relay is intentionally dependency-free and local-only.
 
 - It binds to `127.0.0.1:8787`.
-- It has no authentication.
-- It has no TLS.
+- It relies on the PHP account API for the browser account gate.
+- It has no TLS on the raw socket; public exposure must go through an HTTPS/WSS
+  reverse proxy.
 - It accepts text WebSocket frames only.
 - In JSON mode it rejects non-JSON payloads.
-- In JSON mode it accepts only `rtt` and `message` envelope types.
+- In JSON mode it accepts only bounded chat, RTT, presence, client-state and
+  Jingle call envelope types.
 - In RFC 7395 mode it accepts `<open/>`, `<close/>`, `<message/>`,
   `<presence/>` and `<iq/>` frames.
-- It limits payloads to 65535 bytes.
+- It limits payloads to 1048576 bytes.
 
-Do not expose this relay to the internet. The production path is a real XMPP
-server with TLS, authentication and XEP-0301 message payloads over normal XMPP
-or RFC 7395.
+Do not expose the raw relay socket directly to the internet. The production path
+is a real XMPP server with TLS, authentication and XEP-0301 message payloads
+over normal XMPP, BOSH or RFC 7395.
 
 ## Validation
 

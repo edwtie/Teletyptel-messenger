@@ -9,7 +9,8 @@ public sealed record XmppPresence(
     XmppAddress? To = null,
     XmppAddress? From = null,
     XmppPresenceType Type = XmppPresenceType.Available,
-    XmppEntityCapabilities? Capabilities = null)
+    XmppEntityCapabilities? Capabilities = null,
+    XmppVCardAvatarUpdate? VCardAvatarUpdate = null)
 {
     public static bool TryParse(XElement element, out XmppPresence? presence)
     {
@@ -42,6 +43,10 @@ public sealed record XmppPresence(
             Capabilities: element
                 .Elements(XName.Get("c", XmppEntityCapabilities.NamespaceName))
                 .Select(child => XmppEntityCapabilities.TryParse(child, out var parsed) ? parsed : null)
+                .FirstOrDefault(parsed => parsed is not null),
+            VCardAvatarUpdate: element
+                .Elements(XName.Get("x", XmppVCardAvatar.UpdateNamespaceName))
+                .Select(child => XmppVCardAvatarUpdate.TryParse(child, out var parsed) ? parsed : null)
                 .FirstOrDefault(parsed => parsed is not null));
         return true;
     }
@@ -97,6 +102,11 @@ public sealed record XmppPresence(
         if (Capabilities is not null)
         {
             element.Add(Capabilities.ToXml());
+        }
+
+        if (VCardAvatarUpdate is not null)
+        {
+            element.Add(VCardAvatarUpdate.ToXml());
         }
 
         return element;

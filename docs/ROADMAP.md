@@ -1,88 +1,182 @@
 # Roadmap
 
-## Alpha 1 - XMPP Core Chat
+Teletyptel phases are now gated by XEP-0479: XMPP Compliance Suites 2023.
+Product names such as Alpha, Beta and Release may still be used for packaging,
+but protocol scope follows the official compliance categories.
 
-- XMPP address/JID model and validation
-- connection settings with TLS defaults
-- stream options and feature flags
-- XMPP account login
-- TLS connection
-- roster/contact list
-- one-to-one chat
-- presence: online, away, offline
-- reconnect using stream management
-- web client shell
-- local account/provider/tab model documentation
+Reference: https://xmpp.org/extensions/xep-0479.html
 
-Protocols:
+## Claim Rule
 
-- RFC 6120
-- RFC 6121
-- XEP-0030
-- XEP-0198
+Do not claim XEP-0479 compliance only because protocol helpers exist. A phase is
+claimable only when the relevant items are implemented, tested, documented and
+available in a usable tagged release.
 
-## Alpha 2 - Conversation Quality
+Evidence levels:
 
-- message delivery receipts
-- typing indicator
-- message carbons for multi-device sync
-- server-side message archive
-- real-time text
-- provider manifest loader
-- static web tabs for provider/support/captions
+- `Protocol`: serializers, parsers, stream-client methods and unit tests exist.
+- `Local smoke`: the local server or local relay exercised the real code path.
+- `Public smoke`: two real accounts or a real public server exercised the path.
+- `Interop smoke`: another installed XMPP client or server exercised the path.
+- `Release`: user-facing setup, binaries/package and repeatable instructions
+  exist.
 
-Protocols:
+## Phase 1 - XEP-0479 Core Client
 
-- XEP-0184
-- XEP-0085
-- XEP-0280
-- XEP-0313
-- XEP-0301
+Goal: a standards-shaped XMPP client foundation.
 
-## Beta 1 - Group And Files
+Required for Client:
 
-- multi-user chat
-- file upload
-- image sharing
-- notification polish
-- first tester build
-- first SMS/caption provider adapter prototype
+- RFC 6120 - XMPP Core
+- RFC 7590 - TLS for XMPP
+- XEP-0030 - Service Discovery
+- XEP-0115 - Entity Capabilities
 
-Protocols:
+Required for Advanced Client:
 
-- XEP-0045
-- XEP-0363
+- XEP-0368 - SRV records for XMPP over TLS
+- XEP-0163 - Personal Eventing Protocol
 
-## Beta 2 - Security
+Not applicable for a normal client:
 
-- OMEMO end-to-end encryption
-- encrypted media sharing
-- local secure credential storage
+- XEP-0114 - Jabber Component Protocol
 
-Protocols:
+Exit criteria:
 
-- XEP-0384
-- XEP-0454
+- login, TLS, SASL, bind, roster, presence and stanza send/receive pass against
+  local and public servers;
+- capability discovery and advertised client capabilities are stable;
+- direct TLS and PEP/PubSub helpers pass public-server smoke where supported.
 
-## Beta 3 - Calls
+## Phase 2 - XEP-0479 Web Client
 
-- audio call signaling
-- video call signaling
-- WebRTC media transport
-- STUN/TURN configuration
-- real-time text during calls
+Goal: browser/mobile-WebView connection paths that are real XMPP, not only the
+demo relay.
 
-Protocols:
+Required for Client and Advanced Client:
 
-- XEP-0166
-- XEP-0167
-- XEP-0176
-- XEP-0301
+- RFC 7395 - XMPP over WebSocket, or XEP-0206/XEP-0124 - BOSH
+- XEP-0156 - Alternative Connection Method discovery
 
-## Release 1.0
+Exit criteria:
 
-- stable chat
-- stable updater/installer plan
-- accessibility options
-- privacy policy
-- support documentation
+- browser client can use a production WebSocket or BOSH XMPP endpoint;
+- host-meta discovery is documented for Windows/WAMP and Linux hosting;
+- local PHP relay remains a development bridge and is not used as a compliance
+  substitute.
+
+## Phase 3 - XEP-0479 IM Client
+
+Goal: complete normal messenger behavior before advanced polish.
+
+Required for Client:
+
+- RFC 6121 - Instant Messaging and Presence
+- XEP-0245 - The `/me` Command
+- XEP-0054 - vcard-temp
+- XEP-0280 - Message Carbons
+- XEP-0045 - Multi-User Chat
+- XEP-0249 - Direct MUC Invitations
+- XEP-0363 - HTTP File Upload
+
+Required for Advanced Client:
+
+- XEP-0084 - User Avatar
+- XEP-0398 and XEP-0153 - vCard avatar compatibility
+- XEP-0191 - Blocking Command
+- XEP-0048 - Bookmark Storage
+- XEP-0313 - Message Archive Management
+- XEP-0402 - PEP Native Bookmarks
+- XEP-0410 - MUC Self-Ping
+- XEP-0223 - Persistent private data via PubSub
+- XEP-0049 - Private XML Storage
+- XEP-0198 - Stream Management
+- XEP-0184 - Message Delivery Receipts
+- XEP-0085 - Chat State Notifications
+- XEP-0308 - Last Message Correction
+- XEP-0234 and XEP-0261 - Jingle file transfer and IBB fallback
+
+Supporting direct-transfer pieces used by the implementation:
+
+- XEP-0047 - In-Band Bytestreams
+- XEP-0065 - SOCKS5 Bytestreams
+- XEP-0260 - Jingle SOCKS5 Bytestreams
+
+Exit criteria:
+
+- one-to-one chat, roster, presence, corrections, receipts, avatars, blocking,
+  MUC, upload and archive flows pass public-server smoke;
+- direct file transfer has both server-smoke evidence and at least one
+  installed-client interop result before it is marketed.
+
+## Phase 4 - XEP-0479 Mobile Client
+
+Goal: WebView/native mobile behavior that survives real mobile networks.
+
+Required for Client:
+
+- XEP-0198 - Stream Management
+- XEP-0352 - Client State Indication
+
+Required for Advanced Client:
+
+- XEP-0357 - Push Notifications
+
+Exit criteria:
+
+- Android and iOS lifecycle tests cover foreground, background, resume and
+  network changes;
+- push-provider integration is live before any Advanced Mobile claim.
+
+## Phase 5 - XEP-0479 A/V Calling Client
+
+Goal: real Jingle call setup and WebRTC media with another capable client.
+
+Required for Client:
+
+- XEP-0167 - Jingle RTP Sessions
+- XEP-0353 - Jingle Message Initiation
+- XEP-0176 - Jingle ICE-UDP Transport
+- XEP-0320 - DTLS-SRTP in Jingle
+- XEP-0215 - External Service Discovery for STUN/TURN
+
+Required for Advanced Client:
+
+- XEP-0293 - Jingle RTP Feedback Negotiation
+- XEP-0294 - Jingle RTP Header Extensions Negotiation
+- XEP-0338 - Jingle Grouping Framework
+- XEP-0339 - Source-Specific Media Attributes in Jingle
+
+Exit criteria:
+
+- call proposal, ringing, proceed/reject, Jingle session setup, ICE, DTLS and
+  hangup pass protocol tests;
+- hosted STUN/TURN discovery works against the production relay;
+- a live call with an installed Jingle-capable client is recorded.
+
+## Teletyptel Product Additions Outside XEP-0479
+
+These features stay important, but they are not allowed to distort the
+XEP-0479 phase gates:
+
+- XEP-0301 real-time text as the core accessibility differentiator.
+- XEP-0080 user location for accessibility and emergency-readiness flows.
+- PIDF-LO/RFC 6442 export for future NG112 gateway experiments.
+- Accessibility agent adapters for captions, speech and sign-language research.
+- LngPdk localization packaging and signed language resources.
+- Account/profile UX, provider tabs and public hosted service operations.
+
+## Release 1.0 Gate
+
+Release 1.0 should claim only the XEP-0479 categories that are truly finished.
+The safe target order is:
+
+1. Core Client.
+2. Web Client.
+3. IM Client.
+4. Mobile Client.
+5. A/V Calling Client.
+
+Advanced claims are separate. For example, Teletyptel may ship an IM Client
+release before it claims Advanced IM, and it may ship video-call experiments
+before it claims A/V Calling compliance.

@@ -5,6 +5,7 @@ public enum XmppProtocolErrorKind
     Connection,
     StreamClosed,
     StreamError,
+    DirectTlsFailure,
     StartTlsFailure,
     AuthenticationFailure,
     ResourceBindingFailure,

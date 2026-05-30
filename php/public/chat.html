@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#111827">
   <title>Tiedragon XMPP Web Client</title>
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="chat-client.css?v=20260527-media-settings">
+  <link rel="stylesheet" href="chat-client.css?v=20260530-jingle-rtt-sync">
 </head>
 <body>
   <div class="app-shell">
@@ -19,7 +19,13 @@
         </div>
       </div>
       <div class="top-actions" role="toolbar" aria-label="Connection actions">
-        <button id="themeButton" class="theme-button" type="button" title="Switch light/dark mode" aria-label="Switch light/dark mode">Theme: Dark</button>
+        <details id="viewMenu" class="top-menu">
+          <summary data-i18n="menu.view">View</summary>
+          <div class="top-menu-panel">
+            <button id="themeButton" class="theme-button" type="button" title="Switch light/dark mode" aria-label="Switch light/dark mode">Theme: White</button>
+          </div>
+        </details>
+        <button id="accountButton" type="button" data-i18n="button.account">Account</button>
         <button id="connectButton" type="button" data-i18n="button.connect">Connect</button>
         <button id="disconnectButton" type="button" disabled data-i18n="button.disconnect">Disconnect</button>
       </div>
@@ -29,9 +35,13 @@
       <aside class="conversation-list" aria-label="Conversations">
         <div class="section-heading">
           <span data-i18n="section.conversations">Conversations</span>
-          <button id="addConversationButton" type="button" title="Add conversation">+</button>
         </div>
         <div id="conversationItems" class="conversation-items"></div>
+        <div class="conversation-actions">
+          <button id="addConversationButton" type="button" data-i18n="button.new_contact">New contact</button>
+          <button id="addGroupButton" type="button" data-i18n="button.new_group">New group</button>
+          <button id="inviteConversationButton" type="button" data-i18n="button.invite">Invite</button>
+        </div>
       </aside>
 
       <section class="chat-panel" aria-label="Chat">
@@ -44,14 +54,22 @@
         <nav id="appTabs" class="app-tabs" aria-label="Teletyptel tabs"></nav>
 
         <div class="chat-header">
-          <div>
+          <div class="chat-title">
+            <div id="activeConversationAvatar" class="avatar avatar-header" aria-hidden="true">R</div>
+            <div>
             <h2 id="activeConversationName">Relay room</h2>
             <span id="activeConversationMeta">Local PHP relay</span>
+            </div>
           </div>
           <div class="chat-header-actions">
             <div class="call-controls" role="toolbar" aria-label="Call controls">
-              <button id="startAudioCallButton" type="button" data-i18n="button.audio_call">Audio call</button>
-              <button id="startVideoCallButton" type="button" data-i18n="button.video_call">Video call</button>
+              <div class="call-menu">
+                <button id="startCallButton" class="call-menu-trigger" type="button" aria-haspopup="true" aria-expanded="false" data-i18n="button.call">Call</button>
+                <div id="startCallMenu" class="call-menu-panel" hidden>
+                  <button id="startAudioCallOption" type="button" data-i18n="button.audio_call">Audio call</button>
+                  <button id="startVideoCallOption" type="button" data-i18n="button.video_call">Video call</button>
+                </div>
+              </div>
               <button id="answerCallButton" type="button" hidden data-i18n="button.answer_call">Answer</button>
               <button id="rejectCallButton" type="button" hidden data-i18n="button.reject_call">Reject</button>
               <button id="hangupCallButton" type="button" disabled data-i18n="button.hangup_call">Hang up</button>
@@ -64,9 +82,41 @@
           </div>
         </div>
 
+        <section id="incomingCallBanner" class="incoming-call" hidden role="alert" aria-live="assertive">
+          <div>
+            <strong id="incomingCallTitle">Incoming video call</strong>
+            <span id="incomingCallText">Incoming call from remote</span>
+          </div>
+          <div class="incoming-call-actions">
+            <button id="incomingAnswerButton" type="button" data-i18n="button.answer_call">Answer</button>
+            <button id="incomingRejectButton" type="button" data-i18n="button.reject_call">Reject</button>
+          </div>
+        </section>
+
+        <div id="incomingCallDialog" class="incoming-call-dialog" hidden role="alertdialog" aria-modal="true" aria-labelledby="incomingCallDialogTitle">
+          <div class="incoming-call-card">
+            <strong id="incomingCallDialogTitle">Incoming video call</strong>
+            <span id="incomingCallDialogText">Incoming call from remote</span>
+            <div class="incoming-call-actions">
+              <button id="dialogAnswerButton" type="button" data-i18n="button.answer_call">Answer</button>
+              <button id="dialogRejectButton" type="button" data-i18n="button.reject_call">Reject</button>
+            </div>
+          </div>
+        </div>
+
         <section id="callPanel" class="call-panel" hidden aria-label="Call media">
           <video id="remoteVideo" autoplay playsinline></video>
           <video id="localVideo" autoplay muted playsinline></video>
+          <div class="call-media-controls" role="toolbar" aria-label="Call audio controls">
+            <button id="toggleCameraButton" type="button" disabled data-i18n="button.turn_camera_off">Turn camera off</button>
+            <button id="muteMicrophoneButton" type="button" disabled data-i18n="button.mute_microphone">Mute microphone</button>
+            <button id="muteRemoteAudioButton" type="button" data-i18n="button.mute_sound">Mute sound</button>
+            <label class="volume-control">
+              <span data-i18n="label.remote_volume">Volume</span>
+              <input id="remoteVolumeInput" type="range" min="0" max="100" value="100">
+              <output id="remoteVolumeValue" for="remoteVolumeInput">100%</output>
+            </label>
+          </div>
         </section>
 
         <div id="messageTimeline" class="message-timeline" aria-live="polite"></div>
@@ -90,8 +140,13 @@
         <form id="composerForm" class="composer">
           <div class="composer-tools" role="toolbar" aria-label="Message tools">
             <button id="resetRttButton" type="button" data-i18n="button.reset_rtt">Reset RTT</button>
-            <button id="composerAudioCallButton" type="button" data-i18n="button.audio_call">Audio call</button>
-            <button id="composerVideoCallButton" type="button" data-i18n="button.video_call">Video call</button>
+            <div class="call-menu composer-call-menu">
+              <button id="composerCallButton" class="call-menu-trigger" type="button" aria-haspopup="true" aria-expanded="false" data-i18n="button.call">Call</button>
+              <div id="composerCallMenu" class="call-menu-panel" hidden>
+                <button id="composerAudioCallOption" type="button" data-i18n="button.audio_call">Audio call</button>
+                <button id="composerVideoCallOption" type="button" data-i18n="button.video_call">Video call</button>
+              </div>
+            </div>
             <button id="uploadFileButton" type="button" data-i18n="button.upload_file">Upload file</button>
             <input id="fileInput" class="file-input" type="file">
             <label class="toggle">
@@ -115,6 +170,14 @@
         <section class="settings-section">
           <h2 data-i18n="section.connection">Connection</h2>
           <label>
+            <span data-i18n="label.browser_session">Browser session</span>
+            <input id="sessionProfileInput" value="default" autocomplete="off">
+          </label>
+          <div class="button-row">
+            <button id="switchSessionButton" type="button" data-i18n="button.switch_session">Switch session</button>
+            <button id="openSecondSessionButton" type="button" data-i18n="button.open_second_session">Open second session</button>
+          </div>
+          <label>
             <span data-i18n="label.relay_websocket">Relay WebSocket</span>
             <input id="relayUrlInput" value="ws://127.0.0.1:8787">
           </label>
@@ -122,6 +185,20 @@
             <span data-i18n="label.display_name">Display name</span>
             <input id="displayNameInput" value="Edward">
           </label>
+          <div class="avatar-editor">
+            <div id="accountAvatarPreview" class="avatar avatar-large" aria-hidden="true">E</div>
+            <div class="avatar-editor-fields">
+              <label>
+                <span data-i18n="label.avatar_color">Avatar color</span>
+                <input id="avatarColorInput" type="color" value="#2563eb">
+              </label>
+              <div class="button-row">
+                <button id="chooseAvatarButton" type="button" data-i18n="button.choose_avatar">Choose avatar</button>
+                <button id="clearAvatarButton" type="button" data-i18n="button.clear_avatar">Clear avatar</button>
+              </div>
+              <input id="avatarFileInput" class="file-input" type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml">
+            </div>
+          </div>
           <label>
             JID
             <input id="jidInput" value="edward@localhost/web">
@@ -132,7 +209,7 @@
           </label>
           <label class="toggle">
             <input id="rememberPasswordToggle" type="checkbox">
-            <span data-i18n="option.remember_password">Remember password locally</span>
+            <span data-i18n="option.remember_password">Keep account for this browser session</span>
           </label>
           <label>
             <span data-i18n="label.peer">Peer</span>
@@ -217,6 +294,116 @@
     </main>
   </div>
 
-  <script src="chat-client.js?v=20260527-media-settings"></script>
+  <div id="accountDialog" class="modal-shell" hidden role="dialog" aria-modal="true" aria-labelledby="accountDialogTitle">
+    <div class="modal-card account-dialog-card">
+      <div class="modal-header">
+        <div>
+          <h2 id="accountDialogTitle" data-i18n="account.dialog_title">Account and password</h2>
+          <span data-i18n="account.dialog_subtitle">Use a real XMPP JID, password and server settings.</span>
+        </div>
+        <button id="closeAccountDialogButton" class="icon-button" type="button" aria-label="Close" data-i18n-aria-label="button.close">x</button>
+      </div>
+      <div class="modal-body account-dialog-body">
+        <div id="dialogAccountStatus" class="dialog-status" role="status" aria-live="polite"></div>
+
+        <section class="modal-section">
+          <h3 data-i18n="section.real_account">Real account</h3>
+          <div class="account-dialog-grid">
+            <label>
+              <span data-i18n="label.browser_session">Browser session</span>
+              <input id="dialogSessionProfileInput" autocomplete="off">
+            </label>
+            <label>
+              <span data-i18n="label.display_name">Display name</span>
+              <input id="dialogDisplayNameInput" autocomplete="name">
+            </label>
+            <label>
+              JID
+              <input id="dialogJidInput" autocomplete="username" inputmode="email">
+            </label>
+            <label>
+              <span data-i18n="label.password">Password</span>
+              <input id="dialogPasswordInput" type="password" autocomplete="current-password">
+            </label>
+            <label class="toggle modal-toggle">
+              <input id="dialogRememberPasswordToggle" type="checkbox">
+              <span data-i18n="option.remember_password">Keep account for this browser session</span>
+            </label>
+          </div>
+        </section>
+
+        <section class="modal-section">
+          <h3 data-i18n="section.server_settings">Server settings</h3>
+          <div class="account-dialog-grid">
+            <label>
+              <span data-i18n="label.xmpp_domain">XMPP domain</span>
+              <input id="dialogXmppDomainInput" autocomplete="off">
+            </label>
+            <label>
+              <span data-i18n="label.xmpp_host">XMPP host</span>
+              <input id="dialogXmppHostInput" autocomplete="off">
+            </label>
+            <label>
+              <span data-i18n="label.xmpp_port">XMPP port</span>
+              <input id="dialogXmppPortInput" type="number" min="1" max="65535" value="5222">
+            </label>
+            <label>
+              <span data-i18n="label.xmpp_tls_mode">TLS mode</span>
+              <select id="dialogXmppTlsModeInput">
+                <option value="starttls">STARTTLS</option>
+                <option value="direct-tls">Direct TLS</option>
+                <option value="websocket">WebSocket only</option>
+              </select>
+            </label>
+            <label>
+              <span data-i18n="label.relay_websocket">Relay WebSocket</span>
+              <input id="dialogRelayUrlInput" autocomplete="url">
+            </label>
+            <label>
+              XMPP WebSocket
+              <input id="dialogXmppUrlInput" autocomplete="url">
+            </label>
+            <label>
+              <span data-i18n="label.provider">Provider</span>
+              <input id="dialogProviderInput">
+            </label>
+            <label>
+              <span data-i18n="label.language">Language</span>
+              <select id="dialogLanguageInput">
+                <option value="ned">Nederlands</option>
+                <option value="eng">English</option>
+              </select>
+            </label>
+          </div>
+        </section>
+
+        <section class="modal-section">
+          <h3 data-i18n="section.chat_defaults">Chat defaults</h3>
+          <div class="account-dialog-grid">
+            <label>
+              <span data-i18n="label.peer">Peer</span>
+              <input id="dialogPeerInput" autocomplete="off">
+            </label>
+            <label>
+              <span data-i18n="label.phone">Phone</span>
+              <input id="dialogPhoneInput" autocomplete="tel">
+            </label>
+          </div>
+        </section>
+      </div>
+      <div class="modal-actions">
+        <button id="dialogCreateAccountButton" type="button" data-i18n="button.create_account">Create account</button>
+        <button id="dialogSaveAccountButton" type="button" data-i18n="button.save_settings">Save settings</button>
+        <button id="dialogConnectButton" type="button" data-i18n="button.save_connect">Save and connect</button>
+        <button id="cancelAccountDialogButton" type="button" data-i18n="button.cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="conversationContextMenu" class="context-menu" hidden role="menu" aria-label="Contact menu">
+    <button id="contextBlockButton" class="danger-action" type="button" role="menuitem" data-i18n="button.block_contact">Block</button>
+  </div>
+
+  <script src="chat-client.js?v=20260530-jingle-rtt-sync"></script>
 </body>
 </html>

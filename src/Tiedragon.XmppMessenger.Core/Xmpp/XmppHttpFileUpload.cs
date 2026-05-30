@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Globalization;
+using System.Xml;
 using System.Xml.Linq;
 
 namespace Tiedragon.XmppMessenger.Core.Xmpp;
@@ -32,7 +33,8 @@ public static class XmppHttpFileUpload
         string fileName,
         long size,
         string? contentType = null,
-        XmppHttpUploadPurpose purpose = XmppHttpUploadPurpose.Default)
+        XmppHttpUploadPurpose purpose = XmppHttpUploadPurpose.Default,
+        DateTimeOffset? expireBefore = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(id);
         ArgumentNullException.ThrowIfNull(uploadService);
@@ -47,10 +49,10 @@ public static class XmppHttpFileUpload
             request.SetAttributeValue("content-type", contentType);
         }
 
-        var purposeElement = PurposeElementName(purpose);
+        var purposeElement = PurposeElement(purpose, expireBefore);
         if (purposeElement is not null)
         {
-            request.Add(new XElement(XName.Get(purposeElement, PurposeNamespaceName)));
+            request.Add(purposeElement);
         }
 
         return new XmppIq(XmppIqType.Get, id, request, To: uploadService);
@@ -71,8 +73,8 @@ public static class XmppHttpFileUpload
         var getUrl = (string?)get?.Attribute("url");
         if (!Uri.TryCreate(putUrl, UriKind.Absolute, out var putUri)
             || !Uri.TryCreate(getUrl, UriKind.Absolute, out var getUri)
-            || putUri.Scheme != Uri.UriSchemeHttps
-            || getUri.Scheme != Uri.UriSchemeHttps)
+            || !IsAllowedUploadUri(putUri)
+            || !IsAllowedUploadUri(getUri))
         {
             return false;
         }
@@ -86,6 +88,24 @@ public static class XmppHttpFileUpload
 
         slot = new XmppHttpUploadSlot(putUri, getUri, headers);
         return true;
+    }
+
+    private static bool IsAllowedUploadUri(Uri uri)
+    {
+        if (uri.Scheme == Uri.UriSchemeHttps)
+        {
+            return true;
+        }
+
+        // LocalServer uses a loopback HTTP endpoint for repeatable lab smokes.
+        // Internet-facing upload services must still use HTTPS.
+        if (uri.Scheme != Uri.UriSchemeHttp)
+        {
+            return false;
+        }
+
+        return string.Equals(uri.Host, "localhost", StringComparison.OrdinalIgnoreCase)
+            || (IPAddress.TryParse(uri.Host, out var address) && IPAddress.IsLoopback(address));
     }
 
     public static bool TryParseFileTooLarge(XmppIq iq, out long? maxFileSize)
@@ -106,6 +126,31 @@ public static class XmppHttpFileUpload
         }
 
         return fileTooLarge is not null;
+    }
+
+    public static bool TryParseRetry(XmppIq iq, out DateTimeOffset? retryAt)
+    {
+        retryAt = null;
+        if (iq.Type != XmppIqType.Error)
+        {
+            return false;
+        }
+
+        var retry = iq.ToXml()
+            .Element(XName.Get("error", XmppXmlNames.ClientNamespace))
+            ?.Element(XName.Get("retry", NamespaceName));
+        var stamp = (string?)retry?.Attribute("stamp");
+        if (!string.IsNullOrWhiteSpace(stamp)
+            && DateTimeOffset.TryParse(
+                stamp,
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+                out var parsed))
+        {
+            retryAt = parsed;
+        }
+
+        return retry is not null;
     }
 
     public static bool TryGetAdvertisedMaxFileSize(
@@ -238,17 +283,31 @@ public static class XmppHttpFileUpload
         return XmppChatMessage.CreateOutOfBandMessage(to, upload.GetUrl, fileName, id);
     }
 
-    private static string? PurposeElementName(XmppHttpUploadPurpose purpose)
+    private static XElement? PurposeElement(XmppHttpUploadPurpose purpose, DateTimeOffset? expireBefore)
     {
         return purpose switch
         {
             XmppHttpUploadPurpose.Default => null,
-            XmppHttpUploadPurpose.Message => "message",
-            XmppHttpUploadPurpose.Profile => "profile",
-            XmppHttpUploadPurpose.Ephemeral => "ephemeral",
-            XmppHttpUploadPurpose.Permanent => "permanent",
+            XmppHttpUploadPurpose.Message => new XElement(XName.Get("message", PurposeNamespaceName)),
+            XmppHttpUploadPurpose.Profile => new XElement(XName.Get("profile", PurposeNamespaceName)),
+            XmppHttpUploadPurpose.Ephemeral => CreateEphemeralPurpose(expireBefore),
+            XmppHttpUploadPurpose.Permanent => new XElement(XName.Get("permanent", PurposeNamespaceName)),
             _ => throw new ArgumentOutOfRangeException(nameof(purpose))
         };
+    }
+
+    private static XElement CreateEphemeralPurpose(DateTimeOffset? expireBefore)
+    {
+        if (expireBefore is null)
+        {
+            throw new ArgumentException("Ephemeral HTTP upload requests require an expire-before timestamp.", nameof(expireBefore));
+        }
+
+        return new XElement(
+            XName.Get("ephemeral", PurposeNamespaceName),
+            new XAttribute(
+                "expire-before",
+                XmlConvert.ToString(expireBefore.Value.UtcDateTime, XmlDateTimeSerializationMode.Utc)));
     }
 
     private static string SanitizeHeader(string value)

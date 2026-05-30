@@ -22,10 +22,16 @@ public sealed record XmppIq(
         XmppAddress.TryParse((string?)element.Attribute("to"), out var to);
         XmppAddress.TryParse((string?)element.Attribute("from"), out var from);
 
+        var children = element.Elements().ToArray();
+        var payload = type == XmppIqType.Error
+            ? children.FirstOrDefault(child => child.Name == XName.Get("error", XmppXmlNames.ClientNamespace))
+                ?? children.FirstOrDefault()
+            : children.SingleOrDefault();
+
         iq = new XmppIq(
             Type: type,
             Id: (string?)element.Attribute("id") ?? string.Empty,
-            Payload: element.Elements().SingleOrDefault(),
+            Payload: payload,
             To: to,
             From: from);
         return true;

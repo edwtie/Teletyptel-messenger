@@ -20,6 +20,13 @@ When that dependency changes, the service can become financially or operationall
 
 The AnnieS case shows the risk of a narrow service model and platform dependence. A service that users rely on for communication and emergency access should not depend on one fragile provider or one declining platform.
 
+Additional AnnieS-specific lessons are tracked in
+[ANNIES_CASE_NOTES.md](ANNIES_CASE_NOTES.md). The key product lesson is that
+Teletyptel must not become only a special device/service for a small reimbursed
+market. It needs mainstream entry points, provider adoption, open protocols,
+fallback routes and a business model that can survive beyond one funder or one
+platform.
+
 ### Care And Assistive-Technology Suppliers
 
 Several Dutch care or assistive-technology suppliers have run into continuity problems when contracts, municipalities, insurers or reimbursement streams changed. The exact companies differ, but the strategic lesson is the same:

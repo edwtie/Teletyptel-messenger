@@ -16,6 +16,12 @@ public sealed record XmppArchivedMessage(
     DateTimeOffset? DelayStamp,
     XmppChatMessage Message);
 
+public sealed record XmppArchivedGroupChatMessage(
+    string Id,
+    string? QueryId,
+    DateTimeOffset? DelayStamp,
+    XmppGroupChatMessage Message);
+
 public sealed record XmppArchiveResultSet(
     string? First,
     string? Last,
@@ -93,15 +99,12 @@ public static class XmppMessageArchive
     {
         archived = null;
 
-        var result = messageStanza.Element(XName.Get("result", NamespaceName));
-        if (result is null)
-        {
-            return false;
-        }
-
-        var forwarded = result.Element(XName.Get("forwarded", XmppMessageCarbons.ForwardedNamespace));
-        var forwardedMessage = forwarded?.Element(XName.Get("message", XmppXmlNames.ClientNamespace));
-        if (forwardedMessage is null || !XmppChatMessage.TryParse(forwardedMessage, out var message) || message is null)
+        if (!TryGetForwardedMessage(messageStanza, out var result, out var forwarded, out var forwardedMessage)
+            || result is null
+            || forwarded is null
+            || forwardedMessage is null
+            || !XmppChatMessage.TryParse(forwardedMessage, out var message)
+            || message is null)
         {
             return false;
         }
@@ -109,7 +112,29 @@ public static class XmppMessageArchive
         archived = new XmppArchivedMessage(
             (string?)result.Attribute("id") ?? string.Empty,
             (string?)result.Attribute("queryid"),
-            TryParseDate(forwarded?.Element(XName.Get("delay", DelayNamespace))?.Attribute("stamp")?.Value),
+            TryParseDate(forwarded.Element(XName.Get("delay", DelayNamespace))?.Attribute("stamp")?.Value),
+            message);
+        return true;
+    }
+
+    public static bool TryParseGroupResult(XElement messageStanza, out XmppArchivedGroupChatMessage? archived)
+    {
+        archived = null;
+
+        if (!TryGetForwardedMessage(messageStanza, out var result, out var forwarded, out var forwardedMessage)
+            || result is null
+            || forwarded is null
+            || forwardedMessage is null
+            || !XmppMultiUserChat.TryParseGroupMessage(forwardedMessage, out var message)
+            || message is null)
+        {
+            return false;
+        }
+
+        archived = new XmppArchivedGroupChatMessage(
+            (string?)result.Attribute("id") ?? string.Empty,
+            (string?)result.Attribute("queryid"),
+            TryParseDate(forwarded.Element(XName.Get("delay", DelayNamespace))?.Attribute("stamp")?.Value),
             message);
         return true;
     }
@@ -146,6 +171,18 @@ public static class XmppMessageArchive
         }
 
         fields.Add(field);
+    }
+
+    private static bool TryGetForwardedMessage(
+        XElement messageStanza,
+        out XElement? result,
+        out XElement? forwarded,
+        out XElement? forwardedMessage)
+    {
+        result = messageStanza.Element(XName.Get("result", NamespaceName));
+        forwarded = result?.Element(XName.Get("forwarded", XmppMessageCarbons.ForwardedNamespace));
+        forwardedMessage = forwarded?.Element(XName.Get("message", XmppXmlNames.ClientNamespace));
+        return result is not null && forwardedMessage is not null;
     }
 
     private static string FormatDate(DateTimeOffset value)

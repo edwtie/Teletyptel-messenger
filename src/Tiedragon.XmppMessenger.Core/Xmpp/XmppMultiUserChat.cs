@@ -103,7 +103,11 @@ public static class XmppMultiUserChat
             new XAttribute("type", "unavailable"));
     }
 
-    public static XElement CreateGroupMessage(XmppAddress room, string body, string? id = null)
+    public static XElement CreateGroupMessage(
+        XmppAddress room,
+        string body,
+        string? id = null,
+        string? replaceId = null)
     {
         ArgumentNullException.ThrowIfNull(room);
         ArgumentNullException.ThrowIfNull(body);
@@ -116,6 +120,11 @@ public static class XmppMultiUserChat
         if (!string.IsNullOrWhiteSpace(id))
         {
             message.SetAttributeValue("id", id);
+        }
+
+        if (!string.IsNullOrWhiteSpace(replaceId))
+        {
+            message.Add(XmppMessageCorrection.CreateReplace(replaceId));
         }
 
         return message;
@@ -153,13 +162,15 @@ public static class XmppMultiUserChat
 
         XmppAddress.TryParse((string?)element.Attribute("from"), out var from);
         XmppAddress.TryParse((string?)element.Attribute("to"), out var to);
+        XmppMessageCorrection.TryGetReplaceId(element, out var replaceId);
         message = new XmppGroupChatMessage(
             Room: from is null ? null : XmppAddress.Parse(from.Bare),
             Nickname: from?.ResourcePart,
             Body: element.Element(XName.Get("body", XmppXmlNames.ClientNamespace))?.Value ?? string.Empty,
             From: from,
             To: to,
-            Id: (string?)element.Attribute("id"));
+            Id: (string?)element.Attribute("id"),
+            ReplaceId: replaceId);
         return true;
     }
 
@@ -427,4 +438,5 @@ public sealed record XmppGroupChatMessage(
     string Body,
     XmppAddress? From = null,
     XmppAddress? To = null,
-    string? Id = null);
+    string? Id = null,
+    string? ReplaceId = null);

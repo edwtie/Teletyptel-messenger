@@ -11,9 +11,25 @@ public static class XmppJingle
 
     public const string RtpInfoNamespaceName = "urn:xmpp:jingle:apps:rtp:info:1";
 
+    public const string RtpAudioFeature = "urn:xmpp:jingle:apps:rtp:audio";
+
+    public const string RtpVideoFeature = "urn:xmpp:jingle:apps:rtp:video";
+
     public const string IceUdpNamespaceName = "urn:xmpp:jingle:transports:ice-udp:1";
 
     public const string DtlsNamespaceName = "urn:xmpp:jingle:apps:dtls:0";
+
+    public static bool SupportsRtpAudio(XmppServiceDiscoveryInfo info)
+    {
+        ArgumentNullException.ThrowIfNull(info);
+        return info.Supports(RtpNamespaceName) && info.Supports(RtpAudioFeature);
+    }
+
+    public static bool SupportsRtpVideo(XmppServiceDiscoveryInfo info)
+    {
+        ArgumentNullException.ThrowIfNull(info);
+        return info.Supports(RtpNamespaceName) && info.Supports(RtpVideoFeature);
+    }
 
     public static XmppIq CreateSessionInitiate(
         string id,
