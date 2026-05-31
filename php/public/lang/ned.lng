@@ -7,6 +7,7 @@ status.connecting_relay=Relay verbinden
 status.relay_connected=Relay verbonden
 status.relay_disconnected=Relay niet verbonden
 status.relay_error=Relay fout
+status.not_connected=Niet verbonden.
 button.connect=Verbinden
 button.disconnect=Verbinding verbreken
 button.switch_session=Sessie wisselen

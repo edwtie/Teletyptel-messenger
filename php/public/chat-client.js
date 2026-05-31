@@ -733,9 +733,7 @@
     state.mode = mode;
     el.relayModeButton.classList.toggle("selected", mode === "relay");
     el.xmppModeButton.classList.toggle("selected", mode === "xmpp");
-    el.composerState.textContent = mode === "relay"
-      ? t("composer.relay_state", "Enter sends, Shift+Enter inserts a line")
-      : t("composer.xmpp_state", "RFC 7395 mode sends XML message stanzas");
+    setDefaultComposerState();
     updateComposerAvailability();
   }
 
@@ -2297,6 +2295,7 @@
 
     socket.addEventListener("open", () => {
       setConnectionStatus(t("status.relay_connected", "Relay connected"), "good");
+      setDefaultComposerState();
       el.connectButton.disabled = true;
       el.disconnectButton.disabled = false;
       setInfrastructurePresence("online");
@@ -2450,6 +2449,7 @@
     socket.addEventListener("open", () => {
       el.xmppOpenButton.disabled = true;
       el.xmppCloseButton.disabled = false;
+      setDefaultComposerState();
       updateComposerAvailability();
       const open = `<open xmlns="urn:ietf:params:xml:ns:xmpp-framing" to="${escapeXml(domainFromJid(el.jidInput.value))}" version="1.0"/>`;
       socket.send(open);
@@ -2607,13 +2607,7 @@
     }
 
     if (!state.relaySocket || state.relaySocket.readyState !== WebSocket.OPEN) {
-      if (edit) {
-        applyMessageCorrection(edit.conversation, edit.replaceId, text, "self", outgoingId);
-        clearMessageEdit();
-      } else {
-        addMessage("self", text, "offline", null, null, null, null, outgoingId);
-      }
-      el.messageInput.value = "";
+      showNotConnectedStatus();
       return;
     }
 
@@ -2637,6 +2631,11 @@
 
   function sendRttReset() {
     if (!hasActiveConversation()) {
+      return;
+    }
+
+    if (!activeJingleRttSyncCall() && !isRelayConnected()) {
+      showNotConnectedStatus();
       return;
     }
 
@@ -3268,7 +3267,8 @@
     }
 
     if (!isRelayConnected()) {
-      setCallStatus(t("call.connect_first", "Connect the relay first."));
+      showNotConnectedStatus();
+      setCallStatus(t("status.not_connected", "Not connected."));
       return;
     }
 
@@ -4337,6 +4337,22 @@
     return state.relaySocket?.readyState === WebSocket.OPEN;
   }
 
+  function hasActiveMessageTransport() {
+    if (activeJingleRttSyncCall()) {
+      return true;
+    }
+
+    return state.mode === "xmpp"
+      ? state.xmppSocket?.readyState === WebSocket.OPEN
+      : isRelayConnected();
+  }
+
+  function showNotConnectedStatus() {
+    const text = t("status.not_connected", "Not connected.");
+    setConnectionStatus(text, "danger");
+    el.composerState.textContent = text;
+  }
+
   function isAddressedToMe(envelope) {
     if (!envelope.to || envelope.to === "relay@localhost") {
       return true;
@@ -4464,6 +4480,10 @@
 
   function clearMessageEdit() {
     state.editingMessage = null;
+    setDefaultComposerState();
+  }
+
+  function setDefaultComposerState() {
     el.composerState.textContent = state.mode === "relay"
       ? t("composer.relay_state", "Enter sends, Shift+Enter inserts a line")
       : t("composer.xmpp_state", "RFC 7395 mode sends XML message stanzas");
@@ -4932,17 +4952,14 @@
   function updateComposerAvailability() {
     const hasConversation = Boolean(activeConversation());
     const blocked = isActiveConversationBlocked();
-    const connected = state.mode === "xmpp"
-      ? state.xmppSocket?.readyState === WebSocket.OPEN
-      : state.relaySocket?.readyState === WebSocket.OPEN;
     const selectedGroup = activeConversation()?.kind === "group";
 
     el.composerForm.classList.toggle("composer-disabled", !hasConversation || blocked);
     el.messageInput.disabled = !hasConversation || blocked;
-    el.sendButton.disabled = !hasConversation || !connected || blocked;
-    el.resetRttButton.disabled = !hasConversation || !connected || blocked;
+    el.sendButton.disabled = !hasConversation || blocked;
+    el.resetRttButton.disabled = !hasConversation || blocked;
     el.uploadFileButton.disabled = !hasConversation || blocked;
-    setCallButtonsDisabled(!hasConversation || !connected || Boolean(state.call) || blocked);
+    setCallButtonsDisabled(!hasConversation || Boolean(state.call) || blocked);
     el.inviteConversationButton.disabled = !selectedGroup;
   }
 
@@ -5349,6 +5366,11 @@
       return;
     }
 
+    if (!hasActiveMessageTransport()) {
+      showNotConnectedStatus();
+      return;
+    }
+
     const uploadable = files.filter((file) => file instanceof File);
     if (uploadable.length === 0) {
       return;
@@ -5457,7 +5479,7 @@
     }
 
     if (!state.relaySocket || state.relaySocket.readyState !== WebSocket.OPEN) {
-      addMessage("self", text, "offline", null, attachment);
+      showNotConnectedStatus();
       return;
     }
 

@@ -7,6 +7,7 @@ status.connecting_relay=Connecting relay
 status.relay_connected=Relay connected
 status.relay_disconnected=Relay disconnected
 status.relay_error=Relay error
+status.not_connected=Not connected.
 button.connect=Connect
 button.disconnect=Disconnect
 button.switch_session=Switch session
