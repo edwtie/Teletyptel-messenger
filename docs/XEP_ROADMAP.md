@@ -68,7 +68,7 @@ layer on top of that core.
 | XEP-0176 | Jingle ICE-UDP Transport | ICE candidates for NAT traversal. | Done for candidate helper, transport-info and web relay demo |
 | XEP-0177 | Jingle Raw UDP Transport | Simple UDP transport. | Future |
 | XEP-0215 | External Service Discovery | Discover STUN/TURN services and short-lived credentials. | Core, local server and RealServerSmoke path done; production relay run is release validation |
-| XEP-0234 | Jingle File Transfer | File metadata and transfer negotiation. | Core metadata, hash, range, received and checksum helpers done |
+| XEP-0234 | Jingle File Transfer | File metadata and transfer negotiation. | Core metadata, hash, range, received and checksum helpers done; Total Conversation profile treats this as the session-bound file path |
 | XEP-0260 | Jingle SOCKS5 Bytestreams | S5B transport candidates in Jingle. | Core candidate/state helpers and real-server S5B proxy smoke path done |
 | XEP-0261 | Jingle In-Band Bytestreams | Slow fallback transport when S5B cannot connect. | Core Jingle transport helpers done; XEP-0047 fallback transfer smoke path done |
 | XEP-0320 | DTLS-SRTP in Jingle | WebRTC-style media security fingerprints. | Fingerprint model started; browser DTLS is WebRTC-managed |

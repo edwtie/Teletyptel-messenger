@@ -122,7 +122,7 @@ Total Conversation layers:
 | Audio/video media | XEP-0167, XEP-0176, XEP-0320, WebRTC | Browser media uses WebRTC; XMPP still owns the signaling shape. |
 | Live text | XEP-0301, RFC 4103, ProtoXEP Jingle synchronized RTT | XEP-0301 is fallback/chat RTT; ProtoXEP RTT is call-bound live text. |
 | Location | XEP-0080, ProtoXEP Jingle User Location | XEP-0080 is the payload; ProtoXEP geoloc scopes it to the call. |
-| Files | XEP-0363, XEP-0234, XEP-0065, XEP-0047/XEP-0261 | Files are attached to the conversation, but they are not synchronized media. |
+| Files | XEP-0363, XEP-0234, XEP-0065, XEP-0047/XEP-0261 | HTTP upload creates message/conversation attachments; XEP-0234 Jingle File Transfer can be session-bound to the same call. |
 | Archives and sync | XEP-0313, XEP-0280, XEP-0198 | History and multi-device behavior must not hide whether text was call-bound or fallback. |
 
 User-visible states must remain explicit:

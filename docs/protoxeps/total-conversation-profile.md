@@ -53,7 +53,7 @@ can support:
 3. audio/video calling;
 4. Jingle-synchronized text in the same call;
 5. call-scoped location when the user explicitly shares it;
-6. file transfer or HTTP upload attachments;
+6. session-bound Jingle file transfer or HTTP upload attachments;
 7. archiving and multi-device sync without hiding fallback state.
 
 The profile is not a new media codec, account system, encryption system or
@@ -98,8 +98,8 @@ emergency-services standard.
 
 | Protocol | Required for profile | Purpose |
 | --- | --- | --- |
-| XEP-0363 | file profile | HTTP file upload |
-| XEP-0234 | call/file-transfer profile | Jingle file-transfer metadata |
+| XEP-0363 | file profile | HTTP file upload for message or conversation attachments |
+| XEP-0234 | call/file-transfer profile | Jingle file-transfer metadata that can be bound to the same session |
 | XEP-0065 | optional | SOCKS5 bytestreams |
 | XEP-0047 | fallback | In-band bytestreams |
 | XEP-0260 | optional | Jingle SOCKS5 bytestream transport |
@@ -218,6 +218,7 @@ Jingle sid: call-123
   content video     -> XEP-0167 RTP video
   content text      -> ProtoXEP Jingle synchronized RTT
   content location  -> ProtoXEP Jingle user location
+  content file      -> XEP-0234 Jingle file transfer
 ```
 
 ### Fallback Paths
@@ -228,8 +229,28 @@ Fallback is allowed, but it must not be hidden:
 | --- | --- | --- |
 | Jingle synchronized RTT | XEP-0301 chat RTT | Show "live text fallback" instead of "synchronized text". |
 | Jingle location | XEP-0080 PEP/PubSub location | Show that location is not call-scoped. |
+| Session-bound Jingle file transfer | XEP-0363 HTTP upload or ordinary link | Show that the file is an attachment/link, not a negotiated Jingle transfer. |
 | HTTP upload | Jingle file transfer or ordinary link | Show transfer method and failure state. |
 | Jingle call | ordinary chat | Do not present text-only chat as a call. |
+
+## File Transfer And Upload Binding
+
+The profile distinguishes three file states:
+
+| State | Protocol path | Synchronization meaning |
+| --- | --- | --- |
+| Message attachment | XEP-0363 HTTP File Upload plus message body or out-of-band URL | The file belongs to a message or conversation thread, but it is not negotiated as media in the Jingle session. |
+| Session-bound file transfer | XEP-0234 Jingle File Transfer with XEP-0260 or XEP-0261 transport | The file transfer belongs to the active Jingle session and is synchronized at the session/protocol level. |
+| Media-synchronized stream | RTP/WebRTC media or future timed media profile | The content has media timing. Ordinary files are not media-clock synchronized unless a future profile defines timed playback. |
+
+When a file is exchanged during an active Total Conversation call, clients
+should prefer XEP-0234 if both sides support it, because it can be negotiated as
+another Jingle content or call-associated transfer. XEP-0363 remains valid for
+attachments, screenshots, documents and asynchronous sharing, but a client must
+not present a plain HTTP upload link as a negotiated Jingle transfer.
+
+If an archive records a file exchanged during a call, it should preserve whether
+the file was transferred through Jingle or attached through HTTP upload.
 
 ## User Interface Rules
 
