@@ -106,17 +106,17 @@ Near term:
 
 - RFC 6120 completion: stream, TLS, SASL, bind, typed errors.
 - RFC 6121 basics: chat, presence, roster.
-- XEP-0301 RTT.
 - XEP-0085 chat state notifications.
 - XEP-0184 delivery receipts.
 - XEP-0198 stream management.
+- XEP-0301 RTT.
 
 Later:
 
+- XEP-0166/Jingle only after the messaging core is stable.
 - XEP-0280 message carbons.
 - XEP-0313 message archive management.
 - XEP-0384 OMEMO.
-- XEP-0166/Jingle only after the messaging core is stable.
 
 ## Conclusion
 

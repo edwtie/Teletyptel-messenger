@@ -69,32 +69,32 @@ Server response flow:
 | XEP | Purpose |
 | --- | --- |
 | XEP-0030 | Service discovery. |
-| XEP-0050 | Ad-hoc command discovery and execution. |
-| XEP-0133 | Service administration commands for server-side status and maintenance. |
-| XEP-0077 | In-band account registration, password change and account removal. |
-| XEP-0124 | BOSH HTTP binding body format. |
-| XEP-0206 | XMPP over BOSH profile and stream restart. |
-| XEP-0157 | Contact addresses for XMPP services. |
-| XEP-0115 | Entity capabilities in presence broadcasts. |
 | XEP-0045 | Multi-user chat. |
 | XEP-0048 | Legacy bookmark storage for MUC room bookmarks. |
 | XEP-0049 | Private XML storage for namespaced account data and legacy bookmark compatibility. |
+| XEP-0050 | Ad-hoc command discovery and execution. |
 | XEP-0060 | Publish-Subscribe for generic nodes, announcements, service news and the foundation used by PEP. |
-| XEP-0153 | vCard-based avatar update hash in presence. |
-| XEP-0163 | Personal Eventing Protocol for publish/retrieve/retract on personal PubSub nodes. |
+| XEP-0077 | In-band account registration, password change and account removal. |
 | XEP-0080 | User location through permission-gated PEP/PubSub events. |
 | XEP-0084 | User avatars via PEP/PubSub. |
-| XEP-0398 | PEP-vCard avatar conversion support discovery. |
 | XEP-0085 | Chat state notifications such as typing. |
+| XEP-0115 | Entity capabilities in presence broadcasts. |
+| XEP-0124 | BOSH HTTP binding body format. |
+| XEP-0133 | Service administration commands for server-side status and maintenance. |
+| XEP-0153 | vCard-based avatar update hash in presence. |
+| XEP-0157 | Contact addresses for XMPP services. |
+| XEP-0163 | Personal Eventing Protocol for publish/retrieve/retract on personal PubSub nodes. |
 | XEP-0184 | Message delivery receipts. |
 | XEP-0191 | Blocking command. |
 | XEP-0198 | Stream management and reconnect support. |
+| XEP-0206 | XMPP over BOSH profile and stream restart. |
 | XEP-0223 | Persistent private data via PubSub/PEP. |
 | XEP-0280 | Message carbons for multi-device sync. |
 | XEP-0308 | Last message correction. |
 | XEP-0313 | Message archive management. |
 | XEP-0352 | Client state indication. |
 | XEP-0363 | HTTP file upload. |
+| XEP-0398 | PEP-vCard avatar conversion support discovery. |
 | XEP-0402 | PEP-native MUC room bookmarks. |
 | XEP-0410 | MUC self-ping. |
 
@@ -597,19 +597,19 @@ requires an audited verifier/backend and real Double Ratchet engine.
 
 | XEP | Purpose |
 | --- | --- |
+| XEP-0047 | In-Band Bytestreams for slow fallback binary chunks over XMPP. |
+| XEP-0065 | SOCKS5 Bytestreams for direct or proxied binary streams. |
 | XEP-0166 | Jingle session signaling. |
 | XEP-0167 | Jingle RTP sessions for audio/video. |
 | XEP-0176 | Jingle ICE-UDP transport. |
+| XEP-0177 | Jingle raw UDP transport. |
 | XEP-0215 | External service discovery for STUN/TURN. |
-| XEP-0320 | DTLS-SRTP fingerprints for secure media setup. |
-| XEP-0353 | Jingle Message Initiation call proposal flow. |
-| XEP-0047 | In-Band Bytestreams for slow fallback binary chunks over XMPP. |
-| XEP-0065 | SOCKS5 Bytestreams for direct or proxied binary streams. |
 | XEP-0234 | Jingle File Transfer metadata and negotiation. |
 | XEP-0260 | Jingle SOCKS5 Bytestreams transport. |
 | XEP-0261 | Jingle In-Band Bytestreams fallback transport. |
-| XEP-0177 | Jingle raw UDP transport. |
+| XEP-0320 | DTLS-SRTP fingerprints for secure media setup. |
 | XEP-0343 | WebRTC data channels in Jingle. |
+| XEP-0353 | Jingle Message Initiation call proposal flow. |
 
 Current core support covers Jingle `session-initiate`, `session-accept`,
 `session-terminate`, `transport-info`, RTP payload descriptions, ICE-UDP

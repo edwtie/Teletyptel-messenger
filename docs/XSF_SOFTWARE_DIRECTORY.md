@@ -95,6 +95,7 @@ Implemented or partially implemented standards for Alpha 2:
 - XEP-0085: Chat State Notifications
 - XEP-0157: Contact Addresses for XMPP Services
 - XEP-0163: Personal Eventing Protocol helpers
+- XEP-0166/0167/0176/0320: Jingle call signaling, ICE transport and DTLS fingerprints
 - XEP-0184: Message Delivery Receipts
 - XEP-0198: Stream Management
 - XEP-0215: External Service Discovery
@@ -104,7 +105,6 @@ Implemented or partially implemented standards for Alpha 2:
 - XEP-0363: HTTP File Upload
 - XEP-0368: SRV records for XMPP over TLS
 - XEP-0384: OMEMO wire/helper boundary, not production E2EE
-- XEP-0166/0167/0176/0320: Jingle call signaling, ICE transport and DTLS fingerprints
 
 Still release-validation or future work:
 

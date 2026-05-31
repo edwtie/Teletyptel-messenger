@@ -73,14 +73,14 @@ item is implemented, tested and documented.
 - [x] TLS/XEP-0368 discovery and hostname-negative smoke passed.
 - [x] Login, bind, initial presence and roster smoke passed.
 - [x] One-to-one chat smoke passed between the two accounts.
-- [x] XEP-0157 server contact discovery checked.
 - [x] XEP-0045 MUC discovery, room join and groupchat smoke passed.
-- [x] XEP-0363 file upload discovery, slot, PUT and attachment smoke passed.
-- [x] XEP-0065 hosted SOCKS5 bytestream proxy discovery, activation and byte-transfer smoke passed.
 - [x] XEP-0047 IBB fallback open/data/close byte-transfer smoke passed.
+- [x] XEP-0065 hosted SOCKS5 bytestream proxy discovery, activation and byte-transfer smoke passed.
 - [x] XEP-0124/XEP-0206 BOSH smoke passed when advertised by the server.
+- [x] XEP-0157 server contact discovery checked.
 - [x] XEP-0215 STUN/TURN discovery checked when advertised by the server.
 - [x] XEP-0308 Last Message Correction smoke passed between two public accounts.
+- [x] XEP-0363 file upload discovery, slot, PUT and attachment smoke passed.
 - [ ] Web client RTT, presence and normal chat passed with the two real accounts.
 - [ ] Browser audio/video call passed between the two real accounts.
 - [ ] Existing Jingle-capable client interop smoke completed or explicitly
@@ -167,21 +167,52 @@ item is implemented, tested and documented.
 - [x] Client helper to request server discovery.
 - [x] Contact/client capability discovery.
 
+## XEP-0045 - Multi-User Chat
+
+- [x] Join room presence serializer.
+- [x] Leave room presence serializer.
+- [x] Groupchat message serializer.
+- [x] Groupchat message parser.
+- [x] Direct invitation serializer.
+- [x] `XmppStreamClient` join helper.
+- [x] Room discovery/items helper.
+- [x] Room configuration forms.
+- [x] Moderation/admin flows.
+- [x] XEP-0048/XEP-0402 bookmark serializers/parsers and `XmppStreamClient` helpers.
+- [x] XEP-0049 generic Private XML Storage helper and `XmppStreamClient` methods.
+- [x] XEP-0410 MUC self-ping serializer/result classifier and `XmppStreamClient` helper.
+- [x] Interoperability smoke path for Prosody/ejabberd MUC through `RealServerSmoke --muc-service --muc-room`.
+- [x] Interoperability smoke executed against a real Prosody MUC service.
+
+## XEP-0047/XEP-0065/XEP-0234/XEP-0260/XEP-0261 - Direct File Transfer
+
+- [x] XEP-0047 IBB open/data/close stanza helpers.
+- [x] XEP-0047 IQ and message data chunk helpers with base64 encode/decode.
+- [x] XEP-0065 disco support and bytestream proxy identity checks.
+- [x] XEP-0065 proxy address query/result parser.
+- [x] XEP-0065 bytestream request with streamhost list.
+- [x] XEP-0065 streamhost-used response parser.
+- [x] XEP-0065 proxy activation request.
+- [x] XEP-0065/XEP-0260 SOCKS5 destination-address hash calculation.
+- [x] XEP-0234 file description with name, media type, size, date, description, range and XEP-0300 hashes.
+- [x] XEP-0234 received/checksum session-info helpers.
+- [x] XEP-0260 Jingle S5B transport candidates.
+- [x] XEP-0260 candidate-used, candidate-error, activated and proxy-error states.
+- [x] XEP-0261 Jingle IBB transport negotiation with block-size, sid and stanza mode.
+- [x] XEP-0261 helper to create the matching XEP-0047 open request after Jingle negotiation.
+- [x] Local SOCKS5 streamhost handshake and data-pump smoke.
+- [x] Real-server S5B proxy discovery smoke path through
+  `RealServerSmoke --socks5-smoke` or explicit `--socks5-proxy`.
+- [x] Real-server S5B proxy activation and byte-transfer smoke path.
+- [x] Real-server IBB fallback open/data/close byte-transfer smoke path through
+  `RealServerSmoke --ibb-smoke`.
+
 ## XEP-0050 - Ad-Hoc Commands
 
 - [x] Command execute IQ serialization.
 - [x] Completed command result parsing.
 - [x] Data-form result parsing for command payloads.
 - [x] Local server advertises the ad-hoc command discovery node.
-
-## XEP-0133 - Service Administration
-
-- [x] Safe read-only LocalServer commands for registered, online, active and idle user counts.
-- [x] Safe read-only LocalServer commands for registered, online, active and idle user lists.
-- [x] Command discovery through XEP-0030 `disco#items` on the XEP-0050 command node.
-- [x] `XmppStreamClient` helper for executing supported read-only administration commands.
-- [x] Retracted password retrieval is intentionally not implemented.
-- [ ] Production admin authorization, audit logging and mutating commands are future server work.
 
 ## XEP-0077 - In-Band Registration
 
@@ -194,14 +225,19 @@ item is implemented, tested and documented.
 - [x] `XmppStreamClient` helper methods.
 - [x] Real-server smoke registration path through `RealServerSmoke --register`.
 
-## XEP-0157 - Contact Addresses For XMPP Services
+## XEP-0080 - User Location
 
-- [x] Server-info `FORM_TYPE=http://jabber.org/network/serverinfo` parser.
-- [x] Registered contact fields: abuse, admin, feedback, sales, security, status and support.
-- [x] URI validation for advertised contact values.
-- [x] Server-info data form creation helper.
-- [x] Local server advertises XEP-0157 contact addresses in `disco#info`.
-- [x] Real-server smoke output prints discovered contact addresses when available.
+- [x] User-location payload model with latitude, longitude, accuracy,
+  altitude, timestamp, text and source metadata.
+- [x] XEP-0080 XML parse/serialize.
+- [x] Capability model for servers without PEP/XEP-0080 support.
+- [x] PEP publish/retrieve helpers through XEP-0163.
+- [x] Location consent model: never publish automatically.
+- [x] Browser/mobile location provider with permission handling.
+- [x] UI shows accuracy, timestamp, source, stale-location and server-support warnings.
+- [x] Emergency-mode export model for PIDF-LO/RFC 6442 gateway testing.
+- [x] Local server smoke path for location PEP events.
+- [ ] Real-server PEP smoke path with a non-emergency test account on supporting and non-supporting servers.
 
 ## XEP-0084 - User Avatars
 
@@ -218,102 +254,6 @@ item is implemented, tested and documented.
 - [x] XEP-0398 PEP-vCard conversion feature detection and vCard PHOTO conversion helpers.
 - [x] `XmppStreamClient` vCard avatar publish helper with presence update.
 
-## XMPP Compliance Suites
-
-- [x] Active XEP-0479 reference documented instead of the old attic-only link.
-- [x] Roadmap phases are broken down by XEP-0479 Core, Web, IM, Mobile and A/V
-  Client gates instead of loose Alpha/Beta feature buckets.
-- [x] XEP-0479 Core Client checklist and self-assessment.
-- [x] XEP-0479 Web Client checklist and self-assessment.
-- [x] XEP-0479 IM Client checklist and self-assessment.
-- [x] XEP-0479 Mobile Client checklist and self-assessment.
-- [x] XEP-0479 A/V Client checklist and self-assessment.
-- [x] XEP-0115 Entity Capabilities.
-- [x] XEP-0156 Alternative Connection Method discovery.
-- [x] XEP-0157 Contact Addresses for XMPP Services.
-- [x] XEP-0060 general PubSub announcement/news node model and provider news UI seed.
-- [x] XEP-0084 User Avatars protocol helpers.
-- [x] XEP-0398/XEP-0153 vCard avatar compatibility.
-- [x] XEP-0245 `/me` command.
-- [x] XEP-0054 vcard-temp.
-- [x] XEP-0280 Message Carbons.
-- [x] XEP-0357 Push Notifications helper.
-- [ ] Public release and user-facing setup guide before any XEP-0479 compliance claim.
-- [x] XEP-0368 direct TLS SRV discovery for Advanced Core Client.
-- [x] XEP-0163 generic PEP/PubSub publishing for Advanced Core Client.
-- [x] XEP-0060 service/provider announcements separate from personal PEP nodes.
-- [ ] Live server XEP-0060 announcement subscription smoke with the deployment PubSub service.
-- [ ] Real hosted RFC 7395/WSS endpoint and XEP-0156 deployment guide for Web Client.
-- [x] XEP-0124/XEP-0206 BOSH body/session/restart helpers for optional Web Client fallback.
-- [x] XEP-0124/XEP-0206 full HTTP long-polling client and real-server BOSH smoke path.
-- [x] XEP-0363 real-server upload-service smoke path for IM Client.
-- [x] XEP-0352 Client State Indication for Mobile Client.
-- [x] Browser/mobile lifecycle wiring for XEP-0352 active/inactive state.
-- [ ] Real mobile push-provider integration for Advanced Mobile Client.
-- [x] XEP-0353 Jingle Message Initiation for A/V Client.
-- [x] XEP-0215 External Service Discovery for STUN/TURN discovery; RealServerSmoke and LocalServer now cover service discovery and restricted TURN credentials.
-- [x] XEP-0191 Blocking Command for Advanced IM Client.
-- [x] XEP-0308 Last Message Correction for Advanced IM Client.
-- [x] XEP-0084 implementation complete; public-server PEP smoke is release validation.
-- [x] XEP-0163 protocol helper and stream-client methods complete; public-server PEP smoke is release validation.
-- [x] XEP-0223 persistent private data via PubSub/PEP with whitelist publish-options and notification trust checks.
-- [x] XEP-0080 User Location for accessibility and emergency-readiness flows.
-- [x] XEP-0049 generic Private XML Storage get/set helper, parser and stream-client methods.
-- [x] XEP-0048/XEP-0402 bookmarks and XEP-0410 MUC self-ping.
-- [x] XEP-0065 SOCKS5 Bytestreams protocol helpers.
-- [x] XEP-0234/XEP-0260 Jingle direct file transfer metadata and S5B transport helpers.
-- [x] XEP-0047/XEP-0261 In-Band Bytestreams fallback helpers.
-
-## XEP-0047/XEP-0065/XEP-0234/XEP-0260/XEP-0261 - Direct File Transfer
-
-- [x] XEP-0065 disco support and bytestream proxy identity checks.
-- [x] XEP-0065 proxy address query/result parser.
-- [x] XEP-0065 bytestream request with streamhost list.
-- [x] XEP-0065 streamhost-used response parser.
-- [x] XEP-0065 proxy activation request.
-- [x] XEP-0065/XEP-0260 SOCKS5 destination-address hash calculation.
-- [x] XEP-0260 Jingle S5B transport candidates.
-- [x] XEP-0260 candidate-used, candidate-error, activated and proxy-error states.
-- [x] XEP-0234 file description with name, media type, size, date, description, range and XEP-0300 hashes.
-- [x] XEP-0234 received/checksum session-info helpers.
-- [x] XEP-0047 IBB open/data/close stanza helpers.
-- [x] XEP-0047 IQ and message data chunk helpers with base64 encode/decode.
-- [x] XEP-0261 Jingle IBB transport negotiation with block-size, sid and stanza mode.
-- [x] XEP-0261 helper to create the matching XEP-0047 open request after Jingle negotiation.
-- [x] Local SOCKS5 streamhost handshake and data-pump smoke.
-- [x] Real-server S5B proxy discovery smoke path through
-  `RealServerSmoke --socks5-smoke` or explicit `--socks5-proxy`.
-- [x] Real-server S5B proxy activation and byte-transfer smoke path.
-- [x] Real-server IBB fallback open/data/close byte-transfer smoke path through
-  `RealServerSmoke --ibb-smoke`.
-
-## XEP-0080 - User Location
-
-- [x] User-location payload model with latitude, longitude, accuracy,
-  altitude, timestamp, text and source metadata.
-- [x] XEP-0080 XML parse/serialize.
-- [x] PEP publish/retrieve helpers through XEP-0163.
-- [x] Capability model for servers without PEP/XEP-0080 support.
-- [x] Location consent model: never publish automatically.
-- [x] Browser/mobile location provider with permission handling.
-- [x] UI shows accuracy, timestamp, source, stale-location and server-support warnings.
-- [x] Emergency-mode export model for PIDF-LO/RFC 6442 gateway testing.
-- [x] Local server smoke path for location PEP events.
-- [ ] Real-server PEP smoke path with a non-emergency test account on supporting and non-supporting servers.
-
-## XEP-0301 - Real-Time Text
-
-- [x] RTT packet model.
-- [x] RTT insert/erase model.
-- [x] RTT XML parse/serialize.
-- [x] RTT state application.
-- [x] Unicode code point positions.
-- [x] RTT JSON envelope for demo relay.
-- [x] RTT XMPP message payload with body fallback.
-- [x] Per-contact RTT state manager.
-- [x] RTT receive integration in `XmppStreamClient`.
-- [x] RTT capability check through XEP-0030.
-
 ## XEP-0085 - Chat State Notifications
 
 - [x] Model states: active, composing, paused, inactive, gone.
@@ -321,6 +261,45 @@ item is implemented, tested and documented.
 - [x] Parse chat state payload.
 - [x] Send helper.
 - [x] Receive helper.
+
+## XEP-0133 - Service Administration
+
+- [x] Safe read-only LocalServer commands for registered, online, active and idle user counts.
+- [x] Safe read-only LocalServer commands for registered, online, active and idle user lists.
+- [x] Command discovery through XEP-0030 `disco#items` on the XEP-0050 command node.
+- [x] `XmppStreamClient` helper for executing supported read-only administration commands.
+- [x] Retracted password retrieval is intentionally not implemented.
+- [ ] Production admin authorization, audit logging and mutating commands are future server work.
+
+## XEP-0157 - Contact Addresses For XMPP Services
+
+- [x] Server-info `FORM_TYPE=http://jabber.org/network/serverinfo` parser.
+- [x] Registered contact fields: abuse, admin, feedback, sales, security, status and support.
+- [x] URI validation for advertised contact values.
+- [x] Server-info data form creation helper.
+- [x] Local server advertises XEP-0157 contact addresses in `disco#info`.
+- [x] Real-server smoke output prints discovered contact addresses when available.
+
+## XEP-0166/0167/0176/0320 - Jingle Calls
+
+- [x] Jingle session-initiate serializer.
+- [x] Jingle session-accept serializer.
+- [x] Jingle session-terminate serializer.
+- [x] RTP content/payload type serializer.
+- [x] RTP audio/video discovery feature checks.
+- [x] ICE-UDP transport element.
+- [x] ICE candidate serialization and parser.
+- [x] DTLS-SRTP fingerprint serialization and parser.
+- [x] Jingle `transport-info` candidate update serializer.
+- [x] Jingle RTP `session-info` states for ringing/hold/mute.
+- [x] XEP-0353 Jingle Message Initiation call setup messages.
+- [x] Jingle parser for action, sid and content.
+- [x] `XmppStreamClient` Jingle send helper.
+- [x] WebRTC peer connection bridge in the web client demo.
+- [x] Basic audio/video permission UI.
+- [x] Device picker and local media preview settings.
+- [x] Per-call device switching after a call has already started.
+- [x] Interoperability smoke with existing Jingle client wire shapes.
 
 ## XEP-0184 - Message Delivery Receipts
 
@@ -359,6 +338,19 @@ item is implemented, tested and documented.
 - [x] Parse sent/received forwarded message.
 - [x] Device sync tests.
 
+## XEP-0301 - Real-Time Text
+
+- [x] RTT packet model.
+- [x] RTT insert/erase model.
+- [x] RTT XML parse/serialize.
+- [x] RTT state application.
+- [x] Unicode code point positions.
+- [x] RTT JSON envelope for demo relay.
+- [x] RTT XMPP message payload with body fallback.
+- [x] Per-contact RTT state manager.
+- [x] RTT receive integration in `XmppStreamClient`.
+- [x] RTT capability check through XEP-0030.
+
 ## XEP-0313 - Message Archive Management
 
 - [x] Query archive.
@@ -366,23 +358,6 @@ item is implemented, tested and documented.
 - [x] Paging/result-set management.
 - [x] Real public-server one-to-one MAM smoke.
 - [x] Real public-server MUC archive smoke.
-
-## XEP-0045 - Multi-User Chat
-
-- [x] Join room presence serializer.
-- [x] Leave room presence serializer.
-- [x] Groupchat message serializer.
-- [x] Groupchat message parser.
-- [x] Direct invitation serializer.
-- [x] `XmppStreamClient` join helper.
-- [x] Room discovery/items helper.
-- [x] Room configuration forms.
-- [x] Moderation/admin flows.
-- [x] XEP-0049 generic Private XML Storage helper and `XmppStreamClient` methods.
-- [x] XEP-0048/XEP-0402 bookmark serializers/parsers and `XmppStreamClient` helpers.
-- [x] XEP-0410 MUC self-ping serializer/result classifier and `XmppStreamClient` helper.
-- [x] Interoperability smoke path for Prosody/ejabberd MUC through `RealServerSmoke --muc-service --muc-room`.
-- [x] Interoperability smoke executed against a real Prosody MUC service.
 
 ## XEP-0363 - HTTP File Upload
 
@@ -428,26 +403,51 @@ item is implemented, tested and documented.
 - [x] Trust/fingerprint UI model.
 - [x] Interoperability smoke with existing OMEMO client wire shapes.
 
-## XEP-0166/0167/0176/0320 - Jingle Calls
+## XMPP Compliance Suites
 
-- [x] Jingle session-initiate serializer.
-- [x] Jingle session-accept serializer.
-- [x] Jingle session-terminate serializer.
-- [x] RTP content/payload type serializer.
-- [x] RTP audio/video discovery feature checks.
-- [x] ICE-UDP transport element.
-- [x] ICE candidate serialization and parser.
-- [x] DTLS-SRTP fingerprint serialization and parser.
-- [x] Jingle `transport-info` candidate update serializer.
-- [x] Jingle RTP `session-info` states for ringing/hold/mute.
-- [x] XEP-0353 Jingle Message Initiation call setup messages.
-- [x] Jingle parser for action, sid and content.
-- [x] `XmppStreamClient` Jingle send helper.
-- [x] WebRTC peer connection bridge in the web client demo.
-- [x] Basic audio/video permission UI.
-- [x] Device picker and local media preview settings.
-- [x] Per-call device switching after a call has already started.
-- [x] Interoperability smoke with existing Jingle client wire shapes.
+- [x] XEP-0047/XEP-0261 In-Band Bytestreams fallback helpers.
+- [x] XEP-0048/XEP-0402 bookmarks and XEP-0410 MUC self-ping.
+- [x] XEP-0049 generic Private XML Storage get/set helper, parser and stream-client methods.
+- [x] XEP-0054 vcard-temp.
+- [x] XEP-0060 general PubSub announcement/news node model and provider news UI seed.
+- [x] XEP-0060 service/provider announcements separate from personal PEP nodes.
+- [ ] Live server XEP-0060 announcement subscription smoke with the deployment PubSub service.
+- [x] XEP-0065 SOCKS5 Bytestreams protocol helpers.
+- [x] XEP-0080 User Location for accessibility and emergency-readiness flows.
+- [x] XEP-0084 User Avatars protocol helpers.
+- [x] XEP-0084 implementation complete; public-server PEP smoke is release validation.
+- [x] XEP-0115 Entity Capabilities.
+- [x] XEP-0124/XEP-0206 BOSH body/session/restart helpers for optional Web Client fallback.
+- [x] XEP-0124/XEP-0206 full HTTP long-polling client and real-server BOSH smoke path.
+- [x] XEP-0153/XEP-0398 vCard avatar compatibility.
+- [x] XEP-0156 Alternative Connection Method discovery.
+- [ ] Real hosted RFC 7395/WSS endpoint and XEP-0156 deployment guide for Web Client.
+- [x] XEP-0157 Contact Addresses for XMPP Services.
+- [x] XEP-0163 generic PEP/PubSub publishing for Advanced Core Client.
+- [x] XEP-0163 protocol helper and stream-client methods complete; public-server PEP smoke is release validation.
+- [x] XEP-0191 Blocking Command for Advanced IM Client.
+- [x] XEP-0215 External Service Discovery for STUN/TURN discovery; RealServerSmoke and LocalServer now cover service discovery and restricted TURN credentials.
+- [x] XEP-0223 persistent private data via PubSub/PEP with whitelist publish-options and notification trust checks.
+- [x] XEP-0234/XEP-0260 Jingle direct file transfer metadata and S5B transport helpers.
+- [x] XEP-0245 `/me` command.
+- [x] XEP-0280 Message Carbons.
+- [x] XEP-0308 Last Message Correction for Advanced IM Client.
+- [x] XEP-0352 Client State Indication for Mobile Client.
+- [x] Browser/mobile lifecycle wiring for XEP-0352 active/inactive state.
+- [x] XEP-0353 Jingle Message Initiation for A/V Client.
+- [x] XEP-0357 Push Notifications helper.
+- [x] XEP-0363 real-server upload-service smoke path for IM Client.
+- [x] XEP-0368 direct TLS SRV discovery for Advanced Core Client.
+- [x] Active XEP-0479 reference documented instead of the old attic-only link.
+- [x] Roadmap phases are broken down by XEP-0479 Core, Web, IM, Mobile and A/V
+  Client gates instead of loose Alpha/Beta feature buckets.
+- [x] XEP-0479 Core Client checklist and self-assessment.
+- [x] XEP-0479 Web Client checklist and self-assessment.
+- [x] XEP-0479 IM Client checklist and self-assessment.
+- [x] XEP-0479 Mobile Client checklist and self-assessment.
+- [x] XEP-0479 A/V Client checklist and self-assessment.
+- [ ] Public release and user-facing setup guide before any XEP-0479 compliance claim.
+- [ ] Real mobile push-provider integration for Advanced Mobile Client.
 
 ## Tooling And Samples
 

@@ -48,7 +48,7 @@ if (options.UploadPort > 0)
 }
 
 Console.WriteLine($"Tiedragon Local XMPP server listening on {options.ListenAddress}:{options.Port} for domain {options.Domain}");
-Console.WriteLine("Features: RFC 6120/6121 C2S, STARTTLS required, SASL PLAIN, resource bind, session, roster, presence, XEP-0030 disco, XEP-0050 ad-hoc commands, XEP-0133 read-only service administration, XEP-0077, XEP-0198 SM, XEP-0352 CSI, XEP-0054 vCard, XEP-0191 blocking, XEP-0215 STUN/TURN discovery, XEP-0363 slot/PUT smoke, XEP-0045 local MUC, direct chat relay");
+Console.WriteLine("Features: RFC 6120/6121 C2S, STARTTLS required, SASL PLAIN, resource bind, session, roster, presence, XEP-0030 disco, XEP-0045 local MUC, XEP-0050 ad-hoc commands, XEP-0054 vCard, XEP-0077, XEP-0133 read-only service administration, XEP-0191 blocking, XEP-0198 SM, XEP-0215 STUN/TURN discovery, XEP-0352 CSI, XEP-0363 slot/PUT smoke, direct chat relay");
 Console.WriteLine("Scope: local development and smoke testing server; not hardened for internet-facing production use.");
 Console.WriteLine($"Certificate SHA-256: {Convert.ToHexString(certificate.GetCertHash(HashAlgorithmName.SHA256)).ToLowerInvariant()}");
 
