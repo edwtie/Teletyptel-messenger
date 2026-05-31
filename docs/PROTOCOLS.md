@@ -64,9 +64,77 @@ Real-server setup guide:
 Server response flow:
 [SERVER_RESPONSE_FLOW.svg](SERVER_RESPONSE_FLOW.svg).
 
-Readable ProtoXEP drafts:
-[Jingle Synchronized Real-Time Text](protoxeps/jingle-rtt-sync.md) and
-[Jingle User Location](protoxeps/jingle-geoloc.md).
+## ProtoXEPs
+
+Teletyptel tracks published XMPP RFCs and XEPs separately from project
+ProtoXEPs. A ProtoXEP is not an official XSF standard yet. It is a concrete
+proposal for behavior that Teletyptel needs but that is not clearly covered by
+the existing XMPP/Jingle specifications.
+
+Current Teletyptel ProtoXEP drafts:
+
+| Draft | Namespace | Purpose | Status |
+| --- | --- | --- | --- |
+| [Jingle Synchronized Real-Time Text](protoxeps/jingle-rtt-sync.md) | `urn:xmpp:jingle:apps:rtt-sync:0` | Bind live text, captions, T.140 or RTT datachannel text to the same Jingle session as audio/video. | Submitted to XSF as PR 1541. |
+| [Jingle User Location](protoxeps/jingle-geoloc.md) | `urn:xmpp:jingle:apps:geoloc:0` | Bind XEP-0080 user location updates to one active Jingle session. | Submitted to XSF as PR 1542. |
+
+Rules for using ProtoXEP behavior in Teletyptel:
+
+1. A published RFC or XEP remains the base protocol whenever one exists.
+2. A ProtoXEP may only define the missing binding or session semantics.
+3. A client must advertise each ProtoXEP namespace separately through
+   XEP-0030 service discovery.
+4. Support for XEP-0301 does not imply support for Jingle-synchronized RTT.
+5. Support for XEP-0080 does not imply support for Jingle-scoped location.
+6. Fallback must be visible to the user when the synchronized or call-scoped
+   behavior is not available.
+
+This separation matters for XSF review: the project is not trying to replace
+existing XEPs. It is proposing the missing glue needed for Total Conversation.
+
+## Total Conversation
+
+Total Conversation is the Teletyptel model where a single conversation can
+contain live text, audio, video and optional call-scoped context such as
+location. It is not just "normal chat plus a call". The media and text must be
+bound to the same Jingle session when the user interface presents them as one
+call.
+
+The binding identity is:
+
+```text
+peer JID + Jingle sid + content name + optional sync-group
+```
+
+Using only the peer JID is not enough, because the same contact can have
+multiple devices, browser sessions, fallback chat streams or simultaneous calls.
+
+Total Conversation layers:
+
+| Layer | Protocol pieces | Teletyptel rule |
+| --- | --- | --- |
+| Account and routing | RFC 6120, RFC 6121, RFC 7622, RFC 7590 | Normal XMPP identity, TLS, stream, stanza and presence rules still apply. |
+| Call proposal | XEP-0353 | A call can be proposed, accepted, rejected, retracted or finished before IQ-based Jingle starts. |
+| Session signaling | XEP-0166 | Audio, video, synchronized text and call-scoped location are contents or session-info inside one Jingle session. |
+| Audio/video media | XEP-0167, XEP-0176, XEP-0320, WebRTC | Browser media uses WebRTC; XMPP still owns the signaling shape. |
+| Live text | XEP-0301, RFC 4103, ProtoXEP Jingle synchronized RTT | XEP-0301 is fallback/chat RTT; ProtoXEP RTT is call-bound live text. |
+| Location | XEP-0080, ProtoXEP Jingle User Location | XEP-0080 is the payload; ProtoXEP geoloc scopes it to the call. |
+| Files | XEP-0363, XEP-0234, XEP-0065, XEP-0047/XEP-0261 | Files are attached to the conversation, but they are not synchronized media. |
+| Archives and sync | XEP-0313, XEP-0280, XEP-0198 | History and multi-device behavior must not hide whether text was call-bound or fallback. |
+
+User-visible states must remain explicit:
+
+| State | Meaning |
+| --- | --- |
+| Synchronized text | Text was negotiated inside the Jingle session. |
+| Live text fallback | XEP-0301 live text is active outside the Jingle session. |
+| Captions | Text source is captioning, ASR, interpreter or translation. |
+| Location shared in call | XEP-0080 payload is scoped to this Jingle session. |
+| Location unavailable | Server, peer or user permission does not allow location sharing. |
+
+This chapter is the product architecture. The ProtoXEPs are the proposed wire
+format for the missing parts. The published XEPs remain the interoperability
+foundation.
 
 ## Chat
 
