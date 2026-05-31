@@ -19,10 +19,14 @@ test a conversation. Both windows can connect to the same local relay.
 
 1. Start `php php/rtt-websocket-server.php`.
 2. Leave the relay URL as `ws://127.0.0.1:8787`.
-3. Choose a display name.
-4. Press **Connect**.
+3. Sign in or create an account in the start screen.
 
-The status in the title bar changes when the relay is connected.
+The client connects automatically after sign-in. The status in the title bar
+changes when the relay is connected.
+
+Developer-only transport controls and XML/debug diagnostics are hidden in the
+normal user interface. Open `http://127.0.0.1:8090/chat.html?dev=1` when you
+need the relay/RFC 7395 switch, manual connect button and debug panel.
 
 ## Sending Messages
 

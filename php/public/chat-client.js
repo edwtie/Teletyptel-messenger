@@ -68,6 +68,8 @@
   const locationStaleAfterMs = 5 * 60 * 1000;
   const sessionProfile = loadSessionProfile();
   const hasInitialAccountProfile = Boolean(loadSavedAccountProfile(sessionProfile));
+  const developerMode = new URLSearchParams(location.search).has("dev")
+    || localStorage.getItem("teletyptel.developerMode") === "1";
 
   const state = {
     mode: "relay",
@@ -75,6 +77,7 @@
     relaySocket: null,
     xmppSocket: null,
     account: null,
+    developerMode,
     provider: null,
     translations: new Map(),
     languageCode: "eng",
@@ -294,6 +297,7 @@
   };
 
   document.body.classList.toggle("account-gate", state.accountGateRequired);
+  document.body.classList.toggle("developer-mode", state.developerMode);
   bindEvents();
   el.sessionProfileInput.value = state.sessionProfile;
   applyTheme(state.theme);
@@ -753,6 +757,7 @@
       renderTabs();
       showAccountStartIfRequired(!databaseLoaded);
       setAccountReady(databaseLoaded);
+      autoConnectIfReady();
       appendDebug("config", `Loaded provider ${provider.providerId}`);
     } catch (error) {
       el.providerSummary.textContent = t("provider.unavailable", "Provider manifest unavailable.");
@@ -761,6 +766,7 @@
       renderTabs();
       showAccountStartIfRequired(!databaseLoaded);
       setAccountReady(databaseLoaded);
+      autoConnectIfReady();
     }
   }
 
@@ -976,6 +982,7 @@
       : t("section.real_account", "Real account");
     el.dialogAdvancedDetails.open = !startMode;
     el.dialogSaveAccountButton.hidden = startMode;
+    el.dialogConnectButton.hidden = !startMode && !state.developerMode;
     el.dialogConnectButton.textContent = startMode
       ? t("button.sign_in", "Sign in")
       : t("button.save_connect", "Save and connect");
@@ -1091,6 +1098,7 @@
       setAccountGateRequired(false);
       if (wasGateRequired) {
         closeAccountDialog();
+        autoConnectIfReady();
       }
     } catch (error) {
       showAccountDialogError(error);
@@ -1115,12 +1123,8 @@
         closeAccountDialog();
       }
 
-      if (connectAfterSave) {
-        if (state.mode === "xmpp") {
-          connectXmppWebSocket();
-        } else {
-          connectRelay();
-        }
+      if (connectAfterSave || wasGateRequired) {
+        autoConnectIfReady();
       }
     } catch (error) {
       showAccountDialogError(error);
@@ -4948,6 +4952,31 @@
     updateComposerAvailability();
   }
 
+  function autoConnectIfReady() {
+    if (!state.accountReady || state.accountGateRequired) {
+      return;
+    }
+
+    if (state.relaySocket?.readyState === WebSocket.CONNECTING
+      || state.relaySocket?.readyState === WebSocket.OPEN
+      || state.xmppSocket?.readyState === WebSocket.CONNECTING
+      || state.xmppSocket?.readyState === WebSocket.OPEN) {
+      return;
+    }
+
+    window.setTimeout(() => {
+      if (!state.accountReady || state.accountGateRequired) {
+        return;
+      }
+
+      if (state.mode === "xmpp") {
+        connectXmppWebSocket();
+      } else {
+        connectRelay();
+      }
+    }, 0);
+  }
+
   function updateConnectButtonAvailability() {
     if (!el.connectButton || !el.disconnectButton) {
       return;
@@ -5695,6 +5724,10 @@
   }
 
   function appendDebug(prefix, message) {
+    if (!state.developerMode) {
+      return;
+    }
+
     const line = `[${new Date().toLocaleTimeString()}] ${prefix}: ${message}`;
     el.debugLog.textContent = el.debugLog.textContent
       ? el.debugLog.textContent + "\n" + line

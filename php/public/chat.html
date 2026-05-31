@@ -14,7 +14,7 @@
     }
   </script>
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="chat-client.css?v=20260531-login-start">
+  <link rel="stylesheet" href="chat-client.css?v=20260531-user-ui">
 </head>
 <body>
   <div class="app-shell">
@@ -33,8 +33,8 @@
             <button id="themeButton" class="theme-button" type="button" title="Switch light/dark mode" aria-label="Switch light/dark mode">Theme: White</button>
           </div>
         </details>
-        <button id="accountButton" type="button" data-i18n="button.account">Account</button>
-        <button id="connectButton" type="button" data-i18n="button.connect">Connect</button>
+        <button id="accountButton" type="button" data-i18n="button.settings">Settings</button>
+        <button id="connectButton" class="developer-only" type="button" data-i18n="button.connect">Connect</button>
         <button id="disconnectButton" type="button" disabled data-i18n="button.disconnect">Disconnect</button>
       </div>
     </header>
@@ -83,7 +83,7 @@
               <button id="hangupCallButton" type="button" disabled data-i18n="button.hangup_call">Hang up</button>
               <span id="callStatus" class="call-status" data-i18n="call.idle">No call</span>
             </div>
-            <div class="mode-switch" role="tablist" aria-label="Transport mode">
+            <div class="mode-switch developer-only" role="tablist" aria-label="Transport mode">
               <button id="relayModeButton" type="button" class="selected" data-i18n="mode.relay">Relay</button>
               <button id="xmppModeButton" type="button">RFC 7395</button>
             </div>
@@ -174,7 +174,7 @@
         </form>
       </section>
 
-      <aside class="detail-panel" aria-label="Connection and debug">
+      <aside class="detail-panel developer-panel" aria-label="Connection and debug">
         <section class="settings-section">
           <h2 data-i18n="section.connection">Connection</h2>
           <label>
@@ -415,6 +415,6 @@
     <button id="contextBlockButton" class="danger-action" type="button" role="menuitem" data-i18n="button.block_contact">Block</button>
   </div>
 
-  <script src="chat-client.js?v=20260531-login-start"></script>
+  <script src="chat-client.js?v=20260531-user-ui"></script>
 </body>
 </html>

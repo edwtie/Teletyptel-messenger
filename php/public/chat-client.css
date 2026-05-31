@@ -449,8 +449,12 @@ textarea {
 
 .client-grid {
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr) 330px;
+  grid-template-columns: 260px minmax(0, 1fr);
   min-height: 0;
+}
+
+body.developer-mode .client-grid {
+  grid-template-columns: 260px minmax(0, 1fr) 330px;
 }
 
 .conversation-list,
@@ -466,11 +470,23 @@ textarea {
 }
 
 .detail-panel {
-  display: flex;
+  display: none;
   flex-direction: column;
   border-left: 1px solid #314159;
   padding: 12px;
   gap: 12px;
+}
+
+body.developer-mode .detail-panel {
+  display: flex;
+}
+
+.developer-only {
+  display: none;
+}
+
+body.developer-mode .developer-only {
+  display: inline-flex;
 }
 
 .section-heading {
@@ -1410,6 +1426,10 @@ textarea {
   }
 
   .client-grid {
+    grid-template-columns: 1fr;
+  }
+
+  body.developer-mode .client-grid {
     grid-template-columns: 1fr;
   }
 
