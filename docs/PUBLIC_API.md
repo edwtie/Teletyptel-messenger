@@ -43,6 +43,8 @@ Normal app flow:
 | Type | Purpose |
 | --- | --- |
 | `XmppServiceDiscovery` | XEP-0030 disco#info request/result support plus feature checks such as RTT and XEP-0049 private XML storage. |
+| `XmppAdHocCommands` | XEP-0050 command execute request and completed command-result parsing. |
+| `XmppServiceAdministration` | XEP-0133 read-only service administration command constants and result helpers. |
 | `XmppInBandRegistration` | XEP-0077 registration info, submit, password-change and remove IQ helpers. |
 | `XmppBosh` | XEP-0124/XEP-0206 BOSH body/session/restart/terminate wire helpers. |
 | `XmppBoshClient` | HTTP long-polling BOSH client for login, stream restart, stanza polling, IQ matching and termination. |

@@ -115,6 +115,8 @@ var tests = new (string Name, Action Test)[]
     ("XMPP service discovery parses info result", XmppServiceDiscoveryParsesInfoResult),
     ("XMPP service discovery checks RTT capability", XmppServiceDiscoveryChecksRttCapability),
     ("XMPP service discovery checks PEP capability", XmppServiceDiscoveryChecksPepCapability),
+    ("XMPP ad hoc command serializes and parses", XmppAdHocCommandSerializesAndParses),
+    ("XMPP service administration parses read-only results", XmppServiceAdministrationParsesReadOnlyResults),
     ("XMPP external service discovery serializes and parses services", XmppExternalServiceDiscoverySerializesAndParsesServices),
     ("XMPP external service discovery handles credentials and pushes", XmppExternalServiceDiscoveryHandlesCredentialsAndPushes),
     ("XMPP service contact addresses parse serverinfo form", XmppServiceContactAddressesParseServerInfoForm),
@@ -3939,6 +3941,103 @@ static void XmppServiceDiscoveryChecksPepCapability()
     True(XmppPersonalEventing.SupportsPersonalEventing(info));
     True(XmppPersonalEventing.SupportsPublishing(info));
     Equal("urn:xmpp:mood+notify", XmppPersonalEventing.CreateNotificationFeature("urn:xmpp:mood"));
+}
+
+static void XmppAdHocCommandSerializesAndParses()
+{
+    var request = XmppAdHocCommands.CreateExecuteRequest(
+        "admin-1",
+        XmppAddress.Parse("example.org"),
+        XmppServiceAdministration.GetOnlineUsersNumberNode).ToXml();
+    var command = request.Elements().Single();
+
+    Equal("set", request.Attribute("type")?.Value);
+    Equal("example.org", request.Attribute("to")?.Value);
+    Equal("command", command.Name.LocalName);
+    Equal(XmppAdHocCommands.NamespaceName, command.Name.NamespaceName);
+    Equal("execute", command.Attribute("action")?.Value);
+    Equal(XmppServiceAdministration.GetOnlineUsersNumberNode, command.Attribute("node")?.Value);
+
+    True(XmppIq.TryParse($"""
+        <iq xmlns="jabber:client" type="result" id="admin-1">
+          <command xmlns="{XmppAdHocCommands.NamespaceName}"
+                   node="{XmppServiceAdministration.GetOnlineUsersNumberNode}"
+                   status="completed">
+            <x xmlns="jabber:x:data" type="result">
+              <field var="FORM_TYPE" type="hidden">
+                <value>{XmppServiceAdministration.NamespaceName}</value>
+              </field>
+              <field var="onlineusersnum">
+                <value>3</value>
+              </field>
+            </x>
+          </command>
+        </iq>
+        """, out var iq));
+    True(XmppAdHocCommands.TryParseCommandResult(iq!, out var result));
+    Equal(XmppServiceAdministration.GetOnlineUsersNumberNode, result!.Node);
+    True(result.Completed);
+    Equal(XmppServiceAdministration.NamespaceName, result.DataForm!.FormType);
+    Equal("3", result.DataForm.GetFirstValue(XmppServiceAdministration.OnlineUsersNumberField));
+
+    var advertised = new XmppServiceDiscoveryInfo(null, [], [XmppAdHocCommands.NamespaceName]);
+    True(XmppServiceAdministration.SupportsServiceAdministration(advertised));
+}
+
+static void XmppServiceAdministrationParsesReadOnlyResults()
+{
+    True(XmppServiceAdministration.IsReadOnlyCommandNode(XmppServiceAdministration.GetRegisteredUsersListNode));
+    False(XmppServiceAdministration.IsReadOnlyCommandNode(XmppServiceAdministration.NamespaceName + "#get-user-password"));
+
+    var request = XmppServiceAdministration.CreateReadOnlyCommandRequest(
+        "admin-2",
+        XmppAddress.Parse("example.org"),
+        XmppServiceAdministration.GetRegisteredUsersListNode).ToXml();
+    Equal("set", request.Attribute("type")?.Value);
+
+    True(XmppIq.TryParse($"""
+        <iq xmlns="jabber:client" type="result" id="admin-2">
+          <command xmlns="{XmppAdHocCommands.NamespaceName}"
+                   node="{XmppServiceAdministration.GetRegisteredUsersListNode}"
+                   status="completed">
+            <x xmlns="jabber:x:data" type="result">
+              <field var="FORM_TYPE" type="hidden">
+                <value>{XmppServiceAdministration.NamespaceName}</value>
+              </field>
+              <field var="registereduserjids" type="jid-multi">
+                <value>edward@example.org</value>
+                <value>tester@example.org</value>
+              </field>
+            </x>
+          </command>
+        </iq>
+        """, out var iq));
+    True(XmppAdHocCommands.TryParseCommandResult(iq!, out var result));
+
+    var jids = XmppServiceAdministration.GetJids(result!, XmppServiceAdministration.RegisteredUserJidsField);
+    Equal(2, jids.Count);
+    Equal("edward@example.org", jids[0].Bare);
+    Equal("tester@example.org", jids[1].Bare);
+
+    True(XmppIq.TryParse($"""
+        <iq xmlns="jabber:client" type="result" id="admin-3">
+          <command xmlns="{XmppAdHocCommands.NamespaceName}"
+                   node="{XmppServiceAdministration.GetIdleUsersNumberNode}"
+                   status="completed">
+            <x xmlns="jabber:x:data" type="result">
+              <field var="FORM_TYPE" type="hidden">
+                <value>{XmppServiceAdministration.NamespaceName}</value>
+              </field>
+              <field var="idleusersnum">
+                <value>1</value>
+              </field>
+            </x>
+          </command>
+        </iq>
+        """, out var countIq));
+    True(XmppAdHocCommands.TryParseCommandResult(countIq!, out var countResult));
+    True(XmppServiceAdministration.TryGetInteger(countResult!, XmppServiceAdministration.IdleUsersNumberField, out var idleUsers));
+    Equal(1, idleUsers);
 }
 
 static void XmppExternalServiceDiscoverySerializesAndParsesServices()

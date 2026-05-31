@@ -167,6 +167,22 @@ item is implemented, tested and documented.
 - [x] Client helper to request server discovery.
 - [x] Contact/client capability discovery.
 
+## XEP-0050 - Ad-Hoc Commands
+
+- [x] Command execute IQ serialization.
+- [x] Completed command result parsing.
+- [x] Data-form result parsing for command payloads.
+- [x] Local server advertises the ad-hoc command discovery node.
+
+## XEP-0133 - Service Administration
+
+- [x] Safe read-only LocalServer commands for registered, online, active and idle user counts.
+- [x] Safe read-only LocalServer commands for registered, online, active and idle user lists.
+- [x] Command discovery through XEP-0030 `disco#items` on the XEP-0050 command node.
+- [x] `XmppStreamClient` helper for executing supported read-only administration commands.
+- [x] Retracted password retrieval is intentionally not implemented.
+- [ ] Production admin authorization, audit logging and mutating commands are future server work.
+
 ## XEP-0077 - In-Band Registration
 
 - [x] Registration info request.

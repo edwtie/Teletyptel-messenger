@@ -69,6 +69,8 @@ Server response flow:
 | XEP | Purpose |
 | --- | --- |
 | XEP-0030 | Service discovery. |
+| XEP-0050 | Ad-hoc command discovery and execution. |
+| XEP-0133 | Service administration commands for server-side status and maintenance. |
 | XEP-0077 | In-band account registration, password change and account removal. |
 | XEP-0124 | BOSH HTTP binding body format. |
 | XEP-0206 | XMPP over BOSH profile and stream restart. |
@@ -120,6 +122,21 @@ items or pushed PubSub event notifications. The web provider manifest can seed
 a News tab with provider announcements. A live public-server subscription smoke
 remains release validation because PubSub service names and access policies vary
 by deployment.
+
+## XEP-0050 And XEP-0133 Server Administration
+
+XEP-0133 defines service administration as XEP-0050 ad-hoc commands. The local
+server now exposes the XEP-0050 command list through XEP-0030 `disco#items` and
+implements a safe read-only XEP-0133 subset:
+
+- number and list of registered users;
+- number and list of online users;
+- number and list of active users;
+- number and list of idle users.
+
+The intentionally removed password retrieval command is not implemented. The
+mutating administration commands, production authorization policy and audit logs
+belong to the real server hardening track, not to the localhost smoke server.
 
 ## XEP-0308 Last Message Correction
 

@@ -48,7 +48,7 @@ if (options.UploadPort > 0)
 }
 
 Console.WriteLine($"Tiedragon Local XMPP server listening on {options.ListenAddress}:{options.Port} for domain {options.Domain}");
-Console.WriteLine("Features: RFC 6120/6121 C2S, STARTTLS required, SASL PLAIN, resource bind, session, roster, presence, XEP-0030 disco, XEP-0077, XEP-0198 SM, XEP-0352 CSI, XEP-0054 vCard, XEP-0191 blocking, XEP-0215 STUN/TURN discovery, XEP-0363 slot/PUT smoke, XEP-0045 local MUC, direct chat relay");
+Console.WriteLine("Features: RFC 6120/6121 C2S, STARTTLS required, SASL PLAIN, resource bind, session, roster, presence, XEP-0030 disco, XEP-0050 ad-hoc commands, XEP-0133 read-only service administration, XEP-0077, XEP-0198 SM, XEP-0352 CSI, XEP-0054 vCard, XEP-0191 blocking, XEP-0215 STUN/TURN discovery, XEP-0363 slot/PUT smoke, XEP-0045 local MUC, direct chat relay");
 Console.WriteLine("Scope: local development and smoke testing server; not hardened for internet-facing production use.");
 Console.WriteLine($"Certificate SHA-256: {Convert.ToHexString(certificate.GetCertHash(HashAlgorithmName.SHA256)).ToLowerInvariant()}");
 
@@ -905,8 +905,31 @@ sealed class LocalXmppSession(TcpClient client, LocalXmppServerState state)
             return;
         }
 
+        if (payload?.Name == XName.Get("command", XmppAdHocCommands.NamespaceName) && type == "set")
+        {
+            await HandleAdHocCommandIqAsync(id, to, payload, cancellationToken);
+            return;
+        }
+
         if (payload?.Name == XName.Get("query", "http://jabber.org/protocol/disco#info") && type == "get")
         {
+            var discoveryNode = (string?)payload.Attribute("node");
+            if (XmppServiceAdministration.IsReadOnlyCommandNode(discoveryNode))
+            {
+                var command = XmppServiceAdministration.ReadOnlyCommands
+                    .First(entry => string.Equals(entry.Node, discoveryNode, StringComparison.Ordinal));
+                await WriteAsync($"""
+                    <iq xmlns="jabber:client" type="result" id="{Escape(id)}">
+                      <query xmlns="http://jabber.org/protocol/disco#info" node="{Escape(discoveryNode)}">
+                        <identity category="automation" type="command-node" name="{Escape(command.Name)}"/>
+                        <feature var="{XmppAdHocCommands.NamespaceName}"/>
+                        <feature var="{XmppServiceDiscovery.DataFormNamespace}"/>
+                      </query>
+                    </iq>
+                    """, cancellationToken);
+                return;
+            }
+
             if (IsMucAddress(to))
             {
                 var identityType = to.Contains('@', StringComparison.Ordinal) ? "text" : "service";
@@ -939,6 +962,7 @@ sealed class LocalXmppSession(TcpClient client, LocalXmppServerState state)
                     <identity category="pubsub" type="pep" name="Personal Eventing"/>
                     <feature var="http://jabber.org/protocol/disco#info"/>
                     <feature var="http://jabber.org/protocol/disco#items"/>
+                    <feature var="{XmppAdHocCommands.NamespaceName}"/>
                     <feature var="{XmppPersonalEventing.PubSubNamespaceName}"/>
                     <feature var="{XmppPersonalEventing.PublishFeature}"/>
                     <feature var="{XmppPersonalEventing.AutoCreateFeature}"/>
@@ -979,6 +1003,22 @@ sealed class LocalXmppSession(TcpClient client, LocalXmppServerState state)
 
         if (payload?.Name == XName.Get("query", "http://jabber.org/protocol/disco#items") && type == "get")
         {
+            var discoveryNode = (string?)payload.Attribute("node");
+            if (string.Equals(discoveryNode, XmppAdHocCommands.CommandsNode, StringComparison.Ordinal))
+            {
+                var commandItems = XmppServiceAdministration.ReadOnlyCommands
+                    .Select(command => $"<item jid=\"{Escape(state.Domain)}\" node=\"{Escape(command.Node)}\" name=\"{Escape(command.Name)}\"/>")
+                    .ToArray();
+                await WriteAsync($"""
+                    <iq xmlns="jabber:client" type="result" id="{Escape(id)}">
+                      <query xmlns="http://jabber.org/protocol/disco#items" node="{XmppAdHocCommands.CommandsNode}">
+                        {string.Join(Environment.NewLine + "    ", commandItems)}
+                      </query>
+                    </iq>
+                    """, cancellationToken);
+                return;
+            }
+
             if (to.Contains("@conference.", StringComparison.OrdinalIgnoreCase))
             {
                 await WriteAsync($"""
@@ -1218,6 +1258,110 @@ sealed class LocalXmppSession(TcpClient client, LocalXmppServerState state)
               </credentials>
             </iq>
             """, cancellationToken);
+    }
+
+    private async Task HandleAdHocCommandIqAsync(
+        string id,
+        string to,
+        XElement payload,
+        CancellationToken cancellationToken)
+    {
+        var action = (string?)payload.Attribute("action");
+        var node = (string?)payload.Attribute("node");
+        if ((!string.IsNullOrWhiteSpace(action) && !string.Equals(action, "execute", StringComparison.Ordinal))
+            || string.IsNullOrWhiteSpace(node))
+        {
+            await WriteAsync(BadRequestIq(id), cancellationToken);
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(to)
+            && !string.Equals(ToBareJid(to), state.Domain, StringComparison.OrdinalIgnoreCase))
+        {
+            await WriteAsync(ItemNotFoundIq(id), cancellationToken);
+            return;
+        }
+
+        if (!XmppServiceAdministration.IsReadOnlyCommandNode(node))
+        {
+            await WriteAsync(ItemNotFoundIq(id), cancellationToken);
+            return;
+        }
+
+        var form = CreateServiceAdministrationResultForm(node);
+        await WriteAsync($"""
+            <iq xmlns="jabber:client" type="result" id="{Escape(id)}">
+              <command xmlns="{XmppAdHocCommands.NamespaceName}" node="{Escape(node)}" status="completed">
+                {form}
+              </command>
+            </iq>
+            """, cancellationToken);
+    }
+
+    private string CreateServiceAdministrationResultForm(string node)
+    {
+        var command = XmppServiceAdministration.ReadOnlyCommands
+            .First(entry => string.Equals(entry.Node, node, StringComparison.Ordinal));
+        var fieldXml = command.ReturnsJids
+            ? CreateDataFormField(command.ResultField, "jid-multi", GetServiceAdministrationJids(node))
+            : CreateDataFormField(command.ResultField, "text-single", [GetServiceAdministrationCount(node).ToString(System.Globalization.CultureInfo.InvariantCulture)]);
+
+        return $"""
+            <x xmlns="{XmppServiceDiscovery.DataFormNamespace}" type="result">
+              <field var="{XmppServiceAdministration.FormTypeField}" type="hidden">
+                <value>{XmppServiceAdministration.NamespaceName}</value>
+              </field>
+              {fieldXml}
+            </x>
+            """;
+    }
+
+    private int GetServiceAdministrationCount(string node)
+    {
+        return node switch
+        {
+            XmppServiceAdministration.GetRegisteredUsersNumberNode => state.Accounts.Count,
+            XmppServiceAdministration.GetOnlineUsersNumberNode => GetOnlineBareJids().Length,
+            XmppServiceAdministration.GetActiveUsersNumberNode => GetOnlineBareJids(inactive: false).Length,
+            XmppServiceAdministration.GetIdleUsersNumberNode => GetOnlineBareJids(inactive: true).Length,
+            _ => 0
+        };
+    }
+
+    private IReadOnlyList<string> GetServiceAdministrationJids(string node)
+    {
+        return node switch
+        {
+            XmppServiceAdministration.GetRegisteredUsersListNode => state.Accounts.Keys
+                .Select(username => $"{username}@{state.Domain}")
+                .Order(StringComparer.OrdinalIgnoreCase)
+                .ToArray(),
+            XmppServiceAdministration.GetOnlineUsersListNode => GetOnlineBareJids(),
+            XmppServiceAdministration.GetActiveUsersNode => GetOnlineBareJids(inactive: false),
+            XmppServiceAdministration.GetIdleUsersNode => GetOnlineBareJids(inactive: true),
+            _ => []
+        };
+    }
+
+    private string[] GetOnlineBareJids(bool? inactive = null)
+    {
+        return state.GetAllSessions()
+            .Where(session => session.BareJid is not null
+                && (inactive is null || session.IsClientInactive == inactive.Value))
+            .Select(session => session.BareJid!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    private static string CreateDataFormField(string name, string type, IEnumerable<string> values)
+    {
+        var valueXml = values.Select(value => $"<value>{Escape(value)}</value>");
+        return $"""
+            <field var="{Escape(name)}" type="{Escape(type)}">
+              {string.Join(Environment.NewLine + "      ", valueXml)}
+            </field>
+            """;
     }
 
     private XmppExternalService[] CreateLocalExternalServices()
@@ -1972,6 +2116,15 @@ sealed class LocalXmppSession(TcpClient client, LocalXmppServerState state)
         return $"""
             <iq xmlns="jabber:client" type="error" id="{Escape(id)}">
               <error type="auth"><not-authorized xmlns="urn:ietf:params:xml:ns:xmpp-stanzas"/></error>
+            </iq>
+            """;
+    }
+
+    private static string ItemNotFoundIq(string id)
+    {
+        return $"""
+            <iq xmlns="jabber:client" type="error" id="{Escape(id)}">
+              <error type="cancel"><item-not-found xmlns="urn:ietf:params:xml:ns:xmpp-stanzas"/></error>
             </iq>
             """;
     }

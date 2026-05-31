@@ -9,6 +9,8 @@ that core.
 | XEP | Name | Purpose | Status |
 | --- | --- | --- | --- |
 | XEP-0030 | Service Discovery | Discover server/client features. | Done; LocalServer and RealServerSmoke cover the main path |
+| XEP-0050 | Ad-Hoc Commands | Execute discoverable server/client commands. | Done for command execute/result helpers and LocalServer command discovery |
+| XEP-0133 | Service Administration | Server administration commands layered on XEP-0050. | Done for safe LocalServer read-only counts/lists; mutating production admin policy later |
 | XEP-0077 | In-Band Registration | Account registration, password change and account removal. | Done; real-server smoke supports `--register` |
 | XEP-0124 | BOSH | HTTP binding session and request body model. | Client done; hosted smoke is release validation |
 | XEP-0206 | XMPP over BOSH | XMPP profile for BOSH including stream restart. | Client done; hosted smoke is release validation |

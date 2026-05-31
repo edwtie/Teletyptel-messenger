@@ -520,6 +520,29 @@ public sealed class XmppStreamClient : IAsyncDisposable
             result.Payload);
     }
 
+    public async Task<XmppAdHocCommandResult> ExecuteServiceAdministrationCommandAsync(
+        XmppAddress to,
+        string node,
+        TimeSpan timeout,
+        string id = "service-admin-1",
+        CancellationToken cancellationToken = default)
+    {
+        var result = await SendIqAndWaitAsync(
+            XmppServiceAdministration.CreateReadOnlyCommandRequest(id, to, node),
+            timeout,
+            cancellationToken).ConfigureAwait(false);
+
+        if (XmppAdHocCommands.TryParseCommandResult(result, out var command) && command is not null)
+        {
+            return command;
+        }
+
+        throw new XmppProtocolException(
+            XmppProtocolErrorKind.IqError,
+            "The service administration response was not a valid XEP-0050 command result.",
+            result.Payload);
+    }
+
     public async Task<XmppExternalServices> RequestExternalServicesAsync(
         XmppAddress? to,
         TimeSpan timeout,

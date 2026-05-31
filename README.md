@@ -126,6 +126,7 @@ Core protocols:
 Important XMPP extensions:
 
 - XEP-0030 - Service Discovery
+- XEP-0050 - Ad-Hoc Commands
 - XEP-0047 - In-Band Bytestreams
 - XEP-0045 - Multi-User Chat
 - XEP-0048 - Bookmarks
@@ -135,6 +136,7 @@ Important XMPP extensions:
 - XEP-0077 - In-Band Registration
 - XEP-0080 - User Location
 - XEP-0085 - Chat State Notifications
+- XEP-0133 - Service Administration
 - XEP-0184 - Message Delivery Receipts
 - XEP-0198 - Stream Management
 - XEP-0223 - Persistent Storage of Private Data via PubSub
