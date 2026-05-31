@@ -77,6 +77,8 @@ layer on top of that core.
 
 Project-specific call additions:
 
+- ProtoXEP `urn:xmpp:total-conversation:0` defines the Total Conversation
+  profile that combines current XMPP RFCs/XEPs with the two Jingle ProtoXEPs.
 - ProtoXEP `urn:xmpp:jingle:apps:rtt-sync:0` keeps live RTT synchronized with a
   WebRTC/Jingle call.
 - ProtoXEP `urn:xmpp:jingle:apps:geoloc:0` carries explicit XEP-0080

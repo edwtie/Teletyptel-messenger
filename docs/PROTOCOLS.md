@@ -75,6 +75,7 @@ Current Teletyptel ProtoXEP drafts:
 
 | Draft | Namespace | Purpose | Status |
 | --- | --- | --- | --- |
+| [Total Conversation Profile](protoxeps/total-conversation-profile.md) | `urn:xmpp:total-conversation:0` | Profile that combines recent XMPP RFCs/XEPs and the two Jingle ProtoXEPs into one discoverable conversation model. | Local draft for review before XSF submission. |
 | [Jingle Synchronized Real-Time Text](protoxeps/jingle-rtt-sync.md) | `urn:xmpp:jingle:apps:rtt-sync:0` | Bind live text, captions, T.140 or RTT datachannel text to the same Jingle session as audio/video. | Submitted to XSF as PR 1541. |
 | [Jingle User Location](protoxeps/jingle-geoloc.md) | `urn:xmpp:jingle:apps:geoloc:0` | Bind XEP-0080 user location updates to one active Jingle session. | Submitted to XSF as PR 1542. |
 
@@ -90,7 +91,9 @@ Rules for using ProtoXEP behavior in Teletyptel:
    behavior is not available.
 
 This separation matters for XSF review: the project is not trying to replace
-existing XEPs. It is proposing the missing glue needed for Total Conversation.
+existing XEPs. The Total Conversation Profile names the complete bundle, while
+the two Jingle ProtoXEPs define the missing wire pieces for synchronized text
+and call-scoped location.
 
 ## Total Conversation
 
@@ -132,9 +135,11 @@ User-visible states must remain explicit:
 | Location shared in call | XEP-0080 payload is scoped to this Jingle session. |
 | Location unavailable | Server, peer or user permission does not allow location sharing. |
 
-This chapter is the product architecture. The ProtoXEPs are the proposed wire
-format for the missing parts. The published XEPs remain the interoperability
-foundation.
+This chapter is the product architecture. The
+[Total Conversation Profile](protoxeps/total-conversation-profile.md) is the
+protocol profile for that architecture. The published XEPs remain the
+interoperability foundation, and the two Jingle ProtoXEPs remain the proposed
+wire format for the missing parts.
 
 ## Chat
 
