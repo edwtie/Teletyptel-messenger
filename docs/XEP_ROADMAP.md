@@ -13,7 +13,7 @@ layer on top of that core.
 | XEP-0050 | Ad-Hoc Commands | Execute discoverable server/client commands. | Done for command execute/result helpers and LocalServer command discovery |
 | XEP-0060 | Publish-Subscribe | Generic PubSub nodes for announcements, service news and the base model used by PEP. | Core helper and provider News tab seed done; live server subscription smoke remains |
 | XEP-0077 | In-Band Registration | Account registration, password change and account removal. | Done; real-server smoke supports `--register` |
-| XEP-0080 | User Location | Publish explicit, permission-gated location such as GPS coordinates and accuracy. | Protocol done; UI consent/provider flow and real-server PEP smoke remain |
+| XEP-0080 | User Location | Publish explicit, permission-gated location such as GPS coordinates and accuracy. | Protocol done; Jingle call wrapper done; UI consent/provider flow and real-server PEP smoke remain |
 | XEP-0084 | User Avatar | Publish and retrieve contact avatars via PEP/PubSub. | Done; public-server smoke is release validation |
 | XEP-0085 | Chat State Notifications | active, composing, paused, inactive, gone. | Done; protocol helpers tested |
 | XEP-0124 | BOSH | HTTP binding session and request body model. | Client done; hosted smoke is release validation |
@@ -75,6 +75,13 @@ layer on top of that core.
 | XEP-0343 | Signaling WebRTC DataChannels in Jingle | WebRTC data channels through Jingle. | Future |
 | XEP-0353 | Jingle Message Initiation | Message-based call proposal, ringing, proceed/reject and finish flow. | Done for protocol helpers; installed-client call setup interop remains release validation |
 
+Project-specific call additions:
+
+- ProtoXEP `urn:xmpp:jingle:apps:rtt-sync:0` keeps live RTT synchronized with a
+  WebRTC/Jingle call.
+- ProtoXEP `urn:xmpp:jingle:apps:geoloc:0` carries explicit XEP-0080
+  location/GPS descriptions and call `session-info` updates.
+
 ## RTT Direction
 
 XEP-0301 should stay a first-class extension. It is not just a typing indicator:
@@ -101,6 +108,8 @@ Important product rules:
 - show coordinates only with accuracy, timestamp and source;
 - warn when a location is stale or manually entered;
 - keep "share once", "share live" and "stop sharing" separate;
+- reuse the same XEP-0080 payload when location is sent as Jingle call
+  `session-info`;
 - never treat XEP-0080 alone as an official 112/NG112 connection.
 
 For NG112 interop, Teletyptel needs a gateway model that can convert the trusted

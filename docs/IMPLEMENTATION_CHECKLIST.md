@@ -53,6 +53,8 @@ item is implemented, tested and documented.
   datachannel and keeps the JSON wrapper for reset/final/non-linear metadata.
 - [x] Core RFC 4103 direction started: T.140 codec, RTP v2 packet parser,
   `text/t140` packetizer and RFC 2198 `text/red` redundant payload helper.
+- [x] ProtoXEP Jingle location/GPS core helper added so call sessions can carry
+  explicit XEP-0080 location updates without relying only on PEP presence.
 - [x] ProtoXEP Jingle synchronized RTT Playwright retest passed with two fresh
   browser profiles: video call connected, `rtt` datachannel opened,
   `jingle-rtt-out`/`jingle-rtt-in` logged, live draft displayed and final
@@ -236,6 +238,8 @@ item is implemented, tested and documented.
 - [x] Browser/mobile location provider with permission handling.
 - [x] UI shows accuracy, timestamp, source, stale-location and server-support warnings.
 - [x] Emergency-mode export model for PIDF-LO/RFC 6442 gateway testing.
+- [x] ProtoXEP Jingle location/GPS description and session-info helpers reuse
+  the same XEP-0080 payload during an active call.
 - [x] Local server smoke path for location PEP events.
 - [ ] Real-server PEP smoke path with a non-emergency test account on supporting and non-supporting servers.
 
@@ -292,6 +296,8 @@ item is implemented, tested and documented.
 - [x] DTLS-SRTP fingerprint serialization and parser.
 - [x] Jingle `transport-info` candidate update serializer.
 - [x] Jingle RTP `session-info` states for ringing/hold/mute.
+- [x] ProtoXEP Jingle location/GPS content and `session-info` updates for
+  call-scoped explicit location sharing.
 - [x] XEP-0353 Jingle Message Initiation call setup messages.
 - [x] Jingle parser for action, sid and content.
 - [x] `XmppStreamClient` Jingle send helper.

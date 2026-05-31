@@ -74,6 +74,7 @@ Normal app flow:
 | `XmppPubSub` | XEP-0060 generic PubSub subscribe, unsubscribe, create/delete node and subscription-result helpers. |
 | `XmppPubSubAnnouncements` | Teletyptel provider announcement model on XEP-0060 with Atom entry publish, retrieve and event parsing. |
 | `XmppJingle` | XEP-0166/0167/0176/0320 call signaling, RTP payloads, ICE candidates, DTLS fingerprints and session-info states. Use `XmppExternalServiceDiscovery` for XEP-0215 STUN/TURN discovery before production calls. |
+| `XmppJingleUserLocation` | ProtoXEP Jingle location/GPS application helper that reuses XEP-0080 payloads for call-scoped descriptions and session-info updates. |
 | `XmppJingleMessageInitiation` | XEP-0353 message-based call setup helpers for `propose`, `ringing`, `proceed`, `reject`, `retract` and `finish`. |
 | `XmppSocks5Bytestreams` | XEP-0065 SOCKS5 Bytestreams disco checks, proxy address query, streamhost negotiation, activation and destination-address hashing. |
 | `XmppSocks5BytestreamSocket` | XEP-0065 SOCKS5 no-auth CONNECT stream opener for destination-address based streamhost transfer tests and data pumps. |

@@ -404,6 +404,15 @@ Implemented protocol and product shape:
    warnings.
 10. PIDF-LO export helper exists for simulator/gateway experiments.
 
+For active audio/video calls, Teletyptel also has a ProtoXEP Jingle location
+application namespace: `urn:xmpp:jingle:apps:geoloc:0`. The helper
+`XmppJingleUserLocation` advertises a `location` content description and sends
+call-scoped `session-info` updates or stop-sharing markers. The payload inside
+that Jingle wrapper is still the normal XEP-0080 `<geoloc/>` element, so the
+privacy, validation, accuracy and timestamp rules stay the same. This is not a
+published XSF XEP yet; it is the project wire shape for synchronized GPS inside
+total-conversation calls.
+
 Still to validate outside localhost:
 
 - real-server PEP smoke with a non-emergency test account on both a supporting
@@ -614,7 +623,9 @@ requires an audited verifier/backend and real Double Ratchet engine.
 Current core support covers Jingle `session-initiate`, `session-accept`,
 `session-terminate`, `transport-info`, RTP payload descriptions, ICE-UDP
 candidates, DTLS-SRTP fingerprints and RTP `session-info` states such as
-ringing, hold and mute. It also covers XEP-0234 Jingle file metadata, XEP-0260
+ringing, hold and mute. It also covers the project ProtoXEP
+`urn:xmpp:jingle:apps:geoloc:0` for call-scoped XEP-0080 location/GPS updates.
+It also covers XEP-0234 Jingle file metadata, XEP-0260
 S5B candidates, XEP-0065 proxy address discovery/bytestream setup/proxy
 activation and XEP-0047/XEP-0261 IBB fallback negotiation with open/data/close
 stanzas. `XmppJingleMessageInitiation` covers the XEP-0353 call proposal layer

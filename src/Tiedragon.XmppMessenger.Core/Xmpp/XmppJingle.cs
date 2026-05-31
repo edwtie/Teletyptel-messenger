@@ -273,7 +273,9 @@ public static class XmppJingle
 
         var reason = ParseReason(iq.Payload.Element(XName.Get("reason", NamespaceName)));
         var sessionInfo = iq.Payload.Elements()
-            .FirstOrDefault(child => child.Name.NamespaceName == RtpInfoNamespaceName);
+            .FirstOrDefault(child =>
+                child.Name != XName.Get("content", NamespaceName)
+                && child.Name != XName.Get("reason", NamespaceName));
 
         session = new XmppJingleSession(
             Sid: sid,

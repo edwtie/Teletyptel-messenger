@@ -141,6 +141,8 @@ var tests = new (string Name, Action Test)[]
     ("XMPP user location handles PEP notifications", XmppUserLocationHandlesPepNotifications),
     ("XMPP stream client handles user location requests", XmppStreamClientHandlesUserLocationRequests),
     ("XMPP emergency location exports PIDF-LO", XmppEmergencyLocationExportsPidfLo),
+    ("XMPP Jingle user location serializes and parses", XmppJingleUserLocationSerializesAndParses),
+    ("XMPP Jingle user location creates session-info updates", XmppJingleUserLocationCreatesSessionInfoUpdates),
     ("XMPP user avatar serializes data and metadata", XmppUserAvatarSerializesDataAndMetadata),
     ("XMPP user avatar parses data and metadata", XmppUserAvatarParsesDataAndMetadata),
     ("XMPP user avatar handles metadata notifications and disable", XmppUserAvatarHandlesMetadataNotificationsAndDisable),
@@ -2885,6 +2887,90 @@ static void XmppEmergencyLocationExportsPidfLo()
 
     Throws<ArgumentException>(() =>
         XmppEmergencyLocation.CreatePidfLoXml("pres:user@example.org", new XmppUserLocationData(Text: "no coordinates")));
+}
+
+static void XmppJingleUserLocationSerializesAndParses()
+{
+    var location = new XmppUserLocationData(
+        Latitude: 52.0907m,
+        Longitude: 5.1214m,
+        Accuracy: 6.5m,
+        Altitude: 3.2m,
+        Text: "Call location consent test",
+        Timestamp: new DateTimeOffset(2026, 5, 31, 9, 15, 0, TimeSpan.Zero),
+        Source: "browser-gps");
+    var content = XmppJingleUserLocation.CreateLocationContent(location);
+    var iq = XmppJingle.CreateSessionInitiate(
+        "jingle-location-1",
+        XmppAddress.Parse("tester@example.org/web"),
+        "sid-location-1",
+        "initiator",
+        [content],
+        initiator: "edward@example.org/browser");
+    var xml = iq.ToXml().ToString(SaveOptions.DisableFormatting);
+
+    True(xml.Contains(XmppJingleUserLocation.NamespaceName, StringComparison.Ordinal));
+    True(xml.Contains(XmppUserLocation.NamespaceName, StringComparison.Ordinal));
+    True(xml.Contains("<lat>52.0907</lat>", StringComparison.Ordinal));
+    True(xml.Contains("<lon>5.1214</lon>", StringComparison.Ordinal));
+    True(!xml.Contains("browser-gps", StringComparison.Ordinal));
+
+    True(XmppJingle.TryParse(iq, out var session));
+    Equal("session-initiate", session!.Action);
+    var parsedContent = session.Contents.Single();
+    True(XmppJingleUserLocation.TryParseLocation(parsedContent, out var parsedLocation));
+    Equal((decimal?)52.0907m, parsedLocation!.Latitude);
+    Equal((decimal?)5.1214m, parsedLocation.Longitude);
+    Equal((decimal?)6.5m, parsedLocation.Accuracy);
+
+    var info = new XmppServiceDiscoveryInfo(
+        Node: null,
+        Identities: [],
+        Features: [XmppJingleUserLocation.NamespaceName]);
+    True(XmppJingleUserLocation.SupportsJingleUserLocation(info));
+}
+
+static void XmppJingleUserLocationCreatesSessionInfoUpdates()
+{
+    var location = new XmppUserLocationData(
+        Latitude: 52.0907m,
+        Longitude: 5.1214m,
+        Accuracy: 4m,
+        Text: "Live call GPS",
+        Timestamp: new DateTimeOffset(2026, 5, 31, 9, 20, 0, TimeSpan.Zero));
+    var updateIq = XmppJingleUserLocation.CreateLocationUpdate(
+        "jingle-location-update-1",
+        XmppAddress.Parse("tester@example.org/web"),
+        "sid-location-1",
+        location,
+        creator: "initiator",
+        contentName: "location",
+        initiator: "edward@example.org/browser",
+        responder: "tester@example.org/web");
+    var updateXml = updateIq.ToXml().ToString(SaveOptions.DisableFormatting);
+
+    True(updateXml.Contains("action=\"session-info\"", StringComparison.Ordinal));
+    True(updateXml.Contains("<location", StringComparison.Ordinal));
+    True(updateXml.Contains("<accuracy>4</accuracy>", StringComparison.Ordinal));
+    True(XmppJingle.TryParse(updateIq, out var updateSession));
+    True(XmppJingleUserLocation.TryParseSessionInfo(updateSession!.SessionInfo, out var update));
+    True(update!.IsSharing);
+    Equal("initiator", update.Creator);
+    Equal("location", update.ContentName);
+    Equal("Live call GPS", update.Location!.Text);
+
+    var stopIq = XmppJingleUserLocation.CreateLocationStop(
+        "jingle-location-stop-1",
+        XmppAddress.Parse("tester@example.org/web"),
+        "sid-location-1",
+        creator: "initiator",
+        contentName: "location");
+
+    True(XmppJingle.TryParse(stopIq, out var stopSession));
+    True(XmppJingleUserLocation.TryParseSessionInfo(stopSession!.SessionInfo, out var stop));
+    True(!stop!.IsSharing);
+    Equal("location", stop.ContentName);
+    True(stop.Location is null);
 }
 
 static async Task RunXmppStreamClientHandlesUserLocationRequestsAsync()

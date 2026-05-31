@@ -32,6 +32,8 @@ Protocol implementation now includes:
 - XEP-0163 publish/retrieve/clear/retract integration;
 - service discovery support detection, because some XMPP servers do not offer
   PEP/XEP-0080 publish or retrieval;
+- a ProtoXEP Jingle wrapper, `urn:xmpp:jingle:apps:geoloc:0`, for carrying the
+  same XEP-0080 location payload inside an active call session;
 - local-server PEP storage for smoke tests;
 - browser location permission flow with share-once, live-share and stop-share
   controls;
@@ -60,7 +62,7 @@ certification, logging policy, privacy review and operational testing.
 | --- | --- | --- |
 | Live text | XEP-0301 | RFC 4103 / MSRP / gateway-specific RTT |
 | Audio/video | Jingle/WebRTC | SIP/WebRTC/NG112 gateway media |
-| Location | XEP-0080 | PIDF-LO / RFC 6442 |
+| Location | XEP-0080 plus ProtoXEP Jingle geoloc | PIDF-LO / RFC 6442 |
 | Service contact | XEP-0157 | provider/service metadata |
 | Identity/account | JID/profile/provider | authenticated caller/callback identity |
 
@@ -80,6 +82,7 @@ certification, logging policy, privacy review and operational testing.
 - [x] User consent and stop-sharing controls.
 - [x] UI for accuracy, timestamp, source, stale state and server-support warning.
 - [x] Server capability model for PEP/XEP-0080 support.
+- [x] ProtoXEP Jingle geoloc helper for call-scoped location/GPS updates.
 - [x] Local-server PEP smoke path.
 - [ ] Real-server PEP smoke path on supporting and non-supporting servers.
 - [x] PIDF-LO/RFC 6442 export prototype.

@@ -74,7 +74,8 @@ Alpha 2 currently provides:
 - Total Conversation web smoke: a Jingle/WebRTC audio/video call can carry
   synchronized RTT over a reliable `rtt` datachannel using the current
   ProtoXEP `urn:xmpp:jingle:apps:rtt-sync:0`, with XEP-0301 fallback when the
-  call channel is unavailable
+  call channel is unavailable; the core also models consent-gated Jingle
+  location/GPS updates with ProtoXEP `urn:xmpp:jingle:apps:geoloc:0`
 - local PHP WebSocket edge relay for live RTT, RFC 7395 frame and browser
   Jingle/WebRTC experiments
 - local web file upload with chat attachment cards
@@ -90,7 +91,7 @@ Alpha 2 currently provides:
   SOCKS5 bytestream negotiation with local streamhost handshake/data smoke and
   hosted proxy smoke, IBB fallback byte-transfer smoke, Jingle file-transfer
   metadata/S5B/IBB transports, OMEMO wire stanzas, OMEMO payload/trust
-  boundary helpers and Jingle RTP/ICE/DTLS signaling, including
+  boundary helpers and Jingle RTP/ICE/DTLS/location signaling, including
   existing-client fixture smokes
 - local XMPP server with mandatory STARTTLS, SASL PLAIN, bind, session,
   roster, presence, chat, vCard, blocking, stream management, client state
@@ -169,12 +170,14 @@ Location is part of the accessibility and emergency-readiness direction, not a
 casual tracking feature. Teletyptel should use XEP-0080 for XMPP user location
 and keep a separate NG112 gateway model for PIDF-LO/RFC 6442 style emergency
 location exchange. The protocol layer now has XEP-0080 parse/serialize,
-server capability detection and PEP publish/retrieve/clear helpers. Some XMPP
-servers do not support PEP/XEP-0080, so clients must discover support and
-degrade cleanly. The web client has explicit browser permission, share-once,
-live-share, stop-share, stale/accuracy/server-support warnings and PIDF-LO
-export for simulator/gateway experiments; real-server non-emergency PEP smoke
-on supporting and non-supporting servers remains release-validation work.
+server capability detection, PEP publish/retrieve/clear helpers and a
+Jingle-call ProtoXEP wrapper that carries the same XEP-0080 payload as
+call-scoped `location` session-info. Some XMPP servers do not support
+PEP/XEP-0080, so clients must discover support and degrade cleanly. The web
+client has explicit browser permission, share-once, live-share, stop-share,
+stale/accuracy/server-support warnings and PIDF-LO export for
+simulator/gateway experiments; real-server non-emergency PEP smoke on
+supporting and non-supporting servers remains release-validation work.
 
 ## Server Direction
 
