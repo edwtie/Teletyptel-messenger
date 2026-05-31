@@ -103,6 +103,12 @@ location. It is not just "normal chat plus a call". The media and text must be
 bound to the same Jingle session when the user interface presents them as one
 call.
 
+Current software status: Teletyptel works at TC-2, meaning audio/video
+conversation is implemented through Jingle-shaped call setup and browser WebRTC
+media. TC-2 is implementation status, not yet a formal XEP-0479 compliance
+claim. TC-3 and TC-4 are represented by the current ProtoXEP drafts and test
+paths.
+
 The binding identity is:
 
 ```text
@@ -137,9 +143,10 @@ User-visible states must remain explicit:
 
 This chapter is the product architecture. The
 [Total Conversation Profile](protoxeps/total-conversation-profile.md) is the
-protocol profile for that architecture. The published XEPs remain the
-interoperability foundation, and the two Jingle ProtoXEPs remain the proposed
-wire format for the missing parts.
+protocol profile for that architecture, and it is linked to the
+[XEP-0479 compliance notes](XMPP_COMPLIANCE_SUITES.md). The published XEPs
+remain the interoperability foundation, and the two Jingle ProtoXEPs remain the
+proposed wire format for the missing parts.
 
 ## Chat
 

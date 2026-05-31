@@ -452,6 +452,8 @@ item is implemented, tested and documented.
 - [x] XEP-0479 IM Client checklist and self-assessment.
 - [x] XEP-0479 Mobile Client checklist and self-assessment.
 - [x] XEP-0479 A/V Client checklist and self-assessment.
+- [x] Total Conversation Profile linked to XEP-0479 Advanced Client baseline.
+- [x] Teletyptel current Total Conversation level documented as TC-2 implementation status.
 - [ ] Public release and user-facing setup guide before any XEP-0479 compliance claim.
 - [ ] Real mobile push-provider integration for Advanced Mobile Client.
 

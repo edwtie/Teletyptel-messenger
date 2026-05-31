@@ -180,3 +180,24 @@ The safe target order is:
 Advanced claims are separate. For example, Teletyptel may ship an IM Client
 release before it claims Advanced IM, and it may ship video-call experiments
 before it claims A/V Calling compliance.
+
+## Total Conversation Track
+
+The [Total Conversation Profile](protoxeps/total-conversation-profile.md) is the
+integrated Teletyptel profile that sits on top of XEP-0479. It combines the
+normal Core/Web/IM/Mobile/A/V suites with XEP-0301 real-time text and the two
+Jingle ProtoXEPs.
+
+Current implementation level:
+
+| Level | Meaning | Teletyptel status |
+| --- | --- | --- |
+| TC-0 | Core conversation | Done as XMPP core foundation. |
+| TC-1 | Live text conversation | Done with XEP-0301 and message fallback. |
+| TC-2 | Audio/video conversation | Working now through Jingle-shaped call setup and browser WebRTC media. |
+| TC-3 | Synchronized Total Conversation | Prototype through Jingle synchronized RTT and `rtt` datachannel tests. |
+| TC-4 | Assistive context | Draft/prototype through XEP-0080 and Jingle user location. |
+
+TC-2 is a product/protocol implementation milestone. It is not the same as a
+formal XEP-0479 A/V Calling Client claim, which still needs release packaging,
+hosted deployment and installed-client interop evidence.

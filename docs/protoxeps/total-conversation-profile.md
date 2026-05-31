@@ -141,6 +141,24 @@ emergency-services standard.
 | Jingle Synchronized Real-Time Text | `urn:xmpp:jingle:apps:rtt-sync:0` | Binds live text, captions, T.140 or RTT datachannel text to one Jingle call. |
 | Jingle User Location | `urn:xmpp:jingle:apps:geoloc:0` | Binds XEP-0080 location payloads to one active Jingle call. |
 
+## Relationship To XEP-0479 Advanced Client
+
+This profile is intended to sit on top of XEP-0479 instead of replacing it.
+XEP-0479 defines the general XMPP client compliance suites. Total Conversation
+defines the integrated conversation behavior that uses those suites together.
+
+| Total Conversation level | XEP-0479 baseline | Additional profile meaning |
+| --- | --- | --- |
+| TC-0 Core conversation | Core Client | Normal authenticated XMPP chat identity, stream, TLS, disco and presence foundation. |
+| TC-1 Live text conversation | Core Client plus IM Client messaging path | XEP-0301 live text is available with normal message fallback. |
+| TC-2 Audio/video conversation | A/V Calling Client baseline | A real Jingle call can be proposed, accepted and represented as audio/video in the conversation. |
+| TC-3 Synchronized Total Conversation | A/V Calling Client plus Jingle synchronized RTT ProtoXEP | Live text/captions are negotiated inside the same Jingle session instead of only in chat. |
+| TC-4 Assistive context | Advanced IM/Mobile/A/V features where applicable | Location, files, captions, device state, service contact and assistive context are explicit and discoverable. |
+
+Advanced Client requirements remain separate claims. For example, a client can
+implement TC-2 locally without honestly claiming full XEP-0479 Advanced A/V
+Client until interop, hosted STUN/TURN and release evidence exist.
+
 ## Discovery
 
 A client that supports this profile should advertise:
@@ -183,6 +201,16 @@ underlying features, peers must treat that omitted part as unsupported.
 
 A client must not claim a higher level in user-facing UI or documentation than
 it can negotiate on the wire.
+
+Teletyptel implementation status:
+
+| Level | Current state |
+| --- | --- |
+| TC-0 | Implemented in the XMPP core and local/public smoke paths. |
+| TC-1 | Implemented with XEP-0301 RTT, normal body fallback and browser/relay demos. |
+| TC-2 | Working in current software through Jingle-shaped call setup and browser WebRTC audio/video. This is implementation evidence, not a formal XEP-0479 A/V compliance claim yet. |
+| TC-3 | Prototype path exists through the Jingle synchronized RTT ProtoXEP and browser `rtt` datachannel tests. |
+| TC-4 | Draft/prototype direction through XEP-0080 and Jingle user location; production consent, mobile and interop evidence remain required. |
 
 ## Binding Model
 
