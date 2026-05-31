@@ -201,3 +201,9 @@ Current implementation level:
 TC-2 is a product/protocol implementation milestone. It is not the same as a
 formal XEP-0479 A/V Calling Client claim, which still needs release packaging,
 hosted deployment and installed-client interop evidence.
+
+Submission timing: the Total Conversation Profile should stay as an internal
+review draft until the two Jingle ProtoXEPs have received initial XSF feedback.
+After that, convert the profile to XSF XML and submit it as the umbrella profile
+that combines XEP-0479, XEP-0301, Jingle synchronized RTT and Jingle user
+location.

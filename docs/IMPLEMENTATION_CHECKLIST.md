@@ -454,6 +454,8 @@ item is implemented, tested and documented.
 - [x] XEP-0479 A/V Client checklist and self-assessment.
 - [x] Total Conversation Profile linked to XEP-0479 Advanced Client baseline.
 - [x] Teletyptel current Total Conversation level documented as TC-2 implementation status.
+- [x] Total Conversation discovery model defined with base feature and XEP-0128 form fields.
+- [x] Total Conversation submission timing documented as "wait for Jingle ProtoXEP feedback first".
 - [ ] Public release and user-facing setup guide before any XEP-0479 compliance claim.
 - [ ] Real mobile push-provider integration for Advanced Mobile Client.
 

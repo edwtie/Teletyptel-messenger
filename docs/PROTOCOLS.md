@@ -109,6 +109,13 @@ media. TC-2 is implementation status, not yet a formal XEP-0479 compliance
 claim. TC-3 and TC-4 are represented by the current ProtoXEP drafts and test
 paths.
 
+Submission status: the Total Conversation Profile is good enough for internal
+review and technical discussion, but should wait for initial feedback on the
+two smaller Jingle ProtoXEPs before being converted to XSF XML and submitted.
+The likely submission model is one discovery feature,
+`urn:xmpp:total-conversation:0`, plus a XEP-0128 data form that advertises
+`tc-0` through `tc-4`.
+
 The binding identity is:
 
 ```text

@@ -70,7 +70,9 @@ emergency-services standard.
 | RFC 7590 | yes | TLS requirements for XMPP |
 | RFC 7622 | yes | XMPP address/JID format |
 | RFC 7395 | web profile | XMPP over WebSocket |
+| XEP-0004 | recommended | Data forms for extended capability metadata |
 | XEP-0030 | yes | Service discovery |
+| XEP-0128 | recommended | Service discovery extensions using data forms |
 | XEP-0198 | recommended | Stream management and reconnect |
 | XEP-0352 | mobile/web profile | Client state indication |
 
@@ -188,6 +190,45 @@ Example:
 
 If a client advertises `urn:xmpp:total-conversation:0` but omits one of the
 underlying features, peers must treat that omitted part as unsupported.
+
+### Capability Data Form
+
+The base feature advertises the profile family. The actual level and supported
+modalities should be carried in a XEP-0128 service discovery extension form.
+This avoids creating many feature strings for every possible combination while
+still making TC-0 through TC-4 machine-readable.
+
+```xml
+<query xmlns='http://jabber.org/protocol/disco#info'>
+  <identity category='client' type='web' name='Teletyptel'/>
+  <feature var='urn:xmpp:total-conversation:0'/>
+  <x xmlns='jabber:x:data' type='result'>
+    <field var='FORM_TYPE' type='hidden'>
+      <value>urn:xmpp:total-conversation:0</value>
+    </field>
+    <field var='tc#level' type='list-single'>
+      <value>tc-2</value>
+    </field>
+    <field var='tc#modalities' type='list-multi'>
+      <value>chat</value>
+      <value>rtt</value>
+      <value>audio</value>
+      <value>video</value>
+      <value>file</value>
+    </field>
+    <field var='tc#fallbacks' type='list-multi'>
+      <value>xep-0301</value>
+      <value>xep-0363</value>
+    </field>
+  </x>
+</query>
+```
+
+The `tc#level` value must be one of `tc-0`, `tc-1`, `tc-2`, `tc-3` or `tc-4`.
+A client must not advertise `tc-3` unless it also advertises and can negotiate
+the Jingle synchronized RTT ProtoXEP. A client must not advertise `tc-4` unless
+it can also represent assistive context such as call-scoped location, fallback
+state and consent state.
 
 ## Conformance Levels
 
@@ -370,15 +411,54 @@ emergency location.
 Emergency gateways need separate requirements, including PIDF-LO/RFC 6442 style
 translation, policy, certification, auditing and simulator testing.
 
+## XMPP Registrar Considerations
+
+This profile would request registration of the following service discovery
+feature:
+
+```text
+urn:xmpp:total-conversation:0
+```
+
+It would also request registration of the following XEP-0128 form type:
+
+```text
+FORM_TYPE = urn:xmpp:total-conversation:0
+```
+
+Initial form fields:
+
+| Field | Type | Values | Meaning |
+| --- | --- | --- | --- |
+| `tc#level` | `list-single` | `tc-0`, `tc-1`, `tc-2`, `tc-3`, `tc-4` | Highest Total Conversation level the entity can honestly negotiate. |
+| `tc#modalities` | `list-multi` | `chat`, `rtt`, `caption`, `audio`, `video`, `file`, `location`, `translation`, `interpreter` | Conversation modalities the entity can present or send. |
+| `tc#fallbacks` | `list-multi` | protocol names such as `xep-0301`, `xep-0363`, `xep-0080-pep` | Fallback paths the entity can use and expose to users. |
+
+## IANA Considerations
+
+This profile does not require IANA action.
+
+## Submission Readiness
+
+This Markdown draft is close to ProtoXEP submission shape, but it should not be
+submitted as XML before these steps are done:
+
+1. Decide whether XSF prefers this as a separate profile XEP or as explanatory
+   text after the two Jingle ProtoXEPs.
+2. Keep the TC-level advertisement model small: one base disco feature plus one
+   XEP-0128 form is easier to review than many feature strings.
+3. Convert this Markdown into XSF XEP XML only after the two smaller Jingle
+   ProtoXEPs receive initial Council/standards feedback.
+4. Keep Teletyptel's current claim at TC-2 until TC-3/TC-4 can be demonstrated
+   with accepted protocol text and interop evidence.
+
 ## Open Issues
 
-1. Should the profile define explicit conformance labels such as `tc-1`,
-   `tc-2`, `tc-3` and `tc-4` in service discovery?
-2. Should synchronized RTT be mandatory for any client that claims Total
+1. Should synchronized RTT be mandatory for any client that claims Total
    Conversation, or only for TC-3 and higher?
-3. Should location be part of the main profile or an optional accessibility and
+2. Should location be part of the main profile or an optional accessibility and
    emergency-readiness extension?
-4. How should archives represent call-bound text without requiring servers to
+3. How should archives represent call-bound text without requiring servers to
    store media streams?
-5. Should this profile be submitted as a separate XSF ProtoXEP after the two
+4. Should this profile be submitted as a separate XSF ProtoXEP after the two
    Jingle ProtoXEPs have been reviewed?
