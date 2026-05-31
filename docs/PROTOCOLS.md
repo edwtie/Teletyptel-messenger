@@ -64,6 +64,10 @@ Real-server setup guide:
 Server response flow:
 [SERVER_RESPONSE_FLOW.svg](SERVER_RESPONSE_FLOW.svg).
 
+Readable ProtoXEP drafts:
+[Jingle Synchronized Real-Time Text](protoxeps/jingle-rtt-sync.md) and
+[Jingle User Location](protoxeps/jingle-geoloc.md).
+
 ## Chat
 
 | XEP | Purpose |
