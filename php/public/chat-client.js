@@ -180,6 +180,7 @@
     conversationContextMenu: byId("conversationContextMenu"),
     contextBlockButton: byId("contextBlockButton"),
     conversationItems: byId("conversationItems"),
+    backToContactsButton: byId("backToContactsButton"),
     activeConversationAvatar: byId("activeConversationAvatar"),
     activeConversationName: byId("activeConversationName"),
     activeConversationMeta: byId("activeConversationMeta"),
@@ -320,6 +321,7 @@
     el.addConversationButton.addEventListener("click", addConversation);
     el.addGroupButton.addEventListener("click", addGroupConversation);
     el.inviteConversationButton.addEventListener("click", inviteContactToActiveGroup);
+    el.backToContactsButton.addEventListener("click", closeActiveConversation);
     el.contextBlockButton.addEventListener("click", toggleBlockContextConversation);
     el.conversationContextMenu.addEventListener("click", (event) => event.stopPropagation());
     el.startCallButton.addEventListener("click", () => toggleCallMenu(el.startCallMenu, el.startCallButton));
@@ -4621,6 +4623,7 @@
         closeConversationContextMenu();
         renderConversations();
         renderActiveConversation();
+        el.messageInput.focus();
       });
       button.addEventListener("contextmenu", (event) => showConversationContextMenu(event, conversation, button));
       button.addEventListener("keydown", (event) => {
@@ -4634,8 +4637,19 @@
     updateComposerAvailability();
   }
 
+  function closeActiveConversation() {
+    state.activeConversationId = null;
+    state.previousText = "";
+    el.messageInput.value = "";
+    closeCallMenus();
+    closeConversationContextMenu();
+    renderConversations();
+    renderActiveConversation();
+  }
+
   function renderActiveConversation() {
     const conversation = activeConversation();
+    document.body.classList.toggle("conversation-open", Boolean(conversation));
     if (!conversation) {
       renderAvatarInto(el.activeConversationAvatar, {
         displayName: "TX",

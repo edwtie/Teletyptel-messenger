@@ -27,6 +27,7 @@ button.block_contact=Block
 button.unblock_contact=Unblock
 button.account=Account
 button.settings=Settings
+button.back_to_contacts=Contacts
 button.save_account=Save account
 button.create_account=Create account
 button.sign_in=Sign in

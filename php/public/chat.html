@@ -14,7 +14,7 @@
     }
   </script>
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="chat-client.css?v=20260531-user-ui">
+  <link rel="stylesheet" href="chat-client.css?v=20260531-contact-first">
 </head>
 <body>
   <div class="app-shell">
@@ -63,6 +63,7 @@
 
         <div class="chat-header">
           <div class="chat-title">
+            <button id="backToContactsButton" class="back-to-contacts" type="button" data-i18n="button.back_to_contacts">Contacts</button>
             <div id="activeConversationAvatar" class="avatar avatar-header" aria-hidden="true">R</div>
             <div>
             <h2 id="activeConversationName">Relay room</h2>
@@ -415,6 +416,6 @@
     <button id="contextBlockButton" class="danger-action" type="button" role="menuitem" data-i18n="button.block_contact">Block</button>
   </div>
 
-  <script src="chat-client.js?v=20260531-not-connected"></script>
+  <script src="chat-client.js?v=20260531-contact-first"></script>
 </body>
 </html>

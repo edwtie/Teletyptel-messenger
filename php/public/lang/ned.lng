@@ -27,6 +27,7 @@ button.block_contact=Blokkeren
 button.unblock_contact=Deblokkeren
 button.account=Account
 button.settings=Instellingen
+button.back_to_contacts=Contacten
 button.save_account=Account opslaan
 button.create_account=Account aanmaken
 button.sign_in=Aanmelden

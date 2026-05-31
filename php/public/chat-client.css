@@ -449,11 +449,16 @@ textarea {
 
 .client-grid {
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr);
+  grid-template-columns: minmax(260px, 420px);
+  align-content: stretch;
   min-height: 0;
 }
 
-body.developer-mode .client-grid {
+body.conversation-open .client-grid {
+  grid-template-columns: 260px minmax(0, 1fr);
+}
+
+body.developer-mode.conversation-open .client-grid {
   grid-template-columns: 260px minmax(0, 1fr) 330px;
 }
 
@@ -465,8 +470,12 @@ body.developer-mode .client-grid {
 }
 
 .conversation-list {
-  border-right: 1px solid #314159;
+  border-right: 0;
   padding: 12px;
+}
+
+body.conversation-open .conversation-list {
+  border-right: 1px solid #314159;
 }
 
 .detail-panel {
@@ -591,11 +600,19 @@ body.developer-mode .developer-only {
 
 .chat-panel {
   position: relative;
-  display: grid;
+  display: none;
   grid-template-rows: auto auto auto minmax(0, 1fr) auto auto;
   min-width: 0;
   min-height: 0;
   background: #0f1724;
+}
+
+body.conversation-open .chat-panel {
+  display: grid;
+}
+
+.back-to-contacts {
+  display: none;
 }
 
 .drop-overlay {
@@ -1429,7 +1446,8 @@ body.developer-mode .developer-only {
     grid-template-columns: 1fr;
   }
 
-  body.developer-mode .client-grid {
+  body.conversation-open .client-grid,
+  body.developer-mode.conversation-open .client-grid {
     grid-template-columns: 1fr;
   }
 
@@ -1443,9 +1461,17 @@ body.developer-mode .developer-only {
     border-bottom: 1px solid #314159;
   }
 
+  body.conversation-open .conversation-list {
+    display: none;
+  }
+
   .chat-panel {
     order: 2;
     min-height: 72vh;
+  }
+
+  body.conversation-open .back-to-contacts {
+    display: inline-flex;
   }
 
   .detail-panel {
