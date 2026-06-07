@@ -1458,6 +1458,38 @@ body.call-active .call-panel video {
   color: #94a3b8;
 }
 
+.call-panel.tc-text-full video {
+  display: none;
+}
+
+.call-panel.tc-text-full .tc-text-panel {
+  top: 14px;
+  bottom: 72px;
+  grid-template-columns: 1fr;
+  grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+  pointer-events: auto;
+}
+
+.call-panel.tc-text-full .tc-text-line {
+  min-height: 0;
+  align-content: start;
+  overflow: auto;
+  padding: 12px 14px;
+}
+
+.call-panel.tc-text-full .tc-text-line span {
+  font-size: 13px;
+}
+
+.call-panel.tc-text-full .tc-text-line p {
+  font-size: clamp(20px, 2.2vw, 34px);
+  line-height: 1.3;
+}
+
+.call-panel.tc-text-full .tc-local-lines p:first-child {
+  font-size: clamp(16px, 1.6vw, 24px);
+}
+
 .message-timeline {
   grid-row: 5;
   min-height: 0;

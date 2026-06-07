@@ -165,6 +165,7 @@ final class XmppOmemoDoubleRatchet
 
         $working = self::cloneState($state);
         $skipped = $working['skippedMessageKeys'];
+        $skippedMessageKey = '';
         if (self::tryUseSkippedMessageKey($message['header'], $skipped, $skippedMessageKey)) {
             $plainText = self::decryptWithMessageKey($skippedMessageKey, $message, $associatedData);
             $working['skippedMessageKeys'] = $skipped;
@@ -371,11 +372,11 @@ final class XmppOmemoDoubleRatchet
      * @param array{ratchetPublicKey:string,previousSendingChainLength:int,messageNumber:int} $header
      * @param array<string,string> $skipped
      */
-    private static function tryUseSkippedMessageKey(array $header, array &$skipped, ?string &$messageKey): bool
+    private static function tryUseSkippedMessageKey(array $header, array &$skipped, string &$messageKey): bool
     {
         $key = self::skippedKey($header['ratchetPublicKey'], (int)$header['messageNumber']);
         if (!isset($skipped[$key])) {
-            $messageKey = null;
+            $messageKey = '';
             return false;
         }
 

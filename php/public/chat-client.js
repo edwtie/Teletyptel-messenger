@@ -6919,10 +6919,15 @@
     return Boolean(stream?.getVideoTracks?.().length);
   }
 
+  function isLocalCameraOff(call = state.call) {
+    const tracks = call?.localStream?.getVideoTracks?.() ?? [];
+    return tracks.length > 0 && tracks.every((track) => !track.enabled);
+  }
+
   function updateCameraToggleUi() {
     const tracks = state.call?.localStream?.getVideoTracks() ?? [];
     const hasVideo = tracks.length > 0;
-    const cameraOff = hasVideo && tracks.every((track) => !track.enabled);
+    const cameraOff = isLocalCameraOff(state.call);
     el.toggleCameraButton.disabled = !hasVideo;
     setIconButtonAction(
       el.toggleCameraButton,
@@ -7517,6 +7522,7 @@
       && state.totalConversationTextVisible
     );
 
+    el.callPanel.classList.toggle("tc-text-full", visible && isLocalCameraOff(call));
     el.totalConversationTextPanel.hidden = !visible;
     if (!visible) {
       el.totalConversationRemoteText.textContent = "";
