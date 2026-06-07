@@ -107,6 +107,7 @@ profile APIs require a local web server.
 - iOS app shell: [docs/IOS_APP.md](docs/IOS_APP.md)
 - Account and identity model: [docs/ACCOUNT_IDENTITY_MODEL.md](docs/ACCOUNT_IDENTITY_MODEL.md)
 - Accessibility vision: [docs/ACCESSIBILITY_AGENT_VISION.md](docs/ACCESSIBILITY_AGENT_VISION.md)
+- Enterprise customers: [docs/grote-klanten/README.md](docs/grote-klanten/README.md)
 - Architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - Changelog: [CHANGELOG.md](CHANGELOG.md)
 
