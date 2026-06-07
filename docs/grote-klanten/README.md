@@ -1,4 +1,4 @@
-# TeleTypTel Voor Grote Klanten
+# TeleTypTel voor grote klanten
 
 TeleTypTel is bedoeld als open communicatieplatform voor organisaties die
 tekst, beeld, spraak en toegankelijkheid niet als losse producten willen
@@ -10,7 +10,7 @@ Het uitgangspunt is eenvoudig: een messenger die normaal genoeg voelt voor
 iedereen, maar tegelijk sterk genoeg is voor toegankelijke communicatie,
 providerintegratie en toekomstige noodcommunicatiepaden.
 
-## Waarde Voor Organisaties
+## Waarde voor organisaties
 
 - Een herkenbare chatervaring voor eindgebruikers.
 - Live tekst, audio en video in dezelfde conversatie.
@@ -19,7 +19,7 @@ providerintegratie en toekomstige noodcommunicatiepaden.
 - Open koppelingen richting XMPP, web, mobiele apps en later SIP-gateways.
 - Betere basis voor toegankelijkheid, auditbaarheid en continuiteit.
 
-## Voor Welke Klanten
+## Voor welke klanten
 
 TeleTypTel past bij organisaties die:
 
@@ -64,7 +64,7 @@ klanten horen te kijken naar een geharde serveropstelling met:
 - logging, monitoring, back-up en abusebeleid;
 - optionele gateway naar SIP/telefonie of relay-diensten.
 
-## Open Standaarden
+## Open standaarden
 
 TeleTypTel kiest bewust voor open standaarden. Dat maakt het systeem beter
 controleerbaar, beter koppelbaar en minder kwetsbaar voor een leverancier.
@@ -81,7 +81,7 @@ Belangrijke standaardfamilies:
 Zie [STANDAARDEN_EN_COMPLIANCE.md](STANDAARDEN_EN_COMPLIANCE.md) voor het
 uitgebreide overzicht.
 
-## Belangrijk Voor Verkoop En Presentatie
+## Belangrijk voor verkoop en presentatie
 
 TeleTypTel moet niet worden gepresenteerd als "alleen een hulpmiddel voor doven".
 Dat maakt het product te klein en te kwetsbaar. De juiste boodschap is:
@@ -92,7 +92,7 @@ Dat is belangrijk voor adoptie. Horende gebruikers moeten de app ook willen
 gebruiken. Pas dan ontstaat echte integratie in plaats van een aparte technische
 wereld.
 
-## Grenzen En Eerlijkheid
+## Grenzen en eerlijkheid
 
 TeleTypTel mag niet te vroeg claimen dat het gecertificeerd is voor
 noodcommunicatie, wettelijke conformiteit of productiebeveiliging. Voor grote

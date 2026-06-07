@@ -1,4 +1,4 @@
-# Standaarden En Compliance Voor Grote Klanten
+# Standaarden en compliance voor grote klanten
 
 Dit document beschrijft welke standaarden en kaders relevant zijn voor
 TeleTypTel bij grotere organisaties. Het is geen certificeringsclaim. Het is een
@@ -52,7 +52,7 @@ Gebruik in TeleTypTel:
 Voor productie is TURN belangrijk. Zonder goede TURN-server kunnen gesprekken
 falen bij bedrijfsnetwerken, mobiele netwerken of strenge firewalls.
 
-## SIP En Telefonie
+## SIP en telefonie
 
 SIP is de bekende standaard voor VoIP, telefonieplatforms en providerkoppelingen.
 Voor TeleTypTel is SIP vooral een gateway-onderwerp, niet iets dat de browser UI
@@ -75,7 +75,7 @@ Architectuurkeuze:
 - end-to-end encryptie en SIP-gateways zijn lastig te combineren, omdat een
   gateway vaak media of metadata moet verwerken.
 
-## Real-Time Text
+## Real-time text
 
 Real-time text is essentieel voor toegankelijke gesprekken. Het verschil met
 gewone chat is dat tekst zichtbaar wordt terwijl iemand typt. Dat is belangrijk
@@ -94,7 +94,7 @@ browserinteroperabiliteit zijn WebRTC-datakanalen relevant. TeleTypTel moet deze
 werelden niet door elkaar halen, maar wel kunnen verbinden via een nette
 gatewaylaag.
 
-## Europese Toegankelijkheidskaders
+## Europese toegankelijkheidskaders
 
 ### EN 301 549
 
@@ -136,7 +136,7 @@ EN 301 549-versie kan juridisch nog naar een andere WCAG-versie verwijzen. Voor
 productontwikkeling is WCAG 2.2 AA verstandig als doel, terwijl juridische
 conformiteit per aanbesteding of markt moet worden gecontroleerd.
 
-### European Accessibility Act En Web Accessibility Directive
+### European Accessibility Act en Web Accessibility Directive
 
 De EU Web Accessibility Directive is belangrijk voor publieke websites en apps.
 De European Accessibility Act is breder en raakt producten en diensten in de
@@ -151,7 +151,7 @@ TeleTypTel moet daarom voorbereid zijn op:
 - documentatie voor beheerders en eindgebruikers;
 - aantoonbare correcties na toegankelijkheidstests.
 
-## Privacy En Beveiliging
+## Privacy en beveiliging
 
 Voor grote klanten moet TeleTypTel privacy en beveiliging niet alleen als code
 zien, maar als beheerproces.
@@ -170,7 +170,7 @@ Belangrijke punten:
 Locatie delen vraagt extra voorzichtigheid. Locatie moet expliciet,
 tijdbegrensd en zichtbaar zijn voor de gebruiker.
 
-## Noodcommunicatie En NG112
+## Noodcommunicatie en NG112
 
 TeleTypTel kan technisch richting noodcommunicatie groeien, maar mag niet zonder
 certificering claimen dat het 112/911 vervangt.
@@ -187,7 +187,7 @@ Voor toekomstige NG112-achtige routes zijn relevant:
 In klantgesprekken moet dit worden gepresenteerd als onderzoeks- en
 gatewayrichting, niet als huidige officiele noodcommunicatiedienst.
 
-## Aanbevolen Klanttraject
+## Aanbevolen klanttraject
 
 Voor grote klanten is een realistisch traject:
 
