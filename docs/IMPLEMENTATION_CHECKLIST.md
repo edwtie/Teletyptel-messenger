@@ -500,13 +500,17 @@ item is implemented, tested and documented.
 - [x] Bundle publish serializer/parser.
 - [x] Encrypted message wrapper serializer/parser.
 - [x] `XmppStreamClient` device list helper.
-- [x] Signal Protocol backend boundary and production guard.
-- [x] OMEMO production backend decision documented: libsignal behind
-  `IXmppOmemoSessionBackend`, PHP wire helpers only.
+- [x] OMEMO session backend boundary and production guard.
+- [x] OMEMO production backend decision documented: in-tree C# Double Ratchet
+  behind `IXmppOmemoSessionBackend`, PHP wire helpers only.
 - [x] X3DH key bundle validation, DH1-DH4 plan and HKDF boundary.
 - [x] X3DH X25519 key agreement implementation for initiator/responder DH1-DH4.
 - [x] Signed pre-key verification gate and verifier contract.
 - [x] Opaque Double Ratchet session store contract.
+- [x] Experimental in-tree Double Ratchet engine for X25519 DH ratchet,
+  root/chain/message KDFs, skipped message keys, AES-GCM message encryption and
+  opaque state export/import.
+- [x] Double Ratchet message envelope mapping to and from OMEMO key transports.
 - [x] Local OMEMO device key-material model.
 - [x] Device-list and bundle publication plan from local key material.
 - [x] One-time pre-key consumption and replenishment model.
@@ -516,8 +520,11 @@ item is implemented, tested and documented.
 - [x] Linux Secret Service secret vault provider.
 - [x] macOS Keychain secret vault provider.
 - [ ] Live vault smoke on Linux and macOS.
-- [ ] Signed pre-key verification with an audited Signal Protocol backend.
-- [ ] Double Ratchet session store with an audited Signal Protocol backend.
+- [ ] Production XEdDSA signed pre-key verification.
+- [ ] Independent review, external test vectors and live interop evidence for
+  the in-tree Double Ratchet engine.
+- [ ] Backend adapter that maps the in-tree ratchet state to OMEMO key
+  transports and persistent device sessions.
 - [x] Payload encryption/decryption boundary helper.
 - [x] Trust/fingerprint UI model.
 - [x] Interoperability smoke with existing OMEMO client wire shapes.

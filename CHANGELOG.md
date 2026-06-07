@@ -96,10 +96,11 @@
 - XEP-0384 OMEMO wire scaffolding for device lists, bundle requests and
   encrypted message wrappers.
 - OMEMO payload encryption boundary helpers, trust fingerprints, X3DH
-  X25519 agreement, signed pre-key verification gate, opaque session storage
-  local device/pre-key publication models, encrypted local key files and a
-  native secret vault layer for key-store passphrases on Windows, Linux and
-  macOS.
+  X25519 agreement, signed pre-key verification gate, experimental in-tree
+  Double Ratchet engine, OMEMO key-transport envelope mapping, opaque session
+  storage, local device/pre-key publication models, encrypted local key files
+  and a native secret vault layer for key-store passphrases on Windows, Linux
+  and macOS.
 - XEP-0166/0167/0176/0320 Jingle call signaling for RTP descriptions,
   ICE-UDP candidates, DTLS-SRTP fingerprints, `transport-info` updates and
   RTP `session-info` call states.
@@ -179,8 +180,8 @@
 ### Release Validation Still Required
 
 - OMEMO has protocol, key-material and crypto-boundary scaffolding, but
-  production use still needs an audited Signal Protocol backend for XEdDSA
-  signed pre-key verification, real Double Ratchet sessions and live vault
+  production use still needs XEdDSA signed pre-key verification, independent
+  review/test vectors for the in-tree Double Ratchet engine and live vault
   smoke on Linux and macOS.
 - Voice/video interop against existing federated Jingle clients still needs
   real-server smoke testing; local browser calls, media permissions, device

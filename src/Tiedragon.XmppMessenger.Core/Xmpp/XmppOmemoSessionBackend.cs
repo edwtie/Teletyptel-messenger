@@ -48,7 +48,7 @@ public static class XmppOmemoProductionGuard
         if (!backend.IsProductionReady || missing != XmppOmemoBackendCapability.None)
         {
             throw new InvalidOperationException(
-                $"OMEMO requires an audited production Signal Protocol backend. Backend '{backend.Name}' is missing: {missing}.");
+                $"OMEMO requires a reviewed production OMEMO session backend. Backend '{backend.Name}' is missing: {missing}.");
         }
     }
 }
@@ -93,7 +93,7 @@ public sealed class XmppOmemoUnavailableSessionBackend : IXmppOmemoSessionBacken
     private static NotSupportedException CreateException()
     {
         return new NotSupportedException(
-            "Production OMEMO needs an audited Signal Protocol backend for X3DH and Double Ratchet sessions.");
+            "Production OMEMO needs a reviewed backend for X3DH, Double Ratchet sessions, signed pre-key verification and one-time pre-key consumption.");
     }
 }
 

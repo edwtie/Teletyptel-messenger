@@ -21,6 +21,9 @@ checks:
 - test: `XmppOmemoX3DhValidatesKeysAndDerivesSecret`
 - test: `XmppOmemoX3DhAgreementMatchesInitiatorAndResponder`
 - test: `XmppOmemoX3DhGatesSignedPreKeyVerification`
+- test: `XmppOmemoDoubleRatchetEncryptsBidirectionalMessages`
+- test: `XmppOmemoDoubleRatchetHandlesSkippedMessageKeys`
+- test: `XmppOmemoDoubleRatchetExportsOpaqueSessionState`
 - command: `dotnet run --project tests/Tiedragon.XmppMessenger.Tests/Tiedragon.XmppMessenger.Tests.csproj`
 
 Covered behavior:
@@ -35,7 +38,7 @@ Covered behavior:
 - backward-compatible parsing of older direct `<key>` elements under `<header>`
 - payload encryption/decryption helper for the message payload secret boundary
 - fingerprint and trust-state model for UI/account storage
-- opaque Double Ratchet session store contract for a future audited backend
+- opaque Double Ratchet session store contract for persistent ratchet state
 - local device key-material model for device-list publication, bundle
   publication, one-time pre-key consumption and replenishment
 - encrypted local device file using PBKDF2-SHA256 and AES-GCM, so private key
@@ -45,21 +48,26 @@ Covered behavior:
 - Linux Secret Service provider via `secret-tool`, with the passphrase passed
   through standard input instead of command-line arguments
 - macOS Keychain provider for generic password storage
-- explicit Signal Protocol backend boundary and production guard
+- explicit OMEMO session backend boundary and production guard
 - X3DH bundle validation, associated data, DH1-DH4 planning and HKDF boundary
 - X25519 X3DH initiator/responder agreement where Alice and Bob derive the same
   shared secret with and without DH4
 - signed pre-key verification gate, so initiator setup can require an audited
   verifier before accepting a remote bundle
+- in-tree Double Ratchet root key, sending chain, receiving chain, DH ratchet,
+  skipped message-key storage, AES-GCM message encryption and opaque session
+  state export/import
+- Double Ratchet message envelope mapping to and from OMEMO key transports
 
 ## Security Boundary
 
-The project does not pretend to have production OMEMO until an audited Signal
-Protocol implementation is integrated. The current work deliberately stops at
-the XMPP wire model, payload envelope helper, trust metadata model, local
-device key-material model, encrypted local device file, native passphrase
-vault providers, opaque session store contract, signed pre-key verification
-contract and backend interface. `XmppOmemoProductionGuard` rejects OMEMO
+The project does not pretend to have production OMEMO until the in-tree
+Double Ratchet engine has independent review, external test-vector coverage and
+live interoperability evidence. The current work covers the XMPP wire model,
+payload envelope helper, trust metadata model, local device key-material model,
+encrypted local device file, native passphrase vault providers, opaque session
+store contract, signed pre-key verification contract, backend interface and
+experimental Double Ratchet engine. `XmppOmemoProductionGuard` rejects OMEMO
 production mode unless a backend explicitly reports X3DH, Double Ratchet,
 persistent session storage, signed pre-key verification and one-time pre-key
 consumption.
@@ -67,23 +75,23 @@ consumption.
 The X3DH helper now performs X25519 agreement for DH1-DH4 using Bouncy Castle
 cryptographic primitives. Initiator setup can now require signed pre-key
 verification, but the built-in verifier is only a guard. Real XEdDSA signed
-pre-key verification still belongs inside the audited backend before production
-OMEMO can be enabled.
+pre-key verification and broader Double Ratchet review are still required
+before production OMEMO can be enabled.
 
 ## Backend Decision
 
-The production backend direction is now fixed in
-`docs/OMEMO_BACKEND_DECISION.md`: use Signal's maintained `libsignal` family
-behind the existing `IXmppOmemoSessionBackend` boundary. TeleTypTel keeps the
-XMPP/XEP-0384 adapter, trust UI, local storage and PEP publication logic. PHP
-keeps OMEMO wire helpers only and must not own browser users' long-term OMEMO
-private keys.
+The production backend direction is now recorded in
+`docs/OMEMO_BACKEND_DECISION.md`: use TeleTypTel's in-tree C# Double Ratchet
+engine behind the existing `IXmppOmemoSessionBackend` boundary after review and
+interop evidence. TeleTypTel keeps the XMPP/XEP-0384 adapter, trust UI, local
+storage and PEP publication logic. PHP keeps OMEMO wire helpers only and must
+not own browser users' long-term OMEMO private keys.
 
 Still required for production end-to-end encryption:
 
-- X3DH session setup
-- Double Ratchet send/receive session state
 - signed pre-key verification
+- independent Double Ratchet review and test vectors
+- backend adapter that maps the in-tree ratchet state to OMEMO key transports
 - one-time pre-key consumption and replenishment policy
 - persistent secure storage for identity keys, sessions and trust decisions
 - live Linux Secret Service and macOS Keychain passphrase vault smoke
@@ -91,7 +99,7 @@ Still required for production end-to-end encryption:
 
 ## Manual Live Smoke Route
 
-Use this when an audited Signal Protocol backend is connected.
+Use this when the reviewed OMEMO session backend is connected to the UI.
 
 Requirements:
 

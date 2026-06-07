@@ -211,10 +211,13 @@ var tests = new (string Name, Action Test)[]
     ("XMPP OMEMO Windows secret vault protects key-store passphrase", XmppOmemoWindowsSecretVaultProtectsKeyStorePassphrase),
     ("XMPP OMEMO Linux Secret Service vault keeps secrets out of arguments", XmppOmemoLinuxSecretServiceVaultKeepsSecretsOutOfArguments),
     ("XMPP OMEMO secret vault factory selects native provider", XmppOmemoSecretVaultFactorySelectsNativeProvider),
-    ("XMPP OMEMO requires production Signal Protocol backend", XmppOmemoRequiresProductionSignalProtocolBackend),
+    ("XMPP OMEMO requires production session backend", XmppOmemoRequiresProductionSessionBackend),
     ("XMPP OMEMO X3DH validates keys and derives secret", XmppOmemoX3DhValidatesKeysAndDerivesSecret),
     ("XMPP OMEMO X3DH agreement matches initiator and responder", XmppOmemoX3DhAgreementMatchesInitiatorAndResponder),
     ("XMPP OMEMO X3DH gates signed pre-key verification", XmppOmemoX3DhGatesSignedPreKeyVerification),
+    ("XMPP OMEMO Double Ratchet encrypts bidirectional messages", XmppOmemoDoubleRatchetEncryptsBidirectionalMessages),
+    ("XMPP OMEMO Double Ratchet handles skipped message keys", XmppOmemoDoubleRatchetHandlesSkippedMessageKeys),
+    ("XMPP OMEMO Double Ratchet exports opaque session state", XmppOmemoDoubleRatchetExportsOpaqueSessionState),
     ("XMPP Jingle serializes session initiate and parse", XmppJingleSerializesSessionInitiateAndParse),
     ("XMPP Jingle message initiation serializes call setup", XmppJingleMessageInitiationSerializesCallSetup),
     ("XMPP Jingle message initiation parses call lifecycle", XmppJingleMessageInitiationParsesCallLifecycle),
@@ -7549,7 +7552,7 @@ static void XmppOmemoSecretVaultFactorySelectsNativeProvider()
     }
 }
 
-static void XmppOmemoRequiresProductionSignalProtocolBackend()
+static void XmppOmemoRequiresProductionSessionBackend()
 {
     var unavailable = XmppOmemoUnavailableSessionBackend.Instance;
     Equal("unavailable", unavailable.Name);
@@ -7557,7 +7560,7 @@ static void XmppOmemoRequiresProductionSignalProtocolBackend()
 
     var guardException = Throws<InvalidOperationException>(
         () => XmppOmemoProductionGuard.RequireProductionBackend(unavailable));
-    True(guardException.Message.Contains("Signal Protocol", StringComparison.Ordinal));
+    True(guardException.Message.Contains("production OMEMO session backend", StringComparison.Ordinal));
 
     var backendException = Throws<NotSupportedException>(
         () => unavailable.EnsureSessionAsync(CreateOmemoSessionSetupRequest()).GetAwaiter().GetResult());
@@ -7783,6 +7786,123 @@ static void XmppOmemoX3DhGatesSignedPreKeyVerification()
     Equal((uint)77, acceptingVerifier.LastRequest.SignedPreKeyId);
     Equal(bobSignedPreKey.PublicKey, acceptingVerifier.LastRequest.SignedPreKeyPublic);
     Equal(signature, acceptingVerifier.LastRequest.SignedPreKeySignature);
+}
+
+static void XmppOmemoDoubleRatchetEncryptsBidirectionalMessages()
+{
+    var sharedSecret = Enumerable.Range(0, XmppOmemoDoubleRatchet.RootKeySize)
+        .Select(value => (byte)(value + 1))
+        .ToArray();
+    var bobRatchetKeyPair = XmppOmemoX3DhAgreement.GenerateSignedPreKeyPair();
+    var alice = XmppOmemoDoubleRatchet.CreateInitiatorState(sharedSecret, bobRatchetKeyPair.PublicKey);
+    var bob = XmppOmemoDoubleRatchet.CreateResponderState(sharedSecret, bobRatchetKeyPair);
+    var associatedData = Encoding.UTF8.GetBytes("alice@example.org\nbob@example.org");
+
+    var aliceFirst = XmppOmemoDoubleRatchet.Encrypt(
+        alice,
+        Encoding.UTF8.GetBytes("Hallo Bob"),
+        associatedData);
+    alice = aliceFirst.State;
+    Equal((uint)1, alice.SendingMessageNumber);
+
+    var keyTransport = XmppOmemoDoubleRatchet.CreateKeyTransport(
+        42,
+        aliceFirst.Message,
+        isPreKey: true,
+        XmppAddress.Parse("bob@example.org"));
+    True(keyTransport.IsPreKey);
+    True(XmppOmemoDoubleRatchet.TryParseKeyTransport(keyTransport, out var parsedTransportMessage));
+    Equal(aliceFirst.Message.Header.RatchetPublicKey, parsedTransportMessage!.Header.RatchetPublicKey);
+    Equal(aliceFirst.Message.CipherText, parsedTransportMessage.CipherText);
+
+    var bobFirst = XmppOmemoDoubleRatchet.Decrypt(bob, parsedTransportMessage, associatedData);
+    bob = bobFirst.State;
+    Equal("Hallo Bob", Encoding.UTF8.GetString(bobFirst.Plaintext));
+    True(!string.IsNullOrWhiteSpace(bob.SendingChainKey));
+    Equal((uint)1, bob.ReceivingMessageNumber);
+
+    var bobReply = XmppOmemoDoubleRatchet.Encrypt(
+        bob,
+        Encoding.UTF8.GetBytes("Hallo Alice"),
+        associatedData);
+    bob = bobReply.State;
+
+    var aliceReply = XmppOmemoDoubleRatchet.Decrypt(alice, bobReply.Message, associatedData);
+    alice = aliceReply.State;
+    Equal("Hallo Alice", Encoding.UTF8.GetString(aliceReply.Plaintext));
+    Equal((uint)1, alice.ReceivingMessageNumber);
+
+    var aliceSecond = XmppOmemoDoubleRatchet.Encrypt(
+        alice,
+        Encoding.UTF8.GetBytes("Tweede bericht"),
+        associatedData);
+    var bobSecond = XmppOmemoDoubleRatchet.Decrypt(bob, aliceSecond.Message, associatedData);
+    Equal("Tweede bericht", Encoding.UTF8.GetString(bobSecond.Plaintext));
+}
+
+static void XmppOmemoDoubleRatchetHandlesSkippedMessageKeys()
+{
+    var sharedSecret = Enumerable.Range(0, XmppOmemoDoubleRatchet.RootKeySize)
+        .Select(value => (byte)(0x80 + value))
+        .ToArray();
+    var bobRatchetKeyPair = XmppOmemoX3DhAgreement.GenerateSignedPreKeyPair();
+    var alice = XmppOmemoDoubleRatchet.CreateInitiatorState(sharedSecret, bobRatchetKeyPair.PublicKey);
+    var bob = XmppOmemoDoubleRatchet.CreateResponderState(sharedSecret, bobRatchetKeyPair);
+    var associatedData = Encoding.UTF8.GetBytes("skipped-message-test");
+
+    var first = XmppOmemoDoubleRatchet.Encrypt(alice, Encoding.UTF8.GetBytes("een"), associatedData);
+    alice = first.State;
+    var second = XmppOmemoDoubleRatchet.Encrypt(alice, Encoding.UTF8.GetBytes("twee"), associatedData);
+    alice = second.State;
+    var third = XmppOmemoDoubleRatchet.Encrypt(alice, Encoding.UTF8.GetBytes("drie"), associatedData);
+
+    var thirdResult = XmppOmemoDoubleRatchet.Decrypt(bob, third.Message, associatedData);
+    bob = thirdResult.State;
+    Equal("drie", Encoding.UTF8.GetString(thirdResult.Plaintext));
+    Equal(2, bob.SkippedMessageKeys.Count);
+
+    var firstResult = XmppOmemoDoubleRatchet.Decrypt(bob, first.Message, associatedData);
+    bob = firstResult.State;
+    Equal("een", Encoding.UTF8.GetString(firstResult.Plaintext));
+    Equal(1, bob.SkippedMessageKeys.Count);
+
+    var secondResult = XmppOmemoDoubleRatchet.Decrypt(bob, second.Message, associatedData);
+    bob = secondResult.State;
+    Equal("twee", Encoding.UTF8.GetString(secondResult.Plaintext));
+    Equal(0, bob.SkippedMessageKeys.Count);
+}
+
+static void XmppOmemoDoubleRatchetExportsOpaqueSessionState()
+{
+    var sharedSecret = Enumerable.Range(0, XmppOmemoDoubleRatchet.RootKeySize)
+        .Select(value => (byte)(0x40 + value))
+        .ToArray();
+    var bobRatchetKeyPair = XmppOmemoX3DhAgreement.GenerateSignedPreKeyPair();
+    var alice = XmppOmemoDoubleRatchet.CreateInitiatorState(sharedSecret, bobRatchetKeyPair.PublicKey);
+    var bob = XmppOmemoDoubleRatchet.CreateResponderState(sharedSecret, bobRatchetKeyPair);
+
+    var first = XmppOmemoDoubleRatchet.Encrypt(alice, Encoding.UTF8.GetBytes("state"), Encoding.UTF8.GetBytes("ad"));
+    alice = XmppOmemoDoubleRatchet.ImportState(XmppOmemoDoubleRatchet.ExportState(first.State));
+    bob = XmppOmemoDoubleRatchet.ImportState(XmppOmemoDoubleRatchet.ExportState(bob));
+
+    var decrypted = XmppOmemoDoubleRatchet.Decrypt(bob, first.Message, Encoding.UTF8.GetBytes("ad"));
+    Equal("state", Encoding.UTF8.GetString(decrypted.Plaintext));
+
+    var storedSession = new XmppOmemoStoredSession(
+        new XmppOmemoSessionKey(
+            XmppAddress.Parse("alice@example.org"),
+            1,
+            XmppAddress.Parse("bob@example.org"),
+            2),
+        "fingerprint",
+        XmppOmemoDoubleRatchet.ExportState(alice),
+        DateTimeOffset.UtcNow);
+    var store = new XmppOmemoInMemorySessionStore();
+    store.SaveAsync(storedSession).GetAwaiter().GetResult();
+    var loaded = store.LoadAsync(storedSession.Key).GetAwaiter().GetResult();
+    True(loaded is not null);
+    var restoredAlice = XmppOmemoDoubleRatchet.ImportState(loaded!.OpaqueState);
+    Equal(alice.LocalRatchetKeyPair.PublicKey, restoredAlice.LocalRatchetKeyPair.PublicKey);
 }
 
 static XmppOmemoSessionSetupRequest CreateOmemoSessionSetupRequest()

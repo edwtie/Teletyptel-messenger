@@ -21,7 +21,7 @@ public sealed class XmppOmemoUnavailableSignedPreKeyVerifier : IXmppOmemoSignedP
     {
         _ = request;
         return XmppOmemoSignedPreKeyVerification.Failed(
-            "Signed pre-key verification requires an audited Signal Protocol/XEdDSA backend.");
+            "Signed pre-key verification requires a reviewed XEdDSA verifier.");
     }
 }
 

@@ -48,7 +48,7 @@ layer on top of that core.
 
 | XEP | Name | Purpose | Status |
 | --- | --- | --- | --- |
-| XEP-0384 | OMEMO Encryption | Modern end-to-end encryption. | Wire/key-storage helpers done; libsignal backend chosen behind `IXmppOmemoSessionBackend`; production interop remains release validation |
+| XEP-0384 | OMEMO Encryption | Modern end-to-end encryption. | Wire/key-storage helpers and experimental in-tree Double Ratchet engine done behind `IXmppOmemoSessionBackend`; production review and interop remain release validation |
 | XEP-0392 | Consistent Color Generation | Stable accessible colors for contacts, avatars and group names. | Done in core and web avatar fallback using SHA-1 hue plus HSLuv conversion |
 | XEP-0454 | OMEMO Media Sharing | Encrypted media sharing. | Later |
 | XEP-0493 | OAuth Client Login | OAuth-based account access without sharing the XMPP password. | Core SASL `OAUTHBEARER` helper done; provider setup documented; server OAuth discovery/PKCE flow is integration work |

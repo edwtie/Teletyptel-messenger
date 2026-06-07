@@ -698,14 +698,15 @@ Current core support covers the current `urn:xmpp:omemo:2` namespace, device
 list requests/parsing, bundle requests on `urn:xmpp:omemo:2:bundles`, bundle
 publish/parsing, encrypted message wrappers with grouped `<keys jid="...">`,
 payload encryption/decryption at the payload-secret boundary and a
-trust/fingerprint model. There is also an explicit Signal Protocol backend
+trust/fingerprint model. There is also an explicit OMEMO session backend
 boundary, production guard and X3DH helper for bundle validation, DH1-DH4
 planning, associated data, HKDF, X25519 initiator/responder agreement and a
-signed pre-key verification gate. It also has an opaque session store contract
-for Double Ratchet backend state plus local device key-material helpers for
-device-list publication, bundle publication, one-time pre-key consumption and
-pre-key replenishment. This is still a protocol foundation: production OMEMO
-requires an audited verifier/backend and real Double Ratchet engine.
+signed pre-key verification gate. The C# core now includes an experimental
+Double Ratchet engine with root/chain/message KDFs, X25519 DH ratchet,
+skipped message-key storage, AES-GCM message encryption and opaque state
+export/import. This is still a protocol foundation: production OMEMO requires
+XEdDSA signed pre-key verification, independent ratchet review, external test
+vectors and live interoperability with existing OMEMO clients.
 
 ## Audio And Video
 

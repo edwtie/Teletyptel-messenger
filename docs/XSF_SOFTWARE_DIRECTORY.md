@@ -139,7 +139,8 @@ Release validation and out-of-scope production work:
 
 - Public hosted Teletyptel instance.
 - Android and iOS packaged apps.
-- Production OMEMO interoperability through an audited Signal Protocol backend.
+- Production OMEMO interoperability through the reviewed in-tree Double Ratchet
+  backend, XEdDSA signed pre-key verification and live client interop evidence.
 - Production HTTP upload, TURN/STUN, MAM and PEP modules on the hosted server.
 
 ## Submit Checklist

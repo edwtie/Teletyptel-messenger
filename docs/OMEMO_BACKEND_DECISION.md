@@ -1,19 +1,24 @@
 # OMEMO Backend Decision
 
-TeleTypTel implements XEP-0384 as an XMPP/OMEMO adapter around a Signal
-Protocol engine. The project must not write its own production Double Ratchet.
+TeleTypTel implements XEP-0384 as an XMPP/OMEMO adapter with an in-tree
+Double Ratchet engine in the C# core. The engine follows the published
+Double Ratchet design, but it is not a production encryption claim until it has
+independent review, test-vector coverage and live OMEMO interoperability.
 
 ## Decision
 
-Use Signal's maintained `libsignal` family as the production crypto direction,
-with TeleTypTel responsible for:
+Build and maintain a TeleTypTel Double Ratchet implementation in C#, with
+TeleTypTel responsible for:
 
 - XEP-0384 device list and bundle publication through XEP-0060/XEP-0163;
 - XEP-0384 encrypted-message XML wire format;
 - XEP-0420 Stanza Content Encryption envelope construction;
 - local trust/fingerprint UI;
 - local device storage and platform secret vaults;
-- mapping the crypto backend results to XMPP messages.
+- X3DH shared-secret setup;
+- Double Ratchet root, sending and receiving chains;
+- skipped message-key storage for out-of-order delivery;
+- mapping ratchet message keys to OMEMO key transports.
 
 PHP remains a wire/protocol layer only. It may build and parse OMEMO device
 lists, bundles and encrypted message wrappers, but it must not hold long-term
@@ -24,11 +29,11 @@ clients must keep the private key material at the edge device.
 
 | Platform | Crypto route | Status |
 | --- | --- | --- |
-| Android | Signal `libsignal-android` plus `libsignal-client` through a native/Capacitor bridge | Chosen |
-| iOS | Signal `libsignal-client` through Swift/native bridge | Chosen |
-| Windows desktop/WebView2 | `libsignal-client` native library behind the C# `IXmppOmemoSessionBackend` adapter | Chosen |
-| Linux/macOS desktop | Same backend adapter with platform native library and secret vault provider | Chosen |
-| Pure browser/PWA | Disabled until a reviewed WebAssembly binding for the same backend is available | Guarded |
+| Android | TeleTypTel ratchet engine through a native/Capacitor bridge or audited shared core binding | Planned |
+| iOS | TeleTypTel ratchet engine through Swift/native bridge or audited shared core binding | Planned |
+| Windows desktop/WebView2 | C# in-tree Double Ratchet engine plus platform secret vault | Implemented as experimental |
+| Linux/macOS desktop | Same C# engine plus platform native secret vault provider | Experimental, vault smoke still needed |
+| Pure browser/PWA | Disabled until a reviewed WebAssembly route exists | Guarded |
 | PHP server | XMPP/OMEMO wire helpers only; no production E2EE private-key ownership | Chosen |
 
 ## Why
@@ -48,14 +53,17 @@ The repository already has:
 - platform secret-vault abstraction;
 - `IXmppOmemoSessionBackend`;
 - `XmppOmemoProductionGuard`.
+- in-tree Double Ratchet state, DH ratchet, root/chain/message KDFs, skipped
+  message keys, AES-GCM message encryption and opaque state export/import.
 
-That is the right boundary. The missing production piece is the audited Signal
-Protocol session backend that performs signed pre-key verification, X3DH
-session setup, Double Ratchet send/receive and persistent ratchet state.
+That is the right boundary. The missing production piece is not "more XML"; it
+is cryptographic assurance: XEdDSA signed pre-key verification, independent
+review, external test vectors, persistent-device recovery testing and live
+interop with existing OMEMO clients.
 
 ## Rules
 
-- Do not implement a custom production Double Ratchet in PHP or JavaScript.
+- Do not move production Double Ratchet state into PHP or server-side storage.
 - Do not store browser users' OMEMO private keys on the PHP server.
 - Do not claim production OMEMO until `XmppOmemoProductionGuard` accepts the
   backend and live interop passes with existing OMEMO clients.
@@ -66,19 +74,20 @@ session setup, Double Ratchet send/receive and persistent ratchet state.
 
 ## Integration Steps
 
-1. Build `XmppOmemoLibsignalBackend` for C# behind
-   `IXmppOmemoSessionBackend`.
+1. Wrap `XmppOmemoDoubleRatchet` behind `IXmppOmemoSessionBackend`.
 2. Map XEP-0384 bundles to the backend's identity key, signed pre-key and
    one-time pre-key types.
 3. Persist opaque ratchet sessions in `XmppOmemoSessionStore`.
 4. Use existing platform vault providers for local key-store passphrases.
-5. Add Android/iOS native bridges before enabling OMEMO in mobile WebViews.
-6. Keep pure browser OMEMO unavailable until a reviewed WASM route exists.
-7. Run live interop with Conversations, Gajim or Dino before any public E2EE
+5. Add XEdDSA signed pre-key verification before production use.
+6. Add Android/iOS native bridges before enabling OMEMO in mobile WebViews.
+7. Keep pure browser OMEMO unavailable until a reviewed WASM route exists.
+8. Run live interop with Conversations, Gajim or Dino before any public E2EE
    claim.
 
 ## References
 
 - XEP-0384: OMEMO Encryption, version 0.9.1.
 - XEP-0420: Stanza Content Encryption.
-- Signal `libsignal` repository and published library packages.
+- Signal Double Ratchet specification.
+- Signal X3DH specification.
