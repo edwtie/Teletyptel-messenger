@@ -1,7 +1,7 @@
-# Tiedragon XMPP Messenger language file
+# TeleTypTel Messenger language file
 # Format: key=value
 
-app.title=Tiedragon XMPP Messenger
+app.title=TeleTypTel Messenger
 label.name=Name
 label.jid=JID
 label.websocket=WebSocket

@@ -1,7 +1,7 @@
-# Tiedragon XMPP Messenger taalbestand
+# TeleTypTel Messenger taalbestand
 # Format: key=value
 
-app.title=Tiedragon XMPP Messenger
+app.title=TeleTypTel Messenger
 menu.file=Bestand
 menu.exit=Afsluiten
 menu.conversation=Gesprek
@@ -18,8 +18,8 @@ theme.white=Wit
 menu.debug=Debuglog
 menu.help=Help
 menu.about=Over
-about.title=Over Tiedragon XMPP Messenger
-about.text=Tiedragon Teletyptel Windows messenger preview.
+about.title=Over TeleTypTel Messenger
+about.text=TeleTypTel Windows messenger preview.
 label.name=Naam
 label.jid=JID
 label.peer=Contact

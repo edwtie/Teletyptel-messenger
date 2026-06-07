@@ -1,4 +1,4 @@
-# Tiedragon.XmppMessenger Architecture
+# TeleTypTel Architecture
 
 The project should grow as a protocol library first and an app second.
 

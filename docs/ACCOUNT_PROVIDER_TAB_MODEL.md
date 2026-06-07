@@ -166,7 +166,7 @@ Adapters live outside the XMPP core:
 ```text
 Teletyptel Web Client
   -> Teletyptel App Model
-  -> Tiedragon XMPP Core
+  -> TeleTypTel XMPP Core
   -> Provider Adapters
        -> SMS
        -> SIP/voice

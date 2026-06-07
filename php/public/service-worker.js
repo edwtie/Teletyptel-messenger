@@ -1,4 +1,4 @@
-const CACHE_NAME = "tiedragon-xmpp-webclient-v112";
+const CACHE_NAME = "teletyptel-webclient-v113";
 const BUILD_VERSION = "20260606-security-totp";
 const ASSETS = [
   "chat.html",

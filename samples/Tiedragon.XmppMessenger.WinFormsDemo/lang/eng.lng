@@ -1,7 +1,7 @@
-# Tiedragon XMPP Messenger language file
+# TeleTypTel Messenger language file
 # Format: key=value
 
-app.title=Tiedragon XMPP Messenger
+app.title=TeleTypTel Messenger
 menu.file=File
 menu.exit=Exit
 menu.conversation=Conversation
@@ -18,8 +18,8 @@ theme.white=White
 menu.debug=Debug log
 menu.help=Help
 menu.about=About
-about.title=About Tiedragon XMPP Messenger
-about.text=Tiedragon Teletyptel Windows messenger preview.
+about.title=About TeleTypTel Messenger
+about.text=TeleTypTel Windows messenger preview.
 label.name=Name
 label.jid=JID
 label.peer=Peer

@@ -27,7 +27,7 @@ This project is not starting in an empty market. XMPP already has many clients a
 - Audio/video support exists, but is uneven across clients and platforms.
 - Real-time text is a strong accessibility feature, but it is not a headline feature in most mainstream XMPP clients.
 
-## Product Gap For Tiedragon XMPP Messenger
+## Product Gap For TeleTypTel Messenger
 
 A useful direction is not to compete as a generic clone. The project should focus on:
 
@@ -42,7 +42,7 @@ A useful direction is not to compete as a generic clone. The project should focu
 
 ## Recommended Positioning
 
-Tiedragon XMPP Messenger should be:
+TeleTypTel Messenger should be:
 
 > A Windows-first XMPP messenger for private chat, real-time text, and accessible audio/video communication.
 

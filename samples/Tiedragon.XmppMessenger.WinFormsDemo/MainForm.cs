@@ -236,7 +236,7 @@ public sealed class MainForm : Form
             _debugMenuItem
         ]);
         _helpMenu.DropDownItems.Add(_aboutMenuItem);
-        _aboutMenuItem.Click += (_, _) => MessageBox.Show(this, T("about.text", "Tiedragon Teletyptel Windows messenger preview."), T("about.title", "About"));
+        _aboutMenuItem.Click += (_, _) => MessageBox.Show(this, T("about.text", "TeleTypTel Windows messenger preview."), T("about.title", "About"));
 
         _menuStrip.Items.AddRange([
             _fileMenu,
@@ -729,7 +729,7 @@ public sealed class MainForm : Form
     private void ApplyLanguage()
     {
         var connected = _client?.State == WebSocketState.Open;
-        Text = T("app.title", "Tiedragon XMPP Messenger");
+        Text = T("app.title", "TeleTypTel Messenger");
         _fileMenu.Text = T("menu.file", "File");
         _connectMenuItem.Text = T("button.connect", "Connect");
         _disconnectMenuItem.Text = T("button.disconnect", "Disconnect");

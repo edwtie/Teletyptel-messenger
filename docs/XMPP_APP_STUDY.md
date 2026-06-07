@@ -1,7 +1,7 @@
 # XMPP App Study
 
 This document compares existing XMPP apps with the direction of
-`Tiedragon.XmppMessenger`.
+TeleTypTel.
 
 Sources:
 
@@ -35,7 +35,7 @@ Sources:
 
 ## Gap For This Project
 
-`Tiedragon.XmppMessenger` should not try to be another generic XMPP client first.
+TeleTypTel should not try to be another generic XMPP client first.
 There are already mature clients for that. The stronger position is:
 
 - a clean C#/.NET XMPP core library;

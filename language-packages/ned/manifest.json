@@ -1,8 +1,8 @@
 {
   "format": 1,
-  "key": "tiedragon-xmpp-messenger-ned",
-  "id": "tiedragon-xmpp-messenger-ned",
-  "product": "Tiedragon XMPP Messenger",
+  "key": "teletyptel-messenger-ned",
+  "id": "teletyptel-messenger-ned",
+  "product": "TeleTypTel Messenger",
   "producer": "Tiedragon",
   "softwareId": "tiedragon.xmppmessenger",
   "languageCode": "ned",

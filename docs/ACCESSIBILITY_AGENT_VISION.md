@@ -1,6 +1,6 @@
 # Accessibility Agent Vision
 
-`Tiedragon.XmppMessenger` should grow into an accessible communication platform,
+TeleTypTel should grow into an accessible communication platform,
 not only a generic XMPP chat client. The target is communication that works for
 hearing, Deaf, hard-of-hearing, speech-impaired, multilingual and mobile users.
 

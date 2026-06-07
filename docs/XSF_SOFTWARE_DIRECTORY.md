@@ -60,7 +60,7 @@ Candidate public entry without DOAP:
     "Web",
     "Windows"
   ],
-  "url": "https://github.com/edwtie/Tiedragon.XmppMessenger",
+  "url": "https://github.com/edwtie/Teletyptel-messenger",
   "categories": [
     "client"
   ]

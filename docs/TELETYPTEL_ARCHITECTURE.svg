@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1400" height="1160" viewBox="0 0 1400 1160" role="img" aria-labelledby="title desc">
-  <title id="title">Tiedragon Teletyptel 2.0 architecture</title>
+  <title id="title">TeleTypTel 2.0 architecture</title>
   <desc id="desc">Light architecture diagram showing clients, web application, PHP edge services, storage, protocol core, XMPP extensions and future production services.</desc>
   <defs>
     <style>
@@ -32,7 +32,7 @@
   </defs>
 
   <rect class="bg" x="0" y="0" width="1400" height="1160" />
-  <text class="title" x="50" y="58">Tiedragon Teletyptel 2.0 Architecture</text>
+  <text class="title" x="50" y="58">TeleTypTel 2.0 Architecture</text>
   <text class="subtitle" x="52" y="86">Open XMPP messenger with RFC 6120/6121 core, XMPP extensions, web/mobile UI, PHP relay/API, MySQL account profiles and .lng localization.</text>
 
   <rect class="lane" x="42" y="112" width="1316" height="130" />

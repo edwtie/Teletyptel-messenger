@@ -58,8 +58,8 @@ infrastructure.
 
 ## Download And Source
 
-- Source: https://github.com/edwtie/Tiedragon.XmppMessenger
-- Releases: https://github.com/edwtie/Tiedragon.XmppMessenger/releases
+- Source: https://github.com/edwtie/Teletyptel-messenger
+- Releases: https://github.com/edwtie/Teletyptel-messenger/releases
 
 ## For Developers
 

@@ -1,7 +1,7 @@
 {
-  "name": "tiedragon.xmppmessenger",
+  "name": "teletyptel-messenger",
   "version": "1.0.0",
-  "description": "Tiedragon Teletyptel 2.0 is an alpha XMPP messenger project focused on accessible real-time text. The current Alpha 2 codebase is usable as an evaluation build: it includes a web chat UI, PHP WebSocket edge relay, C# XMPP core, local STARTTLS XMPP server, real-server smoke tool and repeatable test suite.",
+  "description": "TeleTypTel 2.0 is an alpha XMPP messenger project focused on accessible real-time text. The current Alpha 2 codebase is usable as an evaluation build: it includes a web chat UI, PHP WebSocket edge relay, C# XMPP core, local STARTTLS XMPP server, real-server smoke tool and repeatable test suite.",
   "main": "index.js",
   "directories": {
     "doc": "docs",
@@ -15,16 +15,16 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/edwtie/Tiedragon.XmppMessenger.git"
+    "url": "git+https://github.com/edwtie/Teletyptel-messenger.git"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "bugs": {
-    "url": "https://github.com/edwtie/Tiedragon.XmppMessenger/issues"
+    "url": "https://github.com/edwtie/Teletyptel-messenger/issues"
   },
-  "homepage": "https://github.com/edwtie/Tiedragon.XmppMessenger#readme",
+  "homepage": "https://github.com/edwtie/Teletyptel-messenger#readme",
   "devDependencies": {
     "@capacitor/cli": "^8.4.0",
     "@capacitor/core": "^8.4.0",

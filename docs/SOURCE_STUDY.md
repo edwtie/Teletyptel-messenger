@@ -1,6 +1,6 @@
 # Source Study
 
-This document lists open-source XMPP projects worth studying before implementing Tiedragon XMPP Messenger.
+This document lists open-source XMPP projects worth studying before implementing TeleTypTel Messenger.
 
 The goal is not to copy code. The goal is to understand architecture, protocol flow, edge cases and user experience decisions.
 
