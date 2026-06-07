@@ -1,0 +1,14 @@
+{
+  "name": "tiedragon/teletyptel-messenger",
+  "description": "TeleTypTel messenger web application and standalone PHP XMPP protocol helpers.",
+  "type": "project",
+  "license": "MIT",
+  "require": {
+    "php": ">=8.1"
+  },
+  "autoload": {
+    "psr-4": {
+      "Tiedragon\\Xmpp\\": "php/lib/Xmpp/"
+    }
+  }
+}
