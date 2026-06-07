@@ -4,6 +4,61 @@
 
 ### Added
 
+- Public TeleTypTel branding pass for the web package, Windows demo language
+  files, language package manifests, project metadata, XSF entry drafts and
+  architecture diagrams. Internal `Tiedragon.XmppMessenger` namespaces and
+  executable names remain stable for build compatibility.
+- TeleTypTel web client shell now uses the TeleTypTel logo, branded chat
+  wallpaper, messenger-style empty state, compact top actions, settings gear,
+  theme toggle and separate contact/group list.
+- Account and identity model for local accounts plus linked login identities:
+  e-mail/JID separation, account/JID collision handling direction, Google,
+  Facebook and Apple OAuth Authorization Code + PKCE backend flows, account
+  profile storage and XMPP account binding.
+- Account security flows for local development: password reset by e-mail,
+  e-mail verification codes, TOTP/QR-code two-factor setup, remembered browser
+  sessions and account/profile database migration helpers.
+- Profile UI and persistence for display name, avatar, phone/date/language and
+  provider metadata, including an avatar cropper with zoom and circular preview.
+- PHP XMPP library expanded into a PHP-only server/runtime path that does not
+  require .NET 10: TCP/STARTTLS stream client, SASL PLAIN/OAUTHBEARER/SCRAM,
+  resource binding, roster, presence, chat, RTT, PubSub/PEP, upload, MAM,
+  BOSH, WebSocket and common XEP wire-model helpers.
+- PHP helpers for XEP-0050, XEP-0054, XEP-0059, XEP-0060, XEP-0077, XEP-0084,
+  XEP-0115, XEP-0124/XEP-0206, XEP-0156, XEP-0157, XEP-0198, XEP-0203,
+  XEP-0215, XEP-0245, XEP-0280, XEP-0334, XEP-0352, XEP-0357, XEP-0359,
+  XEP-0385, XEP-0392, XEP-0393, XEP-0424, XEP-0425, XEP-0433, XEP-0494
+  and XEP-0514.
+- XEP-0060 provider announcement/news helper with Atom entry publish, item
+  retrieval and event-notification parsing.
+- Web attachment menu for photo, video, documents and location sharing, with
+  file/photo cards, local upload API, image preview popup and download action.
+- Database-backed chat history for completed messages, edited messages,
+  retractions, attachments and location cards, so browser sessions can reload
+  conversation state instead of only showing transient relay text.
+- Interactive location sharing UI with map preview, share duration up to eight
+  hours, Google Maps/OpenStreetMap provider setting, browser geolocation
+  permission handling and single live location card updates instead of duplicate
+  GPS bubbles.
+- Total Conversation call UI with combined audio/video/RTT modes, hangup,
+  microphone mute, camera on/off, speaker mute, volume control and show/hide
+  live RTT overlay during a call.
+- Two-line live RTT overlay during Total Conversation calls: local text and
+  remote/relay text remain visible over the video area while the normal chat
+  timeline stays available.
+- Web client smiley picker behavior now inserts smiley codes while rendering
+  images in messages, keeping the typed protocol text clean.
+- LocalServer Admin Windows app for local development: process/port overview,
+  Apache/WAMP visibility, local server controls, SQL status and force-terminate
+  action for stuck localhost services.
+- Enterprise/customer documentation folder with standards notes, EN 301 549 and
+  WCAG 2.2 AA direction, SIP-gateway positioning, ejabberd provider-server
+  recommendation and a simplified network/layers SVG.
+- Linux setup and README now explain the split between the C# XMPP library and
+  PHP XMPP library, including that PHP-hosted deployments do not require
+  .NET 10 unless C# tools or desktop samples are used.
+- GitHub Actions cross-platform protocol test workflow for Ubuntu, Windows and
+  macOS.
 - XEP-0045 Multi-User Chat helpers for room discovery, room items,
   join/leave presence, groupchat messages, direct invitations, room
   configuration forms and admin role/affiliation flows.
@@ -107,6 +162,20 @@
 - Local web file upload endpoint and chat attachment cards for Alpha relay
   testing.
 
+### Changed
+
+- Public package and repository metadata now point to
+  `edwtie/Teletyptel-messenger`.
+- Product copy now presents TeleTypTel as an open messenger and Total
+  Conversation platform instead of the older "Tiedragon XMPP Messenger" working
+  name.
+- Production server direction is documented as ejabberd plus coturn and
+  production modules for roster, MUC, MAM, PubSub/PEP, HTTP upload, TURN/STUN
+  discovery and optional SIP-gateway work.
+- XSF/software-directory notes now describe only the current evaluation scope
+  and avoid claiming Android/iOS or formal XEP-0479 compliance before release
+  validation.
+
 ### Release Validation Still Required
 
 - OMEMO has protocol, key-material and crypto-boundary scaffolding, but
@@ -122,11 +191,23 @@
 - Direct file-transfer S5B/IBB command-line smoke paths have passed against
   `conversations.im`; repeat with one installed XMPP client before making a
   polished user-facing file-transfer interop claim.
-- XEP-0313 one-to-one MAM has public-server evidence; MUC archive smoke still
-  needs an archive-enabled room before claiming Advanced group chat history.
+- XEP-0313 one-to-one and MUC archive smoke have public-server evidence; repeat
+  against the production TeleTypTel/ejabberd server before making a hosted
+  service claim.
+- Live social-login smoke still needs final real Google/Facebook/Apple
+  provider configuration and redirect URLs for the production domain.
+- Account security flows are implemented for development/evaluation, but still
+  need production hardening, rate limiting, mail-delivery monitoring and abuse
+  policy before public signup.
 
 ### Fixed
 
+- Old public product names were replaced with TeleTypTel in visible UI text,
+  language files, project metadata, XSF draft entries and public documentation.
+- Cross-platform protocol tests no longer assume separate TCP reads for XMPP
+  Client State Indication; Linux/macOS socket coalescing is now tolerated.
+- Local server port conflicts are easier to diagnose through the LocalServer
+  Admin process overview and force-terminate action.
 - Smiley images in the live RTT draft no longer reload and flicker on every
   typed character.
 - Receiving a final message no longer rebuilds the full timeline, so existing
