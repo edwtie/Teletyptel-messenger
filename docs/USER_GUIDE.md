@@ -9,7 +9,7 @@ testing. It is intended for testers and developers, not for production use.
 Open:
 
 ```text
-http://127.0.0.1:8090/chat.html
+http://127.0.0.1/chat.html
 ```
 
 Do not open `php/public/chat.html` directly from `C:\...`; the account login
