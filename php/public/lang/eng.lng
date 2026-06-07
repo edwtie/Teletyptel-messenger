@@ -296,6 +296,7 @@ account.account_not_found=This account was not found on the XMPP server.
 account.disconnected_login_required=Connection closed. Sign in to continue.
 account.connection_failed_login_required=Connection failed. Sign in to try again.
 account.account_exists=This account already exists. Use Sign in instead.
+account.account_suggestions=Available alternatives
 account.unsupported_local_registration=New account creation here is only for @localhost. Use Sign in for an existing Freedom or XMPP account.
 account.external_account_saved=External XMPP account saved. Connecting to the server now.
 account.ready=Update your account settings. The connection starts automatically after sign-in.

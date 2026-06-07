@@ -296,6 +296,7 @@ account.account_not_found=Dit account staat niet op de XMPP-server.
 account.disconnected_login_required=Verbinding verbroken. Meld je aan om verder te gaan.
 account.connection_failed_login_required=Verbinding mislukt. Meld je aan om het opnieuw te proberen.
 account.account_exists=Dit account bestaat al. Gebruik Aanmelden.
+account.account_suggestions=Beschikbare alternatieven
 account.unsupported_local_registration=Nieuwe gebruiker aanmaken kan hier alleen voor @localhost. Gebruik Aanmelden voor een bestaand Freedom- of XMPP-account.
 account.external_account_saved=Extern XMPP-account opgeslagen. Er wordt nu verbinding gemaakt met de server.
 account.ready=Werk je accountinstellingen bij. De verbinding start automatisch na aanmelden.

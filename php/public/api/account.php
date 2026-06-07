@@ -226,8 +226,14 @@ function createAccount(array $input): void
     $parts = explode('@', $jid, 2);
     if (!createXmppSqlAccount($parts[0], $password)) {
         if (!verifyXmppAccountPassword($jid, $password)) {
+            $pdo = Database::connect();
+            ensureAccountProfileSchema($pdo);
             http_response_code(409);
-            echo json_encode(['ok' => false, 'error' => 'account_exists']);
+            echo json_encode([
+                'ok' => false,
+                'error' => 'account_exists',
+                'suggestions' => suggestAvailableLocalJids($pdo, $jid),
+            ], JSON_UNESCAPED_SLASHES);
             return;
         }
     }
@@ -1494,6 +1500,40 @@ function xmppAccountExists(string $jid): bool
     } catch (Throwable) {
         return false;
     }
+}
+
+/**
+ * @return list<string>
+ */
+function suggestAvailableLocalJids(PDO $pdo, string $jid, int $limit = 3): array
+{
+    $parts = explode('@', strtolower(bareJid($jid)), 2);
+    if (count($parts) !== 2 || $parts[0] === '') {
+        return [];
+    }
+
+    $base = preg_replace('/[^a-z0-9._-]+/', '', $parts[0]) ?? '';
+    $base = trim($base, '._-');
+    if ($base === '') {
+        $base = 'gebruiker';
+    }
+
+    $suggestions = [];
+    for ($index = 1; $index <= 99 && count($suggestions) < $limit; $index++) {
+        $candidate = $base . $index . '@localhost';
+        if (!xmppAccountExists($candidate) && !accountProfileJidExists($pdo, $candidate)) {
+            $suggestions[] = $candidate;
+        }
+    }
+
+    return $suggestions;
+}
+
+function accountProfileJidExists(PDO $pdo, string $jid): bool
+{
+    $statement = $pdo->prepare('SELECT jid FROM account_profiles WHERE jid = :jid LIMIT 1');
+    $statement->execute(['jid' => bareJid($jid)]);
+    return is_array($statement->fetch());
 }
 
 function createXmppSqlAccount(string $username, string $password): bool

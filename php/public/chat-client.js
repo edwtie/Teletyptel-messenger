@@ -2065,7 +2065,7 @@
       });
       const payload = await response.json();
       if (!response.ok || !payload.ok) {
-        throw new Error(accountApiErrorText(payload.error || `account API returned ${response.status}`));
+        throw new Error(accountApiErrorText(payload.error || `account API returned ${response.status}`, payload));
       }
 
       el.dialogAccountStatus.textContent = payload.mailSent
@@ -2103,7 +2103,7 @@
       });
       const payload = await response.json();
       if (!response.ok || !payload.ok) {
-        throw new Error(accountApiErrorText(payload.error || `account API returned ${response.status}`));
+        throw new Error(accountApiErrorText(payload.error || `account API returned ${response.status}`, payload));
       }
 
       el.passwordInput.value = password;
@@ -2201,7 +2201,7 @@
     });
     const payload = await response.json();
     if (!response.ok || !payload.ok) {
-      throw new Error(accountApiErrorText(payload.error || `account API returned ${response.status}`));
+      throw new Error(accountApiErrorText(payload.error || `account API returned ${response.status}`, payload));
     }
 
     return payload;
@@ -2483,7 +2483,7 @@
 
     const payload = await response.json();
     if (!response.ok || !payload.ok) {
-      throw new Error(accountApiErrorText(payload.error || `account API returned ${response.status}`));
+      throw new Error(accountApiErrorText(payload.error || `account API returned ${response.status}`, payload));
     }
 
     appendDebug("account-db", `Saved ${payload.account.jid}`);
@@ -2523,7 +2523,7 @@
     history.replaceState(null, document.title, cleanUrl.toString());
   }
 
-  function accountApiErrorText(error) {
+  function accountApiErrorText(error, payload = null) {
     if (error === "invalid_credentials") {
       return t("account.invalid_credentials", "The server rejected this email or password.");
     }
@@ -2577,6 +2577,11 @@
     }
 
     if (error === "account_exists") {
+      const suggestions = Array.isArray(payload?.suggestions) ? payload.suggestions.filter(Boolean) : [];
+      if (suggestions.length) {
+        return `${t("account.account_exists", "This account already exists. Use Sign in instead.")} ${t("account.account_suggestions", "Available alternatives")}: ${suggestions.join(", ")}`;
+      }
+
       return t("account.account_exists", "This account already exists. Use Sign in instead.");
     }
 
