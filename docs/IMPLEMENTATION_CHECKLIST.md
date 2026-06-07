@@ -501,8 +501,8 @@ item is implemented, tested and documented.
 - [x] Encrypted message wrapper serializer/parser.
 - [x] `XmppStreamClient` device list helper.
 - [x] OMEMO session backend boundary and production guard.
-- [x] OMEMO production backend decision documented: in-tree C# Double Ratchet
-  behind `IXmppOmemoSessionBackend`, PHP wire helpers only.
+- [x] OMEMO production backend decision documented: C# desktop/tooling ratchet
+  and standalone PHP/Linux ratchet are separate experimental paths.
 - [x] X3DH key bundle validation, DH1-DH4 plan and HKDF boundary.
 - [x] X3DH X25519 key agreement implementation for initiator/responder DH1-DH4.
 - [x] Signed pre-key verification gate and verifier contract.
@@ -510,7 +510,11 @@ item is implemented, tested and documented.
 - [x] Experimental in-tree Double Ratchet engine for X25519 DH ratchet,
   root/chain/message KDFs, skipped message keys, AES-GCM message encryption and
   opaque state export/import.
+- [x] Experimental standalone PHP Double Ratchet helper for Linux/web runtime
+  using sodium X25519 and openssl AES-256-GCM, without C# or .NET dependency.
 - [x] Double Ratchet message envelope mapping to and from OMEMO key transports.
+- [x] Internal OMEMO Double Ratchet audit note records checks, runtime boundary
+  and production blockers.
 - [x] Local OMEMO device key-material model.
 - [x] Device-list and bundle publication plan from local key material.
 - [x] One-time pre-key consumption and replenishment model.

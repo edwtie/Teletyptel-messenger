@@ -701,12 +701,13 @@ payload encryption/decryption at the payload-secret boundary and a
 trust/fingerprint model. There is also an explicit OMEMO session backend
 boundary, production guard and X3DH helper for bundle validation, DH1-DH4
 planning, associated data, HKDF, X25519 initiator/responder agreement and a
-signed pre-key verification gate. The C# core now includes an experimental
-Double Ratchet engine with root/chain/message KDFs, X25519 DH ratchet,
-skipped message-key storage, AES-GCM message encryption and opaque state
-export/import. This is still a protocol foundation: production OMEMO requires
-XEdDSA signed pre-key verification, independent ratchet review, external test
-vectors and live interoperability with existing OMEMO clients.
+signed pre-key verification gate. The C# core and standalone PHP library now
+include experimental Double Ratchet engines with root/chain/message KDFs,
+X25519 DH ratchet, skipped message-key storage, AES-GCM message encryption and
+opaque state export/import. The PHP path is independent from C# and does not
+require .NET on Linux. This is still a protocol foundation: production OMEMO
+requires XEdDSA signed pre-key verification, independent ratchet review,
+external test vectors and live interoperability with existing OMEMO clients.
 
 ## Audio And Video
 

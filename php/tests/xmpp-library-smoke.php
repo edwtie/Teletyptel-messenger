@@ -39,6 +39,7 @@ use Tiedragon\Xmpp\XmppMessageModeration;
 use Tiedragon\Xmpp\XmppMessageStyling;
 use Tiedragon\Xmpp\XmppMuc;
 use Tiedragon\Xmpp\XmppOmemo;
+use Tiedragon\Xmpp\XmppOmemoDoubleRatchet;
 use Tiedragon\Xmpp\XmppConnectionSettings;
 use Tiedragon\Xmpp\XmppPresence;
 use Tiedragon\Xmpp\XmppPersistentPrivateData;
@@ -455,6 +456,44 @@ $omemoMessage = XmppOmemo::encryptedMessage(
 $omemoParsedMessage = XmppOmemo::parseEncryptedMessage($omemoMessage);
 assertTrue($omemoParsedMessage !== null && $omemoParsedMessage['senderDeviceId'] === 123 && $omemoParsedMessage['keys'][0]['isPreKey'] && $omemoParsedMessage['payload'] === 'payload', 'OMEMO encrypted message parse failed.');
 assertTrue(XmppOmemo::isValidBase64('AQIDBA==') && !XmppOmemo::isValidBase64('not valid'), 'OMEMO base64 validation failed.');
+assertTrue(XmppOmemoDoubleRatchet::isAvailable(), 'PHP OMEMO Double Ratchet crypto extensions unavailable.');
+
+$omemoRatchetSecret = pack('C*', ...range(1, XmppOmemoDoubleRatchet::ROOT_KEY_SIZE));
+$omemoBobRatchetKey = XmppOmemoDoubleRatchet::generateKeyPair();
+$omemoAliceRatchet = XmppOmemoDoubleRatchet::createInitiatorState($omemoRatchetSecret, $omemoBobRatchetKey['publicKey']);
+$omemoBobRatchet = XmppOmemoDoubleRatchet::createResponderState($omemoRatchetSecret, $omemoBobRatchetKey);
+$omemoRatchetAd = 'edward@example.org|anna@example.org';
+$omemoAliceFirst = XmppOmemoDoubleRatchet::encrypt($omemoAliceRatchet, 'Hallo Bob', $omemoRatchetAd);
+$omemoAliceRatchet = $omemoAliceFirst['state'];
+$omemoRatchetTransport = XmppOmemoDoubleRatchet::createKeyTransport(456, $omemoAliceFirst['message'], true, 'anna@example.org/phone');
+$omemoParsedRatchetMessage = XmppOmemoDoubleRatchet::tryParseKeyTransport($omemoRatchetTransport);
+assertTrue($omemoParsedRatchetMessage !== null && $omemoParsedRatchetMessage['header']['messageNumber'] === 0, 'PHP OMEMO Double Ratchet transport parse failed.');
+$omemoBobFirst = XmppOmemoDoubleRatchet::decrypt($omemoBobRatchet, $omemoParsedRatchetMessage, $omemoRatchetAd);
+$omemoBobRatchet = $omemoBobFirst['state'];
+assertTrue($omemoBobFirst['plaintext'] === 'Hallo Bob', 'PHP OMEMO Double Ratchet first decrypt failed.');
+$omemoBobReply = XmppOmemoDoubleRatchet::encrypt($omemoBobRatchet, 'Hallo Alice', $omemoRatchetAd);
+$omemoBobRatchet = $omemoBobReply['state'];
+$omemoAliceReply = XmppOmemoDoubleRatchet::decrypt($omemoAliceRatchet, $omemoBobReply['message'], $omemoRatchetAd);
+$omemoAliceRatchet = $omemoAliceReply['state'];
+assertTrue($omemoAliceReply['plaintext'] === 'Hallo Alice', 'PHP OMEMO Double Ratchet reply decrypt failed.');
+
+$omemoSkippedBobKey = XmppOmemoDoubleRatchet::generateKeyPair();
+$omemoSkippedAlice = XmppOmemoDoubleRatchet::createInitiatorState($omemoRatchetSecret, $omemoSkippedBobKey['publicKey']);
+$omemoSkippedBob = XmppOmemoDoubleRatchet::createResponderState($omemoRatchetSecret, $omemoSkippedBobKey);
+$omemoSkippedFirst = XmppOmemoDoubleRatchet::encrypt($omemoSkippedAlice, 'een', 'skip-test');
+$omemoSkippedAlice = $omemoSkippedFirst['state'];
+$omemoSkippedSecond = XmppOmemoDoubleRatchet::encrypt($omemoSkippedAlice, 'twee', 'skip-test');
+$omemoSkippedAlice = $omemoSkippedSecond['state'];
+$omemoSkippedThird = XmppOmemoDoubleRatchet::encrypt($omemoSkippedAlice, 'drie', 'skip-test');
+$omemoSkippedThirdResult = XmppOmemoDoubleRatchet::decrypt($omemoSkippedBob, $omemoSkippedThird['message'], 'skip-test');
+$omemoSkippedBob = $omemoSkippedThirdResult['state'];
+assertTrue($omemoSkippedThirdResult['plaintext'] === 'drie' && count($omemoSkippedBob['skippedMessageKeys']) === 2, 'PHP OMEMO Double Ratchet skipped key cache failed.');
+$omemoSkippedFirstResult = XmppOmemoDoubleRatchet::decrypt($omemoSkippedBob, $omemoSkippedFirst['message'], 'skip-test');
+$omemoSkippedBob = $omemoSkippedFirstResult['state'];
+$omemoSkippedSecondResult = XmppOmemoDoubleRatchet::decrypt($omemoSkippedBob, $omemoSkippedSecond['message'], 'skip-test');
+assertTrue($omemoSkippedFirstResult['plaintext'] === 'een' && $omemoSkippedSecondResult['plaintext'] === 'twee', 'PHP OMEMO Double Ratchet out-of-order decrypt failed.');
+$omemoImportedState = XmppOmemoDoubleRatchet::importState(XmppOmemoDoubleRatchet::exportState($omemoAliceRatchet));
+assertTrue($omemoImportedState['localRatchetKeyPair']['publicKey'] === $omemoAliceRatchet['localRatchetKeyPair']['publicKey'], 'PHP OMEMO Double Ratchet state import/export failed.');
 
 $s5bDestination = XmppSocks5Bytestreams::destinationAddress(
     'vj3hs98y',

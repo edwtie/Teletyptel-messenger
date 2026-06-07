@@ -25,6 +25,7 @@ checks:
 - test: `XmppOmemoDoubleRatchetHandlesSkippedMessageKeys`
 - test: `XmppOmemoDoubleRatchetExportsOpaqueSessionState`
 - command: `dotnet run --project tests/Tiedragon.XmppMessenger.Tests/Tiedragon.XmppMessenger.Tests.csproj`
+- command: `& 'C:\wamp64\bin\php\php8.4.15\php.exe' php\tests\xmpp-library-smoke.php`
 
 Covered behavior:
 
@@ -58,6 +59,8 @@ Covered behavior:
   skipped message-key storage, AES-GCM message encryption and opaque session
   state export/import
 - Double Ratchet message envelope mapping to and from OMEMO key transports
+- standalone PHP Double Ratchet helper smoke for Linux/web runtime experiments,
+  without C# or .NET dependency
 
 ## Security Boundary
 
@@ -81,16 +84,16 @@ before production OMEMO can be enabled.
 ## Backend Decision
 
 The production backend direction is now recorded in
-`docs/OMEMO_BACKEND_DECISION.md`: use TeleTypTel's in-tree C# Double Ratchet
-engine behind the existing `IXmppOmemoSessionBackend` boundary after review and
-interop evidence. TeleTypTel keeps the XMPP/XEP-0384 adapter, trust UI, local
-storage and PEP publication logic. PHP keeps OMEMO wire helpers only and must
-not own browser users' long-term OMEMO private keys.
+`docs/OMEMO_BACKEND_DECISION.md`: TeleTypTel keeps separate experimental C# and
+standalone PHP Double Ratchet paths. The PHP path is for Linux/web runtime
+experiments and must not depend on C# or .NET. The PHP server still must not own
+browser users' long-term OMEMO private keys.
 
 Still required for production end-to-end encryption:
 
 - signed pre-key verification
 - independent Double Ratchet review and test vectors
+- audit follow-up from `docs/OMEMO_DOUBLE_RATCHET_AUDIT.md`
 - backend adapter that maps the in-tree ratchet state to OMEMO key transports
 - one-time pre-key consumption and replenishment policy
 - persistent secure storage for identity keys, sessions and trust decisions

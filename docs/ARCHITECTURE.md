@@ -9,7 +9,7 @@ The project should grow as a protocol library first and an app second.
 | Core protocol | RFC 6120 stream, TLS, SASL, bind, stanzas | `src/Tiedragon.XmppMessenger.Core` | No WinForms, no UI text, no app-specific state. |
 | IM layer | RFC 6121 chat, presence, roster | `src/Tiedragon.XmppMessenger.Core/Xmpp` for now | Can move to a separate package when larger. |
 | Extension layer | XEP helpers such as RTT, receipts, chat states | `src/Tiedragon.XmppMessenger.Core/Rtt` and XMPP helpers | Keep each XEP isolated and testable. |
-| PHP XMPP layer | PHP wire models and web-server protocol helpers | `php/lib/Xmpp` | Must not require .NET at runtime; mirrors the C# core where useful. |
+| PHP XMPP layer | Standalone PHP protocol helpers and Linux/web runtime path | `php/lib/Xmpp` | Must not require .NET, C# assemblies or LocalServer at runtime. |
 | Localization | LngPdk package reading/building | `src/Tiedragon.LngPdk` | Independent from XMPP protocol. |
 | Web localization fallback | Loose `.lng` files for the web demo | `php/public/lang` | Development/fallback only; not a verified package boundary. |
 | Accessibility agent | Speech, captions, translation, voice relay and later sign-language experiments | Future accessibility/agent packages | Must stay outside RFC 6120 core. |

@@ -101,6 +101,10 @@
   storage, local device/pre-key publication models, encrypted local key files
   and a native secret vault layer for key-store passphrases on Windows, Linux
   and macOS.
+- Standalone PHP OMEMO Double Ratchet helper for Linux/web runtime experiments,
+  using sodium X25519 and openssl AES-256-GCM without C# or .NET dependency,
+  plus an internal audit note that keeps production E2EE claims blocked until
+  independent review, test vectors and live OMEMO interop are complete.
 - XEP-0166/0167/0176/0320 Jingle call signaling for RTP descriptions,
   ICE-UDP candidates, DTLS-SRTP fingerprints, `transport-info` updates and
   RTP `session-info` call states.

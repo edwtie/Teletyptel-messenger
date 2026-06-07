@@ -111,10 +111,10 @@ other XMPP smoke targets.
   XEP-0077 registration including optional local CAPTCHA, XEP-0313 local
   archive, XEP-0363 slot/PUT, vCard, blocking, stream management and
   client-state smoke paths.
-- OMEMO protocol/key-storage helpers and an experimental C# Double Ratchet
-  engine exist, but production end-to-end encryption still needs XEdDSA signed
-  pre-key verification, independent review and live interoperability
-  validation.
+- OMEMO protocol/key-storage helpers plus experimental C# and standalone PHP
+  Double Ratchet engines exist, but production end-to-end encryption still needs
+  XEdDSA signed pre-key verification, independent review and live
+  interoperability validation.
 - Group chat, file upload and calls have local/demo and smoke paths; public
   release validation still needs hosted server accounts and interoperability
   runs against existing clients.

@@ -1,19 +1,19 @@
 # PHP XMPP Library
 
-TeleTypTel heeft naast de C# core ook een PHP XMPP-laag nodig. De reden is
-praktisch: de webversie draait op Apache/WAMP of Linux-hosting, terwijl niet elke
-omgeving een .NET-process mag of kan starten. De C# library blijft leidend voor
-desktop, tooling en diepe protocoltesten; de PHP library krijgt dezelfde
-wire-modellen zodat webserver-code niet zelf losse XML-stringen hoeft te bouwen.
+TeleTypTel heeft een zelfstandige PHP XMPP-library. De reden is praktisch: de
+webversie draait op Apache/WAMP of Linux-hosting, terwijl niet elke omgeving een
+.NET-proces mag of kan starten. De PHP library mag daarom geen brug naar de C#
+core zijn. Zij moet op Linux zelfstandig kunnen draaien met PHP, sodium, openssl
+en een echte XMPP-server.
 
-## C# Library En PHP Library
+## Standalone PHP-Lijn En C#-Lijn
 
-TeleTypTel heeft bewust twee XMPP-libraries:
+TeleTypTel heeft bewust twee gescheiden XMPP-lijnen:
 
 | Library | Locatie | Runtime | Rol |
 | --- | --- | --- | --- |
-| C# XMPP library | `src/Tiedragon.XmppMessenger.Core` | .NET 10 | Hoofdmodel voor desktop, LocalServer, RealServerSmoke, diepe protocoltesten en gedeelde architectuur. |
-| PHP XMPP library | `php/lib/Xmpp` | PHP 8.1+ | Webserverlaag voor Apache/WAMP/Linux-hosting, account/API-flows en PHP-only server-side XMPP-smokes. |
+| C# XMPP library | `src/Tiedragon.XmppMessenger.Core` | .NET 10 | Desktop, Windows tooling, LocalServer, RealServerSmoke en C# protocoltesten. |
+| PHP XMPP library | `php/lib/Xmpp` | PHP 8.1+ | Standalone webserverlaag voor Apache/WAMP/Linux-hosting, account/API-flows en PHP-only XMPP-smokes. |
 
 De PHP XMPP-library heeft **geen .NET 10 nodig**. Een webserver die alleen de
 TeleTypTel webclient, PHP API's, PHP relay en `php/lib/Xmpp` gebruikt, heeft PHP
@@ -27,22 +27,21 @@ en de normale PHP-extensies nodig, maar geen draaiend .NET-proces.
 - Windows/WinForms demo;
 - console tools en package-builds die C# projecten publiceren.
 
-De libraries moeten inhoudelijk gelijk blijven waar dat zinvol is. De C# core
-blijft de strenge referentie voor protocolontwerp en tests; de PHP library maakt
-dezelfde richting bruikbaar op gewone webhosting.
+De twee lijnen mogen dezelfde protocolkeuzes volgen, maar de PHP library mag
+niet afhankelijk zijn van C# assemblies, `dotnet`, LocalServer of WebView2. Een
+Linux-installatie kan dus alleen met PHP worden uitgerold.
 
 ## Doel
 
 - PHP kan XMPP-stanza's veilig bouwen en parsen.
-- PHP gebruikt dezelfde JID-, message-, presence-, IQ- en XEP-modellen als de C#
-  core.
+- PHP heeft eigen JID-, message-, presence-, IQ- en XEP-modellen.
 - De webserver kan zonder C# tussenlaag met een echte XMPP-server praten.
 - UI-code blijft dun: chat.html roept API's aan, de protocolkennis zit in
   `php/lib/Xmpp`.
 
 ## Protocoldekking
 
-| PHP class | Gebaseerd op C# core | Functie |
+| PHP class | Protocol / equivalent | Functie |
 | --- | --- | --- |
 | `XmppJid` | `XmppAddress` | Bare/full JID parsing en domeinnormalisatie. |
 | `XmppXml` | `XmppXmlNames`, `XmppXmlValue` | Namespace-constanten, escaping, DOM parsing en XPath. |
@@ -92,7 +91,8 @@ dezelfde richting bruikbaar op gewone webhosting.
 | `XmppMessageStyling` | XEP-0393 Message Styling | Unstyled marker and lightweight style-span parser. |
 | `XmppMessageModeration` | XEP-0425 Message Moderation | Moderated retraction request and moderated marker parser. |
 | `XmppWebSocket` | RFC 7395 transport layer | `<open/>` and `<close/>` framing for XMPP-over-WebSocket. |
-| `XmppOmemo` | `XmppOmemo` | XEP-0384 wire helpers for device lists, bundles and encrypted-message wrappers; no production crypto claim. |
+| `XmppOmemo` | XEP-0384 | Device lists, bundles and encrypted-message wrappers. |
+| `XmppOmemoDoubleRatchet` | Signal Double Ratchet / XEP-0384 session payload helper | Experimental standalone PHP Double Ratchet helper using sodium X25519 and openssl AES-256-GCM; no C# or .NET dependency. |
 | `XmppWebSocketFrame` | `XmppWebSocketFrame` | RFC 6455 text/close/ping/pong frame codec with client masking. |
 | `XmppWebSocketTransport` | `XmppClientWebSocketTransport` | HTTP Upgrade handshake and `xmpp` subprotocol transport. |
 | `XmppBosh` | XEP-0124/XEP-0206 BOSH | BOSH session, restart, payload, polling and terminate body helpers. |
@@ -125,9 +125,10 @@ nodig heeft.
 De resterende punten zijn geen open bouwlijst voor deze library,
 maar release- en veiligheidsgrenzen:
 
-- OMEMO heeft wire helpers voor device lists, bundles en encrypted-message
-  wrappers. Productie-encryptie blijft pas claimbaar na koppeling met een
-  gecontroleerde Signal/OMEMO crypto-backend.
+- OMEMO heeft device-list, bundle, encrypted-message wrappers en een
+  experimentele standalone PHP Double Ratchet helper. Productie-encryptie
+  blijft pas claimbaar na onafhankelijke review, testvectors, XEdDSA signed
+  pre-key verificatie en live interop met bestaande OMEMO-clients.
 - WebSocket, BOSH, TCP/TLS en SASL zijn als PHP-clientlaag aanwezig. Een
   publieke productieclaim vereist nog deployment met echte serverconfiguratie,
   certificaten, abusebeleid en herhaalbare live-smokes.
@@ -143,8 +144,8 @@ Run:
 & 'C:\wamp64\bin\php\php8.4.15\php.exe' php\tests\xmpp-library-smoke.php
 ```
 
-The smoke test validates the first wire-model layer. It does not connect to a
-real XMPP server.
+The smoke test validates the standalone PHP XMPP library. It does not require
+.NET and does not connect to a real XMPP server.
 
 For a real PHP login smoke against a local or public XMPP server, using the best
 advertised mechanism in this order: SCRAM-SHA-256, SCRAM-SHA-1, PLAIN:
