@@ -11,6 +11,9 @@ host. It mirrors the WAMP layout, but uses normal Linux paths.
 - internet access for the first NuGet restore;
 - optional: Linux host or VM for runtime testing.
 
+The .NET SDK is required for the full package build because the package includes
+C# tools. A PHP-only web deployment does not need the .NET SDK.
+
 Build the package with Linux output:
 
 ```powershell
@@ -24,7 +27,8 @@ Build both Windows/WAMP and Linux output:
 ```
 
 The Linux .NET tools are published for `linux-x64` as framework-dependent
-executables. The Linux target must have .NET runtime 10 installed.
+executables. The Linux target must have .NET runtime 10 installed only when
+those C# tools are used.
 
 Each tool folder contains three useful entry points:
 
@@ -40,13 +44,18 @@ Windows and should not be used on Linux.
 
 ## Target Machine Requirements
 
+For the PHP web application and PHP XMPP library:
+
 - Linux x64;
 - Apache or Nginx;
 - PHP 8.1 or newer with CLI support;
 - PHP extensions: `pdo_mysql`, `dom`, `mbstring`, `openssl` and `json`;
 - MySQL or MariaDB;
-- .NET runtime 10;
 - systemd when using the included relay service file.
+
+For the optional C# tools:
+
+- .NET runtime 10.
 
 Recommended target layout:
 
@@ -76,6 +85,10 @@ the Linux-friendly server-side protocol layer for hosting environments where
 starting a long-running .NET process is not desirable. The .NET tools remain
 useful for deeper protocol validation, local server testing and cross-platform
 development.
+
+If you deploy only the browser/PHP application, you can copy only
+`linux/var/www/teletyptel` and skip `/opt/teletyptel/bin`. In that PHP-only
+layout, the target server does not require .NET 10.
 
 Copy it onto the server:
 
@@ -159,6 +172,10 @@ It mirrors the C# protocol core where practical, but runs directly inside the
 PHP/Apache hosting model. Use it for server-side account flows, web XMPP
 experiments and command-line smokes. Use the .NET tools when you need the local
 test server, Windows tooling or deeper cross-platform protocol checks.
+
+Important: the PHP XMPP library does not require .NET 10. It requires PHP 8.1+
+and the PHP extensions listed above. .NET 10 is only for the C# library,
+LocalServer, RealServerSmoke and desktop/console tools.
 
 From a repository checkout, validate the PHP library with:
 
@@ -322,7 +339,8 @@ PASS Two-account chat message delivered.
 - The PHP relay is a local development bridge. The PHP XMPP library is the
   server-side protocol layer, but production hosting still needs a hardened real
   XMPP server and deployment policy.
-- The package is framework-dependent; install .NET runtime 10 on Linux.
+- The optional C# tools are framework-dependent; install .NET runtime 10 only
+  when you run those tools on Linux.
 - Authentication/session hardening, abuse controls and monitoring are deployment
   work, not just code work.
 - Public deployment should use TLS, firewall rules and reverse proxy

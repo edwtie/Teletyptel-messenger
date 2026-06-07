@@ -6,6 +6,31 @@ omgeving een .NET-process mag of kan starten. De C# library blijft leidend voor
 desktop, tooling en diepe protocoltesten; de PHP library krijgt dezelfde
 wire-modellen zodat webserver-code niet zelf losse XML-stringen hoeft te bouwen.
 
+## C# Library En PHP Library
+
+TeleTypTel heeft bewust twee XMPP-libraries:
+
+| Library | Locatie | Runtime | Rol |
+| --- | --- | --- | --- |
+| C# XMPP library | `src/Tiedragon.XmppMessenger.Core` | .NET 10 | Hoofdmodel voor desktop, LocalServer, RealServerSmoke, diepe protocoltesten en gedeelde architectuur. |
+| PHP XMPP library | `php/lib/Xmpp` | PHP 8.1+ | Webserverlaag voor Apache/WAMP/Linux-hosting, account/API-flows en PHP-only server-side XMPP-smokes. |
+
+De PHP XMPP-library heeft **geen .NET 10 nodig**. Een webserver die alleen de
+TeleTypTel webclient, PHP API's, PHP relay en `php/lib/Xmpp` gebruikt, heeft PHP
+en de normale PHP-extensies nodig, maar geen draaiend .NET-proces.
+
+.NET 10 is alleen nodig wanneer je de C# onderdelen gebruikt:
+
+- `Tiedragon.XmppMessenger.Core` tests;
+- LocalServer;
+- RealServerSmoke;
+- Windows/WinForms demo;
+- console tools en package-builds die C# projecten publiceren.
+
+De libraries moeten inhoudelijk gelijk blijven waar dat zinvol is. De C# core
+blijft de strenge referentie voor protocolontwerp en tests; de PHP library maakt
+dezelfde richting bruikbaar op gewone webhosting.
+
 ## Doel
 
 - PHP kan XMPP-stanza's veilig bouwen en parsen.
@@ -90,6 +115,12 @@ De PHP XMPP-library is nu de primaire server-side protocolbouwlaag voor
 TeleTypTel. De classes hierboven bouwen en parsen de stanza's voor core XMPP,
 transporten, IM, PubSub/PEP, upload, Jingle, RTT, locatie, avatars,
 moderatie, media en de belangrijkste compliance-XEPs.
+
+Op Linux of gedeelde hosting betekent dit: de browser/PHP-app kan zonder .NET 10
+worden uitgerold zolang je geen C# tools op die server start. Voor productie is
+nog steeds een echte, geharde XMPP-server nodig; de PHP library vervangt niet
+het serverbeheer, maar voorkomt dat PHP losse XML-stringen of een C# tussenlaag
+nodig heeft.
 
 De resterende punten zijn geen open bouwlijst voor deze library,
 maar release- en veiligheidsgrenzen:

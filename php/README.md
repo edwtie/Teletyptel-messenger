@@ -76,11 +76,15 @@ The release zip is generated from the repository root with:
 
 That script name is historical; it currently packages the Alpha 2 web client
 and server test tools until the release recipe is renamed. It needs PowerShell
-and the .NET 10 SDK on the build machine. It includes `public`, `lib`,
-`schema.sql`, `config.example.php`, the relay server and the published .NET test
-tools under a WAMP-style folder layout. The target machine needs WAMP or another
-Apache/PHP/MySQL stack, PHP 8.1 or newer for the relay and .NET runtime 10 for
-the published smoke tools.
+and the .NET 10 SDK on the build machine because it publishes the C# tools.
+It includes `public`, `lib`, `schema.sql`, `config.example.php`, the relay server
+and the published .NET test tools under a WAMP-style folder layout.
+
+The PHP web application and PHP XMPP library do not require .NET 10 on the
+target machine. The target machine needs WAMP or another Apache/PHP/MySQL stack
+and PHP 8.1 or newer for the web/API/relay path. Install .NET runtime 10 only
+when you want to run the published C# smoke tools or desktop/console tools on
+that same machine.
 
 The fuller web chat client must be opened through localhost, not directly from
 `C:\...` or `file:///...`, because login uses the PHP account API:
@@ -156,6 +160,13 @@ chat states, correction/retraction, MUC, blocking and Jingle session-info
 helpers. This is not yet the complete TCP/TLS/WebSocket network transport or
 WebSocket/BOSH transport stack; it is the PHP protocol layer that those
 transports will use.
+
+Runtime split:
+
+- C# XMPP library: lives in `src/Tiedragon.XmppMessenger.Core` and requires
+  .NET 10 when running C# tests, LocalServer, RealServerSmoke or desktop tools.
+- PHP XMPP library: lives in `php/lib/Xmpp` and requires PHP 8.1+ only. It does
+  not require .NET 10.
 
 Run the smoke test with:
 

@@ -9,6 +9,7 @@ The project should grow as a protocol library first and an app second.
 | Core protocol | RFC 6120 stream, TLS, SASL, bind, stanzas | `src/Tiedragon.XmppMessenger.Core` | No WinForms, no UI text, no app-specific state. |
 | IM layer | RFC 6121 chat, presence, roster | `src/Tiedragon.XmppMessenger.Core/Xmpp` for now | Can move to a separate package when larger. |
 | Extension layer | XEP helpers such as RTT, receipts, chat states | `src/Tiedragon.XmppMessenger.Core/Rtt` and XMPP helpers | Keep each XEP isolated and testable. |
+| PHP XMPP layer | PHP wire models and web-server protocol helpers | `php/lib/Xmpp` | Must not require .NET at runtime; mirrors the C# core where useful. |
 | Localization | LngPdk package reading/building | `src/Tiedragon.LngPdk` | Independent from XMPP protocol. |
 | Web localization fallback | Loose `.lng` files for the web demo | `php/public/lang` | Development/fallback only; not a verified package boundary. |
 | Accessibility agent | Speech, captions, translation, voice relay and later sign-language experiments | Future accessibility/agent packages | Must stay outside RFC 6120 core. |
@@ -88,6 +89,18 @@ Critical notes:
 Teletyptel 2.0 uses open XMPP standards, but the project owns its XMPP client
 core. The runtime should not depend on a third-party XMPP client library for
 stream negotiation, TLS, SASL, stanza parsing or XEP-0301 behavior.
+
+There are two owned XMPP libraries:
+
+- the C# library in `src/Tiedragon.XmppMessenger.Core`, used by desktop apps,
+  LocalServer, RealServerSmoke, test tools and the strict reference test suite;
+- the PHP library in `php/lib/Xmpp`, used by Apache/WAMP/Linux hosting,
+  server-side account/API flows and PHP-only smoke tools.
+
+The PHP library does not require .NET 10. A PHP-hosted TeleTypTel web deployment
+can run with PHP, the required PHP extensions and a real XMPP server. .NET 10 is
+only required on machines that run the C# tools, LocalServer, desktop samples or
+the .NET test suite.
 
 Allowed dependencies:
 
