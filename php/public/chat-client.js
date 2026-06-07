@@ -6016,7 +6016,7 @@
     } else if (action === "transport-info") {
       handleIncomingTransportInfo(envelope);
     } else if (action === "session-info") {
-      setCallStatus(jingleInfoText(envelope.info, envelope.mediaKind));
+      handleIncomingSessionInfo(envelope);
     } else if (action === "session-terminate") {
       cleanupCall(false);
       setCallStatus(envelope.reasonText || t("call.remote_ended", "Remote ended the call"));
@@ -6110,6 +6110,20 @@
     }
   }
 
+  function handleIncomingSessionInfo(envelope) {
+    const call = state.call;
+    if (call && (!envelope.sid || call.sid === envelope.sid) && envelope.mediaKind === "video") {
+      if (envelope.info === "mute") {
+        call.remoteVideoMuted = true;
+      } else if (envelope.info === "unmute") {
+        call.remoteVideoMuted = false;
+      }
+      updateCallUi();
+    }
+
+    setCallStatus(jingleInfoText(envelope.info, envelope.mediaKind));
+  }
+
   async function flushPendingIceCandidates(call) {
     while (call.pendingCandidates.length > 0 && call.pc && call.remoteDescriptionSet) {
       const candidate = call.pendingCandidates.shift();
@@ -6128,6 +6142,7 @@
       pc: null,
       localStream: null,
       remoteStream: null,
+      remoteVideoMuted: false,
       rttChannel: null,
       rttSync: rttEnabled ? createJingleRttSyncDescriptor(sid, "offered") : null,
       incomingOffer: null,
@@ -6253,6 +6268,7 @@
       }
 
       call.remoteStream.addTrack(event.track);
+      watchCallVideoTrack(call, event.track);
       updateVideoElementSource(el.remoteVideo, call.remoteStream);
       el.callPanel.hidden = false;
       updateCallUi();
@@ -6600,6 +6616,7 @@
       }
 
       if (call.localStream) {
+        watchCallVideoTracks(call, call.localStream);
         updateVideoElementSource(el.localVideo, call.localStream);
         el.callPanel.hidden = false;
         updateCallUi();
@@ -6612,6 +6629,7 @@
     }
 
     updateVideoElementSource(el.localVideo, call.localStream);
+    watchCallVideoTracks(call, call.localStream);
     el.callPanel.hidden = false;
     updateCallUi();
     return call.localStream;
@@ -6727,6 +6745,7 @@
     }
 
     call.localStream.addTrack(replacementTrack);
+    watchCallVideoTrack(call, replacementTrack);
     for (const extraTrack of replacementStream.getTracks()) {
       if (extraTrack !== replacementTrack) {
         extraTrack.stop();
@@ -6939,6 +6958,10 @@
     return Boolean(stream?.getVideoTracks?.().some((track) => track.readyState !== "ended"));
   }
 
+  function activeVideoTracks(stream) {
+    return stream?.getVideoTracks?.().filter((track) => track.readyState !== "ended") ?? [];
+  }
+
   function updateVideoElementSource(video, stream) {
     if (!video) {
       return;
@@ -6949,9 +6972,61 @@
     video.hidden = !hasVideo;
   }
 
+  function watchCallVideoTracks(call, stream) {
+    for (const track of activeVideoTracks(stream)) {
+      watchCallVideoTrack(call, track);
+    }
+  }
+
+  function watchCallVideoTrack(call, track) {
+    if (!call || track?.kind !== "video" || track.teletyptelVideoWatcherAttached) {
+      return;
+    }
+
+    track.teletyptelVideoWatcherAttached = true;
+    const refresh = () => {
+      if (state.call?.sid !== call.sid) {
+        return;
+      }
+
+      updateVideoElementSource(el.localVideo, call.localStream);
+      updateVideoElementSource(el.remoteVideo, call.remoteStream);
+      updateCallUi();
+    };
+
+    track.addEventListener("mute", refresh);
+    track.addEventListener("unmute", refresh);
+    track.addEventListener("ended", refresh);
+  }
+
   function isLocalCameraOff(call = state.call) {
     const tracks = call?.localStream?.getVideoTracks?.() ?? [];
     return tracks.length > 0 && tracks.every((track) => !track.enabled);
+  }
+
+  function isRemoteCameraOff(call = state.call) {
+    if (call?.remoteVideoMuted) {
+      return true;
+    }
+
+    const tracks = activeVideoTracks(call?.remoteStream);
+    return tracks.length > 0 && tracks.every((track) => track.muted);
+  }
+
+  function isVideoMissingForTotalConversation(call = state.call) {
+    if (!call?.rttEnabled) {
+      return false;
+    }
+
+    const hasLocalStreamWithoutVideo = Boolean(call.localStream) && !hasVideoTrack(call.localStream);
+    const hasRemoteStreamWithoutVideo = Boolean(call.remoteStream) && !hasVideoTrack(call.remoteStream);
+    const audioOnlyRttCall = call.mediaKind !== "video" && !hasVideoTrack(call.localStream) && !hasVideoTrack(call.remoteStream);
+    return hasLocalStreamWithoutVideo || hasRemoteStreamWithoutVideo || audioOnlyRttCall;
+  }
+
+  function shouldUseFullTotalConversationText(call = state.call) {
+    return Boolean(call?.rttEnabled)
+      && (isVideoMissingForTotalConversation(call) || isLocalCameraOff(call) || isRemoteCameraOff(call));
   }
 
   function updateCameraToggleUi() {
@@ -7551,7 +7626,7 @@
       && !call.incomingOffer
       && state.totalConversationTextVisible
     );
-    const fullTextMode = visible && isLocalCameraOff(call);
+    const fullTextMode = visible && shouldUseFullTotalConversationText(call);
 
     el.callPanel.classList.toggle("tc-text-full", fullTextMode);
     document.body.classList.toggle("tc-text-full-active", fullTextMode);
