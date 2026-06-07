@@ -370,7 +370,7 @@ server to complete the unchecked items below:
   `disco#info`, `open`, ordered `data`, `close` and byte verification.
 - [x] Set `TELETYPTEL_XMPP_MAM_SMOKE=1`, then confirm XEP-0313 one-to-one
   archive discovery, seed message delivery and MAM lookup.
-- [ ] Set `TELETYPTEL_XMPP_MUC_MAM_SMOKE=1` with a known archive-enabled
+- [x] Set `TELETYPTEL_XMPP_MUC_MAM_SMOKE=1` with a known archive-enabled
   MUC room, then confirm room archive lookup.
 - [ ] Run with `-DiscoverBosh` or `TELETYPTEL_XMPP_BOSH_URL` when the server
   advertises BOSH.
@@ -833,11 +833,17 @@ Openfire can be used as a second smoke target after Prosody:
 `Tiedragon.XmppMessenger.LocalServer` is a local STARTTLS development XMPP
 server. It implements real C2S stream, TLS, SASL, bind, session, roster,
 presence, chat, MUC, XEP-0363 slot/PUT, vCard, stream management, client state
-indication and XEP-0215 external STUN/TURN discovery protocol paths for
-repeatable client tests without creating public server accounts. It is not
-production-hardened, so keep it on localhost or a protected lab network. TLS is
-mandatory; the server advertises
+indication, XEP-0215 external STUN/TURN discovery and XEP-0313 local message
+archive protocol paths for repeatable client tests without creating public
+server accounts. It is not production-hardened, so keep it on localhost or a
+protected lab network. TLS is mandatory; the server advertises
 `<starttls><required/></starttls>` before SASL.
+
+The server has its own portable data directory. Accounts created through
+XEP-0077, roster changes and the local message archive are stored as normal
+files under `--data-dir`; the same command-line option works on Windows, Linux
+and macOS. PHP/WAMP may still host the browser UI, upload API or relay bridge,
+but authoritative XMPP behavior belongs here.
 
 The local server is intentionally strict about the RFC 6120 order: SASL is only
 accepted after TLS, resource binding is only accepted after SASL, and normal
@@ -854,8 +860,8 @@ Run the complete local server compliance smoke:
 The script starts the local server on a free loopback port, captures the
 self-signed certificate SHA-256 fingerprint and runs `RealServerSmoke` against
 the server. It checks STARTTLS, hostname rejection, login/bind/roster, XEP-0157,
-XEP-0191, XEP-0215, XEP-0363 discovery/slot/PUT/attachment, direct chat and
-XEP-0045 MUC.
+XEP-0191, XEP-0215, XEP-0313 archive discovery/query, XEP-0363
+discovery/slot/PUT/attachment, direct chat and XEP-0045 MUC.
 
 Start it with two preloaded accounts:
 
@@ -863,7 +869,10 @@ Start it with two preloaded accounts:
 dotnet run --project tools/Tiedragon.XmppMessenger.LocalServer -- `
   --listen 127.0.0.1 `
   --port 55222 `
+  --upload-listen 127.0.0.1 `
+  --upload-port 58088 `
   --domain localhost `
+  --data-dir .tmp/local-xmpp-data `
   --account edward:secret `
   --account anna:secret
 ```
@@ -899,6 +908,11 @@ dotnet run --project tools/Tiedragon.XmppMessenger.RealServerSmoke -- `
 
 Add `--register` to the smoke command when you want the tool to create the
 temporary accounts through XEP-0077 instead of preloading them with `--account`.
+Add `--registration-captcha true` to LocalServer when the registration flow must
+simulate a server-side CAPTCHA. The local server then returns an XEP-0077
+`jabber:x:data` form with `captcha-fallback-url`, hidden challenge `key` and
+required `ocr`; the PNG image is served from the same loopback HTTP endpoint as
+the XEP-0363 upload test server.
 
 Implemented local server behavior:
 
@@ -906,11 +920,14 @@ Implemented local server behavior:
   roster get/set, presence broadcast and direct one-to-one chat relay;
 - XEP-0030 disco#info/disco#items for server, MUC and avatar nodes;
 - XEP-0054 vCard-temp get/set;
-- XEP-0077 account registration IQs;
+- XEP-0077 account registration IQs, including optional local PNG CAPTCHA data
+  form challenges;
 - XEP-0191 blocking command list/block/unblock;
 - XEP-0198 stream management enable and acknowledgement;
 - XEP-0215 `stun`/`turn` service discovery and short-lived local TURN
   credential responses;
+- XEP-0313 local message archive advertisement and query responses for
+  one-to-one chat and local MUC rooms;
 - XEP-0352 client state indication active/inactive;
 - XEP-0363 upload-slot discovery, local slot responses, loopback HTTP PUT and
   attachment messages;

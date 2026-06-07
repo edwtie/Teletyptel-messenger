@@ -47,6 +47,8 @@ var tests = new (string Name, Action Test)[]
     ("XMPP stream features parse stream management", XmppStreamFeaturesParseStreamManagement),
     ("XMPP stream features parse client state indication", XmppStreamFeaturesParseClientStateIndication),
     ("XMPP SASL PLAIN creates auth element", XmppSaslPlainCreatesAuthElement),
+    ("XMPP OAuth client login creates bearer auth element", XmppOAuthClientLoginCreatesBearerAuthElement),
+    ("XMPP OAuth client login parses discovery challenge", XmppOAuthClientLoginParsesDiscoveryChallenge),
     ("XMPP SASL selector prefers SCRAM SHA256", XmppSaslSelectorPrefersScramSha256),
     ("XMPP SASL SCRAM SHA1 matches RFC vector", XmppSaslScramSha1MatchesRfcVector),
     ("XMPP resource binding creates bind IQ", XmppResourceBindingCreatesBindIq),
@@ -106,6 +108,12 @@ var tests = new (string Name, Action Test)[]
     ("XMPP chat message serializes stanza", XmppChatMessageSerializesStanza),
     ("XMPP message correction serializes and parses", XmppMessageCorrectionSerializesAndParses),
     ("XMPP incoming stanza exposes message correction", XmppIncomingStanzaExposesMessageCorrection),
+    ("XMPP message styling serializes unstyled marker", XmppMessageStylingSerializesUnstyledMarker),
+    ("XMPP message styling parses inline spans", XmppMessageStylingParsesInlineSpans),
+    ("XMPP emoji markup serializes and parses", XmppEmojiMarkupSerializesAndParses),
+    ("XMPP incoming stanza exposes custom emoji media", XmppIncomingStanzaExposesCustomEmojiMedia),
+    ("XMPP message retraction serializes and parses", XmppMessageRetractionSerializesAndParses),
+    ("XMPP incoming stanza exposes message retraction", XmppIncomingStanzaExposesMessageRetraction),
     ("XMPP presence serializes away stanza", XmppPresenceSerializesAwayStanza),
     ("XMPP presence serializes subscription stanza", XmppPresenceSerializesSubscriptionStanza),
     ("XMPP roster get serializes IQ", XmppRosterGetSerializesIq),
@@ -115,11 +123,13 @@ var tests = new (string Name, Action Test)[]
     ("XMPP service discovery parses info result", XmppServiceDiscoveryParsesInfoResult),
     ("XMPP service discovery checks RTT capability", XmppServiceDiscoveryChecksRttCapability),
     ("XMPP service discovery checks PEP capability", XmppServiceDiscoveryChecksPepCapability),
+    ("XMPP consistent color generation follows XEP-0392", XmppConsistentColorGenerationFollowsXep0392),
     ("XMPP ad hoc command serializes and parses", XmppAdHocCommandSerializesAndParses),
     ("XMPP service administration parses read-only results", XmppServiceAdministrationParsesReadOnlyResults),
     ("XMPP external service discovery serializes and parses services", XmppExternalServiceDiscoverySerializesAndParsesServices),
     ("XMPP external service discovery handles credentials and pushes", XmppExternalServiceDiscoveryHandlesCredentialsAndPushes),
     ("XMPP service contact addresses parse serverinfo form", XmppServiceContactAddressesParseServerInfoForm),
+    ("XMPP client access management serializes and parses", XmppClientAccessManagementSerializesAndParses),
     ("XMPP service contact addresses create serverinfo form", XmppServiceContactAddressesCreateServerInfoForm),
     ("XMPP in-band registration serializes requests", XmppInBandRegistrationSerializesRequests),
     ("XMPP in-band registration serializes data form request", XmppInBandRegistrationSerializesDataFormRequest),
@@ -169,6 +179,7 @@ var tests = new (string Name, Action Test)[]
     ("XMPP message archive parses fin result set", XmppMessageArchiveParsesFinResultSet),
     ("XMPP multi-user chat serializes join and group message", XmppMultiUserChatSerializesJoinAndGroupMessage),
     ("XMPP multi-user chat serializes message correction", XmppMultiUserChatSerializesMessageCorrection),
+    ("XMPP multi-user chat handles moderated retraction", XmppMultiUserChatHandlesModeratedRetraction),
     ("XMPP multi-user chat discovers rooms and items", XmppMultiUserChatDiscoversRoomsAndItems),
     ("XMPP multi-user chat handles configuration forms", XmppMultiUserChatHandlesConfigurationForms),
     ("XMPP multi-user chat handles admin items", XmppMultiUserChatHandlesAdminItems),
@@ -179,6 +190,12 @@ var tests = new (string Name, Action Test)[]
     ("XMPP HTTP file upload handles purpose and retry details", XmppHttpFileUploadHandlesPurposeAndRetryDetails),
     ("XMPP HTTP file upload executes PUT", XmppHttpFileUploadExecutesPut),
     ("XMPP HTTP file upload creates message attachment", XmppHttpFileUploadCreatesMessageAttachment),
+    ("XMPP stateless inline media sharing serializes and parses", XmppStatelessInlineMediaSharingSerializesAndParses),
+    ("XMPP stateless inline media sharing creates upload message", XmppStatelessInlineMediaSharingCreatesUploadMessage),
+    ("XMPP stateless inline media sharing exposes discovery and hash", XmppStatelessInlineMediaSharingExposesDiscoveryAndHash),
+    ("XMPP public channel search serializes and parses", XmppPublicChannelSearchSerializesAndParses),
+    ("XMPP stream client handles public channel search", XmppStreamClientHandlesPublicChannelSearch),
+    ("XMPP incoming stanza exposes stateless inline media", XmppIncomingStanzaExposesStatelessInlineMedia),
     ("XMPP SOCKS5 bytestreams serializes requests", XmppSocks5BytestreamsSerializesRequests),
     ("XMPP SOCKS5 bytestreams computes destination address", XmppSocks5BytestreamsComputesDestinationAddress),
     ("XMPP SOCKS5 bytestreams opens local streamhost and exchanges bytes", XmppSocks5BytestreamsOpensLocalStreamHostAndExchangesBytes),
@@ -771,6 +788,38 @@ static void XmppSaslPlainCreatesAuthElement()
     Equal("urn:ietf:params:xml:ns:xmpp-sasl", auth.Name.NamespaceName);
     Equal("PLAIN", auth.Attribute("mechanism")?.Value);
     Equal("ZWR3YXJkQGV4YW1wbGUub3JnAGVkd2FyZABzZWNyZXQ=", auth.Value);
+}
+
+static void XmppOAuthClientLoginCreatesBearerAuthElement()
+{
+    var auth = XmppOAuthClientLogin.CreateAuthElement(
+        "token-123",
+        "romeo@example.net");
+
+    Equal(XName.Get("auth", "urn:ietf:params:xml:ns:xmpp-sasl"), auth.Name);
+    Equal(XmppOAuthClientLogin.Mechanism, (string?)auth.Attribute("mechanism"));
+
+    var decoded = XmppOAuthClientLogin.DecodeInitialResponse(auth.Value);
+    Equal("n,a=romeo@example.net,\u0001auth=Bearer token-123\u0001\u0001", decoded);
+}
+
+static void XmppOAuthClientLoginParsesDiscoveryChallenge()
+{
+    var json = """
+        {
+          "status": "invalid_token",
+          "scope": "xmpp:client:normal",
+          "openid-configuration": "https://example.net/.well-known/oauth-authorization-server"
+        }
+        """;
+    var challenge = new XElement(
+        XName.Get("challenge", "urn:ietf:params:xml:ns:xmpp-sasl"),
+        Convert.ToBase64String(Encoding.UTF8.GetBytes(json)));
+
+    True(XmppOAuthClientLogin.TryParseBearerError(challenge, out var error));
+    Equal("invalid_token", error!.Status);
+    Equal(XmppOAuthClientLogin.ScopeClientNormal, error.Scope);
+    Equal("https://example.net/.well-known/oauth-authorization-server", error.OpenIdConfiguration?.AbsoluteUri);
 }
 
 static void XmppSaslSelectorPrefersScramSha256()
@@ -3887,6 +3936,148 @@ static void XmppIncomingStanzaExposesMessageCorrection()
     Equal("original-2", stanza.Message.ReplaceId);
 }
 
+static void XmppMessageStylingSerializesUnstyledMarker()
+{
+    var message = new XmppChatMessage(
+        To: XmppAddress.Parse("anna@example.org/phone"),
+        Body: "*letterlijk* _geen stijl_",
+        Id: "style-1",
+        StylingDisabled: true);
+
+    var xml = message.ToXml();
+    var unstyled = xml.Element(XName.Get("unstyled", XmppMessageStyling.NamespaceName));
+
+    True(unstyled is not null);
+    True(XmppMessageStyling.IsStylingDisabled(xml));
+    True(XmppChatMessage.TryParse(xml, out var parsed));
+    True(parsed!.StylingDisabled);
+    Equal("*letterlijk* _geen stijl_", parsed.Body);
+}
+
+static void XmppMessageStylingParsesInlineSpans()
+{
+    var spans = XmppMessageStyling.ParseLine("Gewoon *vet* _cursief_ ~door~ `code`");
+
+    Equal(8, spans.Count);
+    Equal(XmppMessageStyleKind.Plain, spans[0].Kind);
+    Equal("Gewoon ", spans[0].Text);
+    Equal(XmppMessageStyleKind.Strong, spans[1].Kind);
+    Equal("vet", spans[1].Text);
+    Equal(XmppMessageStyleKind.Emphasis, spans[3].Kind);
+    Equal("cursief", spans[3].Text);
+    Equal(XmppMessageStyleKind.Strikethrough, spans[5].Kind);
+    Equal("door", spans[5].Text);
+    Equal(XmppMessageStyleKind.Preformatted, spans[7].Kind);
+    Equal("code", spans[7].Text);
+
+    var lineBreakSpans = XmppMessageStyling.ParseLine("*niet\nover regels*");
+    Equal(1, lineBreakSpans.Count);
+    Equal(XmppMessageStyleKind.Plain, lineBreakSpans[0].Kind);
+    Equal("*niet\nover regels*", lineBreakSpans[0].Text);
+}
+
+static void XmppEmojiMarkupSerializesAndParses()
+{
+    var hash = new XmppJingleFileHash("sha-256", "emojihash==");
+    var message = XmppEmojiMarkup.CreateCustomEmojiMessage(
+        XmppAddress.Parse("anna@example.org/phone"),
+        "Hoi :teletyptel:",
+        [new XmppCustomEmojiSpan(4, 15, "teletyptel", [hash])],
+        [
+            XmppStatelessInlineMediaSharing.CreateMediaSharingReference(
+                new XmppJingleFile(
+                    "teletyptel.svg",
+                    321,
+                    "image/svg+xml",
+                    Hashes: [hash]),
+                [new Uri("https://cdn.example.org/emoji/teletyptel.svg")])
+        ],
+        id: "emoji-1",
+        from: XmppAddress.Parse("edward@example.org/web"));
+
+    var xml = message.ToString(SaveOptions.DisableFormatting);
+    True(xml.Contains(XmppEmojiMarkup.MarkupNamespaceName, StringComparison.Ordinal));
+    True(xml.Contains(XmppEmojiMarkup.NamespaceName, StringComparison.Ordinal));
+    True(xml.Contains("urn:xmpp:sims:1", StringComparison.Ordinal));
+    True(XmppEmojiMarkup.TryParse(message, out var emojis));
+
+    Equal(1, emojis.Count);
+    Equal(4, emojis.Single().Start);
+    Equal(15, emojis.Single().End);
+    Equal("teletyptel", emojis.Single().Name!);
+    Equal("sha-256", emojis.Single().Hashes.Single().Algorithm);
+    True(XmppStatelessInlineMediaSharing.TryParse(message, out var media));
+    True(XmppEmojiMarkup.TryFindInlineMediaForEmoji(emojis.Single(), [media!], out var matched));
+    Equal("teletyptel.svg", matched!.File.Name);
+}
+
+static void XmppIncomingStanzaExposesCustomEmojiMedia()
+{
+    var hash = XmppStatelessInlineMediaSharing.CreateSha256Hash(Encoding.UTF8.GetBytes("smile-svg"));
+    var message = XmppEmojiMarkup.CreateCustomEmojiMessage(
+        XmppAddress.Parse("edward@example.org/web"),
+        "Goed :)",
+        [new XmppCustomEmojiSpan(5, 7, "smile", [hash])],
+        [
+            XmppStatelessInlineMediaSharing.CreateMediaSharingReference(
+                new XmppJingleFile(
+                    "smile.svg",
+                    123,
+                    "image/svg+xml",
+                    Hashes: [hash]),
+                [new Uri("https://cdn.example.org/emoji/smile.svg")],
+                begin: 5,
+                end: 7)
+        ]);
+    message.SetAttributeValue("from", "anna@example.org/phone");
+
+    var stanza = XmppIncomingStanza.FromElement(message);
+
+    True(stanza.HasCustomEmojis);
+    True(stanza.HasInlineMedia);
+    True(XmppEmojiMarkup.TryFindInlineMediaForEmoji(stanza.CustomEmojis!.Single(), [stanza.InlineMedia!], out var matched));
+    Equal("smile.svg", matched!.File.Name);
+}
+
+static void XmppMessageRetractionSerializesAndParses()
+{
+    var xml = XmppMessageRetraction.CreateRetractMessage(
+        XmppAddress.Parse("anna@example.org/phone"),
+        "old-message-1",
+        id: "retract-1",
+        from: XmppAddress.Parse("edward@example.org/web"));
+
+    Equal("message", xml.Name.LocalName);
+    Equal("anna@example.org/phone", xml.Attribute("to")?.Value);
+    Equal("old-message-1", xml.Element(XName.Get("retract", XmppMessageRetraction.NamespaceName))?.Attribute("id")?.Value);
+    True(xml.Element(XName.Get("store", XmppMessageRetraction.MessageHintsNamespaceName)) is not null);
+    True(XmppMessageRetraction.TryParseRetract(xml, out var retraction));
+    Equal("old-message-1", retraction!.TargetMessageId);
+    Equal("retract-1", retraction.RetractionMessageId);
+
+    True(XmppChatMessage.TryParse(xml, out var parsed));
+    Equal("old-message-1", parsed!.Retraction!.TargetMessageId);
+}
+
+static void XmppIncomingStanzaExposesMessageRetraction()
+{
+    var xml = XElement.Parse("""
+        <message xmlns="jabber:client" type="chat" from="anna@example.org/phone" to="edward@example.org/web" id="retract-2">
+          <retract xmlns="urn:xmpp:message-retract:1" id="old-message-2"/>
+          <fallback xmlns="urn:xmpp:fallback:0" for="urn:xmpp:message-retract:1"/>
+          <body>/me retracted a previous message, but it's unsupported by your client.</body>
+          <store xmlns="urn:xmpp:hints"/>
+        </message>
+        """);
+
+    var stanza = XmppIncomingStanza.FromElement(xml);
+
+    True(stanza.IsMessage);
+    True(stanza.IsMessageRetraction);
+    Equal("old-message-2", stanza.MessageRetraction!.TargetMessageId);
+    Equal("old-message-2", stanza.Message!.Retraction!.TargetMessageId);
+}
+
 static void XmppPresenceSerializesAwayStanza()
 {
     var presence = new XmppPresence(
@@ -4027,6 +4218,20 @@ static void XmppServiceDiscoveryChecksPepCapability()
     True(XmppPersonalEventing.SupportsPersonalEventing(info));
     True(XmppPersonalEventing.SupportsPublishing(info));
     Equal("urn:xmpp:mood+notify", XmppPersonalEventing.CreateNotificationFeature("urn:xmpp:mood"));
+}
+
+static void XmppConsistentColorGenerationFollowsXep0392()
+{
+    Equal(327.255249, Math.Round(XmppConsistentColor.CreateHueAngle("Romeo"), 6));
+    Equal(209.410400, Math.Round(XmppConsistentColor.CreateHueAngle("juliet@capulet.lit"), 6));
+    Equal(117.575684, Math.Round(XmppConsistentColor.CreateHueAngle("😀"), 6));
+    Equal(359.994507, Math.Round(XmppConsistentColor.CreateHueAngle("council"), 6));
+
+    var color = XmppConsistentColor.CreateRgb("Romeo");
+    True(color.R >= 0 && color.R <= 255);
+    True(color.G >= 0 && color.G <= 255);
+    True(color.B >= 0 && color.B <= 255);
+    True(XmppConsistentColor.CreateHex("Romeo").StartsWith('#'));
 }
 
 static void XmppAdHocCommandSerializesAndParses()
@@ -4977,6 +5182,17 @@ static void XmppPubSubSerializesSubscriptionRequests()
 {
     var service = XmppAddress.Parse("pubsub.example.org");
     var jid = XmppAddress.Parse("anna@example.org/desktop");
+    var configureForm = new XElement(
+        XName.Get("x", XmppServiceDiscovery.DataFormNamespace),
+        new XAttribute("type", "submit"),
+        new XElement(
+            XName.Get("field", XmppServiceDiscovery.DataFormNamespace),
+            new XAttribute("var", "FORM_TYPE"),
+            new XElement(XName.Get("value", XmppServiceDiscovery.DataFormNamespace), XmppPubSub.NodeConfigNamespaceName)),
+        new XElement(
+            XName.Get("field", XmppServiceDiscovery.DataFormNamespace),
+            new XAttribute("var", "pubsub#persist_items"),
+            new XElement(XName.Get("value", XmppServiceDiscovery.DataFormNamespace), "true")));
 
     var subscribe = XmppPubSub.CreateSubscribeRequest(
         "sub1",
@@ -5005,6 +5221,71 @@ static void XmppPubSubSerializesSubscriptionRequests()
     True(createXml.Contains("<create", StringComparison.Ordinal));
     True(createXml.Contains("to=\"pubsub.example.org\"", StringComparison.Ordinal));
 
+    var createConfigured = XmppPubSub.CreateCreateNodeRequest(
+        "create-configured",
+        XmppPubSubAnnouncements.DefaultNode,
+        service,
+        configureForm);
+    var createConfiguredXml = createConfigured.ToXml().ToString(SaveOptions.DisableFormatting);
+    True(createConfiguredXml.Contains("<configure", StringComparison.Ordinal));
+    True(createConfiguredXml.Contains("pubsub#persist_items", StringComparison.Ordinal));
+
+    var publish = XmppPubSub.CreatePublishRequest(
+        "publish1",
+        XmppPubSubAnnouncements.DefaultNode,
+        "item-1",
+        new XElement("payload", "hoi"),
+        service);
+    var publishXml = publish.ToXml().ToString(SaveOptions.DisableFormatting);
+    True(publishXml.Contains("<publish", StringComparison.Ordinal));
+    True(publishXml.Contains("item id=\"item-1\"", StringComparison.Ordinal));
+    Equal("pubsub.example.org", publish.To!.Bare);
+
+    var retract = XmppPubSub.CreateRetractRequest(
+        "retract1",
+        XmppPubSubAnnouncements.DefaultNode,
+        "item-1",
+        service: service);
+    var retractXml = retract.ToXml().ToString(SaveOptions.DisableFormatting);
+    True(retractXml.Contains("<retract", StringComparison.Ordinal));
+    True(retractXml.Contains("notify=\"true\"", StringComparison.Ordinal));
+
+    var configureGet = XmppPubSub.CreateConfigurationRequest("config1", XmppPubSubAnnouncements.DefaultNode, service);
+    var configureGetXml = configureGet.ToXml().ToString(SaveOptions.DisableFormatting);
+    Equal(XmppIqType.Get, configureGet.Type);
+    True(configureGetXml.Contains(XmppPubSub.OwnerNamespaceName, StringComparison.Ordinal));
+    True(configureGetXml.Contains("<configure", StringComparison.Ordinal));
+
+    var configureSet = XmppPubSub.CreateConfigureNodeRequest(
+        "config-set1",
+        XmppPubSubAnnouncements.DefaultNode,
+        configureForm,
+        service);
+    var configureSetXml = configureSet.ToXml().ToString(SaveOptions.DisableFormatting);
+    True(configureSetXml.Contains("type=\"submit\"", StringComparison.Ordinal));
+    True(configureSetXml.Contains(XmppPubSub.OwnerNamespaceName, StringComparison.Ordinal));
+
+    var purge = XmppPubSub.CreatePurgeNodeRequest("purge1", XmppPubSubAnnouncements.DefaultNode, service);
+    var purgeXml = purge.ToXml().ToString(SaveOptions.DisableFormatting);
+    True(purgeXml.Contains("<purge", StringComparison.Ordinal));
+    True(purgeXml.Contains(XmppPubSub.OwnerNamespaceName, StringComparison.Ordinal));
+
+    var subscriptionsRequest = XmppPubSub.CreateSubscriptionsRequest(
+        "subscriptions1",
+        XmppPubSubAnnouncements.DefaultNode,
+        service);
+    var subscriptionsRequestXml = subscriptionsRequest.ToXml().ToString(SaveOptions.DisableFormatting);
+    Equal(XmppIqType.Get, subscriptionsRequest.Type);
+    True(subscriptionsRequestXml.Contains("<subscriptions", StringComparison.Ordinal));
+
+    var affiliationsRequest = XmppPubSub.CreateAffiliationsRequest(
+        "affiliations1",
+        XmppPubSubAnnouncements.DefaultNode,
+        service);
+    var affiliationsRequestXml = affiliationsRequest.ToXml().ToString(SaveOptions.DisableFormatting);
+    Equal(XmppIqType.Get, affiliationsRequest.Type);
+    True(affiliationsRequestXml.Contains("<affiliations", StringComparison.Ordinal));
+
     True(XmppIq.TryParse("""
         <iq xmlns="jabber:client" type="result" id="sub1">
           <pubsub xmlns="http://jabber.org/protocol/pubsub">
@@ -5018,11 +5299,66 @@ static void XmppPubSubSerializesSubscriptionRequests()
     Equal("subscribed", subscription.State);
     Equal("subscription-1", subscription.SubscriptionId);
 
+    True(XmppIq.TryParse("""
+        <iq xmlns="jabber:client" type="result" id="subscriptions1">
+          <pubsub xmlns="http://jabber.org/protocol/pubsub">
+            <subscriptions>
+              <subscription node="urn:tiedragon:teletyptel:announcements" jid="anna@example.org/desktop" subscription="subscribed" subid="subscription-1" expiry="never"/>
+            </subscriptions>
+          </pubsub>
+        </iq>
+        """, out var subscriptionsResult));
+    True(XmppPubSub.TryParseSubscriptionsResult(subscriptionsResult!, out var subscriptions));
+    Equal(1, subscriptions.Count);
+    Equal("never", subscriptions.Single().Expiry);
+
+    True(XmppIq.TryParse("""
+        <iq xmlns="jabber:client" type="result" id="affiliations1">
+          <pubsub xmlns="http://jabber.org/protocol/pubsub">
+            <affiliations>
+              <affiliation node="urn:tiedragon:teletyptel:announcements" jid="anna@example.org/desktop" affiliation="owner"/>
+            </affiliations>
+          </pubsub>
+        </iq>
+        """, out var affiliationsResult));
+    True(XmppPubSub.TryParseAffiliationsResult(affiliationsResult!, out var affiliations));
+    Equal(1, affiliations.Count);
+    Equal("owner", affiliations.Single().State);
+    Equal("anna@example.org/desktop", affiliations.Single().Jid!.Full);
+
+    True(XmppIq.TryParse("""
+        <iq xmlns="jabber:client" type="result" id="config1">
+          <pubsub xmlns="http://jabber.org/protocol/pubsub#owner">
+            <configure node="urn:tiedragon:teletyptel:announcements">
+              <x xmlns="jabber:x:data" type="form">
+                <field var="FORM_TYPE" type="hidden">
+                  <value>http://jabber.org/protocol/pubsub#node_config</value>
+                </field>
+                <field var="pubsub#persist_items">
+                  <value>true</value>
+                </field>
+              </x>
+            </configure>
+          </pubsub>
+        </iq>
+        """, out var configResult));
+    True(XmppPubSub.TryParseConfigurationResult(configResult!, out var config));
+    Equal("form", config!.Type!);
+    Equal("true", config.Fields["pubsub#persist_items"].Single());
+
     var info = new XmppServiceDiscoveryInfo(
         null,
         [new XmppServiceIdentity("pubsub", "service")],
-        [XmppPubSub.SubscribeFeature, XmppPubSub.CreateNodesFeature]);
+        [
+            XmppPubSub.SubscribeFeature,
+            XmppPubSub.CreateNodesFeature,
+            XmppPubSub.ConfigureNodesFeature,
+            XmppPubSub.PurgeNodesFeature,
+            XmppPubSub.RetrieveSubscriptionsFeature,
+            XmppPubSub.RetrieveAffiliationsFeature
+        ]);
     True(XmppPubSub.SupportsPubSub(info));
+    True(info.Supports(XmppPubSub.ConfigureNodesFeature));
 }
 
 static void XmppAnnouncementsSerializeAndParseAtomEntries()
@@ -5359,6 +5695,47 @@ static void XmppPushNotificationsSerializeEnableAndDisable()
     Equal("push.example.org", disable.Payload.Attribute("jid")?.Value);
     Equal("device-node", disable.Payload.Attribute("node")?.Value);
     True(XmppPushNotifications.IsEnableResult(new XmppIq(XmppIqType.Result, "push1"), "push1"));
+}
+
+static void XmppClientAccessManagementSerializesAndParses()
+{
+    var list = XmppClientAccessManagement.CreateListRequest("cam-list").ToXml();
+    Equal("get", list.Attribute("type")?.Value);
+    Equal("list", list.Elements().Single().Name.LocalName);
+    Equal(XmppClientAccessManagement.NamespaceName, list.Elements().Single().Name.NamespaceName);
+
+    var revoke = XmppClientAccessManagement.CreateRevokeRequest("cam-revoke", "client-1").ToXml();
+    Equal("set", revoke.Attribute("type")?.Value);
+    Equal("revoke", revoke.Elements().Single().Name.LocalName);
+    Equal("client-1", revoke.Elements().Single().Attribute("id")?.Value);
+
+    var clientsElement = XmppClientAccessManagement.CreateClientsElement(
+    [
+        new XmppClientAccessEntry(
+            "client-1",
+            XmppClientAccessManagement.ClientTypeSession,
+            Connected: true,
+            FirstSeen: DateTimeOffset.Parse("2026-06-05T08:00:00Z", CultureInfo.InvariantCulture),
+            LastSeen: DateTimeOffset.Parse("2026-06-05T08:10:00Z", CultureInfo.InvariantCulture),
+            AuthMethods: ["grant", "fast"],
+            PermissionStatus: XmppClientAccessManagement.PermissionNormal,
+            Software: "TeleTypTel",
+            Uri: new Uri("https://teletyptel.nl/"),
+            Device: "Windows laptop")
+    ]);
+    var iq = new XmppIq(XmppIqType.Result, "cam-list", clientsElement);
+
+    True(XmppClientAccessManagement.TryParseClientsResult(iq, out var clients));
+    var client = clients.Single();
+    Equal("client-1", client.Id);
+    Equal(XmppClientAccessManagement.ClientTypeSession, client.Type);
+    True(client.Connected);
+    Equal("grant", client.AuthenticationMethods[0]);
+    Equal("fast", client.AuthenticationMethods[1]);
+    Equal(XmppClientAccessManagement.PermissionNormal, client.PermissionStatus);
+    Equal("TeleTypTel", client.Software);
+    Equal("https://teletyptel.nl/", client.Uri?.AbsoluteUri);
+    Equal("Windows laptop", client.Device);
 }
 
 static void XmppChatStateSerializesAndParses()
@@ -5869,6 +6246,50 @@ static void XmppMultiUserChatSerializesMessageCorrection()
     Equal("muc-original-2", parsed.ReplaceId);
 }
 
+static void XmppMultiUserChatHandlesModeratedRetraction()
+{
+    var room = XmppAddress.Parse("team@conference.example.org");
+    var request = XmppMultiUserChat.CreateModeratedRetractionRequest(
+        "moderate-1",
+        room,
+        "stanza-123",
+        "Spam").ToXml();
+    var moderate = request.Element(XName.Get("moderate", XmppMessageModeration.NamespaceName));
+
+    Equal("set", request.Attribute("type")?.Value);
+    Equal("team@conference.example.org", request.Attribute("to")?.Value);
+    Equal("stanza-123", moderate?.Attribute("id")?.Value);
+    True(moderate?.Element(XName.Get("retract", XmppMessageRetraction.NamespaceName)) is not null);
+    Equal("Spam", moderate?.Element(XName.Get("reason", XmppMessageModeration.NamespaceName))?.Value);
+
+    var incoming = XElement.Parse("""
+        <message xmlns="jabber:client" type="groupchat" from="team@conference.example.org" to="edward@example.org/desktop" id="muc-retract-1">
+          <retract xmlns="urn:xmpp:message-retract:1" id="stanza-123">
+            <moderated xmlns="urn:xmpp:message-moderate:1" by="team@conference.example.org/Edward"/>
+            <reason xmlns="urn:xmpp:message-moderate:1">Spam</reason>
+          </retract>
+        </message>
+        """);
+
+    True(XmppMultiUserChat.TryParseGroupMessage(incoming, out var parsed));
+    Equal("stanza-123", parsed!.Retraction!.TargetMessageId);
+    True(parsed.Retraction.IsModerated);
+    Equal("team@conference.example.org/Edward", parsed.Retraction.Moderation!.By!.Full);
+    Equal("Spam", parsed.Retraction.Moderation.Reason);
+
+    var tombstone = new XElement(
+        XName.Get("message", "jabber:client"),
+        new XAttribute("id", "stanza-123"),
+        XmppMessageRetraction.CreateTombstone(
+            "muc-retract-1",
+            new DateTimeOffset(2026, 6, 2, 12, 0, 0, TimeSpan.Zero),
+            new XmppModeratedRetraction(XmppAddress.Parse("team@conference.example.org/Edward"), "Spam")));
+    True(XmppMessageRetraction.TryParseTombstone(tombstone, out var parsedTombstone));
+    Equal("stanza-123", parsedTombstone!.OriginalMessageId);
+    Equal("muc-retract-1", parsedTombstone.RetractionMessageId);
+    Equal("Spam", parsedTombstone.Moderation!.Reason);
+}
+
 static void XmppMultiUserChatDiscoversRoomsAndItems()
 {
     var service = XmppAddress.Parse("conference.example.org");
@@ -6206,6 +6627,236 @@ static void XmppHttpFileUploadCreatesMessageAttachment()
     True(XmppChatMessage.TryParse(message.ToXml(), out var parsed));
     Equal(upload.GetUrl, parsed!.OutOfBandUrl!);
     Equal("foto.jpg", parsed.OutOfBandDescription!);
+}
+
+static void XmppStatelessInlineMediaSharingSerializesAndParses()
+{
+    var file = new XmppJingleFile(
+        "foto.jpg",
+        123,
+        "image/jpeg",
+        Description: "Voorbeeldfoto",
+        Hashes: [new XmppJingleFileHash("sha-256", "abc123")]);
+    var reference = XmppStatelessInlineMediaSharing.CreateMediaSharingReference(
+        file,
+        [new Uri("https://download.example.org/u/foto.jpg")]);
+    var message = new XElement(
+        XName.Get("message", "jabber:client"),
+        new XAttribute("to", "anna@example.org/phone"),
+        new XAttribute("type", "chat"),
+        new XElement(XName.Get("body", "jabber:client"), "foto"),
+        reference);
+    var xml = message.ToString(SaveOptions.DisableFormatting);
+
+    True(xml.Contains("urn:xmpp:sims:1", StringComparison.Ordinal));
+    True(xml.Contains("urn:xmpp:jingle:apps:file-transfer:5", StringComparison.Ordinal));
+    True(xml.Contains("urn:xmpp:reference:0", StringComparison.Ordinal));
+    True(XmppStatelessInlineMediaSharing.TryParse(message, out var parsed));
+    Equal("foto.jpg", parsed!.File.Name);
+    Equal("image/jpeg", parsed.File.MediaType!);
+    Equal(123L, parsed.File.Size!.Value);
+    Equal("https://download.example.org/u/foto.jpg", parsed.Sources.Single().ToString());
+    Equal("sha-256", parsed.File.Hashes!.Single().Algorithm);
+}
+
+static void XmppStatelessInlineMediaSharingCreatesUploadMessage()
+{
+    var upload = new XmppHttpUploadCompletion(new Uri("https://download.example.org/u/foto.jpg"), 123, "image/jpeg");
+    var message = XmppStatelessInlineMediaSharing.CreateHttpUploadMessage(
+        XmppAddress.Parse("anna@example.org/phone"),
+        "Bestand gedeeld: foto.jpg",
+        upload,
+        "foto.jpg",
+        [new XmppJingleFileHash("sha-256", "abc123")],
+        "sims-1",
+        "Voorbeeldfoto");
+
+    Equal("sims-1", message.Attribute("id")!.Value);
+    True(XmppStatelessInlineMediaSharing.TryParse(message, out var parsed));
+    Equal(upload.GetUrl, parsed!.Sources.Single());
+    Equal("Voorbeeldfoto", parsed.File.Description!);
+    Equal(0, parsed.Begin!.Value);
+    Equal("Bestand gedeeld: foto.jpg".Length, parsed.End!.Value);
+}
+
+static void XmppStatelessInlineMediaSharingExposesDiscoveryAndHash()
+{
+    var info = new XmppServiceDiscoveryInfo(
+        null,
+        [],
+        [XmppStatelessInlineMediaSharing.NamespaceName]);
+    var hash = XmppStatelessInlineMediaSharing.CreateSha256Hash(Encoding.UTF8.GetBytes("foto"));
+
+    True(XmppStatelessInlineMediaSharing.SupportsStatelessInlineMediaSharing(info));
+    Equal("sha-256", hash.Algorithm);
+    Equal(Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes("foto"))), hash.Value);
+}
+
+static void XmppPublicChannelSearchSerializesAndParses()
+{
+    var service = XmppAddress.Parse("search.example.org");
+    var info = new XmppServiceDiscoveryInfo(null, [], [XmppPublicChannelSearch.NamespaceName]);
+    True(XmppPublicChannelSearch.SupportsPublicChannelSearch(info));
+
+    var formRequest = XmppPublicChannelSearch.CreateSearchFormRequest("channel-form-1", service).ToXml();
+    Equal("get", formRequest.Attribute("type")!.Value);
+    Equal("search.example.org", formRequest.Attribute("to")!.Value);
+    Equal(XmppPublicChannelSearch.NamespaceName, formRequest.Elements().Single().Name.NamespaceName);
+
+    var search = XmppPublicChannelSearch.CreateSearchRequest(
+        "channel-search-1",
+        service,
+        new XmppPublicChannelSearchQuery(
+            Text: "xmpp",
+            SearchInAddress: true,
+            SearchInName: true,
+            SearchInDescription: true,
+            ServiceTypes: [XmppPublicChannelSearch.MucServiceType],
+            SortKey: XmppPublicChannelSearch.AddressSortKey),
+        new XmppResultSetRequest(Max: 5)).ToXml();
+    var searchXml = search.ToString(SaveOptions.DisableFormatting);
+    True(searchXml.Contains("urn:xmpp:channel-search:0:search-params", StringComparison.Ordinal));
+    True(searchXml.Contains("sinaddress", StringComparison.Ordinal));
+    Equal(
+        "5",
+        search.Elements().Single().Element(XName.Get("set", XmppPublicChannelSearch.ResultSetManagementNamespace))!
+            .Element(XName.Get("max", XmppPublicChannelSearch.ResultSetManagementNamespace))!.Value);
+
+    var resultXml = XElement.Parse("""
+        <iq xmlns='jabber:client' from='search.example.org' to='edward@example.org/web' id='channel-search-1' type='result'>
+          <result xmlns='urn:xmpp:channel-search:0:search'>
+            <item address='commteam@muc.xmpp.org'>
+              <name>commteam</name>
+              <description>XMPP community team</description>
+              <language>en</language>
+              <nusers>10</nusers>
+              <service-type>xep-0045</service-type>
+              <is-open/>
+              <anonymity-mode>muc_semianonymous</anonymity-mode>
+            </item>
+            <set xmlns='http://jabber.org/protocol/rsm'>
+              <first index='0'>opaque-string-1</first>
+              <last>opaque-string-2</last>
+              <max>5</max>
+              <count>42</count>
+            </set>
+          </result>
+        </iq>
+        """);
+
+    True(XmppIq.TryParse(resultXml, out var iq));
+    True(XmppPublicChannelSearch.TryParseSearchResult(iq!, out var result));
+    Equal("commteam@muc.xmpp.org", result!.Channels.Single().Address.Bare);
+    Equal("XMPP community team", result.Channels.Single().Description!);
+    Equal(10, result.Channels.Single().UserCount!.Value);
+    Equal(true, result.Channels.Single().IsOpen!.Value);
+    Equal("opaque-string-2", result.ResultSet!.Last!);
+    Equal(42, result.ResultSet.Count!.Value);
+    Equal(0, result.ResultSet.FirstIndex!.Value);
+}
+
+static void XmppStreamClientHandlesPublicChannelSearch()
+{
+    RunXmppStreamClientHandlesPublicChannelSearchAsync().GetAwaiter().GetResult();
+}
+
+static async Task RunXmppStreamClientHandlesPublicChannelSearchAsync()
+{
+    var listener = new TcpListener(IPAddress.Loopback, 0);
+    listener.Start();
+
+    var endpoint = (IPEndPoint)listener.LocalEndpoint;
+    var serverTask = Task.Run(async () =>
+    {
+        using var serverClient = await listener.AcceptTcpClientAsync();
+        await using var serverStream = serverClient.GetStream();
+        var buffer = new byte[8192];
+
+        await ReadTextAsync(serverStream, buffer);
+        await WriteTextAsync(serverStream, """
+            <stream:stream xmlns="jabber:client" xmlns:stream="http://etherx.jabber.org/streams" from="localhost" version="1.0">
+            <stream:features/>
+            """);
+
+        var formRequest = await ReadTextAsync(serverStream, buffer);
+        True(formRequest.Contains(XmppPublicChannelSearch.NamespaceName, StringComparison.Ordinal));
+        await WriteTextAsync(serverStream, """
+            <iq xmlns='jabber:client' from='search.localhost' id='channel-search-form-1' type='result'>
+              <search xmlns='urn:xmpp:channel-search:0:search'>
+                <x xmlns='jabber:x:data' type='form'>
+                  <field type='hidden' var='FORM_TYPE'>
+                    <value>urn:xmpp:channel-search:0:search-params</value>
+                  </field>
+                  <field type='text-single' var='q' label='Search for'/>
+                </x>
+              </search>
+            </iq>
+            """);
+
+        var searchRequest = await ReadTextAsync(serverStream, buffer);
+        True(searchRequest.Contains("<value>teletyptel</value>", StringComparison.Ordinal));
+        await WriteTextAsync(serverStream, """
+            <iq xmlns='jabber:client' from='search.localhost' id='channel-search-1' type='result'>
+              <result xmlns='urn:xmpp:channel-search:0:search'>
+                <item address='teletyptel@muc.localhost'>
+                  <name>Teletyptel</name>
+                  <nusers>3</nusers>
+                  <is-open>true</is-open>
+                </item>
+              </result>
+            </iq>
+            """);
+
+        await ReadTextAsync(serverStream, buffer);
+    });
+
+    try
+    {
+        var searchService = XmppAddress.Parse("search.localhost");
+        var settings = new XmppConnectionSettings(
+            XmppAddress.Parse("edward@localhost/web"),
+            IPAddress.Loopback.ToString(),
+            endpoint.Port,
+            requireTls: false);
+        await using var client = new XmppStreamClient(settings);
+
+        await client.ConnectAndReadFeaturesAsync();
+        var form = await client.RequestPublicChannelSearchFormAsync(searchService, TimeSpan.FromSeconds(5));
+        var result = await client.SearchPublicChannelsAsync(
+            searchService,
+            new XmppPublicChannelSearchQuery(Text: "teletyptel"),
+            TimeSpan.FromSeconds(5));
+        await client.DisconnectAsync();
+
+        Equal(XmppPublicChannelSearch.SearchParamsFormType, form.FormType!);
+        Equal("teletyptel@muc.localhost", result.Channels.Single().Address.Bare);
+        Equal("Teletyptel", result.Channels.Single().Name!);
+        Equal(3, result.Channels.Single().UserCount!.Value);
+    }
+    finally
+    {
+        listener.Stop();
+    }
+
+    await serverTask;
+}
+
+static void XmppIncomingStanzaExposesStatelessInlineMedia()
+{
+    var message = XmppStatelessInlineMediaSharing.CreateHttpUploadMessage(
+        XmppAddress.Parse("edward@example.org/web"),
+        "Bestand gedeeld: foto.jpg",
+        new XmppHttpUploadCompletion(new Uri("https://download.example.org/u/foto.jpg"), 123, "image/jpeg"),
+        "foto.jpg",
+        [new XmppJingleFileHash("sha-256", "abc123")],
+        "sims-incoming-1");
+    message.SetAttributeValue("from", "anna@example.org/phone");
+    var stanza = XmppIncomingStanza.FromElement(message);
+
+    True(stanza.IsMessage);
+    True(stanza.HasInlineMedia);
+    Equal("foto.jpg", stanza.InlineMedia!.File.Name);
+    Equal("https://download.example.org/u/foto.jpg", stanza.InlineMedia.Sources.Single().ToString());
 }
 
 static void XmppSocks5BytestreamsSerializesRequests()

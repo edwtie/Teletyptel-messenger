@@ -1,9 +1,9 @@
 # Teletyptel 2.0 Project Page
 
 Teletyptel 2.0 is an open XMPP messenger project for accessible real-time
-communication. The Alpha 1 release focuses on live text: a conversation can
-show text while it is being typed, then keep the final message in the chat
-history.
+communication. The Alpha 2 evaluation build focuses on chat, live real-time
+text, WebRTC/Jingle call experiments, file/location sharing experiments and
+repeatable XMPP server smoke testing.
 
 The project is built around open protocols rather than a closed messaging
 network. The current codebase contains a web client, PHP relay for local demos,
@@ -15,13 +15,14 @@ and Dutch localization files.
 - Source: https://github.com/edwtie/Tiedragon.XmppMessenger
 - Release: https://github.com/edwtie/Tiedragon.XmppMessenger/releases
 
-## Try Alpha 1
+## Try Alpha 2
 
 1. Install .NET 10 SDK and PHP 8.1 or newer.
 2. Build and test the repository.
 3. Start `php php/rtt-websocket-server.php`.
 4. Open `php/public/chat.html` in two browser windows.
-5. Connect both windows to `ws://127.0.0.1:8787`.
+5. Sign in with two browser profiles and connect both windows to
+   `ws://127.0.0.1:8787`.
 
 ## Current Features
 
@@ -34,6 +35,8 @@ and Dutch localization files.
 - Legacy smiley rendering.
 - C# XMPP core for TLS/SASL/bind/roster/presence/chat and multiple XEP models.
 - STARTTLS local server and real-server smoke tools.
+- LocalServer XEP-0077 registration, optional CAPTCHA, XEP-0313 archive, MUC
+  and XEP-0363 upload smoke paths.
 
 ## Standards Direction
 
@@ -53,7 +56,7 @@ and Dutch localization files.
 
 ## Status
 
-Alpha 1 is for evaluation. It is not yet a production service. The next public
-milestones are a hosted demo instance, direct browser login to an XMPP
-WebSocket endpoint, Android/iOS packaging experiments and stronger signed
-language-package delivery.
+Alpha 2 is for evaluation. It is not yet a production service. The next public
+milestones are a hosted demo instance, production XMPP WebSocket/BOSH endpoint,
+Android/iOS packaging experiments and stronger signed language-package
+delivery.

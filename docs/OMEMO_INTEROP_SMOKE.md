@@ -70,6 +70,15 @@ verification, but the built-in verifier is only a guard. Real XEdDSA signed
 pre-key verification still belongs inside the audited backend before production
 OMEMO can be enabled.
 
+## Backend Decision
+
+The production backend direction is now fixed in
+`docs/OMEMO_BACKEND_DECISION.md`: use Signal's maintained `libsignal` family
+behind the existing `IXmppOmemoSessionBackend` boundary. TeleTypTel keeps the
+XMPP/XEP-0384 adapter, trust UI, local storage and PEP publication logic. PHP
+keeps OMEMO wire helpers only and must not own browser users' long-term OMEMO
+private keys.
+
 Still required for production end-to-end encryption:
 
 - X3DH session setup

@@ -26,8 +26,10 @@ available in a tagged release with user-facing setup instructions.
 It is useful because it exercises the real client stack against a real
 STARTTLS/SASL/bind C2S flow, but it is intentionally scoped to localhost or a
 protected lab network. Production server compliance must be validated against a
-hardened deployment such as Prosody or ejabberd, plus the required modules for
-upload, MAM, PubSub/PEP, STUN/TURN discovery and BOSH/WebSocket where used.
+hardened deployment. ejabberd is the preferred provider/lab target when SIP
+gateway work matters; Prosody and Openfire remain useful interoperability
+targets. The chosen server still needs the required modules for upload, MAM,
+PubSub/PEP, STUN/TURN discovery and BOSH/WebSocket where used.
 
 Status key:
 
@@ -158,18 +160,22 @@ compliance requirements:
 
 | Area | Provider | Teletyptel status |
 | --- | --- | --- |
-| Public account registration | XEP-0077 | Done for helper and real-server smoke path. |
-| Service contact addresses | XEP-0157 | Done for server-info data form parsing/creation. |
-| User avatars | XEP-0084 | Done: protocol helper layer, browser UI/cache, local server storage and vCard compatibility are implemented; public-server PEP smoke remains release validation. |
 | File link fallback | XEP-0066 | Done as HTTP upload message fallback. |
-| Stateless inline media sharing | XEP-0385 | Open. |
-| Consistent user colors | XEP-0392 | Open. |
-| Plaintext message styling | XEP-0393 | Open. |
-| Public channel search | XEP-0433 | Open. |
-| Message retraction | XEP-0424 | Open. |
-| Message moderation | XEP-0425 | Open. |
+| Public account registration | XEP-0077 | Done for helper and real-server smoke path. |
+| User avatars | XEP-0084 | Done: protocol helper layer, browser UI/cache, local server storage and vCard compatibility are implemented; public-server PEP smoke remains release validation. |
+| Service contact addresses | XEP-0157 | Done for server-info data form parsing/creation. |
+| Delayed delivery | XEP-0203 | Done for PHP metadata helper/parser and incoming stanza exposure. |
+| Message processing hints | XEP-0334 | Done for PHP helper/parser and incoming stanza exposure. |
+| Stable and unique stanza IDs | XEP-0359 | Done for PHP origin-id/stanza-id helper/parser and incoming stanza exposure. |
+| Stateless inline media sharing | XEP-0385 | Done for core serializer/parser, discovery, SHA-256 helper, incoming stanza detection and HTTP-upload message helper; web upload hash integration remains UI wiring. |
+| Consistent user colors | XEP-0392 | Done in core and web avatar fallback using stable SHA-1/HSLuv-based colors. |
+| Plaintext message styling | XEP-0393 | Done for core unstyled marker plus conservative web renderer for strong, emphasis, strike and code. |
+| Message retraction | XEP-0424 | Done for core serializer/parser, incoming stanza detection and web retraction display; public-server interop remains release validation. |
+| Message moderation | XEP-0425 | Done for MUC moderation IQ helper, moderated retraction parser and web display; public MUC moderation smoke remains release validation. |
+| Public channel search | XEP-0433 | Done for protocol helper, search-form request, search request, RSM paging and result parser; XEP-0433 is Deferred, so live search-service interop remains release validation. |
+| Custom emoji | XEP-0514 | Done for protocol helper, XEP-0394 markup spans, XEP-0300 hash links and SIMS/XEP-0385 media matching; XEP-0514 is Experimental, so UI and live-server interop remain release validation. |
 
-## Immediate Work Queue
+## Release Validation Queue
 
 1. Prepare a usable release with server setup, WAMP package notes and public
    demo instructions.
@@ -181,5 +187,5 @@ compliance requirements:
 5. Run hosted XEP-0215 TURN credential discovery against the production relay
    and repeat call setup with an installed Jingle client before any A/V Client
    claim.
-7. Keep XEP-0301 RTT as a Teletyptel product feature even though it is outside
+6. Keep XEP-0301 RTT as a Teletyptel product feature even though it is outside
    the XEP-0479 baseline.

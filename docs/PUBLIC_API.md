@@ -66,12 +66,15 @@ Normal app flow:
 | `XmppMessageCarbons` | XEP-0280 enable and forwarded message parsing. |
 | `XmppMessageCorrection` | XEP-0308 `replace` payload helper for corrected messages. |
 | `XmppMessageArchive` | XEP-0313 archive query/result parsing. |
+| `XmppMessageMetadata` | XEP-0203 delayed delivery, XEP-0334 message processing hints and XEP-0359 origin/stanza-id helpers and parser. |
+| `XmppEmojiMarkup` | XEP-0514 Custom Emoji helpers on XEP-0394 markup spans with XEP-0300 hash links and SIMS/XEP-0385 media matching. |
 | `XmppMultiUserChat` | XEP-0045 MUC room discovery, room items, join/leave, config forms, admin helpers and groupchat correction payloads. |
+| `XmppPublicChannelSearch` | XEP-0433 Extended Channel Search helpers for search form requests, submitted search data forms, RSM paging and public channel result parsing. |
 | `XmppPrivateXmlStorage` | XEP-0049 generic private XML storage get/set/result helpers for namespaced account data. |
 | `XmppPersistentPrivateData` | XEP-0223 PEP/PubSub private-data storage with persistent whitelist publish-options and notification trust checks. |
 | `XmppBookmarks` | XEP-0402 PEP-native bookmarks plus XEP-0048/XEP-0049 legacy bookmark compatibility. |
 | `XmppMucSelfPing` | XEP-0410 ping helper for confirming whether the current MUC occupant session is still joined. |
-| `XmppPubSub` | XEP-0060 generic PubSub subscribe, unsubscribe, create/delete node and subscription-result helpers. |
+| `XmppPubSub` | XEP-0060 generic PubSub publish/items/retract, service-node targeting, subscribe/unsubscribe, create/configure/delete/purge node and subscription/affiliation/configuration-result helpers. |
 | `XmppPubSubAnnouncements` | Teletyptel provider announcement model on XEP-0060 with Atom entry publish, retrieve and event parsing. |
 | `XmppJingle` | XEP-0166/0167/0176/0320 call signaling, RTP payloads, ICE candidates, DTLS fingerprints and session-info states. Use `XmppExternalServiceDiscovery` for XEP-0215 STUN/TURN discovery before production calls. |
 | `XmppJingleUserLocation` | ProtoXEP Jingle location/GPS application helper that reuses XEP-0080 payloads for call-scoped descriptions and session-info updates. |

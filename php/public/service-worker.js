@@ -1,10 +1,21 @@
-const CACHE_NAME = "tiedragon-xmpp-webclient-v40";
-const BUILD_VERSION = "20260530-jingle-rtt-sync";
+const CACHE_NAME = "tiedragon-xmpp-webclient-v112";
+const BUILD_VERSION = "20260606-security-totp";
 const ASSETS = [
   "chat.html",
+  "dev.html",
   `chat-client.css?v=${BUILD_VERSION}`,
   `chat-client.js?v=${BUILD_VERSION}`,
+  `vendor/qrcode.js?v=${BUILD_VERSION}`,
   "manifest.webmanifest",
+  "assets/brand/teletyptel-logo-header.png",
+  "assets/brand/teletyptel-logo-header@2x.png",
+  "assets/brand/teletyptel-logo-clean.png",
+  "assets/brand/teletyptel-icon-192.png",
+  "assets/brand/teletyptel-icon-512.png",
+  "assets/backgrounds/teletyptel-bg-mobile.png",
+  "assets/backgrounds/teletyptel-bg-wide-1.png",
+  "assets/backgrounds/teletyptel-bg-wide-2.png",
+  "assets/backgrounds/teletyptel-bg-wide-3.png",
   "config/account-profile.json",
   "config/providers/example-provider.json",
   "lang/eng.lng",
@@ -67,6 +78,7 @@ function shouldCache(request) {
 
   return request.mode === "navigate"
     || ["style", "script", "manifest"].includes(request.destination)
+    || (request.destination === "image" && (url.pathname.includes("/smileys/") || url.pathname.includes("/assets/")))
     || url.pathname.includes("/lang/")
     || url.pathname.includes("/config/");
 }

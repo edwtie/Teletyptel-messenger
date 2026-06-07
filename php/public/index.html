@@ -1,179 +1,18 @@
 <!doctype html>
-<html lang="en">
+<html lang="nl">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Tiedragon RTT WebSocket Demo</title>
-  <style>
-    :root {
-      color-scheme: light dark;
-      font-family: "Segoe UI", Arial, sans-serif;
-    }
-
-    body {
-      margin: 24px;
-      max-width: 900px;
-    }
-
-    textarea {
-      box-sizing: border-box;
-      display: block;
-      min-height: 160px;
-      width: 100%;
-      font: 16px/1.45 Consolas, monospace;
-      margin-block: 8px 16px;
-    }
-
-    input {
-      width: min(100%, 360px);
-      padding: 6px 8px;
-    }
-
-    button {
-      padding: 6px 14px;
-    }
-
-    pre {
-      overflow: auto;
-      padding: 12px;
-      border: 1px solid CanvasText;
-    }
-  </style>
+  <meta http-equiv="refresh" content="0; url=chat.html">
+  <title>TeleTypTel</title>
+  <link rel="canonical" href="chat.html">
 </head>
 <body>
-  <h1>Tiedragon RTT WebSocket Demo</h1>
-
-  <p>
-    This page sends XEP-0301-style RTT XML through a local PHP WebSocket relay.
-    Open this page twice to see live text move between browser windows.
-  </p>
-
-  <label>
-    WebSocket URL
-    <input id="url" value="ws://127.0.0.1:8787">
-  </label>
-  <button id="connect">Connect</button>
-  <button id="reset">Reset RTT</button>
-
-  <h2>Local draft</h2>
-  <textarea id="local" spellcheck="false"></textarea>
-
-  <h2>Remote live text</h2>
-  <textarea id="remote" spellcheck="false" readonly></textarea>
-
-  <h2>Last RTT XML</h2>
-  <pre id="log"></pre>
-
   <script>
-    let socket = null;
-    let sequence = 0;
-    let previousText = "";
-
-    const url = document.getElementById("url");
-    const connect = document.getElementById("connect");
-    const reset = document.getElementById("reset");
-    const local = document.getElementById("local");
-    const remote = document.getElementById("remote");
-    const log = document.getElementById("log");
-
-    connect.addEventListener("click", () => {
-      socket = new WebSocket(url.value);
-      socket.addEventListener("open", () => {
-        log.textContent = "Connected";
-        sendReset();
-      });
-      socket.addEventListener("message", event => {
-        const message = JSON.parse(event.data);
-        if (message.type !== "rtt" && message.type !== "message") {
-          return;
-        }
-
-        remote.value = message.text ?? "";
-        log.textContent = message.type === "rtt" ? message.xml : "Message snapshot received.";
-      });
-      socket.addEventListener("close", () => {
-        log.textContent = "Disconnected";
-      });
-    });
-
-    reset.addEventListener("click", sendReset);
-    local.addEventListener("input", () => sendEdit(local.value));
-
-    function sendReset() {
-      sequence = 0;
-      previousText = local.value;
-      sendRtt("reset", local.value);
-    }
-
-    function sendEdit(text) {
-      const actions = createDeltaActions(previousText, text);
-      previousText = text;
-      sendRtt("edit", text, actions);
-    }
-
-    function sendRtt(eventName, text, actions = null) {
-      if (!socket || socket.readyState !== WebSocket.OPEN) {
-        return;
-      }
-
-      const escaped = escapeXml(text);
-      const xml = eventName === "edit"
-        ? `<rtt xmlns="urn:xmpp:rtt:0" seq="${sequence++}">${actions ?? `<t p="0">${escaped}</t>`}</rtt>`
-        : `<rtt xmlns="urn:xmpp:rtt:0" event="${eventName}" seq="${sequence++}"><t p="0">${escaped}</t></rtt>`;
-
-      socket.send(JSON.stringify({
-        type: "rtt",
-        text,
-        xml
-      }));
-
-      log.textContent = xml;
-    }
-
-    function createDeltaActions(oldText, newText) {
-      if (oldText === newText) {
-        return "";
-      }
-
-      const oldChars = Array.from(oldText);
-      const newChars = Array.from(newText);
-      let prefix = 0;
-      while (prefix < oldChars.length && prefix < newChars.length && oldChars[prefix] === newChars[prefix]) {
-        prefix++;
-      }
-
-      let suffix = 0;
-      while (
-        oldChars.length - 1 - suffix >= prefix &&
-        newChars.length - 1 - suffix >= prefix &&
-        oldChars[oldChars.length - 1 - suffix] === newChars[newChars.length - 1 - suffix]
-      ) {
-        suffix++;
-      }
-
-      const removed = oldChars.length - prefix - suffix;
-      const inserted = newChars.length - prefix - suffix;
-      let xml = "";
-
-      if (removed > 0) {
-        xml += `<e p="${prefix + removed}" n="${removed}"/>`;
-      }
-
-      if (inserted > 0) {
-        xml += `<t p="${prefix}">${escapeXml(newChars.slice(prefix, prefix + inserted).join(""))}</t>`;
-      }
-
-      return xml;
-    }
-
-    function escapeXml(value) {
-      return value
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&apos;");
-    }
+    const params = new URLSearchParams(window.location.search);
+    const target = params.has("reset") ? "reset.html" : "chat.html";
+    window.location.replace(target + window.location.search + window.location.hash);
   </script>
+  <p><a href="chat.html">TeleTypTel openen</a></p>
 </body>
 </html>

@@ -1,0 +1,12 @@
+{
+  "appId": "com.tiedragon.teletyptel",
+  "appName": "TeleTypTel",
+  "webDir": "php/public",
+  "bundledWebRuntime": false,
+  "server": {
+    "iosScheme": "teletyptel"
+  },
+  "ios": {
+    "contentInset": "always"
+  }
+}

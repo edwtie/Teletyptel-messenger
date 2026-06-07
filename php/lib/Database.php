@@ -5,12 +5,29 @@ final class Database
 {
     public static function connect(): PDO
     {
+        return self::connectNamed('mysql');
+    }
+
+    public static function connectXmpp(): PDO
+    {
+        return self::connectNamed('xmpp_mysql');
+    }
+
+    private static function connectNamed(string $name): PDO
+    {
         $config = self::loadConfig()['mysql'] ?? [];
-        $host = self::env('TELETYPTEL_DB_HOST', (string)($config['host'] ?? '127.0.0.1'));
-        $port = (int)self::env('TELETYPTEL_DB_PORT', (string)($config['port'] ?? '3306'));
-        $database = self::env('TELETYPTEL_DB_NAME', (string)($config['database'] ?? 'teletyptel'));
-        $username = self::env('TELETYPTEL_DB_USER', (string)($config['username'] ?? 'teletyptel'));
-        $password = self::env('TELETYPTEL_DB_PASSWORD', (string)($config['password'] ?? ''));
+        if ($name !== 'mysql') {
+            $config = self::loadConfig()[$name] ?? $config;
+        }
+
+        $prefix = $name === 'mysql' ? 'TELETYPTEL_DB' : 'TELETYPTEL_XMPP_DB';
+        $fallbackDatabase = $name === 'mysql' ? 'teletyptel' : 'ejabberd';
+        $fallbackUsername = $name === 'mysql' ? 'teletyptel' : 'ejabberd';
+        $host = self::env($prefix . '_HOST', (string)($config['host'] ?? '127.0.0.1'));
+        $port = (int)self::env($prefix . '_PORT', (string)($config['port'] ?? '3306'));
+        $database = self::env($prefix . '_NAME', (string)($config['database'] ?? $fallbackDatabase));
+        $username = self::env($prefix . '_USER', (string)($config['username'] ?? $fallbackUsername));
+        $password = self::env($prefix . '_PASSWORD', (string)($config['password'] ?? ''));
         $charset = (string)($config['charset'] ?? 'utf8mb4');
 
         $dsn = "mysql:host={$host};port={$port};dbname={$database};charset={$charset}";

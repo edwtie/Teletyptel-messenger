@@ -135,7 +135,8 @@ $env:RTT_RELAY_PORT = '18787'
 php .\php\rtt-websocket-server.php
 ```
 
-Then open `php/public/index.html` in two browser windows and connect both to:
+Then open the current client, `php/public/chat.html`, in two browser windows
+and connect both to:
 
 ```text
 ws://127.0.0.1:8787

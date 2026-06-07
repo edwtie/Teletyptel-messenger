@@ -25,6 +25,7 @@ $clients = [];
 $handshakes = [];
 $buffers = [];
 $clientProtocols = [];
+$clientPeers = [];
 
 echo "Tiedragon RTT/RFC7395 WebSocket relay listening on ws://" . HOST . ':' . $port . "\n";
 echo "Open php/public/index.html in a browser and connect to this server.\n";
@@ -48,6 +49,7 @@ while (true) {
                 $handshakes[$id] = false;
                 $buffers[$id] = '';
                 $clientProtocols[$id] = 'rtt-json';
+                $clientPeers[$id] = [];
                 echo "Client $id connected\n";
             }
 
@@ -57,7 +59,7 @@ while (true) {
         $id = (int)$socket;
         $data = @fread($socket, 8192);
         if ($data === false) {
-            closeClient($id, $clients, $handshakes, $buffers, $clientProtocols);
+            closeClient($id, $clients, $handshakes, $buffers, $clientProtocols, $clientPeers);
             continue;
         }
 
@@ -74,7 +76,7 @@ while (true) {
 
             $protocol = 'rtt-json';
             if (!performHandshake($socket, $buffers[$id], $protocol)) {
-                closeClient($id, $clients, $handshakes, $buffers, $clientProtocols);
+                closeClient($id, $clients, $handshakes, $buffers, $clientProtocols, $clientPeers);
                 continue;
             }
 
@@ -94,7 +96,7 @@ while (true) {
             $buffers[$id] = substr($buffers[$id], $frame['consumed']);
 
             if ($frame['type'] === 'close') {
-                closeClient($id, $clients, $handshakes, $buffers, $clientProtocols);
+                closeClient($id, $clients, $handshakes, $buffers, $clientProtocols, $clientPeers);
                 break;
             }
 
@@ -114,16 +116,17 @@ while (true) {
                 continue;
             }
 
-            if (!isAllowedRttMessage($message)) {
+            $message = prepareRttMessage($message, $id, $clientPeers);
+            if ($message === null) {
                 @fwrite($socket, encodeWebSocketFrame(json_encode([
                     'type' => 'error',
-                    'message' => 'Only JSON RTT, message, presence, client state, location or Jingle call snapshots are accepted.'
+                    'message' => 'Only JSON RTT, message, delete, presence, client state, location or Jingle call snapshots are accepted.'
                 ], JSON_UNESCAPED_SLASHES)));
                 continue;
             }
 
             echo "RTT from $id: $message\n";
-            broadcast($clients, $clientProtocols, $id, $message, 'rtt-json');
+            broadcastJson($clients, $clientProtocols, $clientPeers, $id, $message);
         }
     }
 }
@@ -274,10 +277,82 @@ function isAllowedRttMessage(string $message): bool
         return false;
     }
 
+    return isAllowedRttEnvelope($json);
+}
+
+function prepareRttMessage(string $message, int $senderId, array &$clientPeers): ?string
+{
+    $json = json_decode($message, true);
+    if (!is_array($json) || !isAllowedRttEnvelope($json)) {
+        return null;
+    }
+
+    rememberClientPeer($clientPeers, $senderId, $json);
+    $json['serverReceivedAt'] = gmdate('c');
+    $json['serverSenderId'] = $senderId;
+
+    if (($json['type'] ?? null) === 'message-delete') {
+        $json['serverAction'] = 'delete';
+    }
+
+    if (($json['type'] ?? null) === 'message' && ($json['forwarded'] ?? false) === true) {
+        $json['serverAction'] = 'forward';
+        $json['originalFrom'] = normalizeRelayAddress($json['originalFrom'] ?? $json['from'] ?? '');
+    }
+
+    return json_encode($json, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+}
+
+function isAllowedRttEnvelope(array $json): bool
+{
     $type = $json['type'] ?? null;
     if ($type === 'message') {
         $text = $json['text'] ?? null;
-        return is_string($text) && strlen($text) <= MAX_PAYLOAD_BYTES;
+        if (!is_string($text) || strlen($text) > MAX_PAYLOAD_BYTES) {
+            return false;
+        }
+
+        foreach (['from', 'to', 'displayName', 'messageId', 'replaceId', 'originalFrom'] as $field) {
+            if (isset($json[$field]) && (!is_string($json[$field]) || strlen($json[$field]) > 512)) {
+                return false;
+            }
+        }
+
+        foreach (['clientId', 'avatarColor'] as $field) {
+            if (isset($json[$field]) && (!is_string($json[$field]) || strlen($json[$field]) > 255)) {
+                return false;
+            }
+        }
+
+        if (isset($json['forwarded']) && !is_bool($json['forwarded'])) {
+            return false;
+        }
+
+        if (isset($json['attachment']) && !isAllowedAttachment($json['attachment'])) {
+            return false;
+        }
+
+        if (isset($json['location']) && !isAllowedLocationPayload($json['location'])) {
+            return false;
+        }
+
+        return true;
+    }
+
+    if ($type === 'message-delete') {
+        foreach (['from', 'to', 'targetMessageId', 'messageId', 'reason', 'clientId'] as $field) {
+            if (!isset($json[$field])) {
+                continue;
+            }
+
+            if (!is_string($json[$field]) || strlen($json[$field]) > 512) {
+                return false;
+            }
+        }
+
+        return isset($json['targetMessageId'])
+            && is_string($json['targetMessageId'])
+            && $json['targetMessageId'] !== '';
     }
 
     if ($type === 'presence') {
@@ -413,6 +488,84 @@ function isAllowedRttMessage(string $message): bool
     return false;
 }
 
+function isAllowedAttachment(mixed $attachment): bool
+{
+    if (!is_array($attachment)) {
+        return false;
+    }
+
+    foreach (['name', 'url', 'type', 'kind'] as $field) {
+        if (isset($attachment[$field]) && (!is_string($attachment[$field]) || strlen($attachment[$field]) > 2048)) {
+            return false;
+        }
+    }
+
+    return isset($attachment['url'])
+        && is_string($attachment['url'])
+        && $attachment['url'] !== ''
+        && (!isset($attachment['size']) || is_numeric($attachment['size']));
+}
+
+function isAllowedLocationPayload(mixed $location): bool
+{
+    if (!is_array($location)) {
+        return false;
+    }
+
+    foreach (['lat', 'lon'] as $field) {
+        if (!isset($location[$field]) || !is_numeric($location[$field])) {
+            return false;
+        }
+    }
+
+    foreach (['accuracy', 'alt', 'altaccuracy', 'bearing', 'speed'] as $field) {
+        if (isset($location[$field]) && $location[$field] !== null && !is_numeric($location[$field])) {
+            return false;
+        }
+    }
+
+    foreach (['timestamp', 'text', 'source'] as $field) {
+        if (isset($location[$field]) && $location[$field] !== null && (!is_string($location[$field]) || strlen($location[$field]) > 512)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+function rememberClientPeer(array &$clientPeers, int $senderId, array $json): void
+{
+    $from = normalizeRelayAddress($json['from'] ?? '');
+    if ($from === '') {
+        return;
+    }
+
+    $bare = bareRelayAddress($from);
+    $clientPeers[$senderId] = array_values(array_unique(array_filter([$from, $bare])));
+}
+
+function normalizeRelayAddress(mixed $value): string
+{
+    return is_string($value) ? trim($value) : '';
+}
+
+function bareRelayAddress(string $jid): string
+{
+    return strtolower(explode('/', trim($jid), 2)[0] ?? '');
+}
+
+function relayAddressMatches(string $left, string $right): bool
+{
+    $left = normalizeRelayAddress($left);
+    $right = normalizeRelayAddress($right);
+    if ($left === '' || $right === '') {
+        return false;
+    }
+
+    return strtolower($left) === strtolower($right)
+        || bareRelayAddress($left) === bareRelayAddress($right);
+}
+
 function handleXmppWebSocketMessage(
     $socket,
     int $id,
@@ -500,7 +653,56 @@ function broadcast(array $clients, array $clientProtocols, int $senderId, string
     }
 }
 
-function closeClient(int $id, array &$clients, array &$handshakes, array &$buffers, array &$clientProtocols): void
+function broadcastJson(array $clients, array $clientProtocols, array $clientPeers, int $senderId, string $message): void
+{
+    $json = json_decode($message, true);
+    if (!is_array($json)) {
+        broadcast($clients, $clientProtocols, $senderId, $message, 'rtt-json');
+        return;
+    }
+
+    $type = $json['type'] ?? '';
+    $to = normalizeRelayAddress($json['to'] ?? '');
+    $targeted = $to !== '' && !relayAddressMatches($to, 'relay@localhost') && $type !== 'presence';
+    if (!$targeted) {
+        broadcast($clients, $clientProtocols, $senderId, $message, 'rtt-json');
+        return;
+    }
+
+    $frame = encodeWebSocketFrame($message);
+    $sent = 0;
+    foreach ($clients as $id => $client) {
+        if ($id === $senderId) {
+            continue;
+        }
+
+        if (($clientProtocols[$id] ?? null) !== 'rtt-json') {
+            continue;
+        }
+
+        $knownPeers = $clientPeers[$id] ?? [];
+        $matches = false;
+        foreach ($knownPeers as $peer) {
+            if (relayAddressMatches((string)$peer, $to)) {
+                $matches = true;
+                break;
+            }
+        }
+
+        if (!$matches) {
+            continue;
+        }
+
+        @fwrite($client, $frame);
+        $sent++;
+    }
+
+    if ($sent === 0) {
+        broadcast($clients, $clientProtocols, $senderId, $message, 'rtt-json');
+    }
+}
+
+function closeClient(int $id, array &$clients, array &$handshakes, array &$buffers, array &$clientProtocols, ?array &$clientPeers = null): void
 {
     if (isset($clients[$id])) {
         @fclose($clients[$id]);
@@ -508,5 +710,8 @@ function closeClient(int $id, array &$clients, array &$handshakes, array &$buffe
     }
 
     unset($handshakes[$id], $buffers[$id], $clientProtocols[$id]);
+    if ($clientPeers !== null) {
+        unset($clientPeers[$id]);
+    }
     echo "Client $id disconnected\n";
 }

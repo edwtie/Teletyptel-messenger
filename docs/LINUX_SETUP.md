@@ -153,7 +153,10 @@ Run the local server:
 /opt/teletyptel/bin/LocalServer/Tiedragon.XmppMessenger.LocalServer \
   --listen 127.0.0.1 \
   --port 55222 \
+  --upload-listen 127.0.0.1 \
+  --upload-port 58088 \
   --domain localhost \
+  --data-dir /var/lib/teletyptel/localserver \
   --account edward:secret \
   --account anna:secret
 ```
@@ -164,10 +167,19 @@ Equivalent portable form:
 dotnet /opt/teletyptel/bin/LocalServer/Tiedragon.XmppMessenger.LocalServer.dll \
   --listen 127.0.0.1 \
   --port 55222 \
+  --upload-listen 127.0.0.1 \
+  --upload-port 58088 \
   --domain localhost \
+  --data-dir /var/lib/teletyptel/localserver \
   --account edward:secret \
   --account anna:secret
 ```
+
+`--data-dir` stores local test accounts, roster items and the XEP-0313 message
+archive. Use a directory owned by the service account when running it under
+systemd.
+Add `--registration-captcha true` when testing XEP-0077 CAPTCHA registration;
+that option uses the local HTTP endpoint configured with `--upload-port`.
 
 Then run the smoke tool with the printed certificate fingerprint:
 

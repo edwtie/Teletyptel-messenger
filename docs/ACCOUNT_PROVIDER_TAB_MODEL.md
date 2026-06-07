@@ -190,11 +190,11 @@ must not become dependencies of `Tiedragon.XmppMessenger.Core`.
 
 ## Alpha Direction
 
-Alpha 1 should implement the model in documentation and local configuration
-only. Runtime enforcement can start with:
+Alpha 2 has the model in documentation, local configuration and first web UI
+paths. Runtime enforcement should continue with:
 
 - local account profile JSON;
 - provider manifest loader;
-- static tab rendering in the web client;
+- static or server-provided tab rendering in the web client;
 - capability display in settings;
 - no external provider secrets in the repository.

@@ -10,7 +10,10 @@ public sealed record XmppChatMessage(
     XmppMessageType Type = XmppMessageType.Chat,
     Uri? OutOfBandUrl = null,
     string? OutOfBandDescription = null,
-    string? ReplaceId = null)
+    string? ReplaceId = null,
+    bool StylingDisabled = false,
+    XmppMessageRetractionEvent? Retraction = null,
+    XmppMessageTombstone? Tombstone = null)
 {
     public const string OutOfBandNamespace = "jabber:x:oob";
 
@@ -67,6 +70,8 @@ public sealed record XmppChatMessage(
         var outOfBand = element.Element(XName.Get("x", OutOfBandNamespace));
         Uri.TryCreate(outOfBand?.Element(XName.Get("url", OutOfBandNamespace))?.Value, UriKind.Absolute, out var outOfBandUrl);
         XmppMessageCorrection.TryGetReplaceId(element, out var replaceId);
+        XmppMessageRetraction.TryParseRetract(element, out var retraction);
+        XmppMessageRetraction.TryParseTombstone(element, out var tombstone);
 
         message = new XmppChatMessage(
             To: to,
@@ -76,7 +81,10 @@ public sealed record XmppChatMessage(
             Type: type,
             OutOfBandUrl: outOfBandUrl,
             OutOfBandDescription: outOfBand?.Element(XName.Get("desc", OutOfBandNamespace))?.Value,
-            ReplaceId: replaceId);
+            ReplaceId: replaceId,
+            StylingDisabled: XmppMessageStyling.IsStylingDisabled(element),
+            Retraction: retraction,
+            Tombstone: tombstone);
         return true;
     }
 
@@ -132,6 +140,24 @@ public sealed record XmppChatMessage(
         if (!string.IsNullOrWhiteSpace(ReplaceId))
         {
             element.Add(XmppMessageCorrection.CreateReplace(ReplaceId));
+        }
+
+        if (Retraction is not null)
+        {
+            element.Add(XmppMessageRetraction.CreateRetract(Retraction.TargetMessageId));
+        }
+
+        if (Tombstone is not null && !string.IsNullOrWhiteSpace(Tombstone.RetractionMessageId))
+        {
+            element.Add(XmppMessageRetraction.CreateTombstone(
+                Tombstone.RetractionMessageId,
+                Tombstone.Stamp,
+                Tombstone.Moderation));
+        }
+
+        if (StylingDisabled)
+        {
+            element.Add(XmppMessageStyling.CreateUnstyled());
         }
 
         return element;

@@ -720,12 +720,177 @@ public sealed class XmppStreamClient : IAsyncDisposable
         XmppAddress service,
         TimeSpan timeout,
         string id = "pubsub-create-1",
+        XElement? configureForm = null,
         CancellationToken cancellationToken = default)
     {
         return SendIqAndWaitAsync(
-            XmppPubSub.CreateCreateNodeRequest(id, node, service),
+            XmppPubSub.CreateCreateNodeRequest(id, node, service, configureForm),
             timeout,
             cancellationToken);
+    }
+
+    public Task PublishPubSubItemAsync(
+        string node,
+        XmppAddress service,
+        XElement payload,
+        TimeSpan timeout,
+        string? itemId = null,
+        string id = "pubsub-publish-1",
+        CancellationToken cancellationToken = default)
+    {
+        return SendIqAndWaitAsync(
+            XmppPubSub.CreatePublishRequest(id, node, itemId, payload, service),
+            timeout,
+            cancellationToken);
+    }
+
+    public Task RetractPubSubItemAsync(
+        string node,
+        XmppAddress service,
+        string itemId,
+        TimeSpan timeout,
+        bool notify = true,
+        string id = "pubsub-retract-1",
+        CancellationToken cancellationToken = default)
+    {
+        return SendIqAndWaitAsync(
+            XmppPubSub.CreateRetractRequest(id, node, itemId, notify, service),
+            timeout,
+            cancellationToken);
+    }
+
+    public async Task<XmppPersonalEventNodeItems> RequestPubSubItemsAsync(
+        string node,
+        XmppAddress service,
+        TimeSpan timeout,
+        string? itemId = null,
+        int? maxItems = null,
+        string id = "pubsub-items-1",
+        CancellationToken cancellationToken = default)
+    {
+        var result = await SendIqAndWaitAsync(
+            XmppPubSub.CreateItemsRequest(id, node, service, itemId, maxItems),
+            timeout,
+            cancellationToken).ConfigureAwait(false);
+
+        if (XmppPersonalEventing.TryParseItemsResult(result, out var items) && items is not null)
+        {
+            return items;
+        }
+
+        throw new XmppProtocolException(
+            XmppProtocolErrorKind.IqError,
+            "The PubSub response was not a valid items result.",
+            result.Payload);
+    }
+
+    public Task DeletePubSubNodeAsync(
+        string node,
+        XmppAddress service,
+        TimeSpan timeout,
+        string id = "pubsub-delete-1",
+        CancellationToken cancellationToken = default)
+    {
+        return SendIqAndWaitAsync(
+            XmppPubSub.CreateDeleteNodeRequest(id, node, service),
+            timeout,
+            cancellationToken);
+    }
+
+    public Task PurgePubSubNodeAsync(
+        string node,
+        XmppAddress service,
+        TimeSpan timeout,
+        string id = "pubsub-purge-1",
+        CancellationToken cancellationToken = default)
+    {
+        return SendIqAndWaitAsync(
+            XmppPubSub.CreatePurgeNodeRequest(id, node, service),
+            timeout,
+            cancellationToken);
+    }
+
+    public async Task<XmppDataForm> RequestPubSubNodeConfigurationAsync(
+        string node,
+        XmppAddress service,
+        TimeSpan timeout,
+        string id = "pubsub-config-1",
+        CancellationToken cancellationToken = default)
+    {
+        var result = await SendIqAndWaitAsync(
+            XmppPubSub.CreateConfigurationRequest(id, node, service),
+            timeout,
+            cancellationToken).ConfigureAwait(false);
+
+        if (XmppPubSub.TryParseConfigurationResult(result, out var form) && form is not null)
+        {
+            return form;
+        }
+
+        throw new XmppProtocolException(
+            XmppProtocolErrorKind.IqError,
+            "The PubSub response was not a valid node configuration form.",
+            result.Payload);
+    }
+
+    public Task ConfigurePubSubNodeAsync(
+        string node,
+        XmppAddress service,
+        XElement configureForm,
+        TimeSpan timeout,
+        string id = "pubsub-config-submit-1",
+        CancellationToken cancellationToken = default)
+    {
+        return SendIqAndWaitAsync(
+            XmppPubSub.CreateConfigureNodeRequest(id, node, configureForm, service),
+            timeout,
+            cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<XmppPubSubSubscription>> RequestPubSubSubscriptionsAsync(
+        XmppAddress service,
+        TimeSpan timeout,
+        string? node = null,
+        string id = "pubsub-subscriptions-1",
+        CancellationToken cancellationToken = default)
+    {
+        var result = await SendIqAndWaitAsync(
+            XmppPubSub.CreateSubscriptionsRequest(id, node, service),
+            timeout,
+            cancellationToken).ConfigureAwait(false);
+
+        if (XmppPubSub.TryParseSubscriptionsResult(result, out var subscriptions))
+        {
+            return subscriptions;
+        }
+
+        throw new XmppProtocolException(
+            XmppProtocolErrorKind.IqError,
+            "The PubSub response was not a valid subscriptions result.",
+            result.Payload);
+    }
+
+    public async Task<IReadOnlyList<XmppPubSubAffiliation>> RequestPubSubAffiliationsAsync(
+        XmppAddress service,
+        TimeSpan timeout,
+        string? node = null,
+        string id = "pubsub-affiliations-1",
+        CancellationToken cancellationToken = default)
+    {
+        var result = await SendIqAndWaitAsync(
+            XmppPubSub.CreateAffiliationsRequest(id, node, service),
+            timeout,
+            cancellationToken).ConfigureAwait(false);
+
+        if (XmppPubSub.TryParseAffiliationsResult(result, out var affiliations))
+        {
+            return affiliations;
+        }
+
+        throw new XmppProtocolException(
+            XmppProtocolErrorKind.IqError,
+            "The PubSub response was not a valid affiliations result.",
+            result.Payload);
     }
 
     public Task PublishAnnouncementAsync(
@@ -763,6 +928,52 @@ public sealed class XmppStreamClient : IAsyncDisposable
         throw new XmppProtocolException(
             XmppProtocolErrorKind.IqError,
             "The announcement response was not a valid XEP-0060 items result.",
+            result.Payload);
+    }
+
+    public async Task<XmppDataForm> RequestPublicChannelSearchFormAsync(
+        XmppAddress searchService,
+        TimeSpan timeout,
+        string id = "channel-search-form-1",
+        CancellationToken cancellationToken = default)
+    {
+        var result = await SendIqAndWaitAsync(
+            XmppPublicChannelSearch.CreateSearchFormRequest(id, searchService),
+            timeout,
+            cancellationToken).ConfigureAwait(false);
+
+        if (XmppPublicChannelSearch.TryParseSearchForm(result, out var form) && form is not null)
+        {
+            return form;
+        }
+
+        throw new XmppProtocolException(
+            XmppProtocolErrorKind.IqError,
+            "The public channel search response was not a valid XEP-0433 search form.",
+            result.Payload);
+    }
+
+    public async Task<XmppPublicChannelSearchResult> SearchPublicChannelsAsync(
+        XmppAddress searchService,
+        XmppPublicChannelSearchQuery query,
+        TimeSpan timeout,
+        XmppResultSetRequest? paging = null,
+        string id = "channel-search-1",
+        CancellationToken cancellationToken = default)
+    {
+        var result = await SendIqAndWaitAsync(
+            XmppPublicChannelSearch.CreateSearchRequest(id, searchService, query, paging),
+            timeout,
+            cancellationToken).ConfigureAwait(false);
+
+        if (XmppPublicChannelSearch.TryParseSearchResult(result, out var searchResult) && searchResult is not null)
+        {
+            return searchResult;
+        }
+
+        throw new XmppProtocolException(
+            XmppProtocolErrorKind.IqError,
+            "The public channel search response was not a valid XEP-0433 result.",
             result.Payload);
     }
 

@@ -15,7 +15,7 @@ they fit together when a client claims to support Total Conversation.
 | Type | Standards Track / Profile |
 | Namespace | `urn:xmpp:total-conversation:0` |
 | Author | Edward Tie, `info@tiedragon.com` |
-| Draft date | 2026-05-31 |
+| Draft date | 2026-06-01 |
 
 ## Abstract
 
@@ -26,6 +26,13 @@ experience.
 
 It composes existing XMPP RFCs and XEPs, plus the ProtoXEPs for Jingle
 synchronized real-time text and Jingle user location.
+
+This profile is intentionally not a codec specification. Codec-specific XEPs
+such as XEP-0266 and XEP-0299 describe implementation considerations for audio
+and video codecs in Jingle RTP sessions. Total Conversation describes the
+conversation contract above those codecs: which media and context streams belong
+together, how they are discovered, how fallback is exposed and how assistive
+text/location state is bound to the same user-visible session.
 
 ## Problem Statement
 
@@ -58,6 +65,36 @@ can support:
 
 The profile is not a new media codec, account system, encryption system or
 emergency-services standard.
+
+## Relationship To Codec XEPs
+
+Jingle RTP already has codec guidance:
+
+| Protocol | Scope | Relevance to this profile |
+| --- | --- | --- |
+| XEP-0266 | Audio codecs for Jingle RTP | Useful background for audio interoperability, but browser/WebRTC deployments normally rely on the WebRTC stack to negotiate Opus and legacy PCMA/PCMU where available. |
+| XEP-0299 | Video codecs for Jingle RTP | Historical/deferred video-codec guidance. Modern browser/WebRTC deployments negotiate video codecs through the WebRTC stack and SDP/Jingle translation rather than through a Total Conversation-specific codec registry. |
+
+Those documents do not solve the Total Conversation problem by themselves.
+Audio and video codecs say how media is encoded; they do not say that live
+typed text, captions, interpreter text, file transfer and call-scoped location
+belong to the same session.
+
+For this profile:
+
+- audio codec negotiation is delegated to XEP-0167/WebRTC/RTP and deployment
+  policy, with Opus preferred for modern clients;
+- legacy audio codecs such as PCMA/PCMU are gateway concerns for SIP/PSTN/NG112
+  interoperability, not a new client-side codec engine requirement;
+- video codec negotiation is delegated to XEP-0167/WebRTC/RTP and deployment
+  policy;
+- real-time text is not covered by Opus or video codecs and therefore needs an
+  explicit Jingle text binding, preferably T.140/RFC 4103 for strict RTP
+  interoperability or a clearly declared WebRTC datachannel/T.140 profile for
+  browser deployments.
+
+This is the reason the Jingle synchronized real-time text ProtoXEP remains
+necessary even when audio and video codec negotiation already works.
 
 ## Normative Building Blocks
 
@@ -400,6 +437,25 @@ need to know whether text is:
 
 The profile should support keyboard operation, screen readers, high contrast
 modes, captions, sign-language video, live text and clear fallback warnings.
+
+Implementations that expose a Total Conversation user interface should treat
+WCAG 2.2 Level AA as the practical web/mobile accessibility target and should
+consider EN 301 549 as the broader European ICT accessibility reference. This
+profile does not itself certify compliance, but it expects implementations to
+make negotiated media state, fallback state, caption source, location sharing
+and call controls perceivable, operable and understandable.
+
+In particular, a Total Conversation implementation should provide:
+
+- keyboard-operable call, text, media, file and location controls;
+- visible and programmatically exposed state for audio, video, RTT, captions,
+  mute, hold, fallback and location sharing;
+- text alternatives or accessible names for icon-only controls;
+- focus order that follows the conversation flow;
+- sufficient contrast for text, controls, status indicators and live captions;
+- fallback warnings that do not rely on color alone;
+- consent prompts before camera, microphone, location, file sharing or
+  third-party relay/ASR/interpreter services are activated.
 
 ## Relationship To Emergency Services
 

@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TeleTypTel Development Status</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --blue: #2563eb;
+      --line: #bfd4f5;
+      --panel: rgba(255, 255, 255, .88);
+      --soft: #eef5ff;
+      --text: #071526;
+      --muted: #52647d;
+      --good: #16a34a;
+      --warn: #b45309;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: #eef2f7;
+      color: var(--text);
+      font-family: "Segoe UI", system-ui, sans-serif;
+    }
+
+    main {
+      display: grid;
+      gap: 18px;
+      width: min(1120px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 28px 0 40px;
+    }
+
+    header {
+      display: grid;
+      gap: 8px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--panel);
+      padding: 18px;
+    }
+
+    h1,
+    h2 {
+      margin: 0;
+      color: #08306f;
+    }
+
+    p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 10px;
+    }
+
+    .summary-card,
+    .section {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--panel);
+      padding: 14px;
+    }
+
+    .summary-card {
+      display: grid;
+      gap: 4px;
+    }
+
+    .summary-card strong {
+      color: var(--blue);
+      font-size: 30px;
+      line-height: 1;
+    }
+
+    .summary-card span {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .protocol-list {
+      display: grid;
+      gap: 8px;
+      margin: 12px 0 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .protocol-list li {
+      display: grid;
+      grid-template-columns: 28px minmax(120px, 180px) minmax(0, 1fr);
+      gap: 10px;
+      align-items: start;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      background: var(--soft);
+      padding: 9px 10px;
+    }
+
+    .mark {
+      display: inline-grid;
+      place-items: center;
+      width: 22px;
+      height: 22px;
+      border-radius: 999px;
+      font-weight: 800;
+    }
+
+    .done .mark {
+      background: rgba(22, 163, 74, .14);
+      color: var(--good);
+    }
+
+    .open .mark {
+      background: rgba(180, 83, 9, .14);
+      color: var(--warn);
+    }
+
+    .label {
+      font-weight: 800;
+      color: #08306f;
+    }
+
+    .desc {
+      color: #23364f;
+    }
+
+    @media (max-width: 720px) {
+      .protocol-list li {
+        grid-template-columns: 28px minmax(0, 1fr);
+      }
+
+      .desc {
+        grid-column: 2;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>TeleTypTel Development Status</h1>
+      <p>Protocoloverzicht voor ontwikkelaars, testers en presentatie. Dit is de zichtbare lijst van XMPP RFCs, XEPs en TeleTypTel ProtoXEP-werk in deze software.</p>
+    </header>
+
+    <section class="summary" id="summary" aria-label="Protocol summary"></section>
+
+    <section class="section">
+      <h2>XMPP / XEP Vinkenlijst</h2>
+      <ul class="protocol-list" id="protocolList"></ul>
+    </section>
+  </main>
+
+  <script>
+    const protocols = [
+      [true, "RFC 6120/6121", "XMPP Core, Instant Messaging and Presence"],
+      [true, "RFC 7395", "XMPP over WebSocket"],
+      [true, "RFC 7590", "TLS for XMPP"],
+      [true, "RFC 7622", "XMPP Address Format"],
+      [true, "XEP-0030", "Service Discovery"],
+      [true, "XEP-0045", "Multi-User Chat helpers"],
+      [true, "XEP-0047", "In-Band Bytestreams"],
+      [true, "XEP-0048", "Bookmarks"],
+      [true, "XEP-0049", "Private XML Storage"],
+      [true, "XEP-0050", "Ad-Hoc Commands"],
+      [true, "XEP-0060", "Publish-Subscribe / provider news"],
+      [true, "XEP-0065", "SOCKS5 Bytestreams"],
+      [true, "XEP-0066", "Out of Band Data fallback for file links"],
+      [true, "XEP-0077", "In-Band Registration"],
+      [true, "XEP-0080", "User Location / GPS sharing"],
+      [true, "XEP-0084", "User Avatars"],
+      [true, "XEP-0085", "Chat State Notifications"],
+      [true, "XEP-0133", "Service Administration helpers"],
+      [true, "XEP-0157", "Contact Addresses for XMPP Services"],
+      [true, "XEP-0163", "Personal Eventing Protocol helpers"],
+      [true, "XEP-0166", "Jingle"],
+      [true, "XEP-0167", "Jingle RTP Sessions"],
+      [true, "XEP-0176", "Jingle ICE-UDP Transport"],
+      [true, "XEP-0184", "Message Delivery Receipts"],
+      [true, "XEP-0191", "Blocking Command"],
+      [true, "XEP-0198", "Stream Management"],
+      [true, "XEP-0215", "External Service Discovery / STUN-TURN"],
+      [true, "XEP-0223", "Persistent Private Data via PubSub"],
+      [true, "XEP-0234", "Jingle File Transfer"],
+      [true, "XEP-0260", "Jingle SOCKS5 Bytestreams Transport"],
+      [true, "XEP-0261", "Jingle In-Band Bytestreams Transport"],
+      [true, "XEP-0280", "Message Carbons"],
+      [true, "XEP-0301", "In-Band Real Time Text"],
+      [true, "XEP-0308", "Last Message Correction"],
+      [true, "XEP-0313", "Message Archive Management"],
+      [true, "XEP-0320", "DTLS-SRTP in Jingle Sessions"],
+      [true, "XEP-0353", "Jingle Message Initiation"],
+      [true, "XEP-0363", "HTTP File Upload"],
+      [true, "XEP-0368", "SRV records for XMPP over TLS"],
+      [true, "XEP-0384", "OMEMO wire/helper boundary"],
+      [true, "XEP-0385", "Stateless Inline Media Sharing"],
+      [true, "XEP-0392", "Consistent Color Generation"],
+      [true, "XEP-0393", "Message Styling"],
+      [true, "XEP-0402", "PEP Native Bookmarks"],
+      [true, "XEP-0410", "MUC Self-Ping"],
+      [true, "XEP-0424", "Message Retraction"],
+      [true, "XEP-0425", "Message Moderation"],
+      [true, "ProtoXEP RTT Sync", "Jingle co-session realtime text channel"],
+      [true, "ProtoXEP Jingle Location", "Synchronized location in Total Conversation"],
+      [false, "XEP-0433", "Extended Channel Search"]
+    ];
+
+    function countBy(predicate) {
+      return protocols.filter(predicate).length;
+    }
+
+    const summaryRows = [
+      ["Totaal", protocols.length],
+      ["Klaar", countBy(([done]) => done)],
+      ["Open", countBy(([done]) => !done)],
+      ["XEPs", countBy(([, label]) => label.startsWith("XEP-"))],
+      ["RFCs", countBy(([, label]) => label.startsWith("RFC "))],
+      ["ProtoXEPs", countBy(([, label]) => label.startsWith("ProtoXEP"))]
+    ];
+
+    const summary = document.getElementById("summary");
+    for (const [label, value] of summaryRows) {
+      const card = document.createElement("div");
+      card.className = "summary-card";
+      card.innerHTML = `<strong>${value}</strong><span>${label}</span>`;
+      summary.appendChild(card);
+    }
+
+    const list = document.getElementById("protocolList");
+    for (const [done, label, description] of protocols) {
+      const item = document.createElement("li");
+      item.className = done ? "done" : "open";
+      item.innerHTML = `<span class="mark">${done ? "✓" : "□"}</span><span class="label"></span><span class="desc"></span>`;
+      item.querySelector(".label").textContent = label;
+      item.querySelector(".desc").textContent = description;
+      list.appendChild(item);
+    }
+  </script>
+</body>
+</html>
