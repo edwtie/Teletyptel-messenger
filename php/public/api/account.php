@@ -160,11 +160,12 @@ function loginAccount(array $input): void
                 'jid' => $jid,
                 'password' => $password,
                 'rememberPassword' => false,
-                'xmppHost' => cleanText($input['xmppHost'] ?? domainFromJid($jid), 255),
-                'xmppDomain' => cleanText($input['xmppDomain'] ?? domainFromJid($jid), 255),
-                'xmppPort' => 5222,
-                'xmppTlsMode' => 'websocket',
-                'xmppWebSocket' => 'wss://localhost:5443/websocket/',
+                'relayWebSocket' => cleanText($input['relayWebSocket'] ?? ($row['relay_websocket'] ?? 'ws://127.0.0.1:8787'), 255),
+                'xmppHost' => cleanText($input['xmppHost'] ?? ($row['xmpp_host'] ?? domainFromJid($jid)), 255),
+                'xmppDomain' => cleanText($input['xmppDomain'] ?? ($row['xmpp_domain'] ?? domainFromJid($jid)), 255),
+                'xmppPort' => (int)($input['xmppPort'] ?? ($row['xmpp_port'] ?? 5222)),
+                'xmppTlsMode' => cleanText($input['xmppTlsMode'] ?? ($row['xmpp_tls_mode'] ?? 'starttls'), 32),
+                'xmppWebSocket' => cleanText($input['xmppWebSocket'] ?? ($row['xmpp_websocket'] ?? 'ws://127.0.0.1:8787'), 255),
             ], is_array($row) ? $row : null);
             persistAccount($pdo, $account);
             $statement = $pdo->prepare('SELECT * FROM account_profiles WHERE account_id = :account_id');
@@ -243,8 +244,9 @@ function createAccount(array $input): void
         'xmppHost' => $domain,
         'xmppDomain' => $domain,
         'xmppPort' => 5222,
-        'xmppTlsMode' => 'websocket',
-        'xmppWebSocket' => 'wss://localhost:5443/websocket/',
+        'xmppTlsMode' => cleanText($input['xmppTlsMode'] ?? 'starttls', 32),
+        'xmppWebSocket' => cleanText($input['xmppWebSocket'] ?? 'ws://127.0.0.1:8787', 255),
+        'relayWebSocket' => cleanText($input['relayWebSocket'] ?? 'ws://127.0.0.1:8787', 255),
     ]));
 }
 
@@ -353,8 +355,9 @@ function resetPassword(array $input): void
             'xmppHost' => domainFromJid($jid),
             'xmppDomain' => domainFromJid($jid),
             'xmppPort' => 5222,
-            'xmppTlsMode' => 'websocket',
-            'xmppWebSocket' => 'wss://localhost:5443/websocket/',
+            'xmppTlsMode' => 'starttls',
+            'xmppWebSocket' => 'ws://127.0.0.1:8787',
+            'relayWebSocket' => 'ws://127.0.0.1:8787',
         ], null);
         persistAccount($pdo, $account);
         $existing = findExistingAccount($pdo, ['jid' => $jid]);

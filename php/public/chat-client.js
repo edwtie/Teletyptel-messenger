@@ -2214,7 +2214,7 @@
     try {
       const wasGateRequired = state.accountGateRequired;
       applyAccountDialogToControls({ requirePassword: wasGateRequired });
-      const result = await saveAccountProfile();
+      const result = await saveAccountProfile(wasGateRequired ? "login" : "save");
       await loadLanguage(el.languageInput.value);
       el.dialogAccountStatus.textContent = accountDialogStatusText("account.database_saved", "Server account saved");
       syncAccountDialogFromControls();

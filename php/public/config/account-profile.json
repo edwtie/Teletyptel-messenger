@@ -11,10 +11,10 @@
   "liveRttEnabled": true,
   "showSmileys": true,
   "relayWebSocket": "ws://127.0.0.1:8787",
-  "xmppWebSocket": "wss://localhost:5443/websocket/",
+  "xmppWebSocket": "ws://127.0.0.1:8787",
   "xmppHost": "localhost",
   "xmppPort": 5222,
   "xmppDomain": "localhost",
-  "xmppTlsMode": "websocket",
+  "xmppTlsMode": "starttls",
   "peer": "relay@localhost"
 }
