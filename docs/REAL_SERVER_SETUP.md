@@ -14,8 +14,8 @@ Erlang/OTP, supports distributed deployments, has broad XMPP server modules and
 documents SIP support through `ejabberd_sip` and `mod_sip`.
 
 Use Prosody and Openfire as useful interoperability targets, but start serious
-provider smoke work with ejabberd when SIP, STUN/TURN, WebSocket/BOSH, MUC,
-MAM, upload and database integration need to be tested together.
+provider smoke work with ejabberd when SIP, STUN/TURN discovery, WebSocket/BOSH,
+MUC, MAM, upload and database integration need to be tested together.
 
 Important: ejabberd SIP support still requires explicit listener, module, DNS,
 TLS and firewall configuration. Treat SIP as a gateway layer for telephony and

@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" viewBox="0 0 1200 760" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="820" viewBox="0 0 1200 820" role="img" aria-labelledby="title desc">
   <title id="title">TeleTypTel netwerk- en lagenoverzicht</title>
-  <desc id="desc">Eenvoudige laagtekening met gebruikers, TeleTypTel client, web/API-laag, ejabberd XMPP-server, media/TURN, SIP-gateway en externe telefonie of relay-diensten.</desc>
+  <desc id="desc">Eenvoudige laagtekening met gebruikers, TeleTypTel client, web/API-laag, ejabberd XMPP-server, media, NAT, STUN/TURN, SIP-gateway en externe telefonie of relay-diensten.</desc>
   <defs>
     <style>
       .bg { fill: #f6f9fc; }
@@ -31,7 +31,7 @@
     </marker>
   </defs>
 
-  <rect class="bg" width="1200" height="760" />
+  <rect class="bg" width="1200" height="820" />
 
   <text class="title" x="46" y="56">TeleTypTel netwerk- en lagenoverzicht</text>
   <text class="subtitle" x="46" y="84">Merk van Tiedragon Labs en Tiedragon. Open communicatie met XMPP, WebRTC en optionele SIP-gateway.</text>
@@ -78,26 +78,26 @@
   <text class="box-text" x="122" y="561">Stabiele providerroute</text>
   <text class="box-text" x="122" y="583">Roster, MUC, MAM, PubSub/PEP</text>
 
-  <rect class="box-blue" x="458" y="500" rx="10" width="245" height="110" />
-  <text class="box-title" x="488" y="535">Media en NAT</text>
+  <rect class="box-blue" x="458" y="500" rx="10" width="260" height="110" />
+  <text class="box-title" x="488" y="535">Media, NAT en TURN</text>
   <text class="box-text" x="488" y="561">WebRTC audio/video</text>
-  <text class="box-text" x="488" y="583">STUN/TURN voor bereikbaarheid</text>
+  <text class="box-text" x="488" y="583">STUN/TURN via XMPP discovery</text>
 
   <rect class="box-orange" x="782" y="500" rx="10" width="300" height="110" />
   <text class="box-title" x="812" y="535">SIP-gateway</text>
   <text class="box-text" x="812" y="561">ejabberd_sip / mod_sip of extern</text>
   <text class="box-text" x="812" y="583">Telefonie, relay en providerkoppeling</text>
 
-  <text class="band-title" x="46" y="652">EXTERNE DIENSTEN</text>
-  <line class="layer-line" x1="46" y1="664" x2="1154" y2="664" />
-  <rect class="box-red" x="136" y="688" rx="10" width="230" height="50" />
-  <text class="box-title" x="166" y="721">Telefonie / PBX</text>
+  <text class="band-title" x="46" y="662">EXTERNE DIENSTEN</text>
+  <line class="layer-line" x1="46" y1="674" x2="1154" y2="674" />
+  <rect class="box-red" x="136" y="700" rx="10" width="230" height="50" />
+  <text class="box-title" x="166" y="733">Telefonie / PBX</text>
 
-  <rect class="box-red" x="486" y="688" rx="10" width="230" height="50" />
-  <text class="box-title" x="516" y="721">Relay / tolkdienst</text>
+  <rect class="box-red" x="486" y="700" rx="10" width="230" height="50" />
+  <text class="box-title" x="516" y="733">Relay / tolkdienst</text>
 
-  <rect class="box-red" x="836" y="688" rx="10" width="230" height="50" />
-  <text class="box-title" x="866" y="721">112 / NG112 lab</text>
+  <rect class="box-red" x="836" y="700" rx="10" width="230" height="50" />
+  <text class="box-title" x="866" y="733">112 / NG112 lab</text>
 
   <path class="arrow" d="M189 240 L250 318" />
   <path class="arrow" d="M469 240 L382 318" />
@@ -108,13 +108,13 @@
   <path class="arrow" d="M662 420 L588 498" />
   <path class="arrow-soft" d="M990 420 L944 498" />
   <path class="arrow" d="M377 555 L456 555" />
-  <path class="arrow" d="M703 555 L780 555" />
+  <path class="arrow" d="M718 555 L780 555" />
 
-  <path class="arrow-soft" d="M916 610 L278 686" />
-  <path class="arrow-soft" d="M932 610 L600 686" />
-  <path class="arrow-soft" d="M960 610 L944 686" />
+  <path class="arrow-soft" d="M916 610 L278 698" />
+  <path class="arrow-soft" d="M932 610 L600 698" />
+  <path class="arrow-soft" d="M960 610 L944 698" />
 
-  <rect class="pill" x="46" y="708" rx="6" width="70" height="24" />
-  <text class="pill-text" x="62" y="725">NU</text>
-  <text class="small" x="126" y="725">Doorgetrokken pijlen zijn huidige kernrichting. Gestippelde pijlen zijn gateway- en groeirichting.</text>
+  <rect class="pill" x="46" y="780" rx="6" width="70" height="24" />
+  <text class="pill-text" x="62" y="797">NU</text>
+  <text class="small" x="126" y="797">Doorgetrokken pijlen zijn huidige kernrichting. Gestippelde pijlen zijn gateway- en groeirichting.</text>
 </svg>

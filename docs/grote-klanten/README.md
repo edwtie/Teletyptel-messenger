@@ -65,15 +65,15 @@ klanten horen te kijken naar een geharde serveropstelling met:
 - WebSocket/BOSH of reverse proxy voor webclients;
 - opslag voor accounts, roster, berichten en bestanden;
 - uploadservice voor foto's, documenten en media;
-- STUN/TURN voor audio/video;
+- STUN/TURN voor audio/video, ontdekt via XMPP server discovery;
 - logging, monitoring, back-up en abusebeleid;
 - optionele ejabberd SIP-route of externe gateway naar telefonie en
   relay-diensten.
 
 ejabberd is hier gekozen vanwege stabiliteit en schaalbaarheid. Het heeft ook
 SIP-ondersteuning via `ejabberd_sip` en `mod_sip`, waardoor dezelfde
-serverrichting geschikt is voor XMPP, WebSocket/BOSH, STUN/TURN, databaseopslag
-en telefonieonderzoek. SIP blijft wel een gatewaylaag die apart moet worden
+serverrichting geschikt is voor XMPP, WebSocket/BOSH, STUN/TURN-discovery,
+databaseopslag en telefonieonderzoek. SIP blijft wel een gatewaylaag die apart moet worden
 geconfigureerd en getest; de browserclient hoort dit niet zelf te dragen.
 
 ## Open standaarden

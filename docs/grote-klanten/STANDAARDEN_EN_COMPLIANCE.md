@@ -52,7 +52,8 @@ Gebruik in TeleTypTel:
 - camera- en microfoonkeuze;
 - mute, camera aan/uit en volume;
 - datachannel-richting voor live tekst tijdens Total Conversation;
-- STUN/TURN voor bereikbaarheid achter NAT/firewalls.
+- STUN/TURN voor bereikbaarheid achter NAT/firewalls, bij voorkeur ontdekt via
+  XMPP server discovery.
 
 Voor productie is TURN belangrijk. Zonder goede TURN-server kunnen gesprekken
 falen bij bedrijfsnetwerken, mobiele netwerken of strenge firewalls.
