@@ -1,0 +1,120 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" viewBox="0 0 1200 760" role="img" aria-labelledby="title desc">
+  <title id="title">TeleTypTel netwerk- en lagenoverzicht</title>
+  <desc id="desc">Eenvoudige laagtekening met gebruikers, TeleTypTel client, web/API-laag, ejabberd XMPP-server, media/TURN, SIP-gateway en externe telefonie of relay-diensten.</desc>
+  <defs>
+    <style>
+      .bg { fill: #f6f9fc; }
+      .title { fill: #07346f; font: 700 34px Arial, sans-serif; }
+      .subtitle { fill: #385277; font: 16px Arial, sans-serif; }
+      .band-title { fill: #07346f; font: 700 15px Arial, sans-serif; letter-spacing: .06em; }
+      .box-title { fill: #082447; font: 700 19px Arial, sans-serif; }
+      .box-text { fill: #27415f; font: 14px Arial, sans-serif; }
+      .small { fill: #4b6484; font: 12px Arial, sans-serif; }
+      .layer-line { stroke: #c8d8ea; stroke-width: 2; }
+      .arrow { stroke: #2367b1; stroke-width: 3; fill: none; marker-end: url(#arrow); }
+      .arrow-soft { stroke: #7894b5; stroke-width: 3; fill: none; stroke-dasharray: 8 8; marker-end: url(#arrow-soft); }
+      .box-blue { fill: #e7f1ff; stroke: #2d7eea; stroke-width: 2; }
+      .box-navy { fill: #143c6a; stroke: #0c2443; stroke-width: 2; }
+      .box-navy-text { fill: #ffffff; font: 700 19px Arial, sans-serif; }
+      .box-navy-small { fill: #dcecff; font: 13px Arial, sans-serif; }
+      .box-green { fill: #e8f7ed; stroke: #20a05a; stroke-width: 2; }
+      .box-orange { fill: #fff6df; stroke: #d89500; stroke-width: 2; }
+      .box-red { fill: #fff0f0; stroke: #db4d4d; stroke-width: 2; }
+      .pill { fill: #0f74d8; }
+      .pill-text { fill: #ffffff; font: 700 13px Arial, sans-serif; }
+    </style>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
+      <path d="M2,2 L10,6 L2,10 Z" fill="#2367b1" />
+    </marker>
+    <marker id="arrow-soft" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
+      <path d="M2,2 L10,6 L2,10 Z" fill="#7894b5" />
+    </marker>
+  </defs>
+
+  <rect class="bg" width="1200" height="760" />
+
+  <text class="title" x="46" y="56">TeleTypTel netwerk- en lagenoverzicht</text>
+  <text class="subtitle" x="46" y="84">Merk van Tiedragon Labs en Tiedragon. Open communicatie met XMPP, WebRTC en optionele SIP-gateway.</text>
+
+  <text class="band-title" x="46" y="128">GEBRUIKERS EN APPS</text>
+  <line class="layer-line" x1="46" y1="140" x2="1154" y2="140" />
+  <rect class="box-blue" x="74" y="162" rx="10" width="230" height="78" />
+  <text class="box-title" x="104" y="196">Web browser</text>
+  <text class="box-text" x="104" y="219">Chrome, Edge, Firefox</text>
+
+  <rect class="box-blue" x="354" y="162" rx="10" width="230" height="78" />
+  <text class="box-title" x="384" y="196">Windows app</text>
+  <text class="box-text" x="384" y="219">WebView2 en C# tooling</text>
+
+  <rect class="box-blue" x="634" y="162" rx="10" width="230" height="78" />
+  <text class="box-title" x="664" y="196">Android / iOS</text>
+  <text class="box-text" x="664" y="219">Toekomstige app shells</text>
+
+  <rect class="box-green" x="914" y="162" rx="10" width="220" height="78" />
+  <text class="box-title" x="944" y="196">Gebruikershulp</text>
+  <text class="box-text" x="944" y="219">RTT, captions, tolk, locatie</text>
+
+  <text class="band-title" x="46" y="282">TELETYPTEL PRODUCTLAAG</text>
+  <line class="layer-line" x1="46" y1="294" x2="1154" y2="294" />
+  <rect class="box-navy" x="124" y="320" rx="10" width="315" height="100" />
+  <text class="box-navy-text" x="154" y="354">TeleTypTel webclient</text>
+  <text class="box-navy-small" x="154" y="380">Chat, contacten, Total Conversation</text>
+  <text class="box-navy-small" x="154" y="402">Bestanden, locatie, avatar, thema</text>
+
+  <rect class="box-blue" x="512" y="320" rx="10" width="300" height="100" />
+  <text class="box-title" x="542" y="354">PHP web/API-laag</text>
+  <text class="box-text" x="542" y="380">Accounts, profiel, database</text>
+  <text class="box-text" x="542" y="402">PHP XMPP-library zonder .NET</text>
+
+  <rect class="box-orange" x="878" y="320" rx="10" width="220" height="100" />
+  <text class="box-title" x="908" y="354">C# tools</text>
+  <text class="box-text" x="908" y="380">Smoke tests, LocalServer</text>
+  <text class="box-text" x="908" y="402">Desktop en validatie</text>
+
+  <text class="band-title" x="46" y="462">SERVER EN MEDIA</text>
+  <line class="layer-line" x1="46" y1="474" x2="1154" y2="474" />
+  <rect class="box-green" x="92" y="500" rx="10" width="285" height="110" />
+  <text class="box-title" x="122" y="535">ejabberd XMPP-server</text>
+  <text class="box-text" x="122" y="561">Stabiele providerroute</text>
+  <text class="box-text" x="122" y="583">Roster, MUC, MAM, PubSub/PEP</text>
+
+  <rect class="box-blue" x="458" y="500" rx="10" width="245" height="110" />
+  <text class="box-title" x="488" y="535">Media en NAT</text>
+  <text class="box-text" x="488" y="561">WebRTC audio/video</text>
+  <text class="box-text" x="488" y="583">STUN/TURN voor bereikbaarheid</text>
+
+  <rect class="box-orange" x="782" y="500" rx="10" width="300" height="110" />
+  <text class="box-title" x="812" y="535">SIP-gateway</text>
+  <text class="box-text" x="812" y="561">ejabberd_sip / mod_sip of extern</text>
+  <text class="box-text" x="812" y="583">Telefonie, relay en providerkoppeling</text>
+
+  <text class="band-title" x="46" y="652">EXTERNE DIENSTEN</text>
+  <line class="layer-line" x1="46" y1="664" x2="1154" y2="664" />
+  <rect class="box-red" x="136" y="688" rx="10" width="230" height="50" />
+  <text class="box-title" x="166" y="721">Telefonie / PBX</text>
+
+  <rect class="box-red" x="486" y="688" rx="10" width="230" height="50" />
+  <text class="box-title" x="516" y="721">Relay / tolkdienst</text>
+
+  <rect class="box-red" x="836" y="688" rx="10" width="230" height="50" />
+  <text class="box-title" x="866" y="721">112 / NG112 lab</text>
+
+  <path class="arrow" d="M189 240 L250 318" />
+  <path class="arrow" d="M469 240 L382 318" />
+  <path class="arrow" d="M749 240 L642 318" />
+  <path class="arrow-soft" d="M1024 240 L968 318" />
+
+  <path class="arrow" d="M282 420 L220 498" />
+  <path class="arrow" d="M662 420 L588 498" />
+  <path class="arrow-soft" d="M990 420 L944 498" />
+  <path class="arrow" d="M377 555 L456 555" />
+  <path class="arrow" d="M703 555 L780 555" />
+
+  <path class="arrow-soft" d="M916 610 L278 686" />
+  <path class="arrow-soft" d="M932 610 L600 686" />
+  <path class="arrow-soft" d="M960 610 L944 686" />
+
+  <rect class="pill" x="46" y="708" rx="6" width="70" height="24" />
+  <text class="pill-text" x="62" y="725">NU</text>
+  <text class="small" x="126" y="725">Doorgetrokken pijlen zijn huidige kernrichting. Gestippelde pijlen zijn gateway- en groeirichting.</text>
+</svg>

@@ -47,6 +47,8 @@ Gebruikers
   -> optionele SIP/telefonie/relay-gateway
 ```
 
+![TeleTypTel netwerk- en lagenoverzicht](TELETYPTEL_NETWERK_LAGEN.svg)
+
 De weblaag kan draaien op PHP/Apache of PHP/Nginx. De PHP XMPP-library heeft
 geen .NET 10 nodig. De C# XMPP-library blijft belangrijk voor desktoptools,
 testtools, LocalServer en diepere protocolvalidatie.
