@@ -1,62 +1,67 @@
-# Teletyptel 2.0 Project Page
+# TeleTypTel Project Page
 
-Teletyptel 2.0 is an open XMPP messenger project for accessible real-time
-communication. The Alpha 2 evaluation build focuses on chat, live real-time
-text, WebRTC/Jingle call experiments, file/location sharing experiments and
-repeatable XMPP server smoke testing.
+**TeleTypTel is Total Conversation for everyone.**
 
-The project is built around open protocols rather than a closed messaging
-network. The current codebase contains a web client, PHP relay for local demos,
-C# XMPP protocol core, STARTTLS local server, real-server smoke tool and English
-and Dutch localization files.
+TeleTypTel is an open messenger for accessible everyday communication. It brings
+chat, live text, voice, video, files and location sharing into one familiar
+conversation screen.
 
-## Download
+The product is designed for deaf, hard-of-hearing and hearing users together.
+That is the core idea: no separate communication island, no technical apartheid,
+but one messenger that can be useful for everyone.
+
+## Short Description
+
+TeleTypTel is a browser-first messenger with accessibility built in. It supports
+normal chat, live typed conversation, voice/video conversation, contacts, groups,
+attachments, location sharing, user profiles, avatars, light/dark mode and Dutch
+and English interface text.
+
+The project is developed by Tiedragon as part of a broader accessibility and
+communication direction.
+
+## Product Promise
+
+- One app for text, image, voice and video.
+- Accessible communication without separating users.
+- Familiar messenger behavior for daily use.
+- Open infrastructure for providers and organizations.
+- Ready to grow toward web, Windows, Android and iOS.
+- Designed with future relay, captioning, interpretation and emergency flows in
+  mind.
+
+## Main Features
+
+- Contact list with online/offline status.
+- One-to-one and group conversation direction.
+- Live text during typing.
+- Audio, video and Total Conversation controls.
+- File, photo and location sharing.
+- Interactive map previews.
+- Smiley picker and local media rendering.
+- User profiles with avatar support.
+- Light and dark interface.
+- Dutch and English language files.
+- Local development server and repeatable test tools.
+
+## Why It Matters
+
+Closed messengers are convenient, but they also make users dependent on one
+company and one network. Smaller accessibility-focused services can be fragile
+when they are isolated from everyday communication habits.
+
+TeleTypTel takes a different route: make the accessible option feel like a normal
+modern messenger, then let providers and organizations operate it through open
+infrastructure.
+
+## Download And Source
 
 - Source: https://github.com/edwtie/Tiedragon.XmppMessenger
-- Release: https://github.com/edwtie/Tiedragon.XmppMessenger/releases
+- Releases: https://github.com/edwtie/Tiedragon.XmppMessenger/releases
 
-## Try Alpha 2
+## For Developers
 
-1. Install .NET 10 SDK and PHP 8.1 or newer.
-2. Build and test the repository.
-3. Start `php php/rtt-websocket-server.php`.
-4. Open `php/public/chat.html` in two browser windows.
-5. Sign in with two browser profiles and connect both windows to
-   `ws://127.0.0.1:8787`.
-
-## Current Features
-
-- Local browser chat UI.
-- XEP-0301-style real-time text in the demo relay.
-- RFC 7395 WebSocket framing experiment controls.
-- Light/dark mode.
-- English and Dutch UI language files.
-- Account profile panel with local storage and optional MySQL API.
-- Legacy smiley rendering.
-- C# XMPP core for TLS/SASL/bind/roster/presence/chat and multiple XEP models.
-- STARTTLS local server and real-server smoke tools.
-- LocalServer XEP-0077 registration, optional CAPTCHA, XEP-0313 archive, MUC
-  and XEP-0363 upload smoke paths.
-
-## Standards Direction
-
-- RFC 6120 XMPP Core
-- RFC 6121 Instant Messaging and Presence
-- RFC 7395 XMPP over WebSocket
-- RFC 7590 TLS for XMPP
-- RFC 7622 XMPP Address Format
-- XEP-0030 Service Discovery
-- XEP-0077 In-Band Registration
-- XEP-0085 Chat State Notifications
-- XEP-0184 Message Delivery Receipts
-- XEP-0198 Stream Management
-- XEP-0280 Message Carbons
-- XEP-0301 In-Band Real Time Text
-- XEP-0313 Message Archive Management
-
-## Status
-
-Alpha 2 is for evaluation. It is not yet a production service. The next public
-milestones are a hosted demo instance, production XMPP WebSocket/BOSH endpoint,
-Android/iOS packaging experiments and stronger signed language-package
-delivery.
+Developer setup, server notes, protocol details and implementation checklists are
+kept in the repository documentation. The project page intentionally avoids deep
+technical terminology so it can be reused for public communication, README
+summaries and presentation material.
