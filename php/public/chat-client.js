@@ -7521,8 +7521,10 @@
       && !call.incomingOffer
       && state.totalConversationTextVisible
     );
+    const fullTextMode = visible && isLocalCameraOff(call);
 
-    el.callPanel.classList.toggle("tc-text-full", visible && isLocalCameraOff(call));
+    el.callPanel.classList.toggle("tc-text-full", fullTextMode);
+    document.body.classList.toggle("tc-text-full-active", fullTextMode);
     el.totalConversationTextPanel.hidden = !visible;
     if (!visible) {
       el.totalConversationRemoteText.textContent = "";

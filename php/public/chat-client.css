@@ -1284,6 +1284,11 @@ body.call-active .call-panel {
   min-height: clamp(320px, 48vh, 620px);
 }
 
+body.tc-text-full-active .call-panel {
+  grid-row: 4 / 6;
+  min-height: 0;
+}
+
 .call-panel[hidden] {
   display: none;
 }
@@ -1488,6 +1493,10 @@ body.call-active .call-panel video {
 
 .call-panel.tc-text-full .tc-local-lines p:first-child {
   font-size: clamp(16px, 1.6vw, 24px);
+}
+
+body.tc-text-full-active .message-timeline {
+  display: none;
 }
 
 .message-timeline {
