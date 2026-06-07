@@ -5307,18 +5307,30 @@
       return "Remote";
     }
 
-    const bare = jid.split("/")[0];
-    if (jid === currentFromJid()) {
+    const normalized = normalizeJidInput(jid);
+    const bare = bareJid(normalized);
+    const lowerBare = bare.toLowerCase();
+    if (lowerBare && lowerBare === currentBareJid()) {
       return currentSenderName();
     }
 
-    if (jid.startsWith("ai@") || bare === "ai@localhost") {
+    if (normalized.startsWith("ai@") || lowerBare === "ai@localhost") {
       return "AI agent";
     }
 
-    const local = bare.split("@")[0] || jid;
-    const resource = jid.includes("/") ? jid.split("/").slice(1).join("/") : "";
-    return resource ? `${local}/${resource}` : local;
+    const known = state.conversations.find((conversation) =>
+      conversation.kind === "contact"
+      && addressMatches(conversation.peer, normalized)
+      && conversation.name
+      && conversation.name !== conversation.peer);
+    if (known) {
+      return conversationDisplayName(known);
+    }
+
+    const local = bare.split("@")[0] || normalized;
+    const resource = normalized.includes("/") ? normalized.split("/").slice(1).join("/") : "";
+    const generatedWebResource = /^web(?:-[a-z0-9]+)?$/i.test(resource);
+    return resource && !generatedWebResource ? `${local}/${resource}` : local;
   }
 
   function applyRelayEnvelope(envelope) {
