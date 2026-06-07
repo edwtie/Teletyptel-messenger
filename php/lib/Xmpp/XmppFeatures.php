@@ -56,6 +56,7 @@ final class XmppFeatures
             'XEP-0424 Message Retraction' => 'urn:xmpp:message-retract:1',
             'XEP-0425 Message Moderation' => XmppXml::MODERATION_NS,
             'XEP-0433 Extended Channel Search' => XmppXml::CHANNEL_SEARCH_NS,
+            'XEP-0486 MUC Avatars' => XmppXml::VCARD_TEMP_NS,
             'XEP-0494 Client Access Management' => XmppXml::CLIENT_ACCESS_MANAGEMENT_NS,
             'XEP-0514 Custom Emoji' => XmppXml::EMOJI_MARKUP_NS,
             'ProtoXEP Jingle RTT Sync' => XmppXml::JINGLE_RTT_SYNC_NS,

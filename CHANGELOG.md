@@ -27,8 +27,10 @@
 - PHP helpers for XEP-0050, XEP-0054, XEP-0059, XEP-0060, XEP-0077, XEP-0084,
   XEP-0115, XEP-0124/XEP-0206, XEP-0156, XEP-0157, XEP-0198, XEP-0203,
   XEP-0215, XEP-0245, XEP-0280, XEP-0334, XEP-0352, XEP-0357, XEP-0359,
-  XEP-0385, XEP-0392, XEP-0393, XEP-0424, XEP-0425, XEP-0433, XEP-0494
-  and XEP-0514.
+  XEP-0385, XEP-0392, XEP-0393, XEP-0424, XEP-0425, XEP-0433, XEP-0486,
+  XEP-0494 and XEP-0514.
+- XEP-0486 MUC Avatars support in PHP and C# helpers, plus web UI for
+  choosing and rendering group avatars in the conversation list and header.
 - XEP-0060 provider announcement/news helper with Atom entry publish, item
   retrieval and event-notification parsing.
 - Web attachment menu for photo, video, documents and location sharing, with

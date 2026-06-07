@@ -90,6 +90,7 @@ Normal app flow:
 | `XmppVCardTemp` | XEP-0054 vcard-temp get/set/result helpers. |
 | `XmppUserAvatar` | XEP-0084 avatar data/metadata publish, retrieve and notification helpers. |
 | `XmppVCardAvatar` | XEP-0153 vCard avatar presence update and XEP-0398 PEP-vCard conversion helpers. |
+| `XmppMucAvatar` | XEP-0486 MUC room avatar discovery/hash verification and vCard get/set/remove helpers. |
 | `XmppPushNotifications` | XEP-0357 enable/disable push IQ payloads. |
 
 ## Real-Time Text

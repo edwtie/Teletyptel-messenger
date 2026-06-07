@@ -183,6 +183,7 @@ var tests = new (string Name, Action Test)[]
     ("XMPP multi-user chat discovers rooms and items", XmppMultiUserChatDiscoversRoomsAndItems),
     ("XMPP multi-user chat handles configuration forms", XmppMultiUserChatHandlesConfigurationForms),
     ("XMPP multi-user chat handles admin items", XmppMultiUserChatHandlesAdminItems),
+    ("XMPP MUC avatar handles room vCard avatar", XmppMucAvatarHandlesRoomVCardAvatar),
     ("XMPP MUC self-ping serializes and classifies", XmppMucSelfPingSerializesAndClassifies),
     ("XMPP HTTP file upload serializes request and parses slot", XmppHttpFileUploadSerializesRequestAndParsesSlot),
     ("XMPP HTTP file upload only allows loopback HTTP", XmppHttpFileUploadOnlyAllowsLoopbackHttp),
@@ -6431,6 +6432,57 @@ static void XmppMultiUserChatHandlesAdminItems()
     Equal("anna@example.org", items[0].Jid!.Bare);
     Equal("member", items[0].Affiliation);
     Equal("Anna", items[0].Nick);
+}
+
+static void XmppMucAvatarHandlesRoomVCardAvatar()
+{
+    var room = XmppAddress.Parse("team@conference.example.org/Edward");
+    var bytes = Encoding.UTF8.GetBytes("room-avatar");
+    var hash = XmppVCardAvatar.ComputePhotoHash(bytes);
+    var info = new XmppServiceDiscoveryInfo(
+        Node: null,
+        Identities: [new XmppServiceIdentity("conference", "text", "Team room")],
+        Features: [XmppMultiUserChat.NamespaceName, XmppVCardTemp.NamespaceName],
+        DataForms:
+        [
+            new XmppDataForm(
+                "result",
+                new Dictionary<string, IReadOnlyList<string>>
+                {
+                    ["FORM_TYPE"] = [XmppMucAvatar.RoomInfoFormType],
+                    [XmppMucAvatar.AvatarHashField] = [hash]
+                })
+        ]);
+
+    True(XmppMucAvatar.SupportsAvatars(info));
+    Equal(hash, XmppMucAvatar.GetRoomAvatarHashes(info).Single());
+
+    var get = XmppMucAvatar.CreateGetRequest("muc-avatar-get", room);
+    Equal(XmppIqType.Get, get.Type);
+    Equal("team@conference.example.org", get.To!.Bare);
+    Equal(XmppVCardTemp.NamespaceName, get.Payload!.Name.NamespaceName);
+
+    var set = XmppMucAvatar.CreateSetRequest("muc-avatar-set", room, bytes, "image/png");
+    Equal(XmppIqType.Set, set.Type);
+    Equal("team@conference.example.org", set.To!.Bare);
+    Equal(
+        Convert.ToBase64String(bytes),
+        set.Payload!
+            .Element(XName.Get("PHOTO", XmppVCardTemp.NamespaceName))!
+            .Element(XName.Get("BINVAL", XmppVCardTemp.NamespaceName))!
+            .Value);
+
+    var result = new XmppIq(XmppIqType.Result, "muc-avatar-get", set.Payload);
+    True(XmppMucAvatar.TryParseVerifiedAvatar(result, [hash], out var photo));
+    Equal("image/png", photo!.ContentType);
+    Equal(hash, photo.Hash);
+    True(photo.MatchedAdvertisedHash);
+    True(photo.Data.SequenceEqual(bytes));
+
+    var remove = XmppMucAvatar.CreateRemoveRequest("muc-avatar-remove", room);
+    Equal(XmppIqType.Set, remove.Type);
+    Equal("team@conference.example.org", remove.To!.Bare);
+    Equal("vCard", remove.Payload!.Name.LocalName);
 }
 
 static void XmppMucSelfPingSerializesAndClassifies()

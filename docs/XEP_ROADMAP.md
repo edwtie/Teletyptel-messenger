@@ -68,6 +68,7 @@ layer on top of that core.
 | XEP-0410 | MUC Self-Ping | Detect stale room occupant sessions. | Done |
 | XEP-0425 | Message Moderation | Moderator-driven MUC message retraction using room stanza-id. | Done; core IQ helper, moderated retraction parser and web display path |
 | XEP-0433 | Extended Channel Search | Search public MUC/MIX channels with server-provided data forms and optional RSM paging. | Done for core helper/parser and stream-client flow; XEP is Deferred, so live search-service interop remains release validation |
+| XEP-0486 | MUC Avatars | Room avatars through vcard-temp and `muc#roominfo_avatarhash`. | Done for PHP/C# helpers and web group avatar UI |
 
 ## Calls And Media
 

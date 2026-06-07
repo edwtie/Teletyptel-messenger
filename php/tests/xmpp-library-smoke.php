@@ -38,6 +38,7 @@ use Tiedragon\Xmpp\XmppMessageMetadata;
 use Tiedragon\Xmpp\XmppMessageModeration;
 use Tiedragon\Xmpp\XmppMessageStyling;
 use Tiedragon\Xmpp\XmppMuc;
+use Tiedragon\Xmpp\XmppMucAvatar;
 use Tiedragon\Xmpp\XmppOmemo;
 use Tiedragon\Xmpp\XmppOmemoDoubleRatchet;
 use Tiedragon\Xmpp\XmppConnectionSettings;
@@ -402,6 +403,28 @@ assertTrue(str_contains($vcardSet, XmppXml::VCARD_TEMP_NS) && str_contains($vcar
 $vcardParsed = XmppVCardTemp::parse('<iq xmlns="' . XmppXml::CLIENT_NS . '" type="result" id="vc1"><vCard xmlns="' . XmppXml::VCARD_TEMP_NS . '"><FN>Edward Tie</FN><NICKNAME>Edward</NICKNAME><EMAIL><INTERNET/><USERID>edward@example.test</USERID></EMAIL><PHOTO><TYPE>image/png</TYPE><BINVAL>' . base64_encode('png-bytes') . '</BINVAL></PHOTO></vCard></iq>');
 assertTrue($vcardParsed['FN'] === 'Edward Tie' && $vcardParsed['PHOTO']['bytes'] === 'png-bytes', 'vCard parse failed.');
 
+$mucAvatarDisco = '<iq xmlns="' . XmppXml::CLIENT_NS . '" type="result" id="muc-avatar-info"><query xmlns="' . XmppXml::DISCO_INFO_NS . '">'
+    . '<identity category="conference" type="text" name="Support"/>'
+    . '<feature var="' . XmppMuc::NS . '"/>'
+    . '<feature var="' . XmppXml::VCARD_TEMP_NS . '"/>'
+    . XmppDataForm::formElement([
+        'FORM_TYPE' => ['type' => 'hidden', 'value' => XmppMucAvatar::ROOMINFO_FORM_TYPE],
+        XmppMucAvatar::AVATAR_HASH_FIELD => XmppMucAvatar::avatarHash('room-avatar-bytes'),
+    ], 'result')
+    . '</query></iq>';
+assertTrue(XmppMucAvatar::serviceSupportsAvatars($mucAvatarDisco), 'MUC avatar support discovery failed.');
+$mucAvatarHashes = XmppMucAvatar::parseRoomAvatarHashes($mucAvatarDisco);
+assertTrue($mucAvatarHashes[0] === XmppMucAvatar::avatarHash('room-avatar-bytes'), 'MUC avatar roominfo hash parse failed.');
+$mucAvatarGet = XmppMucAvatar::getRoomAvatarRequest('muc-avatar-get', 'support@conference.localhost/Edward');
+assertTrue(str_contains($mucAvatarGet, 'to="support@conference.localhost"') && str_contains($mucAvatarGet, XmppXml::VCARD_TEMP_NS), 'MUC avatar get request failed.');
+$mucAvatarSet = XmppMucAvatar::setRoomAvatarRequest('muc-avatar-set', 'support@conference.localhost', 'image/png', 'room-avatar-bytes');
+assertTrue(str_contains($mucAvatarSet, '<PHOTO') && str_contains($mucAvatarSet, 'to="support@conference.localhost"'), 'MUC avatar set request failed.');
+$mucAvatarParsed = XmppMucAvatar::parseVerifiedAvatar(
+    '<iq xmlns="' . XmppXml::CLIENT_NS . '" type="result" id="muc-avatar-get"><vCard xmlns="' . XmppXml::VCARD_TEMP_NS . '"><PHOTO><TYPE>image/png</TYPE><BINVAL>' . base64_encode('room-avatar-bytes') . '</BINVAL></PHOTO></vCard></iq>',
+    $mucAvatarHashes
+);
+assertTrue($mucAvatarParsed !== null && $mucAvatarParsed['matched'] && $mucAvatarParsed['hash'] === $mucAvatarHashes[0], 'MUC avatar verified parse failed.');
+
 $servicesIq = '<iq xmlns="' . XmppXml::CLIENT_NS . '" type="result" id="ext1"><services xmlns="' . XmppXml::EXTERNAL_SERVICE_NS . '"><service type="stun" host="turn.localhost" port="3478" transport="udp" restricted="true"/></services></iq>';
 $services = XmppExternalServices::parseServices($servicesIq);
 assertTrue($services[0]['type'] === 'stun' && $services[0]['restricted'], 'External services parse failed.');
@@ -581,5 +604,6 @@ $features = XmppFeatures::supportedNamespaces();
 assertTrue(isset($features['XEP-0301 Real-Time Text']), 'Feature list missing XEP-0301.');
 assertTrue(isset($features['XEP-0047 In-Band Bytestreams']) && isset($features['XEP-0261 Jingle In-Band Bytestreams']), 'Feature list missing bytestream transfer XEPs.');
 assertTrue(isset($features['XEP-0384 OMEMO Encryption Wire Format']), 'Feature list missing OMEMO wire format.');
+assertTrue(isset($features['XEP-0486 MUC Avatars']), 'Feature list missing MUC avatars.');
 
 echo "PHP XMPP library smoke OK\n";

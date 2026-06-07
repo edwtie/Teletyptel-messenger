@@ -736,8 +736,10 @@
   </div>
 
   <div id="conversationContextMenu" class="context-menu" hidden role="menu" aria-label="Contact menu">
+    <button id="contextRoomAvatarButton" type="button" role="menuitem" data-i18n="button.group_avatar">Group avatar...</button>
     <button id="contextBlockButton" class="danger-action" type="button" role="menuitem" data-i18n="button.block_contact">Block</button>
   </div>
+  <input id="mucAvatarFileInput" class="file-input" type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" aria-label="Choose group avatar" data-i18n-aria-label="button.group_avatar">
 
   <div id="messageContextMenu" class="context-menu message-context-menu" hidden role="menu" aria-label="Message menu">
     <button id="messageContextEditButton" type="button" role="menuitem" data-i18n="button.edit_message">Edit</button>

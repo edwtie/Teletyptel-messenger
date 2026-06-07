@@ -60,6 +60,7 @@ Linux-installatie kan dus alleen met PHP worden uitgerold.
 | `XmppPubSubAnnouncements` | `XmppPubSubAnnouncements` | Provider/news announcements as Atom entries on a PubSub node. |
 | `XmppGeoloc` | `XmppUserLocation` | XEP-0080 payload en PEP publish. |
 | `XmppAvatar` | `XmppUserAvatar` | XEP-0084 avatar id, data, metadata and vCard update helpers. |
+| `XmppMucAvatar` | `XmppMucAvatar` | XEP-0486 MUC avatar discovery, `muc#roominfo_avatarhash` parsing and room vCard get/set/remove helpers. |
 | `XmppHttpUpload` | `XmppHttpFileUpload` | XEP-0363 slot request en slot result parser. |
 | `XmppMam` | `XmppMessageArchive` | XEP-0313 query form. |
 | `XmppJingle` | `XmppJingle`, protoXEP RTT/geoloc | Jingle session-initiate/session-info helpers. |

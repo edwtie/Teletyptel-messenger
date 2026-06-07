@@ -107,7 +107,7 @@ IM compliance builds on Core.
 | Outbound message synchronization | XEP-0280 | Required | Required | Done | Add real multi-resource interop smoke. |
 | User blocking | XEP-0191 | Not required | Required | Done | Blocklist, block/unblock, unblock-all, push parsing, local server behavior, web contact context menu, hidden blocked contacts and real-server smoke path are implemented. |
 | Group chat | XEP-0045 and XEP-0249 | Required | Required | Done | Keep Prosody/ejabberd MUC smoke and direct invitation tests. |
-| Advanced group chat | XEP-0048, XEP-0313, XEP-0402 and XEP-0410 | Not required | Required | Done | XEP-0048/XEP-0402 bookmark helpers, XEP-0410 self-ping, MUC archive query path and public MUC archive smoke are implemented. |
+| Advanced group chat | XEP-0048, XEP-0313, XEP-0402, XEP-0410 and XEP-0486 | Not required | Required | Done | Bookmarks, self-ping, MUC archive query, public MUC archive smoke and MUC avatar helpers/UI are implemented. |
 | Persistent private data via PubSub | XEP-0223 | Not required | Required | Done | Generic PEP/PubSub private-data store/retrieve helpers, stream-client methods, publish-options and notification trust checks are implemented. |
 | Private XML storage | XEP-0049 | Not required | Required | Done | Generic private XML get/set helper, parser and stream-client methods are implemented; legacy XEP-0048 bookmarks now use that layer. |
 | Stream management | XEP-0198 | Not required | Required | Done | Keep reconnect/resume tests on real unstable transport. |
@@ -163,6 +163,7 @@ compliance requirements:
 | File link fallback | XEP-0066 | Done as HTTP upload message fallback. |
 | Public account registration | XEP-0077 | Done for helper and real-server smoke path. |
 | User avatars | XEP-0084 | Done: protocol helper layer, browser UI/cache, local server storage and vCard compatibility are implemented; public-server PEP smoke remains release validation. |
+| MUC avatars | XEP-0486 | Done for PHP/C# room avatar helpers, hash verification and web group avatar UI. |
 | Service contact addresses | XEP-0157 | Done for server-info data form parsing/creation. |
 | Delayed delivery | XEP-0203 | Done for PHP metadata helper/parser and incoming stanza exposure. |
 | Message processing hints | XEP-0334 | Done for PHP helper/parser and incoming stanza exposure. |

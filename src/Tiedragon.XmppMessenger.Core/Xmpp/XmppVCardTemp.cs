@@ -33,10 +33,10 @@ public sealed record XmppVCardTemp(
         return new XmppIq(XmppIqType.Get, id, new XElement(XName.Get("vCard", NamespaceName)), To: to);
     }
 
-    public static XmppIq CreateSetRequest(string id, XmppVCardTemp vCard)
+    public static XmppIq CreateSetRequest(string id, XmppVCardTemp vCard, XmppAddress? to = null)
     {
         ArgumentNullException.ThrowIfNull(vCard);
-        return new XmppIq(XmppIqType.Set, id, vCard.ToXml());
+        return new XmppIq(XmppIqType.Set, id, vCard.ToXml(), To: to);
     }
 
     public static bool TryParse(XElement element, out XmppVCardTemp? vCard)
@@ -128,4 +128,3 @@ public sealed record XmppVCardPhoto(
         return string.IsNullOrEmpty(value) ? null : value;
     }
 }
-

@@ -533,6 +533,15 @@ item is implemented, tested and documented.
 - [x] Trust/fingerprint UI model.
 - [x] Interoperability smoke with existing OMEMO client wire shapes.
 
+## XEP-0486 - MUC Avatars
+
+- [x] Room avatar capability detection through MUC disco and `vcard-temp`.
+- [x] `muc#roominfo_avatarhash` parsing from the room info data form.
+- [x] Room avatar get, set and remove helpers using vCard `PHOTO`.
+- [x] SHA-1 verification against advertised room avatar hashes.
+- [x] PHP and C# smoke tests for the wire model.
+- [x] Web UI can choose and render group avatars in the conversation list and header.
+
 ## XMPP Compliance Suites
 
 - [x] XEP-0047/XEP-0261 In-Band Bytestreams fallback helpers.

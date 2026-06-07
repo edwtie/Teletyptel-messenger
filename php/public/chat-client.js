@@ -295,6 +295,7 @@
     mediaPreviewStream: null,
     blockedJids: new Set(loadBlockedJids(sessionProfile)),
     accountReady: false,
+    pendingMucAvatarConversationId: null,
     security: {
       twoFactorVerificationId: 0,
       twoFactorMethod: "authenticator",
@@ -388,7 +389,9 @@
     inviteConversationButton: byId("inviteConversationButton"),
     developerPanel: byId("developerPanel"),
     conversationContextMenu: byId("conversationContextMenu"),
+    contextRoomAvatarButton: byId("contextRoomAvatarButton"),
     contextBlockButton: byId("contextBlockButton"),
+    mucAvatarFileInput: byId("mucAvatarFileInput"),
     messageContextMenu: byId("messageContextMenu"),
     messageContextEditButton: byId("messageContextEditButton"),
     messageContextDeleteButton: byId("messageContextDeleteButton"),
@@ -643,7 +646,9 @@
     el.addGroupButton.addEventListener("click", addGroupConversation);
     el.inviteConversationButton.addEventListener("click", inviteContactToActiveGroup);
     el.backToContactsButton.addEventListener("click", closeActiveConversation);
+    el.contextRoomAvatarButton.addEventListener("click", chooseContextRoomAvatar);
     el.contextBlockButton.addEventListener("click", toggleBlockContextConversation);
+    el.mucAvatarFileInput.addEventListener("change", handleMucAvatarFileSelected);
     el.conversationContextMenu.addEventListener("click", (event) => event.stopPropagation());
     el.messageContextMenu.addEventListener("click", (event) => event.stopPropagation());
     el.messageContextEditButton.addEventListener("click", editContextMessage);
@@ -3303,7 +3308,7 @@
       [true, "Accounts", t("checklist.accounts", "Server account profile, MySQL account API and language preference")],
       [true, "XEP-0363", t("checklist.file_upload", "Local file upload plus XMPP HTTP upload slot helpers")],
       [true, "Jingle", t("checklist.calls", "Audio, audio+video and Total Conversation calls with camera, microphone, sound, volume, RTT sync and live device switching")],
-      [true, "XEP-0084", t("checklist.avatars", "Account avatar, contact avatar cache and avatar presence")],
+      [true, "XEP-0084/0486", t("checklist.avatars", "Account avatar, contact avatar cache, group avatars and avatar presence")],
       [true, "XEP-0191", t("checklist.blocking", "Block and unblock contacts, with blocked chat, RTT and calls filtered")],
       [true, "XEP-0080", t("checklist.location", "Opt-in browser location sharing with XEP-0080 and PIDF-LO export")],
       [true, "XEP-0060", t("checklist.pubsub_news", "Provider news and announcements through PubSub")],
@@ -3971,7 +3976,7 @@
   }
 
   function showConversationContextMenu(event, conversation, anchor = null) {
-    if (!canBlockConversation(conversation)) {
+    if (!canOpenConversationContextMenu(conversation)) {
       return;
     }
 
@@ -3995,7 +4000,10 @@
     const top = Math.max(8, Math.min(y, window.innerHeight - rect.height - 8));
     menu.style.left = `${left}px`;
     menu.style.top = `${top}px`;
-    el.contextBlockButton.focus();
+    const focusTarget = !el.contextRoomAvatarButton.hidden
+      ? el.contextRoomAvatarButton
+      : el.contextBlockButton;
+    focusTarget.focus();
   }
 
   function closeConversationContextMenuOnOutsideClick(event) {
@@ -5060,7 +5068,8 @@
 
   function avatarVisual(source) {
     const name = source?.displayName || (source ? conversationDisplayName(source) : "") || source?.name || source?.peer || "TX";
-    const dataUrl = isValidAvatarDataUrl(source?.avatarDataUrl) ? source.avatarDataUrl : "";
+    const avatarDataUrl = source?.avatarDataUrl || source?.roomAvatarDataUrl || "";
+    const dataUrl = isValidAvatarDataUrl(avatarDataUrl) ? avatarDataUrl : "";
     const color = normalizeAvatarColor(source?.avatarColor || avatarColorFor(`${name}:${source?.peer ?? ""}`));
     return {
       dataUrl,
@@ -5236,6 +5245,25 @@
   function isAvatarSourceDataUrl(value) {
     const text = String(value || "");
     return text.length <= avatarSourceMaxBytes * 2 && /^data:image\/(?:png|jpeg|jpg|gif|webp|svg\+xml);base64,/i.test(text);
+  }
+
+  function dataUrlMediaType(value) {
+    const match = String(value || "").match(/^data:([^;,]+);base64,/i);
+    return match ? match[1].toLowerCase() : "";
+  }
+
+  function dataUrlPayloadBytes(value) {
+    const comma = String(value || "").indexOf(",");
+    if (comma < 0) {
+      return [];
+    }
+
+    const binary = atob(String(value).slice(comma + 1));
+    return Array.from(binary, (char) => char.charCodeAt(0));
+  }
+
+  function hexBytes(bytes) {
+    return bytes.map((byte) => byte.toString(16).padStart(2, "0")).join("");
   }
 
   function currentFromJid() {
@@ -7655,7 +7683,11 @@
     const conversation = state.conversations.find((item) => item.id === state.contextConversationId) ?? null;
     const canBlock = canBlockConversation(conversation);
     const blocked = isBlockedConversation(conversation);
+    const canChangeRoomAvatar = canChangeMucAvatar(conversation);
+    el.contextRoomAvatarButton.hidden = !canChangeRoomAvatar;
+    el.contextRoomAvatarButton.disabled = !canChangeRoomAvatar;
     el.contextBlockButton.disabled = !canBlock;
+    el.contextBlockButton.hidden = !canBlock;
     el.contextBlockButton.textContent = blocked
       ? t("button.unblock_contact", "Unblock")
       : t("button.block_contact", "Block");
@@ -7668,6 +7700,69 @@
       && conversation.kind === "contact"
       && !isOwnPeer(conversation.peer)
       && !isInfrastructurePeer(conversation.peer);
+  }
+
+  function canOpenConversationContextMenu(conversation) {
+    return canBlockConversation(conversation) || canChangeMucAvatar(conversation);
+  }
+
+  function canChangeMucAvatar(conversation) {
+    return Boolean(conversation)
+      && conversation.kind === "group"
+      && !isBlockedConversation(conversation);
+  }
+
+  function chooseContextRoomAvatar() {
+    const conversation = state.conversations.find((item) => item.id === state.contextConversationId) ?? null;
+    if (!canChangeMucAvatar(conversation)) {
+      return;
+    }
+
+    state.pendingMucAvatarConversationId = conversation.id;
+    closeConversationContextMenu();
+    el.mucAvatarFileInput.value = "";
+    el.mucAvatarFileInput.click();
+  }
+
+  function handleMucAvatarFileSelected() {
+    const conversationId = state.pendingMucAvatarConversationId || state.contextConversationId;
+    const conversation = state.conversations.find((item) => item.id === conversationId) ?? activeConversation();
+    state.pendingMucAvatarConversationId = null;
+    const file = el.mucAvatarFileInput.files?.[0] ?? null;
+    if (!file || !canChangeMucAvatar(conversation)) {
+      return;
+    }
+
+    if (!/^image\/(?:png|jpeg|gif|webp|svg\+xml)$/i.test(file.type)) {
+      setConnectionStatus(t("avatar.unsupported", "Choose a PNG, JPEG, GIF, WebP or SVG avatar."), "warn");
+      return;
+    }
+
+    if (file.size > avatarMaxBytes) {
+      setConnectionStatus(t("avatar.file_too_large", "Avatar file is too large. Choose an image up to 256 KB."), "warn");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.addEventListener("load", () => {
+      const dataUrl = String(reader.result ?? "");
+      if (!isValidAvatarDataUrl(dataUrl)) {
+        setConnectionStatus(t("avatar.read_failed", "Avatar could not be read."), "danger");
+        return;
+      }
+
+      conversation.avatarDataUrl = dataUrl;
+      conversation.mucAvatarHash = hexBytes(sha1Bytes(dataUrlPayloadBytes(dataUrl)));
+      conversation.mucAvatarMediaType = file.type || dataUrlMediaType(dataUrl) || "image/png";
+      conversation.mucAvatarUpdatedAt = new Date().toISOString();
+      setConnectionStatus(t("status.group_avatar_changed", "Group avatar changed."), "good");
+      appendDebug("muc-avatar", `${conversation.peer} ${conversation.mucAvatarHash}`);
+      renderConversations();
+      renderActiveConversation();
+      refreshOpenTabPanel();
+    });
+    reader.addEventListener("error", () => setConnectionStatus(t("avatar.read_failed", "Avatar could not be read."), "danger"));
+    reader.readAsDataURL(file);
   }
 
   function refreshOpenTabPanel() {

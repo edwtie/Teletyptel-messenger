@@ -191,6 +191,7 @@ proposed wire format for the missing parts.
 | XEP-0398 | PEP-vCard avatar conversion support discovery. |
 | XEP-0402 | PEP-native MUC room bookmarks. |
 | XEP-0410 | MUC self-ping. |
+| XEP-0486 | MUC avatars through room vCard and roominfo avatar hash. |
 
 ## XEP-0060 Publish-Subscribe
 
@@ -463,6 +464,18 @@ relay presence hints for the local demo. `XmppVCardAvatar` adds XEP-0153
 `vcard-temp:x:update` presence hash support, vCard `PHOTO` conversion helpers
 and XEP-0398 `urn:xmpp:pep-vcard-conversion:0` discovery. Public-server PEP
 smoke remains a release validation item, not an implementation gap.
+
+## XEP-0486 MUC Avatars
+
+`XmppMucAvatar` implements the room-avatar path defined by XEP-0486. It checks
+whether a room or MUC service advertises both MUC and `vcard-temp`, reads the
+`muc#roominfo_avatarhash` value from the room info data form, and creates room
+vCard get/set/remove IQs for the `PHOTO` element.
+
+The helper verifies fetched room avatars by recalculating the SHA-1 hash over
+the raw image bytes and comparing it with the advertised hash. The web client
+can choose and render a group avatar in the conversation list and active chat
+header, so the UI already follows the same room identity model as the protocol.
 
 ## XEP-0163 Personal Eventing Protocol
 

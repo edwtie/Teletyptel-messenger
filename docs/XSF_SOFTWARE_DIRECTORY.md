@@ -132,6 +132,7 @@ Implementation evidence for Alpha 2:
   search-service interop remains release validation
 - XEP-0479: compliance mapping and Total Conversation direction, not a formal
   compliance claim yet
+- XEP-0486: MUC Avatars helper and group avatar UI
 - XEP-0514: Custom Emoji protocol helper; the XEP is Experimental and UI/live
   interoperability remains release validation
 
