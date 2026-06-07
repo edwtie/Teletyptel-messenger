@@ -3296,13 +3296,13 @@ static async Task RunXmppStreamClientSendsClientStateIndicationAsync()
             </stream:features>
             """);
 
-        var inactive = await ReadTextAsync(serverStream, buffer);
-        sawInactive = inactive.Contains("<inactive", StringComparison.Ordinal)
-            && inactive.Contains("urn:xmpp:csi:0", StringComparison.Ordinal);
-
-        var active = await ReadTextAsync(serverStream, buffer);
-        sawActive = active.Contains("<active", StringComparison.Ordinal)
-            && active.Contains("urn:xmpp:csi:0", StringComparison.Ordinal);
+        var clientStateXml = await ReadUntilAsync(serverStream, buffer, text =>
+            text.Contains("<inactive", StringComparison.Ordinal)
+            && text.Contains("<active", StringComparison.Ordinal));
+        sawInactive = clientStateXml.Contains("<inactive", StringComparison.Ordinal)
+            && clientStateXml.Contains("urn:xmpp:csi:0", StringComparison.Ordinal);
+        sawActive = clientStateXml.Contains("<active", StringComparison.Ordinal)
+            && clientStateXml.Contains("urn:xmpp:csi:0", StringComparison.Ordinal);
 
         await ReadTextAsync(serverStream, buffer);
     });
@@ -3621,6 +3621,26 @@ static async Task<string> ReadTextAsync(Stream stream, byte[] buffer)
 {
     var count = await stream.ReadAsync(buffer);
     return Encoding.UTF8.GetString(buffer, 0, count);
+}
+
+static async Task<string> ReadUntilAsync(Stream stream, byte[] buffer, Func<string, bool> predicate)
+{
+    var builder = new StringBuilder();
+    while (true)
+    {
+        var count = await stream.ReadAsync(buffer);
+        if (count == 0)
+        {
+            throw new EndOfStreamException("Stream closed before expected text was read.");
+        }
+
+        builder.Append(Encoding.UTF8.GetString(buffer, 0, count));
+        var text = builder.ToString();
+        if (predicate(text))
+        {
+            return text;
+        }
+    }
 }
 
 static async Task<byte[]> ReadExactBytesAsync(Stream stream, int count)
