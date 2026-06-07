@@ -21,6 +21,11 @@ XMPP is de hoofdstandaard voor berichten, aanwezigheid, contactlijsten,
 groepsgesprekken en uitbreidingen. Voor TeleTypTel is XMPP belangrijk omdat het
 decentrale servers en providerkeuze mogelijk maakt.
 
+Voor grote klanten is ejabberd de gekozen serverrichting. De reden is
+stabiliteit: ejabberd is gebouwd op Erlang/OTP, kan gedistribueerd draaien en is
+bedoeld voor grote XMPP-deployments. Prosody en Openfire blijven nuttig als
+extra interop-test, maar de providerroute start met ejabberd.
+
 Gebruik in TeleTypTel:
 
 - chat en live tekst;
@@ -57,6 +62,12 @@ falen bij bedrijfsnetwerken, mobiele netwerken of strenge firewalls.
 SIP is de bekende standaard voor VoIP, telefonieplatforms en providerkoppelingen.
 Voor TeleTypTel is SIP vooral een gateway-onderwerp, niet iets dat de browser UI
 zelf moet dragen.
+
+De gekozen serverrichting sluit daarop aan: ejabberd beschikt over
+SIP-ondersteuning via `ejabberd_sip` en `mod_sip`. Dat maakt ejabberd interessant
+voor providerlabs waar XMPP/Jingle, WebRTC, STUN/TURN en SIP naast elkaar getest
+moeten worden. DNS, TLS, poorten, NAT/firewall en interop met bijvoorbeeld
+Asterisk, Kamailio of een providerplatform moeten wel apart worden gevalideerd.
 
 Mogelijke SIP-routes:
 
@@ -202,6 +213,9 @@ Voor grote klanten is een realistisch traject:
 
 ## Bronnen
 
+- ejabberd platform overview: https://ejabberd.im/
+- ejabberd SIP listener documentation:
+  https://docs.ejabberd.im/archive/26.04/listen/
 - ETSI EN 301 549: https://www.etsi.org/human-factors-accessibility/en-301-549-v3-the-harmonized-european-standard-for-ict-accessibility
 - European Commission Web Accessibility Directive standards:
   https://digital-strategy.ec.europa.eu/en/policies/web-accessibility-directive-standards-and-harmonisation

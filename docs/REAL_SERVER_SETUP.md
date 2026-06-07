@@ -6,7 +6,33 @@ credentials and a local server profile are available.
 
 ![Teletyptel XMPP server response flow](SERVER_RESPONSE_FLOW.svg)
 
-## Local Prosody Direction
+## ejabberd provider direction
+
+For provider-like and larger customer tests, ejabberd is the preferred server
+direction. It is chosen for stability and scale: ejabberd is built on
+Erlang/OTP, supports distributed deployments, has broad XMPP server modules and
+documents SIP support through `ejabberd_sip` and `mod_sip`.
+
+Use Prosody and Openfire as useful interoperability targets, but start serious
+provider smoke work with ejabberd when SIP, STUN/TURN, WebSocket/BOSH, MUC,
+MAM, upload and database integration need to be tested together.
+
+Important: ejabberd SIP support still requires explicit listener, module, DNS,
+TLS and firewall configuration. Treat SIP as a gateway layer for telephony and
+relay integration, not as browser UI logic.
+
+Typical ejabberd provider ports to plan:
+
+```text
+5222        XMPP client STARTTLS
+5223        direct TLS / legacy SSL client path when enabled
+5269        XMPP server-to-server
+5280/5443   HTTP/HTTPS, WebSocket, BOSH, upload and admin paths
+3478/5349   STUN/TURN depending on configuration
+5060/5061   SIP/SIPS through ejabberd_sip when enabled
+```
+
+## Local Prosody direction
 
 Recommended local domain:
 

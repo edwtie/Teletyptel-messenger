@@ -55,14 +55,22 @@ Voor productie-achtige provideromgevingen is een echte XMPP-server nodig. De
 lokale TeleTypTel server blijft nuttig voor tests en ontwikkeling, maar grote
 klanten horen te kijken naar een geharde serveropstelling met:
 
-- XMPP-server zoals ejabberd, Prosody of Openfire;
+- ejabberd als voorkeursserver voor stabiele provideromgevingen;
+- Prosody of Openfire als nuttige tweede interoperabiliteitsdoelen;
 - TLS-certificaten en goede domeinconfiguratie;
 - WebSocket/BOSH of reverse proxy voor webclients;
 - opslag voor accounts, roster, berichten en bestanden;
 - uploadservice voor foto's, documenten en media;
 - STUN/TURN voor audio/video;
 - logging, monitoring, back-up en abusebeleid;
-- optionele gateway naar SIP/telefonie of relay-diensten.
+- optionele ejabberd SIP-route of externe gateway naar telefonie en
+  relay-diensten.
+
+ejabberd is hier gekozen vanwege stabiliteit en schaalbaarheid. Het heeft ook
+SIP-ondersteuning via `ejabberd_sip` en `mod_sip`, waardoor dezelfde
+serverrichting geschikt is voor XMPP, WebSocket/BOSH, STUN/TURN, databaseopslag
+en telefonieonderzoek. SIP blijft wel een gatewaylaag die apart moet worden
+geconfigureerd en getest; de browserclient hoort dit niet zelf te dragen.
 
 ## Open standaarden
 
