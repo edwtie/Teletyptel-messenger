@@ -1,6 +1,6 @@
 # Getting Started
 
-This guide lets a reviewer evaluate Teletyptel 2.0 Alpha 1 on a local machine.
+This guide lets a reviewer evaluate Teletyptel 2.0 Alpha 2 on a local machine.
 It does not require a public XMPP account.
 
 ## Requirements
@@ -61,6 +61,10 @@ Create the WAMP-ready zip with:
 .\scripts\package-alpha1.ps1
 ```
 
+The script name still contains `alpha1` because it is the existing release
+recipe. It now packages the current Alpha 2 web client, LocalServer and smoke
+tools until the packaging script is renamed.
+
 The package script publishes the .NET tools and verifies that the zip contains:
 
 - `wamp\www\teletyptel\public` for the browser client;
@@ -108,7 +112,7 @@ Windows setup is documented separately: [Windows Setup](WINDOWS_SETUP.md).
 
 ## Deployment Lines
 
-Teletyptel Alpha currently has three practical deployment lines:
+Teletyptel Alpha 2 currently has three practical deployment lines:
 
 | Line | Use When | Main Layout |
 | --- | --- | --- |
@@ -128,7 +132,7 @@ Start the PHP relay:
 php php/rtt-websocket-server.php
 ```
 
-Open the full Alpha 1 web client in two browser windows through localhost.
+Open the full Alpha 2 web client in two browser windows through localhost.
 Do not open `php/public/chat.html` directly from `C:\...`; the login and
 account API require HTTP/PHP.
 
@@ -167,8 +171,9 @@ dotnet run --project samples/Tiedragon.XmppMessenger.WinFormsDemo/Tiedragon.Xmpp
 
 The WAMP package publishes this client to `wamp\bin\teletyptel\WindowsApp`.
 
-Use `relay@localhost` as `Peer` for shared-room testing with browser windows.
-For directed one-to-one tests, enter the other participant's bare or full JID.
+Use the Relay room for shared-room testing with browser windows. For directed
+one-to-one tests, choose the other participant from the contact list or enter
+the other participant's bare or full JID in the account/settings panel.
 
 ## Run Under WAMP On Windows
 
@@ -257,7 +262,10 @@ Run the local XMPP server from the published binary:
 C:\wamp64\bin\teletyptel\LocalServer\Tiedragon.XmppMessenger.LocalServer.exe `
   --listen 127.0.0.1 `
   --port 55222 `
+  --upload-listen 127.0.0.1 `
+  --upload-port 58088 `
   --domain localhost `
+  --data-dir C:\wamp64\bin\teletyptel\LocalServerData `
   --account edward:secret `
   --account anna:secret
 ```
@@ -300,7 +308,8 @@ against it:
 
 The smoke covers STARTTLS, hostname rejection, SASL login, resource binding,
 roster, XEP-0157 service contacts, XEP-0191 blocking, XEP-0215 STUN/TURN
-discovery, XEP-0363 upload service discovery, direct chat and XEP-0045 MUC.
+discovery, XEP-0313 message archive, XEP-0363 upload service discovery, direct
+chat and XEP-0045 MUC.
 
 To run the pieces manually, start the local development XMPP server:
 
@@ -308,7 +317,10 @@ To run the pieces manually, start the local development XMPP server:
 dotnet run --project tools/Tiedragon.XmppMessenger.LocalServer -- `
   --listen 127.0.0.1 `
   --port 55222 `
-  --domain localhost
+  --upload-listen 127.0.0.1 `
+  --upload-port 58088 `
+  --domain localhost `
+  --data-dir .tmp/local-xmpp-data
 ```
 
 Copy the printed `Certificate SHA-256` value and run:
@@ -344,6 +356,12 @@ library and proves that the client can register accounts, negotiate TLS/SASL,
 bind a resource, discover local STUN/TURN services and deliver a normal chat
 message between two accounts.
 
+When you want to test the in-band registration CAPTCHA path, add
+`--registration-captcha true` to LocalServer. The server then returns an
+XEP-0077 data form with `captcha-fallback-url`, hidden challenge key and
+required `ocr`; the PNG image is served by the local HTTP endpoint configured
+with `--upload-port`.
+
 ## Optional MySQL Account Profile
 
 Create the schema:
@@ -367,4 +385,6 @@ without MySQL by using browser storage.
 - Repeatable local relay demo.
 - XMPP core models and negotiation code in C#.
 - Mandatory TLS path with local STARTTLS XMPP server smoke.
-- A first public release shape that can be tested by other developers.
+- Local server registration, roster, upload, MUC and message archive smoke
+  paths.
+- A public evaluation shape that can be tested by other developers.

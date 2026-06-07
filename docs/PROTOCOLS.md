@@ -31,8 +31,8 @@ Initial implementation status:
   now cover the first RFC 6120 stream negotiation building blocks.
 - `XmppFeatureSet` models support for roster, presence, stream management and
   real-time text.
-- `XmppChatMessage`, `XmppPresence` and `XmppIq` serialize the first
-  RFC 6120/6121 stanzas used by Alpha 1.
+- `XmppChatMessage`, `XmppPresence` and `XmppIq` serialize the RFC 6120/6121
+  stanzas used by the Alpha 2 client, local server and smoke tools.
 - The same stanza models parse incoming chat messages, presence updates and
   roster IQ results back into typed objects.
 
@@ -178,12 +178,15 @@ proposed wire format for the missing parts.
 | XEP-0184 | Message delivery receipts. |
 | XEP-0191 | Blocking command. |
 | XEP-0198 | Stream management and reconnect support. |
+| XEP-0203 | Delayed delivery timestamps for offline/archive-forwarded messages. |
 | XEP-0206 | XMPP over BOSH profile and stream restart. |
 | XEP-0223 | Persistent private data via PubSub/PEP. |
 | XEP-0280 | Message carbons for multi-device sync. |
 | XEP-0308 | Last message correction. |
 | XEP-0313 | Message archive management. |
+| XEP-0334 | Message processing hints for storage/copy policy. |
 | XEP-0352 | Client state indication. |
+| XEP-0359 | Stable and unique stanza IDs for message correlation. |
 | XEP-0363 | HTTP file upload. |
 | XEP-0398 | PEP-vCard avatar conversion support discovery. |
 | XEP-0402 | PEP-native MUC room bookmarks. |
@@ -205,14 +208,25 @@ Planned Teletyptel announcement model:
 - UI presents them as news/mededelingen, status notices or provider service
   updates, not as unsolicited chat spam.
 
-Current implementation status: `XmppPubSub` adds explicit XEP-0060 subscribe,
-unsubscribe, create-node, delete-node and subscription-result helpers.
+Current implementation status: `XmppPubSub` adds explicit XEP-0060 service-node
+targeting, publish/items/retract, subscribe/unsubscribe, node
+create/configure/delete/purge, subscriptions, affiliations and configuration-form
+helpers.
 `XmppPubSubAnnouncements` defines the Teletyptel announcement node
 `urn:tiedragon:teletyptel:announcements`, serializes Atom entries and parses
 items or pushed PubSub event notifications. The web provider manifest can seed
 a News tab with provider announcements. A live public-server subscription smoke
 remains release validation because PubSub service names and access policies vary
 by deployment.
+
+## Message Metadata
+
+Teletyptel uses message metadata for history, corrections, deletions and
+moderation correlation. XEP-0203 marks delayed or archive-forwarded messages,
+XEP-0334 carries storage/copy hints such as `store` or `no-copy`, and XEP-0359
+adds `origin-id` and server `stanza-id` values. The PHP `XmppMessageMetadata`
+helper now builds and parses these elements and exposes them through
+`XmppIncomingStanza`.
 
 ## XEP-0050 And XEP-0133 Server Administration
 

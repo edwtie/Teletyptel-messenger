@@ -30,6 +30,7 @@ $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
 $serverOut = Join-Path $logs "local-xmpp-server-$stamp.out.log"
 $serverErr = Join-Path $logs "local-xmpp-server-$stamp.err.log"
 $uploadFile = Join-Path $logs "local-xmpp-upload-$stamp.txt"
+$dataDir = ".tmp\local-xmpp-data-$stamp"
 Set-Content -LiteralPath $uploadFile -Value "Teletyptel local XEP-0363 upload smoke $stamp" -Encoding UTF8
 
 Push-Location $root
@@ -53,6 +54,7 @@ try {
         "--upload-listen", "127.0.0.1",
         "--upload-port", "$UploadPort",
         "--domain", "localhost",
+        "--data-dir", $dataDir,
         "--account", "edward:secret",
         "--account", "anna:secret"
     )
@@ -114,6 +116,7 @@ try {
             "--upload-service", "localhost",
             "--upload-file", $uploadFile,
             "--upload-recipient", "anna@localhost/desktop",
+            "--mam-smoke",
             "--muc-service", "conference.localhost",
             "--muc-room", "team@conference.localhost",
             "--muc-admin"

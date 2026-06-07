@@ -6,6 +6,8 @@ using System.Security.Authentication;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
+using System.Text.Json;
+using System.IO.Compression;
 using System.Xml;
 using System.Xml.Linq;
 using Tiedragon.XmppMessenger.Core.Xmpp;
@@ -18,14 +20,31 @@ if (options is null)
     return;
 }
 
+var dataStore = LocalServerDataStore.Open(options.DataDirectory);
 using var certificate = options.LoadOrCreateCertificate();
 var uploadBaseUrl = options.UploadPort > 0
     ? $"http://{options.UploadListenAddress}:{options.UploadPort}/"
     : null;
-var state = new LocalXmppServerState(options.Domain, certificate, uploadBaseUrl);
+var state = new LocalXmppServerState(
+    options.Domain,
+    certificate,
+    uploadBaseUrl,
+    dataStore,
+    options.RegistrationCaptchaEnabled);
+foreach (var account in dataStore.LoadAccounts())
+{
+    state.Accounts[account.Username] = account.Password;
+}
+
 foreach (var account in options.Accounts)
 {
     state.Accounts[account.Username] = account.Password;
+    dataStore.SaveAccount(account);
+}
+
+foreach (var item in dataStore.LoadRosterItems())
+{
+    state.LoadRosterItem(item);
 }
 
 using var cancellation = new CancellationTokenSource();
@@ -48,8 +67,10 @@ if (options.UploadPort > 0)
 }
 
 Console.WriteLine($"Tiedragon Local XMPP server listening on {options.ListenAddress}:{options.Port} for domain {options.Domain}");
-Console.WriteLine("Features: RFC 6120/6121 C2S, STARTTLS required, SASL PLAIN, resource bind, session, roster, presence, XEP-0030 disco, XEP-0045 local MUC, XEP-0050 ad-hoc commands, XEP-0054 vCard, XEP-0077, XEP-0133 read-only service administration, XEP-0191 blocking, XEP-0198 SM, XEP-0215 STUN/TURN discovery, XEP-0352 CSI, XEP-0363 slot/PUT smoke, direct chat relay");
+Console.WriteLine("Features: RFC 6120/6121 C2S, STARTTLS required, SASL PLAIN, resource bind, session, roster, presence, XEP-0030 disco, XEP-0045 local MUC, XEP-0050 ad-hoc commands, XEP-0054 vCard, XEP-0077, XEP-0133 read-only service administration, XEP-0191 blocking, XEP-0198 SM, XEP-0215 STUN/TURN discovery, XEP-0313 local message archive, XEP-0352 CSI, XEP-0363 slot/PUT smoke, direct chat relay");
 Console.WriteLine("Scope: local development and smoke testing server; not hardened for internet-facing production use.");
+Console.WriteLine($"Data directory: {dataStore.RootDirectory}");
+Console.WriteLine($"XEP-0077 CAPTCHA: {(state.RegistrationCaptchaEnabled ? "enabled" : "disabled")}");
 Console.WriteLine($"Certificate SHA-256: {Convert.ToHexString(certificate.GetCertHash(HashAlgorithmName.SHA256)).ToLowerInvariant()}");
 
 try
@@ -107,7 +128,12 @@ static async Task HandleClientAsync(
     }
 }
 
-sealed class LocalXmppServerState(string domain, X509Certificate2 certificate, string? uploadBaseUrl)
+sealed class LocalXmppServerState(
+    string domain,
+    X509Certificate2 certificate,
+    string? uploadBaseUrl,
+    LocalServerDataStore dataStore,
+    bool registrationCaptchaEnabled)
 {
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, LocalXmppSession>> _sessionsByBareJid = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, LocalXmppSession> _sessionsByFullJid = new(StringComparer.OrdinalIgnoreCase);
@@ -118,6 +144,7 @@ sealed class LocalXmppServerState(string domain, X509Certificate2 certificate, s
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, byte>> _blockedJidsByBareJid = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, LocalRosterItem>> _rostersByBareJid = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, LocalUploadSlotState> _uploadSlots = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, LocalCaptchaChallenge> _captchaChallenges = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, string> _presenceByBareJid = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, string> _vCardsByBareJid = new(StringComparer.OrdinalIgnoreCase);
 
@@ -128,6 +155,10 @@ sealed class LocalXmppServerState(string domain, X509Certificate2 certificate, s
     public string? UploadBaseUrl { get; } = uploadBaseUrl;
 
     public ConcurrentDictionary<string, string> Accounts { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+    public LocalServerDataStore DataStore { get; } = dataStore;
+
+    public bool RegistrationCaptchaEnabled { get; } = registrationCaptchaEnabled && uploadBaseUrl is not null;
 
     public LocalUploadSlot CreateUploadSlot(string fileName, long expectedSize)
     {
@@ -191,6 +222,53 @@ sealed class LocalXmppServerState(string domain, X509Certificate2 certificate, s
         data = slot.Data;
         contentType = slot.ContentType;
         return true;
+    }
+
+    public LocalCaptchaChallenge CreateCaptchaChallenge()
+    {
+        var challenge = LocalCaptchaGenerator.Create();
+        _captchaChallenges[challenge.Key] = challenge;
+        return challenge;
+    }
+
+    public bool TryReadCaptcha(string path, out byte[] data, out string contentType)
+    {
+        data = [];
+        contentType = "image/png";
+        var parts = path.Trim('/').Split('/', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length != 2
+            || !string.Equals(parts[0], "captcha", StringComparison.OrdinalIgnoreCase)
+            || !_captchaChallenges.TryGetValue(parts[1], out var challenge))
+        {
+            return false;
+        }
+
+        if (challenge.ExpiresUtc < DateTimeOffset.UtcNow)
+        {
+            _captchaChallenges.TryRemove(challenge.Key, out _);
+            return false;
+        }
+
+        data = challenge.PngBytes;
+        return true;
+    }
+
+    public bool ValidateCaptcha(string? key, string? answer)
+    {
+        if (!RegistrationCaptchaEnabled)
+        {
+            return true;
+        }
+
+        if (string.IsNullOrWhiteSpace(key)
+            || string.IsNullOrWhiteSpace(answer)
+            || !_captchaChallenges.TryRemove(key, out var challenge))
+        {
+            return false;
+        }
+
+        return challenge.ExpiresUtc >= DateTimeOffset.UtcNow
+            && string.Equals(challenge.Answer, answer.Trim(), StringComparison.OrdinalIgnoreCase);
     }
 
     public void AddSession(LocalXmppSession session)
@@ -301,21 +379,34 @@ sealed class LocalXmppServerState(string domain, X509Certificate2 certificate, s
         return roster.Values.OrderBy(item => item.Jid, StringComparer.OrdinalIgnoreCase).ToArray();
     }
 
+    public void LoadRosterItem(LocalStoredRosterItem item)
+    {
+        var roster = _rostersByBareJid.GetOrAdd(
+            item.OwnerBareJid,
+            _ => new ConcurrentDictionary<string, LocalRosterItem>(StringComparer.OrdinalIgnoreCase));
+        roster[item.Jid] = new LocalRosterItem(item.Jid, item.Name, item.Subscription);
+    }
+
     public void SetRosterItem(string ownerBareJid, string jid, string? name)
     {
         var roster = _rostersByBareJid.GetOrAdd(
             ownerBareJid,
             _ => new ConcurrentDictionary<string, LocalRosterItem>(StringComparer.OrdinalIgnoreCase));
         var bare = BareJid(NormalizeJid(jid));
-        roster[bare] = new LocalRosterItem(bare, string.IsNullOrWhiteSpace(name) ? bare.Split('@')[0] : name, "both");
+        var item = new LocalRosterItem(bare, string.IsNullOrWhiteSpace(name) ? bare.Split('@')[0] : name, "both");
+        roster[bare] = item;
+        DataStore.SaveRosterItem(new LocalStoredRosterItem(ownerBareJid, item.Jid, item.Name, item.Subscription));
     }
 
     public void RemoveRosterItem(string ownerBareJid, string jid)
     {
+        var bare = BareJid(NormalizeJid(jid));
         if (_rostersByBareJid.TryGetValue(ownerBareJid, out var roster))
         {
-            roster.TryRemove(BareJid(NormalizeJid(jid)), out _);
+            roster.TryRemove(bare, out _);
         }
+
+        DataStore.RemoveRosterItem(ownerBareJid, bare);
     }
 
     public void StorePresence(string bareJid, XElement presence)
@@ -475,10 +566,75 @@ sealed class LocalXmppServerState(string domain, X509Certificate2 certificate, s
         return _userLocationByBareJid.TryGetValue(bareJid, out locationXml);
     }
 
+    public void StoreChatArchive(XElement message, string senderBareJid, string recipientBareJid)
+    {
+        if (!HasArchivablePayload(message))
+        {
+            return;
+        }
+
+        var conversation = BareJid(recipientBareJid);
+        DataStore.AppendArchiveMessage(new LocalArchiveMessage(
+            CreateArchiveId(),
+            senderBareJid,
+            conversation,
+            new XElement(message).ToString(SaveOptions.DisableFormatting),
+            DateTimeOffset.UtcNow));
+
+        if (!string.Equals(senderBareJid, recipientBareJid, StringComparison.OrdinalIgnoreCase))
+        {
+            DataStore.AppendArchiveMessage(new LocalArchiveMessage(
+                CreateArchiveId(),
+                recipientBareJid,
+                BareJid(senderBareJid),
+                new XElement(message).ToString(SaveOptions.DisableFormatting),
+                DateTimeOffset.UtcNow));
+        }
+    }
+
+    public void StoreRoomArchive(string roomBareJid, XElement message)
+    {
+        if (!HasArchivablePayload(message))
+        {
+            return;
+        }
+
+        DataStore.AppendArchiveMessage(new LocalArchiveMessage(
+            CreateArchiveId(),
+            roomBareJid,
+            roomBareJid,
+            new XElement(message).ToString(SaveOptions.DisableFormatting),
+            DateTimeOffset.UtcNow));
+    }
+
+    public IReadOnlyList<LocalArchiveMessage> QueryArchive(
+        string ownerBareJid,
+        string? withBareJid,
+        DateTimeOffset? start,
+        DateTimeOffset? end,
+        int max,
+        string? after,
+        string? before)
+    {
+        return DataStore.QueryArchive(ownerBareJid, withBareJid, start, end, max, after, before);
+    }
+
     private static string BareJid(string jid)
     {
         var slash = jid.IndexOf('/');
         return slash >= 0 ? jid[..slash] : jid;
+    }
+
+    private static string CreateArchiveId()
+    {
+        return "local-mam-" + DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString("x") + "-" + Guid.NewGuid().ToString("N")[..10];
+    }
+
+    private static bool HasArchivablePayload(XElement message)
+    {
+        return message.Element(XName.Get("body", "jabber:client")) is not null
+            || message.Element(XName.Get("body", string.Empty)) is not null
+            || message.Elements().Any(element => element.Name.NamespaceName is not "http://jabber.org/protocol/chatstates");
     }
 
     private static string NormalizeJid(string jid)
@@ -939,6 +1095,7 @@ sealed class LocalXmppSession(TcpClient client, LocalXmppServerState state)
                       <query xmlns="http://jabber.org/protocol/disco#info">
                         <identity category="conference" type="{identityType}" name="{identityName}"/>
                         <feature var="http://jabber.org/protocol/muc"/>
+                        <feature var="{XmppMessageArchive.NamespaceName}"/>
                       </query>
                     </iq>
                     """, cancellationToken);
@@ -978,6 +1135,7 @@ sealed class LocalXmppSession(TcpClient client, LocalXmppServerState state)
                     <feature var="urn:xmpp:csi:0"/>
                     <feature var="urn:xmpp:chat-markers:0"/>
                     <feature var="http://jabber.org/protocol/chatstates"/>
+                    <feature var="{XmppMessageArchive.NamespaceName}"/>
                     <feature var="{XmppBlockingCommand.NamespaceName}"/>
                     <feature var="{XmppUserAvatar.MetadataNotificationFeature}"/>
                     <feature var="{XmppUserAvatar.DataNamespaceName}+notify"/>
@@ -1054,6 +1212,12 @@ sealed class LocalXmppSession(TcpClient client, LocalXmppServerState state)
                   </query>
                 </iq>
                 """, cancellationToken);
+            return;
+        }
+
+        if (payload?.Name == XName.Get("query", XmppMessageArchive.NamespaceName) && type == "set")
+        {
+            await HandleMessageArchiveIqAsync(id, to, payload, cancellationToken);
             return;
         }
 
@@ -1391,6 +1555,121 @@ sealed class LocalXmppSession(TcpClient client, LocalXmppServerState state)
         ];
     }
 
+    private async Task HandleMessageArchiveIqAsync(
+        string id,
+        string to,
+        XElement query,
+        CancellationToken cancellationToken)
+    {
+        var ownerBareJid = IsMucAddress(to) && to.Contains('@', StringComparison.Ordinal)
+            ? ToBareJid(to)
+            : BareJid;
+        if (string.IsNullOrWhiteSpace(ownerBareJid))
+        {
+            await WriteAsync(BadRequestIq(id), cancellationToken);
+            return;
+        }
+
+        var queryId = (string?)query.Attribute("queryid");
+        var options = ParseArchiveQueryOptions(query);
+        var max = options.Max is > 0 and <= 500 ? options.Max.Value : 50;
+        var archived = state.QueryArchive(
+            ownerBareJid,
+            options.With?.Bare,
+            options.Start,
+            options.End,
+            max,
+            options.After,
+            options.Before);
+
+        foreach (var item in archived)
+        {
+            await WriteAsync(CreateArchiveResultMessage(ownerBareJid, item, queryId), cancellationToken);
+        }
+
+        var first = archived.FirstOrDefault();
+        var last = archived.LastOrDefault();
+        var firstXml = first is null
+            ? string.Empty
+            : $"<first index=\"0\">{Escape(first.ArchiveId)}</first>";
+        var lastXml = last is null
+            ? string.Empty
+            : $"<last>{Escape(last.ArchiveId)}</last>";
+        await WriteAsync($"""
+            <iq xmlns="jabber:client" type="result" id="{Escape(id)}">
+              <fin xmlns="{XmppMessageArchive.NamespaceName}" complete="true">
+                <set xmlns="{XmppMessageArchive.ResultSetManagementNamespace}">
+                  {firstXml}
+                  {lastXml}
+                  <count>{archived.Count}</count>
+                </set>
+              </fin>
+            </iq>
+            """, cancellationToken);
+    }
+
+    private string CreateArchiveResultMessage(string ownerBareJid, LocalArchiveMessage item, string? queryId)
+    {
+        var result = new XElement(XName.Get("result", XmppMessageArchive.NamespaceName),
+            new XAttribute("id", item.ArchiveId));
+        if (!string.IsNullOrWhiteSpace(queryId))
+        {
+            result.SetAttributeValue("queryid", queryId);
+        }
+
+        result.Add(new XElement(XName.Get("forwarded", XmppMessageCarbons.ForwardedNamespace),
+            new XElement(XName.Get("delay", XmppMessageArchive.DelayNamespace),
+                new XAttribute("stamp", item.StampUtc.ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'"))),
+            XElement.Parse(item.StanzaXml, LoadOptions.PreserveWhitespace)));
+
+        var message = new XElement(XName.Get("message", "jabber:client"),
+            new XAttribute("from", ownerBareJid),
+            result);
+        if (!string.IsNullOrWhiteSpace(FullJid ?? BareJid))
+        {
+            message.SetAttributeValue("to", FullJid ?? BareJid);
+        }
+
+        return message.ToString(SaveOptions.DisableFormatting);
+    }
+
+    private static XmppArchiveQueryOptions ParseArchiveQueryOptions(XElement query)
+    {
+        var fields = query
+            .Elements(XName.Get("x", XmppMessageArchive.DataFormsNamespace))
+            .Elements(XName.Get("field", XmppMessageArchive.DataFormsNamespace))
+            .ToDictionary(
+                field => (string?)field.Attribute("var") ?? string.Empty,
+                field => field.Element(XName.Get("value", XmppMessageArchive.DataFormsNamespace))?.Value,
+                StringComparer.OrdinalIgnoreCase);
+
+        XmppAddress? with = null;
+        if (fields.TryGetValue("with", out var withText)
+            && XmppAddress.TryParse(withText, out var parsedWith))
+        {
+            with = parsedWith;
+        }
+
+        var set = query.Element(XName.Get("set", XmppMessageArchive.ResultSetManagementNamespace));
+        return new XmppArchiveQueryOptions(
+            TryParseArchiveDate(fields.GetValueOrDefault("start")),
+            TryParseArchiveDate(fields.GetValueOrDefault("end")),
+            with,
+            TryParseArchiveInt(set?.Element(XName.Get("max", XmppMessageArchive.ResultSetManagementNamespace))?.Value),
+            set?.Element(XName.Get("after", XmppMessageArchive.ResultSetManagementNamespace))?.Value,
+            set?.Element(XName.Get("before", XmppMessageArchive.ResultSetManagementNamespace))?.Value);
+    }
+
+    private static DateTimeOffset? TryParseArchiveDate(string? value)
+    {
+        return DateTimeOffset.TryParse(value, out var parsed) ? parsed : null;
+    }
+
+    private static int? TryParseArchiveInt(string? value)
+    {
+        return int.TryParse(value, out var parsed) ? parsed : null;
+    }
+
     private static int? ParsePort(string? value)
     {
         return int.TryParse(value, out var parsed) && parsed is >= 0 and <= 65535
@@ -1575,15 +1854,7 @@ sealed class LocalXmppSession(TcpClient client, LocalXmppServerState state)
     {
         if (type == "get")
         {
-            await WriteAsync($"""
-                <iq xmlns="jabber:client" type="result" id="{Escape(id)}">
-                  <query xmlns="jabber:iq:register">
-                    <instructions>Choose a username and password.</instructions>
-                    <username/>
-                    <password/>
-                  </query>
-                </iq>
-                """, cancellationToken);
+            await WriteAsync(CreateRegistrationInfoIq(id), cancellationToken);
             return;
         }
 
@@ -1594,14 +1865,15 @@ sealed class LocalXmppSession(TcpClient client, LocalXmppServerState state)
                 if (_username is not null)
                 {
                     state.Accounts.TryRemove(_username, out _);
+                    state.DataStore.RemoveAccount(_username);
                 }
 
                 await WriteAsync($"<iq xmlns=\"jabber:client\" type=\"result\" id=\"{Escape(id)}\"/>", cancellationToken);
                 return;
             }
 
-            var username = query.Element(XName.Get("username", "jabber:iq:register"))?.Value;
-            var password = query.Element(XName.Get("password", "jabber:iq:register"))?.Value;
+            var username = GetRegistrationValue(query, "username");
+            var password = GetRegistrationValue(query, "password");
             if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
             {
                 await WriteAsync($"""
@@ -1612,9 +1884,86 @@ sealed class LocalXmppSession(TcpClient client, LocalXmppServerState state)
                 return;
             }
 
+            if (!state.ValidateCaptcha(GetRegistrationValue(query, "key"), GetRegistrationValue(query, "ocr")))
+            {
+                await WriteAsync($"""
+                    <iq xmlns="jabber:client" type="error" id="{Escape(id)}">
+                      <error type="cancel">
+                        <not-allowed xmlns="urn:ietf:params:xml:ns:xmpp-stanzas"/>
+                        <text xmlns="urn:ietf:params:xml:ns:xmpp-stanzas">The CAPTCHA verification has failed</text>
+                      </error>
+                    </iq>
+                    """, cancellationToken);
+                return;
+            }
+
             state.Accounts[username] = password;
+            state.DataStore.SaveAccount(new LocalAccount(username, password));
             await WriteAsync($"<iq xmlns=\"jabber:client\" type=\"result\" id=\"{Escape(id)}\"/>", cancellationToken);
         }
+    }
+
+    private string CreateRegistrationInfoIq(string id)
+    {
+        if (!state.RegistrationCaptchaEnabled || state.UploadBaseUrl is null)
+        {
+            return $"""
+                <iq xmlns="jabber:client" type="result" id="{Escape(id)}">
+                  <query xmlns="jabber:iq:register">
+                    <instructions>Choose a username and password.</instructions>
+                    <username/>
+                    <password/>
+                  </query>
+                </iq>
+                """;
+        }
+
+        var challenge = state.CreateCaptchaChallenge();
+        var captchaUrl = state.UploadBaseUrl.TrimEnd('/') + "/captcha/" + challenge.Key;
+        return $"""
+            <iq xmlns="jabber:client" type="result" id="{Escape(id)}">
+              <query xmlns="jabber:iq:register">
+                <instructions>Choose a username and password, then copy the CAPTCHA text.</instructions>
+                <x xmlns="jabber:x:data" type="form">
+                  <title>Account registration</title>
+                  <instructions>Complete the CAPTCHA to create a local test account.</instructions>
+                  <field var="FORM_TYPE" type="hidden">
+                    <value>jabber:iq:register</value>
+                  </field>
+                  <field var="username" type="text-single" label="Username">
+                    <required/>
+                  </field>
+                  <field var="password" type="text-private" label="Password">
+                    <required/>
+                  </field>
+                  <field var="captcha-fallback-url" type="hidden">
+                    <value>{Escape(captchaUrl)}</value>
+                  </field>
+                  <field var="key" type="hidden">
+                    <value>{Escape(challenge.Key)}</value>
+                  </field>
+                  <field var="ocr" type="text-single" label="CAPTCHA">
+                    <required/>
+                  </field>
+                </x>
+              </query>
+            </iq>
+            """;
+    }
+
+    private static string? GetRegistrationValue(XElement query, string fieldName)
+    {
+        var direct = query.Element(XName.Get(fieldName, "jabber:iq:register"))?.Value;
+        if (!string.IsNullOrWhiteSpace(direct))
+        {
+            return direct;
+        }
+
+        return query
+            .Descendants(XName.Get("field", "jabber:x:data"))
+            .FirstOrDefault(field => string.Equals((string?)field.Attribute("var"), fieldName, StringComparison.OrdinalIgnoreCase))
+            ?.Element(XName.Get("value", "jabber:x:data"))
+            ?.Value;
     }
 
     private async Task HandlePresenceAsync(XElement element, CancellationToken cancellationToken)
@@ -1792,12 +2141,19 @@ sealed class LocalXmppSession(TcpClient client, LocalXmppServerState state)
         {
             var room = ToBareJid(to);
             var nick = state.GetRoomNick(room, this) ?? _username ?? "anonymous";
+            XElement? archiveMessage = null;
             foreach (var occupant in state.GetRoomOccupants(room))
             {
                 var outgoing = new XElement(element);
                 outgoing.SetAttributeValue("from", room + "/" + nick);
                 outgoing.SetAttributeValue("to", occupant.Session.FullJid ?? occupant.Session.BareJid);
+                archiveMessage ??= new XElement(outgoing);
                 await occupant.Session.SendAsync(outgoing.ToString(SaveOptions.DisableFormatting), cancellationToken);
+            }
+
+            if (archiveMessage is not null)
+            {
+                state.StoreRoomArchive(room, archiveMessage);
             }
 
             return;
@@ -1812,9 +2168,15 @@ sealed class LocalXmppSession(TcpClient client, LocalXmppServerState state)
             return;
         }
 
+        if (BareJid is not null)
+        {
+            state.StoreChatArchive(element, BareJid, ToBareJid(to));
+        }
+
         if (state.TryGetSession(to, out var recipient) && recipient is not null)
         {
-            await recipient.SendAsync(element.ToString(SaveOptions.DisableFormatting), cancellationToken);
+            var outgoing = element.ToString(SaveOptions.DisableFormatting);
+            await recipient.SendAsync(outgoing, cancellationToken);
         }
     }
 
@@ -2159,6 +2521,15 @@ sealed class LocalXmppSession(TcpClient client, LocalXmppServerState state)
 
 sealed record LocalAccount(string Username, string Password);
 
+sealed record LocalStoredRosterItem(string OwnerBareJid, string Jid, string Name, string Subscription);
+
+sealed record LocalArchiveMessage(
+    string ArchiveId,
+    string OwnerBareJid,
+    string ConversationJid,
+    string StanzaXml,
+    DateTimeOffset StampUtc);
+
 sealed record LocalRosterItem(string Jid, string Name, string Subscription);
 
 sealed record LocalUploadSlot(string PutUrl, string GetUrl);
@@ -2177,6 +2548,293 @@ sealed class LocalUploadSlotState(
     public byte[]? Data { get; set; }
 
     public string ContentType { get; set; } = "application/octet-stream";
+}
+
+sealed record LocalCaptchaChallenge(
+    string Key,
+    string Answer,
+    byte[] PngBytes,
+    DateTimeOffset ExpiresUtc);
+
+static class LocalCaptchaGenerator
+{
+    private const int Width = 180;
+    private const int Height = 70;
+    private static readonly byte[] PngSignature = [137, 80, 78, 71, 13, 10, 26, 10];
+
+    public static LocalCaptchaChallenge Create()
+    {
+        var random = new Random(RandomNumberGenerator.GetInt32(int.MaxValue));
+        var answer = string.Concat(Enumerable.Range(0, 5).Select(_ => (char)('0' + random.Next(10))));
+        var pixels = CreateCanvas(random);
+
+        for (var index = 0; index < answer.Length; index++)
+        {
+            var x = 18 + index * 28 + random.Next(-2, 3);
+            var y = 17 + random.Next(-5, 6);
+            DrawSevenSegmentDigit(pixels, answer[index], x + 1, y + 1, 4, (170, 190, 210));
+            DrawSevenSegmentDigit(pixels, answer[index], x, y, 4, (
+                (byte)random.Next(20, 70),
+                (byte)random.Next(45, 100),
+                (byte)random.Next(85, 145)));
+        }
+
+        ApplyEffects(pixels, random);
+        return new LocalCaptchaChallenge(
+            Guid.NewGuid().ToString("N"),
+            answer,
+            EncodePng(pixels, Width, Height),
+            DateTimeOffset.UtcNow.AddMinutes(5));
+    }
+
+    private static byte[] CreateCanvas(Random random)
+    {
+        var pixels = new byte[Width * Height * 3];
+        for (var y = 0; y < Height; y++)
+        {
+            for (var x = 0; x < Width; x++)
+            {
+                var offset = Offset(x, y);
+                var shade = random.Next(-8, 9);
+                pixels[offset] = Clamp(239 + shade);
+                pixels[offset + 1] = Clamp(246 + shade);
+                pixels[offset + 2] = Clamp(252 + shade);
+            }
+        }
+
+        return pixels;
+    }
+
+    private static void ApplyEffects(byte[] pixels, Random random)
+    {
+        for (var line = 0; line < 7; line++)
+        {
+            DrawLine(
+                pixels,
+                random.Next(Width),
+                random.Next(Height),
+                random.Next(Width),
+                random.Next(Height),
+                (
+                    (byte)random.Next(80, 170),
+                    (byte)random.Next(120, 190),
+                    (byte)random.Next(150, 220)));
+        }
+
+        for (var dot = 0; dot < 900; dot++)
+        {
+            var x = random.Next(Width);
+            var y = random.Next(Height);
+            SetPixel(pixels, x, y, (
+                (byte)random.Next(80, 210),
+                (byte)random.Next(95, 215),
+                (byte)random.Next(110, 230)));
+        }
+
+        for (var y = 0; y < Height; y += 9)
+        {
+            var wave = (int)Math.Round(Math.Sin(y / 6.0) * 3);
+            if (wave == 0)
+            {
+                continue;
+            }
+
+            ShiftRow(pixels, y, wave);
+        }
+    }
+
+    private static void DrawSevenSegmentDigit(
+        byte[] pixels,
+        char digit,
+        int x,
+        int y,
+        int scale,
+        (byte R, byte G, byte B) color)
+    {
+        var segments = digit switch
+        {
+            '0' => "abcfed",
+            '1' => "bc",
+            '2' => "abged",
+            '3' => "abgcd",
+            '4' => "fgbc",
+            '5' => "afgcd",
+            '6' => "afgecd",
+            '7' => "abc",
+            '8' => "abcdefg",
+            '9' => "abfgcd",
+            _ => "g"
+        };
+
+        foreach (var segment in segments)
+        {
+            switch (segment)
+            {
+                case 'a':
+                    FillRect(pixels, x + scale, y, 5 * scale, scale, color);
+                    break;
+                case 'b':
+                    FillRect(pixels, x + 6 * scale, y + scale, scale, 5 * scale, color);
+                    break;
+                case 'c':
+                    FillRect(pixels, x + 6 * scale, y + 7 * scale, scale, 5 * scale, color);
+                    break;
+                case 'd':
+                    FillRect(pixels, x + scale, y + 12 * scale, 5 * scale, scale, color);
+                    break;
+                case 'e':
+                    FillRect(pixels, x, y + 7 * scale, scale, 5 * scale, color);
+                    break;
+                case 'f':
+                    FillRect(pixels, x, y + scale, scale, 5 * scale, color);
+                    break;
+                case 'g':
+                    FillRect(pixels, x + scale, y + 6 * scale, 5 * scale, scale, color);
+                    break;
+            }
+        }
+    }
+
+    private static void FillRect(byte[] pixels, int x, int y, int width, int height, (byte R, byte G, byte B) color)
+    {
+        for (var yy = y; yy < y + height; yy++)
+        {
+            for (var xx = x; xx < x + width; xx++)
+            {
+                SetPixel(pixels, xx, yy, color);
+            }
+        }
+    }
+
+    private static void DrawLine(byte[] pixels, int x0, int y0, int x1, int y1, (byte R, byte G, byte B) color)
+    {
+        var dx = Math.Abs(x1 - x0);
+        var sx = x0 < x1 ? 1 : -1;
+        var dy = -Math.Abs(y1 - y0);
+        var sy = y0 < y1 ? 1 : -1;
+        var error = dx + dy;
+        while (true)
+        {
+            SetPixel(pixels, x0, y0, color);
+            if (x0 == x1 && y0 == y1)
+            {
+                break;
+            }
+
+            var e2 = 2 * error;
+            if (e2 >= dy)
+            {
+                error += dy;
+                x0 += sx;
+            }
+
+            if (e2 <= dx)
+            {
+                error += dx;
+                y0 += sy;
+            }
+        }
+    }
+
+    private static void ShiftRow(byte[] pixels, int y, int amount)
+    {
+        var copy = new byte[Width * 3];
+        Buffer.BlockCopy(pixels, Offset(0, y), copy, 0, copy.Length);
+        for (var x = 0; x < Width; x++)
+        {
+            var sourceX = Math.Clamp(x - amount, 0, Width - 1);
+            Buffer.BlockCopy(copy, sourceX * 3, pixels, Offset(x, y), 3);
+        }
+    }
+
+    private static void SetPixel(byte[] pixels, int x, int y, (byte R, byte G, byte B) color)
+    {
+        if (x < 0 || y < 0 || x >= Width || y >= Height)
+        {
+            return;
+        }
+
+        var offset = Offset(x, y);
+        pixels[offset] = color.R;
+        pixels[offset + 1] = color.G;
+        pixels[offset + 2] = color.B;
+    }
+
+    private static byte[] EncodePng(byte[] rgb, int width, int height)
+    {
+        using var png = new MemoryStream();
+        png.Write(PngSignature);
+        WriteChunk(png, "IHDR", CreateIhdr(width, height));
+
+        using var raw = new MemoryStream();
+        for (var y = 0; y < height; y++)
+        {
+            raw.WriteByte(0);
+            raw.Write(rgb, y * width * 3, width * 3);
+        }
+
+        using var compressed = new MemoryStream();
+        raw.Position = 0;
+        using (var zlib = new ZLibStream(compressed, CompressionLevel.SmallestSize, leaveOpen: true))
+        {
+            raw.CopyTo(zlib);
+        }
+
+        WriteChunk(png, "IDAT", compressed.ToArray());
+        WriteChunk(png, "IEND", []);
+        return png.ToArray();
+    }
+
+    private static byte[] CreateIhdr(int width, int height)
+    {
+        var data = new byte[13];
+        WriteInt(data.AsSpan(0, 4), width);
+        WriteInt(data.AsSpan(4, 4), height);
+        data[8] = 8;
+        data[9] = 2;
+        return data;
+    }
+
+    private static void WriteChunk(Stream stream, string type, byte[] data)
+    {
+        Span<byte> length = stackalloc byte[4];
+        WriteInt(length, data.Length);
+        stream.Write(length);
+        var typeBytes = Encoding.ASCII.GetBytes(type);
+        stream.Write(typeBytes);
+        stream.Write(data);
+        var crc = Crc32(typeBytes, data);
+        Span<byte> crcBytes = stackalloc byte[4];
+        WriteInt(crcBytes, unchecked((int)crc));
+        stream.Write(crcBytes);
+    }
+
+    private static uint Crc32(byte[] typeBytes, byte[] data)
+    {
+        var crc = 0xffffffffu;
+        foreach (var value in typeBytes.Concat(data))
+        {
+            crc ^= value;
+            for (var bit = 0; bit < 8; bit++)
+            {
+                crc = (crc & 1) == 1 ? 0xedb88320u ^ (crc >> 1) : crc >> 1;
+            }
+        }
+
+        return crc ^ 0xffffffffu;
+    }
+
+    private static void WriteInt(Span<byte> target, int value)
+    {
+        target[0] = (byte)((value >> 24) & 0xff);
+        target[1] = (byte)((value >> 16) & 0xff);
+        target[2] = (byte)((value >> 8) & 0xff);
+        target[3] = (byte)(value & 0xff);
+    }
+
+    private static int Offset(int x, int y) => (y * Width + x) * 3;
+
+    private static byte Clamp(int value) => (byte)Math.Clamp(value, 0, 255);
 }
 
 enum LocalUploadWriteStatus
@@ -2264,6 +2922,13 @@ sealed class LocalUploadHttpServer(string listenAddress, int port, LocalXmppServ
                     && state.TryReadUpload(request.Path, out var data, out var contentType))
                 {
                     await WriteResponseAsync(stream, 200, "OK", contentType, data, cancellationToken);
+                    return;
+                }
+
+                if (string.Equals(request.Method, "GET", StringComparison.OrdinalIgnoreCase)
+                    && state.TryReadCaptcha(request.Path, out var captchaData, out var captchaContentType))
+                {
+                    await WriteResponseAsync(stream, 200, "OK", captchaContentType, captchaData, cancellationToken);
                     return;
                 }
 
@@ -2426,6 +3091,234 @@ sealed record LocalHttpRequest(
     IReadOnlyDictionary<string, string> Headers,
     byte[] Body);
 
+sealed class LocalServerDataStore
+{
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        WriteIndented = true
+    };
+
+    private readonly object _gate = new();
+    private readonly string _accountsPath;
+    private readonly string _archivePath;
+    private readonly string _rosterPath;
+    private readonly List<LocalArchiveMessage> _archive;
+    private readonly List<LocalAccount> _accounts;
+    private readonly List<LocalStoredRosterItem> _rosterItems;
+
+    private LocalServerDataStore(string rootDirectory)
+    {
+        RootDirectory = Path.GetFullPath(rootDirectory);
+        Directory.CreateDirectory(RootDirectory);
+        _accountsPath = Path.Combine(RootDirectory, "accounts.json");
+        _rosterPath = Path.Combine(RootDirectory, "roster.json");
+        _archivePath = Path.Combine(RootDirectory, "message-archive.jsonl");
+        _accounts = LoadJsonList<LocalAccount>(_accountsPath);
+        _rosterItems = LoadJsonList<LocalStoredRosterItem>(_rosterPath);
+        _archive = LoadArchive(_archivePath);
+    }
+
+    public string RootDirectory { get; }
+
+    public static LocalServerDataStore Open(string rootDirectory)
+    {
+        return new LocalServerDataStore(rootDirectory);
+    }
+
+    public static string DefaultRootDirectory()
+    {
+        var localData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        if (string.IsNullOrWhiteSpace(localData))
+        {
+            localData = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".local", "share");
+        }
+
+        return Path.Combine(localData, "Tiedragon", "TeleTypTel", "LocalServer");
+    }
+
+    public IReadOnlyList<LocalAccount> LoadAccounts()
+    {
+        lock (_gate)
+        {
+            return _accounts.ToArray();
+        }
+    }
+
+    public void SaveAccount(LocalAccount account)
+    {
+        lock (_gate)
+        {
+            _accounts.RemoveAll(existing => string.Equals(existing.Username, account.Username, StringComparison.OrdinalIgnoreCase));
+            _accounts.Add(account);
+            SaveJsonList(_accountsPath, _accounts.OrderBy(item => item.Username, StringComparer.OrdinalIgnoreCase));
+        }
+    }
+
+    public void RemoveAccount(string username)
+    {
+        lock (_gate)
+        {
+            _accounts.RemoveAll(existing => string.Equals(existing.Username, username, StringComparison.OrdinalIgnoreCase));
+            SaveJsonList(_accountsPath, _accounts.OrderBy(item => item.Username, StringComparer.OrdinalIgnoreCase));
+        }
+    }
+
+    public IReadOnlyList<LocalStoredRosterItem> LoadRosterItems()
+    {
+        lock (_gate)
+        {
+            return _rosterItems.ToArray();
+        }
+    }
+
+    public void SaveRosterItem(LocalStoredRosterItem item)
+    {
+        lock (_gate)
+        {
+            _rosterItems.RemoveAll(existing =>
+                string.Equals(existing.OwnerBareJid, item.OwnerBareJid, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(existing.Jid, item.Jid, StringComparison.OrdinalIgnoreCase));
+            _rosterItems.Add(item);
+            SaveJsonList(_rosterPath, _rosterItems
+                .OrderBy(existing => existing.OwnerBareJid, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(existing => existing.Jid, StringComparer.OrdinalIgnoreCase));
+        }
+    }
+
+    public void RemoveRosterItem(string ownerBareJid, string jid)
+    {
+        lock (_gate)
+        {
+            _rosterItems.RemoveAll(existing =>
+                string.Equals(existing.OwnerBareJid, ownerBareJid, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(existing.Jid, jid, StringComparison.OrdinalIgnoreCase));
+            SaveJsonList(_rosterPath, _rosterItems
+                .OrderBy(existing => existing.OwnerBareJid, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(existing => existing.Jid, StringComparer.OrdinalIgnoreCase));
+        }
+    }
+
+    public void AppendArchiveMessage(LocalArchiveMessage message)
+    {
+        lock (_gate)
+        {
+            _archive.Add(message);
+            var line = JsonSerializer.Serialize(message, JsonOptions);
+            File.AppendAllText(_archivePath, line.Replace(Environment.NewLine, string.Empty, StringComparison.Ordinal) + Environment.NewLine, Encoding.UTF8);
+        }
+    }
+
+    public IReadOnlyList<LocalArchiveMessage> QueryArchive(
+        string ownerBareJid,
+        string? withBareJid,
+        DateTimeOffset? start,
+        DateTimeOffset? end,
+        int max,
+        string? after,
+        string? before)
+    {
+        lock (_gate)
+        {
+            var query = _archive
+                .Where(message => string.Equals(message.OwnerBareJid, ownerBareJid, StringComparison.OrdinalIgnoreCase));
+            if (!string.IsNullOrWhiteSpace(withBareJid))
+            {
+                query = query.Where(message => string.Equals(message.ConversationJid, withBareJid, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (start.HasValue)
+            {
+                query = query.Where(message => message.StampUtc >= start.Value.ToUniversalTime());
+            }
+
+            if (end.HasValue)
+            {
+                query = query.Where(message => message.StampUtc <= end.Value.ToUniversalTime());
+            }
+
+            var ordered = query
+                .OrderBy(message => message.StampUtc)
+                .ThenBy(message => message.ArchiveId, StringComparer.Ordinal)
+                .ToList();
+            if (!string.IsNullOrWhiteSpace(after))
+            {
+                var index = ordered.FindIndex(message => string.Equals(message.ArchiveId, after, StringComparison.Ordinal));
+                if (index >= 0)
+                {
+                    ordered = ordered.Skip(index + 1).ToList();
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(before))
+            {
+                var index = ordered.FindIndex(message => string.Equals(message.ArchiveId, before, StringComparison.Ordinal));
+                if (index >= 0)
+                {
+                    ordered = ordered.Take(index).ToList();
+                }
+            }
+
+            return ordered.Take(Math.Clamp(max, 1, 500)).ToArray();
+        }
+    }
+
+    private static List<T> LoadJsonList<T>(string path)
+    {
+        if (!File.Exists(path))
+        {
+            return [];
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<List<T>>(File.ReadAllText(path, Encoding.UTF8), JsonOptions) ?? [];
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
+    }
+
+    private static void SaveJsonList<T>(string path, IEnumerable<T> values)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        var tempPath = path + ".tmp";
+        File.WriteAllText(tempPath, JsonSerializer.Serialize(values.ToArray(), JsonOptions), Encoding.UTF8);
+        File.Move(tempPath, path, overwrite: true);
+    }
+
+    private static List<LocalArchiveMessage> LoadArchive(string path)
+    {
+        if (!File.Exists(path))
+        {
+            return [];
+        }
+
+        var messages = new List<LocalArchiveMessage>();
+        foreach (var line in File.ReadLines(path, Encoding.UTF8))
+        {
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                continue;
+            }
+
+            try
+            {
+                var message = JsonSerializer.Deserialize<LocalArchiveMessage>(line, JsonOptions);
+                if (message is not null)
+                {
+                    messages.Add(message);
+                }
+            }
+            catch (JsonException)
+            {
+            }
+        }
+
+        return messages;
+    }
+}
+
 sealed record LocalServerOptions(
     string ListenAddress,
     int Port,
@@ -2434,6 +3327,8 @@ sealed record LocalServerOptions(
     string Domain,
     string? CertificatePath,
     string? CertificatePassword,
+    string DataDirectory,
+    bool RegistrationCaptchaEnabled,
     IReadOnlyList<LocalAccount> Accounts)
 {
     public X509Certificate2 LoadOrCreateCertificate()
@@ -2475,6 +3370,8 @@ sealed record LocalServerOptions(
         var domain = ValueOrDefault(values, "domain", "localhost");
         var portText = ValueOrDefault(values, "port", "5222");
         var uploadPortText = ValueOrDefault(values, "upload-port", "0");
+        var dataDirectory = ValueOrDefault(values, "data-dir", LocalServerDataStore.DefaultRootDirectory());
+        var registrationCaptchaText = ValueOrDefault(values, "registration-captcha", "false");
         values.TryGetValue("cert-path", out var certPaths);
         values.TryGetValue("cert-password", out var certPasswords);
         if (!int.TryParse(portText, out var port))
@@ -2485,6 +3382,11 @@ sealed record LocalServerOptions(
         if (!int.TryParse(uploadPortText, out var uploadPort) || uploadPort < 0)
         {
             return null;
+        }
+
+        if (!bool.TryParse(registrationCaptchaText, out var registrationCaptchaEnabled))
+        {
+            registrationCaptchaEnabled = registrationCaptchaText is "1" or "yes" or "on";
         }
 
         var accounts = values.TryGetValue("account", out var accountValues)
@@ -2498,6 +3400,8 @@ sealed record LocalServerOptions(
             domain,
             certPaths?.LastOrDefault(),
             certPasswords?.LastOrDefault(),
+            dataDirectory,
+            registrationCaptchaEnabled,
             accounts);
     }
 
@@ -2511,12 +3415,16 @@ sealed record LocalServerOptions(
                 --upload-listen 127.0.0.1 \
                 --upload-port 8088 \
                 --domain localhost \
+                --data-dir .tmp/local-xmpp-data \
+                --registration-captcha true \
                 --cert-path .tmp/local-xmpp-localhost.pfx \
                 --cert-password changeit \
                 --account edward:secret \
                 --account anna:secret
 
             Accounts can also be created with XEP-0077 while the server runs.
+            Accounts, roster items and XEP-0313 message archive data are stored under --data-dir.
+            --registration-captcha true advertises a CAPTCHA data form and requires --upload-port.
             STARTTLS is always required. Without --cert-path, an ephemeral self-signed
             certificate is generated and its SHA-256 fingerprint is printed.
             """);

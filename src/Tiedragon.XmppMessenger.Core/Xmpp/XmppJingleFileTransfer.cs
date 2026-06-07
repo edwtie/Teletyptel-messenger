@@ -125,7 +125,7 @@ public sealed record XmppJingleFile(
     XmppJingleFileRange? Range = null,
     IReadOnlyList<XmppJingleFileHash>? Hashes = null)
 {
-    public XElement ToDescriptionXml()
+    public XElement ToFileXml()
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(Name);
         var file = new XElement(XName.Get("file", XmppJingleFileTransfer.NamespaceName));
@@ -162,7 +162,12 @@ public sealed record XmppJingleFile(
             file.Add(Hashes.Select(hash => hash.ToXml()));
         }
 
-        return new XElement(XName.Get("description", XmppJingleFileTransfer.NamespaceName), file);
+        return file;
+    }
+
+    public XElement ToDescriptionXml()
+    {
+        return new XElement(XName.Get("description", XmppJingleFileTransfer.NamespaceName), ToFileXml());
     }
 
     public static bool TryParseDescription(XElement? element, out XmppJingleFile? file)
@@ -173,7 +178,13 @@ public sealed record XmppJingleFile(
             return false;
         }
 
-        var fileElement = element.Element(XName.Get("file", XmppJingleFileTransfer.NamespaceName));
+        return TryParseFileElement(element.Element(XName.Get("file", XmppJingleFileTransfer.NamespaceName)), out file);
+    }
+
+    public static bool TryParseFileElement(XElement? fileElement, out XmppJingleFile? file)
+    {
+        file = null;
+
         var name = fileElement?.Element(XName.Get("name", XmppJingleFileTransfer.NamespaceName))?.Value;
         if (fileElement is null || string.IsNullOrWhiteSpace(name))
         {

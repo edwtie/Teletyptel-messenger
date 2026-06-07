@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TeleTypTel reset</title>
+  <style>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      font-family: Arial, sans-serif;
+      background: #eef4ff;
+      color: #0f172a;
+    }
+
+    main {
+      width: min(420px, calc(100vw - 32px));
+      padding: 24px;
+      border: 1px solid #60a5fa;
+      border-radius: 8px;
+      background: #fff;
+      box-shadow: 0 18px 45px rgba(15, 23, 42, .16);
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 22px;
+    }
+
+    p {
+      margin: 0 0 16px;
+      color: #475569;
+      line-height: 1.45;
+    }
+
+    a {
+      color: #1d4ed8;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>TeleTypTel wordt vernieuwd</h1>
+    <p id="status">Browsercache en service worker worden gewist...</p>
+    <p><a id="fallbackLink" href="chat.html?fresh=20260606-google-login">TeleTypTel openen</a></p>
+  </main>
+  <script>
+    (async () => {
+      const status = document.getElementById("status");
+      try {
+        if ("serviceWorker" in navigator) {
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(registrations.map((registration) => registration.unregister()));
+        }
+        if ("caches" in window) {
+          const keys = await caches.keys();
+          await Promise.all(keys.map((key) => caches.delete(key)));
+        }
+        status.textContent = "Cache is gewist. TeleTypTel opent opnieuw...";
+      } catch (error) {
+        status.textContent = "Cache reset kon niet volledig worden uitgevoerd. TeleTypTel opent toch opnieuw...";
+      }
+      window.setTimeout(() => {
+        window.location.replace("chat.html?fresh=20260606-google-login");
+      }, 500);
+    })();
+  </script>
+</body>
+</html>

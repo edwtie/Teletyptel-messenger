@@ -15,9 +15,11 @@ edge, a local STARTTLS C2S smoke server and public-server smoke tools.
 
 That is not the same as a public production service. The local server is a
 repeatable protocol test target for localhost/protected lab use. The production
-server direction remains a hardened XMPP server such as Prosody or ejabberd,
-with coturn, HTTP upload, MAM, PubSub/PEP, account policy, abuse handling and
-backup/monitoring around it.
+server direction remains a hardened XMPP server. ejabberd is the preferred
+provider/lab direction when SIP gateway work matters; Prosody and Openfire
+remain useful interoperability targets. Production needs coturn, HTTP upload,
+MAM, PubSub/PEP, account policy, abuse handling and backup/monitoring around
+the chosen XMPP server.
 
 The XSF entry text must describe only what visitors can evaluate today. Do not
 list planned Android/iOS packaging, a public hosted service or XEP-0479
@@ -81,7 +83,7 @@ client stabilizes and must not be listed as current platforms yet.
 
 ## XMPP Scope
 
-Implemented or partially implemented standards for Alpha 2:
+Implementation evidence for Alpha 2:
 
 - RFC 6120: XMPP Core
 - RFC 6121: Instant Messaging and Presence
@@ -90,28 +92,54 @@ Implemented or partially implemented standards for Alpha 2:
 - RFC 7622: XMPP Address Format
 - XEP-0030: Service Discovery
 - XEP-0045: Multi-User Chat
+- XEP-0047: In-Band Bytestreams
+- XEP-0050: Ad-Hoc Commands
+- XEP-0060: Publish-Subscribe
+- XEP-0065: SOCKS5 Bytestreams
 - XEP-0077: In-Band Registration
+- XEP-0080: User Location
 - XEP-0084: User Avatars
 - XEP-0085: Chat State Notifications
+- XEP-0124/XEP-0206: BOSH client path
+- XEP-0133: Service Administration, safe LocalServer read-only commands only
+- XEP-0153: vCard-Based Avatars
 - XEP-0157: Contact Addresses for XMPP Services
 - XEP-0163: Personal Eventing Protocol helpers
 - XEP-0166/0167/0176/0320: Jingle call signaling, ICE transport and DTLS fingerprints
 - XEP-0184: Message Delivery Receipts
+- XEP-0191: Blocking Command
 - XEP-0198: Stream Management
 - XEP-0215: External Service Discovery
+- XEP-0223: Persistent Storage of Private Data via PubSub
+- XEP-0234/0260/0261: Jingle file transfer metadata and bytestream fallback helpers
 - XEP-0280: Message Carbons
 - XEP-0301: In-Band Real Time Text
+- XEP-0308: Last Message Correction
 - XEP-0313: Message Archive Management
+- XEP-0352: Client State Indication
+- XEP-0353: Jingle Message Initiation helpers; installed-client interop remains
+  release validation
 - XEP-0363: HTTP File Upload
 - XEP-0368: SRV records for XMPP over TLS
 - XEP-0384: OMEMO wire/helper boundary, not production E2EE
+- XEP-0385: Stateless Inline Media Sharing
+- XEP-0392: Consistent Color Generation
+- XEP-0393: Message Styling
+- XEP-0398: User Avatar to vCard-Based Avatars Conversion
+- XEP-0402/0410: MUC bookmarks and self-ping helpers
+- XEP-0424/0425: Message retraction and moderation helpers
+- XEP-0433: Extended Channel Search helper; the XEP is Deferred, so live
+  search-service interop remains release validation
+- XEP-0479: compliance mapping and Total Conversation direction, not a formal
+  compliance claim yet
+- XEP-0514: Custom Emoji protocol helper; the XEP is Experimental and UI/live
+  interoperability remains release validation
 
-Still release-validation or future work:
+Release validation and out-of-scope production work:
 
 - Public hosted Teletyptel instance.
 - Android and iOS packaged apps.
 - Production OMEMO interoperability through an audited Signal Protocol backend.
-- XEP-0353 Jingle Message Initiation.
 - Production HTTP upload, TURN/STUN, MAM and PEP modules on the hosted server.
 
 ## Submit Checklist

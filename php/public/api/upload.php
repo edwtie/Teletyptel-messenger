@@ -1,8 +1,11 @@
 <?php
 declare(strict_types=1);
 
+require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'Database.php';
+
 const MAX_UPLOAD_BYTES = 10_485_760;
 
+session_start();
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 
@@ -33,35 +36,81 @@ try {
         return;
     }
 
+    $tmpName = (string)($file['tmp_name'] ?? '');
+    if ($tmpName === '' || !is_uploaded_file($tmpName)) {
+        throw new RuntimeException('Uploaded temporary file is not available.');
+    }
+
     $originalName = sanitizeFileName((string)($file['name'] ?? 'upload.bin'));
     $extension = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
-    $storedName = bin2hex(random_bytes(12)) . ($extension !== '' ? '.' . $extension : '');
-    $uploadDir = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'uploads';
-
-    if (!is_dir($uploadDir) && !mkdir($uploadDir, 0775, true) && !is_dir($uploadDir)) {
-        throw new RuntimeException('Cannot create upload directory.');
+    $fileId = bin2hex(random_bytes(16));
+    $storedName = $fileId . ($extension !== '' ? '.' . $extension : '');
+    $mime = detectMime($tmpName, (string)($file['type'] ?? ''));
+    $content = file_get_contents($tmpName);
+    if ($content === false) {
+        throw new RuntimeException('Cannot read uploaded file.');
     }
 
-    $target = $uploadDir . DIRECTORY_SEPARATOR . $storedName;
-    if (!move_uploaded_file((string)$file['tmp_name'], $target)) {
-        throw new RuntimeException('Cannot store uploaded file.');
-    }
+    $pdo = Database::connect();
+    ensureUploadedFilesSchema($pdo);
+    $statement = $pdo->prepare(
+        'INSERT INTO uploaded_files (
+            file_id, uploader_account_id, original_name, stored_name, mime_type, file_size, content
+        ) VALUES (
+            :file_id, :uploader_account_id, :original_name, :stored_name, :mime_type, :file_size, :content
+        )'
+    );
+    $statement->bindValue('file_id', $fileId);
+    $statement->bindValue('uploader_account_id', currentAccountId());
+    $statement->bindValue('original_name', $originalName);
+    $statement->bindValue('stored_name', $storedName);
+    $statement->bindValue('mime_type', $mime);
+    $statement->bindValue('file_size', $size, PDO::PARAM_INT);
+    $statement->bindValue('content', $content, PDO::PARAM_LOB);
+    $statement->execute();
 
-    $mime = detectMime($target, (string)($file['type'] ?? ''));
     echo json_encode([
         'ok' => true,
         'file' => [
+            'id' => $fileId,
             'name' => $originalName,
             'storedName' => $storedName,
-            'url' => 'uploads/' . rawurlencode($storedName),
+            'url' => 'api/file.php?id=' . rawurlencode($fileId),
+            'downloadUrl' => 'api/file.php?id=' . rawurlencode($fileId) . '&download=1',
             'size' => $size,
             'type' => $mime,
+            'storage' => 'database',
             'uploadedAt' => gmdate('c'),
         ],
     ], JSON_UNESCAPED_SLASHES);
 } catch (Throwable $error) {
     http_response_code(500);
     echo json_encode(['ok' => false, 'error' => 'server_error', 'message' => $error->getMessage()]);
+}
+
+function ensureUploadedFilesSchema(PDO $pdo): void
+{
+    $pdo->exec(
+        'CREATE TABLE IF NOT EXISTS uploaded_files (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            file_id CHAR(32) NOT NULL,
+            uploader_account_id VARCHAR(96) NOT NULL DEFAULT "",
+            original_name VARCHAR(180) NOT NULL,
+            stored_name VARCHAR(220) NOT NULL,
+            mime_type VARCHAR(120) NOT NULL DEFAULT "application/octet-stream",
+            file_size INT UNSIGNED NOT NULL,
+            content LONGBLOB NOT NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_uploaded_files_file_id (file_id),
+            KEY idx_uploaded_files_uploader_created (uploader_account_id, created_at)
+        ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
+    );
+}
+
+function currentAccountId(): string
+{
+    $value = $_SESSION['teletyptel_account_id'] ?? '';
+    return is_string($value) ? substr($value, 0, 96) : '';
 }
 
 function sanitizeFileName(string $name): string

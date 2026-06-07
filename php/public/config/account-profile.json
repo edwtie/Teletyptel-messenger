@@ -1,6 +1,6 @@
 {
-  "accountId": "local-edward",
-  "jid": "edward@localhost/web",
+  "accountId": "xmpp-edward-localhost",
+  "jid": "edward@localhost",
   "displayName": "Edward",
   "avatarDataUrl": "",
   "avatarColor": "#2563eb",
@@ -8,11 +8,13 @@
   "providerId": "example-provider",
   "accessibilityProfileId": "default-live-text",
   "preferredLanguage": "nl",
+  "liveRttEnabled": true,
+  "showSmileys": true,
   "relayWebSocket": "ws://127.0.0.1:8787",
-  "xmppWebSocket": "ws://127.0.0.1:8787",
+  "xmppWebSocket": "wss://localhost:5443/websocket/",
   "xmppHost": "localhost",
   "xmppPort": 5222,
   "xmppDomain": "localhost",
-  "xmppTlsMode": "starttls",
+  "xmppTlsMode": "websocket",
   "peer": "relay@localhost"
 }

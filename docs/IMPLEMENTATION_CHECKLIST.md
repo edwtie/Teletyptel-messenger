@@ -11,8 +11,9 @@ item is implemented, tested and documented.
 - [x] `Tiedragon.XmppMessenger.LocalServer` is documented as a real local C2S
   test server for localhost/protected lab use, not internet-facing production
   hosting.
-- [x] Production server direction is documented as Prosody/ejabberd plus coturn,
-  HTTP upload, MAM and PubSub/PEP modules.
+- [x] Production server direction is documented as ejabberd plus coturn, HTTP
+  upload, MAM and PubSub/PEP modules when SIP/provider gateway work matters;
+  Prosody/Openfire remain secondary interoperability targets.
 - [x] XSF software-directory notes say not to resubmit until a usable release,
   user-facing docs and public evaluation path are complete.
 - [x] XEP-0479 compliance notes separate repository evidence from formal
@@ -31,6 +32,80 @@ item is implemented, tested and documented.
 - [x] PHP account API for loading and saving account profiles.
 - [x] MySQL/MariaDB schema for account profiles.
 - [x] WAMP/MySQL local setup documented.
+- [x] PHP XMPP wire-model library built from the C# core: JID, XML, stanza,
+  disco, roster, RTT, PubSub/PEP, geoloc, upload, MAM and Jingle helpers.
+- [x] PHP stream/auth layer added: stream open/close, RFC 7395 open/close,
+  stream feature parser, SASL PLAIN/OAUTHBEARER and resource binding helpers.
+- [x] PHP TCP/STARTTLS/SASL PLAIN/bind stream client added with CLI login smoke tool.
+- [x] PHP SCRAM-SHA-1/SCRAM-SHA-256 helper implemented and checked against a
+  known SCRAM-SHA-1 proof/server-signature vector.
+- [x] PHP stream client selects SCRAM-SHA-256, SCRAM-SHA-1, then PLAIN.
+- [x] PHP stream client can send chat, RTT, presence, roster, disco and upload
+  slot requests and read incoming message/presence/IQ stanzas.
+- [x] PHP stream/stanza error parser added and wired into stream-client IQ and
+  stream read paths.
+- [x] PHP presence parser and subscription helpers added, including caps and
+  vCard avatar update hints.
+- [x] PHP roster result and disco#items result parsers added with stream-client
+  convenience methods.
+- [x] PHP PubSub/PEP items-result and event-message parsers added with
+  stream-client publish/items/retract convenience methods.
+- [x] PHP XEP-0060 PubSub service-node targeting, node create/configure/delete/purge,
+  subscribe/unsubscribe, subscriptions and affiliations helpers added.
+- [x] PHP XEP-0163 Personal Eventing wrapper added for PEP publish/items/retract/delete
+  and notification parsing.
+- [x] PHP XEP-0223 Persistent Private Data wrapper added with whitelist
+  publish-options and trusted notification parsing.
+- [x] PHP XEP-0060 provider announcement/news helper added with Atom entry
+  publish/items/notification parsing.
+- [x] PHP XEP-0047 In-Band Bytestreams helpers added for IQ/message data
+  transfer fallback.
+- [x] PHP XEP-0065 SOCKS5 Bytestreams helpers added for proxy discovery,
+  streamhost selection, activation and destination-address hashing.
+- [x] PHP XEP-0234/XEP-0260/XEP-0261 Jingle file-transfer helpers added for
+  metadata, S5B transport and IBB transport negotiation.
+- [x] PHP fuller client smoke tool added for login plus roster/disco/message.
+- [x] PHP RFC 7395 WebSocket frame codec and `xmpp` subprotocol handshake
+  transport added.
+- [x] PHP RFC 7395 WebSocket endpoint smoke tool added.
+- [x] PHP XEP-0004 data-form builder/parser added for shared XEP form handling.
+- [x] PHP XEP-0048/XEP-0049 bookmark/private-storage helpers added.
+- [x] PHP XEP-0050 ad-hoc command discovery, execute and result parser added.
+- [x] PHP XEP-0054 vcard-temp get/set/parser added, including PHOTO payloads.
+- [x] PHP XEP-0059 result-set-management helper added for MAM and paged queries.
+- [x] PHP XEP-0077 in-band registration info/submit/password/remove helpers added.
+- [x] PHP XEP-0084 avatar data/metadata helpers added.
+- [x] PHP XEP-0115 entity capabilities helper added.
+- [x] PHP XEP-0124/XEP-0206 BOSH body helpers added for Web Client fallback.
+- [x] PHP XEP-0124/XEP-0206 BOSH HTTP transport and endpoint smoke tool added.
+- [x] PHP XEP-0156 alternate connection discovery parser added.
+- [x] PHP XEP-0157 service contact address data-form builder/parser added.
+- [x] PHP XEP-0198 stream-management enable, ack, request and resume wire helpers added.
+- [x] PHP XEP-0203 delayed delivery helper/parser added.
+- [x] PHP XEP-0215 external service discovery helper added.
+- [x] PHP XEP-0245 `/me` command message marker helper added.
+- [x] PHP XEP-0280 message carbons enable/disable/private and forwarded-message parser added.
+- [x] PHP XEP-0334 message processing hints helper/parser added.
+- [x] PHP XEP-0352 client state indication helper added.
+- [x] PHP XEP-0357 push notification helper added.
+- [x] PHP XEP-0359 origin-id/stanza-id helper/parser added.
+- [x] PHP XEP-0384 OMEMO wire helpers added for device lists, bundles and
+  encrypted-message wrappers; production encryption remains gated.
+- [x] PHP XEP-0385 SIMS/media sharing helper added.
+- [x] PHP XEP-0393 message styling helper added.
+- [x] PHP XEP-0425 message moderation helper added.
+- [x] PHP XEP-0433 public channel search form/query/result helper added.
+- [x] PHP XEP-0494 client access management list/revoke helper added.
+- [x] PHP XEP-0514 custom emoji markup helper added.
+- [x] PHP stream client convenience methods added for bookmarks, avatars,
+  external services, push and mobile active/inactive state.
+- [x] PHP stream client convenience methods added for XEP-0198 stream management,
+  XEP-0077 registration, XEP-0054 vCard, XEP-0280 carbons and XEP-0050 commands.
+- [x] PHP stream client convenience methods added for XEP-0157 service contacts,
+  XEP-0433 channel search and XEP-0494 client access management.
+- [x] PHP IM extension layer added: delivery receipts, chat states, message
+  correction, message retraction, MUC join/group message and blocking helpers.
+- [x] PHP XMPP library smoke test.
 - [x] Account API smoke-tested against local MariaDB.
 - [x] Web `.lng` loader with English and Dutch language files.
 - [x] `preferredLanguage` saved through the account profile API.
@@ -42,6 +117,18 @@ item is implemented, tested and documented.
 - [ ] Language key completeness validator for web `.lng` and packaged LngPdk resources.
 - [ ] Account authentication/session model; current Alpha 2 profile API is not login security.
 - [ ] Password handling hardening; current local profile password option is a prototype setting.
+- [x] Account identity model separates login identity from XMPP JID/server identity.
+- [x] Social login provider setup documented for Google, Facebook and Apple.
+- [x] XEP-0493 OAuth Client Login researched and mapped to SASL `OAUTHBEARER`.
+- [x] Core SASL `OAUTHBEARER` auth element helper implemented and tested.
+- [x] XEP-0494 Client Access Management list/revoke wire helpers implemented and tested.
+- [x] Backend Authorization Code + PKCE flow for Google login.
+- [x] Backend Authorization Code + PKCE flow for Facebook login.
+- [x] Backend Authorization Code + PKCE flow for Apple login.
+- [ ] Live social-login smoke with real Google/Facebook/Apple provider configuration.
+- [x] Database schema and compatibility migration for `accounts`, `account_identities`, `account_credentials` and `account_xmpp`.
+- [ ] Security UI for active clients/grants and revoke access.
+- [ ] XMPP server OAuth discovery and OAUTHBEARER live-server smoke.
 - [x] Real XMPP server two-account chat smoke test.
 - [x] Location and NG112 protocol direction recorded: XEP-0080 for XMPP user
   location and PIDF-LO/RFC 6442 for future emergency gateway interop.
@@ -51,7 +138,7 @@ item is implemented, tested and documented.
   backspace/delete plus CR/LF as live call text.
 - [x] Browser sends linear live edits as raw T.140 over the negotiated `rtt`
   datachannel and keeps the JSON wrapper for reset/final/non-linear metadata.
-- [x] Core RFC 4103 direction started: T.140 codec, RTP v2 packet parser,
+- [x] Core RFC 4103 helper layer added: T.140 codec, RTP v2 packet parser,
   `text/t140` packetizer and RFC 2198 `text/red` redundant payload helper.
 - [x] ProtoXEP Jingle location/GPS core helper added so call sessions can carry
   explicit XEP-0080 location updates without relying only on PEP presence.
@@ -226,6 +313,9 @@ item is implemented, tested and documented.
 - [x] Stream feature detection.
 - [x] `XmppStreamClient` helper methods.
 - [x] Real-server smoke registration path through `RealServerSmoke --register`.
+- [x] LocalServer can advertise an optional XEP-0077 CAPTCHA data form with
+  `captcha-fallback-url`, hidden challenge key and required `ocr`, backed by a
+  generated PNG image on the local HTTP endpoint.
 
 ## XEP-0080 - User Location
 
@@ -338,6 +428,12 @@ item is implemented, tested and documented.
 - [x] Resume support.
 - [x] Reconnect local server test.
 
+## XEP-0203 - Delayed Delivery
+
+- [x] Delay element builder.
+- [x] Delay stamp/from/reason parser.
+- [x] Incoming message extension exposure.
+
 ## XEP-0280 - Message Carbons
 
 - [x] Enable carbons.
@@ -364,6 +460,21 @@ item is implemented, tested and documented.
 - [x] Paging/result-set management.
 - [x] Real public-server one-to-one MAM smoke.
 - [x] Real public-server MUC archive smoke.
+- [x] LocalServer persists one-to-one and local MUC messages and serves
+  XEP-0313 results from its portable data directory.
+
+## XEP-0334 - Message Processing Hints
+
+- [x] `store`, `no-store`, `no-copy` and `no-permanent-store` element builders.
+- [x] Message hint parser.
+- [x] Incoming message extension exposure.
+
+## XEP-0359 - Stable And Unique Stanza IDs
+
+- [x] `origin-id` builder.
+- [x] `stanza-id` builder.
+- [x] Origin and server stanza-id parser.
+- [x] Incoming message extension exposure.
 
 ## XEP-0363 - HTTP File Upload
 
@@ -390,6 +501,8 @@ item is implemented, tested and documented.
 - [x] Encrypted message wrapper serializer/parser.
 - [x] `XmppStreamClient` device list helper.
 - [x] Signal Protocol backend boundary and production guard.
+- [x] OMEMO production backend decision documented: libsignal behind
+  `IXmppOmemoSessionBackend`, PHP wire helpers only.
 - [x] X3DH key bundle validation, DH1-DH4 plan and HKDF boundary.
 - [x] X3DH X25519 key agreement implementation for initiator/responder DH1-DH4.
 - [x] Signed pre-key verification gate and verifier contract.
@@ -432,8 +545,11 @@ item is implemented, tested and documented.
 - [x] XEP-0163 generic PEP/PubSub publishing for Advanced Core Client.
 - [x] XEP-0163 protocol helper and stream-client methods complete; public-server PEP smoke is release validation.
 - [x] XEP-0191 Blocking Command for Advanced IM Client.
+- [x] XEP-0203 Delayed Delivery message metadata.
 - [x] XEP-0215 External Service Discovery for STUN/TURN discovery; RealServerSmoke and LocalServer now cover service discovery and restricted TURN credentials.
 - [x] XEP-0223 persistent private data via PubSub/PEP with whitelist publish-options and notification trust checks.
+- [x] XEP-0334 Message Processing Hints.
+- [x] XEP-0359 Stable And Unique Stanza IDs.
 - [x] XEP-0234/XEP-0260 Jingle direct file transfer metadata and S5B transport helpers.
 - [x] XEP-0245 `/me` command.
 - [x] XEP-0280 Message Carbons.
@@ -444,7 +560,9 @@ item is implemented, tested and documented.
 - [x] XEP-0357 Push Notifications helper.
 - [x] XEP-0363 real-server upload-service smoke path for IM Client.
 - [x] XEP-0368 direct TLS SRV discovery for Advanced Core Client.
+- [x] XEP-0433 Extended Channel Search helper, RSM paging model, result parser and stream-client flow.
 - [x] Active XEP-0479 reference documented instead of the old attic-only link.
+- [x] XEP-0514 Custom Emoji protocol helper with XEP-0394 markup spans, XEP-0300 hash links and SIMS/XEP-0385 media matching.
 - [x] Roadmap phases are broken down by XEP-0479 Core, Web, IM, Mobile and A/V
   Client gates instead of loose Alpha/Beta feature buckets.
 - [x] XEP-0479 Core Client checklist and self-assessment.
@@ -479,6 +597,8 @@ item is implemented, tested and documented.
 - [x] Real-server smoke tool for TLS, hostname validation, two-account chat and MUC discovery/join/groupchat.
 - [x] Real-server smoke tool can create temporary XEP-0077 in-band registration accounts with `--register`.
 - [x] Local XMPP server tool for repeatable STARTTLS, chat, upload and MUC protocol smoke tests.
+- [x] Local XMPP server has portable `--data-dir` storage for accounts, roster
+  items and local message archive across Windows/Linux/macOS.
 - [x] `scripts/local-xmpp-server-smoke.ps1` starts LocalServer and verifies it with the real client smoke stack.
 
 ## Accessibility Agent

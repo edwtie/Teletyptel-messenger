@@ -130,6 +130,15 @@ public static class XmppMultiUserChat
         return message;
     }
 
+    public static XmppIq CreateModeratedRetractionRequest(
+        string id,
+        XmppAddress room,
+        string stanzaId,
+        string? reason = null)
+    {
+        return XmppMessageModeration.CreateModeratedRetractionRequest(id, room, stanzaId, reason);
+    }
+
     public static XElement CreateDirectInvitation(
         XmppAddress invitee,
         XmppAddress room,
@@ -163,6 +172,8 @@ public static class XmppMultiUserChat
         XmppAddress.TryParse((string?)element.Attribute("from"), out var from);
         XmppAddress.TryParse((string?)element.Attribute("to"), out var to);
         XmppMessageCorrection.TryGetReplaceId(element, out var replaceId);
+        XmppMessageRetraction.TryParseRetract(element, out var retraction);
+        XmppMessageRetraction.TryParseTombstone(element, out var tombstone);
         message = new XmppGroupChatMessage(
             Room: from is null ? null : XmppAddress.Parse(from.Bare),
             Nickname: from?.ResourcePart,
@@ -170,7 +181,9 @@ public static class XmppMultiUserChat
             From: from,
             To: to,
             Id: (string?)element.Attribute("id"),
-            ReplaceId: replaceId);
+            ReplaceId: replaceId,
+            Retraction: retraction,
+            Tombstone: tombstone);
         return true;
     }
 
@@ -439,4 +452,6 @@ public sealed record XmppGroupChatMessage(
     XmppAddress? From = null,
     XmppAddress? To = null,
     string? Id = null,
-    string? ReplaceId = null);
+    string? ReplaceId = null,
+    XmppMessageRetractionEvent? Retraction = null,
+    XmppMessageTombstone? Tombstone = null);

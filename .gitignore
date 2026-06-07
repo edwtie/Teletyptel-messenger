@@ -7,11 +7,16 @@ obj/
 *.log
 artifacts/
 packages/
+node_modules/
 TestResults/
 logs/
 *-cdx.json
 archive-teletyptel/
 php/*screenshot*.png
 php/config.php
+php/config.local.php
+php/storage/
+php/public/config/google-maps.json
 php/public/uploads/*
 !php/public/uploads/.gitkeep
+tmp-oauth-smoke.png

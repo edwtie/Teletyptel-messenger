@@ -1,7 +1,8 @@
 # User Guide
 
-Teletyptel 2.0 Alpha 1 is a local evaluation build for accessible real-time
-text chat. It is intended for testers and developers, not for production use.
+Teletyptel 2.0 Alpha 2 is a local evaluation build for accessible chat,
+real-time text, attachment/location experiments and WebRTC Total Conversation
+testing. It is intended for testers and developers, not for production use.
 
 ## Opening The Client
 
@@ -37,10 +38,12 @@ need the relay/RFC 7395 switch, manual connect button and debug panel.
 
 ## Modes
 
-- **Relay**: local PHP relay mode for Alpha 1 chat testing.
+- **Relay**: local PHP relay mode for Alpha 2 chat, RTT and WebRTC/Jingle
+  testing.
 - **RFC 7395**: WebSocket framing test mode for XMPP-over-WebSocket experiments.
 
-Relay mode is the normal Alpha 1 demo path.
+Relay mode is the normal Alpha 2 browser demo path. Standards-based XMPP flows
+are validated through LocalServer and RealServerSmoke.
 
 ## Mobile Lifecycle
 
@@ -72,15 +75,16 @@ production direction.
 
 ## Smilies
 
-The smiley toggle converts supported legacy text codes, such as `:)` and `:D`,
-to local SVG/GIF smiley assets.
+The smiley button opens the local smiley picker. Supported legacy text codes,
+such as `:)` and `:D`, are converted to local SVG/GIF smiley assets in the
+message view.
 
 ## Account Profile
 
 The account panel lets you set:
 
 - display name
-- JID
+- e-mail/JID
 - peer/contact
 - phone field
 - provider id
@@ -104,8 +108,9 @@ other XMPP smoke targets.
 - The PHP relay is a web edge for local UI, RTT, RFC 7395 and WebRTC/Jingle demo
   testing; it is not the authoritative XMPP server.
 - LocalServer covers STARTTLS, SASL, bind, session, roster, presence, MUC,
-  XEP-0363 slot/PUT, vCard, blocking, stream management and client-state
-  smoke paths.
+  XEP-0077 registration including optional local CAPTCHA, XEP-0313 local
+  archive, XEP-0363 slot/PUT, vCard, blocking, stream management and
+  client-state smoke paths.
 - OMEMO protocol/key-storage helpers exist, but production end-to-end encryption
   still needs an audited Signal Protocol backend and live interoperability
   validation.

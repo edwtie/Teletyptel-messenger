@@ -19,7 +19,7 @@ php php/rtt-websocket-server.php
 Then open:
 
 ```text
-php/public/index.html
+php/public/chat.html
 ```
 
 Open the page in two browser windows, connect both to:
@@ -74,11 +74,13 @@ The release zip is generated from the repository root with:
 .\scripts\package-alpha1.ps1
 ```
 
-That script needs PowerShell and the .NET 10 SDK on the build machine. It
-includes `public`, `lib`, `schema.sql`, `config.example.php`, the relay server
-and the published .NET test tools under a WAMP-style folder layout. The target
-machine needs WAMP or another Apache/PHP/MySQL stack, PHP 8.1 or newer for the
-relay and .NET runtime 10 for the published smoke tools.
+That script name is historical; it currently packages the Alpha 2 web client
+and server test tools until the release recipe is renamed. It needs PowerShell
+and the .NET 10 SDK on the build machine. It includes `public`, `lib`,
+`schema.sql`, `config.example.php`, the relay server and the published .NET test
+tools under a WAMP-style folder layout. The target machine needs WAMP or another
+Apache/PHP/MySQL stack, PHP 8.1 or newer for the relay and .NET runtime 10 for
+the published smoke tools.
 
 The fuller web chat client must be opened through localhost, not directly from
 `C:\...` or `file:///...`, because login uses the PHP account API:
@@ -136,6 +138,50 @@ LngPdk packages. Treat them as a web-demo and fallback layer until LngPdk
 packages are served and verified by the web/mobile clients.
 
 Critical notes: [../docs/LOCALIZATION_CRITICAL_NOTES.md](../docs/LOCALIZATION_CRITICAL_NOTES.md).
+
+## PHP XMPP Library
+
+The PHP tree now also contains a first standalone XMPP wire-model library:
+
+```text
+php/lib/Xmpp
+```
+
+It mirrors the C# XMPP core where practical, starting with stream open/close,
+RFC 7395 open/close, stream feature parsing, SASL PLAIN/OAUTHBEARER XML,
+resource binding, SCRAM-SHA-1/SCRAM-SHA-256, JID parsing, XML escaping/parsing, message/presence/IQ
+builders, XEP-0030 service discovery, roster, XEP-0301 RTT, PubSub/PEP,
+XEP-0080 geolocation, XEP-0363 HTTP upload, XEP-0313 MAM, delivery receipts,
+chat states, correction/retraction, MUC, blocking and Jingle session-info
+helpers. This is not yet the complete TCP/TLS/WebSocket network transport or
+WebSocket/BOSH transport stack; it is the PHP protocol layer that those
+transports will use.
+
+Run the smoke test with:
+
+```powershell
+& 'C:\wamp64\bin\php\php8.4.15\php.exe' php\tests\xmpp-library-smoke.php
+```
+
+Run a real XMPP login smoke with:
+
+```powershell
+& 'C:\wamp64\bin\php\php8.4.15\php.exe' php\tools\xmpp-login-smoke.php --jid user@localhost --password secret --host localhost --resource php
+```
+
+Run a fuller PHP client smoke with roster/disco/message:
+
+```powershell
+& 'C:\wamp64\bin\php\php8.4.15\php.exe' php\tools\xmpp-client-smoke.php --jid user@localhost --password secret --host localhost --roster --disco localhost --to tester@localhost --message "Hallo vanaf PHP"
+```
+
+Run an RFC 7395 WebSocket endpoint smoke with:
+
+```powershell
+& 'C:\wamp64\bin\php\php8.4.15\php.exe' php\tools\xmpp-websocket-smoke.php --url ws://localhost:5280/xmpp-websocket --domain localhost
+```
+
+Design notes: [../docs/PHP_XMPP_LIBRARY.md](../docs/PHP_XMPP_LIBRARY.md).
 
 ## Server Account Storage
 
@@ -204,6 +250,40 @@ The relay accepts JSON messages like:
 The `xml` field is the XEP-0301-style payload. The `text` field is included only
 for the browser demo.
 
+Normal chat messages use `type: "message"` with `messageId`, `from`, `to`, and
+optional `attachment` or `location` metadata. Forwarded messages set
+`forwarded: true`; the relay normalizes them with `serverAction: "forward"` and
+keeps `originalFrom` so clients can show where the forwarded item came from.
+
+Message deletion uses a server-side event:
+
+```json
+{
+  "type": "message-delete",
+  "from": "edward@localhost/web",
+  "to": "tester@localhost",
+  "targetMessageId": "msg-labc123"
+}
+```
+
+The relay validates the event, adds server metadata and routes it to the target
+peer when that peer is known. If the target is not known yet it falls back to the
+old broadcast behavior so local demos keep working.
+
+## Message History
+
+When a browser session is signed in through the PHP account API, the web client
+also uses `public/api/history.php` to persist completed chat messages in
+MySQL/MariaDB. The history layer stores text, attachments, shared locations,
+corrections and retractions in the `message_history` table. RTT draft updates are
+not stored; only completed messages are saved.
+
+The API is session-bound to the active account profile. A client can only read or
+write history for the `account_id` stored in `$_SESSION['teletyptel_account_id']`.
+On startup the client loads the latest messages and reconstructs local
+conversations from `conversation_peer`, `conversation_name` and
+`conversation_kind`.
+
 ## Current Boundaries
 
 The browser client now expects a server-side account profile. The PHP account
@@ -219,6 +299,10 @@ real XMPP server such as Prosody, ejabberd or Openfire.
 
 - local RTT/RFC 7395 relay for browser UI and WebRTC/Jingle-shaped tests
 - binds to localhost by default
+- routes JSON envelopes with `to` to known local peers and supports
+  server-side message delete/forward events for the browser client
+- persists completed chat messages, attachments, locations and retractions
+  through `public/api/history.php` and the `message_history` table
 - use Apache/Nginx/WAMP reverse proxy TLS before exposing any WebSocket endpoint
 - account profile login is handled by the PHP account API and MySQL/MariaDB
 - XMPP account login, roster, presence, MUC, upload slots and discovery belong

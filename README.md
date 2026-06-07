@@ -33,8 +33,12 @@ Out of scope for the current alpha:
 
 `Tiedragon.XmppMessenger.LocalServer` is a real local C2S protocol test server,
 not a fake relay, but it is intentionally scoped to localhost/protected lab
-testing. For production deployment the server direction remains Prosody or
-ejabberd plus coturn, HTTP upload, MAM and PubSub/PEP modules.
+testing. For production and provider lab deployments, ejabberd is the preferred
+server direction when SIP interoperability matters, because it can provide the
+normal XMPP server role and also has SIP service/gateway support. Prosody
+remains useful as a lightweight interoperability target, but the Teletyptel
+production path should assume ejabberd plus coturn, HTTP upload, MAM and
+PubSub/PEP modules.
 
 The XMPP client core is built in this repository rather than delegated to a
 third-party XMPP library. Teletyptel 2.0 should own its RFC 6120 stream flow,
@@ -52,6 +56,8 @@ still using normal platform primitives such as TLS, XML and WebSocket APIs.
 - Real server and local server setup: [Real Server Setup](docs/REAL_SERVER_SETUP.md)
 - Windows deployment/setup: [Windows Setup](docs/WINDOWS_SETUP.md)
 - Linux deployment/setup: [Linux Setup](docs/LINUX_SETUP.md)
+- iOS app shell: [TeleTypTel iOS app](docs/IOS_APP.md)
+- OMEMO backend decision: [OMEMO Backend Decision](docs/OMEMO_BACKEND_DECISION.md)
 - OMEMO interop smoke: [OMEMO Interop Smoke](docs/OMEMO_INTEROP_SMOKE.md)
 - Jingle interop smoke: [Jingle Interop Smoke](docs/JINGLE_INTEROP_SMOKE.md)
 - NG112 and location direction: [NG112 Teletyptel Notes](docs/NG112_TELETYPTEL_NOTES.md)
@@ -157,6 +163,8 @@ Important XMPP extensions:
 - XEP-0384 - OMEMO Encryption
 - XEP-0402 - PEP Native Bookmarks
 - XEP-0410 - MUC Self-Ping
+- XEP-0433 - Extended Channel Search
+- XEP-0514 - Custom Emoji
 
 Audio and video use XMPP/Jingle call setup and WebRTC media transport. The web
 demo can place local relay calls today. The core builds and parses XEP-0353
@@ -183,11 +191,20 @@ supporting and non-supporting servers remains release-validation work.
 
 Candidate server stack:
 
-- Prosody or ejabberd for XMPP
+- ejabberd as the preferred XMPP lab/production server when SIP gateway
+  integration is required
+- Prosody as a lightweight secondary interoperability target
 - coturn for STUN/TURN
 - HTTP upload module for files
 - MAM support for history
-- PubSub/PEP support for OMEMO
+- PubSub/PEP support for avatars, location and OMEMO device data
+- ejabberd SIP service/gateway path for future XMPP/Jingle to SIP integration
+  with Asterisk, Kamailio, provider VoIP or NG112/relay experiments
+
+The client should not embed SIP carrier logic directly. Teletyptel should keep
+Jingle, RTT, location and file exchange in the client/core layer, then bridge to
+SIP from the server/gateway layer when a deployment needs PSTN, VoIP provider or
+emergency-service integration.
 
 ## Release Lines
 
@@ -214,7 +231,11 @@ Local development XMPP server:
 dotnet run --project tools/Tiedragon.XmppMessenger.LocalServer -- `
   --listen 127.0.0.1 `
   --port 55222 `
+  --upload-listen 127.0.0.1 `
+  --upload-port 58088 `
   --domain localhost `
+  --data-dir .tmp/local-xmpp-data `
+  --registration-captcha true `
   --account edward:secret `
   --account anna:secret
 ```
@@ -222,7 +243,15 @@ dotnet run --project tools/Tiedragon.XmppMessenger.LocalServer -- `
 The local server requires STARTTLS and supports XEP-0077, SASL PLAIN,
 resource binding, session IQ, roster get/set/remove, presence, direct
 one-to-one chat relay, vCard, blocking, stream management, client state
-indication, STUN/TURN discovery, upload slots and a small MUC conference path.
+indication, STUN/TURN discovery, XEP-0313 local message archive, upload slots
+and a small MUC conference path. Accounts created through XEP-0077, roster
+changes and archived messages are stored under `--data-dir`; when omitted, the
+server uses the user's cross-platform local application data folder.
+With `--registration-captcha true`, LocalServer advertises an XEP-0077 data
+form with `captcha-fallback-url`, hidden challenge key and required `ocr`
+answer. The CAPTCHA image is generated as PNG with local line/dot distortion
+and served through the loopback HTTP endpoint, so this option requires
+`--upload-port`.
 For local self-signed certificates, pass the printed SHA-256 fingerprint to the
 smoke tool with `--cert-sha256`.
 
@@ -235,6 +264,17 @@ One-command local server compliance smoke:
 This starts `LocalServer`, captures its certificate fingerprint and verifies it
 through the same `RealServerSmoke` client stack used for public XMPP servers.
 
+Localhost admin panel:
+
+```powershell
+dotnet run --project tools/Tiedragon.XmppMessenger.LocalServerAdmin
+```
+
+The admin app is a Windows/.NET tool, not a PHP page. It manages the same
+LocalServer data directory as the localhost XMPP server: accounts, roster items
+and the local XEP-0313 message archive. It can also start and stop the
+localhost LocalServer with the selected data directory.
+
 ```text
 src/Tiedragon.XmppMessenger.Core
 tests/Tiedragon.XmppMessenger.Tests
@@ -242,7 +282,8 @@ samples/Tiedragon.XmppMessenger.WebSocketConsole
 samples/Tiedragon.XmppMessenger.WinFormsDemo
 samples/Tiedragon.XmppMessenger.AiBotConsole
 php/rtt-websocket-server.php
-php/public/index.html
+php/public/chat.html
+php/public/index.html  legacy minimal RTT page
 ```
 
 The first implemented layer is `Tiedragon.XmppMessenger.Core.Rtt`:
@@ -342,8 +383,9 @@ ws://127.0.0.1:8787
 Each profile stores its own local account settings, JID and generated browser
 resource. The second session can also be opened from the Connection panel.
 
-PHP is not bundled with this repository. `php/public/index.html` remains a
-minimal RTT protocol page; `php/public/chat.html` is the preferred Alpha UI.
+The PHP runtime is not bundled with this repository. `php/public/index.html`
+remains a legacy minimal RTT protocol page; `php/public/chat.html` is the
+current Alpha 2 UI.
 
 ## C# WebSocket Console Demo
 

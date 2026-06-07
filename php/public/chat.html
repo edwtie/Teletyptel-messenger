@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#111827">
-  <title>Tiedragon XMPP Web Client</title>
+  <title>TeleTypTel Messenger</title>
   <script>
     if (location.protocol === "file:") {
       const localUrl = new URL("http://127.0.0.1:8090/chat.html");
@@ -14,28 +14,55 @@
     }
   </script>
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="chat-client.css?v=20260531-contact-first">
+  <link rel="stylesheet" href="chat-client.css?v=20260606-security-totp">
 </head>
 <body>
+  <a class="skip-link" href="#messageInput" data-i18n="button.skip_to_message">Skip to message</a>
   <div class="app-shell">
     <header class="topbar">
       <div class="brand">
-        <div class="brand-mark">TX</div>
-        <div>
-          <h1>Tiedragon XMPP</h1>
-          <span id="connectionSummary" data-i18n="status.disconnected">Disconnected</span>
+        <img class="brand-logo" src="assets/brand/teletyptel-logo-header.png" srcset="assets/brand/teletyptel-logo-header.png 1x, assets/brand/teletyptel-logo-header@2x.png 2x" alt="TeleTypTel">
+        <div class="brand-status">
+          <h1 class="sr-only" data-i18n="app.title">TeleTypTel Messenger</h1>
+          <span id="connectionSummary" role="status" aria-live="polite" data-i18n="status.disconnected">Disconnected</span>
         </div>
       </div>
       <div class="top-actions" role="toolbar" aria-label="Connection actions">
+        <button id="newsButton" type="button" data-i18n="tab.news" hidden>News</button>
+        <button id="supportButton" type="button" hidden>Support</button>
         <details id="viewMenu" class="top-menu">
-          <summary data-i18n="menu.view">View</summary>
+          <summary class="top-icon-button" title="View" aria-label="View" data-i18n-title="menu.view" data-i18n-aria-label="menu.view">
+            <span class="contrast-symbol" aria-hidden="true"><span></span></span>
+            <span class="sr-only" data-i18n="menu.view">View</span>
+          </summary>
           <div class="top-menu-panel">
             <button id="themeButton" class="theme-button" type="button" title="Switch light/dark mode" aria-label="Switch light/dark mode">Theme: White</button>
+            <label class="top-menu-field">
+              <span data-i18n="label.chat_background">Chat background</span>
+              <select id="chatBackgroundInput">
+                <option value="auto" data-i18n="background.auto">Auto accessibility</option>
+                <option value="none" data-i18n="background.none">None</option>
+                <option value="wide-1" data-i18n="background.wide_1">World soft</option>
+                <option value="wide-2" data-i18n="background.wide_2">World open</option>
+                <option value="wide-3" data-i18n="background.wide_3">World right</option>
+                <option value="mobile" data-i18n="background.mobile">Mobile portrait</option>
+              </select>
+            </label>
           </div>
         </details>
-        <button id="accountButton" type="button" data-i18n="button.settings">Settings</button>
+        <button id="profileButton" class="icon-button top-icon-button" type="button" title="Profile" aria-label="Profile" data-i18n-title="button.profile" data-i18n-aria-label="button.profile">
+          <span class="material-icon" data-icon="person" aria-hidden="true"></span>
+          <span class="sr-only" data-i18n="button.profile">Profile</span>
+        </button>
+        <button id="accountButton" class="icon-button top-icon-button" type="button" title="Settings" aria-label="Settings" data-i18n-title="button.settings" data-i18n-aria-label="button.settings">
+          <span class="material-icon" data-icon="settings" aria-hidden="true"></span>
+          <span class="sr-only" data-i18n="button.settings">Settings</span>
+        </button>
         <button id="connectButton" class="developer-only" type="button" data-i18n="button.connect">Connect</button>
-        <button id="disconnectButton" type="button" disabled data-i18n="button.disconnect">Disconnect</button>
+        <button id="disconnectButton" class="icon-button disconnect-icon-button" type="button" disabled hidden title="Disconnect" aria-label="Disconnect" data-i18n-title="button.disconnect" data-i18n-aria-label="button.disconnect">
+          <span class="material-icon" data-icon="callEnd" aria-hidden="true"></span>
+          <span class="sr-only" data-i18n="button.disconnect">Disconnect</span>
+        </button>
       </div>
     </header>
 
@@ -72,17 +99,35 @@
           </div>
           <div class="chat-header-actions">
             <div class="call-controls" role="toolbar" aria-label="Call controls">
-              <div class="call-menu">
-                <button id="startCallButton" class="call-menu-trigger" type="button" aria-haspopup="true" aria-expanded="false" data-i18n="button.call">Call</button>
-                <div id="startCallMenu" class="call-menu-panel" hidden>
-                  <button id="startAudioCallOption" type="button" data-i18n="button.audio_call">Audio call</button>
-                  <button id="startVideoCallOption" type="button" data-i18n="button.video_call">Video call</button>
-                </div>
+              <div class="call-mode-buttons" role="group" aria-label="Call modes" data-i18n-aria-label="aria.call_modes">
+                <button id="startAudioCallOption" class="icon-button call-mode-button" type="button" title="Audio" aria-label="Audio" data-i18n-title="button.call_audio" data-i18n-aria-label="button.call_audio">
+                  <span class="material-icon" data-icon="call" aria-hidden="true"></span>
+                  <span class="sr-only" data-i18n="button.call_audio">Audio</span>
+                </button>
+                <button id="startVideoCallOption" class="icon-button call-mode-button" type="button" title="Audio + video" aria-label="Audio + video" data-i18n-title="button.call_audio_video" data-i18n-aria-label="button.call_audio_video">
+                  <span class="material-icon" data-icon="videocam" aria-hidden="true"></span>
+                  <span class="sr-only" data-i18n="button.call_audio_video">Audio + video</span>
+                </button>
+                <button id="startTotalCallOption" class="icon-button call-mode-button total-conversation-button" type="button" title="Total conversation" aria-label="Total conversation" data-i18n-title="button.call_total_conversation" data-i18n-aria-label="button.call_total_conversation">
+                  <span class="material-icon" data-icon="rtt" aria-hidden="true"></span>
+                  <span class="sr-only" data-i18n="button.call_total_conversation">Total conversation</span>
+                </button>
               </div>
+              <button id="resetRttButton" class="icon-button call-mode-button rtt-toolbar-button" type="button" title="Reset RTT" aria-label="Reset RTT" data-i18n-title="button.reset_rtt" data-i18n-aria-label="button.reset_rtt">
+                <span class="material-icon" data-icon="restartAlt" aria-hidden="true"></span>
+                <span class="sr-only" data-i18n="button.reset_rtt">Reset RTT</span>
+              </button>
+              <button id="enableRttButton" class="icon-button call-mode-button rtt-toolbar-button" type="button" title="Real-time text" aria-label="Real-time text" data-i18n-title="button.enable_rtt" data-i18n-aria-label="button.enable_rtt" hidden>
+                <span class="material-icon" data-icon="rtt" aria-hidden="true"></span>
+                <span class="sr-only" data-i18n="button.enable_rtt">Real-time text</span>
+              </button>
               <button id="answerCallButton" type="button" hidden data-i18n="button.answer_call">Answer</button>
               <button id="rejectCallButton" type="button" hidden data-i18n="button.reject_call">Reject</button>
-              <button id="hangupCallButton" type="button" disabled data-i18n="button.hangup_call">Hang up</button>
-              <span id="callStatus" class="call-status" data-i18n="call.idle">No call</span>
+              <button id="hangupCallButton" class="icon-button call-mode-button hangup-icon-button" type="button" disabled title="Hang up" aria-label="Hang up" data-i18n-title="button.hangup_call" data-i18n-aria-label="button.hangup_call">
+                <span class="material-icon" data-icon="callEnd" aria-hidden="true"></span>
+                <span class="sr-only" data-i18n="button.hangup_call">Hang up</span>
+              </button>
+              <span id="callStatus" class="call-status" role="status" aria-live="polite" data-i18n="call.idle">No call</span>
             </div>
             <div class="mode-switch developer-only" role="tablist" aria-label="Transport mode">
               <button id="relayModeButton" type="button" class="selected" data-i18n="mode.relay">Relay</button>
@@ -117,14 +162,40 @@
           <video id="remoteVideo" autoplay playsinline></video>
           <video id="localVideo" autoplay muted playsinline></video>
           <div class="call-media-controls" role="toolbar" aria-label="Call audio controls">
-            <button id="toggleCameraButton" type="button" disabled data-i18n="button.turn_camera_off">Turn camera off</button>
-            <button id="muteMicrophoneButton" type="button" disabled data-i18n="button.mute_microphone">Mute microphone</button>
-            <button id="muteRemoteAudioButton" type="button" data-i18n="button.mute_sound">Mute sound</button>
+            <button id="toggleCameraButton" class="icon-button call-media-icon-button" type="button" disabled title="Turn camera off" aria-label="Turn camera off" data-i18n-title="button.turn_camera_off" data-i18n-aria-label="button.turn_camera_off">
+              <span class="material-icon" data-icon="videocamOff" aria-hidden="true"></span>
+              <span class="sr-only" data-i18n="button.turn_camera_off">Turn camera off</span>
+            </button>
+            <button id="muteMicrophoneButton" class="icon-button call-media-icon-button" type="button" disabled title="Mute microphone" aria-label="Mute microphone" data-i18n-title="button.mute_microphone" data-i18n-aria-label="button.mute_microphone">
+              <span class="material-icon" data-icon="micOff" aria-hidden="true"></span>
+              <span class="sr-only" data-i18n="button.mute_microphone">Mute microphone</span>
+            </button>
+            <button id="muteRemoteAudioButton" class="icon-button call-media-icon-button" type="button" title="Mute sound" aria-label="Mute sound" data-i18n-title="button.mute_sound" data-i18n-aria-label="button.mute_sound">
+              <span class="material-icon" data-icon="volumeOff" aria-hidden="true"></span>
+              <span class="sr-only" data-i18n="button.mute_sound">Mute sound</span>
+            </button>
+            <button id="toggleTotalConversationTextButton" class="icon-button call-media-icon-button" type="button" disabled title="Hide real-time text" aria-label="Hide real-time text" data-i18n-title="button.hide_tc_text" data-i18n-aria-label="button.hide_tc_text">
+              <span class="material-icon" data-icon="rtt" aria-hidden="true"></span>
+              <span class="sr-only" data-i18n="button.hide_tc_text">Hide real-time text</span>
+            </button>
             <label class="volume-control">
               <span data-i18n="label.remote_volume">Volume</span>
               <input id="remoteVolumeInput" type="range" min="0" max="100" value="100">
               <output id="remoteVolumeValue" for="remoteVolumeInput">100%</output>
             </label>
+          </div>
+          <div id="totalConversationTextPanel" class="tc-text-panel" hidden aria-live="polite">
+            <div class="tc-text-line tc-text-remote">
+              <span id="totalConversationRemoteName" data-i18n="tc.remote_label">Other person</span>
+              <p id="totalConversationRemoteText"></p>
+            </div>
+            <div class="tc-text-line tc-text-local">
+              <span data-i18n="tc.local_label">You</span>
+              <div class="tc-local-lines">
+                <p id="totalConversationLocalPreviousText"></p>
+                <p id="totalConversationLocalText"></p>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -143,39 +214,64 @@
 
         <div id="remoteDraft" class="remote-draft" hidden>
           <span id="remoteDraftName">Remote</span>
-          <p id="remoteDraftText"></p>
+          <div class="remote-draft-lines">
+            <p id="remoteDraftPreviousText"></p>
+            <p id="remoteDraftText"></p>
+          </div>
         </div>
 
         <form id="composerForm" class="composer">
-          <div class="composer-tools" role="toolbar" aria-label="Message tools">
-            <button id="resetRttButton" type="button" data-i18n="button.reset_rtt">Reset RTT</button>
-            <div class="call-menu composer-call-menu">
-              <button id="composerCallButton" class="call-menu-trigger" type="button" aria-haspopup="true" aria-expanded="false" data-i18n="button.call">Call</button>
-              <div id="composerCallMenu" class="call-menu-panel" hidden>
-                <button id="composerAudioCallOption" type="button" data-i18n="button.audio_call">Audio call</button>
-                <button id="composerVideoCallOption" type="button" data-i18n="button.video_call">Video call</button>
+          <div class="composer-input-row">
+            <div class="attachment-menu">
+              <button id="attachmentMenuButton" class="icon-button composer-round-button" type="button" aria-haspopup="true" aria-expanded="false" title="Add attachment" aria-label="Add attachment" data-i18n-title="attachment.add" data-i18n-aria-label="attachment.add">
+                <span class="material-icon" data-icon="add" aria-hidden="true"></span>
+                <span class="sr-only" data-i18n="attachment.add">Add attachment</span>
+              </button>
+              <div id="attachmentMenuPanel" class="attachment-menu-panel" hidden role="menu">
+                <button id="attachmentPhotoButton" type="button" role="menuitem">
+                  <span class="attachment-icon attachment-media"><span class="material-icon" data-icon="photoLibrary" aria-hidden="true"></span></span>
+                  <span data-i18n="attachment.photo">Photo</span>
+                </button>
+                <button id="attachmentVideoButton" type="button" role="menuitem">
+                  <span class="attachment-icon attachment-video"><span class="material-icon" data-icon="videocam" aria-hidden="true"></span></span>
+                  <span data-i18n="attachment.video">Video</span>
+                </button>
+                <button id="attachmentFilesButton" type="button" role="menuitem">
+                  <span class="attachment-icon attachment-document"><span class="material-icon" data-icon="description" aria-hidden="true"></span></span>
+                  <span data-i18n="attachment.files">Files</span>
+                </button>
+                <button id="attachmentLocationButton" type="button" role="menuitem">
+                  <span class="attachment-icon attachment-location"><span class="material-icon" data-icon="locationOn" aria-hidden="true"></span></span>
+                  <span data-i18n="attachment.location">Share location</span>
+                </button>
               </div>
             </div>
-            <button id="uploadFileButton" type="button" data-i18n="button.upload_file">Upload file</button>
-            <input id="fileInput" class="file-input" type="file">
-            <label class="toggle">
-              <input id="rttToggle" type="checkbox" checked>
-              <span data-i18n="option.live_rtt">Live RTT</span>
-            </label>
-            <label class="toggle">
-              <input id="smileyToggle" type="checkbox" checked>
-              <span data-i18n="option.smilies">Smilies</span>
-            </label>
+            <div class="smiley-menu">
+              <button id="emojiButton" class="icon-button composer-round-button" type="button" aria-haspopup="true" aria-expanded="false" title="Choose smiley" aria-label="Choose smiley" data-i18n-title="smiley.choose" data-i18n-aria-label="smiley.choose">
+                <span class="material-icon" data-icon="mood" aria-hidden="true"></span>
+                <span class="sr-only" data-i18n="smiley.choose">Choose smiley</span>
+              </button>
+              <div id="smileyPickerPanel" class="smiley-picker-panel" hidden role="menu" aria-label="Smiley picker" data-i18n-aria-label="smiley.picker"></div>
+            </div>
+            <label class="sr-only" for="messageInput" data-i18n="label.message">Message</label>
+            <textarea id="messageInput" rows="1" spellcheck="true" placeholder="Type a message" data-i18n-placeholder="placeholder.message"></textarea>
+            <button id="voiceMessageButton" class="icon-button composer-round-button" type="button" title="Voice message" aria-label="Voice message" data-i18n-title="attachment.voice_message" data-i18n-aria-label="attachment.voice_message">
+              <span class="material-icon" data-icon="mic" aria-hidden="true"></span>
+              <span class="sr-only" data-i18n="attachment.voice_message">Voice message</span>
+            </button>
+            <button id="sendButton" class="icon-button composer-send-button" type="submit" title="Send" aria-label="Send" data-i18n-title="button.send" data-i18n-aria-label="button.send">
+              <span class="material-icon" data-icon="send" aria-hidden="true"></span>
+              <span class="sr-only" data-i18n="button.send">Send</span>
+            </button>
           </div>
-          <textarea id="messageInput" rows="4" spellcheck="true" placeholder="Type a message" data-i18n-placeholder="placeholder.message"></textarea>
           <div class="send-row">
             <span id="composerState" data-i18n="composer.relay_state">Enter sends, Shift+Enter inserts a line</span>
-            <button id="sendButton" type="submit" data-i18n="button.send">Send</button>
           </div>
+          <input id="fileInput" class="file-input" type="file" multiple aria-label="Upload files" data-i18n-aria-label="upload.files">
         </form>
       </section>
 
-      <aside class="detail-panel developer-panel" aria-label="Connection and debug">
+      <aside id="developerPanel" class="detail-panel developer-panel" aria-label="Connection and debug" hidden aria-hidden="true">
         <section class="settings-section">
           <h2 data-i18n="section.connection">Connection</h2>
           <label>
@@ -205,11 +301,11 @@
                 <button id="chooseAvatarButton" type="button" data-i18n="button.choose_avatar">Choose avatar</button>
                 <button id="clearAvatarButton" type="button" data-i18n="button.clear_avatar">Clear avatar</button>
               </div>
-              <input id="avatarFileInput" class="file-input" type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml">
+          <input id="avatarFileInput" class="file-input" type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" aria-label="Choose avatar image" data-i18n-aria-label="button.choose_avatar">
             </div>
           </div>
           <label>
-            JID
+            <span data-i18n="label.email">E-mail</span>
             <input id="jidInput" value="edward@localhost/web">
           </label>
           <label>
@@ -218,7 +314,7 @@
           </label>
           <label class="toggle">
             <input id="rememberPasswordToggle" type="checkbox">
-            <span data-i18n="option.remember_password">Keep account for this browser session</span>
+            <span data-i18n="option.remember_password">Save account</span>
           </label>
           <label>
             <span data-i18n="label.peer">Peer</span>
@@ -239,7 +335,7 @@
             <span data-i18n="label.provider">Provider</span>
             <input id="providerInput" value="example-provider" readonly>
           </label>
-          <div id="accountStatus" class="account-status" data-i18n="account.default_profile">Default account profile</div>
+          <div id="accountStatus" class="account-status" role="status" aria-live="polite" data-i18n="account.default_profile">Default account profile</div>
           <div class="button-row">
             <button id="saveAccountButton" type="button" data-i18n="button.save_account">Save account</button>
             <button id="resetAccountButton" type="button" data-i18n="button.reset">Reset</button>
@@ -266,7 +362,7 @@
               <option value="fullhd">1920 x 1080</option>
             </select>
           </label>
-          <div id="mediaStatus" class="media-status" data-i18n="media.not_loaded">Media devices not loaded yet.</div>
+          <div id="mediaStatus" class="media-status" role="status" aria-live="polite" data-i18n="media.not_loaded">Media devices not loaded yet.</div>
           <div class="button-row">
             <button id="refreshMediaButton" type="button" data-i18n="button.refresh_devices">Refresh devices</button>
             <button id="previewMediaButton" type="button" data-i18n="button.preview_camera">Preview</button>
@@ -308,43 +404,158 @@
       <div class="modal-header">
         <div>
           <h2 id="accountDialogTitle" data-i18n="account.dialog_title">Account and password</h2>
-          <span id="accountDialogSubtitle" data-i18n="account.dialog_subtitle">Use a real XMPP JID, password and server settings.</span>
+          <span id="accountDialogSubtitle" data-i18n="account.dialog_subtitle">Use your e-mail, password and server settings.</span>
         </div>
         <button id="closeAccountDialogButton" class="icon-button" type="button" aria-label="Close" data-i18n-aria-label="button.close">x</button>
       </div>
       <div class="modal-body account-dialog-body">
         <div id="dialogAccountStatus" class="dialog-status" role="status" aria-live="polite"></div>
 
-        <section class="modal-section">
+        <section class="modal-section account-auth-section">
           <h3 id="dialogRealAccountTitle" data-i18n="section.real_account">Real account</h3>
           <div class="account-dialog-grid">
             <label class="account-start-hidden">
               <span data-i18n="label.browser_session">Browser session</span>
               <input id="dialogSessionProfileInput" autocomplete="off">
             </label>
-            <label class="account-start-hidden">
-              <span data-i18n="label.display_name">Display name</span>
-              <input id="dialogDisplayNameInput" autocomplete="name">
-            </label>
             <label>
-              JID
+              <span data-i18n="label.email">E-mail</span>
               <input id="dialogJidInput" autocomplete="username" inputmode="email">
             </label>
             <label>
               <span data-i18n="label.password">Password</span>
               <input id="dialogPasswordInput" type="password" autocomplete="current-password">
             </label>
+            <button id="dialogForgotPasswordButton" class="link-button account-forgot-password" type="button" data-i18n="button.forgot_password">Forgot password?</button>
+            <div class="social-login-row">
+              <button id="dialogGoogleLoginButton" class="social-login-button google-login-button" type="button">
+                <span class="social-login-mark" aria-hidden="true">G</span>
+                <span data-i18n="button.continue_google">Continue with Google</span>
+              </button>
+            </div>
             <label class="toggle modal-toggle">
               <input id="dialogRememberPasswordToggle" type="checkbox">
-              <span data-i18n="option.remember_password">Keep account for this browser session</span>
+              <span data-i18n="option.remember_password">Save account</span>
             </label>
           </div>
         </section>
 
-        <details id="dialogAdvancedDetails" class="modal-section account-advanced">
+        <section class="modal-section account-profile-section">
+          <h3 data-i18n="section.profile">Profile</h3>
+          <div class="avatar-editor">
+            <div id="dialogAccountAvatarPreview" class="avatar avatar-large" aria-hidden="true">E</div>
+            <div class="avatar-editor-fields">
+              <label>
+                <span data-i18n="label.avatar_color">Avatar color</span>
+                <input id="dialogAvatarColorInput" type="color" value="#2563eb">
+              </label>
+              <div class="button-row">
+                <button id="dialogChooseAvatarButton" type="button" data-i18n="button.choose_avatar">Choose avatar</button>
+                <button id="dialogClearAvatarButton" type="button" data-i18n="button.clear_avatar">Clear avatar</button>
+              </div>
+              <input id="dialogAvatarFileInput" class="file-input" type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" aria-label="Choose avatar image" data-i18n-aria-label="button.choose_avatar">
+            </div>
+          </div>
+          <div class="account-dialog-grid">
+            <label>
+              <span data-i18n="label.display_name">Display name</span>
+              <input id="dialogDisplayNameInput" autocomplete="name">
+            </label>
+            <label>
+              <span data-i18n="label.phone">Phone</span>
+              <input id="dialogPhoneInput" autocomplete="tel">
+            </label>
+            <label>
+              <span data-i18n="label.birth_date">Birth date</span>
+              <input id="dialogBirthDateInput" type="date" autocomplete="bday">
+            </label>
+            <label>
+              <span data-i18n="label.language">Language</span>
+              <select id="dialogLanguageInput">
+                <option value="ned">Nederlands</option>
+                <option value="eng">English</option>
+              </select>
+            </label>
+          </div>
+        </section>
+
+        <section id="accountSecuritySection" class="modal-section account-security-section account-settings-section">
+          <h3 data-i18n="section.security">Security</h3>
+          <div id="twoFactorStatus" class="security-status" role="status" aria-live="polite" data-i18n="account.two_factor_off">2FA is off.</div>
+          <div id="twoFactorQrPanel" class="two-factor-qr-panel" hidden>
+            <div id="twoFactorQrCode" class="two-factor-qr-code" aria-label="Authenticator QR code" data-i18n-aria-label="account.two_factor_qr"></div>
+            <div class="two-factor-secret">
+              <span data-i18n="account.two_factor_manual_code">Manual code</span>
+              <code id="twoFactorSecretText"></code>
+            </div>
+          </div>
+          <div class="account-dialog-grid security-code-grid">
+            <label>
+              <span data-i18n="label.verification_code">Verification code</span>
+              <input id="twoFactorCodeInput" autocomplete="one-time-code" inputmode="numeric" pattern="[0-9]*" maxlength="6">
+            </label>
+            <div class="button-row">
+              <button id="requestTwoFactorButton" type="button" data-i18n="button.show_two_factor_qr">Show QR code</button>
+              <button id="confirmTwoFactorButton" type="button" data-i18n="button.enable_two_factor">Enable 2FA</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="modal-section account-preferences-section account-settings-section">
+          <h3 data-i18n="section.preferences">Preferences</h3>
+          <div class="account-dialog-grid">
+            <label class="toggle modal-toggle">
+              <input id="rttToggle" type="checkbox" checked>
+              <span data-i18n="option.live_rtt">Live RTT</span>
+            </label>
+            <label class="toggle modal-toggle">
+              <input id="smileyToggle" type="checkbox" checked>
+              <span data-i18n="option.render_smilies">Show smileys</span>
+            </label>
+            <label>
+              <span data-i18n="label.map_provider">Map provider</span>
+              <select id="dialogMapProviderInput">
+                <option value="openstreetmap" data-i18n="map.openstreetmap">OpenStreetMap</option>
+                <option value="google" data-i18n="map.google_maps">Google Maps</option>
+              </select>
+            </label>
+          </div>
+        </section>
+
+        <section class="modal-section account-settings-section account-media-section">
+          <h3 data-i18n="section.media">Media</h3>
+          <div class="account-dialog-grid">
+            <label>
+              <span data-i18n="label.camera">Camera</span>
+              <select id="dialogCameraInput"></select>
+            </label>
+            <label>
+              <span data-i18n="label.microphone">Microphone</span>
+              <select id="dialogMicrophoneInput"></select>
+            </label>
+            <label>
+              <span data-i18n="label.video_quality">Video quality</span>
+              <select id="dialogVideoQualityInput">
+                <option value="default" data-i18n="quality.default">Default</option>
+                <option value="qvga">320 x 240</option>
+                <option value="vga">640 x 480</option>
+                <option value="hd">1280 x 720</option>
+              </select>
+            </label>
+          </div>
+          <div id="dialogMediaStatus" class="media-status" role="status" aria-live="polite" data-i18n="media.not_loaded">Media devices not loaded yet.</div>
+          <div class="button-row">
+            <button id="dialogRefreshMediaButton" type="button" data-i18n="button.refresh_devices">Refresh devices</button>
+            <button id="dialogPreviewMediaButton" type="button" data-i18n="button.preview_camera">Preview</button>
+            <button id="dialogStopMediaPreviewButton" type="button" data-i18n="button.stop_preview">Stop preview</button>
+          </div>
+        </section>
+
+        <details id="dialogAdvancedDetails" class="modal-section account-advanced account-settings-section">
           <summary data-i18n="account.advanced_settings">Advanced settings</summary>
           <section class="modal-section">
             <h3 data-i18n="section.server_settings">Server settings</h3>
+            <p id="dialogServerSettingsLockNote" class="server-settings-lock-note" hidden data-i18n="account.server_settings_locked">Server settings are read-only while connected. Disconnect to change them.</p>
             <div class="account-dialog-grid">
               <label>
                 <span data-i18n="label.xmpp_domain">XMPP domain</span>
@@ -378,13 +589,6 @@
                 <span data-i18n="label.provider">Provider</span>
                 <input id="dialogProviderInput">
               </label>
-              <label>
-                <span data-i18n="label.language">Language</span>
-                <select id="dialogLanguageInput">
-                  <option value="ned">Nederlands</option>
-                  <option value="eng">English</option>
-                </select>
-              </label>
             </div>
           </section>
 
@@ -396,10 +600,27 @@
                 <input id="dialogPeerInput" autocomplete="off">
               </label>
               <label>
-                <span data-i18n="label.phone">Phone</span>
-                <input id="dialogPhoneInput" autocomplete="tel">
+                <span data-i18n="label.chat_background">Chat background</span>
+                <select id="dialogChatBackgroundInput">
+                  <option value="auto" data-i18n="background.auto">Auto accessibility</option>
+                  <option value="none" data-i18n="background.none">None</option>
+                  <option value="wide-1" data-i18n="background.wide_1">World soft</option>
+                  <option value="wide-2" data-i18n="background.wide_2">World open</option>
+                  <option value="wide-3" data-i18n="background.wide_3">World right</option>
+                  <option value="mobile" data-i18n="background.mobile">Mobile portrait</option>
+                </select>
               </label>
             </div>
+          </section>
+
+          <section class="modal-section">
+            <h3 data-i18n="tab.contacts">Contacts</h3>
+            <div id="dialogContactsPanel" class="settings-panel"></div>
+          </section>
+
+          <section class="modal-section">
+            <h3 data-i18n="tab.accessibility">Accessibility</h3>
+            <div id="dialogAccessibilityPanel" class="settings-panel"></div>
           </section>
         </details>
       </div>
@@ -407,8 +628,110 @@
         <button id="dialogCreateAccountButton" type="button" data-i18n="button.create_account">Create account</button>
         <button id="dialogSaveAccountButton" type="button" data-i18n="button.save_settings">Save settings</button>
         <button id="dialogConnectButton" type="button" data-i18n="button.save_connect">Save and connect</button>
+        <button id="dialogResetPasswordButton" type="button" hidden data-i18n="button.reset_password">Reset password</button>
         <button id="cancelAccountDialogButton" type="button" data-i18n="button.cancel">Cancel</button>
+        <button id="dialogServerSettingsButton" class="icon-button dialog-server-settings-button" type="button" title="Server settings" aria-label="Server settings" data-i18n-title="section.server_settings" data-i18n-aria-label="section.server_settings">
+          <span class="material-icon" data-icon="settings" aria-hidden="true"></span>
+          <span class="sr-only" data-i18n="section.server_settings">Server settings</span>
+        </button>
       </div>
+    </div>
+  </div>
+
+  <div id="avatarCropDialog" class="modal-shell" hidden role="dialog" aria-modal="true" aria-labelledby="avatarCropTitle">
+    <div class="modal-card avatar-crop-card">
+      <div class="modal-header">
+        <div>
+          <h2 id="avatarCropTitle" data-i18n="avatar.crop_title">Crop avatar</h2>
+          <span data-i18n="avatar.crop_subtitle">Drag the photo and zoom until your avatar fits.</span>
+        </div>
+        <button id="closeAvatarCropButton" class="icon-button" type="button" aria-label="Close" data-i18n-aria-label="button.close">x</button>
+      </div>
+      <div class="modal-body avatar-crop-body">
+        <div id="avatarCropStatus" class="dialog-status" role="status" aria-live="polite" data-i18n="avatar.crop_ready">Position the photo inside the circle.</div>
+        <div class="avatar-crop-stage">
+          <canvas id="avatarCropCanvas" width="320" height="320" aria-label="Avatar crop preview" data-i18n-aria-label="avatar.crop_preview"></canvas>
+        </div>
+        <label class="avatar-crop-zoom">
+          <span data-i18n="button.zoom_in">Zoom</span>
+          <input id="avatarCropZoomInput" type="range" min="1" max="4" step="0.01" value="1">
+        </label>
+      </div>
+      <div class="modal-actions">
+        <button id="cancelAvatarCropButton" type="button" data-i18n="button.cancel">Cancel</button>
+        <button id="applyAvatarCropButton" type="button" data-i18n="avatar.use_cropped">Use avatar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="locationShareDialog" class="modal-shell" hidden role="dialog" aria-modal="true" aria-labelledby="locationShareDialogTitle">
+    <div class="modal-card location-share-card">
+      <div class="modal-header">
+        <div>
+          <h2 id="locationShareDialogTitle" data-i18n="location.dialog_title">Share location</h2>
+          <span id="locationShareDialogSubtitle" data-i18n="location.dialog_subtitle">Check the map first, then choose how long to share.</span>
+        </div>
+        <button id="closeLocationShareDialogButton" class="icon-button" type="button" aria-label="Close" data-i18n-aria-label="button.close">x</button>
+      </div>
+      <div class="modal-body location-share-body">
+        <div id="locationShareStatus" class="dialog-status" role="status" aria-live="polite"></div>
+        <iframe id="locationShareMap" class="location-share-map" title="Location map" data-i18n-title="location.map_title" loading="lazy" hidden></iframe>
+        <label class="location-share-duration">
+          <span data-i18n="location.share_duration">Share for</span>
+          <select id="locationShareDurationInput">
+            <option value="900000" data-i18n="location.duration_15m">15 min</option>
+            <option value="1800000" data-i18n="location.duration_30m">30 min</option>
+            <option value="3600000" data-i18n="location.duration_1h">1 hour</option>
+            <option value="7200000" data-i18n="location.duration_2h">2 hours</option>
+            <option value="14400000" data-i18n="location.duration_4h">4 hours</option>
+            <option value="28800000" data-i18n="location.duration_8h">8 hours</option>
+          </select>
+        </label>
+      </div>
+      <div class="modal-actions">
+        <button id="confirmLocationShareButton" type="button" data-i18n="button.location_share">Share location</button>
+        <button id="cancelLocationShareButton" type="button" data-i18n="button.cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="photoViewerDialog" class="photo-viewer-shell" hidden role="dialog" aria-modal="true" aria-labelledby="photoViewerTitle">
+    <div class="photo-viewer-card">
+      <div class="photo-viewer-header">
+        <strong id="photoViewerTitle" data-i18n="photo.viewer_title">Photo</strong>
+        <div class="photo-viewer-actions">
+          <button id="photoViewerZoomOutButton" class="icon-button" type="button" title="Zoom out" aria-label="Zoom out" data-i18n-title="button.zoom_out" data-i18n-aria-label="button.zoom_out">-</button>
+          <button id="photoViewerZoomInButton" class="icon-button" type="button" title="Zoom in" aria-label="Zoom in" data-i18n-title="button.zoom_in" data-i18n-aria-label="button.zoom_in">+</button>
+          <button id="photoViewerResetButton" class="icon-button" type="button" title="Reset zoom" aria-label="Reset zoom" data-i18n-title="button.reset_zoom" data-i18n-aria-label="button.reset_zoom">1:1</button>
+          <button id="photoViewerCloseButton" class="icon-button" type="button" aria-label="Close" data-i18n-aria-label="button.close">x</button>
+        </div>
+      </div>
+      <div id="photoViewerCanvas" class="photo-viewer-canvas">
+        <img id="photoViewerImage" alt="">
+      </div>
+    </div>
+  </div>
+
+  <div id="mapViewerDialog" class="map-viewer-shell" hidden role="dialog" aria-modal="true" aria-labelledby="mapViewerTitle">
+    <div class="map-viewer-card">
+      <div class="map-viewer-header">
+        <div>
+          <strong id="mapViewerTitle" data-i18n="location.card_title">Shared location</strong>
+          <span id="mapViewerMeta"></span>
+        </div>
+        <div class="map-viewer-actions">
+          <button id="mapViewerOpenStreetMapButton" type="button">OpenStreetMap</button>
+          <button id="mapViewerGoogleButton" type="button">Google Maps</button>
+          <button id="mapViewerZoomOutButton" class="icon-button" type="button" title="Zoom out" aria-label="Zoom out" data-i18n-title="button.zoom_out" data-i18n-aria-label="button.zoom_out">-</button>
+          <button id="mapViewerZoomInButton" class="icon-button" type="button" title="Zoom in" aria-label="Zoom in" data-i18n-title="button.zoom_in" data-i18n-aria-label="button.zoom_in">+</button>
+          <button id="mapViewerCloseButton" class="icon-button" type="button" aria-label="Close" data-i18n-aria-label="button.close">x</button>
+        </div>
+      </div>
+      <div class="map-viewer-canvas">
+        <div id="mapViewerTiles" class="map-viewer-tiles" role="img" aria-label="Location map" data-i18n-aria-label="location.map_title"></div>
+        <div id="mapViewerPositionDot" class="location-position-marker map-viewer-position-dot" aria-hidden="true"></div>
+      </div>
+      <a id="mapViewerExternalLink" class="map-viewer-external" target="_blank" rel="noopener" data-i18n="location.open_map">Open map</a>
     </div>
   </div>
 
@@ -416,6 +739,14 @@
     <button id="contextBlockButton" class="danger-action" type="button" role="menuitem" data-i18n="button.block_contact">Block</button>
   </div>
 
-  <script src="chat-client.js?v=20260531-contact-first"></script>
+  <div id="messageContextMenu" class="context-menu message-context-menu" hidden role="menu" aria-label="Message menu">
+    <button id="messageContextEditButton" type="button" role="menuitem" data-i18n="button.edit_message">Edit</button>
+    <button id="messageContextDeleteButton" class="danger-action" type="button" role="menuitem" data-i18n="button.delete_message">Delete</button>
+    <button id="messageContextDownloadButton" type="button" role="menuitem" data-i18n="button.download">Download</button>
+    <button id="messageContextForwardButton" type="button" role="menuitem" data-i18n="button.forward_message">Forward</button>
+  </div>
+
+  <script src="vendor/qrcode.js?v=20260606-security-totp"></script>
+  <script src="chat-client.js?v=20260606-security-totp"></script>
 </body>
 </html>

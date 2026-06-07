@@ -9,7 +9,11 @@ public sealed record XmppIncomingStanza(
     XmppIq? Iq = null,
     XmppRealTimeTextMessage? RealTimeText = null,
     XmppCarbonMessage? Carbon = null,
-    XmppPersonalEventNotification? PersonalEvent = null)
+    XmppPersonalEventNotification? PersonalEvent = null,
+    XmppStatelessInlineMedia? InlineMedia = null,
+    IReadOnlyList<XmppCustomEmojiSpan>? CustomEmojis = null,
+    XmppMessageRetractionEvent? MessageRetraction = null,
+    XmppMessageTombstone? MessageTombstone = null)
 {
     public bool IsMessage => Element.Name == XName.Get("message", XmppXmlNames.ClientNamespace);
 
@@ -23,6 +27,14 @@ public sealed record XmppIncomingStanza(
 
     public bool IsPersonalEvent => PersonalEvent is not null;
 
+    public bool HasInlineMedia => InlineMedia is not null;
+
+    public bool HasCustomEmojis => CustomEmojis is { Count: > 0 };
+
+    public bool IsMessageRetraction => MessageRetraction is not null;
+
+    public bool IsMessageTombstone => MessageTombstone is not null;
+
     public static XmppIncomingStanza FromElement(XElement element)
     {
         ArgumentNullException.ThrowIfNull(element);
@@ -33,12 +45,20 @@ public sealed record XmppIncomingStanza(
             XmppRealTimeTextMessage.TryParse(element, out var realTimeText);
             XmppChatMessage.TryParse(element, out var message);
             XmppPersonalEventing.TryParseNotification(element, out var personalEvent);
+            XmppStatelessInlineMediaSharing.TryParse(element, out var inlineMedia);
+            XmppEmojiMarkup.TryParse(element, out var customEmojis);
+            XmppMessageRetraction.TryParseRetract(element, out var messageRetraction);
+            XmppMessageRetraction.TryParseTombstone(element, out var messageTombstone);
             return new XmppIncomingStanza(
                 element,
                 Message: message,
                 RealTimeText: realTimeText,
                 Carbon: carbon,
-                PersonalEvent: personalEvent);
+                PersonalEvent: personalEvent,
+                InlineMedia: inlineMedia,
+                CustomEmojis: customEmojis,
+                MessageRetraction: messageRetraction,
+                MessageTombstone: messageTombstone);
         }
 
         if (XmppPresence.TryParse(element, out var presence) && presence is not null)
