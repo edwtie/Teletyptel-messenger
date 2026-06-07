@@ -1301,6 +1301,10 @@ body.tc-text-full-active .call-panel {
   object-fit: cover;
 }
 
+.call-panel video[hidden] {
+  display: none;
+}
+
 body.call-active .call-panel video {
   min-height: clamp(320px, 48vh, 620px);
 }

@@ -5798,7 +5798,7 @@
     try {
       const stream = await navigator.mediaDevices.getUserMedia(createMediaConstraints("video"));
       state.mediaPreviewStream = stream;
-      el.localVideo.srcObject = stream;
+      updateVideoElementSource(el.localVideo, stream);
       el.callPanel.hidden = false;
       await refreshMediaDevices(false);
       setMediaStatus(t("media.previewing", "Previewing selected camera and microphone."));
@@ -5815,12 +5815,13 @@
     stopStream(state.mediaPreviewStream);
     state.mediaPreviewStream = null;
     if (!state.call?.localStream) {
-      el.localVideo.srcObject = null;
+      updateVideoElementSource(el.localVideo, null);
     }
 
     if (!state.call?.localStream && !state.call?.remoteStream) {
       el.callPanel.hidden = true;
     }
+    updateCallUi();
 
     setMediaStatus(t("media.preview_stopped", "Preview stopped."));
   }
@@ -6252,7 +6253,7 @@
       }
 
       call.remoteStream.addTrack(event.track);
-      el.remoteVideo.srcObject = call.remoteStream;
+      updateVideoElementSource(el.remoteVideo, call.remoteStream);
       el.callPanel.hidden = false;
       updateCallUi();
     });
@@ -6599,7 +6600,7 @@
       }
 
       if (call.localStream) {
-        el.localVideo.srcObject = call.localStream;
+        updateVideoElementSource(el.localVideo, call.localStream);
         el.callPanel.hidden = false;
         updateCallUi();
         return call.localStream;
@@ -6610,7 +6611,7 @@
       call.localStream = await navigator.mediaDevices.getUserMedia(createMediaConstraints("audio"));
     }
 
-    el.localVideo.srcObject = call.localStream;
+    updateVideoElementSource(el.localVideo, call.localStream);
     el.callPanel.hidden = false;
     updateCallUi();
     return call.localStream;
@@ -6732,7 +6733,7 @@
       }
     }
 
-    el.localVideo.srcObject = call.localStream;
+    updateVideoElementSource(el.localVideo, call.localStream);
     el.callPanel.hidden = false;
     await refreshMediaDevices(false);
     updateCallUi();
@@ -6763,8 +6764,8 @@
     if (call.remoteStream) {
       stopStream(call.remoteStream);
     }
-    el.localVideo.srcObject = null;
-    el.remoteVideo.srcObject = null;
+    updateVideoElementSource(el.localVideo, null);
+    updateVideoElementSource(el.remoteVideo, null);
     el.callPanel.hidden = true;
     state.call = null;
     updateCallUi();
@@ -6922,6 +6923,8 @@
     const hasRemoteVideo = hasVideoTrack(call?.remoteStream);
     const hasMedia = Boolean(call?.localStream || call?.remoteStream);
     el.callPanel.hidden = !hasMedia;
+    el.localVideo.hidden = !hasLocalVideo;
+    el.remoteVideo.hidden = !hasRemoteVideo;
     el.callPanel.classList.toggle("local-video-main", hasLocalVideo && !hasRemoteVideo);
     el.callPanel.classList.toggle("remote-video-main", hasRemoteVideo);
     document.body.classList.toggle("call-active", hasMedia);
@@ -6933,7 +6936,17 @@
   }
 
   function hasVideoTrack(stream) {
-    return Boolean(stream?.getVideoTracks?.().length);
+    return Boolean(stream?.getVideoTracks?.().some((track) => track.readyState !== "ended"));
+  }
+
+  function updateVideoElementSource(video, stream) {
+    if (!video) {
+      return;
+    }
+
+    const hasVideo = hasVideoTrack(stream);
+    video.srcObject = hasVideo ? stream : null;
+    video.hidden = !hasVideo;
   }
 
   function isLocalCameraOff(call = state.call) {
