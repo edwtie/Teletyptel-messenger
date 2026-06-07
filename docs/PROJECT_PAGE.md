@@ -10,6 +10,8 @@ The product is designed for deaf, hard-of-hearing and hearing users together.
 That is the core idea: no separate communication island, no technical apartheid,
 but one messenger that can be useful for everyone.
 
+TeleTypTel is a brand of Tiedragon Labs and Tiedragon.
+
 ## Short Description
 
 TeleTypTel is a browser-first messenger with accessibility built in. It supports
@@ -17,8 +19,8 @@ normal chat, live typed conversation, voice/video conversation, contacts, groups
 attachments, location sharing, user profiles, avatars, light/dark mode and Dutch
 and English interface text.
 
-The project is developed by Tiedragon as part of a broader accessibility and
-communication direction.
+The project is developed by Tiedragon Labs and Tiedragon as part of a broader
+accessibility and communication direction.
 
 ## Product Promise
 

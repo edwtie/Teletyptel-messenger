@@ -10,6 +10,8 @@ Het uitgangspunt is eenvoudig: een messenger die normaal genoeg voelt voor
 iedereen, maar tegelijk sterk genoeg is voor toegankelijke communicatie,
 providerintegratie en toekomstige noodcommunicatiepaden.
 
+TeleTypTel is een merk van Tiedragon Labs en Tiedragon.
+
 ## Waarde voor organisaties
 
 - Een herkenbare chatervaring voor eindgebruikers.

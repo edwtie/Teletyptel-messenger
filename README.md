@@ -10,6 +10,8 @@ world.
 The goal is simple: a familiar messenger experience with accessibility built in
 from the start.
 
+TeleTypTel is a brand of Tiedragon Labs and Tiedragon.
+
 ## Why TeleTypTel
 
 Most people already understand chat apps. TeleTypTel builds on that familiar
