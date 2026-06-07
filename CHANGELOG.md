@@ -230,6 +230,17 @@
 - Real-server MUC smoke now submits an explicit open room configuration for
   newly created rooms, so public servers with restrictive defaults do not make
   the second account fail with `registration-required`.
+- Local account creation and login now keep localhost accounts on the active
+  PHP relay (`ws://127.0.0.1:8787`) instead of falling back to the old
+  `wss://localhost:5443/websocket/` endpoint, and existing local usernames
+  return clearer account suggestions.
+- Generated browser resource JIDs such as `/web-...` are no longer shown as
+  separate people in the UI; contact names and bare JIDs are used for display
+  while full JIDs remain available for routing.
+- Call media panes no longer show black local or remote video previews when a
+  stream has no usable video track.
+- Total Conversation now switches to the full realtime-text view when RTT is
+  active and video is unavailable, ended, locally disabled or remotely muted.
 
 ## 0.1.0-alpha1 - 2026-05-27
 
