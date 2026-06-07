@@ -43,6 +43,7 @@ Windows and should not be used on Linux.
 - Linux x64;
 - Apache or Nginx;
 - PHP 8.1 or newer with CLI support;
+- PHP extensions: `pdo_mysql`, `dom`, `mbstring`, `openssl` and `json`;
 - MySQL or MariaDB;
 - .NET runtime 10;
 - systemd when using the included relay service file.
@@ -64,6 +65,18 @@ linux/opt/teletyptel/bin/
 linux/etc/systemd/system/
 ```
 
+The web tree includes the PHP XMPP library:
+
+```text
+linux/var/www/teletyptel/lib/Xmpp/
+```
+
+That library is used by PHP account/API code and command-line smoke tools. It is
+the Linux-friendly server-side protocol layer for hosting environments where
+starting a long-running .NET process is not desirable. The .NET tools remain
+useful for deeper protocol validation, local server testing and cross-platform
+development.
+
 Copy it onto the server:
 
 ```bash
@@ -78,6 +91,16 @@ sudo chmod +x /opt/teletyptel/bin/*/Tiedragon.XmppMessenger.* || true
 If executable permissions are lost while unpacking the zip, use `dotnet
 ToolName.dll` or `sh run.sh`. A zip created on Windows should not be trusted to
 preserve Linux execute bits.
+
+Install the typical Debian/Ubuntu PHP packages with:
+
+```bash
+sudo apt update
+sudo apt install php-cli php-mysql php-xml php-mbstring
+```
+
+On other distributions, install the equivalent packages for PDO MySQL, DOM/XML,
+multibyte string handling and OpenSSL-enabled stream sockets.
 
 ## Database
 
@@ -120,6 +143,82 @@ For Nginx, serve `/var/www/teletyptel/public` as the document root or as an
 alias. PHP execution is only needed for `public/api/account.php`; static files
 can be served directly.
 
+Keep `/var/www/teletyptel/lib`, `/var/www/teletyptel/config.php` and
+`/var/www/teletyptel/schema.sql` outside the public document root. The browser
+should only see files below `/var/www/teletyptel/public`.
+
+## PHP XMPP Library
+
+The PHP library lives at:
+
+```text
+/var/www/teletyptel/lib/Xmpp/
+```
+
+It mirrors the C# protocol core where practical, but runs directly inside the
+PHP/Apache hosting model. Use it for server-side account flows, web XMPP
+experiments and command-line smokes. Use the .NET tools when you need the local
+test server, Windows tooling or deeper cross-platform protocol checks.
+
+From a repository checkout, validate the PHP library with:
+
+```bash
+php php/tests/xmpp-library-smoke.php
+```
+
+Expected result:
+
+```text
+PHP XMPP library smoke OK
+```
+
+Run a real login smoke against a local or public XMPP server:
+
+```bash
+php php/tools/xmpp-login-smoke.php \
+  --jid user@example.org \
+  --password 'secret' \
+  --host example.org \
+  --resource php
+```
+
+Run a fuller client smoke with roster, discovery and a test message:
+
+```bash
+php php/tools/xmpp-client-smoke.php \
+  --jid user@example.org \
+  --password 'secret' \
+  --host example.org \
+  --resource php \
+  --roster \
+  --disco example.org \
+  --to tester@example.org \
+  --message 'Hallo vanaf PHP op Linux'
+```
+
+For an XMPP WebSocket endpoint:
+
+```bash
+php php/tools/xmpp-websocket-smoke.php \
+  --url wss://example.org/xmpp-websocket \
+  --domain example.org
+```
+
+For a BOSH endpoint:
+
+```bash
+php php/tools/xmpp-bosh-smoke.php \
+  --url https://example.org/http-bind \
+  --domain example.org
+```
+
+Use `--direct-tls` for direct TLS ports. Use `--no-tls` only on a protected
+local lab server.
+
+The release package contains the runtime library under `lib/Xmpp`. The
+development smoke scripts under `php/tools` and `php/tests` are normally run
+from a repository checkout.
+
 ## RTT Relay
 
 Start manually:
@@ -146,6 +245,10 @@ For a public server, place TLS and reverse proxy configuration in Apache or
 Nginx and proxy the WebSocket endpoint to `127.0.0.1:8787`.
 
 ## .NET Smoke Tools
+
+These tools are still valuable on Linux, but they are no longer the only way to
+exercise XMPP behavior. Use the PHP library smokes above for PHP-hosting checks;
+use the .NET tools below for the local test server and cross-platform validation.
 
 Run the local server:
 
@@ -216,9 +319,11 @@ PASS Two-account chat message delivered.
 
 ## What Is Not Production Yet
 
-- The PHP relay is a local development bridge, not a full production XMPP
-  server.
+- The PHP relay is a local development bridge. The PHP XMPP library is the
+  server-side protocol layer, but production hosting still needs a hardened real
+  XMPP server and deployment policy.
 - The package is framework-dependent; install .NET runtime 10 on Linux.
-- Authentication/session hardening is still an Alpha task.
+- Authentication/session hardening, abuse controls and monitoring are deployment
+  work, not just code work.
 - Public deployment should use TLS, firewall rules and reverse proxy
   hardening.
