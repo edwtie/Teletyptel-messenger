@@ -306,13 +306,17 @@ function prepareRttMessage(string $message, int $senderId, array &$clientPeers):
 function isAllowedRttEnvelope(array $json): bool
 {
     $type = $json['type'] ?? null;
+    if (!isAllowedConversationKind($json)) {
+        return false;
+    }
+
     if ($type === 'message') {
         $text = $json['text'] ?? null;
         if (!is_string($text) || strlen($text) > MAX_PAYLOAD_BYTES) {
             return false;
         }
 
-        foreach (['from', 'to', 'displayName', 'messageId', 'replaceId', 'originalFrom'] as $field) {
+        foreach (['from', 'to', 'displayName', 'messageId', 'replaceId', 'originalFrom', 'conversationKind'] as $field) {
             if (isset($json[$field]) && (!is_string($json[$field]) || strlen($json[$field]) > 512)) {
                 return false;
             }
@@ -340,7 +344,7 @@ function isAllowedRttEnvelope(array $json): bool
     }
 
     if ($type === 'message-delete') {
-        foreach (['from', 'to', 'targetMessageId', 'messageId', 'reason', 'clientId'] as $field) {
+        foreach (['from', 'to', 'targetMessageId', 'messageId', 'reason', 'clientId', 'conversationKind'] as $field) {
             if (!isset($json[$field])) {
                 continue;
             }
@@ -376,6 +380,12 @@ function isAllowedRttEnvelope(array $json): bool
 
     if ($type === 'rtt') {
         $xml = $json['xml'] ?? null;
+        foreach (['from', 'to', 'displayName', 'clientId', 'conversationKind'] as $field) {
+            if (isset($json[$field]) && (!is_string($json[$field]) || strlen($json[$field]) > 512)) {
+                return false;
+            }
+        }
+
         return is_string($xml)
             && strlen($xml) <= MAX_PAYLOAD_BYTES
             && str_contains($xml, '<rtt')
@@ -401,7 +411,7 @@ function isAllowedRttEnvelope(array $json): bool
             return false;
         }
 
-        foreach (['from', 'to', 'displayName', 'reason', 'sentAt'] as $field) {
+        foreach (['from', 'to', 'displayName', 'reason', 'sentAt', 'conversationKind'] as $field) {
             if (isset($json[$field]) && (!is_string($json[$field]) || strlen($json[$field]) > 255)) {
                 return false;
             }
@@ -416,7 +426,7 @@ function isAllowedRttEnvelope(array $json): bool
             return false;
         }
 
-        foreach (['from', 'to', 'displayName', 'text', 'xml'] as $field) {
+        foreach (['from', 'to', 'displayName', 'text', 'xml', 'conversationKind'] as $field) {
             if (isset($json[$field]) && (!is_string($json[$field]) || strlen($json[$field]) > MAX_PAYLOAD_BYTES)) {
                 return false;
             }
@@ -472,7 +482,7 @@ function isAllowedRttEnvelope(array $json): bool
             return false;
         }
 
-        foreach (['from', 'to', 'xml', 'sdp', 'reasonText'] as $field) {
+        foreach (['from', 'to', 'xml', 'sdp', 'reasonText', 'conversationKind'] as $field) {
             if (isset($json[$field]) && (!is_string($json[$field]) || strlen($json[$field]) > MAX_PAYLOAD_BYTES)) {
                 return false;
             }
@@ -486,6 +496,16 @@ function isAllowedRttEnvelope(array $json): bool
     }
 
     return false;
+}
+
+function isAllowedConversationKind(array $json): bool
+{
+    if (!isset($json['conversationKind'])) {
+        return true;
+    }
+
+    return is_string($json['conversationKind'])
+        && in_array($json['conversationKind'], ['contact', 'group'], true);
 }
 
 function isAllowedAttachment(mixed $attachment): bool
@@ -663,7 +683,8 @@ function broadcastJson(array $clients, array $clientProtocols, array $clientPeer
 
     $type = $json['type'] ?? '';
     $to = normalizeRelayAddress($json['to'] ?? '');
-    $targeted = $to !== '' && !relayAddressMatches($to, 'relay@localhost') && $type !== 'presence';
+    $isGroupEnvelope = ($json['conversationKind'] ?? null) === 'group';
+    $targeted = !$isGroupEnvelope && $to !== '' && !relayAddressMatches($to, 'relay@localhost') && $type !== 'presence';
     if (!$targeted) {
         broadcast($clients, $clientProtocols, $senderId, $message, 'rtt-json');
         return;

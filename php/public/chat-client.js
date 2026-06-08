@@ -5122,6 +5122,7 @@
   }
 
   function createRelayEnvelope(type, text, xml, to = null) {
+    const conversation = activeConversation();
     return {
       type,
       text,
@@ -5129,6 +5130,7 @@
       clientId: state.clientInstance.id,
       from: currentFromJid(),
       to: to || currentToJid(),
+      conversationKind: conversation?.kind === "group" ? "group" : "contact",
       ...currentAvatarEnvelope(type !== "rtt" && type !== "client-state")
     };
   }
