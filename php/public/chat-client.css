@@ -2139,18 +2139,18 @@ body:not([data-chat-background="none"]) .message-body {
   margin-left: auto;
 }
 
-.message.group-message {
+.message.with-avatar {
   grid-template-columns: 34px minmax(0, 1fr);
   align-items: end;
   max-width: min(82ch, 88%);
 }
 
-.message.group-message.self {
+.message.with-avatar.self {
   grid-template-columns: minmax(0, 1fr) 34px;
   margin-left: auto;
 }
 
-.message.group-message .message-avatar {
+.message.with-avatar .message-avatar {
   width: 30px;
   height: 30px;
   align-self: end;
@@ -2159,23 +2159,23 @@ body:not([data-chat-background="none"]) .message-body {
   font-size: 12px;
 }
 
-.message.group-message .message-content {
+.message.with-avatar .message-content {
   display: grid;
   gap: 4px;
   min-width: 0;
 }
 
-.message.group-message.self .message-avatar {
+.message.with-avatar.self .message-avatar {
   grid-column: 2;
   grid-row: 1;
 }
 
-.message.group-message.self .message-content {
+.message.with-avatar.self .message-content {
   grid-column: 1;
   grid-row: 1;
 }
 
-.message.group-message.self .message-meta {
+.message.with-avatar.self .message-meta {
   text-align: right;
 }
 

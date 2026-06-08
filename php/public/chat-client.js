@@ -5031,13 +5031,13 @@
         applyMessageCorrection(edit.conversation, edit.replaceId, text, "self", outgoingId);
         clearMessageEdit();
       } else {
-        clearLocalGroupDraftMessage();
+        clearLocalRttDraftMessage();
         addMessage("self", text, "jingle-rtt", null, null, null, null, outgoingId);
       }
       el.messageInput.value = "";
       state.previousText = "";
       state.sequence = 0;
-      clearLocalGroupDraftMessage();
+      clearLocalRttDraftMessage();
       updateTotalConversationTextPanel();
       return;
     }
@@ -5058,13 +5058,13 @@
       applyMessageCorrection(edit.conversation, edit.replaceId, text, "self", outgoingId);
       clearMessageEdit();
     } else {
-      clearLocalGroupDraftMessage();
+      clearLocalRttDraftMessage();
       addMessage("self", text, "sent", null, null, null, null, outgoingId);
     }
     el.messageInput.value = "";
     state.previousText = "";
     state.sequence = 0;
-    clearLocalGroupDraftMessage();
+    clearLocalRttDraftMessage();
     updateTotalConversationTextPanel();
   }
 
@@ -5080,7 +5080,7 @@
 
     state.sequence = 0;
     state.previousText = el.messageInput.value;
-    updateLocalGroupDraftMessage();
+    updateLocalRttDraftMessage();
     updateTotalConversationTextPanel();
     if (sendJingleRttSyncPacket("reset", el.messageInput.value)) {
       return;
@@ -5090,7 +5090,7 @@
 
   function sendRttEdit() {
     if (!hasActiveConversation() || !el.rttToggle.checked) {
-      clearLocalGroupDraftMessage();
+      clearLocalRttDraftMessage();
       return;
     }
 
@@ -5103,7 +5103,7 @@
     const previousText = state.previousText;
     const actions = createDeltaActions(previousText, text);
     state.previousText = text;
-    updateLocalGroupDraftMessage();
+    updateLocalRttDraftMessage();
     updateTotalConversationTextPanel();
     if (sendJingleRttSyncPacket("edit", text, { actions, previousText })) {
       return;
@@ -7772,7 +7772,7 @@
       el.remoteDraftText.textContent = "";
     }
 
-    updateLocalGroupDraftMessage(conversation, false);
+    updateLocalRttDraftMessage(conversation, false);
     updateComposerAvailability();
     el.messageTimeline.scrollTop = el.messageTimeline.scrollHeight;
     updateTotalConversationTextPanel(conversation);
@@ -7831,9 +7831,9 @@
     updateTotalConversationTextPanel(conversation);
   }
 
-  function updateLocalGroupDraftMessage(conversation = activeConversation(), scroll = true) {
+  function updateLocalRttDraftMessage(conversation = activeConversation(), scroll = true) {
     const existing = el.messageTimeline.querySelector('[data-local-draft="true"]');
-    if (!conversation || conversation.id !== state.activeConversationId || conversation.kind !== "group" || !el.rttToggle.checked) {
+    if (!conversation || conversation.id !== state.activeConversationId || !el.rttToggle.checked) {
       existing?.remove();
       return;
     }
@@ -7868,7 +7868,7 @@
     }
   }
 
-  function clearLocalGroupDraftMessage() {
+  function clearLocalRttDraftMessage() {
     el.messageTimeline.querySelector('[data-local-draft="true"]')?.remove();
   }
 
@@ -8543,9 +8543,11 @@
   }
 
   function applyMessageElementClass(item, message) {
+    const withAvatar = shouldShowMessageAvatar(message);
     item.className = "message " + message.direction
       + (message.draft ? " draft" : "")
       + (message.retracted ? " retracted" : "")
+      + (withAvatar ? " with-avatar" : "")
       + (activeConversation()?.kind === "group" ? " group-message" : "");
   }
 
@@ -8578,7 +8580,7 @@
       body.appendChild(createLocationElement(message.location, message));
     }
 
-    if (activeConversation()?.kind !== "group") {
+    if (!shouldShowMessageAvatar(message)) {
       item.replaceChildren(meta, body);
       return;
     }
@@ -8588,6 +8590,10 @@
     content.append(meta, body);
     const avatar = createAvatarElement(messageAvatarSource(message), "message-avatar");
     item.replaceChildren(avatar, content);
+  }
+
+  function shouldShowMessageAvatar(message) {
+    return activeConversation()?.kind === "group" || message?.draft === true;
   }
 
   function messageMetaText(message) {
