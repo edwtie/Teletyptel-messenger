@@ -88,6 +88,12 @@ function readAccount(): void
 
     $pdo = Database::connect();
     ensureAccountProfileSchema($pdo);
+    $lookupJid = bareJid(cleanText($_GET['lookupJid'] ?? '', 255));
+    if ($lookupJid !== '') {
+        readPublicProfile($pdo, $lookupJid);
+        return;
+    }
+
     $statement = $pdo->prepare('SELECT * FROM account_profiles WHERE account_id = :account_id');
     $statement->execute(['account_id' => $accountId]);
     $row = $statement->fetch();
@@ -99,6 +105,21 @@ function readAccount(): void
     }
 
     echo json_encode(['ok' => true, 'account' => rowToAccount($row)], JSON_UNESCAPED_SLASHES);
+}
+
+function readPublicProfile(PDO $pdo, string $jid): void
+{
+    $statement = $pdo->prepare('SELECT * FROM account_profiles WHERE jid = :jid LIMIT 1');
+    $statement->execute(['jid' => $jid]);
+    $row = $statement->fetch();
+
+    if (!$row) {
+        http_response_code(404);
+        echo json_encode(['ok' => false, 'error' => 'not_found']);
+        return;
+    }
+
+    echo json_encode(['ok' => true, 'profile' => rowToPublicProfile($pdo, $row)], JSON_UNESCAPED_SLASHES);
 }
 
 function consumeOAuthLoginToken(string $accountId, string $token): bool
@@ -889,6 +910,40 @@ function rowToAccount(array $row): array
         'twoFactorMethod' => $security['twoFactorMethod'],
         'savedInDatabase' => true,
     ];
+}
+
+function rowToPublicProfile(PDO $pdo, array $row): array
+{
+    return [
+        'jid' => $row['jid'],
+        'email' => publicEmailForAccount($pdo, (string)$row['account_id'], (string)$row['jid']),
+        'displayName' => $row['display_name'],
+        'phoneNumber' => $row['phone_number'],
+        'preferredLanguage' => $row['preferred_language'],
+        'avatarDataUrl' => $row['avatar_data_url'] ?? '',
+        'avatarColor' => $row['avatar_color'] ?? '#2563eb',
+    ];
+}
+
+function publicEmailForAccount(PDO $pdo, string $accountId, string $fallbackJid): string
+{
+    try {
+        $statement = $pdo->prepare(
+            'SELECT email
+             FROM account_identities
+             WHERE account_id = :account_id AND email <> ""
+             ORDER BY email_verified DESC, last_used_at DESC, linked_at DESC
+             LIMIT 1'
+        );
+        $statement->execute(['account_id' => $accountId]);
+        $email = $statement->fetchColumn();
+        if (is_string($email) && trim($email) !== '') {
+            return trim($email);
+        }
+    } catch (Throwable) {
+    }
+
+    return filter_var($fallbackJid, FILTER_VALIDATE_EMAIL) ? $fallbackJid : '';
 }
 
 function accountToClient(array $account): array

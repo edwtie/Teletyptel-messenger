@@ -417,6 +417,71 @@ body.account-gate .modal-shell {
   font-size: 13px;
 }
 
+.contact-profile-card {
+  width: min(520px, calc(100vw - 32px));
+}
+
+.contact-profile-body {
+  display: grid;
+  gap: 14px;
+}
+
+.contact-profile-heading {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+}
+
+.contact-profile-heading strong {
+  display: block;
+  color: var(--text);
+  font-size: 22px;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.contact-profile-heading span {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.contact-profile-details {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.contact-profile-details div {
+  display: grid;
+  grid-template-columns: minmax(110px, 36%) minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, .03);
+}
+
+.contact-profile-details div + div {
+  border-top: 1px solid var(--line);
+}
+
+.contact-profile-details dt {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.contact-profile-details dd {
+  margin: 0;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
 .link-button.account-forgot-password {
   justify-self: start;
   min-height: 0;

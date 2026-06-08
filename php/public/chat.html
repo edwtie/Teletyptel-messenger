@@ -736,10 +736,50 @@
   </div>
 
   <div id="conversationContextMenu" class="context-menu" hidden role="menu" aria-label="Contact menu">
+    <button id="contextProfileButton" type="button" role="menuitem" data-i18n="button.view_profile">View profile</button>
     <button id="contextRoomAvatarButton" type="button" role="menuitem" data-i18n="button.group_avatar">Group avatar...</button>
     <button id="contextBlockButton" class="danger-action" type="button" role="menuitem" data-i18n="button.block_contact">Block</button>
   </div>
   <input id="mucAvatarFileInput" class="file-input" type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" aria-label="Choose group avatar" data-i18n-aria-label="button.group_avatar">
+
+  <div id="contactProfileDialog" class="modal-shell contact-profile-dialog" hidden role="dialog" aria-modal="true" aria-labelledby="contactProfileTitle">
+    <div class="modal-card contact-profile-card">
+      <div class="modal-header">
+        <div>
+          <h2 id="contactProfileTitle" data-i18n="profile.contact_title">Contact profile</h2>
+          <span id="contactProfileSubtitle" data-i18n="profile.contact_subtitle">Contact details from this TeleTypTel account.</span>
+        </div>
+        <button id="closeContactProfileButton" class="icon-button" type="button" aria-label="Close" data-i18n-aria-label="button.close">x</button>
+      </div>
+      <div class="modal-body contact-profile-body">
+        <div class="contact-profile-heading">
+          <div id="contactProfileAvatar" class="avatar avatar-large" aria-hidden="true">TE</div>
+          <div>
+            <strong id="contactProfileName">Tester</strong>
+            <span id="contactProfilePresence">Offline</span>
+          </div>
+        </div>
+        <dl class="contact-profile-details">
+          <div>
+            <dt data-i18n="label.email">E-mail</dt>
+            <dd id="contactProfileEmail">tester@localhost</dd>
+          </div>
+          <div>
+            <dt data-i18n="label.phone">Phone</dt>
+            <dd id="contactProfilePhone">-</dd>
+          </div>
+          <div>
+            <dt data-i18n="label.xmpp_jid">XMPP JID</dt>
+            <dd id="contactProfileJid">tester@localhost</dd>
+          </div>
+        </dl>
+        <div id="contactProfileStatus" class="dialog-status" role="status" aria-live="polite"></div>
+      </div>
+      <div class="modal-actions">
+        <button id="contactProfileOkButton" type="button" data-i18n="button.close">Close</button>
+      </div>
+    </div>
+  </div>
 
   <div id="messageContextMenu" class="context-menu message-context-menu" hidden role="menu" aria-label="Message menu">
     <button id="messageContextEditButton" type="button" role="menuitem" data-i18n="button.edit_message">Edit</button>
@@ -748,7 +788,7 @@
     <button id="messageContextForwardButton" type="button" role="menuitem" data-i18n="button.forward_message">Forward</button>
   </div>
 
-  <script src="vendor/qrcode.js?v=20260608-tc-text-without-video"></script>
-  <script src="chat-client.js?v=20260608-tc-text-without-video"></script>
+  <script src="vendor/qrcode.js?v=20260608-contact-profile"></script>
+  <script src="chat-client.js?v=20260608-contact-profile"></script>
 </body>
 </html>

@@ -115,8 +115,12 @@ item is implemented, tested and documented.
 - [x] LngPdk production direction documented separately from loose `.lng` fallback.
 - [ ] LngPdk package serving and verification in the web/mobile clients.
 - [ ] Language key completeness validator for web `.lng` and packaged LngPdk resources.
-- [ ] Account authentication/session model; current Alpha 2 profile API is not login security.
-- [ ] Password handling hardening; current local profile password option is a prototype setting.
+- [x] Account authentication/session model for evaluation: server-side account
+  sessions, local credentials, remembered browser sessions, password reset,
+  e-mail verification, TOTP setup and OAuth identity handoff are implemented.
+- [ ] Production account security hardening: rate limiting, CSRF/session expiry
+  review, abuse controls, mail-delivery monitoring, recovery policy and public
+  signup policy still need release validation.
 - [x] Account identity model separates login identity from XMPP JID/server identity.
 - [x] Social login provider setup documented for Google, Facebook and Apple.
 - [x] XEP-0493 OAuth Client Login researched and mapped to SASL `OAUTHBEARER`.

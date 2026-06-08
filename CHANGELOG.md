@@ -207,6 +207,32 @@
   need production hardening, rate limiting, mail-delivery monitoring and abuse
   policy before public signup.
 
+### Current Known Limits
+
+- The current web client is strong enough for Alpha 2/Beta-RC evaluation, but
+  the public hosted TeleTypTel service still needs final domain/server release
+  operations, public signup policy, moderation, backups and monitoring before a
+  production launch.
+- Browser chat, profile, history, attachment, location and Total Conversation
+  flows run through the TeleTypTel PHP web/API layer and local relay today.
+  Standards-based XMPP pieces are available in the PHP/C# libraries, LocalServer
+  and real-server smoke tools, but the browser UI is not yet a full federated
+  direct-XMPP client for arbitrary providers.
+- OMEMO/Double Ratchet work is intentionally audit-gated: wire helpers,
+  envelopes, local key models and experimental PHP/C# ratchet code exist, but
+  production end-to-end encryption must wait for independent review, stable test
+  vectors and live interop with existing OMEMO clients.
+- SIP/NG112/relay-provider interop is documented as provider-server direction.
+  ejabberd plus coturn and optional SIP gateway modules are the selected
+  deployment path, but production SIP gateway operation is not bundled in the
+  web client.
+- Android and iOS remain packaging targets. The browser UI and iOS shell notes
+  are present, but app-store-ready mobile builds and device-contact integration
+  are still separate release work.
+- LngPdk is the intended signed language-package path. Loose `.lng` web files
+  still exist for development fallback until web/mobile package serving,
+  verification and completeness checks are finished.
+
 ### Fixed
 
 - Old public product names were replaced with TeleTypTel in visible UI text,
@@ -268,9 +294,11 @@ First public alpha evaluation release.
 - Public documentation for getting started, real-server testing, protocol
   coverage, accessibility vision and XSF software-directory readiness.
 
-### Known Limits
+### Known Limits At Alpha 1 Release
 
-- The hosted public demo is not live yet; Alpha 1 is evaluated locally.
-- The PHP relay is a development bridge, not a production XMPP server.
-- The web UI does not yet log into arbitrary production XMPP servers directly.
-- End-to-end encryption, group chat, file upload and calls are roadmap items.
+- The hosted public demo was not live yet; Alpha 1 was evaluated locally.
+- The PHP relay was a development bridge, not a production XMPP server.
+- The web UI did not log into arbitrary production XMPP servers directly.
+- End-to-end encryption, group chat, file upload and calls were not part of the
+  Alpha 1 release payload yet. Current progress is tracked in the Unreleased
+  section above.

@@ -296,6 +296,7 @@
     blockedJids: new Set(loadBlockedJids(sessionProfile)),
     accountReady: false,
     pendingMucAvatarConversationId: null,
+    contactProfileRequestId: 0,
     security: {
       twoFactorVerificationId: 0,
       twoFactorMethod: "authenticator",
@@ -389,9 +390,22 @@
     inviteConversationButton: byId("inviteConversationButton"),
     developerPanel: byId("developerPanel"),
     conversationContextMenu: byId("conversationContextMenu"),
+    contextProfileButton: byId("contextProfileButton"),
     contextRoomAvatarButton: byId("contextRoomAvatarButton"),
     contextBlockButton: byId("contextBlockButton"),
     mucAvatarFileInput: byId("mucAvatarFileInput"),
+    contactProfileDialog: byId("contactProfileDialog"),
+    contactProfileTitle: byId("contactProfileTitle"),
+    contactProfileSubtitle: byId("contactProfileSubtitle"),
+    contactProfileAvatar: byId("contactProfileAvatar"),
+    contactProfileName: byId("contactProfileName"),
+    contactProfilePresence: byId("contactProfilePresence"),
+    contactProfileEmail: byId("contactProfileEmail"),
+    contactProfilePhone: byId("contactProfilePhone"),
+    contactProfileJid: byId("contactProfileJid"),
+    contactProfileStatus: byId("contactProfileStatus"),
+    closeContactProfileButton: byId("closeContactProfileButton"),
+    contactProfileOkButton: byId("contactProfileOkButton"),
     messageContextMenu: byId("messageContextMenu"),
     messageContextEditButton: byId("messageContextEditButton"),
     messageContextDeleteButton: byId("messageContextDeleteButton"),
@@ -646,10 +660,14 @@
     el.addGroupButton.addEventListener("click", addGroupConversation);
     el.inviteConversationButton.addEventListener("click", inviteContactToActiveGroup);
     el.backToContactsButton.addEventListener("click", closeActiveConversation);
+    el.contextProfileButton.addEventListener("click", openContextConversationProfile);
     el.contextRoomAvatarButton.addEventListener("click", chooseContextRoomAvatar);
     el.contextBlockButton.addEventListener("click", toggleBlockContextConversation);
     el.mucAvatarFileInput.addEventListener("change", handleMucAvatarFileSelected);
     el.conversationContextMenu.addEventListener("click", (event) => event.stopPropagation());
+    el.closeContactProfileButton.addEventListener("click", closeContactProfileDialog);
+    el.contactProfileOkButton.addEventListener("click", closeContactProfileDialog);
+    el.contactProfileDialog.addEventListener("click", closeContactProfileDialogOnBackdrop);
     el.messageContextMenu.addEventListener("click", (event) => event.stopPropagation());
     el.messageContextEditButton.addEventListener("click", editContextMessage);
     el.messageContextDeleteButton.addEventListener("click", deleteContextMessage);
@@ -697,6 +715,7 @@
     document.addEventListener("keydown", closeAttachmentMenuOnEscape);
     document.addEventListener("keydown", closeSmileyPickerOnEscape);
     document.addEventListener("keydown", closeConversationContextMenuOnEscape);
+    document.addEventListener("keydown", closeContactProfileDialogOnEscape);
     document.addEventListener("keydown", closeMessageContextMenuOnEscape);
     document.addEventListener("keydown", closeAccountDialogOnEscape);
     document.addEventListener("keydown", closeAvatarCropDialogOnEscape);
@@ -4005,9 +4024,11 @@
     const top = Math.max(8, Math.min(y, window.innerHeight - rect.height - 8));
     menu.style.left = `${left}px`;
     menu.style.top = `${top}px`;
-    const focusTarget = !el.contextRoomAvatarButton.hidden
-      ? el.contextRoomAvatarButton
-      : el.contextBlockButton;
+    const focusTarget = [
+      el.contextProfileButton,
+      el.contextRoomAvatarButton,
+      el.contextBlockButton
+    ].find((button) => !button.hidden && !button.disabled) || menu;
     focusTarget.focus();
   }
 
@@ -4028,6 +4049,132 @@
   function closeConversationContextMenu() {
     state.contextConversationId = null;
     el.conversationContextMenu.hidden = true;
+  }
+
+  function openContextConversationProfile() {
+    const conversation = state.conversations.find((item) => item.id === state.contextConversationId) ?? null;
+    if (!canViewContactProfile(conversation)) {
+      return;
+    }
+
+    closeConversationContextMenu();
+    openContactProfileDialog(conversation);
+  }
+
+  function openContactProfileDialog(conversation) {
+    const requestId = ++state.contactProfileRequestId;
+    renderContactProfileDialog(conversation, null);
+    el.contactProfileStatus.textContent = state.account?.accountId
+      ? t("profile.loading", "Loading server profile...")
+      : t("profile.local_only", "Only local contact details are available.");
+    el.contactProfileDialog.hidden = false;
+    document.body.classList.add("modal-open");
+    el.closeContactProfileButton.focus();
+
+    loadPublicContactProfile(conversation)
+      .then((profile) => {
+        if (requestId !== state.contactProfileRequestId || el.contactProfileDialog.hidden) {
+          return;
+        }
+
+        if (!profile) {
+          el.contactProfileStatus.textContent = t("profile.local_only", "Only local contact details are available.");
+          return;
+        }
+
+        applyPublicProfileToConversation(conversation, profile);
+        renderContactProfileDialog(conversation, profile);
+        el.contactProfileStatus.textContent = t("profile.loaded", "Profile loaded from server.");
+      })
+      .catch((error) => {
+        appendDebug("profile-error", error.message || String(error));
+        if (requestId === state.contactProfileRequestId && !el.contactProfileDialog.hidden) {
+          el.contactProfileStatus.textContent = t("profile.local_only", "Only local contact details are available.");
+        }
+      });
+  }
+
+  function closeContactProfileDialog() {
+    state.contactProfileRequestId++;
+    el.contactProfileDialog.hidden = true;
+    if (el.accountDialog.hidden && el.avatarCropDialog.hidden && el.locationShareDialog.hidden) {
+      document.body.classList.remove("modal-open");
+    }
+  }
+
+  function closeContactProfileDialogOnBackdrop(event) {
+    if (event.target === el.contactProfileDialog) {
+      closeContactProfileDialog();
+    }
+  }
+
+  function closeContactProfileDialogOnEscape(event) {
+    if (event.key === "Escape" && !el.contactProfileDialog.hidden) {
+      closeContactProfileDialog();
+    }
+  }
+
+  function renderContactProfileDialog(conversation, profile = null) {
+    const name = profile?.displayName || conversationDisplayName(conversation) || displayNameForJid(conversation?.peer);
+    const jid = bareJid(profile?.jid || conversation?.peer || "");
+    const email = profile?.email || conversation?.email || jid || "-";
+    const phone = profile?.phoneNumber || conversation?.phoneNumber || conversation?.phone || conversation?.telephone || "-";
+    const avatarSource = {
+      displayName: name,
+      peer: jid,
+      avatarDataUrl: profile?.avatarDataUrl || conversation?.avatarDataUrl || "",
+      avatarColor: profile?.avatarColor || conversation?.avatarColor || avatarColorFor(`${name}:${jid}`)
+    };
+
+    el.contactProfileTitle.textContent = t("profile.contact_title", "Contact profile");
+    el.contactProfileSubtitle.textContent = t("profile.contact_subtitle", "Contact details from this TeleTypTel account.");
+    el.contactProfileName.textContent = name;
+    el.contactProfilePresence.textContent = conversationMeta(conversation);
+    el.contactProfileEmail.textContent = email;
+    el.contactProfilePhone.textContent = phone;
+    el.contactProfileJid.textContent = jid || "-";
+    renderAvatarInto(el.contactProfileAvatar, avatarSource);
+  }
+
+  async function loadPublicContactProfile(conversation) {
+    const accountId = state.account?.accountId || "";
+    const lookupJid = bareJid(conversation?.peer || "");
+    if (!accountId || !lookupJid || isInfrastructurePeer(lookupJid)) {
+      return null;
+    }
+
+    const query = new URLSearchParams({ accountId, lookupJid });
+    const response = await fetch(`${accountApiPath}?${query.toString()}`, {
+      cache: "no-store"
+    });
+    if (response.status === 404 || response.status === 401) {
+      return null;
+    }
+
+    if (!response.ok) {
+      throw new Error(`profile API returned ${response.status}`);
+    }
+
+    const payload = await response.json();
+    return payload.ok && payload.profile ? payload.profile : null;
+  }
+
+  function applyPublicProfileToConversation(conversation, profile) {
+    if (!conversation || !profile) {
+      return;
+    }
+
+    conversation.email = profile.email || conversation.email || "";
+    conversation.phoneNumber = profile.phoneNumber || conversation.phoneNumber || "";
+    if (isValidAvatarDataUrl(profile.avatarDataUrl)) {
+      conversation.avatarDataUrl = profile.avatarDataUrl;
+    }
+
+    if (profile.avatarColor) {
+      conversation.avatarColor = profile.avatarColor;
+    }
+
+    renderConversations();
   }
 
   function showMessageContextMenu(event, message, anchor = null) {
@@ -7794,9 +7941,12 @@
 
   function updateConversationContextMenu() {
     const conversation = state.conversations.find((item) => item.id === state.contextConversationId) ?? null;
+    const canViewProfile = canViewContactProfile(conversation);
     const canBlock = canBlockConversation(conversation);
     const blocked = isBlockedConversation(conversation);
     const canChangeRoomAvatar = canChangeMucAvatar(conversation);
+    el.contextProfileButton.hidden = !canViewProfile;
+    el.contextProfileButton.disabled = !canViewProfile;
     el.contextRoomAvatarButton.hidden = !canChangeRoomAvatar;
     el.contextRoomAvatarButton.disabled = !canChangeRoomAvatar;
     el.contextBlockButton.disabled = !canBlock;
@@ -7816,7 +7966,14 @@
   }
 
   function canOpenConversationContextMenu(conversation) {
-    return canBlockConversation(conversation) || canChangeMucAvatar(conversation);
+    return canViewContactProfile(conversation) || canBlockConversation(conversation) || canChangeMucAvatar(conversation);
+  }
+
+  function canViewContactProfile(conversation) {
+    return Boolean(conversation)
+      && conversation.kind === "contact"
+      && !isOwnPeer(conversation.peer)
+      && !isInfrastructurePeer(conversation.peer);
   }
 
   function canChangeMucAvatar(conversation) {
