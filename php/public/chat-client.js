@@ -5031,11 +5031,13 @@
         applyMessageCorrection(edit.conversation, edit.replaceId, text, "self", outgoingId);
         clearMessageEdit();
       } else {
+        clearLocalGroupDraftMessage();
         addMessage("self", text, "jingle-rtt", null, null, null, null, outgoingId);
       }
       el.messageInput.value = "";
       state.previousText = "";
       state.sequence = 0;
+      clearLocalGroupDraftMessage();
       updateTotalConversationTextPanel();
       return;
     }
@@ -5056,11 +5058,13 @@
       applyMessageCorrection(edit.conversation, edit.replaceId, text, "self", outgoingId);
       clearMessageEdit();
     } else {
+      clearLocalGroupDraftMessage();
       addMessage("self", text, "sent", null, null, null, null, outgoingId);
     }
     el.messageInput.value = "";
     state.previousText = "";
     state.sequence = 0;
+    clearLocalGroupDraftMessage();
     updateTotalConversationTextPanel();
   }
 
@@ -5076,6 +5080,7 @@
 
     state.sequence = 0;
     state.previousText = el.messageInput.value;
+    updateLocalGroupDraftMessage();
     updateTotalConversationTextPanel();
     if (sendJingleRttSyncPacket("reset", el.messageInput.value)) {
       return;
@@ -5085,6 +5090,7 @@
 
   function sendRttEdit() {
     if (!hasActiveConversation() || !el.rttToggle.checked) {
+      clearLocalGroupDraftMessage();
       return;
     }
 
@@ -5097,6 +5103,7 @@
     const previousText = state.previousText;
     const actions = createDeltaActions(previousText, text);
     state.previousText = text;
+    updateLocalGroupDraftMessage();
     updateTotalConversationTextPanel();
     if (sendJingleRttSyncPacket("edit", text, { actions, previousText })) {
       return;
@@ -5117,6 +5124,9 @@
       ? `<rtt xmlns="urn:xmpp:rtt:0" seq="${state.sequence++}">${actions ?? `<t p="0">${escapeXml(text)}</t>`}</rtt>`
       : `<rtt xmlns="urn:xmpp:rtt:0" event="${eventName}" seq="${state.sequence++}"><t p="0">${escapeXml(text)}</t></rtt>`;
     const envelope = createRelayEnvelope("rtt", text, xml);
+    if (eventName === "reset" || state.sequence === 1) {
+      Object.assign(envelope, currentAvatarEnvelope(true));
+    }
     state.relaySocket.send(JSON.stringify(envelope));
     appendDebug("rtt-out", xml);
   }
@@ -5546,6 +5556,7 @@
       applyEnvelopeIdentity(conversation, envelope);
       conversation.remoteText = "";
       conversation.remoteFrom = envelopeFrom(envelope);
+      conversation.remoteIdentity = mergeMessageIdentity(conversation.remoteIdentity, envelopeMessageIdentity(envelope));
       conversation.remoteDraftUpdatedAt = null;
       conversation.clientState = "active";
       conversation.clientStateUpdatedAt = new Date();
@@ -5567,7 +5578,10 @@
           envelope.attachment ?? null,
           conversation.id,
           envelope.location ?? null,
-          typeof envelope.messageId === "string" ? envelope.messageId : null);
+          typeof envelope.messageId === "string" ? envelope.messageId : null,
+          false,
+          true,
+          envelopeMessageIdentity(envelope));
       }
       return;
     }
@@ -5580,6 +5594,7 @@
     applyEnvelopeIdentity(conversation, envelope);
     conversation.remoteText = envelope.text ?? "";
     conversation.remoteFrom = envelopeFrom(envelope);
+    conversation.remoteIdentity = mergeMessageIdentity(conversation.remoteIdentity, envelopeMessageIdentity(envelope));
     conversation.remoteDraftUpdatedAt = new Date();
     conversation.clientState = "active";
     conversation.clientStateUpdatedAt = new Date();
@@ -5665,6 +5680,7 @@
     conversation.presence = "online";
     conversation.clientState = "active";
     conversation.clientStateUpdatedAt = new Date();
+    const senderIdentity = envelopeMessageIdentity(envelope);
     if (envelope.locationAction === "stop") {
       addMessage(
         "peer",
@@ -5672,7 +5688,12 @@
         "location",
         envelopeFrom(envelope),
         null,
-        conversation.id);
+        conversation.id,
+        null,
+        null,
+        false,
+        true,
+        senderIdentity);
       return;
     }
 
@@ -5680,9 +5701,9 @@
     const text = envelope.text || (location ? locationMessageText(location) : t("location.shared_message", "Location shared"));
     const from = envelopeFrom(envelope);
     if (envelope.locationAction === "live") {
-      upsertLiveLocationMessage("peer", text, "location live", from, conversation.id, location);
+      upsertLiveLocationMessage("peer", text, "location live", from, conversation.id, location, senderIdentity);
     } else {
-      addMessage("peer", text, "location", from, null, conversation.id, location, typeof envelope.messageId === "string" ? envelope.messageId : null);
+      addMessage("peer", text, "location", from, null, conversation.id, location, typeof envelope.messageId === "string" ? envelope.messageId : null, false, true, senderIdentity);
     }
   }
 
@@ -5973,6 +5994,31 @@
     updateCallUi();
 
     setMediaStatus(t("media.preview_stopped", "Preview stopped."));
+  }
+
+  function envelopeMessageIdentity(envelope) {
+    const peer = envelopeFrom(envelope);
+    return {
+      displayName: typeof envelope?.displayName === "string" && envelope.displayName.trim()
+        ? envelope.displayName.trim()
+        : displayNameForJid(peer),
+      peer,
+      avatarColor: typeof envelope?.avatarColor === "string" && envelope.avatarColor.trim()
+        ? normalizeAvatarColor(envelope.avatarColor)
+        : avatarColorFor(peer || "remote"),
+      avatarDataUrl: isValidAvatarDataUrl(envelope?.avatarDataUrl) ? envelope.avatarDataUrl : ""
+    };
+  }
+
+  function mergeMessageIdentity(previous, next) {
+    return {
+      displayName: next?.displayName || previous?.displayName || "",
+      peer: next?.peer || previous?.peer || "",
+      avatarColor: next?.avatarColor || previous?.avatarColor || "",
+      avatarDataUrl: isValidAvatarDataUrl(next?.avatarDataUrl)
+        ? next.avatarDataUrl
+        : (isValidAvatarDataUrl(previous?.avatarDataUrl) ? previous.avatarDataUrl : "")
+    };
   }
 
   async function startCall(mediaKind) {
@@ -7489,7 +7535,7 @@
     return `${prefix}-${token}`;
   }
 
-  function addMessage(direction, text, status, from = null, attachment = null, conversationId = null, location = null, xmppId = null, stylingDisabled = false, persist = true) {
+  function addMessage(direction, text, status, from = null, attachment = null, conversationId = null, location = null, xmppId = null, stylingDisabled = false, persist = true, senderIdentity = null) {
     const conversation = conversationId
       ? state.conversations.find((item) => item.id === conversationId)
       : activeConversation();
@@ -7507,6 +7553,9 @@
       status,
       xmppId,
       stylingDisabled,
+      senderDisplayName: senderIdentity?.displayName || null,
+      senderAvatarColor: senderIdentity?.avatarColor || null,
+      senderAvatarDataUrl: isValidAvatarDataUrl(senderIdentity?.avatarDataUrl) ? senderIdentity.avatarDataUrl : null,
       retracted: false,
       retraction: null,
       edited: false,
@@ -7525,7 +7574,7 @@
     return message;
   }
 
-  function upsertLiveLocationMessage(direction, text, status, from, conversationId, location) {
+  function upsertLiveLocationMessage(direction, text, status, from, conversationId, location, senderIdentity = null) {
     const conversation = state.conversations.find((item) => item.id === conversationId);
     if (!conversation) {
       return;
@@ -7546,7 +7595,7 @@
     const existing = conversation.messages.find(matchesLiveLocation);
 
     if (!existing) {
-      addMessage(direction, text, status, from, null, conversation.id, location);
+      addMessage(direction, text, status, from, null, conversation.id, location, null, false, true, senderIdentity);
       const inserted = conversation.messages[conversation.messages.length - 1];
       if (inserted) {
         inserted.locationLive = true;
@@ -7558,6 +7607,15 @@
     existing.status = status;
     existing.from = from;
     existing.location = location;
+    if (senderIdentity?.displayName) {
+      existing.senderDisplayName = senderIdentity.displayName;
+    }
+    if (senderIdentity?.avatarColor) {
+      existing.senderAvatarColor = senderIdentity.avatarColor;
+    }
+    if (isValidAvatarDataUrl(senderIdentity?.avatarDataUrl)) {
+      existing.senderAvatarDataUrl = senderIdentity.avatarDataUrl;
+    }
     existing.timestamp = new Date();
 
     conversation.messages = conversation.messages.filter((message) => message === existing || !matchesLiveLocation(message));
@@ -7699,7 +7757,10 @@
         text: conversation.remoteText,
         status: "typing",
         timestamp: conversation.remoteDraftUpdatedAt ?? new Date(),
-        draft: true
+        draft: true,
+        senderDisplayName: conversation.remoteIdentity?.displayName || null,
+        senderAvatarColor: conversation.remoteIdentity?.avatarColor || null,
+        senderAvatarDataUrl: conversation.remoteIdentity?.avatarDataUrl || null
       }));
       el.remoteDraft.hidden = false;
       el.remoteDraftName.textContent = displayNameForJid(conversation.remoteFrom || conversation.peer);
@@ -7711,6 +7772,7 @@
       el.remoteDraftText.textContent = "";
     }
 
+    updateLocalGroupDraftMessage(conversation, false);
     updateComposerAvailability();
     el.messageTimeline.scrollTop = el.messageTimeline.scrollHeight;
     updateTotalConversationTextPanel(conversation);
@@ -7751,7 +7813,10 @@
       text: conversation.remoteText,
       status: "typing",
       timestamp: conversation.remoteDraftUpdatedAt ?? new Date(),
-      draft: true
+      draft: true,
+      senderDisplayName: conversation.remoteIdentity?.displayName || null,
+      senderAvatarColor: conversation.remoteIdentity?.avatarColor || null,
+      senderAvatarDataUrl: conversation.remoteIdentity?.avatarDataUrl || null
     };
 
     if (!existing) {
@@ -7764,6 +7829,47 @@
     updateMessageElement(existing, message);
     el.messageTimeline.scrollTop = el.messageTimeline.scrollHeight;
     updateTotalConversationTextPanel(conversation);
+  }
+
+  function updateLocalGroupDraftMessage(conversation = activeConversation(), scroll = true) {
+    const existing = el.messageTimeline.querySelector('[data-local-draft="true"]');
+    if (!conversation || conversation.id !== state.activeConversationId || conversation.kind !== "group" || !el.rttToggle.checked) {
+      existing?.remove();
+      return;
+    }
+
+    const text = el.messageInput.value;
+    if (!text) {
+      existing?.remove();
+      return;
+    }
+
+    const message = {
+      direction: "self",
+      from: currentFromJid(),
+      text,
+      status: "typing",
+      timestamp: new Date(),
+      draft: true,
+      localDraft: true,
+      senderDisplayName: currentSenderName(),
+      senderAvatarColor: currentAvatarColor(),
+      senderAvatarDataUrl: currentAvatarDataUrl()
+    };
+
+    if (!existing) {
+      el.messageTimeline.appendChild(createMessageElement(message));
+    } else {
+      updateMessageElement(existing, message);
+    }
+
+    if (scroll) {
+      el.messageTimeline.scrollTop = el.messageTimeline.scrollHeight;
+    }
+  }
+
+  function clearLocalGroupDraftMessage() {
+    el.messageTimeline.querySelector('[data-local-draft="true"]')?.remove();
   }
 
   function updateTotalConversationTextPanel(conversation = activeConversation()) {
@@ -8367,30 +8473,13 @@
 
   function createMessageElement(message) {
     const item = document.createElement("article");
-    item.className = "message " + message.direction + (message.draft ? " draft" : "") + (message.retracted ? " retracted" : "");
+    applyMessageElementClass(item, message);
     if (message.id) {
       item.dataset.messageId = message.id;
     }
     item.addEventListener("contextmenu", (event) => showMessageContextMenu(event, message, item));
-    if (message.draft) {
-      item.dataset.remoteDraft = "true";
-    } else {
-      delete item.dataset.remoteDraft;
-    }
-
-    const meta = document.createElement("div");
-    meta.className = "message-meta";
-    meta.textContent = messageMetaText(message);
-    const body = document.createElement("div");
-    body.className = "message-body";
-    renderRichText(body, message.text, message.stylingDisabled);
-    if (!message.retracted && message.attachment) {
-      body.appendChild(createAttachmentElement(message.attachment));
-    }
-    if (!message.retracted && message.location) {
-      body.appendChild(createLocationElement(message.location, message));
-    }
-    item.append(meta, body);
+    applyMessageDraftDataset(item, message);
+    renderMessageElementChildren(item, message);
     return item;
   }
 
@@ -8402,7 +8491,7 @@
       return;
     }
 
-    item.className = "message " + message.direction;
+    applyMessageElementClass(item, message);
     const meta = item.querySelector(".message-meta");
     if (meta) {
       meta.textContent = messageMetaText(message);
@@ -8426,16 +8515,19 @@
   }
 
   function updateMessageElement(item, message) {
-    item.className = "message " + message.direction + (message.draft ? " draft" : "") + (message.retracted ? " retracted" : "");
+    applyMessageElementClass(item, message);
     if (message.id) {
       item.dataset.messageId = message.id;
     }
+    applyMessageDraftDataset(item, message);
     if (message.draft) {
-      item.dataset.remoteDraft = "true";
-    } else {
-      delete item.dataset.remoteDraft;
+      updateDraftMessageElement(item, message);
+      return;
     }
+    renderMessageElementChildren(item, message);
+  }
 
+  function updateDraftMessageElement(item, message) {
     const meta = item.querySelector(".message-meta");
     if (meta) {
       meta.textContent = messageMetaText(message);
@@ -8444,23 +8536,90 @@
     const body = item.querySelector(".message-body");
     if (body) {
       renderRichText(body, message.text, message.stylingDisabled);
-      if (!message.retracted && message.attachment) {
-        body.appendChild(createAttachmentElement(message.attachment));
-      }
-      if (!message.retracted && message.location) {
-        body.appendChild(createLocationElement(message.location, message));
-      }
+      return;
     }
+
+    renderMessageElementChildren(item, message);
+  }
+
+  function applyMessageElementClass(item, message) {
+    item.className = "message " + message.direction
+      + (message.draft ? " draft" : "")
+      + (message.retracted ? " retracted" : "")
+      + (activeConversation()?.kind === "group" ? " group-message" : "");
+  }
+
+  function applyMessageDraftDataset(item, message) {
+    if (message.draft && !message.localDraft) {
+      item.dataset.remoteDraft = "true";
+    } else {
+      delete item.dataset.remoteDraft;
+    }
+
+    if (message.localDraft) {
+      item.dataset.localDraft = "true";
+    } else {
+      delete item.dataset.localDraft;
+    }
+  }
+
+  function renderMessageElementChildren(item, message) {
+    const meta = document.createElement("div");
+    meta.className = "message-meta";
+    meta.textContent = messageMetaText(message);
+
+    const body = document.createElement("div");
+    body.className = "message-body";
+    renderRichText(body, message.text, message.stylingDisabled);
+    if (!message.retracted && message.attachment) {
+      body.appendChild(createAttachmentElement(message.attachment));
+    }
+    if (!message.retracted && message.location) {
+      body.appendChild(createLocationElement(message.location, message));
+    }
+
+    if (activeConversation()?.kind !== "group") {
+      item.replaceChildren(meta, body);
+      return;
+    }
+
+    const content = document.createElement("div");
+    content.className = "message-content";
+    content.append(meta, body);
+    const avatar = createAvatarElement(messageAvatarSource(message), "message-avatar");
+    item.replaceChildren(avatar, content);
   }
 
   function messageMetaText(message) {
     const sender = message.direction === "self"
       ? currentSenderName()
-      : displayNameForJid(message.from);
+      : message.senderDisplayName || displayNameForJid(message.from);
     const status = message.edited
       ? `${message.status} (${t("message.edited", "edited")})`
       : message.status;
     return `${sender} - ${status} - ${formatTime(message.timestamp)}`;
+  }
+
+  function messageAvatarSource(message) {
+    if (message?.direction === "self") {
+      return {
+        displayName: currentSenderName(),
+        peer: currentFromJid(),
+        avatarDataUrl: currentAvatarDataUrl(),
+        avatarColor: currentAvatarColor()
+      };
+    }
+
+    if (message?.senderDisplayName || message?.senderAvatarColor || message?.senderAvatarDataUrl) {
+      return {
+        displayName: message.senderDisplayName || displayNameForJid(message.from),
+        peer: message.from || "",
+        avatarDataUrl: message.senderAvatarDataUrl || "",
+        avatarColor: message.senderAvatarColor || avatarColorFor(message.from || message.senderDisplayName || "remote")
+      };
+    }
+
+    return locationMarkerSource(message);
   }
 
   function createMessageActions(message) {

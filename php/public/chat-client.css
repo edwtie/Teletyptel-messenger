@@ -2139,6 +2139,46 @@ body:not([data-chat-background="none"]) .message-body {
   margin-left: auto;
 }
 
+.message.group-message {
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: end;
+  max-width: min(82ch, 88%);
+}
+
+.message.group-message.self {
+  grid-template-columns: minmax(0, 1fr) 34px;
+  margin-left: auto;
+}
+
+.message.group-message .message-avatar {
+  width: 30px;
+  height: 30px;
+  align-self: end;
+  margin-bottom: 2px;
+  color: #ffffff;
+  font-size: 12px;
+}
+
+.message.group-message .message-content {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.message.group-message.self .message-avatar {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.message.group-message.self .message-content {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.message.group-message.self .message-meta {
+  text-align: right;
+}
+
 .message.draft .message-body {
   border-style: dashed;
 }
