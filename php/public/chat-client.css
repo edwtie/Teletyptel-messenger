@@ -2536,9 +2536,9 @@ body[data-theme="dark"] .link-preview-loading {
 
 .attachment-card.audio,
 .attachment-card.video {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
+  display: block;
+  position: relative;
+  padding: 6px;
 }
 
 .attachment-card.audio .attachment-icon {
@@ -2551,10 +2551,9 @@ body[data-theme="dark"] .link-preview-loading {
 
 .attachment-audio-player,
 .attachment-video-player {
-  grid-column: 1 / -1;
   width: 100%;
   min-width: 220px;
-  margin-top: 6px;
+  margin-top: 0;
 }
 
 .attachment-video-player {
@@ -2988,6 +2987,14 @@ body[data-theme="dark"] .link-preview-loading {
 
 .attachment-card.photo .attachment-download-button {
   align-self: start;
+}
+
+.attachment-card.audio .attachment-download-button,
+.attachment-card.video .attachment-download-button {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 2;
 }
 
 .voice-action-play {

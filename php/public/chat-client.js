@@ -10028,7 +10028,7 @@
     }
 
     const kind = message.attachment.kind || classifyAttachment(message.attachment);
-    if (kind === "audio" || kind === "video" || kind === "photo") {
+    if (kind === "photo") {
       return "";
     }
 
@@ -10527,7 +10527,7 @@
       player.preload = "metadata";
       player.src = attachment.url;
       player.addEventListener("click", (event) => event.stopPropagation());
-      wrapper.append(text, downloadButton, player);
+      wrapper.append(player, downloadButton);
     } else if (kind === "video") {
       const player = document.createElement("video");
       player.className = "attachment-video-player";
@@ -10536,7 +10536,7 @@
       player.playsInline = true;
       player.src = attachment.url;
       player.addEventListener("click", (event) => event.stopPropagation());
-      wrapper.append(text, downloadButton, player);
+      wrapper.append(player, downloadButton);
     } else {
       wrapper.append(icon, text, downloadButton);
     }
@@ -10568,11 +10568,16 @@
   }
 
   function createAttachmentDownloadButton(attachment) {
+    const kind = attachment.kind || classifyAttachment(attachment);
+    const metaText = attachmentMetaText(attachment, kind);
+    const label = metaText
+      ? `${t("button.download", "Download")} - ${metaText}`
+      : t("button.download", "Download");
     const button = document.createElement("button");
     button.className = "icon-button attachment-download-button";
     button.type = "button";
-    button.title = t("button.download", "Download");
-    button.setAttribute("aria-label", t("button.download", "Download"));
+    button.title = label;
+    button.setAttribute("aria-label", label);
     const icon = document.createElement("span");
     icon.className = "material-icon";
     icon.dataset.icon = "download";
