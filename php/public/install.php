@@ -21,6 +21,10 @@ $state = [
     'xmpp_websocket' => defaultXmppWebSocket(),
     'xmpp_domain' => defaultXmppDomain(),
     'relay_port' => '8787',
+    'admin_name' => 'TeleTypTel beheerder',
+    'admin_email' => '',
+    'admin_password' => '',
+    'admin_password_confirm' => '',
 ];
 $errors = [];
 $messages = [];
@@ -43,6 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ensureDatabase($state);
             writeConfig($configPath, $state);
             importSchema($schemaPath, $state);
+            createAdminAccount($state);
             $generated = writeRuntimeScripts($runtimePath, $rootPath, $state);
             $installed = true;
             $messages[] = 'Configuratie opgeslagen in php/config.php.';
@@ -86,6 +91,16 @@ function validateInstallInput(array $state, array &$errors): void
         if (!preg_match('/^wss?:\/\//i', $state[$key])) {
             $errors[] = "Veld '{$key}' moet beginnen met ws:// of wss://.";
         }
+    }
+
+    if (!filter_var($state['admin_email'], FILTER_VALIDATE_EMAIL)) {
+        $errors[] = 'Admin e-mail is verplicht en moet een geldig e-mailadres zijn.';
+    }
+    if (strlen($state['admin_password']) < 10) {
+        $errors[] = 'Admin wachtwoord moet minimaal 10 tekens hebben.';
+    }
+    if (!hash_equals($state['admin_password'], $state['admin_password_confirm'])) {
+        $errors[] = 'Admin wachtwoord en herhaling zijn niet gelijk.';
     }
 }
 
@@ -131,6 +146,46 @@ function importSchema(string $schemaPath, array $state): void
     foreach (splitSqlStatements($sql) as $statement) {
         $pdo->exec($statement);
     }
+}
+
+function createAdminAccount(array $state): void
+{
+    $dsn = sprintf(
+        'mysql:host=%s;port=%d;dbname=%s;charset=utf8mb4',
+        $state['host'],
+        (int)$state['port'],
+        $state['database']
+    );
+    $pdo = new PDO($dsn, $state['username'], $state['password'], pdoOptions());
+    $pdo->exec(
+        'CREATE TABLE IF NOT EXISTS admin_users (
+            admin_id VARCHAR(96) NOT NULL PRIMARY KEY,
+            email VARCHAR(255) NOT NULL,
+            display_name VARCHAR(120) NOT NULL DEFAULT "",
+            password_hash VARCHAR(255) NOT NULL,
+            role VARCHAR(32) NOT NULL DEFAULT "owner",
+            enabled TINYINT(1) NOT NULL DEFAULT 1,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            last_login_at DATETIME NULL,
+            UNIQUE KEY uq_admin_users_email (email(190))
+        ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
+    );
+
+    $adminId = 'admin-' . substr(hash('sha256', strtolower($state['admin_email'])), 0, 32);
+    $statement = $pdo->prepare(
+        'INSERT INTO admin_users (admin_id, email, display_name, password_hash, role, enabled)
+         VALUES (:admin_id, :email, :display_name, :password_hash, "owner", 1)
+         ON DUPLICATE KEY UPDATE
+             display_name = VALUES(display_name),
+             password_hash = VALUES(password_hash),
+             enabled = 1'
+    );
+    $statement->execute([
+        'admin_id' => $adminId,
+        'email' => strtolower($state['admin_email']),
+        'display_name' => cleanInstallerText($state['admin_name'], 120),
+        'password_hash' => password_hash($state['admin_password'], PASSWORD_DEFAULT),
+    ]);
 }
 
 function splitSqlStatements(string $sql): array
@@ -582,7 +637,7 @@ function renderInstallPage(array $state, array $messages, array $errors, bool $i
       <p>Er bestaat al een configuratie. De installer verandert niets zonder bewuste herconfiguratie.</p>
       <p class="actions">
         <a class="button" href="chat.html">Open TeleTypTel</a>
-        <a class="button" href="install.php?force=1">Opnieuw configureren</a>
+        <a class="button" href="install.php?force=1">Opnieuw configureren / admin maken</a>
       </p>
     </section>
   <?php else: ?>
@@ -617,6 +672,17 @@ function renderInstallPage(array $state, array $messages, array $errors, bool $i
           <?= input('relay_port', 'RTT relay poort', $state['relay_port'], 'number') ?>
           <?= input('xmpp_websocket', 'XMPP WebSocket', $state['xmpp_websocket'], 'text', 'full') ?>
           <?= input('xmpp_domain', 'XMPP domein', $state['xmpp_domain'], 'text', 'full') ?>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Admin-account</legend>
+        <p class="small">Dit account gebruikt straks <code>admin.php</code>. Bewaar dit wachtwoord goed.</p>
+        <div class="grid">
+          <?= input('admin_name', 'Naam beheerder', $state['admin_name']) ?>
+          <?= input('admin_email', 'Admin e-mail', $state['admin_email'], 'email') ?>
+          <?= input('admin_password', 'Admin wachtwoord', $state['admin_password'], 'password') ?>
+          <?= input('admin_password_confirm', 'Herhaal wachtwoord', $state['admin_password_confirm'], 'password') ?>
         </div>
       </fieldset>
 
@@ -658,4 +724,11 @@ function input(string $name, string $label, string $value, string $type = 'text'
     $classAttribute = $class !== '' ? ' class="' . e($class) . '"' : '';
     return '<label' . $classAttribute . ' for="' . e($id) . '"><span>' . e($label) . '</span>'
         . '<input id="' . e($id) . '" name="' . e($name) . '" type="' . e($type) . '" value="' . e($value) . '"></label>';
+}
+
+function cleanInstallerText(string $value, int $maxLength): string
+{
+    $text = trim($value);
+    $text = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F]/', '', $text) ?? '';
+    return substr($text, 0, $maxLength);
 }

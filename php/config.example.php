@@ -33,7 +33,8 @@ return [
         'timeout' => 10,
     ],
     'admin' => [
-        // Required when admin.php is exposed beyond localhost. Environment variable TELETYPTEL_ADMIN_TOKEN wins.
+        // Emergency fallback for admin.php. Prefer the admin account created by install.php.
+        // Environment variable TELETYPTEL_ADMIN_TOKEN wins.
         'token' => '',
     ],
     'oauth' => [

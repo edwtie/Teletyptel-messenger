@@ -8,17 +8,37 @@ header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 
 try {
-    requireAdminAccess();
     $pdo = Database::connect();
     ensureAdminSchema($pdo);
+    $requestInput = null;
+
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $requestInput = json_decode(file_get_contents('php://input') ?: '', true);
+        if (!is_array($requestInput)) {
+            jsonResponse(['ok' => false, 'error' => 'invalid_json'], 400);
+            return;
+        }
+
+        $action = cleanAdminText($requestInput['action'] ?? 'update_account', 32);
+        if ($action === 'login') {
+            loginAdmin($pdo, $requestInput);
+            return;
+        }
+        if ($action === 'logout') {
+            logoutAdmin();
+            return;
+        }
+    }
+
+    requireAdminAccess($pdo);
 
     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         readAdminData($pdo);
         return;
     }
 
-    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        updateAccountAdminFields($pdo);
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_array($requestInput)) {
+        updateAccountAdminFields($pdo, $requestInput);
         return;
     }
 
@@ -27,8 +47,12 @@ try {
     jsonResponse(['ok' => false, 'error' => 'server_error', 'message' => $error->getMessage()], 500);
 }
 
-function requireAdminAccess(): void
+function requireAdminAccess(PDO $pdo): void
 {
+    if (currentAdminUser($pdo) !== null) {
+        return;
+    }
+
     $configuredToken = adminToken();
     $providedToken = cleanAdminText($_SERVER['HTTP_X_TELETYPTEL_ADMIN_TOKEN'] ?? ($_GET['token'] ?? ''), 255);
     if ($configuredToken !== '') {
@@ -39,14 +63,66 @@ function requireAdminAccess(): void
         return;
     }
 
+    if (isLocalRequest() && scalarInt($pdo, 'SELECT COUNT(*) FROM admin_users WHERE enabled = 1') === 0) {
+        return;
+    }
+
+    if (isLocalRequest()) {
+        jsonResponse(['ok' => false, 'error' => 'admin_login_required', 'message' => 'Log in met het admin-account.'], 401);
+        exit;
+    }
+
     if (!isLocalRequest()) {
         jsonResponse([
             'ok' => false,
-            'error' => 'admin_token_not_configured',
-            'message' => 'Configureer TELETYPTEL_ADMIN_TOKEN of admin.token in php/config.php voor publiek beheer.'
+            'error' => 'admin_login_required',
+            'message' => 'Log in met het admin-account of configureer TELETYPTEL_ADMIN_TOKEN voor noodbeheer.'
         ], 403);
         exit;
     }
+}
+
+function loginAdmin(PDO $pdo, array $input): void
+{
+    $email = strtolower(cleanAdminText($input['email'] ?? '', 255));
+    $password = cleanAdminText($input['password'] ?? '', 1024);
+    if ($email === '' || $password === '') {
+        jsonResponse(['ok' => false, 'error' => 'missing_credentials'], 400);
+        return;
+    }
+
+    $statement = $pdo->prepare('SELECT * FROM admin_users WHERE email = :email AND enabled = 1 LIMIT 1');
+    $statement->execute(['email' => $email]);
+    $row = $statement->fetch();
+    if (!is_array($row) || !password_verify($password, (string)($row['password_hash'] ?? ''))) {
+        jsonResponse(['ok' => false, 'error' => 'invalid_credentials'], 401);
+        return;
+    }
+
+    session_regenerate_id(true);
+    $_SESSION['teletyptel_admin_id'] = (string)$row['admin_id'];
+    $pdo->prepare('UPDATE admin_users SET last_login_at = NOW() WHERE admin_id = :admin_id')
+        ->execute(['admin_id' => $row['admin_id']]);
+    jsonResponse(['ok' => true, 'admin' => adminUserToClient($row)]);
+}
+
+function logoutAdmin(): void
+{
+    unset($_SESSION['teletyptel_admin_id']);
+    jsonResponse(['ok' => true]);
+}
+
+function currentAdminUser(PDO $pdo): ?array
+{
+    $adminId = cleanAdminText($_SESSION['teletyptel_admin_id'] ?? '', 96);
+    if ($adminId === '') {
+        return null;
+    }
+
+    $statement = $pdo->prepare('SELECT * FROM admin_users WHERE admin_id = :admin_id AND enabled = 1 LIMIT 1');
+    $statement->execute(['admin_id' => $adminId]);
+    $row = $statement->fetch();
+    return is_array($row) ? $row : null;
 }
 
 function adminToken(): string
@@ -81,9 +157,11 @@ function isLocalRequest(): bool
 
 function readAdminData(PDO $pdo): void
 {
+    $admin = currentAdminUser($pdo);
     jsonResponse([
         'ok' => true,
         'generatedAt' => gmdate('c'),
+        'admin' => $admin !== null ? adminUserToClient($admin) : null,
         'server' => serverSummary(),
         'stats' => statsSummary($pdo),
         'accounts' => accountRows($pdo),
@@ -91,14 +169,8 @@ function readAdminData(PDO $pdo): void
     ]);
 }
 
-function updateAccountAdminFields(PDO $pdo): void
+function updateAccountAdminFields(PDO $pdo, array $input): void
 {
-    $input = json_decode(file_get_contents('php://input') ?: '', true);
-    if (!is_array($input)) {
-        jsonResponse(['ok' => false, 'error' => 'invalid_json'], 400);
-        return;
-    }
-
     $accountId = cleanAdminText($input['accountId'] ?? '', 96);
     if ($accountId === '') {
         jsonResponse(['ok' => false, 'error' => 'missing_account_id'], 400);
@@ -224,6 +296,7 @@ function serverSummary(): array
         'pdoMysql' => extension_loaded('pdo_mysql'),
         'openssl' => extension_loaded('openssl'),
         'adminTokenConfigured' => adminToken() !== '',
+        'adminSession' => isset($_SESSION['teletyptel_admin_id']),
         'localRequest' => isLocalRequest(),
     ];
 }
@@ -251,6 +324,29 @@ function ensureAdminSchema(PDO $pdo): void
     ensureColumn($pdo, 'account_profiles', 'created_at', 'created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP');
     ensureColumn($pdo, 'account_profiles', 'updated_at', 'updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP');
 
+    $pdo->exec(
+        'CREATE TABLE IF NOT EXISTS admin_users (
+            admin_id VARCHAR(96) NOT NULL PRIMARY KEY,
+            email VARCHAR(255) NOT NULL,
+            display_name VARCHAR(120) NOT NULL DEFAULT "",
+            password_hash VARCHAR(255) NOT NULL,
+            role VARCHAR(32) NOT NULL DEFAULT "owner",
+            enabled TINYINT(1) NOT NULL DEFAULT 1,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            last_login_at DATETIME NULL,
+            UNIQUE KEY uq_admin_users_email (email(190))
+        ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
+    );
+}
+
+function adminUserToClient(array $row): array
+{
+    return [
+        'adminId' => $row['admin_id'],
+        'email' => $row['email'],
+        'displayName' => $row['display_name'],
+        'role' => $row['role'],
+    ];
 }
 
 function ensureColumn(PDO $pdo, string $table, string $column, string $definition): void

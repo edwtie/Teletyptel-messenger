@@ -250,8 +250,9 @@ php/public/admin.php
 ```
 
 It shows server status, accounts, usage counts, recent mail/message logs and
-early subscription/status fields. Localhost can open it without a token. On a
-public server set `TELETYPTEL_ADMIN_TOKEN` or `admin.token` in `php/config.php`.
+early subscription/status fields. `install.php` creates the first admin account.
+For emergency access you can still set `TELETYPTEL_ADMIN_TOKEN` or `admin.token`
+in `php/config.php`.
 
 The account popup stores real server settings with the profile:
 
