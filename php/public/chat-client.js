@@ -5660,6 +5660,11 @@
     if (!button || !media) {
       return;
     }
+    if (kind === "voice") {
+      button.hidden = true;
+      button.disabled = true;
+      return;
+    }
 
     const available = Boolean(previewPlaybackBlob(kind)) && !previewRecordingActive(kind);
     button.hidden = !available;

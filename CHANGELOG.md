@@ -203,6 +203,8 @@
   text buttons.
 - Mobile voice recording waveform now expands across the available row space
   instead of leaving an empty area.
+- Mobile voice-message preview now removes the redundant custom play/pause
+  button and keeps the audio controls plus actions on one row.
 
 ### Changed
 

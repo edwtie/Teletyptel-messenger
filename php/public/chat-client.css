@@ -3146,12 +3146,12 @@ body.viewport-phone .composer-send-button {
 }
 
 body.viewport-phone .voice-preview-panel {
-  grid-template-columns: minmax(0, 1fr);
-  align-items: stretch;
-  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
   width: 100%;
   border-radius: 18px;
-  padding: 8px;
+  padding: 6px;
 }
 
 body.viewport-phone .voice-preview-panel.recording {
@@ -3185,6 +3185,19 @@ body.viewport-phone .voice-preview-panel.recording .voice-recording-wave {
 body.viewport-phone .voice-preview-panel audio {
   width: 100%;
   max-width: 100%;
+  height: 40px;
+}
+
+body.viewport-phone .voice-preview-panel.preview-ready .voice-preview-actions {
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  width: auto;
+}
+
+body.viewport-phone .voice-preview-panel.preview-ready .voice-action-button {
+  width: 38px;
+  min-width: 38px;
+  height: 38px;
 }
 
 body.viewport-phone .voice-preview-panel.recording .voice-preview-actions {
