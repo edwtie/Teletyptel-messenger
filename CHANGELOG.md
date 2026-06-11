@@ -195,6 +195,8 @@
   renaming `install.php` to a timestamped disabled file when the server allows it.
 - Web chat now creates link-preview cards from Open Graph metadata when a
   message contains an HTTP/HTTPS URL.
+- Mobile voice-message recording preview now stacks cleanly on phone screens,
+  keeping the audio player, recording wave and action buttons inside the viewport.
 
 ### Changed
 

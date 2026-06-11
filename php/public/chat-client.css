@@ -3144,6 +3144,49 @@ body.viewport-phone .composer-send-button {
   height: 34px;
 }
 
+body.viewport-phone .voice-preview-panel {
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+  gap: 8px;
+  width: 100%;
+  border-radius: 18px;
+  padding: 8px;
+}
+
+body.viewport-phone .voice-preview-panel.recording {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+body.viewport-phone .voice-preview-meta {
+  flex-wrap: wrap;
+  white-space: normal;
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+body.viewport-phone .voice-recording-wave {
+  width: 100%;
+  max-width: 100%;
+  margin-left: 0;
+  flex: 1 1 100%;
+}
+
+body.viewport-phone .voice-preview-panel audio {
+  width: 100%;
+  max-width: 100%;
+}
+
+body.viewport-phone .voice-preview-actions {
+  justify-content: space-between;
+  width: 100%;
+}
+
+body.viewport-phone .voice-action-button {
+  width: 38px;
+  min-width: 38px;
+  height: 38px;
+}
+
 body.viewport-phone .video-preview-panel {
   grid-template-columns: minmax(0, 1fr);
 }
