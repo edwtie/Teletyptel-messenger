@@ -193,6 +193,8 @@
   including SIP/SIPS port checks for future ejabberd_sip/mod_sip work.
 - The web installer now disables itself after a successful installation by
   renaming `install.php` to a timestamped disabled file when the server allows it.
+- Web chat now creates link-preview cards from Open Graph metadata when a
+  message contains an HTTP/HTTPS URL.
 
 ### Changed
 

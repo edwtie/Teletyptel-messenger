@@ -63,6 +63,7 @@
   const chatBackgroundStorageKeyBase = "teletyptel.chatBackground";
   const accountApiPath = "api/account.php";
   const historyApiPath = "api/history.php";
+  const linkPreviewApiPath = "api/link-preview.php";
   const uploadApiPath = "api/upload.php";
   const uploadChunkSize = 1_310_720;
   const languageBasePath = "lang/";
@@ -85,6 +86,7 @@
   ];
   const maxLocationLiveDurationMs = 8 * 60 * 60 * 1000;
   const chatBackgroundIds = new Set(["auto", "none", "wide-1", "wide-2", "wide-3", "mobile"]);
+  const linkPreviewCache = new Map();
   let googleMapsApiPromise = null;
   const materialIcons = {
     add: {
@@ -9991,6 +9993,7 @@
     if (!message.retracted && message.location) {
       body.appendChild(createLocationElement(message.location, message));
     }
+    appendLinkPreviewIfNeeded(body, message);
 
     if (!shouldShowMessageAvatar(message)) {
       item.replaceChildren(meta, body);
@@ -10498,6 +10501,108 @@
       wrapper.append(icon, text);
     }
 
+    return wrapper;
+  }
+
+  function appendLinkPreviewIfNeeded(body, message) {
+    if (message.retracted || message.attachment || message.location || !message.text) {
+      return;
+    }
+
+    const url = firstUrlFromText(message.text);
+    if (!url) {
+      return;
+    }
+
+    const existing = linkPreviewCache.get(url);
+    const card = createLinkPreviewElement(url, existing?.preview || null, existing?.error || "");
+    body.appendChild(card);
+    if (existing) {
+      return;
+    }
+
+    linkPreviewCache.set(url, { loading: true });
+    fetchLinkPreview(url).then((preview) => {
+      linkPreviewCache.set(url, { preview });
+      updateRenderedLinkPreview(url, preview);
+    }).catch((error) => {
+      linkPreviewCache.set(url, { error: error.message || "preview_failed" });
+      updateRenderedLinkPreview(url, null, error.message || "preview_failed");
+      appendDebug("link-preview", error.message || String(error));
+    });
+  }
+
+  function firstUrlFromText(text) {
+    const match = String(text || "").match(/\bhttps?:\/\/[^\s<>"']+/i);
+    if (!match) {
+      return "";
+    }
+    return match[0].replace(/[),.;!?]+$/u, "");
+  }
+
+  async function fetchLinkPreview(url) {
+    const target = `${linkPreviewApiPath}?url=${encodeURIComponent(url)}`;
+    const payload = await fetchJson(target);
+    if (!payload.ok || !payload.preview) {
+      throw new Error(payload.error || "preview_failed");
+    }
+    return payload.preview;
+  }
+
+  function updateRenderedLinkPreview(url, preview, error = "") {
+    document.querySelectorAll(".link-preview-card[data-preview-url]").forEach((card) => {
+      if (card.dataset.previewUrl !== url) {
+        return;
+      }
+      card.replaceWith(createLinkPreviewElement(url, preview, error));
+    });
+  }
+
+  function createLinkPreviewElement(url, preview = null, error = "") {
+    const wrapper = document.createElement("a");
+    wrapper.className = "link-preview-card";
+    wrapper.href = preview?.url || url;
+    wrapper.target = "_blank";
+    wrapper.rel = "noopener noreferrer";
+    wrapper.dataset.previewUrl = url;
+    wrapper.classList.toggle("no-image", !preview?.image);
+
+    if (!preview && !error) {
+      const loading = document.createElement("span");
+      loading.className = "link-preview-loading";
+      loading.textContent = t("link.loading", "Loading link preview...");
+      wrapper.appendChild(loading);
+      return wrapper;
+    }
+
+    if (error || (!preview?.title && !preview?.description && !preview?.image)) {
+      const fallback = document.createElement("span");
+      fallback.className = "link-preview-url";
+      fallback.textContent = url;
+      wrapper.appendChild(fallback);
+      return wrapper;
+    }
+
+    if (preview.image) {
+      const image = document.createElement("img");
+      image.className = "link-preview-image";
+      image.src = preview.image;
+      image.alt = "";
+      image.loading = "lazy";
+      wrapper.appendChild(image);
+    }
+
+    const text = document.createElement("span");
+    text.className = "link-preview-text";
+    const title = document.createElement("strong");
+    title.textContent = preview.title || preview.siteName || url;
+    const description = document.createElement("small");
+    description.textContent = preview.description || preview.siteName || url;
+    const site = document.createElement("span");
+    site.className = "link-preview-site";
+    site.textContent = preview.siteName || new URL(preview.url || url).hostname;
+    text.append(title, description, site);
+    wrapper.appendChild(text);
     return wrapper;
   }
 
