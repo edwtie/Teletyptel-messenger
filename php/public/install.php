@@ -303,9 +303,11 @@ function collectSystemChecks(string $rootPath, string $configPath, string $schem
     $checks[] = checkItem('RTT relay poort ' . $state['relay_port'], relayPortStatus((int)$state['relay_port']), true);
 
     if (PHP_OS_FAMILY === 'Linux') {
+        $checks[] = checkItem('ejabberd', ejabberdStatus(), commandExists('ejabberdctl') || commandExists('ejabberd'));
         $checks[] = checkItem('Linux service voorbeeld', 'linux/etc/systemd/system/teletyptel-rtt-relay.service', true);
         $checks[] = checkItem('Aanbevolen WSS route', '/rtt-relay via Apache/Nginx reverse proxy', true);
     } elseif (PHP_OS_FAMILY === 'Windows') {
+        $checks[] = checkItem('ejabberd', 'controle gebeurt straks op de Linux-server', true);
         $checks[] = checkItem('Windows startscript', 'scripts/start-rtt-relay.ps1 of gegenereerde .cmd', true);
     }
 
@@ -326,6 +328,46 @@ function relayPortStatus(int $port): string
     }
 
     return 'nog niet actief op 127.0.0.1:' . $port;
+}
+
+function ejabberdStatus(): string
+{
+    if (commandExists('ejabberdctl')) {
+        $service = trim((string)runCommand('systemctl is-active ejabberd 2>/dev/null'));
+        return $service !== '' && $service !== 'unknown'
+            ? 'aanwezig, systemd status: ' . $service
+            : 'aanwezig via ejabberdctl';
+    }
+
+    if (commandExists('ejabberd')) {
+        return 'aanwezig';
+    }
+
+    return 'niet gevonden, gebruik install-linux-ejabberd.sh op Linux';
+}
+
+function commandExists(string $command): bool
+{
+    if (PHP_OS_FAMILY === 'Windows') {
+        return false;
+    }
+
+    $result = runCommand('command -v ' . escapeshellarg($command) . ' 2>/dev/null');
+    return trim((string)$result) !== '';
+}
+
+function runCommand(string $command): ?string
+{
+    if (!function_exists('shell_exec')) {
+        return null;
+    }
+
+    $disabled = array_map('trim', explode(',', (string)ini_get('disable_functions')));
+    if (in_array('shell_exec', $disabled, true)) {
+        return null;
+    }
+
+    return shell_exec($command);
 }
 
 function writeRuntimeScripts(string $runtimePath, string $rootPath, array $state): array
@@ -389,7 +431,39 @@ function writeRuntimeScripts(string $runtimePath, string $rootPath, array $state
     file_put_contents($installShPath, $installSh, LOCK_EX);
     @chmod($installShPath, 0755);
 
-    return [$cmdPath, $shPath, $servicePath, $installShPath];
+    $ejabberdInstallPath = $runtimePath . DIRECTORY_SEPARATOR . 'install-linux-ejabberd.sh';
+    $domain = shellQuote($state['xmpp_domain']);
+    $ejabberdInstall = "#!/usr/bin/env sh\n"
+        . "set -eu\n"
+        . "DOMAIN={$domain}\n"
+        . "if command -v ejabberdctl >/dev/null 2>&1; then\n"
+        . "  echo \"ejabberd is already installed.\"\n"
+        . "else\n"
+        . "  if command -v apt-get >/dev/null 2>&1; then\n"
+        . "    sudo apt-get update\n"
+        . "    sudo apt-get install -y ejabberd\n"
+        . "  elif command -v dnf >/dev/null 2>&1; then\n"
+        . "    sudo dnf install -y ejabberd\n"
+        . "  elif command -v yum >/dev/null 2>&1; then\n"
+        . "    sudo yum install -y ejabberd\n"
+        . "  else\n"
+        . "    echo \"No supported package manager found. Install ejabberd manually.\"\n"
+        . "    exit 1\n"
+        . "  fi\n"
+        . "fi\n"
+        . "sudo systemctl enable --now ejabberd\n"
+        . "sudo systemctl status ejabberd --no-pager\n"
+        . "echo \"Next: add host/domain \${DOMAIN} and required modules in /etc/ejabberd/ejabberd.yml.\"\n"
+        . "echo \"Recommended modules: mod_roster, mod_muc, mod_mam, mod_pubsub, mod_http_upload, mod_register, mod_websocket, mod_bosh.\"\n";
+    file_put_contents($ejabberdInstallPath, $ejabberdInstall, LOCK_EX);
+    @chmod($ejabberdInstallPath, 0755);
+
+    return [$cmdPath, $shPath, $servicePath, $installShPath, $ejabberdInstallPath];
+}
+
+function shellQuote(string $value): string
+{
+    return "'" . str_replace("'", "'\"'\"'", $value) . "'";
 }
 
 function relayPortFromUrl(string $url): int
@@ -559,6 +633,15 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now teletyptel-rtt-relay.service
 sudo systemctl status teletyptel-rtt-relay.service</pre>
     <p class="small">Op productie hoort Apache/Nginx <code>/rtt-relay</code> door te sturen naar <code>127.0.0.1:<?= e((string)$state['relay_port']) ?></code>.</p>
+  </section>
+
+  <section class="notice">
+    <h2>ejabberd installeren</h2>
+    <p>Als de systeemcheck ejabberd niet vindt, gebruik dan na installatie het gegenereerde Linux-script:</p>
+    <pre>cd /var/www/teletyptel
+sudo sh php/install-runtime/install-linux-ejabberd.sh</pre>
+    <p>Daarna moet <code>/etc/ejabberd/ejabberd.yml</code> nog het juiste domein en modules krijgen.</p>
+    <p class="small">Aanbevolen modules: roster, MUC, MAM, PubSub/PEP, HTTP upload, register, WebSocket en BOSH. Voor echte video/spraak komt later ook TURN/coturn erbij.</p>
   </section>
 </main>
 </body>

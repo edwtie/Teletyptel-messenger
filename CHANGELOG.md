@@ -180,7 +180,8 @@
 - Web installer `install.php` can run server checks, create/check the
   TeleTypTel database, write `php/config.php` outside the public directory,
   import `schema.sql` and generate WebSocket relay start files for Windows and
-  Linux/systemd.
+  Linux/systemd, plus an ejabberd Linux install helper when ejabberd is not
+  present.
 
 ### Changed
 
