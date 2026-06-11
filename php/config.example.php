@@ -69,5 +69,12 @@ return [
             'token_endpoint' => 'https://appleid.apple.com/auth/token',
             'scopes' => ['name', 'email'],
         ],
+        'auth0' => [
+            'auth0_domain' => 'your-tenant.eu.auth0.com',
+            'client_id' => '',
+            'client_secret' => '',
+            'redirect_uri' => 'http://localhost/api/auth/auth0/callback',
+            'scopes' => ['openid', 'email', 'profile'],
+        ],
     ],
 ];

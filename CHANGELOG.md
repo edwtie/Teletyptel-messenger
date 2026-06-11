@@ -185,6 +185,8 @@
 - Web admin panel `admin.php` shows server status, account usage, recent logs
   and early subscription/account-status controls guarded by an installer-created
   admin account, with admin token support kept as an emergency fallback.
+- Auth0 can now be configured as an OpenID Connect login provider alongside
+  Google, Facebook and Apple.
 
 ### Changed
 

@@ -644,6 +644,7 @@
     dialogAccountStatus: byId("dialogAccountStatus"),
     dialogCreateAccountButton: byId("dialogCreateAccountButton"),
     dialogGoogleLoginButton: byId("dialogGoogleLoginButton"),
+    dialogAuth0LoginButton: byId("dialogAuth0LoginButton"),
     dialogSaveAccountButton: byId("dialogSaveAccountButton"),
     dialogConnectButton: byId("dialogConnectButton"),
     dialogResetPasswordButton: byId("dialogResetPasswordButton"),
@@ -870,6 +871,7 @@
     el.cancelAccountDialogButton.addEventListener("click", closeAccountDialog);
     el.dialogCreateAccountButton.addEventListener("click", createAccountFromDialog);
     el.dialogGoogleLoginButton.addEventListener("click", startGoogleLoginFromDialog);
+    el.dialogAuth0LoginButton.addEventListener("click", startAuth0LoginFromDialog);
     el.dialogSaveAccountButton.addEventListener("click", () => saveAccountDialogProfile(false));
     el.dialogConnectButton.addEventListener("click", () => saveAccountDialogProfile(true));
     el.dialogForgotPasswordButton.addEventListener("click", requestPasswordResetFromDialog);
@@ -2104,6 +2106,12 @@
   function startGoogleLoginFromDialog() {
     updateAccountStatus(t("account.google_redirecting", "Opening Google sign-in..."));
     const target = new URL("api/auth/google/start", location.href);
+    location.assign(target.toString());
+  }
+
+  function startAuth0LoginFromDialog() {
+    updateAccountStatus(t("account.auth0_redirecting", "Opening Auth0 sign-in..."));
+    const target = new URL("api/auth/auth0/start", location.href);
     location.assign(target.toString());
   }
 

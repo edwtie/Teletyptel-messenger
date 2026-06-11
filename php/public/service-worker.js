@@ -1,5 +1,5 @@
-const CACHE_NAME = "teletyptel-webclient-v170";
-const BUILD_VERSION = "20260611-video-recorder-popup-fix";
+const CACHE_NAME = "teletyptel-webclient-v171";
+const BUILD_VERSION = "20260611-auth0-login";
 const ASSETS = [
   "chat.html",
   "dev.html",

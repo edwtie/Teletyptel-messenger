@@ -143,6 +143,13 @@ function ttAuthProviderConfig(string $provider): array
             'userinfo_endpoint' => '',
             'scopes' => ['name', 'email'],
         ],
+        'auth0' => [
+            'auth0_domain' => '',
+            'authorization_endpoint' => '',
+            'token_endpoint' => '',
+            'userinfo_endpoint' => '',
+            'scopes' => ['openid', 'email', 'profile'],
+        ],
     ];
     if (!isset($defaults[$provider])) {
         return ['configured' => false];
@@ -151,6 +158,15 @@ function ttAuthProviderConfig(string $provider): array
     $merged = array_merge($defaults[$provider], $providerConfig);
     $envPrefix = 'TELETYPTEL_OAUTH_' . strtoupper($provider) . '_';
     $plainPrefix = strtoupper($provider) . '_';
+    if ($provider === 'auth0') {
+        $domain = ttAuthNormalizeAuth0Domain(ttAuthEnv($envPrefix . 'DOMAIN', ttAuthEnv($plainPrefix . 'DOMAIN', (string)($merged['auth0_domain'] ?? $merged['domain'] ?? ''))));
+        if ($domain !== '') {
+            $merged['auth0_domain'] = $domain;
+            $merged['authorization_endpoint'] = (string)($merged['authorization_endpoint'] ?: 'https://' . $domain . '/authorize');
+            $merged['token_endpoint'] = (string)($merged['token_endpoint'] ?: 'https://' . $domain . '/oauth/token');
+            $merged['userinfo_endpoint'] = (string)($merged['userinfo_endpoint'] ?: 'https://' . $domain . '/userinfo');
+        }
+    }
     $clientIdKey = $provider === 'facebook' ? 'app_id' : 'client_id';
     $secretKey = $provider === 'facebook' ? 'app_secret' : 'client_secret';
     $clientId = ttAuthEnv($envPrefix . 'CLIENT_ID', ttAuthEnv($envPrefix . 'APP_ID', ttAuthEnv($plainPrefix . 'CLIENT_ID', ttAuthEnv($plainPrefix . 'APP_ID', (string)($merged[$clientIdKey] ?? $merged['client_id'] ?? '')))));
@@ -162,8 +178,18 @@ function ttAuthProviderConfig(string $provider): array
     $merged['xmpp_domain'] = (string)($oauth['xmpp_domain'] ?? $config['default_xmpp_domain'] ?? 'localhost');
     $merged['xmpp_host'] = (string)($oauth['xmpp_host'] ?? $config['default_xmpp_host'] ?? $merged['xmpp_domain']);
     $merged['xmpp_websocket'] = (string)($oauth['xmpp_websocket'] ?? $config['default_xmpp_websocket'] ?? 'wss://localhost:5443/websocket/');
-    $merged['configured'] = $clientId !== '' && ($provider !== 'apple' || $clientSecret !== '');
+    $merged['configured'] = $clientId !== ''
+        && ($provider !== 'apple' || $clientSecret !== '')
+        && ($provider !== 'auth0' || (string)($merged['auth0_domain'] ?? '') !== '');
     return $merged;
+}
+
+function ttAuthNormalizeAuth0Domain(string $domain): string
+{
+    $domain = strtolower(trim($domain));
+    $domain = preg_replace('#^https?://#', '', $domain) ?? $domain;
+    $domain = rtrim($domain, '/');
+    return preg_match('/^[a-z0-9.-]+$/', $domain) === 1 ? $domain : '';
 }
 
 function ttAuthExchangeCode(string $provider, array $config, string $code, string $verifier, string $redirectUri): array

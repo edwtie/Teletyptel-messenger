@@ -14,7 +14,7 @@
     }
   </script>
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="chat-client.css?v=20260611-video-recorder-popup-fix">
+  <link rel="stylesheet" href="chat-client.css?v=20260611-auth0-login">
 </head>
 <body>
   <a class="skip-link" href="#messageInput" data-i18n="button.skip_to_message">Skip to message</a>
@@ -526,6 +526,10 @@
                 <span class="social-login-mark" aria-hidden="true">G</span>
                 <span data-i18n="button.continue_google">Continue with Google</span>
               </button>
+              <button id="dialogAuth0LoginButton" class="social-login-button auth0-login-button" type="button">
+                <span class="social-login-mark" aria-hidden="true">A0</span>
+                <span data-i18n="button.continue_auth0">Continue with Auth0</span>
+              </button>
             </div>
             <label class="toggle modal-toggle">
               <input id="dialogRememberPasswordToggle" type="checkbox">
@@ -906,6 +910,6 @@
   </div>
 
   <script src="vendor/qrcode.js?v=20260608-contact-profile"></script>
-  <script src="chat-client.js?v=20260611-video-recorder-popup-fix"></script>
+  <script src="chat-client.js?v=20260611-auth0-login"></script>
 </body>
 </html>

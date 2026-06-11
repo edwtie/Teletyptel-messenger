@@ -25,6 +25,9 @@ $state = [
     'admin_email' => '',
     'admin_password' => '',
     'admin_password_confirm' => '',
+    'auth0_domain' => '',
+    'auth0_client_id' => '',
+    'auth0_client_secret' => '',
 ];
 $errors = [];
 $messages = [];
@@ -281,6 +284,13 @@ function writeConfig(string $configPath, array $state): void
         . arrayEntry('xmpp_domain', $state['xmpp_domain'])
         . arrayEntry('xmpp_host', $state['xmpp_domain'])
         . arrayEntry('xmpp_websocket', $state['xmpp_websocket'])
+        . "        'auth0' => [\n"
+        . "            'auth0_domain' => " . var_export((string)$state['auth0_domain'], true) . ",\n"
+        . "            'client_id' => " . var_export((string)$state['auth0_client_id'], true) . ",\n"
+        . "            'client_secret' => " . var_export((string)$state['auth0_client_secret'], true) . ",\n"
+        . "            'redirect_uri' => " . var_export(defaultAuth0RedirectUri(), true) . ",\n"
+        . "            'scopes' => ['openid', 'email', 'profile'],\n"
+        . "        ],\n"
         . "    ],\n"
         . "    'relay' => [\n"
         . arrayEntry('websocket', $state['relay_websocket'])
@@ -325,6 +335,7 @@ function loadExistingConfig(string $configPath): ?array
     $mysql = is_array($config['mysql'] ?? null) ? $config['mysql'] : [];
     $xmpp = is_array($config['xmpp_mysql'] ?? null) ? $config['xmpp_mysql'] : [];
     $oauth = is_array($config['oauth'] ?? null) ? $config['oauth'] : [];
+    $auth0 = is_array($oauth['auth0'] ?? null) ? $oauth['auth0'] : [];
     $relay = is_array($config['relay'] ?? null) ? $config['relay'] : [];
 
     return [
@@ -342,6 +353,13 @@ function loadExistingConfig(string $configPath): ?array
         'xmpp_websocket' => (string)($oauth['xmpp_websocket'] ?? defaultXmppWebSocket()),
         'xmpp_domain' => (string)($oauth['xmpp_domain'] ?? defaultXmppDomain()),
         'relay_port' => (string)relayPortFromUrl((string)($relay['websocket'] ?? defaultRelayWebSocket())),
+        'admin_name' => 'TeleTypTel beheerder',
+        'admin_email' => '',
+        'admin_password' => '',
+        'admin_password_confirm' => '',
+        'auth0_domain' => (string)($auth0['auth0_domain'] ?? $auth0['domain'] ?? ''),
+        'auth0_client_id' => (string)($auth0['client_id'] ?? ''),
+        'auth0_client_secret' => (string)($auth0['client_secret'] ?? ''),
     ];
 }
 
@@ -552,6 +570,12 @@ function defaultXmppDomain(): string
     return preg_replace('/:\d+$/', '', $host) ?: 'localhost';
 }
 
+function defaultAuth0RedirectUri(): string
+{
+    $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+    return (isHttpsRequest() ? 'https' : 'http') . '://' . $host . '/api/auth/auth0/callback';
+}
+
 function isHttpsRequest(): bool
 {
     return (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
@@ -683,6 +707,16 @@ function renderInstallPage(array $state, array $messages, array $errors, bool $i
           <?= input('admin_email', 'Admin e-mail', $state['admin_email'], 'email') ?>
           <?= input('admin_password', 'Admin wachtwoord', $state['admin_password'], 'password') ?>
           <?= input('admin_password_confirm', 'Herhaal wachtwoord', $state['admin_password_confirm'], 'password') ?>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Auth0 optioneel</legend>
+        <p class="small">Laat leeg als je Auth0 nog niet gebruikt. Callback URL: <code><?= e(defaultAuth0RedirectUri()) ?></code></p>
+        <div class="grid">
+          <?= input('auth0_domain', 'Auth0 domein', $state['auth0_domain'], 'text', 'full') ?>
+          <?= input('auth0_client_id', 'Auth0 client ID', $state['auth0_client_id']) ?>
+          <?= input('auth0_client_secret', 'Auth0 client secret', $state['auth0_client_secret'], 'password') ?>
         </div>
       </fieldset>
 
