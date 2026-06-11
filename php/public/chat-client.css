@@ -3166,16 +3166,20 @@ body.viewport-phone .voice-preview-panel.recording {
 body.viewport-phone .voice-preview-panel.recording .voice-preview-meta {
   flex-wrap: nowrap;
   white-space: nowrap;
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  gap: 6px;
   font-size: 13px;
   line-height: 1.25;
 }
 
 body.viewport-phone .voice-preview-panel.recording .voice-recording-wave {
-  width: clamp(72px, 24vw, 118px);
-  max-width: 118px;
+  width: 100%;
+  max-width: none;
   height: 28px;
-  margin-left: 2px;
-  flex: 0 1 118px;
+  margin-left: 0;
+  flex: 1 1 auto;
+  justify-self: stretch;
 }
 
 body.viewport-phone .voice-preview-panel audio {

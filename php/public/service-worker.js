@@ -1,5 +1,5 @@
-const CACHE_NAME = "teletyptel-webclient-v175";
-const BUILD_VERSION = "20260611-video-recording-icons";
+const CACHE_NAME = "teletyptel-webclient-v176";
+const BUILD_VERSION = "20260611-mobile-voice-wave-fill";
 const ASSETS = [
   "chat.html",
   "dev.html",

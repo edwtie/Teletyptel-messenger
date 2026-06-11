@@ -201,6 +201,8 @@
   waveform and action buttons.
 - Video recording dialog actions now use compact icon buttons instead of visible
   text buttons.
+- Mobile voice recording waveform now expands across the available row space
+  instead of leaving an empty area.
 
 ### Changed
 
