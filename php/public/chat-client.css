@@ -3154,21 +3154,27 @@ body.viewport-phone .voice-preview-panel {
 }
 
 body.viewport-phone .voice-preview-panel.recording {
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  min-height: 46px;
+  border-radius: 999px;
+  padding: 5px 7px;
 }
 
-body.viewport-phone .voice-preview-meta {
-  flex-wrap: wrap;
-  white-space: normal;
+body.viewport-phone .voice-preview-panel.recording .voice-preview-meta {
+  flex-wrap: nowrap;
+  white-space: nowrap;
   font-size: 13px;
   line-height: 1.25;
 }
 
-body.viewport-phone .voice-recording-wave {
-  width: 100%;
-  max-width: 100%;
-  margin-left: 0;
-  flex: 1 1 100%;
+body.viewport-phone .voice-preview-panel.recording .voice-recording-wave {
+  width: clamp(72px, 24vw, 118px);
+  max-width: 118px;
+  height: 28px;
+  margin-left: 2px;
+  flex: 0 1 118px;
 }
 
 body.viewport-phone .voice-preview-panel audio {
@@ -3176,12 +3182,13 @@ body.viewport-phone .voice-preview-panel audio {
   max-width: 100%;
 }
 
-body.viewport-phone .voice-preview-actions {
+body.viewport-phone .voice-preview-panel.recording .voice-preview-actions {
+  flex-wrap: nowrap;
   justify-content: space-between;
-  width: 100%;
+  width: auto;
 }
 
-body.viewport-phone .voice-action-button {
+body.viewport-phone .voice-preview-panel.recording .voice-action-button {
   width: 38px;
   min-width: 38px;
   height: 38px;

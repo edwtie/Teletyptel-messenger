@@ -197,6 +197,8 @@
   message contains an HTTP/HTTPS URL.
 - Mobile voice-message recording preview now stacks cleanly on phone screens,
   keeping the audio player, recording wave and action buttons inside the viewport.
+- Active mobile voice recording now stays on one compact row with a short timer,
+  waveform and action buttons.
 
 ### Changed
 

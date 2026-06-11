@@ -4973,7 +4973,7 @@
       el.voicePreviewAudio.hidden = true;
       el.sendVoiceMessageButton.disabled = false;
       updateVoicePreviewActionButtons("recording");
-      el.voicePreviewStatus.textContent = t("voice.recording", "Recording voice message {0}").replace("{0}", "00:00");
+      el.voicePreviewStatus.textContent = voiceRecordingStatusText("00:00");
       state.voiceRecorder.timerId = window.setInterval(updateVoiceRecordingTimer, 500);
       updateVoiceRecordingTimer();
     } catch (error) {
@@ -5171,9 +5171,15 @@
     const elapsedSeconds = Math.max(0, Math.floor((Date.now() - state.voiceRecorder.startedAt) / 1000));
     const minutes = String(Math.floor(elapsedSeconds / 60)).padStart(2, "0");
     const seconds = String(elapsedSeconds % 60).padStart(2, "0");
-    const status = t("voice.recording", "Recording voice message {0}").replace("{0}", `${minutes}:${seconds}`);
+    const status = voiceRecordingStatusText(`${minutes}:${seconds}`);
     el.voicePreviewStatus.textContent = status;
     setConnectionStatus(status, "warn");
+  }
+
+  function voiceRecordingStatusText(timeText) {
+    return document.body.classList.contains("viewport-phone")
+      ? timeText
+      : t("voice.recording", "Recording voice message {0}").replace("{0}", timeText);
   }
 
   function clearVoiceTimer() {
