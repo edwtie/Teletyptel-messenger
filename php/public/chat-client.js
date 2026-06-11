@@ -7481,8 +7481,7 @@
 
   function toggleTotalConversationText() {
     state.totalConversationTextVisible = !state.totalConversationTextVisible;
-    updateTotalConversationTextToggleUi();
-    updateTotalConversationTextPanel();
+    updateCallUi();
   }
 
   function handleJingleEnvelope(envelope) {

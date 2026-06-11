@@ -1,5 +1,5 @@
-const CACHE_NAME = "teletyptel-webclient-v186";
-const BUILD_VERSION = "20260612-keep-call-video-visible";
+const CACHE_NAME = "teletyptel-webclient-v187";
+const BUILD_VERSION = "20260612-refresh-call-layout-on-rtt-toggle";
 const ASSETS = [
   "chat.html",
   "dev.html",
