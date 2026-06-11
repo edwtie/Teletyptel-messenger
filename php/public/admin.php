@@ -33,6 +33,7 @@
     .toolbar label { display: grid; gap: 4px; min-width: 220px; font-weight: 700; }
     .login-bar { display: flex; gap: 10px; align-items: end; flex-wrap: wrap; }
     .cards { display: grid; grid-template-columns: repeat(5, minmax(130px, 1fr)); gap: 12px; }
+    .server-grid { display: grid; grid-template-columns: repeat(4, minmax(150px, 1fr)); gap: 12px; margin-top: 12px; }
     .card { border: 1px solid #c7ddff; border-radius: 8px; padding: 12px; background: #f8fbff; }
     .card strong { display: block; font-size: 26px; }
     .small, .status { color: var(--muted); font-size: 13px; }
@@ -46,7 +47,7 @@
     .error { border-color: #d92d20; background: #fff1f0; color: #991b1b; }
     @media (max-width: 900px) {
       header { align-items: flex-start; flex-direction: column; }
-      .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .cards, .server-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .log-row { grid-template-columns: 1fr; }
     }
   </style>
@@ -83,6 +84,13 @@
       <h2>Overzicht</h2>
       <div id="cards" class="cards"></div>
       <p id="serverStatus" class="status"></p>
+    </section>
+
+    <section>
+      <h2>ejabberd en SIP-server</h2>
+      <p class="small">SIP hoort bij de server/gatewaylaag. Dit paneel controleert de bekende ejabberd-configuratie en of de SIP-poorten bereikbaar lijken.</p>
+      <div id="sipStatus" class="server-grid"></div>
+      <p id="sipHint" class="status"></p>
     </section>
 
     <section>
@@ -124,6 +132,8 @@
     const messagePanel = document.getElementById("messagePanel");
     const cards = document.getElementById("cards");
     const serverStatus = document.getElementById("serverStatus");
+    const sipStatus = document.getElementById("sipStatus");
+    const sipHint = document.getElementById("sipHint");
     const accountsTable = document.getElementById("accountsTable");
     const logs = document.getElementById("logs");
 
@@ -174,6 +184,7 @@
       }).catch(() => {});
       setAdminIdentity(null);
       renderCards({});
+      renderSip({});
       renderAccounts([]);
       renderLogs([]);
       setMessage("Uitgelogd.");
@@ -186,6 +197,7 @@
         setAdminIdentity(data.admin || null);
         renderCards(data.stats || {});
         renderServer(data.server || {});
+        renderSip(data.server?.ejabberd || {});
         renderAccounts(data.accounts || []);
         renderLogs(data.logs || []);
       } catch (error) {
@@ -221,6 +233,24 @@
         server.adminTokenConfigured ? "token actief" : "alleen lokaal"
       ];
       serverStatus.textContent = parts.join(" · ");
+    }
+
+    function renderSip(sip) {
+      const items = [
+        ["ejabberd", sip.ejabberdService || "onbekend", sip.ejabberdService === "active" || sip.ejabberdCtlAvailable],
+        ["XMPP domein", sip.xmppDomain || "-", Boolean(sip.xmppDomain)],
+        ["XMPP WebSocket", sip.xmppWebSocket || "-", Boolean(sip.xmppWebSocket)],
+        [`SIP ${sip.sipPort || 5060}`, sip.sipPortOpen ? "open" : "niet open", Boolean(sip.sipPortOpen)],
+        [`SIPS ${sip.sipsPort || 5061}`, sip.sipsPortOpen ? "open" : "niet open", Boolean(sip.sipsPortOpen)],
+        ["Module", sip.moduleHint || "ejabberd_sip / mod_sip", Boolean(sip.sipConfigured || sip.sipPortOpen || sip.sipsPortOpen)],
+        ["Database", [sip.xmppDatabaseHost, sip.xmppDatabase].filter(Boolean).join(" / ") || "-", Boolean(sip.xmppDatabase)],
+        ["Gateway", sip.sipConfigured ? "geconfigureerd" : "nog niet actief", Boolean(sip.sipConfigured)],
+      ];
+      sipStatus.innerHTML = items.map(([label, value, ok]) => `<div class="card">
+        <span>${escapeHtml(label)}</span>
+        <strong><span class="badge ${ok ? "ok" : "warn"}">${escapeHtml(String(value))}</span></strong>
+      </div>`).join("");
+      sipHint.textContent = sip.gatewayRole || "SIP is gatewaylaag voor telefonie/relay, niet de browser-client zelf.";
     }
 
     function renderAccounts(accounts) {

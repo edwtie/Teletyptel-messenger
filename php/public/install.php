@@ -327,6 +327,13 @@ function writeConfig(string $configPath, array $state): void
         . "    'relay' => [\n"
         . arrayEntry('websocket', $state['relay_websocket'])
         . "    ],\n"
+        . "    'sip' => [\n"
+        . arrayEntry('enabled', 0, false)
+        . arrayEntry('host', $state['xmpp_domain'])
+        . arrayEntry('port', 5060, false)
+        . arrayEntry('tls_port', 5061, false)
+        . arrayEntry('module', 'ejabberd_sip / mod_sip')
+        . "    ],\n"
         . "    'admin' => [\n"
         . arrayEntry('token', '')
         . "    ],\n"

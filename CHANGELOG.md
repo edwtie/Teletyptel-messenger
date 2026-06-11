@@ -189,6 +189,8 @@
   Google, Facebook and Apple.
 - The web installer now collects Google, Facebook, Apple and Auth0 provider
   IDs/secrets and writes the matching OAuth callback configuration.
+- The web admin panel now shows ejabberd/XMPP and SIP gateway readiness,
+  including SIP/SIPS port checks for future ejabberd_sip/mod_sip work.
 
 ### Changed
 

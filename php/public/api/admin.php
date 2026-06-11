@@ -288,6 +288,7 @@ function logRows(PDO $pdo): array
 
 function serverSummary(): array
 {
+    $config = loadAdminConfig();
     return [
         'phpVersion' => PHP_VERSION,
         'os' => PHP_OS_FAMILY,
@@ -298,7 +299,94 @@ function serverSummary(): array
         'adminTokenConfigured' => adminToken() !== '',
         'adminSession' => isset($_SESSION['teletyptel_admin_id']),
         'localRequest' => isLocalRequest(),
+        'ejabberd' => ejabberdSipSummary($config),
     ];
+}
+
+function ejabberdSipSummary(array $config): array
+{
+    $xmppMysql = is_array($config['xmpp_mysql'] ?? null) ? $config['xmpp_mysql'] : [];
+    $oauth = is_array($config['oauth'] ?? null) ? $config['oauth'] : [];
+    $sip = is_array($config['sip'] ?? null) ? $config['sip'] : [];
+    $host = cleanAdminText($sip['host'] ?? $oauth['xmpp_domain'] ?? $xmppMysql['host'] ?? 'localhost', 255);
+    $sipPort = normalizePort($sip['port'] ?? 5060, 5060);
+    $sipsPort = normalizePort($sip['tls_port'] ?? 5061, 5061);
+
+    return [
+        'xmppDomain' => cleanAdminText($oauth['xmpp_domain'] ?? '', 255),
+        'xmppWebSocket' => cleanAdminText($oauth['xmpp_websocket'] ?? '', 255),
+        'xmppDatabaseHost' => cleanAdminText($xmppMysql['host'] ?? '', 255),
+        'xmppDatabase' => cleanAdminText($xmppMysql['database'] ?? '', 255),
+        'ejabberdCtlAvailable' => commandExists('ejabberdctl'),
+        'ejabberdService' => ejabberdServiceStatus(),
+        'sipHost' => $host,
+        'sipPort' => $sipPort,
+        'sipsPort' => $sipsPort,
+        'sipConfigured' => (bool)($sip['enabled'] ?? false),
+        'sipPortOpen' => tcpPortOpen($host, $sipPort),
+        'sipsPortOpen' => tcpPortOpen($host, $sipsPort),
+        'moduleHint' => 'ejabberd_sip / mod_sip',
+        'gatewayRole' => 'SIP is gatewaylaag voor telefonie/relay, niet de browser-client zelf.',
+    ];
+}
+
+function loadAdminConfig(): array
+{
+    $path = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'config.php';
+    if (!is_file($path)) {
+        return [];
+    }
+    $config = require $path;
+    return is_array($config) ? $config : [];
+}
+
+function normalizePort(mixed $value, int $fallback): int
+{
+    $port = filter_var($value, FILTER_VALIDATE_INT, [
+        'options' => ['min_range' => 1, 'max_range' => 65535],
+    ]);
+    return $port === false ? $fallback : (int)$port;
+}
+
+function tcpPortOpen(string $host, int $port): bool
+{
+    if ($host === '') {
+        return false;
+    }
+    $errno = 0;
+    $errstr = '';
+    $socket = @fsockopen($host, $port, $errno, $errstr, 0.35);
+    if (is_resource($socket)) {
+        fclose($socket);
+        return true;
+    }
+    return false;
+}
+
+function ejabberdServiceStatus(): string
+{
+    if (PHP_OS_FAMILY !== 'Linux') {
+        return 'alleen op Linux-server te controleren';
+    }
+    if (!commandExists('systemctl')) {
+        return commandExists('ejabberdctl') ? 'ejabberdctl aanwezig' : 'systemctl niet beschikbaar';
+    }
+    $status = trim((string)runAdminCommand('systemctl is-active ejabberd 2>/dev/null'));
+    return $status !== '' ? $status : 'onbekend';
+}
+
+function commandExists(string $command): bool
+{
+    $probe = PHP_OS_FAMILY === 'Windows' ? "where {$command} 2>NUL" : "command -v {$command} 2>/dev/null";
+    return trim((string)runAdminCommand($probe)) !== '';
+}
+
+function runAdminCommand(string $command): ?string
+{
+    if (!function_exists('shell_exec')) {
+        return null;
+    }
+    return shell_exec($command);
 }
 
 function ensureAdminSchema(PDO $pdo): void

@@ -37,6 +37,14 @@ return [
         // Environment variable TELETYPTEL_ADMIN_TOKEN wins.
         'token' => '',
     ],
+    'sip' => [
+        // SIP is a server/gateway layer through ejabberd_sip/mod_sip or an external gateway.
+        'enabled' => false,
+        'host' => 'localhost',
+        'port' => 5060,
+        'tls_port' => 5061,
+        'module' => 'ejabberd_sip / mod_sip',
+    ],
     'oauth' => [
         // Used when social login creates or links a TeleTypTel account.
         'xmpp_domain' => 'localhost',
