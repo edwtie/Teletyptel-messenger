@@ -182,6 +182,9 @@
   import `schema.sql` and generate WebSocket relay start files for Windows and
   Linux/systemd, plus an ejabberd Linux install helper when ejabberd is not
   present.
+- Web admin panel `admin.php` shows server status, account usage, recent logs
+  and early subscription/account-status controls guarded by localhost or an
+  admin token.
 
 ### Changed
 

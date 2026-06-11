@@ -32,6 +32,10 @@ return [
         'local_recipient' => '',
         'timeout' => 10,
     ],
+    'admin' => [
+        // Required when admin.php is exposed beyond localhost. Environment variable TELETYPTEL_ADMIN_TOKEN wins.
+        'token' => '',
+    ],
     'oauth' => [
         // Used when social login creates or links a TeleTypTel account.
         'xmpp_domain' => 'localhost',

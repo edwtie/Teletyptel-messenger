@@ -241,6 +241,18 @@ browser session". The PHP API owns the account profile and stores only a passwor
 hash, not the plaintext password. If MySQL is unavailable, the first-run account
 gate remains open and the client will not enter the messenger.
 
+## Admin Panel
+
+Open the development admin panel at:
+
+```text
+php/public/admin.php
+```
+
+It shows server status, accounts, usage counts, recent mail/message logs and
+early subscription/status fields. Localhost can open it without a token. On a
+public server set `TELETYPTEL_ADMIN_TOKEN` or `admin.token` in `php/config.php`.
+
 The account popup stores real server settings with the profile:
 
 ```text

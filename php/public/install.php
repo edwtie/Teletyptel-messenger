@@ -230,6 +230,9 @@ function writeConfig(string $configPath, array $state): void
         . "    'relay' => [\n"
         . arrayEntry('websocket', $state['relay_websocket'])
         . "    ],\n"
+        . "    'admin' => [\n"
+        . arrayEntry('token', '')
+        . "    ],\n"
         . "];\n";
 
     $directory = dirname($configPath);
