@@ -132,6 +132,10 @@
       viewBox: "0 -960 960 960",
       paths: ["M440-200h80v-167l64 64 56-57-160-160-160 160 57 56 63-63v167ZM240-80q-33 0-56.5-23.5T160-160v-640q0-33 23.5-56.5T240-880h320l240 240v480q0 33-23.5 56.5T720-80H240Zm280-520v-200H240v640h480v-440H520ZM240-800v200-200 640-640Z"]
     },
+    download: {
+      viewBox: "0 -960 960 960",
+      paths: ["M480-320 280-520l56-58 104 104v-326h80v326l104-104 56 58-200 200ZM240-160q-33 0-56.5-23.5T160-240v-120h80v120h480v-120h80v120q0 33-23.5 56.5T720-160H240Z"]
+    },
     gpsFixed: {
       viewBox: "0 0 24 24",
       paths: ["M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3c-.46-4.17-3.77-7.48-7.94-7.94V1h-2v2.06C6.83 3.52 3.52 6.83 3.06 11H1v2h2.06c.46 4.17 3.77 7.48 7.94 7.94V23h2v-2.06c4.17-.46 7.48-3.77 7.94-7.94H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"]
@@ -10463,12 +10467,8 @@
 
   function createAttachmentElement(attachment) {
     const kind = attachment.kind || classifyAttachment(attachment);
-    const wrapper = document.createElement("a");
+    const wrapper = document.createElement("div");
     wrapper.className = `attachment-card ${kind}`;
-    wrapper.href = attachment.url;
-    wrapper.target = "_blank";
-    wrapper.rel = "noopener";
-    wrapper.download = attachment.name || "";
 
     const icon = document.createElement("span");
     icon.className = "attachment-icon";
@@ -10483,6 +10483,7 @@
       .filter(Boolean)
       .join(" - ");
     text.append(name, meta);
+    const downloadButton = createAttachmentDownloadButton(attachment);
 
     if (kind === "photo") {
       const preview = document.createElement("img");
@@ -10490,8 +10491,11 @@
       preview.src = attachment.url;
       preview.alt = attachment.name || t("upload.photo", "Photo");
       preview.loading = "lazy";
-      wrapper.append(preview, text);
+      wrapper.append(preview, text, downloadButton);
       wrapper.addEventListener("click", (event) => {
+        if (event.target.closest(".attachment-download-button")) {
+          return;
+        }
         if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) {
           return;
         }
@@ -10506,7 +10510,7 @@
       player.preload = "metadata";
       player.src = attachment.url;
       player.addEventListener("click", (event) => event.stopPropagation());
-      wrapper.append(icon, text, player);
+      wrapper.append(icon, text, downloadButton, player);
     } else if (kind === "video") {
       const player = document.createElement("video");
       player.className = "attachment-video-player";
@@ -10515,12 +10519,32 @@
       player.playsInline = true;
       player.src = attachment.url;
       player.addEventListener("click", (event) => event.stopPropagation());
-      wrapper.append(icon, text, player);
+      wrapper.append(icon, text, downloadButton, player);
     } else {
-      wrapper.append(icon, text);
+      wrapper.append(icon, text, downloadButton);
     }
+    renderMaterialIcons(wrapper);
 
     return wrapper;
+  }
+
+  function createAttachmentDownloadButton(attachment) {
+    const button = document.createElement("button");
+    button.className = "icon-button attachment-download-button";
+    button.type = "button";
+    button.title = t("button.download", "Download");
+    button.setAttribute("aria-label", t("button.download", "Download"));
+    const icon = document.createElement("span");
+    icon.className = "material-icon";
+    icon.dataset.icon = "download";
+    icon.setAttribute("aria-hidden", "true");
+    button.appendChild(icon);
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      downloadAttachment(attachment);
+    });
+    return button;
   }
 
   function appendLinkPreviewIfNeeded(body, message) {

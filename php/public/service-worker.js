@@ -1,5 +1,5 @@
-const CACHE_NAME = "teletyptel-webclient-v179";
-const BUILD_VERSION = "20260612-light-link-preview";
+const CACHE_NAME = "teletyptel-webclient-v180";
+const BUILD_VERSION = "20260612-attachment-download-icon";
 const ASSETS = [
   "chat.html",
   "dev.html",

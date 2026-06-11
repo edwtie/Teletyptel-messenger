@@ -2435,7 +2435,6 @@ body[data-theme="dark"] .link-preview-loading {
   background: rgba(79, 140, 255, .12);
   color: var(--text);
   padding: 8px;
-  text-decoration: none;
 }
 
 .attachment-card:hover {
@@ -2538,7 +2537,7 @@ body[data-theme="dark"] .link-preview-loading {
 .attachment-card.audio,
 .attachment-card.video {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
 }
 
@@ -2970,6 +2969,25 @@ body[data-theme="dark"] .link-preview-loading {
   border-color: rgba(239, 68, 68, .35);
   background: rgba(239, 68, 68, .08);
   color: #b91c1c;
+}
+
+.attachment-download-button {
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  justify-self: end;
+  border-color: rgba(79, 140, 255, .45);
+  background: rgba(255, 255, 255, .62);
+  color: #0f172a;
+}
+
+.attachment-download-button:hover {
+  border-color: var(--accent);
+  background: rgba(255, 255, 255, .9);
+}
+
+.attachment-card.photo .attachment-download-button {
+  align-self: start;
 }
 
 .voice-action-play {

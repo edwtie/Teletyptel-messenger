@@ -209,6 +209,8 @@
   and link-preview fetching uses a browser-like request header for sites such as YouTube.
 - Link-preview cards now use a lighter WhatsApp-style surface in the default
   chat theme instead of the previous dark block.
+- Attachment cards now expose downloading through a small dedicated icon button
+  instead of making the whole media preview act as a download link.
 
 ### Changed
 
