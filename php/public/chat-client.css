@@ -1351,7 +1351,7 @@ body.call-active .call-panel {
   max-height: 420px;
 }
 
-body.call-active .call-panel.local-video-main {
+body.call-active .call-panel.local-video-main:not(.no-remote-video) {
   height: 170px;
   max-height: 170px;
 }
@@ -1425,7 +1425,7 @@ body.call-active .call-panel video {
   overflow: hidden;
 }
 
-.call-panel.no-remote-video.local-video-main {
+body.call-active .call-panel.no-remote-video.local-video-main {
   display: block;
   height: clamp(260px, 42vh, 420px);
   min-height: 0;
