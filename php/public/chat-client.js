@@ -10140,16 +10140,24 @@
   function updateVideoDialogActionButtons(mode) {
     const recording = mode === "recording";
     const preview = mode === "preview";
-    el.startVideoRecordingButton.hidden = preview;
-    el.startVideoRecordingButton.disabled = false;
-    el.startVideoRecordingButton.textContent = recording
+    const recordingLabel = recording
       ? t("video.stop_recording", "Stop recording")
       : t("video.start_recording", "Start recording");
+    const startIcon = el.startVideoRecordingButton.querySelector(".material-icon");
+    el.startVideoRecordingButton.hidden = preview;
+    el.startVideoRecordingButton.disabled = false;
+    el.startVideoRecordingButton.title = recordingLabel;
+    el.startVideoRecordingButton.setAttribute("aria-label", recordingLabel);
+    el.startVideoRecordingButton.classList.toggle("recording", recording);
+    if (startIcon) {
+      startIcon.dataset.icon = recording ? "stop" : "videocam";
+    }
     el.dialogCancelVideoMessageButton.hidden = false;
     el.dialogRerecordVideoMessageButton.hidden = !preview;
     el.dialogSendVideoMessageButton.hidden = !preview;
     el.dialogRerecordVideoMessageButton.disabled = !preview;
     el.dialogSendVideoMessageButton.disabled = !preview;
+    renderMaterialIcons(el.videoPreviewDialog);
   }
 
   function closeVideoPreviewDialog() {

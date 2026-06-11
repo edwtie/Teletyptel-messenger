@@ -3118,9 +3118,10 @@ body:not([data-chat-background="none"]) .message-body {
 }
 
 .video-preview-dialog-actions button {
-  width: auto;
+  width: 42px;
   min-width: 42px;
-  padding-inline: 14px;
+  height: 42px;
+  padding: 0;
 }
 
 @media (max-width: 640px) {

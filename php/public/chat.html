@@ -825,10 +825,22 @@
       </div>
       <video id="videoPreviewDialogVideo" controls playsinline></video>
       <div class="video-preview-dialog-actions">
-        <button id="startVideoRecordingButton" class="voice-action-button voice-action-primary" type="button" data-i18n="video.start_recording">Start recording</button>
-        <button id="dialogCancelVideoMessageButton" class="voice-action-button voice-action-cancel" type="button" data-i18n="button.cancel">Cancel</button>
-        <button id="dialogRerecordVideoMessageButton" class="voice-action-button voice-action-repeat" type="button" data-i18n="video.rerecord" hidden>Record again</button>
-        <button id="dialogSendVideoMessageButton" class="voice-action-button voice-action-primary" type="button" data-i18n="video.send" hidden>Send video message</button>
+        <button id="startVideoRecordingButton" class="icon-button voice-action-button voice-action-primary" type="button" title="Start recording" aria-label="Start recording" data-i18n-title="video.start_recording" data-i18n-aria-label="video.start_recording">
+          <span class="material-icon" data-icon="videocam" aria-hidden="true"></span>
+          <span class="sr-only" data-i18n="video.start_recording">Start recording</span>
+        </button>
+        <button id="dialogCancelVideoMessageButton" class="icon-button voice-action-button voice-action-cancel" type="button" title="Cancel" aria-label="Cancel" data-i18n-title="button.cancel" data-i18n-aria-label="button.cancel">
+          <span class="material-icon" data-icon="delete" aria-hidden="true"></span>
+          <span class="sr-only" data-i18n="button.cancel">Cancel</span>
+        </button>
+        <button id="dialogRerecordVideoMessageButton" class="icon-button voice-action-button voice-action-repeat" type="button" title="Record again" aria-label="Record again" data-i18n-title="video.rerecord" data-i18n-aria-label="video.rerecord" hidden>
+          <span class="material-icon" data-icon="restartAlt" aria-hidden="true"></span>
+          <span class="sr-only" data-i18n="video.rerecord">Record again</span>
+        </button>
+        <button id="dialogSendVideoMessageButton" class="icon-button voice-action-button voice-action-primary" type="button" title="Send video message" aria-label="Send video message" data-i18n-title="video.send" data-i18n-aria-label="video.send" hidden>
+          <span class="material-icon" data-icon="send" aria-hidden="true"></span>
+          <span class="sr-only" data-i18n="video.send">Send video message</span>
+        </button>
       </div>
     </div>
   </div>

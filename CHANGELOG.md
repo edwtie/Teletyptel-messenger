@@ -199,6 +199,8 @@
   keeping the audio player, recording wave and action buttons inside the viewport.
 - Active mobile voice recording now stays on one compact row with a short timer,
   waveform and action buttons.
+- Video recording dialog actions now use compact icon buttons instead of visible
+  text buttons.
 
 ### Changed
 
