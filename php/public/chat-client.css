@@ -2389,6 +2389,17 @@ body:not([data-chat-background="none"]) .message-body {
   font-size: .95em;
 }
 
+.message-link {
+  color: #0f766e;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+body[data-theme="dark"] .message-link {
+  color: #93c5fd;
+}
+
 .message-style-strikethrough {
   text-decoration-thickness: 2px;
 }

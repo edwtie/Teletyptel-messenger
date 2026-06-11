@@ -205,6 +205,8 @@
   instead of leaving an empty area.
 - Mobile voice-message preview now removes the redundant custom play/pause
   button and keeps the audio controls plus actions on one row.
+- Message URLs now render as links without smiley replacement inside the URL,
+  and link-preview fetching uses a browser-like request header for sites such as YouTube.
 
 ### Changed
 

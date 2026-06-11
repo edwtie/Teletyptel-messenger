@@ -10556,7 +10556,7 @@
     if (!match) {
       return "";
     }
-    return match[0].replace(/[),.;!?]+$/u, "");
+    return trimTrailingUrlPunctuation(match[0]);
   }
 
   async function fetchLinkPreview(url) {
@@ -11133,7 +11133,8 @@
 
   function renderRichText(container, text, stylingDisabled = false) {
     text = String(text ?? "");
-    const styledRuns = stylingDisabled ? null : parseMessageStyling(text);
+    const hasUrl = messageUrlPattern().test(text);
+    const styledRuns = stylingDisabled || hasUrl ? null : parseMessageStyling(text);
     const mode = `${el.smileyToggle.checked ? "smiley" : "plain"}:${styledRuns ? "styled" : "unstyled"}`;
     if (container.dataset.richText === text && container.dataset.richTextMode === mode) {
       return;
@@ -11143,6 +11144,11 @@
     container.dataset.richTextMode = mode;
     if (styledRuns) {
       renderStyledRichText(container, styledRuns);
+      return;
+    }
+
+    if (hasUrl) {
+      renderTextWithLinks(container, text);
       return;
     }
 
@@ -11192,6 +11198,56 @@
     for (const token of tokenizeSmilies(text)) {
       parent.appendChild(token.kind === "text" ? document.createTextNode(token.text) : createSmileyImage(token));
     }
+  }
+
+  function renderTextWithLinks(container, text) {
+    const nodes = [];
+    let position = 0;
+    for (const match of text.matchAll(messageUrlPattern())) {
+      const url = trimTrailingUrlPunctuation(match[0]);
+      const start = match.index ?? 0;
+      const end = start + url.length;
+      if (start > position) {
+        appendPlainMessageNodes(nodes, text.slice(position, start));
+      }
+      nodes.push(createMessageLink(url));
+      position = end;
+    }
+    if (position < text.length) {
+      appendPlainMessageNodes(nodes, text.slice(position));
+    }
+    patchChildren(container, nodes);
+  }
+
+  function appendPlainMessageNodes(nodes, text) {
+    if (!text) {
+      return;
+    }
+    if (!el.smileyToggle.checked) {
+      nodes.push(document.createTextNode(text));
+      return;
+    }
+    for (const token of tokenizeSmilies(text)) {
+      nodes.push(token.kind === "text" ? document.createTextNode(token.text) : createSmileyImage(token));
+    }
+  }
+
+  function createMessageLink(url) {
+    const link = document.createElement("a");
+    link.className = "message-link";
+    link.href = url;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.textContent = url;
+    return link;
+  }
+
+  function messageUrlPattern() {
+    return /\bhttps?:\/\/[^\s<>"']+/gi;
+  }
+
+  function trimTrailingUrlPunctuation(url) {
+    return String(url || "").replace(/[),.;!?]+$/u, "");
   }
 
   function styleElementName(kind) {

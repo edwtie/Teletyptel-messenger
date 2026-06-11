@@ -22,7 +22,11 @@ try {
         return;
     }
 
-    jsonPreview(['ok' => true, 'preview' => parsePreviewHtml($html, $url)]);
+    $preview = parsePreviewHtml($html, $url);
+    if (previewNeedsFallback($preview) && isYouTubeUrl($url)) {
+        $preview = array_merge($preview, fetchYouTubeOEmbedPreview($url));
+    }
+    jsonPreview(['ok' => true, 'preview' => $preview]);
 } catch (Throwable $error) {
     jsonPreview(['ok' => false, 'error' => 'server_error', 'message' => $error->getMessage()], 500);
 }
@@ -68,7 +72,7 @@ function fetchPreviewHtml(string $url): string
             'follow_location' => 1,
             'max_redirects' => 3,
             'ignore_errors' => true,
-            'header' => "User-Agent: TeleTypTel-LinkPreview/1.0\r\nAccept: text/html,application/xhtml+xml\r\n",
+            'header' => "User-Agent: Mozilla/5.0 (compatible; TeleTypTel-LinkPreview/1.0)\r\nAccept: text/html,application/xhtml+xml;q=0.9,*/*;q=0.8\r\nAccept-Language: nl,en;q=0.8\r\n",
         ],
         'ssl' => [
             'verify_peer' => true,
@@ -117,6 +121,46 @@ function parsePreviewHtml(string $html, string $baseUrl): array
         'description' => cleanPreviewText($description, 280),
         'image' => $image,
         'siteName' => $siteName,
+    ];
+}
+
+function previewNeedsFallback(array $preview): bool
+{
+    return ($preview['title'] ?? '') === '' && ($preview['description'] ?? '') === '' && ($preview['image'] ?? '') === '';
+}
+
+function isYouTubeUrl(string $url): bool
+{
+    $host = strtolower((string)(parse_url($url, PHP_URL_HOST) ?: ''));
+    return $host === 'youtu.be' || str_ends_with($host, '.youtube.com') || $host === 'youtube.com';
+}
+
+function fetchYouTubeOEmbedPreview(string $url): array
+{
+    $endpoint = 'https://www.youtube.com/oembed?format=json&url=' . rawurlencode($url);
+    $context = stream_context_create([
+        'http' => [
+            'method' => 'GET',
+            'timeout' => 4,
+            'ignore_errors' => true,
+            'header' => "User-Agent: TeleTypTel-LinkPreview/1.0\r\nAccept: application/json\r\n",
+        ],
+        'ssl' => [
+            'verify_peer' => true,
+            'verify_peer_name' => true,
+        ],
+    ]);
+    $json = @file_get_contents($endpoint, false, $context, 0, 65536);
+    $data = is_string($json) ? json_decode($json, true) : null;
+    if (!is_array($data)) {
+        return [];
+    }
+
+    return [
+        'title' => cleanPreviewText((string)($data['title'] ?? ''), 180),
+        'description' => cleanPreviewText((string)($data['author_name'] ?? ''), 280),
+        'image' => absolutizePreviewUrl((string)($data['thumbnail_url'] ?? ''), $url),
+        'siteName' => 'YouTube',
     ];
 }
 
