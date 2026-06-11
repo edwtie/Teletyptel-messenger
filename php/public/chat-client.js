@@ -10477,7 +10477,7 @@
     const text = document.createElement("span");
     text.className = "attachment-text";
     const name = document.createElement("strong");
-    name.textContent = attachment.name || "download";
+    name.textContent = attachmentTitleText(attachment, kind);
     const meta = document.createElement("small");
     meta.textContent = [attachmentKindText(kind), formatBytes(attachment.size), attachment.type]
       .filter(Boolean)
@@ -10526,6 +10526,19 @@
     renderMaterialIcons(wrapper);
 
     return wrapper;
+  }
+
+  function attachmentTitleText(attachment, kind) {
+    if (kind === "video") {
+      return t("upload.video_message", "Video message");
+    }
+    if (kind === "audio") {
+      return t("upload.voice_message", "Voice message");
+    }
+    if (kind === "photo") {
+      return t("upload.photo", "Photo");
+    }
+    return attachment.name || "download";
   }
 
   function createAttachmentDownloadButton(attachment) {

@@ -211,6 +211,8 @@
   chat theme instead of the previous dark block.
 - Attachment cards now expose downloading through a small dedicated icon button
   instead of making the whole media preview act as a download link.
+- Media attachment cards now hide generated recording filenames and show clean
+  labels such as "Video message" or "Voice message".
 
 ### Changed
 
