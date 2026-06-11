@@ -1,5 +1,5 @@
-const CACHE_NAME = "teletyptel-webclient-v183";
-const BUILD_VERSION = "20260612-hide-media-message-labels";
+const CACHE_NAME = "teletyptel-webclient-v184";
+const BUILD_VERSION = "20260612-hide-media-attachment-icons";
 const ASSETS = [
   "chat.html",
   "dev.html",

@@ -10527,7 +10527,7 @@
       player.preload = "metadata";
       player.src = attachment.url;
       player.addEventListener("click", (event) => event.stopPropagation());
-      wrapper.append(icon, text, downloadButton, player);
+      wrapper.append(text, downloadButton, player);
     } else if (kind === "video") {
       const player = document.createElement("video");
       player.className = "attachment-video-player";
@@ -10536,7 +10536,7 @@
       player.playsInline = true;
       player.src = attachment.url;
       player.addEventListener("click", (event) => event.stopPropagation());
-      wrapper.append(icon, text, downloadButton, player);
+      wrapper.append(text, downloadButton, player);
     } else {
       wrapper.append(icon, text, downloadButton);
     }
