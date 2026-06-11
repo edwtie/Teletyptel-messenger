@@ -208,8 +208,9 @@ For local development or first server setup, open the web installer:
 php/public/install.php
 ```
 
-The installer writes `php/config.php` outside the public web directory and
-imports `php/schema.sql`. Remove or block `install.php` after production setup.
+The installer checks the server, writes `php/config.php` outside the public web
+directory, imports `php/schema.sql` and generates WebSocket relay start files in
+`php/install-runtime`. Remove or block `install.php` after production setup.
 
 Manual setup is still possible. Create the database tables with:
 

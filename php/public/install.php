@@ -4,6 +4,7 @@ declare(strict_types=1);
 $rootPath = dirname(__DIR__);
 $configPath = $rootPath . DIRECTORY_SEPARATOR . 'config.php';
 $schemaPath = $rootPath . DIRECTORY_SEPARATOR . 'schema.sql';
+$runtimePath = $rootPath . DIRECTORY_SEPARATOR . 'install-runtime';
 
 $state = [
     'host' => '127.0.0.1',
@@ -19,6 +20,7 @@ $state = [
     'relay_websocket' => defaultRelayWebSocket(),
     'xmpp_websocket' => defaultXmppWebSocket(),
     'xmpp_domain' => defaultXmppDomain(),
+    'relay_port' => '8787',
 ];
 $errors = [];
 $messages = [];
@@ -41,9 +43,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ensureDatabase($state);
             writeConfig($configPath, $state);
             importSchema($schemaPath, $state);
+            $generated = writeRuntimeScripts($runtimePath, $rootPath, $state);
             $installed = true;
             $messages[] = 'Configuratie opgeslagen in php/config.php.';
             $messages[] = 'Databaseverbinding gelukt en schema is aangemaakt/bijgewerkt.';
+            foreach ($generated as $path) {
+                $messages[] = 'Startbestand gemaakt: ' . $path;
+            }
             $messages[] = 'Verwijder of blokkeer install.php op een publieke server zodra installatie klaar is.';
         } catch (Throwable $exception) {
             $errors[] = $exception->getMessage();
@@ -56,7 +62,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-renderInstallPage($state, $messages, $errors, $installed, $force);
+$checks = collectSystemChecks($rootPath, $configPath, $schemaPath, $state);
+renderInstallPage($state, $messages, $errors, $installed, $force, $checks, $runtimePath);
 
 function validateInstallInput(array $state, array &$errors): void
 {
@@ -66,7 +73,7 @@ function validateInstallInput(array $state, array &$errors): void
         }
     }
 
-    foreach (['port', 'xmpp_port'] as $key) {
+    foreach (['port', 'xmpp_port', 'relay_port'] as $key) {
         $port = filter_var($state[$key], FILTER_VALIDATE_INT, [
             'options' => ['min_range' => 1, 'max_range' => 65535],
         ]);
@@ -276,7 +283,123 @@ function loadExistingConfig(string $configPath): ?array
         'relay_websocket' => (string)($relay['websocket'] ?? defaultRelayWebSocket()),
         'xmpp_websocket' => (string)($oauth['xmpp_websocket'] ?? defaultXmppWebSocket()),
         'xmpp_domain' => (string)($oauth['xmpp_domain'] ?? defaultXmppDomain()),
+        'relay_port' => (string)relayPortFromUrl((string)($relay['websocket'] ?? defaultRelayWebSocket())),
     ];
+}
+
+function collectSystemChecks(string $rootPath, string $configPath, string $schemaPath, array $state): array
+{
+    $relayScript = $rootPath . DIRECTORY_SEPARATOR . 'rtt-websocket-server.php';
+    $runtimePath = $rootPath . DIRECTORY_SEPARATOR . 'install-runtime';
+    $checks = [];
+    $checks[] = checkItem('Besturingssysteem', PHP_OS_FAMILY . ' (' . PHP_OS . ')', true);
+    $checks[] = checkItem('PHP versie', PHP_VERSION, version_compare(PHP_VERSION, '8.0.0', '>='));
+    $checks[] = checkItem('PDO MySQL', extension_loaded('pdo_mysql') ? 'beschikbaar' : 'niet beschikbaar', extension_loaded('pdo_mysql'));
+    $checks[] = checkItem('OpenSSL', extension_loaded('openssl') ? 'beschikbaar' : 'niet beschikbaar', extension_loaded('openssl'));
+    $checks[] = checkItem('Schema', $schemaPath, is_file($schemaPath));
+    $checks[] = checkItem('Config schrijfbaar', dirname($configPath), is_writable(dirname($configPath)));
+    $checks[] = checkItem('Runtime map schrijfbaar', $runtimePath, is_dir($runtimePath) ? is_writable($runtimePath) : is_writable($rootPath));
+    $checks[] = checkItem('RTT relay script', $relayScript, is_file($relayScript));
+    $checks[] = checkItem('RTT relay poort ' . $state['relay_port'], relayPortStatus((int)$state['relay_port']), true);
+
+    if (PHP_OS_FAMILY === 'Linux') {
+        $checks[] = checkItem('Linux service voorbeeld', 'linux/etc/systemd/system/teletyptel-rtt-relay.service', true);
+        $checks[] = checkItem('Aanbevolen WSS route', '/rtt-relay via Apache/Nginx reverse proxy', true);
+    } elseif (PHP_OS_FAMILY === 'Windows') {
+        $checks[] = checkItem('Windows startscript', 'scripts/start-rtt-relay.ps1 of gegenereerde .cmd', true);
+    }
+
+    return $checks;
+}
+
+function checkItem(string $label, string $detail, bool $ok): array
+{
+    return ['label' => $label, 'detail' => $detail, 'ok' => $ok];
+}
+
+function relayPortStatus(int $port): string
+{
+    $socket = @fsockopen('127.0.0.1', $port, $errno, $errstr, 0.25);
+    if (is_resource($socket)) {
+        fclose($socket);
+        return 'luistert op 127.0.0.1:' . $port;
+    }
+
+    return 'nog niet actief op 127.0.0.1:' . $port;
+}
+
+function writeRuntimeScripts(string $runtimePath, string $rootPath, array $state): array
+{
+    if (!is_dir($runtimePath) && !mkdir($runtimePath, 0775, true) && !is_dir($runtimePath)) {
+        throw new RuntimeException('Kan install-runtime map niet maken.');
+    }
+
+    $relayPort = (int)$state['relay_port'];
+    $phpBinary = PHP_BINARY ?: 'php';
+    $relayScript = $rootPath . DIRECTORY_SEPARATOR . 'rtt-websocket-server.php';
+    $windowsRelayScript = str_replace('/', '\\', $relayScript);
+    $linuxRoot = '/var/www/teletyptel';
+
+    $cmdPath = $runtimePath . DIRECTORY_SEPARATOR . 'start-rtt-relay.cmd';
+    $cmd = "@echo off\r\n"
+        . "set RTT_RELAY_HOST=127.0.0.1\r\n"
+        . "set RTT_RELAY_PORT={$relayPort}\r\n"
+        . '"' . $phpBinary . '" "' . $windowsRelayScript . '"' . "\r\n";
+    file_put_contents($cmdPath, $cmd, LOCK_EX);
+
+    $shPath = $runtimePath . DIRECTORY_SEPARATOR . 'start-rtt-relay.sh';
+    $sh = "#!/usr/bin/env sh\n"
+        . "set -eu\n"
+        . "export RTT_RELAY_HOST=127.0.0.1\n"
+        . "export RTT_RELAY_PORT={$relayPort}\n"
+        . "exec /usr/bin/php {$linuxRoot}/rtt-websocket-server.php\n";
+    file_put_contents($shPath, $sh, LOCK_EX);
+    @chmod($shPath, 0755);
+
+    $servicePath = $runtimePath . DIRECTORY_SEPARATOR . 'teletyptel-rtt-relay.service';
+    $service = "[Unit]\n"
+        . "Description=TeleTypTel RTT WebSocket relay\n"
+        . "After=network-online.target\n"
+        . "Wants=network-online.target\n\n"
+        . "[Service]\n"
+        . "Type=simple\n"
+        . "User=www-data\n"
+        . "Group=www-data\n"
+        . "WorkingDirectory={$linuxRoot}\n"
+        . "Environment=RTT_RELAY_HOST=127.0.0.1\n"
+        . "Environment=RTT_RELAY_PORT={$relayPort}\n"
+        . "ExecStart=/usr/bin/php {$linuxRoot}/rtt-websocket-server.php\n"
+        . "Restart=always\n"
+        . "RestartSec=3\n"
+        . "NoNewPrivileges=true\n"
+        . "PrivateTmp=true\n"
+        . "ProtectSystem=full\n"
+        . "ProtectHome=true\n\n"
+        . "[Install]\n"
+        . "WantedBy=multi-user.target\n";
+    file_put_contents($servicePath, $service, LOCK_EX);
+
+    $installShPath = $runtimePath . DIRECTORY_SEPARATOR . 'install-linux-rtt-relay.sh';
+    $installSh = "#!/usr/bin/env sh\n"
+        . "set -eu\n"
+        . "sudo cp {$linuxRoot}/install-runtime/teletyptel-rtt-relay.service /etc/systemd/system/\n"
+        . "sudo systemctl daemon-reload\n"
+        . "sudo systemctl enable --now teletyptel-rtt-relay.service\n"
+        . "sudo systemctl status teletyptel-rtt-relay.service --no-pager\n";
+    file_put_contents($installShPath, $installSh, LOCK_EX);
+    @chmod($installShPath, 0755);
+
+    return [$cmdPath, $shPath, $servicePath, $installShPath];
+}
+
+function relayPortFromUrl(string $url): int
+{
+    $port = parse_url($url, PHP_URL_PORT);
+    if (is_int($port) && $port >= 1 && $port <= 65535) {
+        return $port;
+    }
+
+    return 8787;
 }
 
 function defaultRelayWebSocket(): string
@@ -308,7 +431,7 @@ function e(string $value): string
     return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 }
 
-function renderInstallPage(array $state, array $messages, array $errors, bool $installed, bool $force): void
+function renderInstallPage(array $state, array $messages, array $errors, bool $installed, bool $force, array $checks, string $runtimePath): void
 {
     http_response_code($errors === [] ? 200 : 400);
     ?>
@@ -324,7 +447,7 @@ function renderInstallPage(array $state, array $messages, array $errors, bool $i
     main { max-width: 880px; margin: 0 auto; padding: 32px 18px 48px; }
     h1 { margin: 0 0 8px; font-size: 32px; }
     p { line-height: 1.45; }
-    form, .notice { background: #fff; border: 1px solid #9cc7ff; border-radius: 8px; padding: 18px; }
+    form, .notice, .checks { background: #fff; border: 1px solid #9cc7ff; border-radius: 8px; padding: 18px; }
     .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
     label { display: grid; gap: 6px; font-weight: 700; }
     input { border: 1px solid #8bb6e8; border-radius: 6px; padding: 10px; font: inherit; }
@@ -334,15 +457,35 @@ function renderInstallPage(array $state, array $messages, array $errors, bool $i
     .full { grid-column: 1 / -1; }
     .ok { border-color: #21a366; background: #e9f9ef; }
     .error { border-color: #d92d20; background: #fff1f0; }
+    .check-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+    .check-list li { display: grid; grid-template-columns: 150px 1fr; gap: 10px; align-items: start; border-bottom: 1px solid #e2e8f0; padding: 8px 0; }
+    .check-list li:last-child { border-bottom: 0; }
+    .badge { display: inline-block; border-radius: 999px; padding: 3px 9px; font-size: 13px; font-weight: 700; }
+    .badge.ok-badge { background: #dcfce7; color: #166534; }
+    .badge.warn-badge { background: #fee2e2; color: #991b1b; }
+    code { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 4px; padding: 2px 5px; }
+    pre { overflow: auto; background: #0f172a; color: #e2e8f0; border-radius: 8px; padding: 12px; }
     .actions { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
     .small { color: #475569; font-size: 14px; }
-    @media (max-width: 720px) { .grid { grid-template-columns: 1fr; } }
+    @media (max-width: 720px) { .grid, .check-list li { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
 <main>
   <h1>TeleTypTel installatie</h1>
-  <p>Maak of controleer de database, schrijf <strong>php/config.php</strong> en importeer het schema.</p>
+  <p>Controleer de server, maak de database, schrijf <strong>php/config.php</strong>, importeer het schema en maak startbestanden voor de WebSocket-relay.</p>
+
+  <section class="checks">
+    <h2>Systeemcheck</h2>
+    <ul class="check-list">
+      <?php foreach ($checks as $check): ?>
+        <li>
+          <span><span class="badge <?= $check['ok'] ? 'ok-badge' : 'warn-badge' ?>"><?= $check['ok'] ? 'OK' : 'Check' ?></span> <?= e($check['label']) ?></span>
+          <span><?= e($check['detail']) ?></span>
+        </li>
+      <?php endforeach; ?>
+    </ul>
+  </section>
 
   <?php if ($messages !== []): ?>
     <section class="notice ok">
@@ -394,6 +537,7 @@ function renderInstallPage(array $state, array $messages, array $errors, bool $i
         <legend>WebSocket en domein</legend>
         <div class="grid">
           <?= input('relay_websocket', 'RTT relay WebSocket', $state['relay_websocket'], 'text', 'full') ?>
+          <?= input('relay_port', 'RTT relay poort', $state['relay_port'], 'number') ?>
           <?= input('xmpp_websocket', 'XMPP WebSocket', $state['xmpp_websocket'], 'text', 'full') ?>
           <?= input('xmpp_domain', 'XMPP domein', $state['xmpp_domain'], 'text', 'full') ?>
         </div>
@@ -405,6 +549,17 @@ function renderInstallPage(array $state, array $messages, array $errors, bool $i
       </p>
     </form>
   <?php endif; ?>
+
+  <section class="notice">
+    <h2>WebSocket automatisch starten</h2>
+    <p>Na installatie maakt deze pagina startbestanden in <code><?= e($runtimePath) ?></code>.</p>
+    <p>Windows gebruikt <code>start-rtt-relay.cmd</code>. Linux gebruikt liever systemd:</p>
+    <pre>sudo cp linux/etc/systemd/system/teletyptel-rtt-relay.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now teletyptel-rtt-relay.service
+sudo systemctl status teletyptel-rtt-relay.service</pre>
+    <p class="small">Op productie hoort Apache/Nginx <code>/rtt-relay</code> door te sturen naar <code>127.0.0.1:<?= e((string)$state['relay_port']) ?></code>.</p>
+  </section>
 </main>
 </body>
 </html>
