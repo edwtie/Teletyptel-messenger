@@ -59,8 +59,10 @@ TELETYPTEL_OAUTH_AUTH0_REDIRECT_URI=
 ```
 
 De PHP-backend leest dezelfde waarden ook uit `php/config.php` onder `oauth`.
-Laat `php/config.example.php` leeg of met placeholders; echte secrets horen niet
-in Git.
+De webinstaller `php/public/install.php` kan deze IDs en secrets tijdens
+installatie invullen voor Google, Facebook, Apple en Auth0. Laat
+`php/config.example.php` leeg of met placeholders; echte secrets horen niet in
+Git.
 
 De backend gebruikt Authorization Code Flow met PKCE:
 

@@ -25,6 +25,12 @@ $state = [
     'admin_email' => '',
     'admin_password' => '',
     'admin_password_confirm' => '',
+    'google_client_id' => '',
+    'google_client_secret' => '',
+    'facebook_app_id' => '',
+    'facebook_app_secret' => '',
+    'apple_client_id' => '',
+    'apple_client_secret' => '',
     'auth0_domain' => '',
     'auth0_client_id' => '',
     'auth0_client_secret' => '',
@@ -284,11 +290,37 @@ function writeConfig(string $configPath, array $state): void
         . arrayEntry('xmpp_domain', $state['xmpp_domain'])
         . arrayEntry('xmpp_host', $state['xmpp_domain'])
         . arrayEntry('xmpp_websocket', $state['xmpp_websocket'])
+        . "        'google' => [\n"
+        . "            'client_id' => " . var_export((string)$state['google_client_id'], true) . ",\n"
+        . "            'client_secret' => " . var_export((string)$state['google_client_secret'], true) . ",\n"
+        . "            'redirect_uri' => " . var_export(defaultProviderRedirectUri('google'), true) . ",\n"
+        . "            'authorization_endpoint' => 'https://accounts.google.com/o/oauth2/v2/auth',\n"
+        . "            'token_endpoint' => 'https://oauth2.googleapis.com/token',\n"
+        . "            'userinfo_endpoint' => 'https://openidconnect.googleapis.com/v1/userinfo',\n"
+        . "            'scopes' => ['openid', 'email', 'profile'],\n"
+        . "        ],\n"
+        . "        'facebook' => [\n"
+        . "            'app_id' => " . var_export((string)$state['facebook_app_id'], true) . ",\n"
+        . "            'app_secret' => " . var_export((string)$state['facebook_app_secret'], true) . ",\n"
+        . "            'redirect_uri' => " . var_export(defaultProviderRedirectUri('facebook'), true) . ",\n"
+        . "            'authorization_endpoint' => 'https://www.facebook.com/v19.0/dialog/oauth',\n"
+        . "            'token_endpoint' => 'https://graph.facebook.com/v19.0/oauth/access_token',\n"
+        . "            'userinfo_endpoint' => 'https://graph.facebook.com/me',\n"
+        . "            'scopes' => ['email', 'public_profile'],\n"
+        . "        ],\n"
+        . "        'apple' => [\n"
+        . "            'client_id' => " . var_export((string)$state['apple_client_id'], true) . ",\n"
+        . "            'client_secret' => " . var_export((string)$state['apple_client_secret'], true) . ",\n"
+        . "            'redirect_uri' => " . var_export(defaultProviderRedirectUri('apple'), true) . ",\n"
+        . "            'authorization_endpoint' => 'https://appleid.apple.com/auth/authorize',\n"
+        . "            'token_endpoint' => 'https://appleid.apple.com/auth/token',\n"
+        . "            'scopes' => ['name', 'email'],\n"
+        . "        ],\n"
         . "        'auth0' => [\n"
         . "            'auth0_domain' => " . var_export((string)$state['auth0_domain'], true) . ",\n"
         . "            'client_id' => " . var_export((string)$state['auth0_client_id'], true) . ",\n"
         . "            'client_secret' => " . var_export((string)$state['auth0_client_secret'], true) . ",\n"
-        . "            'redirect_uri' => " . var_export(defaultAuth0RedirectUri(), true) . ",\n"
+        . "            'redirect_uri' => " . var_export(defaultProviderRedirectUri('auth0'), true) . ",\n"
         . "            'scopes' => ['openid', 'email', 'profile'],\n"
         . "        ],\n"
         . "    ],\n"
@@ -335,6 +367,9 @@ function loadExistingConfig(string $configPath): ?array
     $mysql = is_array($config['mysql'] ?? null) ? $config['mysql'] : [];
     $xmpp = is_array($config['xmpp_mysql'] ?? null) ? $config['xmpp_mysql'] : [];
     $oauth = is_array($config['oauth'] ?? null) ? $config['oauth'] : [];
+    $google = is_array($oauth['google'] ?? null) ? $oauth['google'] : [];
+    $facebook = is_array($oauth['facebook'] ?? null) ? $oauth['facebook'] : [];
+    $apple = is_array($oauth['apple'] ?? null) ? $oauth['apple'] : [];
     $auth0 = is_array($oauth['auth0'] ?? null) ? $oauth['auth0'] : [];
     $relay = is_array($config['relay'] ?? null) ? $config['relay'] : [];
 
@@ -357,6 +392,12 @@ function loadExistingConfig(string $configPath): ?array
         'admin_email' => '',
         'admin_password' => '',
         'admin_password_confirm' => '',
+        'google_client_id' => (string)($google['client_id'] ?? ''),
+        'google_client_secret' => (string)($google['client_secret'] ?? ''),
+        'facebook_app_id' => (string)($facebook['app_id'] ?? $facebook['client_id'] ?? ''),
+        'facebook_app_secret' => (string)($facebook['app_secret'] ?? $facebook['client_secret'] ?? ''),
+        'apple_client_id' => (string)($apple['client_id'] ?? ''),
+        'apple_client_secret' => (string)($apple['client_secret'] ?? ''),
         'auth0_domain' => (string)($auth0['auth0_domain'] ?? $auth0['domain'] ?? ''),
         'auth0_client_id' => (string)($auth0['client_id'] ?? ''),
         'auth0_client_secret' => (string)($auth0['client_secret'] ?? ''),
@@ -572,8 +613,13 @@ function defaultXmppDomain(): string
 
 function defaultAuth0RedirectUri(): string
 {
+    return defaultProviderRedirectUri('auth0');
+}
+
+function defaultProviderRedirectUri(string $provider): string
+{
     $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-    return (isHttpsRequest() ? 'https' : 'http') . '://' . $host . '/api/auth/auth0/callback';
+    return (isHttpsRequest() ? 'https' : 'http') . '://' . $host . '/api/auth/' . rawurlencode($provider) . '/callback';
 }
 
 function isHttpsRequest(): bool
@@ -711,12 +757,22 @@ function renderInstallPage(array $state, array $messages, array $errors, bool $i
       </fieldset>
 
       <fieldset>
-        <legend>Auth0 optioneel</legend>
-        <p class="small">Laat leeg als je Auth0 nog niet gebruikt. Callback URL: <code><?= e(defaultAuth0RedirectUri()) ?></code></p>
+        <legend>Social login optioneel</legend>
+        <p class="small">Laat leeg wat je nog niet gebruikt. Zet deze callback-URLs ook bij de provider.</p>
         <div class="grid">
+          <?= input('google_client_id', 'Google client ID', $state['google_client_id'], 'text', 'full') ?>
+          <?= input('google_client_secret', 'Google client secret', $state['google_client_secret'], 'password', 'full') ?>
+          <p class="small full">Google callback: <code><?= e(defaultProviderRedirectUri('google')) ?></code></p>
+          <?= input('facebook_app_id', 'Facebook app ID', $state['facebook_app_id'], 'text', 'full') ?>
+          <?= input('facebook_app_secret', 'Facebook app secret', $state['facebook_app_secret'], 'password', 'full') ?>
+          <p class="small full">Facebook callback: <code><?= e(defaultProviderRedirectUri('facebook')) ?></code></p>
+          <?= input('apple_client_id', 'Apple client ID', $state['apple_client_id'], 'text', 'full') ?>
+          <?= input('apple_client_secret', 'Apple client secret', $state['apple_client_secret'], 'password', 'full') ?>
+          <p class="small full">Apple callback: <code><?= e(defaultProviderRedirectUri('apple')) ?></code></p>
           <?= input('auth0_domain', 'Auth0 domein', $state['auth0_domain'], 'text', 'full') ?>
-          <?= input('auth0_client_id', 'Auth0 client ID', $state['auth0_client_id']) ?>
-          <?= input('auth0_client_secret', 'Auth0 client secret', $state['auth0_client_secret'], 'password') ?>
+          <?= input('auth0_client_id', 'Auth0 client ID', $state['auth0_client_id'], 'text', 'full') ?>
+          <?= input('auth0_client_secret', 'Auth0 client secret', $state['auth0_client_secret'], 'password', 'full') ?>
+          <p class="small full">Auth0 callback: <code><?= e(defaultAuth0RedirectUri()) ?></code></p>
         </div>
       </fieldset>
 

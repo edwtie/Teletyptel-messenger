@@ -187,6 +187,8 @@
   admin account, with admin token support kept as an emergency fallback.
 - Auth0 can now be configured as an OpenID Connect login provider alongside
   Google, Facebook and Apple.
+- The web installer now collects Google, Facebook, Apple and Auth0 provider
+  IDs/secrets and writes the matching OAuth callback configuration.
 
 ### Changed
 
