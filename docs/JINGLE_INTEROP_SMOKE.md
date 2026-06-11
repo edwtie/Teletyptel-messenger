@@ -35,6 +35,11 @@ The current web demo uses the local PHP relay for WebRTC call signaling. A live
 external-client proof still needs server-backed XMPP IQ routing, two accounts
 and a Jingle-capable client installed.
 
+The 2026-06-09 iPhone Safari test is therefore recorded as an open mobile media
+smoke, not as a passed Jingle interop result. It still needs separate evidence
+for camera preview, microphone capture, local video rendering, WSS/WebSocket
+stability and call setup through standards-based XMPP routing.
+
 ## Manual Live Smoke Route
 
 Use this when a real external client is available.
@@ -47,6 +52,10 @@ Requirements:
 - one existing Jingle client, for example Dino, Gajim, Conversations or Monal
 - camera and microphone permissions
 - STUN/TURN configuration when the clients are not on the same network
+
+For provider-scale validation, prefer ejabberd plus coturn first. Djabberd is
+not the current primary target; if it is used as an additional lab server, record
+that separately with its version and supported modules.
 
 Pass criteria:
 

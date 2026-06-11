@@ -142,16 +142,24 @@ if ($Target -eq "Linux" -or $Target -eq "All") {
     New-Item -ItemType Directory -Force $systemdRoot | Out-Null
     @"
 [Unit]
-Description=Tiedragon Teletyptel RTT WebSocket relay
-After=network.target
+Description=TeleTypTel RTT WebSocket relay
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=/var/www/teletyptel
-ExecStart=/usr/bin/php /var/www/teletyptel/rtt-websocket-server.php
-Restart=on-failure
 User=www-data
 Group=www-data
+WorkingDirectory=/var/www/teletyptel
+Environment=RTT_RELAY_HOST=127.0.0.1
+Environment=RTT_RELAY_PORT=8787
+ExecStart=/usr/bin/php /var/www/teletyptel/rtt-websocket-server.php
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
 
 [Install]
 WantedBy=multi-user.target

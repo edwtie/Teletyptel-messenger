@@ -64,6 +64,7 @@
   const accountApiPath = "api/account.php";
   const historyApiPath = "api/history.php";
   const uploadApiPath = "api/upload.php";
+  const uploadChunkSize = 1_310_720;
   const languageBasePath = "lang/";
   const avatarMaxBytes = 256 * 1024;
   const avatarSourceMaxBytes = 5 * 1024 * 1024;
@@ -117,6 +118,10 @@
       viewBox: "0 -960 960 960",
       paths: ["M320-240h320v-80H320v80Zm0-160h320v-80H320v80ZM240-80q-33 0-56.5-23.5T160-160v-640q0-33 23.5-56.5T240-880h320l240 240v480q0 33-23.5 56.5T720-80H240Zm280-520v-200H240v640h480v-440H520ZM240-800v200-200 640-640Z"]
     },
+    delete: {
+      viewBox: "0 0 791.908 791.908",
+      paths: ["M648.587,99.881H509.156C500.276,43.486,452.761,0,394.444,0S287.696,43.486,279.731,99.881H142.315c-26.733,0-48.43,21.789-48.43,48.43v49.437c0,24.719,17.761,44.493,41.564,47.423V727.64c0,35.613,28.655,64.268,64.268,64.268h392.475c35.613,0,64.268-28.655,64.268-64.268V246.087c23.711-3.937,41.564-23.711,41.564-47.423v-49.437C697.017,121.67,675.228,99.881,648.587,99.881z M394.444,36.62c38.543,0,70.219,26.733,77.085,63.261H316.351C324.225,64.268,355.901,36.62,394.444,36.62z M618.924,728.739c0,14.831-11.901,27.648-27.648,27.648H198.71c-14.831,0-27.648-11.901-27.648-27.648V247.185h446.948v481.554H618.924z M660.397,197.748c0,6.958-4.944,11.902-11.902,11.902H142.223c-6.958,0-11.902-4.944-11.902-11.902v-49.437c0-6.958,4.944-11.902,11.902-11.902h505.265c6.958,0,11.901,4.944,11.901,11.902v49.437H660.397z M253.09,661.45V349.081c0-9.887,7.873-17.761,17.761-17.761s17.761,7.873,17.761,17.761V661.45c0,9.887-7.873,17.761-17.761,17.761C260.964,680.309,253.09,671.337,253.09,661.45z M378.606,661.45V349.081c0-9.887,7.873-17.761,17.761-17.761c9.887,0,17.761,7.873,17.761,17.761V661.45c0,9.887-7.873,17.761-17.761,17.761C386.57,680.309,378.606,671.337,378.606,661.45z M504.212,661.45V349.081c0-9.887,7.873-17.761,17.761-17.761s17.761,7.873,17.761,17.761V661.45c0,9.887-7.873,17.761-17.761,17.761C513.093,680.309,504.212,671.337,504.212,661.45z"]
+    },
     event: {
       viewBox: "0 -960 960 960",
       paths: ["M580-240q-42 0-71-29t-29-71q0-42 29-71t71-29q42 0 71 29t29 71q0 42-29 71t-71 29ZM200-80q-33 0-56.5-23.5T120-160v-560q0-33 23.5-56.5T200-800h40v-80h80v80h320v-80h80v80h40q33 0 56.5 23.5T840-720v560q0 33-23.5 56.5T760-80H200Zm0-80h560v-400H200v400Zm0-480h560v-80H200v80Zm0 0v-80 80Z"]
@@ -169,6 +174,10 @@
       viewBox: "0 -960 960 960",
       paths: ["M480-480q-66 0-113-47t-47-113q0-66 47-113t113-47q66 0 113 47t47 113q0 66-47 113t-113 47ZM160-160v-112q0-34 17.5-62.5T224-378q62-31 126-46.5T480-440q66 0 130 15.5T736-378q29 15 46.5 43.5T800-272v112H160Zm80-80h480v-32q0-11-5.5-20T700-306q-54-27-109-40.5T480-360q-56 0-111 13.5T260-306q-9 5-14.5 14t-5.5 20v32Zm240-320q33 0 56.5-23.5T560-640q0-33-23.5-56.5T480-720q-33 0-56.5 23.5T400-640q0 33 23.5 56.5T480-560Zm0-80Zm0 400Z"]
     },
+    pause: {
+      viewBox: "0 -960 960 960",
+      paths: ["M520-200v-560h240v560H520Zm-320 0v-560h240v560H200Zm400-80h80v-400h-80v400Zm-320 0h80v-400h-80v400Zm0-400v400-400Zm320 0v400-400Z"]
+    },
     photoCamera: {
       viewBox: "0 -960 960 960",
       paths: ["M480-260q75 0 127.5-52.5T660-440q0-75-52.5-127.5T480-620q-75 0-127.5 52.5T300-440q0 75 52.5 127.5T480-260Zm0-80q-42 0-71-29t-29-71q0-42 29-71t71-29q42 0 71 29t29 71q0 42-29 71t-71 29ZM160-120q-33 0-56.5-23.5T80-200v-480q0-33 23.5-56.5T160-760h126l74-80h240l74 80h126q33 0 56.5 23.5T880-680v480q0 33-23.5 56.5T800-120H160Zm0-80h640v-480H638l-73-80H395l-73 80H160v480Zm320-240Z"]
@@ -176,6 +185,10 @@
     photoLibrary: {
       viewBox: "0 -960 960 960",
       paths: ["M360-400h400L622-580l-92 120-62-80-108 140Zm-40 160q-33 0-56.5-23.5T240-320v-480q0-33 23.5-56.5T320-880h480q33 0 56.5 23.5T880-800v480q0 33-23.5 56.5T800-240H320Zm0-80h480v-480H320v480ZM160-80q-33 0-56.5-23.5T80-160v-560h80v560h560v80H160Zm160-720v480-480Z"]
+    },
+    playArrow: {
+      viewBox: "0 -960 960 960",
+      paths: ["M320-200v-560l440 280-440 280Zm80-280Zm0 134 210-134-210-134v268Z"]
     },
     rtt: {
       viewBox: "0 -960 960 960",
@@ -207,6 +220,18 @@
     sticker: {
       viewBox: "0 -960 960 960",
       paths: ["M460-360q69 0 120-45t60-113l-320 90q26 32 62 50t78 18ZM294-510l106-30q4-28-14-49t-46-21q-25 0-42.5 17.5T280-550q0 11 4 21t10 19Zm240-70 106-30q5-28-13.5-49T580-680q-25 0-42.5 17.5T520-620q0 11 4 21t10 19Zm106 460H200q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v440L640-120Zm-40-80v-80q0-33 23.5-56.5T680-360h80v-400H200v560h400Zm0 0Zm-400 0v-560 560Z"]
+    },
+    stop: {
+      viewBox: "0 -960 960 960",
+      paths: ["M320-240v-480h320v480H320Z"]
+    },
+    supportTech: {
+      viewBox: "0 0 448 448",
+      paths: [
+        "M384,172.4C384,83.6,312.4,12,224,12S64,83.6,64,172c0,0,0,0,0,0.4C28.4,174.4,0,204,0,240v8c0,37.6,30.4,68,68,68h3.6l28.4,45.2c20,32,54,50.8,91.6,50.8h5.6c3.6,13.6,16,24,30.8,24c17.6,0,32-14.4,32-32c0-17.6-14.4-32-32-32c-14.8,0-27.2,10.4-30.8,24h-5.6c-32,0-61.2-16.4-78-43.6L90.4,316H96c8.8,0,16-7.2,16-16V188c0-8.8-7.2-16-16-16H80c0-79.6,64.4-144,144-144s144,64.4,144,144h-16c-8.8,0-16,7.2-16,16v112c0,8.8,7.2,16,16,16h28c37.6,0,68-30.4,68-68v-8C448,204,419.6,174.4,384,172.4z M228,388c8.8,0,16,7.2,16,16s-7.2,16-16,16s-16-7.2-16-16S219.2,388,228,388z M96,188v112H68c-28.8,0-52-23.2-52-52v-8c0-28.8,23.2-52,52-52H96z M432,248c0,28.8-23.2,52-52,52h-28V188h28c28.8,0,52,23.2,52,52V248z",
+        "M290.4,72.4c-0.8-0.4-2-1.2-3.2-2c-1.2-0.8-2.4-1.6-3.2-2c-3.6-2.4-8.8-1.2-10.8,2.8S272,79.6,276,82c0.8,0.4,2,1.2,3.2,2s2.4,1.6,3.6,2c1.2,0.8,2.8,1.2,4,1.2c2.8,0,5.2-1.2,6.8-4C295.6,79.6,294.4,74.8,290.4,72.4z",
+        "M224,52c-34,0-66,14.8-88,40.4c-2.8,3.2-2.4,8.4,0.8,11.2c1.6,1.2,3.2,2,5.2,2c2.4,0,4.4-0.8,6-2.8c19.2-22,46.8-34.8,76-34.8c7.2,0,14.4,0.8,21.6,2.4c4.4,0.8,8.4-2,9.6-6s-2-8.4-6-9.6C240.8,52.8,232.4,52,224,52z"
+      ]
     }
   };
   const sessionProfile = loadSessionProfile();
@@ -238,7 +263,9 @@
       relayLastSent: null,
       xmppLastSent: null,
       nativeLastPosted: null,
-      blurTimer: null
+      blurTimer: null,
+      mediaCaptureUntil: 0,
+      transientReconnectTimer: null
     },
     activeTabId: "chat",
     sequence: 0,
@@ -293,6 +320,33 @@
     mediaSettings: loadMediaSettings(),
     mediaDevices: [],
     mediaPreviewStream: null,
+    voiceRecorder: {
+      recorder: null,
+      stream: null,
+      chunks: [],
+      blob: null,
+      objectUrl: "",
+      mimeType: "",
+      startedAt: 0,
+      timerId: null,
+      audioContext: null,
+      analyser: null,
+      meterData: null,
+      meterAnimationId: null,
+      waveLevels: [],
+      cancelled: false
+    },
+    videoRecorder: {
+      recorder: null,
+      stream: null,
+      chunks: [],
+      blob: null,
+      objectUrl: "",
+      mimeType: "",
+      startedAt: 0,
+      timerId: null,
+      cancelled: false
+    },
     blockedJids: new Set(loadBlockedJids(sessionProfile)),
     accountReady: false,
     pendingMucAvatarConversationId: null,
@@ -444,6 +498,7 @@
     remoteVolumeValue: byId("remoteVolumeValue"),
     totalConversationTextPanel: byId("totalConversationTextPanel"),
     totalConversationRemoteName: byId("totalConversationRemoteName"),
+    totalConversationRemotePreviousText: byId("totalConversationRemotePreviousText"),
     totalConversationRemoteText: byId("totalConversationRemoteText"),
     totalConversationLocalPreviousText: byId("totalConversationLocalPreviousText"),
     totalConversationLocalText: byId("totalConversationLocalText"),
@@ -471,10 +526,36 @@
     attachmentLocationButton: byId("attachmentLocationButton"),
     emojiButton: byId("emojiButton"),
     smileyPickerPanel: byId("smileyPickerPanel"),
+    videoMessageButton: byId("videoMessageButton"),
     voiceMessageButton: byId("voiceMessageButton"),
+    voicePreviewPanel: byId("voicePreviewPanel"),
+    voicePreviewStatus: byId("voicePreviewStatus"),
+    voicePreviewAudio: byId("voicePreviewAudio"),
+    voiceRecordingWaveLine: byId("voiceRecordingWaveLine"),
+    cancelVoiceMessageButton: byId("cancelVoiceMessageButton"),
+    playVoiceMessageButton: byId("playVoiceMessageButton"),
+    rerecordVoiceMessageButton: byId("rerecordVoiceMessageButton"),
+    sendVoiceMessageButton: byId("sendVoiceMessageButton"),
+    videoPreviewPanel: byId("videoPreviewPanel"),
+    openVideoPreviewDialogButton: byId("openVideoPreviewDialogButton"),
+    videoPreviewVideo: byId("videoPreviewVideo"),
+    videoPreviewStatus: byId("videoPreviewStatus"),
+    videoPreviewDialog: byId("videoPreviewDialog"),
+    videoPreviewDialogTitle: byId("videoPreviewDialogTitle"),
+    videoPreviewDialogVideo: byId("videoPreviewDialogVideo"),
+    closeVideoPreviewDialogButton: byId("closeVideoPreviewDialogButton"),
+    startVideoRecordingButton: byId("startVideoRecordingButton"),
+    dialogCancelVideoMessageButton: byId("dialogCancelVideoMessageButton"),
+    dialogRerecordVideoMessageButton: byId("dialogRerecordVideoMessageButton"),
+    dialogSendVideoMessageButton: byId("dialogSendVideoMessageButton"),
+    cancelVideoMessageButton: byId("cancelVideoMessageButton"),
+    playVideoMessageButton: byId("playVideoMessageButton"),
+    rerecordVideoMessageButton: byId("rerecordVideoMessageButton"),
+    sendVideoMessageButton: byId("sendVideoMessageButton"),
     fileInput: byId("fileInput"),
     rttToggle: byId("rttToggle"),
     smileyToggle: byId("smileyToggle"),
+    composerInputRow: byId("composerInputRow"),
     messageInput: byId("messageInput"),
     sendButton: byId("sendButton"),
     composerState: byId("composerState"),
@@ -548,10 +629,15 @@
     dialogCameraInput: byId("dialogCameraInput"),
     dialogMicrophoneInput: byId("dialogMicrophoneInput"),
     dialogVideoQualityInput: byId("dialogVideoQualityInput"),
+    dialogVideoMessageFacingInput: byId("dialogVideoMessageFacingInput"),
     dialogMediaStatus: byId("dialogMediaStatus"),
     dialogRefreshMediaButton: byId("dialogRefreshMediaButton"),
     dialogPreviewMediaButton: byId("dialogPreviewMediaButton"),
     dialogStopMediaPreviewButton: byId("dialogStopMediaPreviewButton"),
+    callCameraInput: byId("callCameraInput"),
+    callVideoFacingToggle: byId("callVideoFacingToggle"),
+    callVideoFacingInput: byId("callVideoFacingInput"),
+    callMicrophoneInput: byId("callMicrophoneInput"),
     dialogContactsPanel: byId("dialogContactsPanel"),
     dialogAccessibilityPanel: byId("dialogAccessibilityPanel"),
     dialogServerSettingsLockNote: byId("dialogServerSettingsLockNote"),
@@ -591,6 +677,7 @@
     cameraInput: byId("cameraInput"),
     microphoneInput: byId("microphoneInput"),
     videoQualityInput: byId("videoQualityInput"),
+    videoMessageFacingInput: byId("videoMessageFacingInput"),
     mediaStatus: byId("mediaStatus"),
     refreshMediaButton: byId("refreshMediaButton"),
     previewMediaButton: byId("previewMediaButton"),
@@ -606,9 +693,11 @@
 
   document.body.classList.toggle("account-gate", state.accountGateRequired);
   document.body.classList.toggle("developer-mode", state.developerMode);
+  applyDeviceDetection();
   updateDeveloperPanelVisibility();
   bindEvents();
   el.sessionProfileInput.value = state.sessionProfile;
+  applyNetworkDefaultsForCurrentHost();
   applyTheme(state.theme);
   applyChatBackground(state.chatBackground, { persist: false });
   renderMaterialIcons();
@@ -687,6 +776,10 @@
     el.muteMicrophoneButton.addEventListener("click", toggleMicrophoneMute);
     el.muteRemoteAudioButton.addEventListener("click", toggleRemoteAudioMute);
     el.toggleTotalConversationTextButton.addEventListener("click", toggleTotalConversationText);
+    el.callCameraInput.addEventListener("change", () => handleMediaSettingsChange("video", "call"));
+    el.callVideoFacingToggle.addEventListener("click", toggleCallVideoFacingMode);
+    el.callVideoFacingInput.addEventListener("change", () => handleMediaSettingsChange("video", "call"));
+    el.callMicrophoneInput.addEventListener("change", () => handleMediaSettingsChange("audio", "call"));
     el.remoteVolumeInput.addEventListener("input", saveRemoteVolumeFromControl);
     el.relayModeButton.addEventListener("click", () => setMode("relay"));
     el.xmppModeButton.addEventListener("click", () => setMode("xmpp"));
@@ -700,7 +793,28 @@
     el.attachmentLocationButton.addEventListener("click", shareLocationFromAttachmentMenu);
     el.emojiButton.addEventListener("click", toggleSmileyPicker);
     el.smileyPickerPanel.addEventListener("click", handleSmileyPickerClick);
-    el.voiceMessageButton.addEventListener("click", () => showAttachmentPlaceholder("attachment.voice_message"));
+    el.videoMessageButton.addEventListener("click", recordNewVideoMessage);
+    el.voiceMessageButton.addEventListener("click", toggleVoiceRecording);
+    el.cancelVoiceMessageButton.addEventListener("click", cancelVoiceMessage);
+    el.playVoiceMessageButton.addEventListener("click", () => togglePreviewPlayback("voice"));
+    el.rerecordVoiceMessageButton.addEventListener("click", rerecordVoiceMessage);
+    el.sendVoiceMessageButton.addEventListener("click", sendRecordedVoiceMessage);
+    el.cancelVideoMessageButton.addEventListener("click", cancelVideoMessage);
+    el.openVideoPreviewDialogButton.addEventListener("click", openVideoPreviewDialog);
+    el.closeVideoPreviewDialogButton.addEventListener("click", closeVideoPreviewDialog);
+    el.videoPreviewDialog.addEventListener("click", closeVideoPreviewDialogOnBackdrop);
+    el.startVideoRecordingButton.addEventListener("click", toggleDialogVideoRecording);
+    el.dialogCancelVideoMessageButton.addEventListener("click", cancelVideoMessage);
+    el.dialogRerecordVideoMessageButton.addEventListener("click", rerecordVideoMessage);
+    el.dialogSendVideoMessageButton.addEventListener("click", sendRecordedVideoMessage);
+    el.playVideoMessageButton.addEventListener("click", () => togglePreviewPlayback("video"));
+    el.rerecordVideoMessageButton.addEventListener("click", rerecordVideoMessage);
+    el.sendVideoMessageButton.addEventListener("click", sendRecordedVideoMessage);
+    for (const eventName of ["play", "pause", "ended"]) {
+      el.voicePreviewAudio.addEventListener(eventName, () => updatePreviewPlaybackButton("voice"));
+      el.videoPreviewVideo.addEventListener(eventName, () => updatePreviewPlaybackButton("video"));
+      el.videoPreviewDialogVideo.addEventListener(eventName, () => updatePreviewPlaybackButton("video"));
+    }
     el.fileInput.addEventListener("change", uploadSelectedFiles);
     document.addEventListener("dragenter", handleDragEnter);
     document.addEventListener("dragover", handleDragOver);
@@ -721,9 +835,13 @@
     document.addEventListener("keydown", closeAvatarCropDialogOnEscape);
     document.addEventListener("keydown", closeLocationShareDialogOnEscape);
     document.addEventListener("keydown", closePhotoViewerOnEscape);
+    document.addEventListener("keydown", closeVideoPreviewDialogOnEscape);
     document.addEventListener("keydown", closeMapViewerOnEscape);
     window.addEventListener("resize", closeConversationContextMenu);
     window.addEventListener("resize", closeMessageContextMenu);
+    window.addEventListener("resize", () => handleViewportChange("resize"));
+    window.addEventListener("orientationchange", () => handleViewportChange("orientationchange"));
+    window.visualViewport?.addEventListener("resize", () => handleViewportChange("visual-viewport-resize"));
     window.addEventListener("scroll", closeConversationContextMenu, true);
     window.addEventListener("scroll", closeMessageContextMenu, true);
     document.addEventListener("visibilitychange", handleVisibilityLifecycleChange);
@@ -736,7 +854,7 @@
     document.addEventListener("resume", () => setClientLifecycleState("active", "app-resume"));
     window.addEventListener("teletyptel:lifecycle", handleNativeLifecycleEvent);
     el.composerForm.addEventListener("submit", sendComposerMessage);
-    el.messageInput.addEventListener("input", sendRttEdit);
+    el.messageInput.addEventListener("input", handleComposerInput);
     el.messageInput.addEventListener("keydown", handleComposerKeydown);
     el.switchSessionButton.addEventListener("click", switchBrowserSession);
     el.openSecondSessionButton.addEventListener("click", openSecondBrowserSession);
@@ -793,12 +911,14 @@
     el.cameraInput.addEventListener("change", () => handleMediaSettingsChange("video"));
     el.microphoneInput.addEventListener("change", () => handleMediaSettingsChange("audio"));
     el.videoQualityInput.addEventListener("change", () => handleMediaSettingsChange("video"));
+    el.videoMessageFacingInput.addEventListener("change", () => handleMediaSettingsChange("video"));
     el.refreshMediaButton.addEventListener("click", () => refreshMediaDevices(true));
     el.previewMediaButton.addEventListener("click", previewMedia);
     el.stopMediaPreviewButton.addEventListener("click", stopMediaPreview);
     el.dialogCameraInput.addEventListener("change", () => handleMediaSettingsChange("video", "dialog"));
     el.dialogMicrophoneInput.addEventListener("change", () => handleMediaSettingsChange("audio", "dialog"));
     el.dialogVideoQualityInput.addEventListener("change", () => handleMediaSettingsChange("video", "dialog"));
+    el.dialogVideoMessageFacingInput.addEventListener("change", () => handleMediaSettingsChange("video", "dialog"));
     el.dialogRefreshMediaButton.addEventListener("click", () => refreshMediaDevices(true));
     el.dialogPreviewMediaButton.addEventListener("click", previewMedia);
     el.dialogStopMediaPreviewButton.addEventListener("click", stopMediaPreview);
@@ -910,11 +1030,145 @@
   function setClientLifecycleState(nextState, reason, options = {}) {
     const normalized = nextState === "inactive" ? "inactive" : "active";
     clearTimeout(state.clientLifecycle.blurTimer);
+    if (normalized === "inactive" && shouldHoldActiveLifecycleDuringMedia(reason)) {
+      appendDebug("client-state", `kept active during media capture (${reason})`);
+      return;
+    }
+
     const changed = state.clientLifecycle.current !== normalized;
     state.clientLifecycle.current = normalized;
     if (changed || options.force === true) {
       flushClientLifecycleState(reason, options.force === true);
     }
+  }
+
+  function markMediaCaptureTransition(reason = "media-capture", durationMs = 8000) {
+    state.clientLifecycle.mediaCaptureUntil = Math.max(
+      state.clientLifecycle.mediaCaptureUntil || 0,
+      Date.now() + durationMs);
+    appendDebug("media-lifecycle", `${reason}: holding active transport state`);
+  }
+
+  function handleCallViewportChange(reason) {
+    if (!state.call) {
+      return;
+    }
+
+    markMediaCaptureTransition(`call-${reason}`, 15000);
+    window.setTimeout(() => {
+      updatePhoneLandscapeCallMode();
+      updateCallUi();
+      startVideoPlayback(el.localVideo);
+      startVideoPlayback(el.remoteVideo);
+    }, 350);
+  }
+
+  function handleViewportChange(reason) {
+    applyViewportDetection();
+    updatePhoneLandscapeCallMode();
+    if (state.call) {
+      handleCallViewportChange(reason);
+    }
+  }
+
+  function updatePhoneLandscapeCallMode(visible = state.totalConversationTextVisible) {
+    const metrics = currentViewportMetrics();
+    const landscape = metrics.landscape;
+    const phoneSized = isPhoneViewport();
+    const keyboardVisible = landscape && phoneSized && metrics.visualHeight > 0 && metrics.visualHeight <= 430;
+    document.body.classList.toggle(
+      "tc-phone-landscape-active",
+      Boolean(state.call && visible && landscape && phoneSized));
+    document.body.classList.toggle(
+      "tc-phone-keyboard-active",
+      Boolean(state.call && visible && keyboardVisible));
+  }
+
+  function applyDeviceDetection() {
+    const device = detectClientDevice();
+    document.body.dataset.platform = device.platform;
+    document.body.dataset.deviceClass = device.deviceClass;
+    document.body.dataset.os = device.os;
+    for (const className of Array.from(document.body.classList)) {
+      if (className.startsWith("device-")) {
+        document.body.classList.remove(className);
+      }
+    }
+    document.body.classList.add(`device-${device.platform}`);
+    document.body.classList.add(`device-${device.deviceClass}`);
+    applyViewportDetection();
+    appendDebug("device", `${device.platform}/${device.deviceClass}: ${device.userAgent}`);
+  }
+
+  function applyViewportDetection() {
+    const metrics = currentViewportMetrics();
+    const viewportClass = metrics.width <= 640
+      ? "phone"
+      : metrics.width <= 1024
+        ? "tablet"
+        : "desktop";
+    document.body.dataset.viewportClass = viewportClass;
+    document.body.dataset.viewportOrientation = metrics.landscape ? "landscape" : "portrait";
+    for (const className of Array.from(document.body.classList)) {
+      if (className.startsWith("viewport-")) {
+        document.body.classList.remove(className);
+      }
+    }
+    document.body.classList.add(`viewport-${viewportClass}`);
+    document.body.classList.add(metrics.landscape ? "viewport-landscape" : "viewport-portrait");
+  }
+
+  function currentViewportMetrics() {
+    const visualViewport = window.visualViewport;
+    const visualWidth = Number(visualViewport?.width || 0);
+    const visualHeight = Number(visualViewport?.height || 0);
+    const layoutWidth = Number(window.innerWidth || document.documentElement.clientWidth || visualWidth || 0);
+    const layoutHeight = Number(window.innerHeight || document.documentElement.clientHeight || visualHeight || 0);
+    const width = Math.round(visualWidth || layoutWidth || 0);
+    const height = Math.round(visualHeight || layoutHeight || 0);
+    return {
+      width,
+      height,
+      visualWidth: Math.round(visualWidth || width),
+      visualHeight: Math.round(visualHeight || height),
+      landscape: width > height
+    };
+  }
+
+  function detectClientDevice() {
+    const userAgent = navigator.userAgent || "";
+    const platformText = navigator.userAgentData?.platform || navigator.platform || "";
+    const touchPoints = Number(navigator.maxTouchPoints || 0);
+    const isIpadDesktopMode = platformText === "MacIntel" && touchPoints > 1;
+    const android = /Android/i.test(userAgent);
+    const ios = /iP(?:hone|ad|od)/i.test(userAgent) || isIpadDesktopMode;
+    const windows = /Windows/i.test(userAgent) || /Win/i.test(platformText);
+    const macos = !ios && (/Macintosh|Mac OS X/i.test(userAgent) || /Mac/i.test(platformText));
+    const linux = !android && (/Linux/i.test(userAgent) || /Linux/i.test(platformText));
+    const mobileUa = /Mobi|Android.*Mobile|iPhone|iPod/i.test(userAgent);
+    const tabletUa = /iPad|Tablet|Android(?!.*Mobile)/i.test(userAgent) || isIpadDesktopMode;
+
+    const platform = ios ? "ios" : android ? "android" : windows ? "windows" : macos ? "macos" : linux ? "linux" : "unknown";
+    const os = ios ? "iOS" : android ? "Android" : windows ? "Windows" : macos ? "macOS" : linux ? "Linux" : "Unknown";
+    const deviceClass = mobileUa ? "phone" : tabletUa ? "tablet" : "desktop";
+    return { platform, os, deviceClass, userAgent };
+  }
+
+  function isPhoneDevice() {
+    return document.body.dataset.deviceClass === "phone";
+  }
+
+  function isPhoneViewport() {
+    return document.body.dataset.viewportClass === "phone"
+      || (isPhoneDevice() && currentViewportMetrics().width <= 940);
+  }
+
+  function isMediaCaptureTransitionActive() {
+    return Date.now() < (state.clientLifecycle.mediaCaptureUntil || 0);
+  }
+
+  function shouldHoldActiveLifecycleDuringMedia(reason) {
+    return Boolean(state.call && isMediaCaptureTransitionActive() && reason !== "pagehide" && reason !== "freeze");
   }
 
   function flushClientLifecycleState(reason = "lifecycle", force = false) {
@@ -1154,6 +1408,7 @@
       cameraDeviceId: "",
       microphoneDeviceId: "",
       videoQuality: "default",
+      videoMessageFacingMode: "user",
       remoteVolume: 1,
       remoteSoundMuted: false
     };
@@ -1245,6 +1500,11 @@
     el.xmppModeButton.classList.toggle("selected", mode === "xmpp");
     setDefaultComposerState();
     updateComposerAvailability();
+  }
+
+  function applyNetworkDefaultsForCurrentHost() {
+    el.relayUrlInput.value = normalizeLocalWebSocketUrlForCurrentHost(el.relayUrlInput.value, 8787);
+    el.xmppUrlInput.value = normalizeLocalWebSocketUrlForCurrentHost(el.xmppUrlInput.value, 8787);
   }
 
   async function loadPlatformConfig() {
@@ -1697,8 +1957,8 @@
     }
     el.languageInput.value = normalizeLanguageCode(account.preferredLanguage ?? "eng");
     el.providerInput.value = account.providerId ?? "";
-    el.relayUrlInput.value = account.relayWebSocket ?? el.relayUrlInput.value;
-    el.xmppUrlInput.value = account.xmppWebSocket ?? el.xmppUrlInput.value;
+    el.relayUrlInput.value = normalizeLocalWebSocketUrlForCurrentHost(account.relayWebSocket ?? el.relayUrlInput.value, 8787);
+    el.xmppUrlInput.value = normalizeLocalWebSocketUrlForCurrentHost(account.xmppWebSocket ?? el.xmppUrlInput.value, 8787);
     state.account.xmppHost = account.xmppHost ?? state.account.xmppHost ?? domainFromJid(account.jid ?? "");
     state.account.xmppPort = account.xmppPort ?? state.account.xmppPort ?? 5222;
     state.account.xmppDomain = account.xmppDomain ?? state.account.xmppDomain ?? domainFromJid(account.jid ?? "");
@@ -1993,7 +2253,7 @@
     const xmppPort = normalizeXmppPort(el.dialogXmppPortInput.value);
     let xmppDomain = el.dialogXmppDomainInput.value.trim() || domainFromJid(jid);
     let xmppHost = el.dialogXmppHostInput.value.trim() || xmppDomain;
-    const xmppWebSocket = el.dialogXmppUrlInput.value.trim() || el.xmppUrlInput.value;
+    const xmppWebSocket = normalizeLocalWebSocketUrlForCurrentHost(el.dialogXmppUrlInput.value.trim() || el.xmppUrlInput.value, 8787);
     if (isLocalAccountDomain(xmppHost) || isLocalXmppWebSocketUrl(xmppWebSocket)) {
       xmppDomain = "localhost";
       xmppHost = "localhost";
@@ -2007,7 +2267,7 @@
     el.dialogJidInput.value = jid;
     el.passwordInput.value = el.dialogPasswordInput.value;
     el.rememberPasswordToggle.checked = el.dialogRememberPasswordToggle.checked;
-    el.relayUrlInput.value = el.dialogRelayUrlInput.value.trim() || el.relayUrlInput.value;
+    el.relayUrlInput.value = normalizeLocalWebSocketUrlForCurrentHost(el.dialogRelayUrlInput.value.trim() || el.relayUrlInput.value, 8787);
     el.xmppUrlInput.value = xmppWebSocket;
     el.providerInput.value = el.dialogProviderInput.value.trim() || "example-provider";
     el.languageInput.value = normalizeLanguageCode(el.dialogLanguageInput.value);
@@ -2309,6 +2569,7 @@
       state.activeConversationId = null;
       state.previousText = "";
       el.messageInput.value = "";
+      syncComposerActionButtons();
     }
 
     renderConversations();
@@ -2460,8 +2721,8 @@
       providerId: el.providerInput.value.trim() || state.account?.providerId || "example-provider",
       accessibilityProfileId: state.account?.accessibilityProfileId ?? "default-live-text",
       preferredLanguage: el.languageInput.value,
-      relayWebSocket: el.relayUrlInput.value.trim(),
-      xmppWebSocket: el.xmppUrlInput.value.trim(),
+      relayWebSocket: normalizeLocalWebSocketUrlForCurrentHost(el.relayUrlInput.value.trim(), 8787),
+      xmppWebSocket: normalizeLocalWebSocketUrlForCurrentHost(el.xmppUrlInput.value.trim(), 8787),
       xmppHost: state.account?.xmppHost || domainFromJid(el.jidInput.value.trim()),
       xmppPort: state.account?.xmppPort || 5222,
       xmppDomain: state.account?.xmppDomain || domainFromJid(el.jidInput.value.trim()),
@@ -3015,7 +3276,13 @@
     el.newsButton.hidden = !newsTab;
     el.newsButton.classList.toggle("selected", state.activeTabId === "news");
     el.supportButton.hidden = !supportTab;
-    el.supportButton.textContent = supportTab?.title ?? "Support";
+    const supportLabel = supportTab?.title ?? t("tab.support", "Support");
+    el.supportButton.title = supportLabel;
+    el.supportButton.setAttribute("aria-label", supportLabel);
+    const supportText = el.supportButton.querySelector(".sr-only");
+    if (supportText) {
+      supportText.textContent = supportLabel;
+    }
     el.supportButton.classList.toggle("selected", Boolean(supportTab) && state.activeTabId === supportTab.id);
 
     const tabs = panels.filter((tab) => tab.id !== "news" && !isSupportTab(tab));
@@ -3363,6 +3630,33 @@
     }
 
     card.appendChild(list);
+    card.appendChild(createTextBlock(
+      t("checklist.mobile_diagnostics", "Mobile test diagnostics"),
+      mobileDiagnosticsText()));
+  }
+
+  function mobileDiagnosticsText() {
+    const relayUrl = normalizeLocalWebSocketUrlForCurrentHost(el.relayUrlInput?.value || "", 8787);
+    const relayState = websocketReadyStateText(state.relaySocket?.readyState);
+    const xmppState = websocketReadyStateText(state.xmppSocket?.readyState);
+    const secure = window.isSecureContext ? "secure" : "not secure";
+    return `Build 20260609-ios-rtt-relay - ${secure} - relay ${relayState} ${relayUrl} - xmpp ${xmppState}`;
+  }
+
+  function websocketReadyStateText(value) {
+    if (value === WebSocket.CONNECTING) {
+      return "connecting";
+    }
+    if (value === WebSocket.OPEN) {
+      return "open";
+    }
+    if (value === WebSocket.CLOSING) {
+      return "closing";
+    }
+    if (value === WebSocket.CLOSED) {
+      return "closed";
+    }
+    return "none";
   }
 
   function createProtocolSummary(items) {
@@ -3843,6 +4137,36 @@
     return `<presence xmlns="urn:ietf:params:xml:ns:pidf" xmlns:gp="urn:ietf:params:xml:ns:pidf:geopriv10" xmlns:bp="urn:ietf:params:xml:ns:pidf:geopriv10:basicPolicy" xmlns:gml="http://www.opengis.net/gml" entity="${escapeXml(entity)}"><tuple id="teletyptel-location"><status><basic>open</basic></status><gp:geopriv><gp:location-info><gml:Point srsName="urn:ogc:def:crs:EPSG::4326"><gml:pos>${escapeXml(location.lat)} ${escapeXml(location.lon)}</gml:pos></gml:Point>${location.accuracy !== null ? `<gp:accuracy uom="urn:ogc:def:uom:EPSG::9001">${escapeXml(location.accuracy)}</gp:accuracy>` : ""}</gp:location-info><gp:usage-rules><bp:retransmission-allowed>no</bp:retransmission-allowed><bp:retention-expiry>${escapeXml(expiry)}</bp:retention-expiry></gp:usage-rules><gp:method>GPS</gp:method></gp:geopriv><note>${escapeXml(location.text || "Teletyptel location")}</note><timestamp>${escapeXml(location.timestamp)}</timestamp></tuple></presence>`;
   }
 
+  function shouldReconnectAfterMediaTransportClose() {
+    return Boolean(!state.intentionalDisconnect && state.accountReady && (state.call || isMediaCaptureTransitionActive()));
+  }
+
+  function scheduleMediaTransportReconnect(kind, reason) {
+    if (!shouldReconnectAfterMediaTransportClose()) {
+      return false;
+    }
+
+    if (state.clientLifecycle.transientReconnectTimer) {
+      return true;
+    }
+
+    setConnectionStatus(t("status.reconnecting", "Reconnecting..."), "warn");
+    appendDebug(`${kind}-reconnect`, `scheduled after ${reason}`);
+    state.clientLifecycle.transientReconnectTimer = window.setTimeout(() => {
+      state.clientLifecycle.transientReconnectTimer = null;
+      if (!state.accountReady || state.accountGateRequired || state.intentionalDisconnect) {
+        return;
+      }
+
+      if (kind === "xmpp") {
+        connectXmppWebSocket();
+      } else {
+        connectRelay();
+      }
+    }, 1000);
+    return true;
+  }
+
   function connectRelay() {
     if (!state.accountReady || state.accountGateRequired) {
       openAccountDialog({ required: true });
@@ -3854,11 +4178,13 @@
     }
 
     state.intentionalDisconnect = false;
-    const socket = new WebSocket(el.relayUrlInput.value.trim());
+    const relayUrl = normalizeLocalWebSocketUrlForCurrentHost(el.relayUrlInput.value.trim(), 8787);
+    el.relayUrlInput.value = relayUrl;
+    const socket = new WebSocket(relayUrl);
     state.relaySocket = socket;
     updateConnectButtonAvailability();
     setConnectionStatus(t("status.connecting_relay", "Connecting relay"), "warn");
-    appendDebug("relay", "Connecting " + el.relayUrlInput.value.trim());
+    appendDebug("relay", "Connecting " + relayUrl);
 
     socket.addEventListener("open", () => {
       setConnectionStatus(t("status.relay_connected", "Relay connected"), "good");
@@ -3886,6 +4212,10 @@
       renderConversations();
       updateConnectButtonAvailability();
       updateComposerAvailability();
+      if (scheduleMediaTransportReconnect("relay", "close")) {
+        return;
+      }
+
       if (!state.intentionalDisconnect && state.accountReady) {
         returnToLoginScreenAfterDisconnect(t("account.disconnected_login_required", "Connection closed. Sign in to continue."));
       }
@@ -3896,6 +4226,10 @@
       if (!state.intentionalDisconnect && state.accountReady) {
         window.setTimeout(() => {
           if (!state.relaySocket || state.relaySocket.readyState === WebSocket.CLOSED) {
+            if (scheduleMediaTransportReconnect("relay", "error")) {
+              return;
+            }
+
             returnToLoginScreenAfterDisconnect(t("account.connection_failed_login_required", "Connection failed. Sign in to try again."));
           }
         }, 0);
@@ -3905,6 +4239,8 @@
 
   function disconnectAll() {
     state.intentionalDisconnect = true;
+    clearTimeout(state.clientLifecycle.transientReconnectTimer);
+    state.clientLifecycle.transientReconnectTimer = null;
     cleanupCall(true);
 
     if (state.location.live) {
@@ -3923,12 +4259,15 @@
 
   function returnToLoginScreenAfterDisconnect(message) {
     state.intentionalDisconnect = true;
+    clearTimeout(state.clientLifecycle.transientReconnectTimer);
+    state.clientLifecycle.transientReconnectTimer = null;
     setAccountReady(false);
     state.clientLifecycle.relayLastSent = null;
     state.clientLifecycle.xmppLastSent = null;
     state.previousText = "";
     state.activeConversationId = null;
     el.messageInput.value = "";
+    syncComposerActionButtons();
     stopLocationWatchOnly();
     clearLocationAutoStopTimer();
     state.location.live = false;
@@ -4460,6 +4799,7 @@
 
   function openAttachmentFilePicker(accept, capture) {
     closeAttachmentMenu();
+    el.fileInput.value = "";
     el.fileInput.accept = accept;
     el.fileInput.multiple = !capture;
     if (capture) {
@@ -4469,6 +4809,10 @@
     }
 
     el.fileInput.click();
+  }
+
+  function recordNewVideoMessage() {
+    openVideoRecorderDialog();
   }
 
   function shareLocationFromAttachmentMenu() {
@@ -4561,6 +4905,826 @@
     setConnectionStatus(
       t("attachment.not_ready", "{0} will be added later.").replace("{0}", t(key, key)),
       "warn");
+  }
+
+  async function toggleVoiceRecording(event) {
+    event?.preventDefault();
+    closeAttachmentMenu();
+    closeSmileyPicker();
+
+    if (state.voiceRecorder.recorder?.state === "recording") {
+      stopVoiceRecording();
+      return;
+    }
+
+    await startVoiceRecording();
+  }
+
+  async function startVoiceRecording() {
+    if (!hasActiveConversation()) {
+      setConnectionStatus(t("status.select_contact_first", "Select a contact first"), "warn");
+      return;
+    }
+
+    if (!hasActiveMessageTransport()) {
+      showNotConnectedStatus();
+      return;
+    }
+
+    if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+      setConnectionStatus(t("voice.unsupported", "Voice recording is not available in this browser."), "danger");
+      return;
+    }
+
+    clearRecordedVoiceMessage();
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia(createAudioOnlyConstraints());
+      const mimeType = preferredVoiceRecordingMimeType();
+      const options = mimeType ? { mimeType } : undefined;
+      const recorder = new MediaRecorder(stream, options);
+      state.voiceRecorder.stream = stream;
+      state.voiceRecorder.recorder = recorder;
+      state.voiceRecorder.mimeType = recorder.mimeType || mimeType || "audio/webm";
+      state.voiceRecorder.chunks = [];
+      state.voiceRecorder.startedAt = Date.now();
+      state.voiceRecorder.cancelled = false;
+      recorder.addEventListener("dataavailable", (recordingEvent) => {
+        if (recordingEvent.data && recordingEvent.data.size > 0) {
+          state.voiceRecorder.chunks.push(recordingEvent.data);
+        }
+      });
+      recorder.addEventListener("stop", prepareVoicePreview);
+      recorder.start(250);
+      updateVoiceRecordingUi(true);
+      startVoiceLevelMeter(stream);
+      el.voicePreviewPanel.hidden = false;
+      el.voicePreviewPanel.classList.add("recording");
+      el.voicePreviewPanel.classList.remove("preview-ready");
+      el.voicePreviewAudio.hidden = true;
+      el.sendVoiceMessageButton.disabled = false;
+      updateVoicePreviewActionButtons("recording");
+      el.voicePreviewStatus.textContent = t("voice.recording", "Recording voice message {0}").replace("{0}", "00:00");
+      state.voiceRecorder.timerId = window.setInterval(updateVoiceRecordingTimer, 500);
+      updateVoiceRecordingTimer();
+    } catch (error) {
+      stopVoiceStream();
+      updateVoiceRecordingUi(false);
+      setConnectionStatus(`${t("voice.record_failed", "Could not start voice recording")}: ${error.message}`, "danger");
+      appendDebug("voice-record-error", error.message || String(error));
+    }
+  }
+
+  function stopVoiceRecording() {
+    const recorder = state.voiceRecorder.recorder;
+    if (recorder?.state === "recording") {
+      recorder.stop();
+    } else {
+      stopVoiceStream();
+    }
+    clearVoiceTimer();
+    stopVoiceLevelMeter();
+    updateVoiceRecordingUi(false);
+  }
+
+  function prepareVoicePreview() {
+    clearVoiceTimer();
+    stopVoiceLevelMeter();
+    stopVoiceStream();
+    updateVoiceRecordingUi(false);
+    if (state.voiceRecorder.cancelled) {
+      clearRecordedVoiceMessage();
+      return;
+    }
+
+    const chunks = state.voiceRecorder.chunks;
+    if (!chunks.length) {
+      setConnectionStatus(t("voice.empty", "No voice was recorded."), "warn");
+      clearRecordedVoiceMessage();
+      return;
+    }
+
+    const mimeType = state.voiceRecorder.mimeType || chunks[0]?.type || "audio/webm";
+    const blob = new Blob(chunks, { type: mimeType });
+    if (blob.size <= 0) {
+      setConnectionStatus(t("voice.empty", "No voice was recorded."), "warn");
+      clearRecordedVoiceMessage();
+      return;
+    }
+
+    state.voiceRecorder.blob = blob;
+    state.voiceRecorder.objectUrl = URL.createObjectURL(blob);
+    el.voicePreviewAudio.src = state.voiceRecorder.objectUrl;
+    el.voicePreviewAudio.hidden = false;
+    el.voicePreviewPanel.hidden = false;
+    el.voicePreviewPanel.classList.remove("recording");
+    el.voicePreviewPanel.classList.add("preview-ready");
+    el.voicePreviewStatus.textContent = "";
+    updateVoicePreviewActionButtons("preview");
+    updatePreviewPlaybackButton("voice");
+    setConnectionStatus(t("voice.preview_ready", "Voice message recorded. Listen, then send or cancel."), "warn");
+    syncComposerActionButtons();
+  }
+
+  async function sendRecordedVoiceMessage() {
+    if (state.voiceRecorder.recorder?.state === "recording") {
+      stopVoiceRecording();
+      return;
+    }
+
+    const blob = state.voiceRecorder.blob;
+    if (!blob) {
+      return;
+    }
+
+    if (!hasActiveMessageTransport()) {
+      showNotConnectedStatus();
+      return;
+    }
+
+    const mimeType = blob.type || state.voiceRecorder.mimeType || "audio/webm";
+    const fileName = `voice-message-${voiceTimestamp()}.${voiceFileExtension(mimeType)}`;
+    const file = new File([blob], fileName, { type: mimeType });
+    el.sendVoiceMessageButton.disabled = true;
+    el.cancelVoiceMessageButton.disabled = true;
+    el.playVoiceMessageButton.disabled = true;
+    el.rerecordVoiceMessageButton.disabled = true;
+    el.voicePreviewStatus.textContent = t("voice.uploading", "Sending voice message...");
+    try {
+      await uploadOneFile(file, { throwOnError: true });
+      clearRecordedVoiceMessage();
+    } catch (error) {
+      el.voicePreviewStatus.textContent = "";
+      setConnectionStatus(`${t("upload.failed", "Upload failed")}: ${file.name}`, "danger");
+      appendDebug("voice-upload-error", error.message || String(error));
+    } finally {
+      el.sendVoiceMessageButton.disabled = false;
+      el.cancelVoiceMessageButton.disabled = false;
+      el.playVoiceMessageButton.disabled = false;
+      el.rerecordVoiceMessageButton.disabled = false;
+    }
+  }
+
+  async function rerecordVoiceMessage() {
+    if (state.voiceRecorder.recorder?.state === "recording") {
+      stopVoiceRecording();
+      return;
+    }
+
+    clearRecordedVoiceMessage();
+    await startVoiceRecording();
+  }
+
+  function cancelVoiceMessage() {
+    if (state.voiceRecorder.recorder?.state === "recording") {
+      state.voiceRecorder.cancelled = true;
+      stopVoiceRecording();
+      setConnectionStatus(t("voice.cancelled", "Voice message cancelled."), "warn");
+      return;
+    }
+    clearRecordedVoiceMessage();
+    setConnectionStatus(t("voice.cancelled", "Voice message cancelled."), "warn");
+  }
+
+  function clearRecordedVoiceMessage() {
+    clearVoiceTimer();
+    stopVoiceStream();
+    if (state.voiceRecorder.objectUrl) {
+      URL.revokeObjectURL(state.voiceRecorder.objectUrl);
+    }
+    state.voiceRecorder.recorder = null;
+    state.voiceRecorder.chunks = [];
+    state.voiceRecorder.blob = null;
+    state.voiceRecorder.objectUrl = "";
+    state.voiceRecorder.mimeType = "";
+    state.voiceRecorder.startedAt = 0;
+    stopVoiceLevelMeter();
+    state.voiceRecorder.cancelled = false;
+    el.voicePreviewAudio.removeAttribute("src");
+    el.voicePreviewAudio.load();
+    el.voicePreviewAudio.hidden = false;
+    el.voicePreviewPanel.hidden = true;
+    el.voicePreviewPanel.classList.remove("recording");
+    el.voicePreviewPanel.classList.remove("preview-ready");
+    updateVoicePreviewActionButtons("preview");
+    updatePreviewPlaybackButton("voice");
+    updateVoiceRecordingUi(false);
+    syncComposerActionButtons();
+  }
+
+  function updateVoiceRecordingUi(recording) {
+    el.voiceMessageButton.classList.toggle("recording", recording);
+    el.voiceMessageButton.setAttribute("aria-pressed", recording ? "true" : "false");
+    const icon = el.voiceMessageButton.querySelector("[data-icon]");
+    if (icon) {
+      icon.dataset.icon = recording ? "micOff" : "mic";
+      icon.dataset.renderedIcon = "";
+      renderMaterialIcons(el.voiceMessageButton);
+    }
+    const label = recording
+      ? t("voice.stop_recording", "Stop recording")
+      : t("attachment.voice_message", "Voice message");
+    el.voiceMessageButton.title = label;
+    el.voiceMessageButton.setAttribute("aria-label", label);
+    syncComposerActionButtons();
+  }
+
+  function updateVoicePreviewActionButtons(mode) {
+    const recording = mode === "recording";
+    const primaryLabel = recording
+      ? t("voice.stop_recording", "Stop recording")
+      : t("voice.send", "Send voice message");
+    const primaryIcon = el.sendVoiceMessageButton.querySelector("[data-icon]");
+    if (primaryIcon) {
+      primaryIcon.dataset.icon = recording ? "stop" : "send";
+      primaryIcon.dataset.renderedIcon = "";
+    }
+
+    const primaryText = el.sendVoiceMessageButton.querySelector(".sr-only");
+    if (primaryText) {
+      primaryText.textContent = primaryLabel;
+    }
+
+    el.rerecordVoiceMessageButton.hidden = recording;
+    el.rerecordVoiceMessageButton.disabled = recording;
+    updatePreviewPlaybackButton("voice");
+    el.sendVoiceMessageButton.title = primaryLabel;
+    el.sendVoiceMessageButton.setAttribute("aria-label", primaryLabel);
+    el.sendVoiceMessageButton.classList.toggle("recording", recording);
+    renderMaterialIcons(el.voicePreviewPanel);
+  }
+
+  function updateVoiceRecordingTimer() {
+    if (!state.voiceRecorder.startedAt) {
+      return;
+    }
+
+    const elapsedSeconds = Math.max(0, Math.floor((Date.now() - state.voiceRecorder.startedAt) / 1000));
+    const minutes = String(Math.floor(elapsedSeconds / 60)).padStart(2, "0");
+    const seconds = String(elapsedSeconds % 60).padStart(2, "0");
+    const status = t("voice.recording", "Recording voice message {0}").replace("{0}", `${minutes}:${seconds}`);
+    el.voicePreviewStatus.textContent = status;
+    setConnectionStatus(status, "warn");
+  }
+
+  function clearVoiceTimer() {
+    if (state.voiceRecorder.timerId !== null) {
+      window.clearInterval(state.voiceRecorder.timerId);
+    }
+    state.voiceRecorder.timerId = null;
+  }
+
+  function startVoiceLevelMeter(stream) {
+    stopVoiceLevelMeter();
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) {
+      return;
+    }
+
+    try {
+      const audioContext = new AudioContextClass();
+      const source = audioContext.createMediaStreamSource(stream);
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 256;
+      analyser.smoothingTimeConstant = 0.72;
+      source.connect(analyser);
+      state.voiceRecorder.audioContext = audioContext;
+      state.voiceRecorder.analyser = analyser;
+      state.voiceRecorder.meterData = new Uint8Array(analyser.fftSize);
+      animateVoiceLevelMeter();
+    } catch (error) {
+      appendDebug("voice-meter-error", error.message || String(error));
+    }
+  }
+
+  function animateVoiceLevelMeter() {
+    const analyser = state.voiceRecorder.analyser;
+    const data = state.voiceRecorder.meterData;
+    if (!analyser || !data) {
+      return;
+    }
+
+    analyser.getByteTimeDomainData(data);
+    updateVoiceLevelMeter(data);
+    state.voiceRecorder.meterAnimationId = window.requestAnimationFrame(animateVoiceLevelMeter);
+  }
+
+  function updateVoiceLevelMeter(data) {
+    const group = el.voiceRecordingWaveLine;
+    if (!group) {
+      return;
+    }
+
+    const width = 180;
+    const height = 32;
+    const middle = height / 2;
+    const barCount = 54;
+    const gap = 1.6;
+    const barWidth = (width - gap * (barCount - 1)) / barCount;
+    if (!data || data.length === 0) {
+      state.voiceRecorder.waveLevels = Array.from({ length: barCount }, () => 0.08);
+      renderVoiceWaveBars(group, state.voiceRecorder.waveLevels, width, height, barWidth, gap);
+      return;
+    }
+
+    let sum = 0;
+    for (const sample of data) {
+      const centered = (sample - 128) / 128;
+      sum += centered * centered;
+    }
+
+    const rms = Math.sqrt(sum / data.length);
+    const level = Math.min(1, Math.max(0.04, rms * 7.2));
+    const previous = state.voiceRecorder.waveLevels.length
+      ? state.voiceRecorder.waveLevels
+      : Array.from({ length: barCount }, () => 0.08);
+    const levels = previous.slice(1);
+    const ripple = 0.72 + Math.sin(Date.now() / 95) * 0.18 + Math.random() * 0.1;
+    levels.push(Math.min(1, Math.max(0.06, level * ripple)));
+    state.voiceRecorder.waveLevels = levels;
+    renderVoiceWaveBars(group, levels, width, height, barWidth, gap);
+  }
+
+  function renderVoiceWaveBars(group, levels, width, height, barWidth, gap) {
+    const middle = height / 2;
+    const barCount = levels.length;
+    while (group.children.length < barCount) {
+      group.appendChild(document.createElementNS("http://www.w3.org/2000/svg", "rect"));
+    }
+    while (group.children.length > barCount) {
+      group.removeChild(group.lastElementChild);
+    }
+
+    levels.forEach((level, index) => {
+      const rect = group.children[index];
+      const shaped = Math.pow(Math.max(0.04, Math.min(1, level)), 0.72);
+      const barHeight = Math.max(2.4, shaped * (height - 4));
+      const x = index * (barWidth + gap);
+      const y = middle - barHeight / 2;
+      rect.setAttribute("x", x.toFixed(1));
+      rect.setAttribute("y", y.toFixed(1));
+      rect.setAttribute("width", Math.max(1.2, barWidth).toFixed(1));
+      rect.setAttribute("height", barHeight.toFixed(1));
+      rect.setAttribute("opacity", (0.38 + shaped * 0.62).toFixed(2));
+    });
+  }
+
+  function stopVoiceLevelMeter() {
+    if (state.voiceRecorder.meterAnimationId !== null) {
+      window.cancelAnimationFrame(state.voiceRecorder.meterAnimationId);
+    }
+
+    state.voiceRecorder.meterAnimationId = null;
+    state.voiceRecorder.analyser = null;
+    state.voiceRecorder.meterData = null;
+    if (state.voiceRecorder.audioContext) {
+      state.voiceRecorder.audioContext.close().catch(() => {});
+    }
+
+    state.voiceRecorder.audioContext = null;
+    updateVoiceLevelMeter(null);
+  }
+
+  function stopVoiceStream() {
+    if (state.voiceRecorder.stream) {
+      stopStream(state.voiceRecorder.stream);
+    }
+    state.voiceRecorder.stream = null;
+  }
+
+  async function startVideoRecording() {
+    closeAttachmentMenu();
+    closeSmileyPicker();
+    if (!hasActiveConversation()) {
+      setConnectionStatus(t("status.select_contact_first", "Select a contact first"), "warn");
+      return;
+    }
+
+    if (!hasActiveMessageTransport()) {
+      showNotConnectedStatus();
+      return;
+    }
+
+    if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+      setConnectionStatus(t("video.unsupported", "Video recording is not available in this browser."), "danger");
+      return;
+    }
+
+    clearRecordedVoiceMessage();
+    if (state.videoRecorder.blob || state.videoRecorder.objectUrl) {
+      clearRecordedVideoMessage();
+      openVideoRecorderDialog({ reset: false });
+    }
+    try {
+      let stream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia(createVideoMessageConstraints());
+      } catch {
+        stream = await navigator.mediaDevices.getUserMedia(createVideoMessageConstraints(true));
+      }
+
+      const mimeType = preferredVideoRecordingMimeType();
+      const options = mimeType ? { mimeType } : undefined;
+      const recorder = new MediaRecorder(stream, options);
+      state.videoRecorder.stream = stream;
+      state.videoRecorder.recorder = recorder;
+      state.videoRecorder.mimeType = recorder.mimeType || mimeType || "video/webm";
+      state.videoRecorder.chunks = [];
+      state.videoRecorder.startedAt = Date.now();
+      state.videoRecorder.cancelled = false;
+      recorder.addEventListener("dataavailable", (recordingEvent) => {
+        if (recordingEvent.data && recordingEvent.data.size > 0) {
+          state.videoRecorder.chunks.push(recordingEvent.data);
+        }
+      });
+      recorder.addEventListener("stop", prepareVideoPreview);
+      el.videoPreviewVideo.muted = true;
+      el.videoPreviewVideo.controls = false;
+      el.videoPreviewVideo.srcObject = stream;
+      el.videoPreviewDialogVideo.srcObject = stream;
+      el.videoPreviewDialogVideo.removeAttribute("src");
+      el.videoPreviewDialogVideo.muted = true;
+      el.videoPreviewDialogVideo.controls = false;
+      el.videoPreviewDialogVideo.autoplay = true;
+      el.videoPreviewDialogVideo.playsInline = true;
+      el.videoPreviewDialogVideo.play?.().catch((error) => appendDebug("video-dialog-live-preview", error.message || String(error)));
+      el.videoPreviewDialog.hidden = false;
+      document.body.classList.add("modal-open");
+      el.videoPreviewPanel.hidden = true;
+      el.openVideoPreviewDialogButton.hidden = true;
+      el.videoPreviewPanel.classList.add("recording");
+      el.videoPreviewPanel.classList.remove("preview-ready");
+      updateVideoPreviewActionButtons("recording");
+      updateVideoDialogActionButtons("recording");
+      recorder.start(500);
+      updateVideoRecordingUi(true);
+      el.videoPreviewStatus.textContent = t("video.recording", "Recording video message {0}").replace("{0}", "00:00");
+      state.videoRecorder.timerId = window.setInterval(updateVideoRecordingTimer, 500);
+      updateVideoRecordingTimer();
+    } catch (error) {
+      stopVideoStream();
+      updateVideoRecordingUi(false);
+      updateVideoDialogActionButtons("setup");
+      setConnectionStatus(`${t("video.record_failed", "Could not start video recording")}: ${error.message}`, "danger");
+      appendDebug("video-record-error", error.message || String(error));
+    }
+  }
+
+  function stopVideoRecording() {
+    const recorder = state.videoRecorder.recorder;
+    if (recorder?.state === "recording") {
+      recorder.stop();
+    } else {
+      stopVideoStream();
+    }
+    clearVideoTimer();
+    updateVideoRecordingUi(false);
+  }
+
+  function prepareVideoPreview() {
+    clearVideoTimer();
+    stopVideoStream();
+    updateVideoRecordingUi(false);
+    if (state.videoRecorder.cancelled) {
+      clearRecordedVideoMessage();
+      return;
+    }
+
+    const chunks = state.videoRecorder.chunks;
+    if (!chunks.length) {
+      setConnectionStatus(t("video.empty", "No video was recorded."), "warn");
+      clearRecordedVideoMessage();
+      return;
+    }
+
+    const mimeType = state.videoRecorder.mimeType || chunks[0]?.type || "video/webm";
+    const blob = new Blob(chunks, { type: mimeType });
+    if (blob.size <= 0) {
+      setConnectionStatus(t("video.empty", "No video was recorded."), "warn");
+      clearRecordedVideoMessage();
+      return;
+    }
+
+    state.videoRecorder.blob = blob;
+    state.videoRecorder.objectUrl = URL.createObjectURL(blob);
+    el.videoPreviewVideo.srcObject = null;
+    el.videoPreviewVideo.src = state.videoRecorder.objectUrl;
+    el.videoPreviewVideo.muted = false;
+    el.videoPreviewVideo.controls = false;
+    el.videoPreviewDialogVideo.srcObject = null;
+    el.videoPreviewDialogVideo.src = state.videoRecorder.objectUrl;
+    el.videoPreviewDialogVideo.currentTime = 0;
+    el.videoPreviewDialogVideo.muted = false;
+    el.videoPreviewDialogVideo.controls = true;
+    if (el.videoPreviewDialogTitle) {
+      el.videoPreviewDialogTitle.textContent = t("video.preview_title", "Video preview");
+    }
+    el.openVideoPreviewDialogButton.hidden = false;
+    el.videoPreviewPanel.hidden = false;
+    el.videoPreviewPanel.classList.remove("recording");
+    el.videoPreviewPanel.classList.add("preview-ready");
+    el.videoPreviewStatus.textContent = t("video.preview_ready", "Video message recorded. Review, then send or cancel.");
+    updateVideoPreviewActionButtons("preview");
+    updateVideoDialogActionButtons("preview");
+    updatePreviewPlaybackButton("video");
+    setConnectionStatus(t("video.preview_ready", "Video message recorded. Review, then send or cancel."), "warn");
+    syncComposerActionButtons();
+  }
+
+  async function sendRecordedVideoMessage() {
+    if (state.videoRecorder.recorder?.state === "recording") {
+      stopVideoRecording();
+      return;
+    }
+
+    const blob = state.videoRecorder.blob;
+    if (!blob) {
+      return;
+    }
+
+    if (!hasActiveMessageTransport()) {
+      showNotConnectedStatus();
+      return;
+    }
+
+    const mimeType = blob.type || state.videoRecorder.mimeType || "video/webm";
+    const fileName = `video-message-${voiceTimestamp()}.${videoFileExtension(mimeType)}`;
+    const file = new File([blob], fileName, { type: mimeType });
+    el.sendVideoMessageButton.disabled = true;
+    el.cancelVideoMessageButton.disabled = true;
+    el.playVideoMessageButton.disabled = true;
+    el.rerecordVideoMessageButton.disabled = true;
+    el.dialogSendVideoMessageButton.disabled = true;
+    el.dialogCancelVideoMessageButton.disabled = true;
+    el.dialogRerecordVideoMessageButton.disabled = true;
+    el.videoPreviewStatus.textContent = t("video.uploading", "Sending video message...");
+    try {
+      await uploadOneFile(file, { throwOnError: true });
+      clearRecordedVideoMessage();
+    } catch (error) {
+      el.videoPreviewStatus.textContent = "";
+      setConnectionStatus(`${t("upload.failed", "Upload failed")}: ${file.name}`, "danger");
+      appendDebug("video-upload-error", error.message || String(error));
+    } finally {
+      el.sendVideoMessageButton.disabled = false;
+      el.cancelVideoMessageButton.disabled = false;
+      el.playVideoMessageButton.disabled = false;
+      el.rerecordVideoMessageButton.disabled = false;
+      el.dialogSendVideoMessageButton.disabled = false;
+      el.dialogCancelVideoMessageButton.disabled = false;
+      el.dialogRerecordVideoMessageButton.disabled = false;
+    }
+  }
+
+  async function rerecordVideoMessage() {
+    if (state.videoRecorder.recorder?.state === "recording") {
+      stopVideoRecording();
+      return;
+    }
+
+    clearRecordedVideoMessage();
+    openVideoRecorderDialog({ reset: false });
+    await startVideoRecording();
+  }
+
+  function cancelVideoMessage() {
+    if (state.videoRecorder.recorder?.state === "recording") {
+      state.videoRecorder.cancelled = true;
+      stopVideoRecording();
+      setConnectionStatus(t("video.cancelled", "Video message cancelled."), "warn");
+      return;
+    }
+    clearRecordedVideoMessage();
+    setConnectionStatus(t("video.cancelled", "Video message cancelled."), "warn");
+  }
+
+  function clearRecordedVideoMessage() {
+    clearVideoTimer();
+    stopVideoStream();
+    if (state.videoRecorder.objectUrl) {
+      URL.revokeObjectURL(state.videoRecorder.objectUrl);
+    }
+    state.videoRecorder.recorder = null;
+    state.videoRecorder.chunks = [];
+    state.videoRecorder.blob = null;
+    state.videoRecorder.objectUrl = "";
+    state.videoRecorder.mimeType = "";
+    state.videoRecorder.startedAt = 0;
+    state.videoRecorder.cancelled = false;
+    el.videoPreviewVideo.pause();
+    el.videoPreviewVideo.srcObject = null;
+    el.videoPreviewVideo.removeAttribute("src");
+    el.videoPreviewVideo.load();
+    el.videoPreviewDialogVideo.pause();
+    el.videoPreviewDialog.hidden = true;
+    document.body.classList.remove("modal-open");
+    el.videoPreviewDialogVideo.srcObject = null;
+    el.videoPreviewDialogVideo.removeAttribute("src");
+    el.videoPreviewDialogVideo.load();
+    if (el.videoPreviewDialogTitle) {
+      el.videoPreviewDialogTitle.textContent = t("video.preview_title", "Video preview");
+    }
+    el.videoPreviewVideo.muted = true;
+    el.videoPreviewVideo.controls = false;
+    el.openVideoPreviewDialogButton.hidden = true;
+    el.videoPreviewPanel.hidden = true;
+    el.videoPreviewPanel.classList.remove("recording");
+    el.videoPreviewPanel.classList.remove("preview-ready");
+    updateVideoPreviewActionButtons("preview");
+    updateVideoDialogActionButtons("setup");
+    updatePreviewPlaybackButton("video");
+    updateVideoRecordingUi(false);
+    syncComposerActionButtons();
+  }
+
+  function updateVideoRecordingUi(recording) {
+    el.videoMessageButton.classList.toggle("recording", recording);
+    el.videoMessageButton.setAttribute("aria-pressed", recording ? "true" : "false");
+    const icon = el.videoMessageButton.querySelector("[data-icon]");
+    if (icon) {
+      icon.dataset.icon = recording ? "videocamOff" : "videocam";
+      icon.dataset.renderedIcon = "";
+      renderMaterialIcons(el.videoMessageButton);
+    }
+    const label = recording
+      ? t("video.stop_recording", "Stop recording")
+      : t("attachment.video_message", "Record new video");
+    el.videoMessageButton.title = label;
+    el.videoMessageButton.setAttribute("aria-label", label);
+    syncComposerActionButtons();
+  }
+
+  function updateVideoPreviewActionButtons(mode) {
+    const recording = mode === "recording";
+    const primaryLabel = recording
+      ? t("video.stop_recording", "Stop recording")
+      : t("video.send", "Send video message");
+    const primaryIcon = el.sendVideoMessageButton.querySelector("[data-icon]");
+    if (primaryIcon) {
+      primaryIcon.dataset.icon = recording ? "stop" : "send";
+      primaryIcon.dataset.renderedIcon = "";
+    }
+    const primaryText = el.sendVideoMessageButton.querySelector(".sr-only");
+    if (primaryText) {
+      primaryText.textContent = primaryLabel;
+    }
+    el.rerecordVideoMessageButton.hidden = recording;
+    el.rerecordVideoMessageButton.disabled = recording;
+    updatePreviewPlaybackButton("video");
+    el.sendVideoMessageButton.title = primaryLabel;
+    el.sendVideoMessageButton.setAttribute("aria-label", primaryLabel);
+    el.sendVideoMessageButton.classList.toggle("recording", recording);
+    renderMaterialIcons(el.videoPreviewPanel);
+  }
+
+  function updateVideoRecordingTimer() {
+    if (!state.videoRecorder.startedAt) {
+      return;
+    }
+
+    const elapsedSeconds = Math.max(0, Math.floor((Date.now() - state.videoRecorder.startedAt) / 1000));
+    const minutes = String(Math.floor(elapsedSeconds / 60)).padStart(2, "0");
+    const seconds = String(elapsedSeconds % 60).padStart(2, "0");
+    const status = t("video.recording", "Recording video message {0}").replace("{0}", `${minutes}:${seconds}`);
+    el.videoPreviewStatus.textContent = status;
+    if (!el.videoPreviewDialog.hidden) {
+      if (el.videoPreviewDialogTitle) {
+        el.videoPreviewDialogTitle.textContent = status;
+      }
+    }
+    setConnectionStatus(status, "warn");
+  }
+
+  async function togglePreviewPlayback(kind) {
+    const media = previewPlaybackElement(kind);
+    if (!media || !previewPlaybackBlob(kind)) {
+      return;
+    }
+
+    try {
+      if (kind === "video" && el.videoPreviewDialog.hidden) {
+        openVideoPreviewDialog();
+      }
+      if (media.paused || media.ended) {
+        if (media.ended) {
+          media.currentTime = 0;
+        }
+        await media.play();
+      } else {
+        media.pause();
+      }
+    } catch (error) {
+      appendDebug(`${kind}-preview-playback`, error.message || String(error));
+      setConnectionStatus(t("media.play_failed", "Could not play media preview."), "warn");
+    } finally {
+      updatePreviewPlaybackButton(kind);
+    }
+  }
+
+  function previewPlaybackElement(kind) {
+    return kind === "video" ? el.videoPreviewDialogVideo : el.voicePreviewAudio;
+  }
+
+  function previewPlaybackButton(kind) {
+    return kind === "video" ? el.playVideoMessageButton : el.playVoiceMessageButton;
+  }
+
+  function previewPlaybackBlob(kind) {
+    return kind === "video" ? state.videoRecorder.blob : state.voiceRecorder.blob;
+  }
+
+  function previewRecordingActive(kind) {
+    return kind === "video"
+      ? state.videoRecorder.recorder?.state === "recording"
+      : state.voiceRecorder.recorder?.state === "recording";
+  }
+
+  function updatePreviewPlaybackButton(kind) {
+    const button = previewPlaybackButton(kind);
+    const media = previewPlaybackElement(kind);
+    if (!button || !media) {
+      return;
+    }
+
+    const available = Boolean(previewPlaybackBlob(kind)) && !previewRecordingActive(kind);
+    button.hidden = !available;
+    button.disabled = !available;
+    const playing = available && !media.paused && !media.ended;
+    const label = playing
+      ? t("media.pause", "Pause")
+      : t("media.play", "Play");
+    const icon = button.querySelector("[data-icon]");
+    if (icon) {
+      icon.dataset.icon = playing ? "pause" : "playArrow";
+      icon.dataset.renderedIcon = "";
+    }
+    const text = button.querySelector(".sr-only");
+    if (text) {
+      text.textContent = label;
+    }
+    button.title = label;
+    button.setAttribute("aria-label", label);
+    renderMaterialIcons(button);
+  }
+
+  function clearVideoTimer() {
+    if (state.videoRecorder.timerId !== null) {
+      window.clearInterval(state.videoRecorder.timerId);
+    }
+    state.videoRecorder.timerId = null;
+  }
+
+  function stopVideoStream() {
+    if (state.videoRecorder.stream) {
+      stopStream(state.videoRecorder.stream);
+    }
+    state.videoRecorder.stream = null;
+  }
+
+  function preferredVoiceRecordingMimeType() {
+    const supportedTypes = [
+      "audio/webm;codecs=opus",
+      "audio/webm",
+      "audio/ogg;codecs=opus",
+      "audio/ogg",
+      "audio/mp4"
+    ];
+    return supportedTypes.find((type) => MediaRecorder.isTypeSupported?.(type)) || "";
+  }
+
+  function preferredVideoRecordingMimeType() {
+    const supportedTypes = [
+      "video/webm;codecs=vp9,opus",
+      "video/webm;codecs=vp8,opus",
+      "video/webm",
+      "video/mp4"
+    ];
+    return supportedTypes.find((type) => MediaRecorder.isTypeSupported?.(type)) || "";
+  }
+
+  function videoFileExtension(mimeType) {
+    const normalized = String(mimeType || "").toLowerCase();
+    if (normalized.includes("mp4")) {
+      return "mp4";
+    }
+    if (normalized.includes("ogg") || normalized.includes("ogv")) {
+      return "ogv";
+    }
+    return "webm";
+  }
+
+  function voiceFileExtension(mimeType) {
+    const normalized = String(mimeType || "").toLowerCase();
+    if (normalized.includes("ogg")) {
+      return "ogg";
+    }
+    if (normalized.includes("mp4") || normalized.includes("m4a")) {
+      return "m4a";
+    }
+    return "webm";
+  }
+
+  function voiceTimestamp() {
+    return new Date().toISOString().replace(/[-:]/g, "").replace(/\..+$/, "").replace("T", "-");
   }
 
   function toggleSmileyPicker(event) {
@@ -4675,7 +5839,8 @@
     }
 
     state.intentionalDisconnect = false;
-    const url = normalizeXmppWebSocketUrl(el.xmppUrlInput.value.trim());
+    const url = normalizeXmppWebSocketUrl(normalizeLocalWebSocketUrlForCurrentHost(el.xmppUrlInput.value.trim(), 8787));
+    el.xmppUrlInput.value = url;
     const socket = new WebSocket(url, "xmpp");
     state.xmppSocket = socket;
     state.xmppSession = createXmppSession();
@@ -4708,6 +5873,10 @@
       appendDebug("xmpp", "Closed");
       updateComposerAvailability();
       updateConnectButtonAvailability();
+      if (scheduleMediaTransportReconnect("xmpp", "close")) {
+        return;
+      }
+
       if (!state.intentionalDisconnect && wasReady) {
         returnToLoginScreenAfterDisconnect(t("account.disconnected_login_required", "Connection closed. Sign in to continue."));
       }
@@ -4719,6 +5888,10 @@
       if (!state.intentionalDisconnect && state.accountReady) {
         window.setTimeout(() => {
           if (!state.xmppSocket || state.xmppSocket.readyState === WebSocket.CLOSED) {
+            if (scheduleMediaTransportReconnect("xmpp", "error")) {
+              return;
+            }
+
             returnToLoginScreenAfterDisconnect(t("account.connection_failed_login_required", "Connection failed. Sign in to try again."));
           }
         }, 0);
@@ -4999,6 +6172,7 @@
         addMessage("self", text, "RFC 7395", null, null, null, null, outgoingId);
       }
       el.messageInput.value = "";
+      syncComposerActionButtons();
       state.previousText = "";
       return;
     }
@@ -5011,6 +6185,24 @@
       event.preventDefault();
       el.composerForm.requestSubmit();
     }
+  }
+
+  function handleComposerInput() {
+    sendRttEdit();
+    syncComposerActionButtons();
+  }
+
+  function syncComposerActionButtons() {
+    const hasText = el.messageInput.value.trim().length > 0;
+    const recording = state.voiceRecorder.recorder?.state === "recording";
+    const videoRecording = state.videoRecorder.recorder?.state === "recording";
+    const hasVoiceDraft = Boolean(state.voiceRecorder.blob);
+    const hasVideoDraft = Boolean(state.videoRecorder.blob);
+    const recorderActive = recording || hasVoiceDraft || videoRecording || hasVideoDraft;
+    el.composerInputRow.hidden = recorderActive;
+    el.sendButton.hidden = !hasText;
+    el.videoMessageButton.hidden = hasText || recorderActive;
+    el.voiceMessageButton.hidden = hasText || recorderActive;
   }
 
   function sendRelayFinalMessage(text, edit = null, outgoingId = createMessageId("msg")) {
@@ -5035,6 +6227,7 @@
         addMessage("self", text, "jingle-rtt", null, null, null, null, outgoingId);
       }
       el.messageInput.value = "";
+      syncComposerActionButtons();
       state.previousText = "";
       state.sequence = 0;
       clearLocalRttDraftMessage();
@@ -5062,6 +6255,7 @@
       addMessage("self", text, "sent", null, null, null, null, outgoingId);
     }
     el.messageInput.value = "";
+    syncComposerActionButtons();
     state.previousText = "";
     state.sequence = 0;
     clearLocalRttDraftMessage();
@@ -5786,12 +6980,14 @@
     }
 
     try {
+      markMediaCaptureTransition("unlock-media-labels", 12000);
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
       stopStream(stream);
     } catch (error) {
       appendDebug("media-permission", error.message);
       for (const constraints of [{ audio: true, video: false }, { audio: false, video: true }]) {
         try {
+          markMediaCaptureTransition("unlock-media-labels-fallback", 8000);
           const stream = await navigator.mediaDevices.getUserMedia(constraints);
           stopStream(stream);
         } catch {
@@ -5804,7 +7000,7 @@
   function renderMediaDeviceSelects() {
     const cameras = state.mediaDevices.filter((device) => device.kind === "videoinput");
     const microphones = state.mediaDevices.filter((device) => device.kind === "audioinput");
-    for (const select of [el.cameraInput, el.dialogCameraInput]) {
+    for (const select of [el.cameraInput, el.dialogCameraInput, el.callCameraInput]) {
       renderDeviceSelect(
         select,
         cameras,
@@ -5812,7 +7008,7 @@
         t("media.default_camera", "Default camera"),
         t("media.camera", "Camera"));
     }
-    for (const select of [el.microphoneInput, el.dialogMicrophoneInput]) {
+    for (const select of [el.microphoneInput, el.dialogMicrophoneInput, el.callMicrophoneInput]) {
       renderDeviceSelect(
         select,
         microphones,
@@ -5827,14 +7023,23 @@
     if (!select) {
       return;
     }
+    const visibleDevices = devices.filter((device) => shouldShowMediaDeviceOption(device, devices));
     select.replaceChildren(new Option(defaultLabel, ""));
-    devices.forEach((device, index) => {
+    visibleDevices.forEach((device, index) => {
       select.appendChild(new Option(device.label || `${fallbackLabel} ${index + 1}`, device.deviceId));
     });
 
-    select.value = devices.some((device) => device.deviceId === selectedValue)
+    select.value = visibleDevices.some((device) => device.deviceId === selectedValue)
       ? selectedValue
       : "";
+  }
+
+  function shouldShowMediaDeviceOption(device, devices) {
+    if (!isAppleMobileBrowser()) {
+      return true;
+    }
+
+    return devices.length > 1 || Boolean(String(device.label || "").trim());
   }
 
   function setMediaControlValues() {
@@ -5844,28 +7049,69 @@
         select.value = videoQuality;
       }
     }
+    const facingMode = normalizeVideoFacingMode(state.mediaSettings.videoMessageFacingMode);
+    for (const select of [el.videoMessageFacingInput, el.dialogVideoMessageFacingInput, el.callVideoFacingInput]) {
+      if (select) {
+        select.value = facingMode;
+      }
+    }
+    syncCallVideoFacingToggle();
+  }
+
+  async function toggleCallVideoFacingMode() {
+    const currentMode = normalizeVideoFacingMode(el.callVideoFacingInput?.value || state.mediaSettings.videoMessageFacingMode);
+    if (el.callVideoFacingInput) {
+      el.callVideoFacingInput.value = currentMode === "user" ? "environment" : "user";
+    }
+    await handleMediaSettingsChange("video", "call");
+    syncCallVideoFacingToggle();
+  }
+
+  function syncCallVideoFacingToggle() {
+    if (!el.callVideoFacingToggle) {
+      return;
+    }
+    const mode = normalizeVideoFacingMode(el.callVideoFacingInput?.value || state.mediaSettings.videoMessageFacingMode);
+    const label = mode === "user"
+      ? t("camera.front", "Front camera")
+      : t("camera.back", "Back camera");
+    const title = `${t("button.switch_camera", "Switch camera")}: ${label}`;
+    el.callVideoFacingToggle.title = title;
+    el.callVideoFacingToggle.setAttribute("aria-label", title);
   }
 
   function mediaControlsForSource(source) {
+    if (source === "call") {
+      return {
+        camera: el.callCameraInput,
+        microphone: el.callMicrophoneInput,
+        quality: el.videoQualityInput,
+        facing: el.callVideoFacingInput
+      };
+    }
+
     return source === "dialog"
       ? {
         camera: el.dialogCameraInput,
         microphone: el.dialogMicrophoneInput,
-        quality: el.dialogVideoQualityInput
+        quality: el.dialogVideoQualityInput,
+        facing: el.dialogVideoMessageFacingInput
       }
       : {
         camera: el.cameraInput,
         microphone: el.microphoneInput,
-        quality: el.videoQualityInput
+        quality: el.videoQualityInput,
+        facing: el.videoMessageFacingInput
       };
   }
 
   function saveMediaSettingsFromControls(announce = true, source = "main") {
     const controls = mediaControlsForSource(source);
     state.mediaSettings = {
-      cameraDeviceId: controls.camera?.value ?? state.mediaSettings.cameraDeviceId ?? "",
-      microphoneDeviceId: controls.microphone?.value ?? state.mediaSettings.microphoneDeviceId ?? "",
+      cameraDeviceId: normalizeSelectedMediaDeviceId(controls.camera?.value, "videoinput"),
+      microphoneDeviceId: normalizeSelectedMediaDeviceId(controls.microphone?.value, "audioinput"),
       videoQuality: controls.quality?.value || state.mediaSettings.videoQuality || "default",
+      videoMessageFacingMode: normalizeVideoFacingMode(controls.facing?.value || state.mediaSettings.videoMessageFacingMode),
       remoteVolume: Number.isFinite(Number(state.mediaSettings.remoteVolume))
         ? state.mediaSettings.remoteVolume
         : 1,
@@ -5876,6 +7122,25 @@
     if (announce) {
       setMediaStatus(t("media.saved", "Media settings saved. They are used for the next call or preview."));
     }
+  }
+
+  function normalizeSelectedMediaDeviceId(deviceId, kind) {
+    const value = String(deviceId ?? "").trim();
+    if (!value) {
+      return "";
+    }
+
+    if (!isAppleMobileBrowser()) {
+      return value;
+    }
+
+    const devices = state.mediaDevices.filter((device) => device.kind === kind);
+    const device = devices.find((item) => item.deviceId === value);
+    if (device && !shouldShowMediaDeviceOption(device, devices)) {
+      return "";
+    }
+
+    return value;
   }
 
   async function handleMediaSettingsChange(kind, source = "main") {
@@ -5958,7 +7223,7 @@
 
   async function previewMedia() {
     if (!navigator.mediaDevices?.getUserMedia) {
-      setMediaStatus(t("call.media_unavailable", "Camera/microphone access is not available."));
+      setMediaStatus(mediaAccessUnavailableMessage());
       return;
     }
 
@@ -5966,6 +7231,7 @@
     saveMediaSettingsFromControls();
 
     try {
+      markMediaCaptureTransition("media-preview", 12000);
       const stream = await navigator.mediaDevices.getUserMedia(createMediaConstraints("video"));
       state.mediaPreviewStream = stream;
       updateVideoElementSource(el.localVideo, stream);
@@ -6032,12 +7298,6 @@
       return;
     }
 
-    if (!isRelayConnected()) {
-      showNotConnectedStatus();
-      setCallStatus(t("status.not_connected", "Not connected."));
-      return;
-    }
-
     if (!supportsWebRtc()) {
       setCallStatus(t("call.unsupported", "WebRTC is not available in this browser."));
       return;
@@ -6056,10 +7316,12 @@
     setCallStatus(t("call.starting", "Starting call..."));
 
     try {
+      await ensureRelayConnectedForJingle(5000);
       await openLocalMedia(call);
       createPeerConnection(call);
       const offer = await call.pc.createOffer();
       await call.pc.setLocalDescription(offer);
+      await ensureRelayConnectedForJingle();
       sendJingleEnvelope("session-initiate", {
         sid: call.sid,
         mediaKind: call.mediaKind,
@@ -6090,6 +7352,7 @@
       await flushPendingIceCandidates(call);
       const answer = await call.pc.createAnswer();
       await call.pc.setLocalDescription(answer);
+      await ensureRelayConnectedForJingle();
       sendJingleEnvelope("session-accept", {
         sid: call.sid,
         mediaKind: call.mediaKind,
@@ -6755,7 +8018,6 @@
     conversation.clientState = "active";
     conversation.clientStateUpdatedAt = new Date();
     setPeerPresence(conversation.peer, "online");
-    updateTotalConversationTextPanel(conversation);
 
     if (packet.replaceId) {
       applyMessageCorrection(
@@ -6765,6 +8027,8 @@
         "peer",
         typeof packet.messageId === "string" ? packet.messageId : null,
         conversation.remoteFrom);
+      updateRemoteDraftMessage(conversation.id);
+      updateTotalConversationTextPanel(conversation);
       return;
     }
 
@@ -6777,6 +8041,8 @@
       conversation.id,
       null,
       typeof packet.messageId === "string" ? packet.messageId : null);
+    updateRemoteDraftMessage(conversation.id);
+    updateTotalConversationTextPanel(conversation);
   }
 
   async function openLocalMedia(call) {
@@ -6785,14 +8051,16 @@
     }
 
     if (!navigator.mediaDevices?.getUserMedia) {
-      throw new Error(t("call.media_unavailable", "Camera/microphone access is not available."));
+      throw new Error(mediaAccessUnavailableMessage());
     }
 
     const wantsVideo = call.mediaKind === "video";
     stopMediaPreview();
     saveMediaSettingsFromControls();
+    markMediaCaptureTransition("get-user-media-start", 20000);
     try {
       call.localStream = await navigator.mediaDevices.getUserMedia(createMediaConstraints(call.mediaKind));
+      markMediaCaptureTransition("get-user-media-ready", 8000);
       await refreshMediaDevices(false);
     } catch (error) {
       if (!wantsVideo) {
@@ -6802,7 +8070,9 @@
       if (state.mediaSettings.cameraDeviceId || state.mediaSettings.microphoneDeviceId) {
         try {
           appendDebug("media", `Selected device unavailable, trying defaults: ${error.message}`);
+          markMediaCaptureTransition("get-user-media-defaults", 12000);
           call.localStream = await navigator.mediaDevices.getUserMedia(createDefaultMediaConstraints("video"));
+          markMediaCaptureTransition("get-user-media-ready", 8000);
           setMediaStatus(t("media.default_fallback", "Selected device was unavailable; using browser defaults."));
           await refreshMediaDevices(false);
         } catch (fallbackError) {
@@ -6820,7 +8090,9 @@
 
       appendDebug("media", `Video unavailable, falling back to audio: ${error.message}`);
       call.mediaKind = "audio";
+      markMediaCaptureTransition("get-user-media-audio-fallback", 12000);
       call.localStream = await navigator.mediaDevices.getUserMedia(createMediaConstraints("audio"));
+      markMediaCaptureTransition("get-user-media-ready", 8000);
     }
 
     updateVideoElementSource(el.localVideo, call.localStream);
@@ -6841,19 +8113,68 @@
   }
 
   function createAudioOnlyConstraints() {
-    const audio = state.mediaSettings.microphoneDeviceId
-      ? { deviceId: { exact: state.mediaSettings.microphoneDeviceId } }
+    const microphoneDeviceId = normalizeSelectedMediaDeviceId(state.mediaSettings.microphoneDeviceId, "audioinput");
+    const audio = microphoneDeviceId
+      ? { deviceId: { ideal: microphoneDeviceId } }
       : true;
     return { audio, video: false };
   }
 
+  function createVideoMessageConstraints(ignoreFacingMode = false) {
+    const { audio } = createAudioOnlyConstraints();
+    const video = videoConstraintsForQuality(state.mediaSettings.videoQuality);
+    const cameraDeviceId = normalizeSelectedMediaDeviceId(state.mediaSettings.cameraDeviceId, "videoinput");
+    if (!ignoreFacingMode && isAppleMobileBrowser()) {
+      video.facingMode = { ideal: selectedVideoFacingModeForCapture() };
+    } else if (cameraDeviceId) {
+      video.deviceId = { ideal: cameraDeviceId };
+    }
+
+    return { audio, video };
+  }
+
   function createVideoOnlyConstraints() {
     const video = videoConstraintsForQuality(state.mediaSettings.videoQuality);
-    if (state.mediaSettings.cameraDeviceId) {
-      video.deviceId = { exact: state.mediaSettings.cameraDeviceId };
+    const cameraDeviceId = normalizeSelectedMediaDeviceId(state.mediaSettings.cameraDeviceId, "videoinput");
+    if (isAppleMobileBrowser()) {
+      video.facingMode = { ideal: selectedVideoFacingModeForCapture() };
+    } else if (cameraDeviceId) {
+      video.deviceId = { ideal: cameraDeviceId };
     }
 
     return { audio: false, video };
+  }
+
+  function selectedVideoFacingModeForCapture() {
+    const mode = normalizeVideoFacingMode(state.mediaSettings.videoMessageFacingMode);
+    return isAppleMobileBrowser()
+      ? mode === "environment" ? "user" : "environment"
+      : mode;
+  }
+
+  function normalizeVideoFacingMode(value) {
+    return value === "environment" ? "environment" : "user";
+  }
+
+  function isAppleMobileBrowser() {
+    const userAgent = navigator.userAgent || "";
+    return /iP(?:hone|ad|od)/.test(userAgent)
+      || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  }
+
+  function mediaAccessUnavailableMessage() {
+    const insecurePage = window.isSecureContext === false
+      && location.protocol !== "https:"
+      && !["localhost", "127.0.0.1", "::1"].includes(location.hostname);
+    if (insecurePage) {
+      const secureHost = location.hostname.toLowerCase() === "dev.teletyptel.nl"
+        ? " https://dev.teletyptel.nl"
+        : "";
+      return t("call.media_requires_secure_context", "Camera and microphone require HTTPS on this device.{0}")
+        .replace("{0}", secureHost);
+    }
+
+    return t("call.media_unavailable", "Camera/microphone access is not available.");
   }
 
   function createDefaultMediaConstraints(mediaKind) {
@@ -6910,6 +8231,7 @@
     const constraints = kind === "audio"
       ? createAudioOnlyConstraints()
       : createVideoOnlyConstraints();
+    markMediaCaptureTransition(`replace-${kind}-track`, 12000);
     const replacementStream = await navigator.mediaDevices.getUserMedia(constraints);
     const replacementTrack = replacementStream.getTracks().find((track) => track.kind === kind);
     if (!replacementTrack) {
@@ -7135,13 +8457,24 @@
     el.hangupCallButton.disabled = !call;
     const hasLocalVideo = hasVideoTrack(call?.localStream);
     const hasRemoteVideo = hasVideoTrack(call?.remoteStream);
-    const hasMedia = Boolean(call?.localStream || call?.remoteStream);
-    el.callPanel.hidden = !hasMedia;
-    el.localVideo.hidden = !hasLocalVideo;
+    const conversation = activeConversation();
+    const totalConversationVisible = Boolean(
+      call?.rttEnabled
+      && conversation
+      && addressMatches(conversation.peer, call.peer)
+      && !call.incomingOffer
+      && state.totalConversationTextVisible
+    );
+    const showLocalPreview = hasLocalVideo;
+    const showCallPanel = hasRemoteVideo || hasLocalVideo || totalConversationVisible;
+    el.callPanel.hidden = !showCallPanel;
+    el.localVideo.hidden = !showLocalPreview;
     el.remoteVideo.hidden = !hasRemoteVideo;
+    el.callPanel.classList.toggle("has-local-video", showLocalPreview);
     el.callPanel.classList.toggle("local-video-main", hasLocalVideo && !hasRemoteVideo);
     el.callPanel.classList.toggle("remote-video-main", hasRemoteVideo);
-    document.body.classList.toggle("call-active", hasMedia);
+    el.callPanel.classList.toggle("no-remote-video", !hasRemoteVideo);
+    document.body.classList.toggle("call-active", showCallPanel);
     updateCameraToggleUi();
     updateMicrophoneMuteUi();
     updateTotalConversationTextToggleUi();
@@ -7163,8 +8496,46 @@
     }
 
     const hasVideo = hasVideoTrack(stream);
-    video.srcObject = hasVideo ? stream : null;
     video.hidden = !hasVideo;
+    video.playsInline = true;
+    video.autoplay = true;
+    if (video === el.localVideo) {
+      video.muted = true;
+      video.defaultMuted = true;
+    }
+
+    const nextSource = hasVideo ? stream : null;
+    if (video.srcObject !== nextSource) {
+      video.srcObject = nextSource;
+    }
+
+    if (hasVideo) {
+      startVideoPlayback(video);
+    } else {
+      video.pause();
+      video.removeAttribute("src");
+      video.load();
+    }
+  }
+
+  function startVideoPlayback(video) {
+    if (!video || video.hidden || !video.srcObject) {
+      return;
+    }
+
+    const play = () => {
+      const promise = video.play?.();
+      if (promise?.catch) {
+        promise.catch((error) => appendDebug("video-playback", error.message || String(error)));
+      }
+    };
+
+    if (video.readyState >= HTMLMediaElement.HAVE_METADATA) {
+      play();
+      return;
+    }
+
+    video.addEventListener("loadedmetadata", play, { once: true });
   }
 
   function watchCallVideoTracks(call, stream) {
@@ -7279,6 +8650,32 @@
 
   function isRelayConnected() {
     return state.relaySocket?.readyState === WebSocket.OPEN;
+  }
+
+  function wait(ms) {
+    return new Promise((resolve) => window.setTimeout(resolve, ms));
+  }
+
+  async function ensureRelayConnectedForJingle(timeoutMs = 3500) {
+    if (isRelayConnected()) {
+      return;
+    }
+
+    if (state.accountReady && !state.accountGateRequired && !state.intentionalDisconnect) {
+      connectRelay();
+    }
+
+    const startedAt = Date.now();
+    while (Date.now() - startedAt < timeoutMs) {
+      await wait(100);
+      if (isRelayConnected()) {
+        return;
+      }
+    }
+
+    const relayUrl = normalizeLocalWebSocketUrlForCurrentHost(el.relayUrlInput?.value || "", 8787);
+    appendDebug("jingle-error", `Relay did not connect for call: ${relayUrl}`);
+    throw new Error(`${t("status.not_connected", "Not connected.")} ${relayUrl}`);
   }
 
   function hasActiveMessageTransport() {
@@ -7422,6 +8819,7 @@
       replaceId: message.xmppId || message.id
     };
     el.messageInput.value = message.text;
+    syncComposerActionButtons();
     el.messageInput.focus();
     el.composerState.textContent = t("composer.editing", "Editing message; sending will replace it.");
   }
@@ -7884,9 +9282,12 @@
     const fullTextMode = visible && shouldUseFullTotalConversationText(call);
 
     el.callPanel.classList.toggle("tc-text-full", fullTextMode);
+    document.body.classList.toggle("tc-text-visible-active", visible);
     document.body.classList.toggle("tc-text-full-active", fullTextMode);
+    updatePhoneLandscapeCallMode(visible);
     el.totalConversationTextPanel.hidden = !visible;
     if (!visible) {
+      el.totalConversationRemotePreviousText.textContent = "";
       el.totalConversationRemoteText.textContent = "";
       el.totalConversationLocalPreviousText.textContent = "";
       el.totalConversationLocalText.textContent = "";
@@ -7894,6 +9295,7 @@
     }
 
     el.totalConversationRemoteName.textContent = displayNameForJid(conversation.remoteFrom || call.peer);
+    el.totalConversationRemotePreviousText.textContent = lastPeerConversationText(conversation);
     el.totalConversationRemoteText.textContent = conversation.remoteText || "";
     el.totalConversationLocalPreviousText.textContent = lastLocalConversationText(conversation);
     el.totalConversationLocalText.textContent = el.messageInput.value || "";
@@ -8253,7 +9655,9 @@
     el.uploadFileButton.disabled = !hasConversation || blocked;
     el.attachmentLocationButton.disabled = !hasConversation || blocked;
     el.emojiButton.disabled = !hasConversation || blocked;
+    el.videoMessageButton.disabled = !hasConversation || blocked;
     el.voiceMessageButton.disabled = !hasConversation || blocked;
+    syncComposerActionButtons();
     syncRttToolbarState();
     if (!hasConversation || blocked) {
       closeAttachmentMenu();
@@ -8593,7 +9997,7 @@
   }
 
   function shouldShowMessageAvatar(message) {
-    return activeConversation()?.kind === "group" || message?.draft === true;
+    return Boolean(message);
   }
 
   function messageMetaText(message) {
@@ -8670,6 +10074,92 @@
   function closePhotoViewerOnEscape(event) {
     if (event.key === "Escape" && !el.photoViewerDialog.hidden) {
       closePhotoViewer();
+    }
+  }
+
+  function openVideoPreviewDialog() {
+    if (!state.videoRecorder.objectUrl) {
+      return;
+    }
+
+    el.videoPreviewDialogVideo.src = state.videoRecorder.objectUrl;
+    el.videoPreviewDialog.hidden = false;
+    document.body.classList.add("modal-open");
+    el.closeVideoPreviewDialogButton.focus();
+    updatePreviewPlaybackButton("video");
+  }
+
+  function openVideoRecorderDialog(options = {}) {
+    const reset = options.reset !== false;
+    closeAttachmentMenu();
+    closeSmileyPicker();
+    if (reset && !state.videoRecorder.blob && state.videoRecorder.recorder?.state !== "recording") {
+      clearRecordedVoiceMessage();
+      clearRecordedVideoMessage();
+    }
+    el.videoPreviewDialogVideo.pause();
+    el.videoPreviewDialogVideo.srcObject = null;
+    if (!state.videoRecorder.objectUrl) {
+      el.videoPreviewDialogVideo.removeAttribute("src");
+      el.videoPreviewDialogVideo.load();
+    }
+    el.videoPreviewDialogVideo.muted = true;
+    el.videoPreviewDialogVideo.controls = false;
+    el.videoPreviewDialog.hidden = false;
+    document.body.classList.add("modal-open");
+    updateVideoDialogActionButtons(state.videoRecorder.blob ? "preview" : "setup");
+    el.startVideoRecordingButton.focus();
+  }
+
+  async function toggleDialogVideoRecording() {
+    if (state.videoRecorder.recorder?.state === "recording") {
+      stopVideoRecording();
+      return;
+    }
+
+    await startVideoRecording();
+  }
+
+  function updateVideoDialogActionButtons(mode) {
+    const recording = mode === "recording";
+    const preview = mode === "preview";
+    el.startVideoRecordingButton.hidden = preview;
+    el.startVideoRecordingButton.disabled = false;
+    el.startVideoRecordingButton.textContent = recording
+      ? t("video.stop_recording", "Stop recording")
+      : t("video.start_recording", "Start recording");
+    el.dialogCancelVideoMessageButton.hidden = false;
+    el.dialogRerecordVideoMessageButton.hidden = !preview;
+    el.dialogSendVideoMessageButton.hidden = !preview;
+    el.dialogRerecordVideoMessageButton.disabled = !preview;
+    el.dialogSendVideoMessageButton.disabled = !preview;
+  }
+
+  function closeVideoPreviewDialog() {
+    if (!el.videoPreviewDialog || el.videoPreviewDialog.hidden) {
+      return;
+    }
+
+    if (state.videoRecorder.recorder?.state === "recording") {
+      cancelVideoMessage();
+      return;
+    }
+
+    el.videoPreviewDialogVideo.pause();
+    el.videoPreviewDialog.hidden = true;
+    document.body.classList.remove("modal-open");
+    updatePreviewPlaybackButton("video");
+  }
+
+  function closeVideoPreviewDialogOnBackdrop(event) {
+    if (event.target === el.videoPreviewDialog) {
+      closeVideoPreviewDialog();
+    }
+  }
+
+  function closeVideoPreviewDialogOnEscape(event) {
+    if (event.key === "Escape" && !el.videoPreviewDialog.hidden) {
+      closeVideoPreviewDialog();
     }
   }
 
@@ -8979,6 +10469,23 @@
         event.preventDefault();
         openPhotoViewer(attachment);
       });
+    } else if (kind === "audio") {
+      const player = document.createElement("audio");
+      player.className = "attachment-audio-player";
+      player.controls = true;
+      player.preload = "metadata";
+      player.src = attachment.url;
+      player.addEventListener("click", (event) => event.stopPropagation());
+      wrapper.append(icon, text, player);
+    } else if (kind === "video") {
+      const player = document.createElement("video");
+      player.className = "attachment-video-player";
+      player.controls = true;
+      player.preload = "metadata";
+      player.playsInline = true;
+      player.src = attachment.url;
+      player.addEventListener("click", (event) => event.stopPropagation());
+      wrapper.append(icon, text, player);
     } else {
       wrapper.append(icon, text);
     }
@@ -9197,6 +10704,26 @@
     }
 
     if (
+      type.startsWith("video/") ||
+      (name.startsWith("video-message-") && ["webm", "mp4", "m4v", "mov", "ogv"].includes(extension))
+    ) {
+      return "video";
+    }
+
+    if (
+      type.startsWith("audio/") ||
+      (!type.startsWith("video/") && ["webm", "ogg", "oga", "opus", "mp3", "wav", "m4a", "aac", "flac"].includes(extension))
+    ) {
+      return "audio";
+    }
+
+    if (
+      ["mp4", "m4v", "mov", "ogv", "avi", "mkv"].includes(extension)
+    ) {
+      return "video";
+    }
+
+    if (
       type.startsWith("text/") ||
       type.includes("pdf") ||
       type.includes("word") ||
@@ -9221,12 +10748,30 @@
   }
 
   function attachmentKindLabel(kind) {
-    return kind === "photo" ? "PHOTO" : kind === "document" ? "DOC" : kind === "binary" ? "BIN" : "FILE";
+    return kind === "photo"
+      ? "PHOTO"
+      : kind === "audio"
+        ? "AUDIO"
+        : kind === "video"
+          ? "VIDEO"
+          : kind === "document"
+            ? "DOC"
+            : kind === "binary"
+              ? "BIN"
+              : "FILE";
   }
 
   function attachmentKindText(kind) {
     if (kind === "photo") {
       return t("upload.photo", "Photo");
+    }
+
+    if (kind === "audio") {
+      return t("upload.voice_message", "Voice message");
+    }
+
+    if (kind === "video") {
+      return t("upload.video_message", "Video message");
     }
 
     if (kind === "document") {
@@ -9276,25 +10821,91 @@
     }
   }
 
-  async function uploadOneFile(file) {
+  async function uploadOneFile(file, options = {}) {
     appendDebug("upload", `${file.name} (${file.size} bytes)`);
     try {
-      const data = new FormData();
-      data.append("file", file);
-      const response = await fetch(uploadApiPath, {
-        method: "POST",
-        body: data
-      });
-      const payload = await response.json();
-      if (!response.ok || !payload.ok || !payload.file) {
-        throw new Error(payload.error || `upload returned ${response.status}`);
-      }
-
+      const payload = file.size > uploadChunkSize
+        ? await uploadFileInChunks(file)
+        : await uploadFileDirect(file);
       sendFileMessage(payload.file);
     } catch (error) {
       appendDebug("upload-error", error.message);
       addMessage("self", `${t("upload.failed", "Upload failed")}: ${file.name}`, "error");
+      if (options.throwOnError) {
+        throw error;
+      }
     }
+  }
+
+  async function uploadFileDirect(file) {
+    const data = new FormData();
+    data.append("file", file);
+    const response = await fetch(uploadApiPath, {
+      method: "POST",
+      body: data
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || !payload.ok || !payload.file) {
+      throw new Error(uploadErrorText(payload, response.status));
+    }
+
+    return payload;
+  }
+
+  async function uploadFileInChunks(file) {
+    const uploadId = createUploadId();
+    const totalChunks = Math.ceil(file.size / uploadChunkSize);
+    for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+      const start = chunkIndex * uploadChunkSize;
+      const chunk = file.slice(start, Math.min(start + uploadChunkSize, file.size), file.type || "application/octet-stream");
+      const data = new FormData();
+      data.append("file", chunk, `${file.name}.part${chunkIndex}`);
+      data.append("uploadId", uploadId);
+      data.append("chunkIndex", String(chunkIndex));
+      data.append("totalChunks", String(totalChunks));
+      data.append("originalName", file.name);
+      data.append("mimeType", file.type || "");
+      data.append("totalSize", String(file.size));
+      const response = await fetch(uploadApiPath, {
+        method: "POST",
+        body: data
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.ok) {
+        throw new Error(uploadErrorText(payload, response.status));
+      }
+
+      const sent = chunkIndex + 1;
+      setConnectionStatus(`${t("upload.uploading", "Uploading...")} ${sent}/${totalChunks}`, "warn");
+      if (payload.file) {
+        return payload;
+      }
+    }
+
+    throw new Error("chunked upload did not return a file");
+  }
+
+  function createUploadId() {
+    if (window.crypto?.randomUUID) {
+      return window.crypto.randomUUID();
+    }
+
+    return `${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
+  }
+
+  function uploadErrorText(payload, status) {
+    const error = String(payload?.error || "");
+    const maxBytes = Number(payload?.maxBytes || 0);
+    const limitText = maxBytes > 0 ? ` (${formatBytes(maxBytes)})` : "";
+    if (["file_too_large", "post_too_large", "file_exceeds_server_limit", "file_exceeds_form_limit"].includes(error)) {
+      return `${t("upload.too_large", "File is too large")}${limitText}`;
+    }
+
+    if (error === "upload_partial") {
+      return t("upload.partial", "Upload was interrupted");
+    }
+
+    return error || `upload returned ${status}`;
   }
 
   function handleDragEnter(event) {
@@ -9349,8 +10960,13 @@
       return;
     }
 
-    const text = `${t("upload.shared_file", "Shared file")}: ${file.name}`;
-    const messageId = createMessageId("file");
+    const kind = classifyAttachment(file);
+    const text = kind === "audio"
+      ? t("upload.voice_message", "Voice message")
+      : kind === "video"
+        ? t("upload.video_message", "Video message")
+        : `${t("upload.shared_file", "Shared file")}: ${file.name}`;
+    const messageId = createMessageId(kind === "audio" ? "voice" : kind === "video" ? "video" : "file");
     const attachment = {
       id: file.id || "",
       name: file.name,
@@ -9358,7 +10974,7 @@
       downloadUrl: file.downloadUrl || file.url,
       size: file.size,
       type: file.type,
-      kind: classifyAttachment(file),
+      kind,
       storage: file.storage || ""
     };
 
@@ -9740,7 +11356,11 @@
 
   function isLocalAccountDomain(domain) {
     const normalized = String(domain ?? "").trim().toLowerCase();
-    return normalized === "localhost" || normalized === "127.0.0.1" || normalized === "::1";
+    return normalized === "localhost"
+      || normalized === "127.0.0.1"
+      || normalized === "::1"
+      || normalized === "dev.teletyptel.nl"
+      || normalized === "teletyptel";
   }
 
   function isLocalXmppWebSocketUrl(url) {
@@ -9749,6 +11369,43 @@
       return isLocalAccountDomain(parsed.hostname);
     } catch {
       return false;
+    }
+  }
+
+  function normalizeLocalWebSocketUrlForCurrentHost(url, fallbackPort = 8787) {
+    const pageHost = location.hostname || "127.0.0.1";
+    const protocol = location.protocol === "https:" ? "wss:" : "ws:";
+    const fallback = location.protocol === "https:"
+      ? `${protocol}//${pageHost}/rtt-relay`
+      : `${protocol}//${pageHost}:${fallbackPort}`;
+    const value = String(url ?? "").trim();
+    if (!value) {
+      return fallback;
+    }
+
+    try {
+      const parsed = new URL(value);
+      if (isLocalAccountDomain(parsed.hostname) && location.protocol !== "file:") {
+        const useHttpsRelayProxy = location.protocol === "https:"
+          && (parsed.port === String(fallbackPort)
+            || parsed.protocol === "ws:"
+            || parsed.pathname === "/"
+            || parsed.pathname === "/rtt-relay");
+        parsed.hostname = pageHost;
+        if (location.protocol === "https:") {
+          parsed.protocol = "wss:";
+          if (useHttpsRelayProxy) {
+            parsed.port = "";
+            parsed.pathname = "/rtt-relay";
+            parsed.search = "";
+            parsed.hash = "";
+          }
+        }
+      }
+
+      return parsed.toString();
+    } catch {
+      return fallback;
     }
   }
 

@@ -1,14 +1,15 @@
 <?php
 declare(strict_types=1);
 
-const HOST = '127.0.0.1';
+const DEFAULT_HOST = '0.0.0.0';
 const DEFAULT_PORT = 8787;
 const MAX_PAYLOAD_BYTES = 1048576;
 
+$host = relayHost();
 $port = relayPort();
 
 $server = stream_socket_server(
-    'tcp://' . HOST . ':' . $port,
+    'tcp://' . $host . ':' . $port,
     $errno,
     $errstr,
     STREAM_SERVER_BIND | STREAM_SERVER_LISTEN
@@ -27,7 +28,10 @@ $buffers = [];
 $clientProtocols = [];
 $clientPeers = [];
 
-echo "Tiedragon RTT/RFC7395 WebSocket relay listening on ws://" . HOST . ':' . $port . "\n";
+echo "Tiedragon RTT/RFC7395 WebSocket relay listening on ws://" . $host . ':' . $port . "\n";
+if ($host === '0.0.0.0') {
+    echo "LAN clients can connect with ws://<this-computer-ip>:" . $port . "\n";
+}
 echo "Open php/public/index.html in a browser and connect to this server.\n";
 
 while (true) {
@@ -146,6 +150,16 @@ function relayPort(): int
     ]);
 
     return is_int($port) ? $port : DEFAULT_PORT;
+}
+
+function relayHost(): string
+{
+    $configured = getenv('RTT_RELAY_HOST');
+    if ($configured === false || trim($configured) === '') {
+        return DEFAULT_HOST;
+    }
+
+    return trim($configured);
 }
 
 function performHandshake($socket, string $request, string &$protocol): bool

@@ -17,6 +17,10 @@ Use Prosody and Openfire as useful interoperability targets, but start serious
 provider smoke work with ejabberd when SIP, STUN/TURN discovery, WebSocket/BOSH,
 MUC, MAM, upload and database integration need to be tested together.
 
+Do not confuse ejabberd with Djabberd. Djabberd can be treated as an extra
+legacy/lab interoperability target only when someone explicitly needs it; it is
+not the current provider baseline for Teletyptel release validation.
+
 Important: ejabberd SIP support still requires explicit listener, module, DNS,
 TLS and firewall configuration. Treat SIP as a gateway layer for telephony and
 relay integration, not as browser UI logic.

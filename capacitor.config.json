@@ -4,7 +4,8 @@
   "webDir": "php/public",
   "bundledWebRuntime": false,
   "server": {
-    "iosScheme": "teletyptel"
+    "hostname": "localhost",
+    "iosScheme": "capacitor"
   },
   "ios": {
     "contentInset": "always"

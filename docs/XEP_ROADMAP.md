@@ -76,9 +76,9 @@ layer on top of that core.
 | --- | --- | --- | --- |
 | XEP-0047 | In-Band Bytestreams | Base64 byte chunks over IQ/message stanzas. | Core open/data/close helpers and two-account IBB byte-transfer smoke path done |
 | XEP-0065 | SOCKS5 Bytestreams | Direct/proxied binary streams, used by file transfer. | Core IQ helpers, S5B hash calculation, local SOCKS5 handshake/data smoke and real-server hosted proxy discovery/activation byte-transfer smoke path done |
-| XEP-0166 | Jingle | Session signaling. | Done for session signaling helpers and web demo bridge |
-| XEP-0167 | Jingle RTP Sessions | Audio/video RTP session descriptions. | Done for RTP payload/session-info helpers and web call demo |
-| XEP-0176 | Jingle ICE-UDP Transport | ICE candidates for NAT traversal. | Done for candidate helper, transport-info and web relay demo |
+| XEP-0166 | Jingle | Session signaling. | Wire helpers and parser done; live server-routed browser/mobile call smoke remains |
+| XEP-0167 | Jingle RTP Sessions | Audio/video RTP session descriptions. | RTP payload/session-info helpers done; iPhone/browser media smoke and installed-client interop remain |
+| XEP-0176 | Jingle ICE-UDP Transport | ICE candidates for NAT traversal. | Candidate helper and transport-info done; production STUN/TURN use in browser calls remains |
 | XEP-0177 | Jingle Raw UDP Transport | Simple UDP transport. | Future |
 | XEP-0215 | External Service Discovery | Discover STUN/TURN services and short-lived credentials. | Core, local server and RealServerSmoke path done; production relay run is release validation |
 | XEP-0234 | Jingle File Transfer | File metadata and transfer negotiation. | Core metadata, hash, range, received and checksum helpers done; Total Conversation profile treats this as the session-bound file path |
@@ -86,9 +86,9 @@ layer on top of that core.
 | XEP-0261 | Jingle In-Band Bytestreams | Slow fallback transport when S5B cannot connect. | Core Jingle transport helpers done; XEP-0047 fallback transfer smoke path done |
 | XEP-0266 | Codecs for Jingle Audio | Audio codec guidance for Jingle RTP. | Covered by WebRTC/browser negotiation for the client; SIP/NG112 PCMA/PCMU interop belongs to a future gateway layer |
 | XEP-0299 | Codecs for Jingle Video | Historical video codec guidance for Jingle RTP. | Deferred upstream; Teletyptel treats this as background because modern browser calls negotiate video through WebRTC |
-| XEP-0320 | DTLS-SRTP in Jingle | WebRTC-style media security fingerprints. | Fingerprint model started; browser DTLS is WebRTC-managed |
-| XEP-0343 | Signaling WebRTC DataChannels in Jingle | WebRTC data channels through Jingle. | Future |
-| XEP-0353 | Jingle Message Initiation | Message-based call proposal, ringing, proceed/reject and finish flow. | Done for protocol helpers; installed-client call setup interop remains release validation |
+| XEP-0320 | DTLS-SRTP in Jingle | WebRTC-style media security fingerprints. | Fingerprint model started; browser DTLS is WebRTC-managed; live interop remains |
+| XEP-0343 | Signaling WebRTC DataChannels in Jingle | WebRTC data channels through Jingle. | Future/review; current RTT datachannel is project ProtoXEP signaling, not a formal XEP-0343 claim |
+| XEP-0353 | Jingle Message Initiation | Message-based call proposal, ringing, proceed/reject and finish flow. | Protocol helpers done; installed-client and mobile call setup interop remain release validation |
 
 Project-specific call additions:
 

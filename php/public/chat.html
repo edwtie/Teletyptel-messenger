@@ -14,7 +14,7 @@
     }
   </script>
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="chat-client.css?v=20260606-security-totp">
+  <link rel="stylesheet" href="chat-client.css?v=20260611-video-recorder-popup-fix">
 </head>
 <body>
   <a class="skip-link" href="#messageInput" data-i18n="button.skip_to_message">Skip to message</a>
@@ -29,7 +29,10 @@
       </div>
       <div class="top-actions" role="toolbar" aria-label="Connection actions">
         <button id="newsButton" type="button" data-i18n="tab.news" hidden>News</button>
-        <button id="supportButton" type="button" hidden>Support</button>
+        <button id="supportButton" class="icon-button top-icon-button" type="button" hidden title="Support" aria-label="Support">
+          <span class="material-icon" data-icon="supportTech" aria-hidden="true"></span>
+          <span class="sr-only">Support</span>
+        </button>
         <details id="viewMenu" class="top-menu">
           <summary class="top-icon-button" title="View" aria-label="View" data-i18n-title="menu.view" data-i18n-aria-label="menu.view">
             <span class="contrast-symbol" aria-hidden="true"><span></span></span>
@@ -178,6 +181,28 @@
               <span class="material-icon" data-icon="rtt" aria-hidden="true"></span>
               <span class="sr-only" data-i18n="button.hide_tc_text">Hide real-time text</span>
             </button>
+            <div class="call-device-controls" aria-label="Media devices">
+              <label class="call-device-select ios-hidden-call-device" title="Camera" data-i18n-title="media.camera">
+                <span class="material-icon call-device-symbol" data-icon="videocam" aria-hidden="true"></span>
+                <span class="sr-only" data-i18n="media.camera">Camera</span>
+                <select id="callCameraInput"></select>
+              </label>
+              <div class="call-device-select ios-facing-control">
+                <button id="callVideoFacingToggle" class="icon-button call-facing-toggle" type="button" title="Switch camera" aria-label="Switch camera" data-i18n-title="button.switch_camera" data-i18n-aria-label="button.switch_camera">
+                  <span class="material-icon call-device-symbol" data-icon="restartAlt" aria-hidden="true"></span>
+                  <span class="sr-only" data-i18n="button.switch_camera">Switch camera</span>
+                </button>
+                <select id="callVideoFacingInput">
+                  <option value="user" data-i18n="camera.front">Front camera</option>
+                  <option value="environment" data-i18n="camera.back">Back camera</option>
+                </select>
+              </div>
+              <label class="call-device-select ios-hidden-call-device" title="Microphone" data-i18n-title="media.microphone">
+                <span class="material-icon call-device-symbol" data-icon="mic" aria-hidden="true"></span>
+                <span class="sr-only" data-i18n="media.microphone">Microphone</span>
+                <select id="callMicrophoneInput"></select>
+              </label>
+            </div>
             <label class="volume-control">
               <span data-i18n="label.remote_volume">Volume</span>
               <input id="remoteVolumeInput" type="range" min="0" max="100" value="100">
@@ -187,11 +212,14 @@
           <div id="totalConversationTextPanel" class="tc-text-panel" hidden aria-live="polite">
             <div class="tc-text-line tc-text-remote">
               <span id="totalConversationRemoteName" data-i18n="tc.remote_label">Other person</span>
-              <p id="totalConversationRemoteText"></p>
+              <div class="tc-text-lines">
+                <p id="totalConversationRemotePreviousText"></p>
+                <p id="totalConversationRemoteText"></p>
+              </div>
             </div>
             <div class="tc-text-line tc-text-local">
               <span data-i18n="tc.local_label">You</span>
-              <div class="tc-local-lines">
+              <div class="tc-text-lines tc-local-lines">
                 <p id="totalConversationLocalPreviousText"></p>
                 <p id="totalConversationLocalText"></p>
               </div>
@@ -221,7 +249,7 @@
         </div>
 
         <form id="composerForm" class="composer">
-          <div class="composer-input-row">
+          <div id="composerInputRow" class="composer-input-row">
             <div class="attachment-menu">
               <button id="attachmentMenuButton" class="icon-button composer-round-button" type="button" aria-haspopup="true" aria-expanded="false" title="Add attachment" aria-label="Add attachment" data-i18n-title="attachment.add" data-i18n-aria-label="attachment.add">
                 <span class="material-icon" data-icon="add" aria-hidden="true"></span>
@@ -255,14 +283,73 @@
             </div>
             <label class="sr-only" for="messageInput" data-i18n="label.message">Message</label>
             <textarea id="messageInput" rows="1" spellcheck="true" placeholder="Type a message" data-i18n-placeholder="placeholder.message"></textarea>
+            <button id="videoMessageButton" class="icon-button composer-round-button" type="button" title="Record new video" aria-label="Record new video" data-i18n-title="attachment.video_message" data-i18n-aria-label="attachment.video_message">
+              <span class="material-icon" data-icon="videocam" aria-hidden="true"></span>
+              <span class="sr-only" data-i18n="attachment.video_message">Record new video</span>
+            </button>
             <button id="voiceMessageButton" class="icon-button composer-round-button" type="button" title="Voice message" aria-label="Voice message" data-i18n-title="attachment.voice_message" data-i18n-aria-label="attachment.voice_message">
               <span class="material-icon" data-icon="mic" aria-hidden="true"></span>
               <span class="sr-only" data-i18n="attachment.voice_message">Voice message</span>
             </button>
-            <button id="sendButton" class="icon-button composer-send-button" type="submit" title="Send" aria-label="Send" data-i18n-title="button.send" data-i18n-aria-label="button.send">
+            <button id="sendButton" class="icon-button composer-send-button" type="submit" title="Send" aria-label="Send" data-i18n-title="button.send" data-i18n-aria-label="button.send" hidden>
               <span class="material-icon" data-icon="send" aria-hidden="true"></span>
               <span class="sr-only" data-i18n="button.send">Send</span>
             </button>
+          </div>
+          <div id="voicePreviewPanel" class="voice-preview-panel" hidden>
+            <div class="voice-preview-meta">
+              <span class="material-icon" data-icon="mic" aria-hidden="true"></span>
+              <span id="voicePreviewStatus" data-i18n="voice.ready">Voice message ready</span>
+              <svg id="voiceRecordingWave" class="voice-recording-wave" viewBox="0 0 180 32" aria-hidden="true" focusable="false">
+                <g id="voiceRecordingWaveLine"></g>
+              </svg>
+            </div>
+            <audio id="voicePreviewAudio" controls preload="metadata"></audio>
+            <div class="voice-preview-actions">
+              <button id="cancelVoiceMessageButton" class="icon-button voice-action-button voice-action-cancel" type="button" title="Cancel" aria-label="Cancel" data-i18n-title="button.cancel" data-i18n-aria-label="button.cancel">
+                <span class="material-icon" data-icon="delete" aria-hidden="true"></span>
+                <span class="sr-only" data-i18n="button.cancel">Cancel</span>
+              </button>
+              <button id="playVoiceMessageButton" class="icon-button voice-action-button voice-action-play" type="button" title="Play" aria-label="Play" data-i18n-title="media.play" data-i18n-aria-label="media.play" hidden>
+                <span class="material-icon" data-icon="playArrow" aria-hidden="true"></span>
+                <span class="sr-only" data-i18n="media.play">Play</span>
+              </button>
+              <button id="rerecordVoiceMessageButton" class="icon-button voice-action-button voice-action-repeat" type="button" title="Record again" aria-label="Record again" data-i18n-title="voice.rerecord" data-i18n-aria-label="voice.rerecord" hidden>
+                <span class="material-icon" data-icon="restartAlt" aria-hidden="true"></span>
+                <span class="sr-only" data-i18n="voice.rerecord">Record again</span>
+              </button>
+              <button id="sendVoiceMessageButton" class="icon-button voice-action-button voice-action-primary" type="button" title="Send voice message" aria-label="Send voice message" data-i18n-title="voice.send" data-i18n-aria-label="voice.send">
+                <span class="material-icon" data-icon="send" aria-hidden="true"></span>
+                <span class="sr-only" data-i18n="voice.send">Send voice message</span>
+              </button>
+            </div>
+          </div>
+          <div id="videoPreviewPanel" class="video-preview-panel" hidden>
+            <button id="openVideoPreviewDialogButton" class="video-preview-summary" type="button" data-i18n-title="video.open_preview" title="Open video preview" hidden>
+              <span class="material-icon" data-icon="videocam" aria-hidden="true"></span>
+              <span id="videoPreviewStatus" data-i18n="video.ready">Video message ready</span>
+            </button>
+            <div class="video-preview-stage">
+              <video id="videoPreviewVideo" muted playsinline autoplay></video>
+            </div>
+            <div class="voice-preview-actions video-preview-actions">
+              <button id="cancelVideoMessageButton" class="icon-button voice-action-button voice-action-cancel" type="button" title="Cancel" aria-label="Cancel" data-i18n-title="button.cancel" data-i18n-aria-label="button.cancel">
+                <span class="material-icon" data-icon="delete" aria-hidden="true"></span>
+                <span class="sr-only" data-i18n="button.cancel">Cancel</span>
+              </button>
+              <button id="playVideoMessageButton" class="icon-button voice-action-button voice-action-play" type="button" title="Play" aria-label="Play" data-i18n-title="media.play" data-i18n-aria-label="media.play" hidden>
+                <span class="material-icon" data-icon="playArrow" aria-hidden="true"></span>
+                <span class="sr-only" data-i18n="media.play">Play</span>
+              </button>
+              <button id="rerecordVideoMessageButton" class="icon-button voice-action-button voice-action-repeat" type="button" title="Record again" aria-label="Record again" data-i18n-title="video.rerecord" data-i18n-aria-label="video.rerecord" hidden>
+                <span class="material-icon" data-icon="restartAlt" aria-hidden="true"></span>
+                <span class="sr-only" data-i18n="video.rerecord">Record again</span>
+              </button>
+              <button id="sendVideoMessageButton" class="icon-button voice-action-button voice-action-primary" type="button" title="Send video message" aria-label="Send video message" data-i18n-title="video.send" data-i18n-aria-label="video.send">
+                <span class="material-icon" data-icon="stop" aria-hidden="true"></span>
+                <span class="sr-only" data-i18n="video.send">Send video message</span>
+              </button>
+            </div>
           </div>
           <div class="send-row">
             <span id="composerState" data-i18n="composer.relay_state">Enter sends, Shift+Enter inserts a line</span>
@@ -344,11 +431,11 @@
 
         <section class="settings-section">
           <h2 data-i18n="section.media">Media</h2>
-          <label>
+          <label class="ios-hidden-device-setting">
             <span data-i18n="label.camera">Camera</span>
             <select id="cameraInput"></select>
           </label>
-          <label>
+          <label class="ios-hidden-device-setting">
             <span data-i18n="label.microphone">Microphone</span>
             <select id="microphoneInput"></select>
           </label>
@@ -360,6 +447,13 @@
               <option value="vga">640 x 480</option>
               <option value="hd">1280 x 720</option>
               <option value="fullhd">1920 x 1080</option>
+            </select>
+          </label>
+          <label class="ios-facing-control">
+            <span data-i18n="label.video_message_camera">Video message camera</span>
+            <select id="videoMessageFacingInput">
+              <option value="user" data-i18n="camera.front">Front camera</option>
+              <option value="environment" data-i18n="camera.back">Back camera</option>
             </select>
           </label>
           <div id="mediaStatus" class="media-status" role="status" aria-live="polite" data-i18n="media.not_loaded">Media devices not loaded yet.</div>
@@ -525,11 +619,11 @@
         <section class="modal-section account-settings-section account-media-section">
           <h3 data-i18n="section.media">Media</h3>
           <div class="account-dialog-grid">
-            <label>
+            <label class="ios-hidden-device-setting">
               <span data-i18n="label.camera">Camera</span>
               <select id="dialogCameraInput"></select>
             </label>
-            <label>
+            <label class="ios-hidden-device-setting">
               <span data-i18n="label.microphone">Microphone</span>
               <select id="dialogMicrophoneInput"></select>
             </label>
@@ -540,6 +634,13 @@
                 <option value="qvga">320 x 240</option>
                 <option value="vga">640 x 480</option>
                 <option value="hd">1280 x 720</option>
+              </select>
+            </label>
+            <label class="ios-facing-control">
+              <span data-i18n="label.video_message_camera">Video message camera</span>
+              <select id="dialogVideoMessageFacingInput">
+                <option value="user" data-i18n="camera.front">Front camera</option>
+                <option value="environment" data-i18n="camera.back">Back camera</option>
               </select>
             </label>
           </div>
@@ -712,6 +813,22 @@
     </div>
   </div>
 
+  <div id="videoPreviewDialog" class="video-preview-dialog-shell" hidden role="dialog" aria-modal="true" aria-labelledby="videoPreviewDialogTitle">
+    <div class="video-preview-dialog-card">
+      <div class="video-preview-dialog-header">
+        <strong id="videoPreviewDialogTitle" data-i18n="video.preview_title">Video preview</strong>
+        <button id="closeVideoPreviewDialogButton" class="icon-button" type="button" aria-label="Close" data-i18n-aria-label="button.close">x</button>
+      </div>
+      <video id="videoPreviewDialogVideo" controls playsinline></video>
+      <div class="video-preview-dialog-actions">
+        <button id="startVideoRecordingButton" class="voice-action-button voice-action-primary" type="button" data-i18n="video.start_recording">Start recording</button>
+        <button id="dialogCancelVideoMessageButton" class="voice-action-button voice-action-cancel" type="button" data-i18n="button.cancel">Cancel</button>
+        <button id="dialogRerecordVideoMessageButton" class="voice-action-button voice-action-repeat" type="button" data-i18n="video.rerecord" hidden>Record again</button>
+        <button id="dialogSendVideoMessageButton" class="voice-action-button voice-action-primary" type="button" data-i18n="video.send" hidden>Send video message</button>
+      </div>
+    </div>
+  </div>
+
   <div id="mapViewerDialog" class="map-viewer-shell" hidden role="dialog" aria-modal="true" aria-labelledby="mapViewerTitle">
     <div class="map-viewer-card">
       <div class="map-viewer-header">
@@ -789,6 +906,6 @@
   </div>
 
   <script src="vendor/qrcode.js?v=20260608-contact-profile"></script>
-  <script src="chat-client.js?v=20260608-contact-profile"></script>
+  <script src="chat-client.js?v=20260611-video-recorder-popup-fix"></script>
 </body>
 </html>

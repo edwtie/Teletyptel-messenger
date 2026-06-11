@@ -150,6 +150,10 @@ item is implemented, tested and documented.
   browser profiles: video call connected, `rtt` datachannel opened,
   `jingle-rtt-out`/`jingle-rtt-in` logged, live draft displayed and final
   `jingle-rtt` message delivered.
+- [ ] iPhone Safari media smoke: HTTPS trust, camera preview, microphone,
+  WebSocket/WSS relay route, local video rendering and failed-call diagnostics.
+- [ ] Standards-based browser call smoke through real XMPP routing instead of
+  the local PHP relay bridge.
 - [ ] Roster/contact model backed by XMPP instead of local demo state.
 - [ ] Replace demo relay semantics with standards-based XMPP production routing.
 - [ ] Mobile WebView packaging smoke test for Android and iOS.
@@ -176,6 +180,8 @@ item is implemented, tested and documented.
 - [x] XEP-0363 file upload discovery, slot, PUT and attachment smoke passed.
 - [ ] Web client RTT, presence and normal chat passed with the two real accounts.
 - [ ] Browser audio/video call passed between the two real accounts.
+- [ ] Browser audio/video call passed on iPhone Safari/WebView with the two real
+  accounts, including camera permission, local preview and reconnect behavior.
 - [ ] Existing Jingle-capable client interop smoke completed or explicitly
   recorded as unavailable for this release.
 - [x] Server domain, test date, feature list and smoke output recorded in the
@@ -400,6 +406,14 @@ item is implemented, tested and documented.
 - [x] Device picker and local media preview settings.
 - [x] Per-call device switching after a call has already started.
 - [x] Interoperability smoke with existing Jingle client wire shapes.
+- [ ] Live standards-based Jingle call routed through XMPP IQ/message stanzas
+  on ejabberd/Prosody/Openfire, not only through the local PHP relay bridge.
+- [ ] XEP-0215 STUN/TURN credentials consumed by the browser call path.
+- [ ] XEP-0343 DataChannels reviewed for the RTT datachannel negotiation path;
+  current Total Conversation RTT datachannel remains a project ProtoXEP bridge.
+- [ ] XEP-0353 live call setup interop with an installed Jingle client.
+- [ ] iPhone Safari/WebView call smoke completed without black local video,
+  dropped WSS connection or generic "call failed" status.
 
 ## XEP-0184 - Message Delivery Receipts
 

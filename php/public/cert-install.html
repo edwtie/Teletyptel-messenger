@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TeleTypTel ontwikkelcertificaat</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f6f7f9;
+      color: #172033;
+      line-height: 1.5;
+    }
+
+    main {
+      box-sizing: border-box;
+      width: min(720px, 100%);
+      margin: 0 auto;
+      padding: 32px 20px;
+    }
+
+    h1 {
+      margin: 0 0 12px;
+      font-size: 1.7rem;
+      line-height: 1.15;
+    }
+
+    p {
+      margin: 0 0 16px;
+    }
+
+    ol {
+      margin: 0 0 20px;
+      padding-left: 24px;
+    }
+
+    li {
+      margin-bottom: 8px;
+    }
+
+    .download-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 20px 0;
+    }
+
+    a.button {
+      display: inline-flex;
+      align-items: center;
+      min-height: 44px;
+      padding: 0 16px;
+      border-radius: 6px;
+      background: #145c9e;
+      color: #fff;
+      font-weight: 650;
+      text-decoration: none;
+    }
+
+    .note {
+      padding: 14px 16px;
+      border-left: 4px solid #b87500;
+      background: #fff8e6;
+    }
+
+    code {
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      font-size: .95em;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>TeleTypTel ontwikkelcertificaat</h1>
+    <p>Installeer dit certificaat alleen op apparaten die deze lokale ontwikkelserver vertrouwen.</p>
+
+    <div class="download-row">
+      <a class="button" href="teletyptel.crt" download>Download PEM certificaat</a>
+    </div>
+
+    <ol>
+      <li>Open deze pagina op de iPhone via <code>http://dev.teletyptel.nl/cert-install.html</code>.</li>
+      <li>Tik op <strong>Download iPhone certificaat</strong> en sta het profiel toe.</li>
+      <li>Ga naar <strong>Instellingen</strong> en installeer het gedownloade profiel.</li>
+      <li>Ga naar <strong>Instellingen &gt; Algemeen &gt; Info &gt; Certificaatvertrouwensinstellingen</strong>.</li>
+      <li>Zet volledige vertrouwensinstelling aan voor <strong>dev.teletyptel.nl</strong>.</li>
+      <li>Herstart Safari en open <code>https://dev.teletyptel.nl</code>.</li>
+    </ol>
+
+    <p class="note">Dit is een lokaal self-signed ontwikkelcertificaat. Voor productie of externe tests is een publiek vertrouwd certificaat, bijvoorbeeld via Let's Encrypt, de betere route.</p>
+  </main>
+</body>
+</html>

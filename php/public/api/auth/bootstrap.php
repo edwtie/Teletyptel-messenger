@@ -454,7 +454,24 @@ function ttAuthHttp(string $method, string $url, ?array $fields = null, array $h
 
 function ttAuthRedirectUri(string $provider, array $config): string
 {
-    return ($config['redirect_uri'] ?? '') !== '' ? (string)$config['redirect_uri'] : ttAuthOrigin() . '/api/auth/' . rawurlencode($provider) . '/callback';
+    $configured = trim((string)($config['redirect_uri'] ?? ''));
+    if ($configured === '') {
+        return ttAuthOrigin() . '/api/auth/' . rawurlencode($provider) . '/callback';
+    }
+
+    $configuredHost = parse_url($configured, PHP_URL_HOST);
+    $requestHost = ttAuthRequestHost();
+    if (
+        is_string($configuredHost)
+        && ttAuthIsLocalHost($configuredHost)
+        && $requestHost !== ''
+        && !ttAuthIsLocalHost($requestHost)
+    ) {
+        $path = parse_url($configured, PHP_URL_PATH);
+        return ttAuthOrigin() . ($path !== null && $path !== false ? $path : '/api/auth/' . rawurlencode($provider) . '/callback');
+    }
+
+    return $configured;
 }
 
 function ttAuthStorePendingState(string $provider, string $state, string $verifier, string $redirectUri): void
@@ -548,6 +565,24 @@ function ttAuthOrigin(): string
 {
     $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || ((int)($_SERVER['SERVER_PORT'] ?? 0) === 443);
     return ($https ? 'https' : 'http') . '://' . (string)($_SERVER['HTTP_HOST'] ?? 'localhost');
+}
+
+function ttAuthRequestHost(): string
+{
+    $host = (string)($_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? '');
+    if (str_contains($host, ':')) {
+        $host = explode(':', $host, 2)[0];
+    }
+
+    return strtolower(trim($host, "[] \t\n\r\0\x0B"));
+}
+
+function ttAuthIsLocalHost(string $host): bool
+{
+    $normalized = strtolower(trim($host, "[] \t\n\r\0\x0B"));
+    return $normalized === 'localhost'
+        || $normalized === '127.0.0.1'
+        || $normalized === '::1';
 }
 
 function ttAuthLoadConfig(): array

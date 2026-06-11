@@ -40,6 +40,12 @@ In Xcode:
 - location while in use, for explicit XEP-0080 location sharing;
 - photo library, for selecting or saving shared media.
 
+The Capacitor web view is configured as `capacitor://localhost`. Keep the
+`localhost` host for the bundled iOS client because WebKit treats camera,
+microphone and similar browser APIs as secure-context features. Do not replace
+the local iOS scheme with a product-specific scheme such as `teletyptel://`
+unless media capture is retested on a real iPhone.
+
 ## Server notes
 
 For real iOS tests, avoid `127.0.0.1` in app settings because that points to the

@@ -168,6 +168,15 @@
   arrive in the same stream read, matching real Prosody batching behavior.
 - Local web file upload endpoint and chat attachment cards for Alpha relay
   testing.
+- Web composer now supports recorded voice and video messages with preview,
+  play/pause, record-again, cancel and send controls. Video recording opens in a
+  popup first so sign-language messages can be checked before sending.
+- Local upload API now supports chunked uploads for larger audio/video message
+  files, with clearer PHP upload-limit errors.
+- Linux deployment assets now include a `teletyptel-rtt-relay.service` systemd
+  unit and Apache/Nginx WebSocket reverse-proxy guidance for `/rtt-relay`.
+- Development HTTPS certificate download page and public certificate files are
+  included for local iPhone/Safari trust testing.
 
 ### Changed
 
@@ -267,6 +276,15 @@
   stream has no usable video track.
 - Total Conversation now switches to the full realtime-text view when RTT is
   active and video is unavailable, ended, locally disabled or remotely muted.
+- iPhone/Safari Total Conversation layout now keeps the avatar, hangup/retry
+  controls, video, RTT overlay and composer usable across portrait, landscape
+  and keyboard-resize states.
+- iPhone camera handling now uses a compact front/back switch and hides desktop
+  camera/microphone device lists that Safari cannot reliably expose.
+- Video recording popup no longer fails before opening because the dialog title
+  element is now wired and guarded in JavaScript.
+- The web client now prefers the current HTTPS host's `/rtt-relay` WSS endpoint
+  for local TeleTypTel/dev accounts instead of stale localhost WebSocket URLs.
 
 ## 0.1.0-alpha1 - 2026-05-27
 

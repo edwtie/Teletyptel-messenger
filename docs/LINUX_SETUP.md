@@ -244,22 +244,93 @@ Start manually:
 php /var/www/teletyptel/rtt-websocket-server.php
 ```
 
-Or use systemd:
+For a Linux server, run it under systemd so it starts on boot and restarts after
+crashes. Install the included service file:
 
 ```bash
+sudo cp linux/etc/systemd/system/teletyptel-rtt-relay.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now teletyptel-rtt-relay.service
 sudo systemctl status teletyptel-rtt-relay.service
 ```
 
-The browser connects to:
+The service runs:
 
 ```text
-ws://127.0.0.1:8787
+RTT_RELAY_HOST=127.0.0.1
+RTT_RELAY_PORT=8787
+/usr/bin/php /var/www/teletyptel/rtt-websocket-server.php
+```
+
+This is the recommended production shape: the PHP WebSocket process only listens
+locally, and Apache or Nginx exposes it as HTTPS/WSS. Check that it is listening:
+
+```bash
+sudo ss -ltnp | grep 8787
+journalctl -u teletyptel-rtt-relay.service -f
 ```
 
 For a public server, place TLS and reverse proxy configuration in Apache or
 Nginx and proxy the WebSocket endpoint to `127.0.0.1:8787`.
+
+Apache example:
+
+```apache
+ProxyPass "/rtt-relay" "ws://127.0.0.1:8787"
+ProxyPassReverse "/rtt-relay" "ws://127.0.0.1:8787"
+```
+
+Required Apache modules:
+
+```bash
+sudo a2enmod proxy proxy_http proxy_wstunnel ssl
+sudo systemctl reload apache2
+```
+
+Nginx example:
+
+```nginx
+location /rtt-relay {
+    proxy_pass http://127.0.0.1:8787;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+    proxy_read_timeout 3600s;
+}
+```
+
+If you want direct LAN testing without Apache/Nginx, override the service host:
+
+```bash
+sudo systemctl edit teletyptel-rtt-relay.service
+```
+
+Add:
+
+```ini
+[Service]
+Environment=RTT_RELAY_HOST=0.0.0.0
+```
+
+Then reload:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl restart teletyptel-rtt-relay.service
+```
+
+The browser connects through the public reverse proxy:
+
+```text
+wss://example.org/rtt-relay
+```
+
+For local development without TLS, it can connect directly:
+
+```text
+ws://127.0.0.1:8787
+```
 
 ## .NET Smoke Tools
 
