@@ -64,7 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             foreach ($generated as $path) {
                 $messages[] = 'Startbestand gemaakt: ' . $path;
             }
-            $messages[] = 'Verwijder of blokkeer install.php op een publieke server zodra installatie klaar is.';
+            disableInstallerAfterSuccess($messages);
         } catch (Throwable $exception) {
             $errors[] = $exception->getMessage();
         }
@@ -353,6 +353,23 @@ function arrayEntry(string $key, string|int $value, bool $quote = true): string
 {
     $encoded = $quote ? var_export((string)$value, true) : (string)$value;
     return "        '{$key}' => {$encoded},\n";
+}
+
+function disableInstallerAfterSuccess(array &$messages): void
+{
+    $currentPath = __FILE__;
+    if (!is_file($currentPath)) {
+        $messages[] = 'Installer kon zichzelf niet vergrendelen: install.php is niet gevonden.';
+        return;
+    }
+
+    $disabledPath = $currentPath . '.disabled-' . gmdate('Ymd-His');
+    if (@rename($currentPath, $disabledPath)) {
+        $messages[] = 'install.php is automatisch vergrendeld als ' . basename($disabledPath) . '.';
+        return;
+    }
+
+    $messages[] = 'Installer kon zichzelf niet vergrendelen. Hernoem of verwijder install.php handmatig op productie.';
 }
 
 function pdoOptions(): array
@@ -785,7 +802,7 @@ function renderInstallPage(array $state, array $messages, array $errors, bool $i
 
       <p class="actions">
         <button type="submit">Installeren</button>
-        <span class="small">Na installatie: blokkeer of verwijder install.php op productie.</span>
+        <span class="small">Na succesvolle installatie vergrendelt install.php zichzelf automatisch.</span>
       </p>
     </form>
   <?php endif; ?>

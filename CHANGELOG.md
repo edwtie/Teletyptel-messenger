@@ -191,6 +191,8 @@
   IDs/secrets and writes the matching OAuth callback configuration.
 - The web admin panel now shows ejabberd/XMPP and SIP gateway readiness,
   including SIP/SIPS port checks for future ejabberd_sip/mod_sip work.
+- The web installer now disables itself after a successful installation by
+  renaming `install.php` to a timestamped disabled file when the server allows it.
 
 ### Changed
 
