@@ -10001,7 +10001,7 @@
 
     const body = document.createElement("div");
     body.className = "message-body";
-    renderRichText(body, message.text, message.stylingDisabled);
+    renderRichText(body, visibleMessageText(message), message.stylingDisabled);
     if (!message.retracted && message.attachment) {
       body.appendChild(createAttachmentElement(message.attachment));
     }
@@ -10020,6 +10020,19 @@
     content.append(meta, body);
     const avatar = createAvatarElement(messageAvatarSource(message), "message-avatar");
     item.replaceChildren(avatar, content);
+  }
+
+  function visibleMessageText(message) {
+    if (!message?.attachment) {
+      return message?.text || "";
+    }
+
+    const kind = message.attachment.kind || classifyAttachment(message.attachment);
+    if (kind === "audio" || kind === "video" || kind === "photo") {
+      return "";
+    }
+
+    return message.text || "";
   }
 
   function shouldShowMessageAvatar(message) {
@@ -10483,10 +10496,10 @@
       text.appendChild(name);
     }
     const meta = document.createElement("small");
-    meta.textContent = [attachmentKindText(kind), formatBytes(attachment.size), attachment.type]
-      .filter(Boolean)
-      .join(" - ");
-    text.appendChild(meta);
+    meta.textContent = attachmentMetaText(attachment, kind);
+    if (meta.textContent) {
+      text.appendChild(meta);
+    }
     const downloadButton = createAttachmentDownloadButton(attachment);
 
     if (kind === "photo") {
@@ -10530,6 +10543,15 @@
     renderMaterialIcons(wrapper);
 
     return wrapper;
+  }
+
+  function attachmentMetaText(attachment, kind) {
+    const parts = kind === "audio" || kind === "video" || kind === "photo"
+      ? [formatBytes(attachment.size), attachment.type]
+      : [attachmentKindText(kind), formatBytes(attachment.size), attachment.type];
+    return parts
+      .filter(Boolean)
+      .join(" - ");
   }
 
   function attachmentTitleText(attachment, kind) {
