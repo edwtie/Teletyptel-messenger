@@ -213,6 +213,8 @@
   instead of making the whole media preview act as a download link.
 - Media attachment cards now hide generated recording filenames and show clean
   labels such as "Video message" or "Voice message".
+- Media attachment cards now omit the bold media title entirely, leaving only
+  compact metadata, preview controls and the download icon.
 
 ### Changed
 
