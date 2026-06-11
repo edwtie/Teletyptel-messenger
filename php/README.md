@@ -202,7 +202,16 @@ The web client stores account profiles on the PHP/MySQL server through:
 php/public/api/account.php
 ```
 
-Create the database tables with:
+For local development or first server setup, open the web installer:
+
+```text
+php/public/install.php
+```
+
+The installer writes `php/config.php` outside the public web directory and
+imports `php/schema.sql`. Remove or block `install.php` after production setup.
+
+Manual setup is still possible. Create the database tables with:
 
 ```sql
 SOURCE php/schema.sql;

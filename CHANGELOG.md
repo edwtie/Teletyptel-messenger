@@ -177,6 +177,8 @@
   unit and Apache/Nginx WebSocket reverse-proxy guidance for `/rtt-relay`.
 - Development HTTPS certificate download page and public certificate files are
   included for local iPhone/Safari trust testing.
+- Web installer `install.php` can create/check the TeleTypTel database, write
+  `php/config.php` outside the public directory and import `schema.sql`.
 
 ### Changed
 
