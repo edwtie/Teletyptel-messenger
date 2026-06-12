@@ -1341,7 +1341,11 @@ body.conversation-open .chat-panel {
   display: grid;
   min-height: 210px;
   border-bottom: 1px solid #314159;
-  background: #07111f;
+  background-color: #0b1220;
+  background-image: linear-gradient(var(--chat-background-overlay), var(--chat-background-overlay)), var(--chat-background-image);
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
   overflow: hidden;
 }
 
@@ -1369,7 +1373,7 @@ body.tc-text-full-active .call-panel {
   width: 100%;
   height: 100%;
   min-height: 210px;
-  background: #050b14;
+  background: transparent;
   object-fit: contain;
 }
 
@@ -1402,8 +1406,10 @@ body.call-active .call-panel video {
 
 .call-panel.local-video-main #localVideo {
   position: static;
-  width: 100%;
+  width: auto;
+  max-width: 100%;
   height: 100%;
+  max-height: 100%;
   min-height: 0;
   aspect-ratio: auto;
   border: 0;
@@ -1426,7 +1432,8 @@ body.call-active .call-panel video {
 }
 
 body.call-active .call-panel.no-remote-video.local-video-main {
-  display: block;
+  display: grid;
+  place-items: center;
   height: clamp(260px, 42vh, 420px);
   min-height: 0;
   max-height: 420px;
@@ -1436,8 +1443,10 @@ body.call-active .call-panel.no-remote-video.local-video-main {
 
 .call-panel.no-remote-video.local-video-main #localVideo {
   position: static;
-  width: 100%;
+  width: auto;
+  max-width: 100%;
   height: 100%;
+  max-height: 100%;
   min-height: 0;
   aspect-ratio: auto;
   border: 0;
@@ -4420,9 +4429,13 @@ body[data-theme] .call-media-icon-button:disabled {
     object-fit: contain;
   }
 
-  .call-panel.local-video-main #localVideo {
-    position: static;
-  }
+.call-panel.local-video-main #localVideo {
+  position: static;
+  width: auto;
+  max-width: 100%;
+  height: 100%;
+  max-height: 100%;
+}
 
   .call-panel:not(.local-video-main) #localVideo {
     position: absolute;
@@ -4812,6 +4825,13 @@ body[data-theme] .call-media-icon-button:disabled {
     object-fit: contain;
   }
 
+  body.tc-text-visible-active.call-active .call-panel.local-video-main #localVideo {
+    width: auto;
+    max-width: 100%;
+    height: 100%;
+    max-height: 100%;
+  }
+
   body.tc-text-visible-active.call-active .call-panel:not(.local-video-main) #localVideo {
     top: 8px;
     right: 8px;
@@ -4991,6 +5011,13 @@ body.tc-phone-landscape-active .call-panel.local-video-main #localVideo {
   height: 100%;
   min-height: 0;
   object-fit: contain;
+}
+
+body.tc-phone-landscape-active .call-panel.local-video-main #localVideo {
+  width: auto;
+  max-width: 100%;
+  height: 100%;
+  max-height: 100%;
 }
 
 body.tc-phone-landscape-active .call-panel:not(.local-video-main) #localVideo {
@@ -5238,6 +5265,13 @@ body.viewport-phone.call-active .call-panel.local-video-main #localVideo {
   max-width: 100vw !important;
 }
 
+body.viewport-phone.call-active .call-panel.local-video-main #localVideo {
+  width: auto !important;
+  max-width: 100vw !important;
+  height: 100% !important;
+  max-height: 100% !important;
+}
+
 body.viewport-phone.call-active .tc-text-panel,
 body.viewport-phone.call-active .call-panel.tc-text-full .tc-text-panel,
 body.viewport-phone.tc-text-visible-active.call-active .tc-text-panel,
@@ -5367,6 +5401,14 @@ body.viewport-phone.tc-text-visible-active.call-active .composer {
     height: 100% !important;
     min-height: 0 !important;
     object-fit: contain !important;
+  }
+
+  body.call-active .call-panel.local-video-main #localVideo,
+  body.tc-text-visible-active.call-active .call-panel.local-video-main #localVideo {
+    width: auto !important;
+    max-width: 100vw !important;
+    height: 100% !important;
+    max-height: 100% !important;
   }
 
   body.call-active .call-panel:not(.local-video-main) #localVideo,
