@@ -34,7 +34,7 @@ function readHistory(): void
         return;
     }
 
-    $limit = max(1, min(500, (int)($_GET['limit'] ?? 200)));
+    $limit = max(1, min(2000, (int)($_GET['limit'] ?? 500)));
     $pdo = Database::connect();
     ensureMessageHistorySchema($pdo);
     ensureConversationHistorySchema($pdo);

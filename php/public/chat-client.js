@@ -1603,9 +1603,9 @@
           storeServerAccountBrowserSession(state.account);
           cleanOauthUrl();
         }
-        await loadMessageHistory();
-        await loadConversationHistory();
       }
+      await loadMessageHistory();
+      await loadConversationHistory();
       await loadLanguage(state.account.preferredLanguage ?? "eng");
       const provider = await fetchJson(`config/providers/${encodeURIComponent(state.account.providerId)}.json`);
       state.provider = provider;
@@ -1868,7 +1868,7 @@
     }
 
     try {
-      const response = await fetch(`${historyApiPath}?accountId=${encodeURIComponent(state.account.accountId)}&limit=300`, {
+      const response = await fetch(`${historyApiPath}?accountId=${encodeURIComponent(state.account.accountId)}&limit=1000`, {
         cache: "no-store"
       });
       if (response.status === 404 || response.status === 401) {
@@ -1885,13 +1885,19 @@
         return false;
       }
 
+      let restored = 0;
+      const restoredByPeer = new Map();
       for (const item of payload.messages) {
-        restoreHistoryMessage(item);
+        const conversation = restoreHistoryMessage(item);
+        if (conversation) {
+          restored += 1;
+          restoredByPeer.set(conversation.peer, (restoredByPeer.get(conversation.peer) || 0) + 1);
+        }
       }
 
       renderConversations();
       renderActiveConversation();
-      appendDebug("history", `Loaded ${payload.messages.length} messages`);
+      appendDebug("history", `Loaded ${payload.messages.length} messages, restored ${restored}: ${Array.from(restoredByPeer, ([peer, count]) => `${peer}=${count}`).join(", ")}`);
       return true;
     } catch (error) {
       appendDebug("history-error", error.message);
@@ -1902,7 +1908,7 @@
   function restoreHistoryMessage(item) {
     const peer = String(item.conversationPeer || "").trim();
     if (!peer) {
-      return;
+      return null;
     }
 
     const conversation = ensureConversationForPeer(
@@ -1910,12 +1916,12 @@
       item.conversationKind === "group" ? "group" : "contact",
       item.conversationName || displayNameForJid(peer));
     if (!conversation) {
-      return;
+      return null;
     }
 
     const messageId = String(item.messageId || "").trim();
     if (messageId && conversation.messages.some((message) => message.xmppId === messageId || message.id === messageId)) {
-      return;
+      return null;
     }
 
     const message = addMessage(
@@ -1930,7 +1936,7 @@
       item.stylingDisabled === true,
       false);
     if (!message) {
-      return;
+      return null;
     }
 
     message.edited = item.edited === true;
@@ -1938,6 +1944,7 @@
     message.retraction = item.retraction || null;
     const timestamp = new Date(item.timestamp || Date.now());
     message.timestamp = Number.isNaN(timestamp.valueOf()) ? new Date() : timestamp;
+    return conversation;
   }
 
   function persistHistoryMessage(conversation, message) {
@@ -10458,6 +10465,10 @@
 
     const existing = state.conversations.find((conversation) => addressMatches(conversation.peer, normalizedPeer));
     if (existing) {
+      if (kind === "group" && existing.kind !== "group") {
+        existing.kind = "group";
+        existing.presence = "group";
+      }
       if (name && existing.name === existing.peer) {
         existing.name = name;
       }
