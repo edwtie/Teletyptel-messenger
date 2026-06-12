@@ -60,6 +60,7 @@
   const mediaSettingsStorageKey = "teletyptel.mediaSettings";
   const callVideoHeightStorageKey = "teletyptel.callVideoHeight";
   const blockedJidsStorageKeyBase = "teletyptel.blockedJids";
+  const xmppStreamManagementStorageKeyBase = "teletyptel.xmppStreamManagement";
   const locationSettingsStorageKeyBase = "teletyptel.locationSettings";
   const chatBackgroundStorageKeyBase = "teletyptel.chatBackground";
   const historySettingsStorageKeyBase = "teletyptel.historySettings";
@@ -72,6 +73,8 @@
   const avatarMaxBytes = 256 * 1024;
   const avatarSourceMaxBytes = 5 * 1024 * 1024;
   const geolocNamespace = "http://jabber.org/protocol/geoloc";
+  const xmppStreamManagementNamespace = "urn:xmpp:sm:3";
+  const xmppStreamManagementResumeMaxAgeMs = 10 * 60 * 1000;
   const jingleRttSyncNamespace = "urn:xmpp:jingle:apps:rtt-sync:0";
   const jingleRttSyncDataChannelLabel = "rtt";
   const jingleRttSyncMaxSkewMs = 700;
@@ -1247,7 +1250,7 @@
     }
 
     const xml = createClientStateXml(clientState);
-    state.xmppSocket.send(xml);
+    sendXmppRaw(xml);
     state.clientLifecycle.xmppLastSent = clientState;
     appendDebug("csi-out", `${xml} (${reason})`);
   }
@@ -1318,6 +1321,11 @@
   function blockedJidsStorageKeyFor(profile) {
     const normalized = sanitizeSessionProfile(profile);
     return normalized === "default" ? blockedJidsStorageKeyBase : `${blockedJidsStorageKeyBase}.${normalized}`;
+  }
+
+  function xmppStreamManagementStorageKeyFor(profile) {
+    const normalized = sanitizeSessionProfile(profile);
+    return normalized === "default" ? xmppStreamManagementStorageKeyBase : `${xmppStreamManagementStorageKeyBase}.${normalized}`;
   }
 
   function locationSettingsStorageKeyFor(profile) {
@@ -4377,8 +4385,7 @@
 
     if (state.mode === "xmpp" && state.xmppSocket?.readyState === WebSocket.OPEN) {
       const iq = createGeolocPublishIq(location);
-      state.xmppSocket.send(iq);
-      appendDebug("C", "geoloc publish redacted");
+      sendXmppStanza(iq, "geoloc publish redacted");
     }
 
     if (action === "live") {
@@ -4411,8 +4418,7 @@
 
     if (state.mode === "xmpp" && state.xmppSocket?.readyState === WebSocket.OPEN) {
       const iq = createGeolocClearIq();
-      state.xmppSocket.send(iq);
-      appendDebug("C", iq);
+      sendXmppStanza(iq);
     }
 
     state.location.sharedConversationId = null;
@@ -4694,7 +4700,7 @@
       const id = createMessageId("ping");
       const xml = `<iq xmlns="jabber:client" type="get" id="${escapeXml(id)}"><ping xmlns="urn:xmpp:ping"/></iq>`;
       try {
-        state.xmppSocket.send(xml);
+        sendXmppStanza(xml, `ping ${id}`);
         appendDebug("xmpp-heartbeat", id);
       } catch (error) {
         appendDebug("xmpp-heartbeat-error", error.message);
@@ -4811,6 +4817,7 @@
     state.clientLifecycle.xmppLastSent = null;
     stopRelayHeartbeat();
     stopXmppHeartbeat();
+    clearStoredXmppStreamManagement();
     state.previousText = "";
     state.activeConversationId = null;
     el.messageInput.value = "";
@@ -5178,8 +5185,7 @@
     if (target.message.direction === "self" && target.message.xmppId) {
       if (state.mode === "xmpp" && state.xmppSocket?.readyState === WebSocket.OPEN) {
         const xml = createMessageRetractionStanza(target.conversation.peer, target.message.xmppId);
-        state.xmppSocket.send(xml);
-        appendDebug("C", xml);
+        sendXmppStanza(xml);
       } else if (state.relaySocket?.readyState === WebSocket.OPEN) {
         const envelope = createRelayEnvelope("message-delete", "", "", target.conversation.peer);
         envelope.targetMessageId = target.message.xmppId;
@@ -5248,8 +5254,7 @@
 
     if (state.mode === "xmpp" && state.xmppSocket?.readyState === WebSocket.OPEN) {
       const xml = createMessageStanza(forwarded.text, outgoingId, null, false, destination.peer);
-      state.xmppSocket.send(xml);
-      appendDebug("C", xml);
+      sendXmppStanza(xml);
       addMessage("self", forwarded.text, "forwarded", null, forwarded.attachment, destination.id, forwarded.location, outgoingId);
       setConnectionStatus(t("status.message_forwarded", "Message forwarded."), "info");
       return;
@@ -6424,6 +6429,7 @@
 
     socket.addEventListener("close", () => {
       stopXmppHeartbeat();
+      window.clearTimeout(state.xmppSession?.streamManagement?.fallbackTimer);
       el.xmppOpenButton.disabled = false;
       el.xmppCloseButton.disabled = true;
       const wasReady = state.accountReady;
@@ -6480,7 +6486,20 @@
       resource,
       accountJid: accountBare,
       bindId: createMessageId("bind"),
-      boundJid: ""
+      boundJid: "",
+      streamManagement: {
+        offered: false,
+        pending: false,
+        pendingResume: false,
+        enabled: false,
+        id: "",
+        resumeSupported: false,
+        inboundHandled: 0,
+        outboundSent: 0,
+        outboundAcked: 0,
+        fallbackTimer: null,
+        resumeCandidate: loadStoredXmppStreamManagement(accountBare, domain)
+      }
     };
   }
 
@@ -6490,9 +6509,108 @@
     }
 
     const open = `<open xmlns="urn:ietf:params:xml:ns:xmpp-framing" to="${escapeXml(state.xmppSession.domain)}" version="1.0"/>`;
-    state.xmppSocket.send(open);
-    appendDebug("C", open);
+    sendXmppRaw(open);
     flushClientLifecycleState("xmpp-open", true);
+  }
+
+  function sendXmppRaw(xml, debugText = xml) {
+    if (state.xmppSocket?.readyState !== WebSocket.OPEN) {
+      return false;
+    }
+
+    state.xmppSocket.send(xml);
+    appendDebug("C", debugText);
+    return true;
+  }
+
+  function sendXmppStanza(xml, debugText = xml) {
+    const sent = sendXmppRaw(xml, debugText);
+    if (sent && state.xmppSession?.streamManagement?.enabled && isXmppCountedStanza(xml)) {
+      state.xmppSession.streamManagement.outboundSent += 1;
+      saveXmppStreamManagementState();
+    }
+
+    return sent;
+  }
+
+  function sendXmppStreamManagementElement(xml, debugText = xml) {
+    return sendXmppRaw(xml, debugText);
+  }
+
+  function isXmppCountedStanza(xml) {
+    return /^<(message|presence|iq)\b/i.test(String(xml || "").trim());
+  }
+
+  function loadStoredXmppStreamManagement(accountJid, domain) {
+    const saved = sessionStorage.getItem(xmppStreamManagementStorageKeyFor(state.sessionProfile));
+    if (!saved) {
+      return null;
+    }
+
+    try {
+      const parsed = JSON.parse(saved);
+      if (!parsed?.id || parsed.accountJid !== accountJid || parsed.domain !== domain) {
+        return null;
+      }
+
+      if (Date.now() - Number(parsed.savedAt || 0) > xmppStreamManagementResumeMaxAgeMs) {
+        clearStoredXmppStreamManagement();
+        return null;
+      }
+
+      return parsed;
+    } catch {
+      clearStoredXmppStreamManagement();
+      return null;
+    }
+  }
+
+  function saveXmppStreamManagementState() {
+    const sm = state.xmppSession?.streamManagement;
+    if (!state.xmppSession || !sm?.enabled || !sm.resumeSupported || !sm.id) {
+      return;
+    }
+
+    sessionStorage.setItem(xmppStreamManagementStorageKeyFor(state.sessionProfile), JSON.stringify({
+      id: sm.id,
+      accountJid: state.xmppSession.accountJid,
+      domain: state.xmppSession.domain,
+      boundJid: state.xmppSession.boundJid,
+      inboundHandled: sm.inboundHandled,
+      outboundSent: sm.outboundSent,
+      outboundAcked: sm.outboundAcked,
+      savedAt: Date.now()
+    }));
+  }
+
+  function clearStoredXmppStreamManagement() {
+    sessionStorage.removeItem(xmppStreamManagementStorageKeyFor(state.sessionProfile));
+  }
+
+  function maybeResumeXmppStreamManagement() {
+    const sm = state.xmppSession?.streamManagement;
+    const candidate = sm?.resumeCandidate;
+    if (!state.xmppSession || !sm?.offered || !candidate?.id || sm.pendingResume || state.xmppSession.authenticated) {
+      return false;
+    }
+
+    state.xmppSession.phase = "resuming";
+    sm.pendingResume = true;
+    const handled = Math.max(0, Number(candidate.inboundHandled || 0));
+    const xml = `<resume xmlns="${xmppStreamManagementNamespace}" previd="${escapeXml(candidate.id)}" h="${handled}"/>`;
+    sendXmppStreamManagementElement(xml);
+    window.clearTimeout(sm.fallbackTimer);
+    sm.fallbackTimer = window.setTimeout(() => {
+      if (!state.xmppSession || state.xmppSession.phase !== "resuming") {
+        return;
+      }
+
+      appendDebug("xmpp-sm", "resume timeout, binding new stream");
+      sm.pendingResume = false;
+      clearStoredXmppStreamManagement();
+      sendXmppBind();
+    }, 1500);
+    return true;
   }
 
   function sendXmppPlainAuth() {
@@ -6509,8 +6627,7 @@
     const payload = base64Utf8(`${authzid}\u0000${authcid}\u0000${password}`);
     const xml = `<auth xmlns="urn:ietf:params:xml:ns:xmpp-sasl" mechanism="PLAIN">${payload}</auth>`;
     state.xmppSession.phase = "authenticating";
-    state.xmppSocket.send(xml);
-    appendDebug("C", "<auth mechanism=\"PLAIN\">...</auth>");
+    sendXmppRaw(xml, "<auth mechanism=\"PLAIN\">...</auth>");
   }
 
   function sendXmppBind() {
@@ -6520,8 +6637,7 @@
 
     state.xmppSession.phase = "binding";
     const xml = `<iq xmlns="jabber:client" type="set" id="${escapeXml(state.xmppSession.bindId)}"><bind xmlns="urn:ietf:params:xml:ns:xmpp-bind"><resource>${escapeXml(state.xmppSession.resource)}</resource></bind></iq>`;
-    state.xmppSocket.send(xml);
-    appendDebug("C", xml);
+    sendXmppStanza(xml);
   }
 
   function completeXmppBind(iq) {
@@ -6529,14 +6645,47 @@
     const boundJid = jidElement?.textContent || currentFromJid();
     state.xmppSession.boundJid = boundJid;
     state.xmppSession.authenticated = true;
-    state.xmppSession.phase = "ready";
     if (state.account) {
       state.account.xmppBoundJid = boundJid;
     }
     state.clientLifecycle.xmppLastSent = null;
+    if (state.xmppSession.streamManagement.offered) {
+      enableXmppStreamManagement();
+      return;
+    }
+
+    finishXmppReady();
+  }
+
+  function enableXmppStreamManagement() {
+    if (!state.xmppSession || state.xmppSession.streamManagement.pending || state.xmppSession.streamManagement.enabled) {
+      return;
+    }
+
+    state.xmppSession.phase = "stream-management";
+    state.xmppSession.streamManagement.pending = true;
+    const xml = `<enable xmlns="${xmppStreamManagementNamespace}" resume="true"/>`;
+    sendXmppStreamManagementElement(xml);
+    window.clearTimeout(state.xmppSession.streamManagement.fallbackTimer);
+    state.xmppSession.streamManagement.fallbackTimer = window.setTimeout(() => {
+      if (!state.xmppSession || state.xmppSession.phase !== "stream-management") {
+        return;
+      }
+
+      appendDebug("xmpp-sm", "enable timeout, continuing without stream management");
+      state.xmppSession.streamManagement.pending = false;
+      finishXmppReady();
+    }, 1500);
+  }
+
+  function finishXmppReady() {
+    if (!state.xmppSession || state.xmppSession.phase === "ready") {
+      return;
+    }
+
+    state.xmppSession.phase = "ready";
     const presence = '<presence xmlns="jabber:client"/>';
-    state.xmppSocket.send(presence);
-    appendDebug("C", presence);
+    sendXmppStanza(presence);
     startXmppHeartbeat();
     flushClientLifecycleState("xmpp-ready", true);
     setConnectionStatus(t("status.xmpp_connected", "XMPP connected"), "good");
@@ -6559,11 +6708,11 @@
 
     if (state.xmppSocket.readyState === WebSocket.OPEN) {
       const close = '<close xmlns="urn:ietf:params:xml:ns:xmpp-framing"/>';
-      state.xmppSocket.send(close);
-      appendDebug("C", close);
+      sendXmppRaw(close);
     }
 
     stopXmppHeartbeat();
+    window.clearTimeout(state.xmppSession?.streamManagement?.fallbackTimer);
     state.xmppSocket.close();
   }
 
@@ -6651,6 +6800,9 @@
       return;
     }
 
+    trackIncomingXmppStanzas(doc);
+    handleXmppStreamManagement(doc);
+
     const features = doc.getElementsByTagNameNS("http://etherx.jabber.org/streams", "features")[0];
     if (features) {
       handleXmppFeatures(features);
@@ -6686,6 +6838,9 @@
       return;
     }
 
+    state.xmppSession.streamManagement.offered = Boolean(
+      features.getElementsByTagNameNS(xmppStreamManagementNamespace, "sm")[0]);
+
     const mechanisms = Array.from(features.getElementsByTagNameNS("urn:ietf:params:xml:ns:xmpp-sasl", "mechanism"))
       .map((item) => item.textContent || "");
     if (mechanisms.length && !state.xmppSession.authenticated && state.xmppSession.phase !== "authenticating") {
@@ -6700,9 +6855,113 @@
     }
 
     const bindFeature = features.getElementsByTagNameNS("urn:ietf:params:xml:ns:xmpp-bind", "bind")[0];
+    if (bindFeature && maybeResumeXmppStreamManagement()) {
+      return;
+    }
+
     if (bindFeature && !state.xmppSession.authenticated && state.xmppSession.phase !== "binding") {
       sendXmppBind();
     }
+  }
+
+  function trackIncomingXmppStanzas(doc) {
+    const sm = state.xmppSession?.streamManagement;
+    if (!sm?.enabled) {
+      return;
+    }
+
+    const count = Array.from(doc.documentElement?.children || [])
+      .filter((element) => ["message", "presence", "iq"].includes(element.localName))
+      .length;
+    if (count > 0) {
+      sm.inboundHandled += count;
+      saveXmppStreamManagementState();
+    }
+  }
+
+  function handleXmppStreamManagement(doc) {
+    const sm = state.xmppSession?.streamManagement;
+    if (!sm) {
+      return false;
+    }
+
+    const enabled = doc.getElementsByTagNameNS(xmppStreamManagementNamespace, "enabled")[0];
+    if (enabled) {
+      window.clearTimeout(sm.fallbackTimer);
+      sm.pending = false;
+      sm.pendingResume = false;
+      sm.enabled = true;
+      sm.id = enabled.getAttribute("id") || "";
+      sm.resumeSupported = ["true", "1"].includes((enabled.getAttribute("resume") || "").toLowerCase());
+      sm.inboundHandled = 0;
+      sm.outboundSent = 0;
+      sm.outboundAcked = 0;
+      appendDebug("xmpp-sm", `enabled id=${sm.id || "-"} resume=${sm.resumeSupported ? "true" : "false"}`);
+      saveXmppStreamManagementState();
+      finishXmppReady();
+      return true;
+    }
+
+    const resumed = doc.getElementsByTagNameNS(xmppStreamManagementNamespace, "resumed")[0];
+    if (resumed && sm.pendingResume) {
+      window.clearTimeout(sm.fallbackTimer);
+      sm.pendingResume = false;
+      sm.pending = false;
+      sm.enabled = true;
+      sm.id = resumed.getAttribute("previd") || sm.resumeCandidate?.id || "";
+      sm.resumeSupported = true;
+      const handled = Number(resumed.getAttribute("h") || "0");
+      sm.outboundAcked = Number.isFinite(handled) ? handled : Number(sm.resumeCandidate?.outboundAcked || 0);
+      sm.outboundSent = Math.max(Number(sm.resumeCandidate?.outboundSent || 0), sm.outboundAcked);
+      sm.inboundHandled = Number(sm.resumeCandidate?.inboundHandled || 0);
+      state.xmppSession.authenticated = true;
+      state.xmppSession.boundJid = sm.resumeCandidate?.boundJid || state.xmppSession.accountJid;
+      appendDebug("xmpp-sm", `resumed id=${sm.id || "-"} h=${sm.outboundAcked}`);
+      saveXmppStreamManagementState();
+      finishXmppReady();
+      return true;
+    }
+
+    const failed = doc.getElementsByTagNameNS(xmppStreamManagementNamespace, "failed")[0];
+    if (failed && sm.pendingResume) {
+      window.clearTimeout(sm.fallbackTimer);
+      sm.pendingResume = false;
+      clearStoredXmppStreamManagement();
+      appendDebug("xmpp-sm", "resume failed, binding new stream");
+      sendXmppBind();
+      return true;
+    }
+
+    if (failed && sm.pending) {
+      window.clearTimeout(sm.fallbackTimer);
+      sm.pending = false;
+      sm.enabled = false;
+      clearStoredXmppStreamManagement();
+      appendDebug("xmpp-sm", "enable failed");
+      finishXmppReady();
+      return true;
+    }
+
+    const ack = doc.getElementsByTagNameNS(xmppStreamManagementNamespace, "a")[0];
+    if (ack) {
+      const handled = Number(ack.getAttribute("h") || "0");
+      if (Number.isFinite(handled)) {
+        sm.outboundAcked = Math.max(sm.outboundAcked, handled);
+        appendDebug("xmpp-sm", `server ack h=${sm.outboundAcked}`);
+        saveXmppStreamManagementState();
+      }
+      return true;
+    }
+
+    const request = doc.getElementsByTagNameNS(xmppStreamManagementNamespace, "r")[0];
+    if (request && sm.enabled) {
+      sendXmppStreamManagementElement(`<a xmlns="${xmppStreamManagementNamespace}" h="${sm.inboundHandled}"/>`);
+      appendDebug("xmpp-sm", `ack sent h=${sm.inboundHandled}`);
+      saveXmppStreamManagementState();
+      return true;
+    }
+
+    return false;
   }
 
   function sendComposerMessage(event) {
@@ -6725,8 +6984,7 @@
     const outgoingId = createMessageId(edit ? "edit" : "msg");
     if (state.mode === "xmpp" && state.xmppSocket?.readyState === WebSocket.OPEN && state.xmppSession?.authenticated) {
       const xml = createMessageStanza(text, outgoingId, edit?.replaceId ?? null);
-      state.xmppSocket.send(xml);
-      appendDebug("C", xml);
+      sendXmppStanza(xml);
       if (edit) {
         applyMessageCorrection(edit.conversation, edit.replaceId, text, "self", outgoingId);
         clearMessageEdit();
@@ -10450,9 +10708,8 @@
     const child = action === "block"
       ? `<block xmlns="urn:xmpp:blocking"><item jid="${jid}"/></block>`
       : `<unblock xmlns="urn:xmpp:blocking"><item jid="${jid}"/></unblock>`;
-    const xml = `<iq xmlns="jabber:client" type="set" id="${id}">${child}</iq>`;
-    state.xmppSocket.send(xml);
-    appendDebug("C", xml);
+      const xml = `<iq xmlns="jabber:client" type="set" id="${id}">${child}</iq>`;
+    sendXmppStanza(xml);
   }
 
   function createNoConversationElement() {
@@ -12041,8 +12298,7 @@
 
     if (state.mode === "xmpp" && state.xmppSocket?.readyState === WebSocket.OPEN) {
       const xml = createMessageStanza(`${text}\n${new URL(file.url, location.href).href}`, messageId);
-      state.xmppSocket.send(xml);
-      appendDebug("C", xml);
+      sendXmppStanza(xml);
       addMessage("self", text, "RFC 7395", null, attachment, null, null, messageId);
       return;
     }

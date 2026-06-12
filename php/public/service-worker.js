@@ -1,5 +1,5 @@
-const CACHE_NAME = "teletyptel-webclient-v209";
-const BUILD_VERSION = "20260612-websocket-heartbeat";
+const CACHE_NAME = "teletyptel-webclient-v210";
+const BUILD_VERSION = "20260612-xep0198-web";
 const ASSETS = [
   "chat.html",
   "dev.html",

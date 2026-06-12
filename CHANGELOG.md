@@ -287,6 +287,9 @@
   schema, and the Google provider manifest no longer 404s.
 - Relay and XMPP WebSocket sessions now send periodic keepalive traffic so
   idle browser/proxy connections are less likely to be closed during a call.
+- Browser XMPP sessions now activate XEP-0198 stream management when the
+  server advertises it, including handled-stanza counters, ack responses and
+  same-tab stream resume attempts after a reconnect.
 - Old public product names were replaced with TeleTypTel in visible UI text,
   language files, project metadata, XSF draft entries and public documentation.
 - Cross-platform protocol tests no longer assume separate TCP reads for XMPP
