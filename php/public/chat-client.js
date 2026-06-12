@@ -7781,7 +7781,9 @@
         rttSync: call.rttSync
       });
       setCallStatus(t("call.ringing", "Ringing..."));
-      addMessage("self", callStartedText(call), "jingle");
+      if (!isTotalConversationCall(call)) {
+        addMessage("self", callStartedText(call), "jingle");
+      }
     } catch (error) {
       setCallStatus(`${t("call.failed", "Call failed")}: ${error.message}`);
       cleanupCall(false, "failed");
@@ -7972,7 +7974,9 @@
       info: "ringing"
     });
     setCallStatus(`${t("call.incoming", "Incoming call from")} ${displayNameForJid(call.peer)}`);
-    addMessage("peer", incomingCallTitle(call), "jingle", call.peer, null, conversation?.id ?? null);
+    if (!isTotalConversationCall(call)) {
+      addMessage("peer", incomingCallTitle(call), "jingle", call.peer, null, conversation?.id ?? null);
+    }
     renderConversations();
     renderActiveConversation();
     updateCallUi();
@@ -8496,23 +8500,6 @@
     updateTotalConversationTextPanel(conversation);
   }
 
-  function callSummaryText(call, status) {
-    const title = isTotalConversationCall(call)
-      ? t("button.call_total_conversation", "Total conversation")
-      : (call?.mediaKind === "video" ? t("button.call_audio_video", "Audio + video") : t("button.call_audio", "Audio"));
-    if (status === "missed") {
-      return `${t("call.missed", "Gemiste oproep")} - ${title}`;
-    }
-    if (status === "rejected") {
-      return `${t("call.rejected", "Call rejected")} - ${title}`;
-    }
-    if (status === "failed") {
-      return `${t("call.failed", "Call failed")} - ${title}`;
-    }
-
-    return title;
-  }
-
   async function openLocalMedia(call) {
     if (call.localStream) {
       return call.localStream;
@@ -8842,43 +8829,6 @@
     refreshOpenTabPanel();
   }
 
-  function addCallSummaryMessage(call, status = "ended") {
-    if (!call || !isTotalConversationCall(call)) {
-      return;
-    }
-
-    const conversation = state.conversations.find((item) => addressMatches(item.peer, call.peer))
-      || ensureConversationForPeer(call.peer, "contact", displayNameForJid(call.peer));
-    if (!conversation) {
-      return;
-    }
-
-    const startedAt = call.historyStartedAt instanceof Date ? call.historyStartedAt : new Date();
-    const durationSeconds = Math.round(Math.max(0, Date.now() - startedAt.getTime()) / 1000);
-    const direction = call.role === "caller" ? "self" : "peer";
-    const message = addMessage(
-      direction,
-      callSummaryText(call, status),
-      `call-${status}`,
-      direction === "peer" ? call.peer : null,
-      null,
-      conversation.id,
-      null,
-      null,
-      false,
-      false);
-    if (message) {
-      message.callInfo = {
-        status,
-        mediaKind: call.mediaKind,
-        rttEnabled: call.rttEnabled,
-        durationSeconds,
-        peer: call.peer
-      };
-      updateMessageElement(message);
-    }
-  }
-
   function cleanupCall(notifyRemote, historyStatus = "ended") {
     const call = state.call;
     if (!call) {
@@ -8887,7 +8837,6 @@
     }
 
     persistConversationHistoryCall(call, historyStatus);
-    addCallSummaryMessage(call, historyStatus);
 
     if (notifyRemote) {
       sendJingleEnvelope("session-terminate", {
