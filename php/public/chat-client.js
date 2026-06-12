@@ -458,6 +458,7 @@
     chatBackgroundInput: byId("chatBackgroundInput"),
     newsButton: byId("newsButton"),
     supportButton: byId("supportButton"),
+    historyButton: byId("historyButton"),
     profileButton: byId("profileButton"),
     accountButton: byId("accountButton"),
     connectButton: byId("connectButton"),
@@ -767,6 +768,7 @@
     el.chatBackgroundInput.addEventListener("change", () => applyChatBackground(el.chatBackgroundInput.value));
     el.newsButton.addEventListener("click", () => activateTab("news"));
     el.supportButton.addEventListener("click", () => activateSupportTab());
+    el.historyButton.addEventListener("click", () => activateTab("history"));
     el.profileButton.addEventListener("click", () => openAccountDialog({ mode: "profile" }));
     el.accountButton.addEventListener("click", () => openAccountDialog({ mode: "settings" }));
     el.connectButton.addEventListener("click", connectRelay);
@@ -3408,6 +3410,7 @@
     }
     const newsTab = panels.find((tab) => tab.id === "news");
     const supportTab = panels.find(isSupportTab);
+    const historyTab = panels.find(isHistoryTab);
     el.newsButton.hidden = !newsTab;
     el.newsButton.classList.toggle("selected", state.activeTabId === "news");
     el.supportButton.hidden = !supportTab;
@@ -3419,8 +3422,10 @@
       supportText.textContent = supportLabel;
     }
     el.supportButton.classList.toggle("selected", Boolean(supportTab) && state.activeTabId === supportTab.id);
+    el.historyButton.hidden = !historyTab;
+    el.historyButton.classList.toggle("selected", state.activeTabId === "history");
 
-    const tabs = panels.filter((tab) => tab.id !== "news" && !isSupportTab(tab));
+    const tabs = panels.filter((tab) => tab.id !== "news" && !isSupportTab(tab) && !isHistoryTab(tab));
     el.appTabs.replaceChildren();
     el.appTabs.hidden = tabs.length === 0;
     for (const tab of tabs) {
@@ -3449,6 +3454,10 @@
 
   function isSupportTab(tab) {
     return tab?.id === "support" || tab?.service === "support";
+  }
+
+  function isHistoryTab(tab) {
+    return tab?.id === "history";
   }
 
   function activateSupportTab() {
