@@ -827,6 +827,17 @@
         <strong id="videoPreviewDialogTitle" data-i18n="video.preview_title">Video preview</strong>
         <button id="closeVideoPreviewDialogButton" class="icon-button" type="button" aria-label="Close" data-i18n-aria-label="button.close">x</button>
       </div>
+      <label class="video-recorder-quality">
+        <span data-i18n="label.video_quality">Video quality</span>
+        <select id="videoRecorderQualityInput">
+          <option value="default" data-i18n="quality.default">FHD Default - 1920 x 1080</option>
+          <option value="qvga">QVGA - 320 x 240</option>
+          <option value="vga">VGA - 640 x 480</option>
+          <option value="hd">HD 720 - 1280 x 720</option>
+          <option value="fullhd">FHD 1080 - 1920 x 1080</option>
+          <option value="uhd">4K UHD - 3840 x 2160</option>
+        </select>
+      </label>
       <video id="videoPreviewDialogVideo" controls playsinline></video>
       <div class="video-preview-dialog-actions">
         <button id="startVideoRecordingButton" class="icon-button voice-action-button voice-action-primary" type="button" title="Start recording" aria-label="Start recording" data-i18n-title="video.start_recording" data-i18n-aria-label="video.start_recording">

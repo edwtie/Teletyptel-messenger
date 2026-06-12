@@ -3209,6 +3209,25 @@ body[data-theme="dark"] .link-preview-loading {
   color: #eff6ff;
 }
 
+.video-recorder-quality {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  color: #dbeafe;
+  font-size: 12px;
+}
+
+.video-recorder-quality select {
+  width: min(260px, 58vw);
+  height: 34px;
+  border: 1px solid rgba(147, 197, 253, .65);
+  border-radius: 8px;
+  background: #f8fbff;
+  color: #0f172a;
+  font: inherit;
+}
+
 .video-preview-dialog-card video {
   display: block;
   width: 100%;

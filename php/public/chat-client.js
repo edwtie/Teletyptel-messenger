@@ -556,6 +556,7 @@
     videoPreviewDialog: byId("videoPreviewDialog"),
     videoPreviewDialogTitle: byId("videoPreviewDialogTitle"),
     videoPreviewDialogVideo: byId("videoPreviewDialogVideo"),
+    videoRecorderQualityInput: byId("videoRecorderQualityInput"),
     closeVideoPreviewDialogButton: byId("closeVideoPreviewDialogButton"),
     startVideoRecordingButton: byId("startVideoRecordingButton"),
     dialogCancelVideoMessageButton: byId("dialogCancelVideoMessageButton"),
@@ -927,6 +928,7 @@
     el.cameraInput.addEventListener("change", () => handleMediaSettingsChange("video"));
     el.microphoneInput.addEventListener("change", () => handleMediaSettingsChange("audio"));
     el.videoQualityInput.addEventListener("change", () => handleMediaSettingsChange("video"));
+    el.videoRecorderQualityInput.addEventListener("change", () => handleMediaSettingsChange("video", "recorder"));
     el.videoMessageFacingInput.addEventListener("change", () => handleMediaSettingsChange("video"));
     el.refreshMediaButton.addEventListener("click", () => refreshMediaDevices(true));
     el.previewMediaButton.addEventListener("click", previewMedia);
@@ -5567,6 +5569,7 @@
   function updateVideoRecordingUi(recording) {
     el.videoMessageButton.classList.toggle("recording", recording);
     el.videoMessageButton.setAttribute("aria-pressed", recording ? "true" : "false");
+    el.videoRecorderQualityInput.disabled = recording;
     const icon = el.videoMessageButton.querySelector("[data-icon]");
     if (icon) {
       icon.dataset.icon = recording ? "videocamOff" : "videocam";
@@ -7077,7 +7080,7 @@
 
   function setMediaControlValues() {
     const videoQuality = state.mediaSettings.videoQuality || "default";
-    for (const select of [el.videoQualityInput, el.dialogVideoQualityInput]) {
+    for (const select of [el.videoQualityInput, el.dialogVideoQualityInput, el.videoRecorderQualityInput]) {
       if (select) {
         select.value = videoQuality;
       }
@@ -7120,6 +7123,15 @@
         microphone: el.callMicrophoneInput,
         quality: el.videoQualityInput,
         facing: el.callVideoFacingInput
+      };
+    }
+
+    if (source === "recorder") {
+      return {
+        camera: el.cameraInput,
+        microphone: el.microphoneInput,
+        quality: el.videoRecorderQualityInput,
+        facing: el.videoMessageFacingInput
       };
     }
 
