@@ -1475,6 +1475,10 @@ body.call-resizing {
   box-shadow: none;
 }
 
+.call-panel video.portrait-video {
+  object-fit: contain;
+}
+
 .call-panel.no-remote-video .tc-text-panel {
   position: absolute;
   left: 14px;
@@ -5396,6 +5400,11 @@ body.viewport-phone.tc-text-visible-active.call-active .composer {
     height: 100% !important;
     min-height: 0 !important;
     object-fit: cover !important;
+  }
+
+  body.call-active .call-panel video.portrait-video,
+  body.tc-text-visible-active.call-active .call-panel video.portrait-video {
+    object-fit: contain !important;
   }
 
   body.call-active .call-panel:not(.local-video-main) #localVideo,

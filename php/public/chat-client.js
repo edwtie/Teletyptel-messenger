@@ -8613,12 +8613,39 @@
     }
 
     if (hasVideo) {
+      updateVideoOrientationClass(video);
       startVideoPlayback(video);
     } else {
+      video.classList.remove("portrait-video", "landscape-video");
       video.pause();
       video.removeAttribute("src");
       video.load();
     }
+  }
+
+  function updateVideoOrientationClass(video) {
+    if (!video) {
+      return;
+    }
+
+    const apply = () => {
+      const portrait = Number(video.videoHeight) > Number(video.videoWidth);
+      video.classList.toggle("portrait-video", portrait);
+      video.classList.toggle("landscape-video", !portrait && Number(video.videoWidth) > 0);
+      if (video.videoWidth && video.videoHeight) {
+        appendDebug(
+          "video-size",
+          `${video.id || "video"} ${video.videoWidth}x${video.videoHeight} ${portrait ? "portrait" : "landscape"}`);
+      }
+    };
+
+    if (video.readyState >= HTMLMediaElement.HAVE_METADATA && video.videoWidth && video.videoHeight) {
+      apply();
+      return;
+    }
+
+    video.addEventListener("loadedmetadata", apply, { once: true });
+    video.addEventListener("resize", apply);
   }
 
   function startVideoPlayback(video) {
