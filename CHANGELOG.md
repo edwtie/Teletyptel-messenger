@@ -298,6 +298,8 @@
   incomplete.
 - Video message playback now fills a compact 16:9 preview area instead of
   showing contain-style black bars.
+- Sender avatars now align with the top of large media/message bubbles instead
+  of dropping to the bottom of tall video cards.
 - Old public product names were replaced with TeleTypTel in visible UI text,
   language files, project metadata, XSF draft entries and public documentation.
 - Cross-platform protocol tests no longer assume separate TCP reads for XMPP

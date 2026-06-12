@@ -2524,7 +2524,7 @@ body:not([data-chat-background="none"]) .message-body {
 
 .message.with-avatar {
   grid-template-columns: 34px minmax(0, 1fr);
-  align-items: end;
+  align-items: start;
   max-width: min(82ch, 88%);
 }
 
@@ -2536,8 +2536,8 @@ body:not([data-chat-background="none"]) .message-body {
 .message.with-avatar .message-avatar {
   width: 30px;
   height: 30px;
-  align-self: end;
-  margin-bottom: 2px;
+  align-self: start;
+  margin-top: 20px;
   color: #ffffff;
   font-size: 12px;
 }
