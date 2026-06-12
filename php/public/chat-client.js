@@ -3544,6 +3544,7 @@
     if (tabId === "chat") {
       el.messageTimeline.hidden = false;
       el.tabPanel.hidden = true;
+      el.composerForm.hidden = false;
       return;
     }
 
@@ -3555,10 +3556,12 @@
 
     el.messageTimeline.hidden = true;
     el.tabPanel.hidden = false;
+    el.composerForm.hidden = true;
     renderTabPanel(tab);
   }
 
   function renderTabPanel(tab) {
+    el.tabPanel.classList.toggle("history-panel", isHistoryTab(tab));
     el.tabPanelTitle.textContent = tab.title;
     el.tabPanelMeta.textContent = tab.type === "builtin"
       ? "Teletyptel"
@@ -3728,9 +3731,10 @@
   }
 
   function renderHistoryTab(card) {
+    card.classList.add("history-card");
     card.appendChild(createTextBlock(
-      t("history.title", "Gespreksgeschiedenis"),
-      t("history.text", "Chat en Totale Conversatie worden bewaard volgens de instellingen van dit account.")));
+      t("history.title", "Total Conversation geschiedenis"),
+      t("history.text", "Oproepen, gemiste oproepen en Total Conversation worden los van de gewone chat bewaard.")));
     card.appendChild(createHistorySettingsPanel());
 
     const layout = document.createElement("div");
@@ -3748,16 +3752,8 @@
   function createHistorySettingsPanel() {
     const panel = document.createElement("section");
     panel.className = "history-settings";
-    const chatLabel = createHistoryToggle(
-      t("history.save_chat", "Chat bewaren"),
-      state.historySettings.saveChat,
-      (checked) => {
-        state.historySettings.saveChat = checked;
-        saveHistorySettings();
-        refreshOpenTabPanel();
-      });
     const tcLabel = createHistoryToggle(
-      t("history.save_tc", "Totale Conversatie bewaren"),
+      t("history.save_tc", "Total Conversation bewaren"),
       state.historySettings.saveTotalConversation,
       (checked) => {
         state.historySettings.saveTotalConversation = checked;
@@ -3782,7 +3778,7 @@
       refreshOpenTabPanel();
     });
     retention.append(retentionText, select);
-    panel.append(chatLabel, tcLabel, retention);
+    panel.append(tcLabel, retention);
     return panel;
   }
 
@@ -3815,7 +3811,7 @@
     if (!entries.length) {
       const empty = document.createElement("p");
       empty.className = "history-empty";
-      empty.textContent = t("history.empty", "Nog geen gespreksgeschiedenis.");
+      empty.textContent = t("history.empty", "Nog geen Total Conversation geschiedenis.");
       container.appendChild(empty);
       return;
     }
@@ -3858,7 +3854,7 @@
     if (!entry) {
       const empty = document.createElement("p");
       empty.className = "history-empty";
-      empty.textContent = t("history.select", "Kies links een gesprek om terug te lezen.");
+      empty.textContent = t("history.select", "Kies links een oproep om terug te lezen.");
       container.appendChild(empty);
       return;
     }
@@ -3911,7 +3907,7 @@
   }
 
   function conversationHistoryEntries() {
-    const callEntries = state.conversationHistory.calls.map((call) => ({
+    return state.conversationHistory.calls.map((call) => ({
       id: `call:${call.callId}`,
       kind: "call",
       startedAt: call.startedAt,
@@ -3919,20 +3915,7 @@
       meta: `${historyCallTypeText(call)} - ${historyStatusText(call.status)} - ${formatHistoryDateTime(call.startedAt)}${call.durationSeconds ? ` - ${formatDuration(call.durationSeconds)}` : ""}`,
       preview: call.transcript?.[0]?.text || call.note || t("call.total_started", "Total conversation started"),
       source: call
-    }));
-    const messageEntries = state.conversations.flatMap((conversation) => (conversation.messages || [])
-      .filter((message) => !message.draft && message.status !== "history" && !isCallMessage(message))
-      .map((message) => ({
-        id: `message:${message.xmppId || message.id}`,
-        kind: "message",
-        startedAt: message.timestamp instanceof Date ? message.timestamp.toISOString() : new Date().toISOString(),
-        title: conversationDisplayName(conversation),
-        meta: `${message.direction === "self" ? t("history.sent", "Verzonden") : t("history.received", "Ontvangen")} - ${formatHistoryDateTime(message.timestamp)}`,
-        preview: message.text || attachmentMetaText(message.attachment) || "",
-        source: message
-      })));
-    return [...callEntries, ...messageEntries]
-      .sort((a, b) => new Date(b.startedAt) - new Date(a.startedAt));
+    })).sort((a, b) => new Date(b.startedAt) - new Date(a.startedAt));
   }
 
   function selectedHistoryId() {

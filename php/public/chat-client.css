@@ -1885,6 +1885,17 @@ body:not([data-chat-background="none"]) .message-body {
   padding: 12px;
 }
 
+.tab-panel.history-panel {
+  background: #f8fbff;
+}
+
+.history-card.provider-card {
+  gap: 14px;
+  border-color: #bfd7ff;
+  background: #f8fbff;
+  color: #0f172a;
+}
+
 .provider-card dl {
   display: grid;
   grid-template-columns: minmax(90px, auto) 1fr;
@@ -2013,9 +2024,9 @@ body:not([data-chat-background="none"]) .message-body {
   flex-wrap: wrap;
   align-items: center;
   gap: 10px;
-  border: 1px solid #3f536d;
+  border: 1px solid #bfd7ff;
   border-radius: var(--radius);
-  background: rgba(19, 32, 52, .72);
+  background: #eef5ff;
   padding: 10px;
 }
 
@@ -2024,7 +2035,7 @@ body:not([data-chat-background="none"]) .message-body {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  color: var(--text);
+  color: #0f172a;
   font-size: 14px;
 }
 
@@ -2048,9 +2059,9 @@ body:not([data-chat-background="none"]) .message-body {
 .history-list,
 .history-detail {
   min-width: 0;
-  border: 1px solid #3f536d;
+  border: 1px solid #bfd7ff;
   border-radius: var(--radius);
-  background: rgba(19, 32, 52, .72);
+  background: #ffffff;
   padding: 10px;
 }
 
@@ -2063,7 +2074,7 @@ body:not([data-chat-background="none"]) .message-body {
 }
 
 .history-group {
-  color: var(--muted);
+  color: #64748b;
   font-size: 12px;
   text-transform: uppercase;
 }
@@ -2072,17 +2083,17 @@ body:not([data-chat-background="none"]) .message-body {
   display: grid;
   gap: 3px;
   width: 100%;
-  border: 1px solid #3f536d;
+  border: 1px solid #bfd7ff;
   border-radius: 8px;
-  background: #132034;
-  color: var(--text);
+  background: #eef5ff;
+  color: #0f172a;
   padding: 9px;
   text-align: left;
 }
 
 .history-item.selected {
-  border-color: var(--accent);
-  background: rgba(37, 99, 235, .2);
+  border-color: #2563eb;
+  background: #dbeafe;
 }
 
 .history-item-title,
@@ -2094,7 +2105,7 @@ body:not([data-chat-background="none"]) .message-body {
 .history-item-preview,
 .history-detail-meta,
 .history-empty {
-  color: var(--muted);
+  color: #475569;
 }
 
 .history-item-preview {
@@ -2127,9 +2138,9 @@ body:not([data-chat-background="none"]) .message-body {
 .history-transcript-line {
   display: grid;
   gap: 3px;
-  border: 1px solid #3f536d;
+  border: 1px solid #d8e6ff;
   border-radius: 8px;
-  background: rgba(11, 18, 32, .56);
+  background: #f8fbff;
   padding: 8px;
 }
 

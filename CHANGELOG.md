@@ -290,6 +290,9 @@
 - Browser XMPP sessions now activate XEP-0198 stream management when the
   server advertises it, including handled-stanza counters, ack responses and
   same-tab stream resume attempts after a reconnect.
+- The history tab is now a separate Total Conversation/call log: it hides the
+  normal composer, uses a light history workspace and no longer mixes ordinary
+  chat messages into TC history.
 - Old public product names were replaced with TeleTypTel in visible UI text,
   language files, project metadata, XSF draft entries and public documentation.
 - Cross-platform protocol tests no longer assume separate TCP reads for XMPP
