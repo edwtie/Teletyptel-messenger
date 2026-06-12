@@ -1868,20 +1868,12 @@
     }
 
     try {
-      const query = historyQueryParams({ limit: "1000" });
-      const response = await fetch(`${historyApiPath}?${query.toString()}`, {
-        cache: "no-store"
-      });
-      if (response.status === 404 || response.status === 401) {
-        appendDebug("history", `History unavailable: ${response.status}`);
+      const result = await fetchHistoryPayload({ limit: "1000" }, "messages", "history");
+      if (!result) {
         return false;
       }
 
-      if (!response.ok) {
-        throw new Error(`history API returned ${response.status}`);
-      }
-
-      const payload = await response.json();
+      const { payload } = result;
       if (!payload.ok || !Array.isArray(payload.messages)) {
         return false;
       }
@@ -1898,7 +1890,7 @@
 
       renderConversations();
       renderActiveConversation();
-      appendDebug("history", `Loaded ${payload.messages.length} messages, restored ${restored}: ${Array.from(restoredByPeer, ([peer, count]) => `${peer}=${count}`).join(", ")}`);
+      appendDebug("history", `Loaded ${payload.messages.length} messages from ${result.accountId}, restored ${restored}: ${Array.from(restoredByPeer, ([peer, count]) => `${peer}=${count}`).join(", ")}`);
       return true;
     } catch (error) {
       appendDebug("history-error", error.message);
@@ -1908,13 +1900,59 @@
 
   function historyQueryParams(params = {}) {
     const query = new URLSearchParams({
-      accountId: state.account?.accountId || "",
       ...params
     });
     if (oauthLoginToken) {
       query.set("loginToken", oauthLoginToken);
     }
     return query;
+  }
+
+  async function fetchHistoryPayload(params, payloadField, debugLabel) {
+    const attempted = [];
+    for (const accountId of historyAccountIdCandidates()) {
+      attempted.push(accountId);
+      const query = historyQueryParams(params);
+      query.set("accountId", accountId);
+      const response = await fetch(`${historyApiPath}?${query.toString()}`, {
+        cache: "no-store"
+      });
+      if (response.status === 404 || response.status === 401) {
+        appendDebug(debugLabel, `History unavailable for ${accountId}: ${response.status}`);
+        continue;
+      }
+
+      if (!response.ok) {
+        throw new Error(`history API returned ${response.status}`);
+      }
+
+      const payload = await response.json();
+      if (payload.ok && Array.isArray(payload[payloadField])) {
+        if (accountId !== state.account.accountId) {
+          appendDebug(debugLabel, `History account switched ${state.account.accountId} -> ${accountId}`);
+        }
+        return { payload, accountId };
+      }
+    }
+
+    setConnectionStatus(`History unavailable: 401 (${attempted.join(", ")})`, "warn");
+    return null;
+  }
+
+  function historyAccountIdCandidates() {
+    const ids = [];
+    const add = (value) => {
+      const id = String(value || "").trim();
+      if (id && !ids.includes(id)) {
+        ids.push(id);
+      }
+    };
+    add(state.account?.accountId);
+    add(accountIdFromJid(stripGeneratedResourceSuffix(state.account?.jid || el.jidInput.value || "")));
+    if (oauthAccountId) {
+      add(oauthAccountId);
+    }
+    return ids;
   }
 
   function restoreHistoryMessage(item) {
@@ -2210,20 +2248,12 @@
     }
 
     try {
-      const query = historyQueryParams({ type: "calls", limit: "200" });
-      const response = await fetch(`${historyApiPath}?${query.toString()}`, {
-        cache: "no-store"
-      });
-      if (response.status === 404 || response.status === 401) {
-        appendDebug("conversation-history", `History unavailable: ${response.status}`);
+      const result = await fetchHistoryPayload({ type: "calls", limit: "200" }, "calls", "conversation-history");
+      if (!result) {
         return false;
       }
 
-      if (!response.ok) {
-        throw new Error(`history API returned ${response.status}`);
-      }
-
-      const payload = await response.json();
+      const { payload } = result;
       if (!payload.ok || !Array.isArray(payload.calls)) {
         return false;
       }
@@ -2231,7 +2261,7 @@
       state.conversationHistory.calls = payload.calls.map(normalizeConversationHistoryCall);
       state.conversationHistory.loaded = true;
       refreshOpenTabPanel();
-      appendDebug("conversation-history", `Loaded ${payload.calls.length} calls`);
+      appendDebug("conversation-history", `Loaded ${payload.calls.length} calls from ${result.accountId}`);
       return true;
     } catch (error) {
       appendDebug("conversation-history-error", error.message);

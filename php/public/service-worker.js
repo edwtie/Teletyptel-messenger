@@ -1,5 +1,5 @@
-const CACHE_NAME = "teletyptel-webclient-v205";
-const BUILD_VERSION = "20260612-linked-history-auth";
+const CACHE_NAME = "teletyptel-webclient-v206";
+const BUILD_VERSION = "20260612-history-account-fallback";
 const ASSETS = [
   "chat.html",
   "dev.html",
