@@ -38,20 +38,23 @@ function readHistory(): void
     $pdo = Database::connect();
     ensureMessageHistorySchema($pdo);
     ensureConversationHistorySchema($pdo);
+    $accountIds = historyAccountIds($pdo, $accountId);
     if (cleanHistoryText($_GET['type'] ?? '', 32) === 'calls') {
-        readConversationHistory($pdo, $accountId, $limit);
+        readConversationHistory($pdo, $accountIds, $limit);
         return;
     }
+    [$accountWhere, $accountParams] = historyAccountWhere($accountIds);
     $statement = $pdo->prepare(
         'SELECT * FROM message_history
-         WHERE account_id = :account_id
+         WHERE ' . $accountWhere . '
          ORDER BY message_timestamp DESC, id DESC
          LIMIT ' . $limit
     );
-    $statement->execute(['account_id' => $accountId]);
+    $statement->execute($accountParams);
     $rows = array_reverse($statement->fetchAll() ?: []);
     echo json_encode([
         'ok' => true,
+        'accountIds' => $accountIds,
         'messages' => array_map('historyRowToClient', $rows)
     ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 }
@@ -88,17 +91,19 @@ function writeHistory(): void
     saveHistoryMessage($pdo, $accountId, $input);
 }
 
-function readConversationHistory(PDO $pdo, string $accountId, int $limit): void
+function readConversationHistory(PDO $pdo, array $accountIds, int $limit): void
 {
+    [$accountWhere, $accountParams] = historyAccountWhere($accountIds);
     $statement = $pdo->prepare(
         'SELECT * FROM conversation_history
-         WHERE account_id = :account_id
+         WHERE ' . $accountWhere . '
          ORDER BY started_at DESC, id DESC
          LIMIT ' . $limit
     );
-    $statement->execute(['account_id' => $accountId]);
+    $statement->execute($accountParams);
     echo json_encode([
         'ok' => true,
+        'accountIds' => $accountIds,
         'calls' => array_map('conversationHistoryRowToClient', $statement->fetchAll() ?: [])
     ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 }
@@ -352,6 +357,107 @@ function isCurrentHistorySession(string $accountId): bool
     return $accountId !== ''
         && isset($_SESSION['teletyptel_account_id'])
         && hash_equals((string)$_SESSION['teletyptel_account_id'], $accountId);
+}
+
+function historyAccountIds(PDO $pdo, string $accountId): array
+{
+    $ids = [$accountId];
+    $profile = historyAccountProfile($pdo, $accountId);
+    $currentJid = historyBareJid((string)($profile['jid'] ?? ''));
+    $currentLocal = historyJidLocalpart($currentJid);
+    $verifiedEmails = historyVerifiedIdentityEmails($pdo, $accountId);
+    if ($currentJid !== '') {
+        $verifiedEmails[] = $currentJid;
+        historyCollectAccountIds(
+            $pdo,
+            $ids,
+            'SELECT account_id FROM account_profiles WHERE LOWER(jid) = :jid',
+            ['jid' => $currentJid]
+        );
+    }
+
+    foreach (array_unique(array_filter($verifiedEmails)) as $email) {
+        historyCollectAccountIds(
+            $pdo,
+            $ids,
+            'SELECT DISTINCT account_id FROM account_identities WHERE email_verified = 1 AND LOWER(email) = :email',
+            ['email' => $email]
+        );
+    }
+
+    foreach (array_unique(array_filter([$currentLocal, ...array_map('historyJidLocalpart', $verifiedEmails)])) as $localpart) {
+        historyCollectAccountIds(
+            $pdo,
+            $ids,
+            'SELECT account_id FROM account_profiles
+             WHERE LOWER(jid) = :oauth_jid
+               AND provider_id IN ("google", "facebook", "apple", "auth0")',
+            ['oauth_jid' => $localpart . '@localhost']
+        );
+    }
+
+    return array_slice(array_values(array_unique($ids)), 0, 8);
+}
+
+function historyAccountProfile(PDO $pdo, string $accountId): array
+{
+    $statement = $pdo->prepare('SELECT account_id, jid, provider_id FROM account_profiles WHERE account_id = :account_id LIMIT 1');
+    $statement->execute(['account_id' => $accountId]);
+    return $statement->fetch() ?: [];
+}
+
+function historyVerifiedIdentityEmails(PDO $pdo, string $accountId): array
+{
+    $statement = $pdo->prepare(
+        'SELECT LOWER(email) AS email
+         FROM account_identities
+         WHERE account_id = :account_id
+           AND email_verified = 1
+           AND email <> ""'
+    );
+    $statement->execute(['account_id' => $accountId]);
+    return array_column($statement->fetchAll() ?: [], 'email');
+}
+
+function historyCollectAccountIds(PDO $pdo, array &$ids, string $sql, array $params): void
+{
+    $statement = $pdo->prepare($sql);
+    $statement->execute($params);
+    foreach ($statement->fetchAll() ?: [] as $row) {
+        $candidate = cleanHistoryText($row['account_id'] ?? '', 96);
+        if ($candidate !== '') {
+            $ids[] = $candidate;
+        }
+    }
+}
+
+function historyAccountWhere(array $accountIds): array
+{
+    $params = [];
+    $placeholders = [];
+    foreach (array_values(array_unique($accountIds)) as $index => $accountId) {
+        $key = 'account_id_' . $index;
+        $placeholders[] = ':' . $key;
+        $params[$key] = $accountId;
+    }
+
+    return ['account_id IN (' . implode(', ', $placeholders) . ')', $params];
+}
+
+function historyBareJid(string $jid): string
+{
+    $bare = strtolower(trim(explode('/', $jid, 2)[0] ?? ''));
+    return cleanHistoryText($bare, 255);
+}
+
+function historyJidLocalpart(string $jid): string
+{
+    $bare = historyBareJid($jid);
+    if ($bare === '' || !str_contains($bare, '@')) {
+        return '';
+    }
+
+    return cleanHistoryText(explode('@', $bare, 2)[0], 96);
 }
 
 function encodeHistoryJson(mixed $value): ?string
