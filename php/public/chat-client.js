@@ -8489,6 +8489,12 @@
       && !call.incomingOffer
       && state.totalConversationTextVisible
     );
+    const totalConversationCallActive = Boolean(
+      call?.rttEnabled
+      && conversation
+      && addressMatches(conversation.peer, call.peer)
+      && !call.incomingOffer
+    );
     const showLocalPreview = hasLocalVideo;
     const showCallPanel = hasRemoteVideo || hasLocalVideo || totalConversationVisible;
     el.callPanel.hidden = !showCallPanel;
@@ -8499,6 +8505,7 @@
     el.callPanel.classList.toggle("remote-video-main", hasRemoteVideo);
     el.callPanel.classList.toggle("no-remote-video", !hasRemoteVideo);
     document.body.classList.toggle("call-active", showCallPanel);
+    document.body.classList.toggle("tc-call-active", totalConversationCallActive && showCallPanel);
     updateCameraToggleUi();
     updateMicrophoneMuteUi();
     updateTotalConversationTextToggleUi();

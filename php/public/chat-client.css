@@ -1737,13 +1737,30 @@ body.tc-text-visible-active.call-active .remote-draft {
   display: none;
 }
 
+body.tc-call-active.call-active .message-timeline,
+body.tc-call-active.call-active .remote-draft {
+  display: none;
+}
+
 body.tc-text-visible-active.call-active .call-panel {
   grid-row: 4 / 6;
   height: auto;
   max-height: none;
 }
 
+body.tc-call-active.call-active .call-panel {
+  grid-row: 4 / 6;
+  height: auto;
+  max-height: none;
+}
+
 body.tc-text-visible-active.call-active .call-panel.no-remote-video.local-video-main {
+  grid-template-rows: minmax(220px, 1fr) auto auto;
+  height: auto;
+  max-height: none;
+}
+
+body.tc-call-active.call-active .call-panel.no-remote-video.local-video-main {
   grid-template-rows: minmax(220px, 1fr) auto auto;
   height: auto;
   max-height: none;
