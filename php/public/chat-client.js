@@ -1904,6 +1904,9 @@
     if (!peer) {
       return;
     }
+    if (isCallMessageStatus(item.status)) {
+      return;
+    }
 
     const conversation = ensureConversationForPeer(
       peer,
@@ -3849,7 +3852,7 @@
       source: call
     }));
     const messageEntries = state.conversations.flatMap((conversation) => (conversation.messages || [])
-      .filter((message) => !message.draft && message.status !== "history")
+      .filter((message) => !message.draft && message.status !== "history" && !isCallMessage(message))
       .map((message) => ({
         id: `message:${message.xmppId || message.id}`,
         kind: "message",
@@ -8859,7 +8862,11 @@
       `call-${status}`,
       direction === "peer" ? call.peer : null,
       null,
-      conversation.id);
+      conversation.id,
+      null,
+      null,
+      false,
+      false);
     if (message) {
       message.callInfo = {
         status,
@@ -9752,6 +9759,9 @@
 
     state.activeConversationId = conversation.id;
     el.peerInput.value = conversation.peer;
+    if (state.activeTabId !== "chat") {
+      activateTab("chat");
+    }
     renderConversations();
     renderActiveConversation();
   }
@@ -9788,6 +9798,9 @@
         state.previousText = "";
         el.messageInput.value = "";
         closeConversationContextMenu();
+        if (state.activeTabId !== "chat") {
+          activateTab("chat");
+        }
         renderConversations();
         renderActiveConversation();
         el.messageInput.focus();
@@ -10709,8 +10722,12 @@
   }
 
   function isCallMessage(message) {
-    const status = String(message?.status || "");
-    return status === "jingle" || status.startsWith("call-");
+    return isCallMessageStatus(message?.status);
+  }
+
+  function isCallMessageStatus(status) {
+    const value = String(status || "");
+    return value === "jingle" || value.startsWith("call-");
   }
 
   function createCallMessageCard(message) {
