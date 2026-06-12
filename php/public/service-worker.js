@@ -1,5 +1,5 @@
-const CACHE_NAME = "teletyptel-webclient-v190";
-const BUILD_VERSION = "20260612-resizable-call-video";
+const CACHE_NAME = "teletyptel-webclient-v191";
+const BUILD_VERSION = "20260612-default-hd-video-capture";
 const ASSETS = [
   "chat.html",
   "dev.html",

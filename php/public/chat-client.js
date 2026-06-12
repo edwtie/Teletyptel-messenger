@@ -8222,22 +8222,22 @@
 
   function videoConstraintsForQuality(quality) {
     if (quality === "qvga") {
-      return { width: { ideal: 320 }, height: { ideal: 240 } };
+      return { width: { ideal: 320 }, height: { ideal: 240 }, aspectRatio: { ideal: 4 / 3 } };
     }
 
     if (quality === "vga") {
-      return { width: { ideal: 640 }, height: { ideal: 480 } };
+      return { width: { ideal: 640 }, height: { ideal: 480 }, aspectRatio: { ideal: 4 / 3 } };
     }
 
     if (quality === "hd") {
-      return { width: { ideal: 1280 }, height: { ideal: 720 } };
+      return { width: { ideal: 1280 }, height: { ideal: 720 }, aspectRatio: { ideal: 16 / 9 } };
     }
 
     if (quality === "fullhd") {
-      return { width: { ideal: 1920 }, height: { ideal: 1080 } };
+      return { width: { ideal: 1920 }, height: { ideal: 1080 }, aspectRatio: { ideal: 16 / 9 } };
     }
 
-    return { width: { ideal: 640 }, height: { ideal: 360 } };
+    return { width: { ideal: 1280 }, height: { ideal: 720 }, aspectRatio: { ideal: 16 / 9 } };
   }
 
   function setMediaStatus(text) {
