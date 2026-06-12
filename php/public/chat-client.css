@@ -2580,6 +2580,56 @@ body:not([data-chat-background="none"]) .message-body {
   font-size: .95em;
 }
 
+.call-message-card {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-width: min(280px, 64vw);
+}
+
+.call-message-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .72);
+  color: #0f766e;
+}
+
+.call-message-icon .material-icon-svg {
+  width: 22px;
+  height: 22px;
+}
+
+.call-message-card.missed .call-message-icon {
+  color: #dc2626;
+}
+
+.call-message-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.call-message-text strong,
+.call-message-text span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.call-message-text strong {
+  color: #0f172a;
+  font-size: 15px;
+}
+
+.call-message-text span {
+  color: #334155;
+  font-size: 13px;
+}
+
 .message-link {
   color: #0f766e;
   text-decoration: underline;

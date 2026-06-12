@@ -8484,6 +8484,23 @@
     updateTotalConversationTextPanel(conversation);
   }
 
+  function callSummaryText(call, status) {
+    const title = isTotalConversationCall(call)
+      ? t("button.call_total_conversation", "Total conversation")
+      : (call?.mediaKind === "video" ? t("button.call_audio_video", "Audio + video") : t("button.call_audio", "Audio"));
+    if (status === "missed") {
+      return `${t("call.missed", "Gemiste oproep")} - ${title}`;
+    }
+    if (status === "rejected") {
+      return `${t("call.rejected", "Call rejected")} - ${title}`;
+    }
+    if (status === "failed") {
+      return `${t("call.failed", "Call failed")} - ${title}`;
+    }
+
+    return title;
+  }
+
   async function openLocalMedia(call) {
     if (call.localStream) {
       return call.localStream;
@@ -8813,6 +8830,39 @@
     refreshOpenTabPanel();
   }
 
+  function addCallSummaryMessage(call, status = "ended") {
+    if (!call || !isTotalConversationCall(call)) {
+      return;
+    }
+
+    const conversation = state.conversations.find((item) => addressMatches(item.peer, call.peer))
+      || ensureConversationForPeer(call.peer, "contact", displayNameForJid(call.peer));
+    if (!conversation) {
+      return;
+    }
+
+    const startedAt = call.historyStartedAt instanceof Date ? call.historyStartedAt : new Date();
+    const durationSeconds = Math.round(Math.max(0, Date.now() - startedAt.getTime()) / 1000);
+    const direction = call.role === "caller" ? "self" : "peer";
+    const message = addMessage(
+      direction,
+      callSummaryText(call, status),
+      `call-${status}`,
+      direction === "peer" ? call.peer : null,
+      null,
+      conversation.id);
+    if (message) {
+      message.callInfo = {
+        status,
+        mediaKind: call.mediaKind,
+        rttEnabled: call.rttEnabled,
+        durationSeconds,
+        peer: call.peer
+      };
+      updateMessageElement(message);
+    }
+  }
+
   function cleanupCall(notifyRemote, historyStatus = "ended") {
     const call = state.call;
     if (!call) {
@@ -8821,6 +8871,7 @@
     }
 
     persistConversationHistoryCall(call, historyStatus);
+    addCallSummaryMessage(call, historyStatus);
 
     if (notifyRemote) {
       sendJingleEnvelope("session-terminate", {
@@ -10610,7 +10661,11 @@
 
     const body = document.createElement("div");
     body.className = "message-body";
-    renderRichText(body, visibleMessageText(message), message.stylingDisabled);
+    if (isCallMessage(message)) {
+      body.appendChild(createCallMessageCard(message));
+    } else {
+      renderRichText(body, visibleMessageText(message), message.stylingDisabled);
+    }
     if (!message.retracted && message.attachment) {
       body.appendChild(createAttachmentElement(message.attachment));
     }
@@ -10642,6 +10697,54 @@
     }
 
     return message.text || "";
+  }
+
+  function isCallMessage(message) {
+    const status = String(message?.status || "");
+    return status === "jingle" || status.startsWith("call-");
+  }
+
+  function createCallMessageCard(message) {
+    const card = document.createElement("div");
+    card.className = "call-message-card";
+    const status = String(message.status || "");
+    card.classList.toggle("missed", status === "call-missed" || status === "call-failed");
+
+    const icon = document.createElement("span");
+    icon.className = "call-message-icon";
+    icon.appendChild(createMaterialIcon(status === "call-missed" || status === "call-failed" ? "callEnd" : "call"));
+
+    const text = document.createElement("div");
+    text.className = "call-message-text";
+    const title = document.createElement("strong");
+    title.textContent = visibleMessageText(message) || t("button.call_total_conversation", "Total conversation");
+    const meta = document.createElement("span");
+    meta.textContent = callMessageMetaText(message);
+    text.append(title, meta);
+
+    card.append(icon, text);
+    return card;
+  }
+
+  function callMessageMetaText(message) {
+    const info = message.callInfo || {};
+    const status = String(message.status || "");
+    if (status === "call-missed") {
+      return t("call.missed_action", "Gemist - terugbellen mogelijk");
+    }
+    if (status === "call-rejected") {
+      return t("call.rejected", "Call rejected");
+    }
+    if (status === "call-failed") {
+      return t("call.failed", "Call failed");
+    }
+    if (Number(info.durationSeconds) > 0) {
+      return formatDuration(info.durationSeconds);
+    }
+    if (status === "jingle") {
+      return t("call.started", "Oproep gestart");
+    }
+    return t("history.status_ended", "beeindigd");
   }
 
   function shouldShowMessageAvatar(message) {
