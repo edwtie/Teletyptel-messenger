@@ -62,6 +62,7 @@
   const blockedJidsStorageKeyBase = "teletyptel.blockedJids";
   const locationSettingsStorageKeyBase = "teletyptel.locationSettings";
   const chatBackgroundStorageKeyBase = "teletyptel.chatBackground";
+  const historySettingsStorageKeyBase = "teletyptel.historySettings";
   const accountApiPath = "api/account.php";
   const historyApiPath = "api/history.php";
   const linkPreviewApiPath = "api/link-preview.php";
@@ -279,6 +280,12 @@
       transientReconnectTimer: null
     },
     activeTabId: "chat",
+    conversationHistory: {
+      calls: [],
+      selectedId: null,
+      loaded: false
+    },
+    historySettings: loadHistorySettings(sessionProfile),
     sequence: 0,
     previousText: "",
     editingMessage: null,
@@ -1316,6 +1323,11 @@
     return normalized === "default" ? chatBackgroundStorageKeyBase : `${chatBackgroundStorageKeyBase}.${normalized}`;
   }
 
+  function historySettingsStorageKeyFor(profile) {
+    const normalized = sanitizeSessionProfile(profile);
+    return normalized === "default" ? historySettingsStorageKeyBase : `${historySettingsStorageKeyBase}.${normalized}`;
+  }
+
   function loadBlockedJids(profile) {
     const saved = localStorage.getItem(blockedJidsStorageKeyFor(profile));
     if (!saved) {
@@ -1360,6 +1372,47 @@
     localStorage.setItem(
       locationSettingsStorageKeyFor(state.sessionProfile),
       JSON.stringify(state.location.settings));
+  }
+
+  function loadHistorySettings(profile) {
+    const saved = localStorage.getItem(historySettingsStorageKeyFor(profile));
+    if (!saved) {
+      return defaultHistorySettings();
+    }
+
+    try {
+      return normalizeHistorySettings({
+        ...defaultHistorySettings(),
+        ...JSON.parse(saved)
+      });
+    } catch {
+      localStorage.removeItem(historySettingsStorageKeyFor(profile));
+      return defaultHistorySettings();
+    }
+  }
+
+  function saveHistorySettings() {
+    state.historySettings = normalizeHistorySettings(state.historySettings);
+    localStorage.setItem(
+      historySettingsStorageKeyFor(state.sessionProfile),
+      JSON.stringify(state.historySettings));
+  }
+
+  function defaultHistorySettings() {
+    return {
+      saveChat: true,
+      saveTotalConversation: true,
+      retention: "365"
+    };
+  }
+
+  function normalizeHistorySettings(settings) {
+    const retention = String(settings?.retention ?? "365");
+    return {
+      saveChat: settings?.saveChat !== false,
+      saveTotalConversation: settings?.saveTotalConversation !== false,
+      retention: ["30", "90", "365", "730", "1825", "unlimited"].includes(retention) ? retention : "365"
+    };
   }
 
   function normalizeLocationSettings(settings) {
@@ -1549,6 +1602,7 @@
           cleanOauthUrl();
         }
         await loadMessageHistory();
+        await loadConversationHistory();
       }
       await loadLanguage(state.account.preferredLanguage ?? "eng");
       const provider = await fetchJson(`config/providers/${encodeURIComponent(state.account.providerId)}.json`);
@@ -1885,7 +1939,7 @@
   }
 
   function persistHistoryMessage(conversation, message) {
-    if (!state.account?.accountId || !conversation || !message || message.draft || message.status === "history") {
+    if (!state.historySettings.saveChat || !state.account?.accountId || !conversation || !message || message.draft || message.status === "history") {
       return;
     }
 
@@ -2127,6 +2181,58 @@
     updateAccountStatus(t("account.google_redirecting", "Opening Google sign-in..."));
     const target = new URL("api/auth/google/start", location.href);
     location.assign(target.toString());
+  }
+
+  async function loadConversationHistory() {
+    if (!state.account?.accountId) {
+      return false;
+    }
+
+    try {
+      const response = await fetch(`${historyApiPath}?accountId=${encodeURIComponent(state.account.accountId)}&type=calls&limit=200`, {
+        cache: "no-store"
+      });
+      if (response.status === 404 || response.status === 401) {
+        appendDebug("conversation-history", `History unavailable: ${response.status}`);
+        return false;
+      }
+
+      if (!response.ok) {
+        throw new Error(`history API returned ${response.status}`);
+      }
+
+      const payload = await response.json();
+      if (!payload.ok || !Array.isArray(payload.calls)) {
+        return false;
+      }
+
+      state.conversationHistory.calls = payload.calls.map(normalizeConversationHistoryCall);
+      state.conversationHistory.loaded = true;
+      refreshOpenTabPanel();
+      appendDebug("conversation-history", `Loaded ${payload.calls.length} calls`);
+      return true;
+    } catch (error) {
+      appendDebug("conversation-history-error", error.message);
+      return false;
+    }
+  }
+
+  function normalizeConversationHistoryCall(item) {
+    return {
+      callId: String(item.callId || "call-" + createShortId()),
+      conversationPeer: String(item.conversationPeer || ""),
+      conversationName: String(item.conversationName || ""),
+      conversationKind: item.conversationKind === "group" ? "group" : "contact",
+      direction: item.direction === "self" ? "self" : "peer",
+      callType: ["audio", "video", "total"].includes(item.callType) ? item.callType : "total",
+      status: ["started", "ended", "missed", "rejected", "failed"].includes(item.status) ? item.status : "ended",
+      startedAt: item.startedAt || new Date().toISOString(),
+      endedAt: item.endedAt || null,
+      durationSeconds: Math.max(0, Number(item.durationSeconds || 0)),
+      transcript: Array.isArray(item.transcript) ? item.transcript : [],
+      media: Array.isArray(item.media) ? item.media : [],
+      note: String(item.note || "")
+    };
   }
 
   function startAuth0LoginFromDialog() {
@@ -2777,6 +2883,7 @@
     appendDebug("account", `Server saved ${el.jidInput.value}`);
     setAccountReady(true);
     await loadMessageHistory();
+    await loadConversationHistory();
     return { profile: state.account, databaseSaved: true };
   }
 
@@ -3335,6 +3442,7 @@
     })) ?? [];
     return [
       ...(state.provider?.announcements ? [{ id: "news", title: t("tab.news", "News"), type: "builtin" }] : []),
+      { id: "history", title: t("tab.history", "History"), type: "builtin" },
       ...providerTabs
     ];
   }
@@ -3393,6 +3501,8 @@
     const card = createProviderCard();
     if (tab.id === "news") {
       renderNewsTab(card);
+    } else if (tab.id === "history") {
+      renderHistoryTab(card);
     } else {
       card.appendChild(createTextBlock(tab.title, t("tab.builtin_text", "Built-in Teletyptel tab.")));
     }
@@ -3534,6 +3644,286 @@
     });
     label.append(text, select);
     return label;
+  }
+
+  function renderHistoryTab(card) {
+    card.appendChild(createTextBlock(
+      t("history.title", "Gespreksgeschiedenis"),
+      t("history.text", "Chat en Totale Conversatie worden bewaard volgens de instellingen van dit account.")));
+    card.appendChild(createHistorySettingsPanel());
+
+    const layout = document.createElement("div");
+    layout.className = "history-layout";
+    const list = document.createElement("div");
+    list.className = "history-list";
+    const detail = document.createElement("div");
+    detail.className = "history-detail";
+    renderHistoryList(list);
+    renderHistoryDetail(detail);
+    layout.append(list, detail);
+    card.appendChild(layout);
+  }
+
+  function createHistorySettingsPanel() {
+    const panel = document.createElement("section");
+    panel.className = "history-settings";
+    const chatLabel = createHistoryToggle(
+      t("history.save_chat", "Chat bewaren"),
+      state.historySettings.saveChat,
+      (checked) => {
+        state.historySettings.saveChat = checked;
+        saveHistorySettings();
+        refreshOpenTabPanel();
+      });
+    const tcLabel = createHistoryToggle(
+      t("history.save_tc", "Totale Conversatie bewaren"),
+      state.historySettings.saveTotalConversation,
+      (checked) => {
+        state.historySettings.saveTotalConversation = checked;
+        saveHistorySettings();
+        refreshOpenTabPanel();
+      });
+    const retention = document.createElement("label");
+    retention.className = "history-retention";
+    const retentionText = document.createElement("span");
+    retentionText.textContent = t("history.retention", "Bewaartermijn");
+    const select = document.createElement("select");
+    for (const [value, label] of historyRetentionOptions()) {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = label;
+      option.selected = state.historySettings.retention === value;
+      select.appendChild(option);
+    }
+    select.addEventListener("change", () => {
+      state.historySettings.retention = select.value;
+      saveHistorySettings();
+      refreshOpenTabPanel();
+    });
+    retention.append(retentionText, select);
+    panel.append(chatLabel, tcLabel, retention);
+    return panel;
+  }
+
+  function createHistoryToggle(labelText, checked, onChange) {
+    const label = document.createElement("label");
+    label.className = "history-toggle";
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.checked = checked;
+    input.addEventListener("change", () => onChange(input.checked));
+    const text = document.createElement("span");
+    text.textContent = labelText;
+    label.append(input, text);
+    return label;
+  }
+
+  function historyRetentionOptions() {
+    return [
+      ["30", t("history.retention_30", "30 dagen")],
+      ["90", t("history.retention_90", "90 dagen")],
+      ["365", t("history.retention_365", "1 jaar")],
+      ["730", t("history.retention_730", "2 jaar")],
+      ["1825", t("history.retention_1825", "5 jaar")],
+      ["unlimited", t("history.retention_unlimited", "Onbeperkt")]
+    ];
+  }
+
+  function renderHistoryList(container) {
+    const entries = conversationHistoryEntries();
+    if (!entries.length) {
+      const empty = document.createElement("p");
+      empty.className = "history-empty";
+      empty.textContent = t("history.empty", "Nog geen gespreksgeschiedenis.");
+      container.appendChild(empty);
+      return;
+    }
+
+    let previousGroup = "";
+    for (const entry of entries) {
+      const group = historyGroupLabel(entry.startedAt || entry.timestamp);
+      if (group !== previousGroup) {
+        const heading = document.createElement("strong");
+        heading.className = "history-group";
+        heading.textContent = group;
+        container.appendChild(heading);
+        previousGroup = group;
+      }
+
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "history-item";
+      button.classList.toggle("selected", selectedHistoryId() === entry.id);
+      button.addEventListener("click", () => {
+        state.conversationHistory.selectedId = entry.id;
+        refreshOpenTabPanel();
+      });
+      const title = document.createElement("span");
+      title.className = "history-item-title";
+      title.textContent = entry.title;
+      const meta = document.createElement("span");
+      meta.className = "history-item-meta";
+      meta.textContent = entry.meta;
+      const preview = document.createElement("span");
+      preview.className = "history-item-preview";
+      preview.textContent = entry.preview;
+      button.append(title, meta, preview);
+      container.appendChild(button);
+    }
+  }
+
+  function renderHistoryDetail(container) {
+    const entry = selectedHistoryEntry();
+    if (!entry) {
+      const empty = document.createElement("p");
+      empty.className = "history-empty";
+      empty.textContent = t("history.select", "Kies links een gesprek om terug te lezen.");
+      container.appendChild(empty);
+      return;
+    }
+
+    const title = document.createElement("h3");
+    title.textContent = entry.title;
+    const meta = document.createElement("p");
+    meta.className = "history-detail-meta";
+    meta.textContent = entry.meta;
+    const actions = document.createElement("div");
+    actions.className = "history-actions";
+    const exportButton = createActionButton(t("button.export", "Exporteren"), () => exportHistoryEntry(entry), { icon: "download" });
+    actions.appendChild(exportButton);
+    container.append(title, meta, actions);
+
+    if (entry.kind === "call") {
+      renderHistoryTranscript(container, entry.source.transcript);
+    } else {
+      const body = document.createElement("p");
+      body.className = "history-message-text";
+      body.textContent = entry.source.text || "";
+      container.appendChild(body);
+    }
+  }
+
+  function renderHistoryTranscript(container, transcript) {
+    const list = document.createElement("div");
+    list.className = "history-transcript";
+    const lines = Array.isArray(transcript) ? transcript : [];
+    if (!lines.length) {
+      const empty = document.createElement("p");
+      empty.className = "history-empty";
+      empty.textContent = t("history.no_transcript", "Nog geen teksttranscript bewaard.");
+      list.appendChild(empty);
+      container.appendChild(list);
+      return;
+    }
+
+    for (const line of lines) {
+      const row = document.createElement("div");
+      row.className = "history-transcript-line";
+      const who = document.createElement("strong");
+      who.textContent = line.direction === "self" ? t("tc.local_label", "You") : displayNameForJid(line.from || "");
+      const text = document.createElement("p");
+      text.textContent = line.text || "";
+      row.append(who, text);
+      list.appendChild(row);
+    }
+    container.appendChild(list);
+  }
+
+  function conversationHistoryEntries() {
+    const callEntries = state.conversationHistory.calls.map((call) => ({
+      id: `call:${call.callId}`,
+      kind: "call",
+      startedAt: call.startedAt,
+      title: call.conversationName || displayNameForJid(call.conversationPeer),
+      meta: `${historyCallTypeText(call)} - ${historyStatusText(call.status)} - ${formatHistoryDateTime(call.startedAt)}${call.durationSeconds ? ` - ${formatDuration(call.durationSeconds)}` : ""}`,
+      preview: call.transcript?.[0]?.text || call.note || t("call.total_started", "Total conversation started"),
+      source: call
+    }));
+    const messageEntries = state.conversations.flatMap((conversation) => (conversation.messages || [])
+      .filter((message) => !message.draft && message.status !== "history")
+      .map((message) => ({
+        id: `message:${message.xmppId || message.id}`,
+        kind: "message",
+        startedAt: message.timestamp instanceof Date ? message.timestamp.toISOString() : new Date().toISOString(),
+        title: conversationDisplayName(conversation),
+        meta: `${message.direction === "self" ? t("history.sent", "Verzonden") : t("history.received", "Ontvangen")} - ${formatHistoryDateTime(message.timestamp)}`,
+        preview: message.text || attachmentMetaText(message.attachment) || "",
+        source: message
+      })));
+    return [...callEntries, ...messageEntries]
+      .sort((a, b) => new Date(b.startedAt) - new Date(a.startedAt));
+  }
+
+  function selectedHistoryId() {
+    const entries = conversationHistoryEntries();
+    return state.conversationHistory.selectedId || entries[0]?.id || "";
+  }
+
+  function selectedHistoryEntry() {
+    const entries = conversationHistoryEntries();
+    return entries.find((entry) => entry.id === selectedHistoryId()) || entries[0] || null;
+  }
+
+  function historyGroupLabel(value) {
+    const date = new Date(value || Date.now());
+    const today = new Date();
+    if (date.toDateString() === today.toDateString()) {
+      return t("history.today", "Vandaag");
+    }
+    const weekAgo = new Date();
+    weekAgo.setDate(today.getDate() - 7);
+    return date >= weekAgo ? t("history.this_week", "Deze week") : t("history.earlier", "Eerder");
+  }
+
+  function historyCallTypeText(call) {
+    if (call.callType === "total") {
+      return t("button.call_total_conversation", "Totale conversatie");
+    }
+    return call.callType === "video"
+      ? t("button.call_audio_video", "Audio + video")
+      : t("button.call_audio", "Audio");
+  }
+
+  function historyStatusText(status) {
+    const map = {
+      ended: t("history.status_ended", "beeindigd"),
+      missed: t("history.status_missed", "gemist"),
+      rejected: t("history.status_rejected", "geweigerd"),
+      failed: t("history.status_failed", "mislukt"),
+      started: t("history.status_started", "gestart")
+    };
+    return map[status] || status;
+  }
+
+  function formatHistoryDateTime(value) {
+    const date = value instanceof Date ? value : new Date(value || Date.now());
+    return date.toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" });
+  }
+
+  function formatDuration(seconds) {
+    const total = Math.max(0, Number(seconds || 0));
+    const minutes = Math.floor(total / 60);
+    const rest = Math.floor(total % 60);
+    return minutes > 0 ? `${minutes}:${String(rest).padStart(2, "0")}` : `0:${String(rest).padStart(2, "0")}`;
+  }
+
+  function exportHistoryEntry(entry) {
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      type: entry.kind,
+      title: entry.title,
+      meta: entry.meta,
+      data: entry.source
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `teletyptel-gespreksgeschiedenis-${entry.id.replace(/[^a-z0-9_-]+/gi, "-")}.json`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
   function renderNewsTab(card) {
@@ -7382,7 +7772,7 @@
       addMessage("self", callStartedText(call), "jingle");
     } catch (error) {
       setCallStatus(`${t("call.failed", "Call failed")}: ${error.message}`);
-      cleanupCall(false);
+      cleanupCall(false, "failed");
     }
   }
 
@@ -7419,7 +7809,7 @@
         reason: "failed-application",
         reasonText: error.message
       });
-      cleanupCall(false);
+      cleanupCall(false, "failed");
     }
   }
 
@@ -7434,7 +7824,7 @@
       reason: "decline",
       reasonText: t("call.rejected", "Call rejected")
     });
-    cleanupCall(false);
+    cleanupCall(false, "rejected");
     setCallStatus(t("call.rejected", "Call rejected"));
   }
 
@@ -7449,7 +7839,7 @@
       reason: "success",
       reasonText: t("call.ended", "Call ended")
     });
-    cleanupCall(false);
+    cleanupCall(false, "ended");
     setCallStatus(t("call.ended", "Call ended"));
   }
 
@@ -7524,7 +7914,7 @@
     } else if (action === "session-info") {
       handleIncomingSessionInfo(envelope);
     } else if (action === "session-terminate") {
-      cleanupCall(false);
+      cleanupCall(false, state.call?.incomingOffer ? "missed" : "ended");
       setCallStatus(envelope.reasonText || t("call.remote_ended", "Remote ended the call"));
     }
   }
@@ -7653,7 +8043,8 @@
       rttSync: rttEnabled ? createJingleRttSyncDescriptor(sid, "offered") : null,
       incomingOffer: null,
       pendingCandidates: [],
-      remoteDescriptionSet: false
+      remoteDescriptionSet: false,
+      historyStartedAt: new Date()
     };
   }
 
@@ -8327,12 +8718,109 @@
     updateCallUi();
   }
 
-  function cleanupCall(notifyRemote) {
+  function persistConversationHistoryCall(call, status = "ended") {
+    if (!state.historySettings.saveTotalConversation || !state.account?.accountId || !isTotalConversationCall(call)) {
+      return;
+    }
+
+    const conversation = state.conversations.find((item) => addressMatches(item.peer, call.peer))
+      || ensureConversationForPeer(call.peer, "contact", displayNameForJid(call.peer));
+    const startedAt = call.historyStartedAt instanceof Date ? call.historyStartedAt : new Date();
+    const endedAt = new Date();
+    const entry = normalizeConversationHistoryCall({
+      callId: call.sid,
+      conversationPeer: call.peer,
+      conversationName: conversation ? conversationDisplayName(conversation) : displayNameForJid(call.peer),
+      conversationKind: conversation?.kind === "group" ? "group" : "contact",
+      direction: call.role === "caller" ? "self" : "peer",
+      callType: "total",
+      status,
+      startedAt: startedAt.toISOString(),
+      endedAt: endedAt.toISOString(),
+      durationSeconds: Math.round(Math.max(0, endedAt.getTime() - startedAt.getTime()) / 1000),
+      transcript: conversation ? conversationHistoryTranscript(conversation, startedAt) : [],
+      media: [],
+      note: t("history.tc_saved_note", "Total Conversation saved in conversation history.")
+    });
+
+    upsertConversationHistoryCall(entry);
+    postHistory({
+      action: "save_call",
+      accountId: state.account.accountId,
+      callId: entry.callId,
+      conversationPeer: entry.conversationPeer,
+      conversationName: entry.conversationName,
+      conversationKind: entry.conversationKind,
+      direction: entry.direction,
+      callType: entry.callType,
+      status: entry.status,
+      startedAt: entry.startedAt,
+      endedAt: entry.endedAt,
+      durationSeconds: entry.durationSeconds,
+      transcript: entry.transcript,
+      media: entry.media,
+      note: entry.note
+    });
+  }
+
+  function conversationHistoryTranscript(conversation, startedAt) {
+    const since = startedAt instanceof Date ? startedAt.getTime() : 0;
+    const messages = (conversation.messages || [])
+      .filter((message) => {
+        const time = message.timestamp instanceof Date ? message.timestamp.getTime() : 0;
+        return time >= since && ["jingle-rtt", "rtt", "message"].includes(message.status || "message");
+      })
+      .slice(-100)
+      .map((message) => ({
+        direction: message.direction === "self" ? "self" : "peer",
+        from: message.from || "",
+        text: message.text || "",
+        timestamp: message.timestamp instanceof Date ? message.timestamp.toISOString() : new Date().toISOString()
+      }))
+      .filter((message) => message.text.trim() !== "");
+
+    if (conversation.remoteText) {
+      messages.push({
+        direction: "peer",
+        from: conversation.remoteFrom || conversation.peer,
+        text: conversation.remoteText,
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    const localText = el.messageInput?.value || "";
+    if (activeConversation()?.id === conversation.id && localText.trim()) {
+      messages.push({
+        direction: "self",
+        from: currentFromJid(),
+        text: localText,
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    return messages;
+  }
+
+  function upsertConversationHistoryCall(entry) {
+    const normalized = normalizeConversationHistoryCall(entry);
+    const index = state.conversationHistory.calls.findIndex((item) => item.callId === normalized.callId);
+    if (index >= 0) {
+      state.conversationHistory.calls[index] = normalized;
+    } else {
+      state.conversationHistory.calls.unshift(normalized);
+    }
+    state.conversationHistory.calls.sort((a, b) => new Date(b.startedAt) - new Date(a.startedAt));
+    refreshOpenTabPanel();
+  }
+
+  function cleanupCall(notifyRemote, historyStatus = "ended") {
     const call = state.call;
     if (!call) {
       updateCallUi();
       return;
     }
+
+    persistConversationHistoryCall(call, historyStatus);
 
     if (notifyRemote) {
       sendJingleEnvelope("session-terminate", {

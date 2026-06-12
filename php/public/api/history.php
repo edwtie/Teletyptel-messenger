@@ -37,6 +37,11 @@ function readHistory(): void
     $limit = max(1, min(500, (int)($_GET['limit'] ?? 200)));
     $pdo = Database::connect();
     ensureMessageHistorySchema($pdo);
+    ensureConversationHistorySchema($pdo);
+    if (cleanHistoryText($_GET['type'] ?? '', 32) === 'calls') {
+        readConversationHistory($pdo, $accountId, $limit);
+        return;
+    }
     $statement = $pdo->prepare(
         'SELECT * FROM message_history
          WHERE account_id = :account_id
@@ -70,12 +75,32 @@ function writeHistory(): void
     $action = cleanHistoryText($input['action'] ?? 'save', 32);
     $pdo = Database::connect();
     ensureMessageHistorySchema($pdo);
+    ensureConversationHistorySchema($pdo);
     if ($action === 'delete') {
         deleteHistoryMessage($pdo, $accountId, $input);
         return;
     }
+    if ($action === 'save_call') {
+        saveConversationHistory($pdo, $accountId, $input);
+        return;
+    }
 
     saveHistoryMessage($pdo, $accountId, $input);
+}
+
+function readConversationHistory(PDO $pdo, string $accountId, int $limit): void
+{
+    $statement = $pdo->prepare(
+        'SELECT * FROM conversation_history
+         WHERE account_id = :account_id
+         ORDER BY started_at DESC, id DESC
+         LIMIT ' . $limit
+    );
+    $statement->execute(['account_id' => $accountId]);
+    echo json_encode([
+        'ok' => true,
+        'calls' => array_map('conversationHistoryRowToClient', $statement->fetchAll() ?: [])
+    ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 }
 
 function saveHistoryMessage(PDO $pdo, string $accountId, array $input): void
@@ -168,6 +193,64 @@ function deleteHistoryMessage(PDO $pdo, string $accountId, array $input): void
     echo json_encode(['ok' => true, 'updated' => $statement->rowCount()]);
 }
 
+function saveConversationHistory(PDO $pdo, string $accountId, array $input): void
+{
+    $callId = cleanHistoryText($input['callId'] ?? '', 160);
+    $peer = cleanHistoryText($input['conversationPeer'] ?? '', 255);
+    if ($callId === '' || $peer === '') {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'missing_call']);
+        return;
+    }
+
+    $startedAt = normalizeHistoryTimestamp($input['startedAt'] ?? null);
+    $endedAtValue = $input['endedAt'] ?? null;
+    $endedAt = $endedAtValue ? normalizeHistoryTimestamp($endedAtValue) : null;
+    $durationSeconds = max(0, (int)($input['durationSeconds'] ?? 0));
+    $statement = $pdo->prepare(
+        'INSERT INTO conversation_history (
+            account_id, call_id, conversation_peer, conversation_name, conversation_kind,
+            direction, call_type, status, started_at, ended_at, duration_seconds,
+            transcript_json, media_json, note
+        ) VALUES (
+            :account_id, :call_id, :conversation_peer, :conversation_name, :conversation_kind,
+            :direction, :call_type, :status, :started_at, :ended_at, :duration_seconds,
+            :transcript_json, :media_json, :note
+        )
+        ON DUPLICATE KEY UPDATE
+            conversation_peer = VALUES(conversation_peer),
+            conversation_name = VALUES(conversation_name),
+            conversation_kind = VALUES(conversation_kind),
+            direction = VALUES(direction),
+            call_type = VALUES(call_type),
+            status = VALUES(status),
+            started_at = VALUES(started_at),
+            ended_at = VALUES(ended_at),
+            duration_seconds = VALUES(duration_seconds),
+            transcript_json = VALUES(transcript_json),
+            media_json = VALUES(media_json),
+            note = VALUES(note)'
+    );
+    $statement->execute([
+        'account_id' => $accountId,
+        'call_id' => $callId,
+        'conversation_peer' => $peer,
+        'conversation_name' => cleanHistoryText($input['conversationName'] ?? '', 255),
+        'conversation_kind' => normalizeHistoryKind($input['conversationKind'] ?? 'contact'),
+        'direction' => normalizeDirection($input['direction'] ?? 'peer'),
+        'call_type' => normalizeCallType($input['callType'] ?? 'total'),
+        'status' => normalizeCallStatus($input['status'] ?? 'ended'),
+        'started_at' => $startedAt,
+        'ended_at' => $endedAt,
+        'duration_seconds' => $durationSeconds,
+        'transcript_json' => encodeHistoryJson($input['transcript'] ?? []),
+        'media_json' => encodeHistoryJson($input['media'] ?? []),
+        'note' => cleanHistoryText($input['note'] ?? '', 1024),
+    ]);
+
+    echo json_encode(['ok' => true]);
+}
+
 function ensureMessageHistorySchema(PDO $pdo): void
 {
     $pdo->exec(
@@ -197,6 +280,33 @@ function ensureMessageHistorySchema(PDO $pdo): void
     );
 }
 
+function ensureConversationHistorySchema(PDO $pdo): void
+{
+    $pdo->exec(
+        'CREATE TABLE IF NOT EXISTS conversation_history (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            account_id VARCHAR(96) NOT NULL,
+            call_id VARCHAR(160) NOT NULL,
+            conversation_peer VARCHAR(255) NOT NULL,
+            conversation_name VARCHAR(255) NOT NULL DEFAULT "",
+            conversation_kind VARCHAR(32) NOT NULL DEFAULT "contact",
+            direction VARCHAR(16) NOT NULL,
+            call_type VARCHAR(32) NOT NULL DEFAULT "total",
+            status VARCHAR(32) NOT NULL DEFAULT "ended",
+            started_at DATETIME(3) NOT NULL,
+            ended_at DATETIME(3) NULL,
+            duration_seconds INT UNSIGNED NOT NULL DEFAULT 0,
+            transcript_json MEDIUMTEXT NULL,
+            media_json MEDIUMTEXT NULL,
+            note TEXT NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_conversation_history_account_call (account_id, call_id),
+            KEY idx_conversation_history_account_peer_time (account_id, conversation_peer, started_at)
+        ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
+    );
+}
+
 function historyRowToClient(array $row): array
 {
     return [
@@ -215,6 +325,25 @@ function historyRowToClient(array $row): array
         'retracted' => (bool)$row['retracted'],
         'retraction' => decodeHistoryJson($row['retraction_json'] ?? null),
         'timestamp' => $row['message_timestamp'],
+    ];
+}
+
+function conversationHistoryRowToClient(array $row): array
+{
+    return [
+        'callId' => $row['call_id'],
+        'conversationPeer' => $row['conversation_peer'],
+        'conversationName' => $row['conversation_name'],
+        'conversationKind' => $row['conversation_kind'],
+        'direction' => $row['direction'],
+        'callType' => $row['call_type'],
+        'status' => $row['status'],
+        'startedAt' => $row['started_at'],
+        'endedAt' => $row['ended_at'],
+        'durationSeconds' => (int)$row['duration_seconds'],
+        'transcript' => decodeHistoryJson($row['transcript_json'] ?? null) ?: [],
+        'media' => decodeHistoryJson($row['media_json'] ?? null) ?: [],
+        'note' => $row['note'] ?? '',
     ];
 }
 
@@ -263,6 +392,18 @@ function normalizeDirection(mixed $value): string
 function normalizeHistoryKind(mixed $value): string
 {
     return (string)$value === 'group' ? 'group' : 'contact';
+}
+
+function normalizeCallType(mixed $value): string
+{
+    $type = (string)$value;
+    return in_array($type, ['audio', 'video', 'total'], true) ? $type : 'total';
+}
+
+function normalizeCallStatus(mixed $value): string
+{
+    $status = (string)$value;
+    return in_array($status, ['started', 'ended', 'missed', 'rejected', 'failed'], true) ? $status : 'ended';
 }
 
 function cleanHistoryText(mixed $value, int $maxLength): string

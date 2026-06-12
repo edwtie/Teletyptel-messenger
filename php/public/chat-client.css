@@ -2008,6 +2008,147 @@ body:not([data-chat-background="none"]) .message-body {
   padding-top: 8px;
 }
 
+.history-settings {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid #3f536d;
+  border-radius: var(--radius);
+  background: rgba(19, 32, 52, .72);
+  padding: 10px;
+}
+
+.history-toggle,
+.history-retention {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.history-toggle input {
+  width: auto;
+}
+
+.history-retention select {
+  width: auto;
+  min-width: 128px;
+  padding: 6px 8px;
+}
+
+.history-layout {
+  display: grid;
+  grid-template-columns: minmax(220px, 320px) minmax(0, 1fr);
+  gap: 12px;
+  min-height: 360px;
+}
+
+.history-list,
+.history-detail {
+  min-width: 0;
+  border: 1px solid #3f536d;
+  border-radius: var(--radius);
+  background: rgba(19, 32, 52, .72);
+  padding: 10px;
+}
+
+.history-list {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  max-height: 62vh;
+  overflow: auto;
+}
+
+.history-group {
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.history-item {
+  display: grid;
+  gap: 3px;
+  width: 100%;
+  border: 1px solid #3f536d;
+  border-radius: 8px;
+  background: #132034;
+  color: var(--text);
+  padding: 9px;
+  text-align: left;
+}
+
+.history-item.selected {
+  border-color: var(--accent);
+  background: rgba(37, 99, 235, .2);
+}
+
+.history-item-title,
+.history-detail h3 {
+  font-weight: 800;
+}
+
+.history-item-meta,
+.history-item-preview,
+.history-detail-meta,
+.history-empty {
+  color: var(--muted);
+}
+
+.history-item-preview {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-detail {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+}
+
+.history-detail h3,
+.history-detail p {
+  margin: 0;
+}
+
+.history-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.history-transcript {
+  display: grid;
+  gap: 8px;
+}
+
+.history-transcript-line {
+  display: grid;
+  gap: 3px;
+  border: 1px solid #3f536d;
+  border-radius: 8px;
+  background: rgba(11, 18, 32, .56);
+  padding: 8px;
+}
+
+.history-transcript-line p,
+.history-message-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 760px) {
+  .history-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .history-list {
+    max-height: 34vh;
+  }
+}
+
 .location-card {
   display: grid;
   gap: 6px;
