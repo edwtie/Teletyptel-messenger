@@ -1,0 +1,49 @@
+{
+  "schema": "https://www.tiedragon.com/teletyptel/schemas/provider-manifest-v1.json",
+  "providerId": "google",
+  "name": "Google",
+  "version": "1.0",
+  "homepage": "https://accounts.google.com",
+  "capabilities": [
+    "phone:sms",
+    "caption:local",
+    "pubsub:announcements"
+  ],
+  "announcements": {
+    "node": "urn:tiedragon:teletyptel:announcements",
+    "items": [
+      {
+        "id": "google-login-history",
+        "title": "Google login",
+        "summary": "Google accounts can use TeleTypTel chat and Total Conversation history.",
+        "category": "account",
+        "priority": "normal",
+        "published": "2026-06-12T00:00:00Z",
+        "link": "https://dev.teletyptel.nl/chat.html"
+      }
+    ]
+  },
+  "tabs": [
+    {
+      "id": "support",
+      "title": "Support",
+      "type": "web",
+      "url": "https://dev.teletyptel.nl/chat.html",
+      "sandbox": true,
+      "capabilities": [
+        "chat:none",
+        "profile:read"
+      ]
+    },
+    {
+      "id": "captions",
+      "title": "Captions",
+      "type": "provider-service",
+      "service": "caption",
+      "sandbox": true,
+      "capabilities": [
+        "caption:local"
+      ]
+    }
+  ]
+}

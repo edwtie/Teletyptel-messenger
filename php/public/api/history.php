@@ -112,7 +112,7 @@ function readConversationHistory(PDO $pdo, array $accountIds, int $limit): void
 
 function saveHistoryMessage(PDO $pdo, string $accountId, array $input): void
 {
-    $messageId = cleanHistoryText($input['messageId'] ?? '', 160);
+    $messageId = cleanHistoryText($input['messageId'] ?? '', 150);
     $peer = cleanHistoryText($input['conversationPeer'] ?? '', 255);
     if ($messageId === '' || $peer === '') {
         http_response_code(400);
@@ -170,7 +170,7 @@ function saveHistoryMessage(PDO $pdo, string $accountId, array $input): void
 
 function deleteHistoryMessage(PDO $pdo, string $accountId, array $input): void
 {
-    $messageId = cleanHistoryText($input['messageId'] ?? $input['targetMessageId'] ?? '', 160);
+    $messageId = cleanHistoryText($input['messageId'] ?? $input['targetMessageId'] ?? '', 150);
     if ($messageId === '') {
         http_response_code(400);
         echo json_encode(['ok' => false, 'error' => 'missing_message_id']);
@@ -202,7 +202,7 @@ function deleteHistoryMessage(PDO $pdo, string $accountId, array $input): void
 
 function saveConversationHistory(PDO $pdo, string $accountId, array $input): void
 {
-    $callId = cleanHistoryText($input['callId'] ?? '', 160);
+    $callId = cleanHistoryText($input['callId'] ?? '', 150);
     $peer = cleanHistoryText($input['conversationPeer'] ?? '', 255);
     if ($callId === '' || $peer === '') {
         http_response_code(400);
@@ -267,7 +267,7 @@ function ensureMessageHistorySchema(PDO $pdo): void
             conversation_peer VARCHAR(255) NOT NULL,
             conversation_name VARCHAR(255) NOT NULL DEFAULT "",
             conversation_kind VARCHAR(32) NOT NULL DEFAULT "contact",
-            message_id VARCHAR(160) NOT NULL,
+            message_id VARCHAR(150) NOT NULL,
             direction VARCHAR(16) NOT NULL,
             sender_jid VARCHAR(255) NOT NULL DEFAULT "",
             text MEDIUMTEXT NOT NULL,
@@ -282,7 +282,7 @@ function ensureMessageHistorySchema(PDO $pdo): void
             created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             UNIQUE KEY uq_message_history_account_message (account_id, message_id),
-            KEY idx_message_history_account_peer_time (account_id, conversation_peer, message_timestamp)
+            KEY idx_message_history_account_peer_time (account_id, conversation_peer(120), message_timestamp)
         ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
     );
 }
@@ -293,7 +293,7 @@ function ensureConversationHistorySchema(PDO $pdo): void
         'CREATE TABLE IF NOT EXISTS conversation_history (
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
             account_id VARCHAR(96) NOT NULL,
-            call_id VARCHAR(160) NOT NULL,
+            call_id VARCHAR(150) NOT NULL,
             conversation_peer VARCHAR(255) NOT NULL,
             conversation_name VARCHAR(255) NOT NULL DEFAULT "",
             conversation_kind VARCHAR(32) NOT NULL DEFAULT "contact",
@@ -309,7 +309,7 @@ function ensureConversationHistorySchema(PDO $pdo): void
             created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             UNIQUE KEY uq_conversation_history_account_call (account_id, call_id),
-            KEY idx_conversation_history_account_peer_time (account_id, conversation_peer, started_at)
+            KEY idx_conversation_history_account_peer_time (account_id, conversation_peer(120), started_at)
         ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
     );
 }

@@ -167,7 +167,7 @@ CREATE TABLE IF NOT EXISTS message_history (
   conversation_peer VARCHAR(255) NOT NULL,
   conversation_name VARCHAR(255) NOT NULL DEFAULT '',
   conversation_kind VARCHAR(32) NOT NULL DEFAULT 'contact',
-  message_id VARCHAR(160) NOT NULL,
+  message_id VARCHAR(150) NOT NULL,
   direction VARCHAR(16) NOT NULL,
   sender_jid VARCHAR(255) NOT NULL DEFAULT '',
   text MEDIUMTEXT NOT NULL,
@@ -182,8 +182,33 @@ CREATE TABLE IF NOT EXISTS message_history (
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uq_message_history_account_message (account_id, message_id),
-  KEY idx_message_history_account_peer_time (account_id, conversation_peer, message_timestamp),
+  KEY idx_message_history_account_peer_time (account_id, conversation_peer(120), message_timestamp),
   CONSTRAINT fk_message_history_account
+    FOREIGN KEY (account_id) REFERENCES account_profiles(account_id)
+    ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS conversation_history (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  account_id VARCHAR(96) NOT NULL,
+  call_id VARCHAR(150) NOT NULL,
+  conversation_peer VARCHAR(255) NOT NULL,
+  conversation_name VARCHAR(255) NOT NULL DEFAULT '',
+  conversation_kind VARCHAR(32) NOT NULL DEFAULT 'contact',
+  direction VARCHAR(16) NOT NULL,
+  call_type VARCHAR(32) NOT NULL DEFAULT 'total',
+  status VARCHAR(32) NOT NULL DEFAULT 'ended',
+  started_at DATETIME(3) NOT NULL,
+  ended_at DATETIME(3) NULL,
+  duration_seconds INT UNSIGNED NOT NULL DEFAULT 0,
+  transcript_json MEDIUMTEXT NULL,
+  media_json MEDIUMTEXT NULL,
+  note TEXT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_conversation_history_account_call (account_id, call_id),
+  KEY idx_conversation_history_account_peer_time (account_id, conversation_peer(120), started_at),
+  CONSTRAINT fk_conversation_history_account
     FOREIGN KEY (account_id) REFERENCES account_profiles(account_id)
     ON DELETE CASCADE
 );
