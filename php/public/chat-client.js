@@ -78,6 +78,7 @@
   const t140Backspace = "\b";
   const t140Delete = "\u007f";
   const locationStaleAfterMs = 5 * 60 * 1000;
+  const websocketHeartbeatMs = 25 * 1000;
   const locationDurationOptions = [
     [15 * 60 * 1000, "location.duration_15m"],
     [30 * 60 * 1000, "location.duration_30m"],
@@ -278,6 +279,10 @@
       blurTimer: null,
       mediaCaptureUntil: 0,
       transientReconnectTimer: null
+    },
+    websocketHeartbeat: {
+      relayTimer: null,
+      xmppTimer: null
     },
     activeTabId: "chat",
     conversationHistory: {
@@ -4653,6 +4658,57 @@
     return true;
   }
 
+  function startRelayHeartbeat() {
+    stopRelayHeartbeat();
+    state.websocketHeartbeat.relayTimer = window.setInterval(() => {
+      if (state.relaySocket?.readyState !== WebSocket.OPEN) {
+        stopRelayHeartbeat();
+        return;
+      }
+
+      const envelope = createRelayEnvelope("heartbeat", "", "", "relay@localhost");
+      envelope.sentAt = new Date().toISOString();
+      try {
+        state.relaySocket.send(JSON.stringify(envelope));
+        appendDebug("relay-heartbeat", envelope.sentAt);
+      } catch (error) {
+        appendDebug("relay-heartbeat-error", error.message);
+      }
+    }, websocketHeartbeatMs);
+  }
+
+  function stopRelayHeartbeat() {
+    if (state.websocketHeartbeat.relayTimer) {
+      window.clearInterval(state.websocketHeartbeat.relayTimer);
+      state.websocketHeartbeat.relayTimer = null;
+    }
+  }
+
+  function startXmppHeartbeat() {
+    stopXmppHeartbeat();
+    state.websocketHeartbeat.xmppTimer = window.setInterval(() => {
+      if (state.xmppSocket?.readyState !== WebSocket.OPEN || !state.xmppSession?.authenticated) {
+        return;
+      }
+
+      const id = createMessageId("ping");
+      const xml = `<iq xmlns="jabber:client" type="get" id="${escapeXml(id)}"><ping xmlns="urn:xmpp:ping"/></iq>`;
+      try {
+        state.xmppSocket.send(xml);
+        appendDebug("xmpp-heartbeat", id);
+      } catch (error) {
+        appendDebug("xmpp-heartbeat-error", error.message);
+      }
+    }, websocketHeartbeatMs);
+  }
+
+  function stopXmppHeartbeat() {
+    if (state.websocketHeartbeat.xmppTimer) {
+      window.clearInterval(state.websocketHeartbeat.xmppTimer);
+      state.websocketHeartbeat.xmppTimer = null;
+    }
+  }
+
   function connectRelay() {
     if (!state.accountReady || state.accountGateRequired) {
       openAccountDialog({ required: true });
@@ -4673,6 +4729,7 @@
     appendDebug("relay", "Connecting " + relayUrl);
 
     socket.addEventListener("open", () => {
+      startRelayHeartbeat();
       setConnectionStatus(t("status.relay_connected", "Relay connected"), "good");
       setDefaultComposerState();
       updateConnectButtonAvailability();
@@ -4691,6 +4748,7 @@
     });
 
     socket.addEventListener("close", () => {
+      stopRelayHeartbeat();
       setConnectionStatus(t("status.relay_disconnected", "Relay disconnected"), "warn");
       state.relaySocket = null;
       state.clientLifecycle.relayLastSent = null;
@@ -4735,6 +4793,7 @@
 
     if (state.relaySocket) {
       sendPresence("offline");
+      stopRelayHeartbeat();
       state.relaySocket.close();
     }
 
@@ -4750,6 +4809,8 @@
     setAccountReady(false);
     state.clientLifecycle.relayLastSent = null;
     state.clientLifecycle.xmppLastSent = null;
+    stopRelayHeartbeat();
+    stopXmppHeartbeat();
     state.previousText = "";
     state.activeConversationId = null;
     el.messageInput.value = "";
@@ -6362,6 +6423,7 @@
     });
 
     socket.addEventListener("close", () => {
+      stopXmppHeartbeat();
       el.xmppOpenButton.disabled = false;
       el.xmppCloseButton.disabled = true;
       const wasReady = state.accountReady;
@@ -6475,6 +6537,7 @@
     const presence = '<presence xmlns="jabber:client"/>';
     state.xmppSocket.send(presence);
     appendDebug("C", presence);
+    startXmppHeartbeat();
     flushClientLifecycleState("xmpp-ready", true);
     setConnectionStatus(t("status.xmpp_connected", "XMPP connected"), "good");
     updateComposerAvailability();
@@ -6500,6 +6563,7 @@
       appendDebug("C", close);
     }
 
+    stopXmppHeartbeat();
     state.xmppSocket.close();
   }
 
@@ -7192,6 +7256,10 @@
     if (envelope.type === "error") {
       appendDebug("relay-error", envelope.message || JSON.stringify(envelope));
       setConnectionStatus(envelope.message || t("status.relay_error", "Relay error"), "danger");
+      return;
+    }
+
+    if (envelope.type === "heartbeat") {
       return;
     }
 

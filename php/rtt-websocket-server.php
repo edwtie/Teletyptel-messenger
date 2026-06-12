@@ -124,7 +124,7 @@ while (true) {
             if ($message === null) {
                 @fwrite($socket, encodeWebSocketFrame(json_encode([
                     'type' => 'error',
-                    'message' => 'Only JSON RTT, message, delete, presence, client state, location or Jingle call snapshots are accepted.'
+                    'message' => 'Only JSON RTT, message, delete, presence, client state, heartbeat, location or Jingle call snapshots are accepted.'
                 ], JSON_UNESCAPED_SLASHES)));
                 continue;
             }
@@ -434,6 +434,16 @@ function isAllowedRttEnvelope(array $json): bool
         return true;
     }
 
+    if ($type === 'heartbeat') {
+        foreach (['from', 'to', 'clientId', 'sentAt'] as $field) {
+            if (isset($json[$field]) && (!is_string($json[$field]) || strlen($json[$field]) > 255)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     if ($type === 'location') {
         $action = $json['locationAction'] ?? null;
         if (!is_string($action) || !in_array($action, ['share', 'live', 'stop'], true)) {
@@ -696,6 +706,10 @@ function broadcastJson(array $clients, array $clientProtocols, array $clientPeer
     }
 
     $type = $json['type'] ?? '';
+    if ($type === 'heartbeat') {
+        return;
+    }
+
     $to = normalizeRelayAddress($json['to'] ?? '');
     $isGroupEnvelope = ($json['conversationKind'] ?? null) === 'group';
     $targeted = !$isGroupEnvelope && $to !== '' && !relayAddressMatches($to, 'relay@localhost') && $type !== 'presence';

@@ -1,5 +1,5 @@
-const CACHE_NAME = "teletyptel-webclient-v208";
-const BUILD_VERSION = "20260612-oauth-history-token";
+const CACHE_NAME = "teletyptel-webclient-v209";
+const BUILD_VERSION = "20260612-websocket-heartbeat";
 const ASSETS = [
   "chat.html",
   "dev.html",
@@ -18,6 +18,7 @@ const ASSETS = [
   "assets/backgrounds/teletyptel-bg-wide-3.png",
   "config/account-profile.json",
   "config/providers/example-provider.json",
+  "config/providers/google.json",
   "lang/eng.lng",
   "lang/ned.lng"
 ];

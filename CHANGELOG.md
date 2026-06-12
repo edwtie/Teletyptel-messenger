@@ -285,6 +285,8 @@
 - Google OAuth sessions can load chat history again: the history schema now fits
   older MySQL index limits, Total Conversation history is part of the install
   schema, and the Google provider manifest no longer 404s.
+- Relay and XMPP WebSocket sessions now send periodic keepalive traffic so
+  idle browser/proxy connections are less likely to be closed during a call.
 - Old public product names were replaced with TeleTypTel in visible UI text,
   language files, project metadata, XSF draft entries and public documentation.
 - Cross-platform protocol tests no longer assume separate TCP reads for XMPP
