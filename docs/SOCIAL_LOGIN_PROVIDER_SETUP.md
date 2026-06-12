@@ -105,11 +105,21 @@ Als providerconfiguratie ontbreekt, geven deze routes bewust
 https://teletyptel.nl/api/auth/google/callback
 ```
 
+Voor de huidige dev-omgeving moet deze exacte URI ook in Google Cloud Console staan:
+
+```text
+https://dev.teletyptel.nl/api/auth/google/callback
+```
+
 Voor lokale tests eventueel:
 
 ```text
 http://localhost/api/auth/google/callback
 ```
+
+Google vergelijkt de redirect URI exact. Een verschil tussen `http` en `https`,
+een andere hostnaam of een extra slash veroorzaakt `redirect_uri_mismatch` of
+de melding dat de app niet voldoet aan het OAuth 2.0-beleid.
 
 Gebruik in TeleTypTel:
 

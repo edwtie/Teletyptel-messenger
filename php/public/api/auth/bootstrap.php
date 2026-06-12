@@ -589,8 +589,21 @@ function ttAuthPrunePendingStates(): void
 
 function ttAuthOrigin(): string
 {
-    $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || ((int)($_SERVER['SERVER_PORT'] ?? 0) === 443);
+    $https = ttAuthRequestIsHttps();
     return ($https ? 'https' : 'http') . '://' . (string)($_SERVER['HTTP_HOST'] ?? 'localhost');
+}
+
+function ttAuthRequestIsHttps(): bool
+{
+    $https = strtolower((string)($_SERVER['HTTPS'] ?? ''));
+    $forwardedProto = strtolower((string)($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? ''));
+    $forwardedSsl = strtolower((string)($_SERVER['HTTP_X_FORWARDED_SSL'] ?? ''));
+    $requestScheme = strtolower((string)($_SERVER['REQUEST_SCHEME'] ?? ''));
+    return ($https !== '' && $https !== 'off')
+        || $forwardedProto === 'https'
+        || $forwardedSsl === 'on'
+        || $requestScheme === 'https'
+        || ((int)($_SERVER['SERVER_PORT'] ?? 0) === 443);
 }
 
 function ttAuthRequestHost(): string

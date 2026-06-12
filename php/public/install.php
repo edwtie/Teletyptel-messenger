@@ -648,8 +648,15 @@ function defaultProviderRedirectUri(string $provider): string
 
 function isHttpsRequest(): bool
 {
-    return (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
-        || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
+    $https = strtolower((string)($_SERVER['HTTPS'] ?? ''));
+    $forwardedProto = strtolower((string)($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? ''));
+    $forwardedSsl = strtolower((string)($_SERVER['HTTP_X_FORWARDED_SSL'] ?? ''));
+    $requestScheme = strtolower((string)($_SERVER['REQUEST_SCHEME'] ?? ''));
+    return ($https !== '' && $https !== 'off')
+        || $forwardedProto === 'https'
+        || $forwardedSsl === 'on'
+        || $requestScheme === 'https'
+        || ((int)($_SERVER['SERVER_PORT'] ?? 0) === 443);
 }
 
 function e(string $value): string
