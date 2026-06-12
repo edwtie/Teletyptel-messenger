@@ -1346,9 +1346,9 @@ body.conversation-open .chat-panel {
 }
 
 body.call-active .call-panel {
-  height: clamp(260px, 42vh, 420px);
+  height: var(--call-panel-height, clamp(260px, 42vh, 420px));
   min-height: 0;
-  max-height: 420px;
+  max-height: none;
 }
 
 body.call-active .call-panel.local-video-main:not(.no-remote-video) {
@@ -1427,11 +1427,40 @@ body.call-active .call-panel video {
 
 body.call-active .call-panel.no-remote-video.local-video-main {
   display: block;
-  height: clamp(260px, 42vh, 420px);
+  height: var(--call-panel-height, clamp(260px, 42vh, 420px));
   min-height: 0;
-  max-height: 420px;
+  max-height: none;
   padding: 0;
   overflow: hidden;
+}
+
+.call-resize-handle {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 5;
+  height: 12px;
+  cursor: ns-resize;
+  touch-action: none;
+}
+
+.call-resize-handle::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 4px;
+  width: 72px;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(219, 234, 254, .72);
+  transform: translateX(-50%);
+  box-shadow: 0 1px 5px rgba(15, 23, 42, .35);
+}
+
+body.call-resizing {
+  cursor: ns-resize;
+  user-select: none;
 }
 
 .call-panel.no-remote-video.local-video-main #localVideo {
@@ -1744,25 +1773,25 @@ body.tc-call-active.call-active .remote-draft {
 
 body.tc-text-visible-active.call-active .call-panel {
   grid-row: 4 / 6;
-  height: auto;
+  height: var(--call-panel-height, auto);
   max-height: none;
 }
 
 body.tc-call-active.call-active .call-panel {
   grid-row: 4 / 6;
-  height: auto;
+  height: var(--call-panel-height, auto);
   max-height: none;
 }
 
 body.tc-text-visible-active.call-active .call-panel.no-remote-video.local-video-main {
   grid-template-rows: minmax(220px, 1fr) auto auto;
-  height: auto;
+  height: var(--call-panel-height, auto);
   max-height: none;
 }
 
 body.tc-call-active.call-active .call-panel.no-remote-video.local-video-main {
   grid-template-rows: minmax(220px, 1fr) auto auto;
-  height: auto;
+  height: var(--call-panel-height, auto);
   max-height: none;
 }
 

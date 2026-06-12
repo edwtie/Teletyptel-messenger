@@ -58,6 +58,7 @@
   const clientInstanceStorageKeyBase = "teletyptel.clientInstance";
   const sessionProfileStorageKey = "teletyptel.sessionProfile";
   const mediaSettingsStorageKey = "teletyptel.mediaSettings";
+  const callVideoHeightStorageKey = "teletyptel.callVideoHeight";
   const blockedJidsStorageKeyBase = "teletyptel.blockedJids";
   const locationSettingsStorageKeyBase = "teletyptel.locationSettings";
   const chatBackgroundStorageKeyBase = "teletyptel.chatBackground";
@@ -278,6 +279,11 @@
     previousText: "",
     editingMessage: null,
     call: null,
+    callVideoResize: {
+      pointerId: null,
+      startY: 0,
+      startHeight: 0
+    },
     totalConversationTextVisible: true,
     photoViewer: {
       scale: 1,
@@ -494,6 +500,7 @@
     dialogAnswerButton: byId("dialogAnswerButton"),
     dialogRejectButton: byId("dialogRejectButton"),
     callPanel: byId("callPanel"),
+    callResizeHandle: byId("callResizeHandle"),
     remoteVideo: byId("remoteVideo"),
     localVideo: byId("localVideo"),
     toggleCameraButton: byId("toggleCameraButton"),
@@ -783,6 +790,7 @@
     el.muteMicrophoneButton.addEventListener("click", toggleMicrophoneMute);
     el.muteRemoteAudioButton.addEventListener("click", toggleRemoteAudioMute);
     el.toggleTotalConversationTextButton.addEventListener("click", toggleTotalConversationText);
+    el.callResizeHandle.addEventListener("pointerdown", startCallVideoResize);
     el.callCameraInput.addEventListener("change", () => handleMediaSettingsChange("video", "call"));
     el.callVideoFacingToggle.addEventListener("click", toggleCallVideoFacingMode);
     el.callVideoFacingInput.addEventListener("change", () => handleMediaSettingsChange("video", "call"));
@@ -8506,11 +8514,71 @@
     el.callPanel.classList.toggle("no-remote-video", !hasRemoteVideo);
     document.body.classList.toggle("call-active", showCallPanel);
     document.body.classList.toggle("tc-call-active", totalConversationCallActive && showCallPanel);
+    applyCallVideoHeight();
     updateCameraToggleUi();
     updateMicrophoneMuteUi();
     updateTotalConversationTextToggleUi();
     applyRemoteVolume();
     updateTotalConversationTextPanel();
+  }
+
+  function savedCallVideoHeight() {
+    const value = Number(localStorage.getItem(callVideoHeightStorageKey));
+    return Number.isFinite(value) && value > 0 ? value : null;
+  }
+
+  function clampCallVideoHeight(height) {
+    const viewportHeight = Math.max(window.innerHeight || 0, 360);
+    const min = 180;
+    const max = Math.max(min, Math.min(760, viewportHeight - 170));
+    return Math.round(Math.min(max, Math.max(min, height)));
+  }
+
+  function applyCallVideoHeight(height = savedCallVideoHeight()) {
+    if (!height) {
+      el.callPanel.style.removeProperty("--call-panel-height");
+      return;
+    }
+
+    el.callPanel.style.setProperty("--call-panel-height", `${clampCallVideoHeight(height)}px`);
+  }
+
+  function startCallVideoResize(event) {
+    if (!state.call || el.callPanel.hidden) {
+      return;
+    }
+
+    event.preventDefault();
+    state.callVideoResize.pointerId = event.pointerId;
+    state.callVideoResize.startY = event.clientY;
+    state.callVideoResize.startHeight = el.callPanel.getBoundingClientRect().height;
+    el.callResizeHandle.setPointerCapture?.(event.pointerId);
+    document.body.classList.add("call-resizing");
+    window.addEventListener("pointermove", resizeCallVideo);
+    window.addEventListener("pointerup", stopCallVideoResize, { once: true });
+    window.addEventListener("pointercancel", stopCallVideoResize, { once: true });
+  }
+
+  function resizeCallVideo(event) {
+    if (state.callVideoResize.pointerId !== event.pointerId) {
+      return;
+    }
+
+    const nextHeight = clampCallVideoHeight(
+      state.callVideoResize.startHeight + event.clientY - state.callVideoResize.startY);
+    el.callPanel.style.setProperty("--call-panel-height", `${nextHeight}px`);
+  }
+
+  function stopCallVideoResize(event) {
+    if (state.callVideoResize.pointerId !== null && event?.pointerId !== state.callVideoResize.pointerId) {
+      return;
+    }
+
+    const height = clampCallVideoHeight(el.callPanel.getBoundingClientRect().height);
+    localStorage.setItem(callVideoHeightStorageKey, String(height));
+    state.callVideoResize.pointerId = null;
+    document.body.classList.remove("call-resizing");
+    window.removeEventListener("pointermove", resizeCallVideo);
   }
 
   function hasVideoTrack(stream) {
