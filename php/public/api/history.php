@@ -28,14 +28,14 @@ try {
 function readHistory(): void
 {
     $accountId = cleanHistoryText($_GET['accountId'] ?? '', 96);
-    if (!isCurrentHistorySession($accountId)) {
+    $pdo = Database::connect();
+    if (!canReadHistorySession($pdo, $accountId, cleanHistoryText($_GET['loginToken'] ?? '', 255))) {
         http_response_code(401);
         echo json_encode(['ok' => false, 'error' => 'not_authenticated']);
         return;
     }
 
     $limit = max(1, min(2000, (int)($_GET['limit'] ?? 500)));
-    $pdo = Database::connect();
     ensureMessageHistorySchema($pdo);
     ensureConversationHistorySchema($pdo);
     $accountIds = historyAccountIds($pdo, $accountId);
@@ -357,6 +357,57 @@ function isCurrentHistorySession(string $accountId): bool
     return $accountId !== ''
         && isset($_SESSION['teletyptel_account_id'])
         && hash_equals((string)$_SESSION['teletyptel_account_id'], $accountId);
+}
+
+function canReadHistorySession(PDO $pdo, string $accountId, string $loginToken = ''): bool
+{
+    if (isCurrentHistorySession($accountId) || consumeHistoryOAuthLoginToken($accountId, $loginToken)) {
+        return true;
+    }
+
+    $sessionAccountId = cleanHistoryText($_SESSION['teletyptel_account_id'] ?? '', 96);
+    if ($accountId === '' || $sessionAccountId === '' || $sessionAccountId === $accountId) {
+        return false;
+    }
+
+    return in_array($accountId, historyAccountIds($pdo, $sessionAccountId), true)
+        || in_array($sessionAccountId, historyAccountIds($pdo, $accountId), true);
+}
+
+function consumeHistoryOAuthLoginToken(string $accountId, string $token): bool
+{
+    if ($accountId === '' || $token === '') {
+        return false;
+    }
+
+    $directory = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'oauth-handoff';
+    if (!is_dir($directory)) {
+        return false;
+    }
+
+    foreach (glob($directory . DIRECTORY_SEPARATOR . '*.json') ?: [] as $path) {
+        if (!is_file($path)) {
+            continue;
+        }
+
+        if ((time() - filemtime($path)) > 180) {
+            unlink($path);
+            continue;
+        }
+
+        $payload = json_decode((string)file_get_contents($path), true);
+        if (!is_array($payload)) {
+            continue;
+        }
+
+        if (($payload['account_id'] ?? '') === $accountId
+            && hash_equals((string)($payload['token_hash'] ?? ''), hash('sha256', $token))) {
+            $_SESSION['teletyptel_account_id'] = $accountId;
+            return true;
+        }
+    }
+
+    return false;
 }
 
 function historyAccountIds(PDO $pdo, string $accountId): array

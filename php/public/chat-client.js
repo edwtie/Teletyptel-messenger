@@ -1868,7 +1868,8 @@
     }
 
     try {
-      const response = await fetch(`${historyApiPath}?accountId=${encodeURIComponent(state.account.accountId)}&limit=1000`, {
+      const query = historyQueryParams({ limit: "1000" });
+      const response = await fetch(`${historyApiPath}?${query.toString()}`, {
         cache: "no-store"
       });
       if (response.status === 404 || response.status === 401) {
@@ -1903,6 +1904,17 @@
       appendDebug("history-error", error.message);
       return false;
     }
+  }
+
+  function historyQueryParams(params = {}) {
+    const query = new URLSearchParams({
+      accountId: state.account?.accountId || "",
+      ...params
+    });
+    if (oauthLoginToken) {
+      query.set("loginToken", oauthLoginToken);
+    }
+    return query;
   }
 
   function restoreHistoryMessage(item) {
@@ -2198,7 +2210,8 @@
     }
 
     try {
-      const response = await fetch(`${historyApiPath}?accountId=${encodeURIComponent(state.account.accountId)}&type=calls&limit=200`, {
+      const query = historyQueryParams({ type: "calls", limit: "200" });
+      const response = await fetch(`${historyApiPath}?${query.toString()}`, {
         cache: "no-store"
       });
       if (response.status === 404 || response.status === 401) {
