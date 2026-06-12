@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'Database.php';
 
+const TELETYPTEL_OAUTH_HANDOFF_TTL_SECONDS = 2592000;
+
 session_start();
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
@@ -145,7 +147,7 @@ function consumeOAuthLoginToken(string $accountId, string $token): bool
             continue;
         }
 
-        if ((time() - filemtime($path)) > 180) {
+        if ((time() - filemtime($path)) > TELETYPTEL_OAUTH_HANDOFF_TTL_SECONDS) {
             unlink($path);
             continue;
         }

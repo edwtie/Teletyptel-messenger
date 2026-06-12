@@ -1594,10 +1594,11 @@
         savedAccount);
       if (oauthAccountId) {
         account.accountId = oauthAccountId;
+        account.loginToken = oauthLoginToken;
       }
       state.account = account;
       applyAccountProfile(account);
-      databaseLoaded = await loadDatabaseAccount(account.accountId, oauthLoginToken);
+      databaseLoaded = await loadDatabaseAccount(account.accountId, accountLoginToken(account));
       if (databaseLoaded) {
         if (oauthAccountId || state.account.savedInDatabase) {
           storeServerAccountBrowserSession(state.account);
@@ -1904,10 +1905,15 @@
     const query = new URLSearchParams({
       ...params
     });
-    if (oauthLoginToken) {
-      query.set("loginToken", oauthLoginToken);
+    const loginToken = accountLoginToken();
+    if (loginToken) {
+      query.set("loginToken", loginToken);
     }
     return query;
+  }
+
+  function accountLoginToken(account = state.account) {
+    return String(oauthLoginToken || account?.loginToken || "").trim();
   }
 
   async function fetchHistoryPayload(params, payloadField, debugLabel) {
@@ -2980,7 +2986,8 @@
     sessionStorage.setItem(key, JSON.stringify({
       accountId: account.accountId,
       jid: account.jid,
-      sessionProfile: state.sessionProfile
+      sessionProfile: state.sessionProfile,
+      loginToken: accountLoginToken(account)
     }));
   }
 

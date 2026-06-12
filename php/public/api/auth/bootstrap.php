@@ -4,6 +4,7 @@ declare(strict_types=1);
 require_once dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'Database.php';
 
 const TT_AUTH_SESSION_KEY = 'teletyptel_oauth';
+const TT_AUTH_HANDOFF_TTL_SECONDS = 2592000;
 
 function ttAuthHandle(string $provider, string $step): void
 {
