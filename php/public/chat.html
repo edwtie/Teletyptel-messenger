@@ -443,12 +443,12 @@
           <label>
             <span data-i18n="label.video_quality">Video quality</span>
             <select id="videoQualityInput">
-              <option value="default" data-i18n="quality.default">FHD Default - 1920 x 1080</option>
-              <option value="qvga">QVGA - 320 x 240</option>
-              <option value="vga">VGA - 640 x 480</option>
-              <option value="hd">HD 720 - 1280 x 720</option>
-              <option value="fullhd">FHD 1080 - 1920 x 1080</option>
-              <option value="uhd">4K UHD - 3840 x 2160</option>
+              <option value="default" data-i18n="quality.default">1080 default</option>
+              <option value="qvga">240</option>
+              <option value="vga">480</option>
+              <option value="hd">720</option>
+              <option value="fullhd">1080</option>
+              <option value="uhd">4K</option>
             </select>
           </label>
           <label class="ios-facing-control">
@@ -636,12 +636,12 @@
             <label>
               <span data-i18n="label.video_quality">Video quality</span>
               <select id="dialogVideoQualityInput">
-                <option value="default" data-i18n="quality.default">FHD Default - 1920 x 1080</option>
-                <option value="qvga">QVGA - 320 x 240</option>
-                <option value="vga">VGA - 640 x 480</option>
-                <option value="hd">HD 720 - 1280 x 720</option>
-                <option value="fullhd">FHD 1080 - 1920 x 1080</option>
-                <option value="uhd">4K UHD - 3840 x 2160</option>
+                <option value="default" data-i18n="quality.default">1080 default</option>
+                <option value="qvga">240</option>
+                <option value="vga">480</option>
+                <option value="hd">720</option>
+                <option value="fullhd">1080</option>
+                <option value="uhd">4K</option>
               </select>
             </label>
             <label class="ios-facing-control">
@@ -828,14 +828,15 @@
         <button id="closeVideoPreviewDialogButton" class="icon-button" type="button" aria-label="Close" data-i18n-aria-label="button.close">x</button>
       </div>
       <label class="video-recorder-quality">
-        <span data-i18n="label.video_quality">Video quality</span>
+        <span class="material-icon" data-icon="highQuality" aria-hidden="true"></span>
+        <span class="sr-only" data-i18n="label.video_quality">Video quality</span>
         <select id="videoRecorderQualityInput">
-          <option value="default" data-i18n="quality.default">FHD Default - 1920 x 1080</option>
-          <option value="qvga">QVGA - 320 x 240</option>
-          <option value="vga">VGA - 640 x 480</option>
-          <option value="hd">HD 720 - 1280 x 720</option>
-          <option value="fullhd">FHD 1080 - 1920 x 1080</option>
-          <option value="uhd">4K UHD - 3840 x 2160</option>
+          <option value="default" data-i18n="quality.default">1080 default</option>
+          <option value="qvga">240</option>
+          <option value="vga">480</option>
+          <option value="hd">720</option>
+          <option value="fullhd">1080</option>
+          <option value="uhd">4K</option>
         </select>
       </label>
       <video id="videoPreviewDialogVideo" controls playsinline></video>

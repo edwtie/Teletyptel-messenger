@@ -3210,19 +3210,27 @@ body[data-theme="dark"] .link-preview-loading {
 }
 
 .video-recorder-quality {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 8px;
+  justify-self: end;
+  gap: 6px;
   color: #dbeafe;
-  font-size: 12px;
+  font-size: 11px;
+}
+
+.video-recorder-quality .material-icon {
+  width: 20px;
+  height: 20px;
+  color: #dbeafe;
 }
 
 .video-recorder-quality select {
-  width: min(260px, 58vw);
-  height: 34px;
+  width: 96px;
+  height: 30px;
   border: 1px solid rgba(147, 197, 253, .65);
   border-radius: 8px;
+  padding: 0 6px;
   background: #f8fbff;
   color: #0f172a;
   font: inherit;
