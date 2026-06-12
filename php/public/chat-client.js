@@ -1904,9 +1904,6 @@
     if (!peer) {
       return;
     }
-    if (isCallMessageStatus(item.status)) {
-      return;
-    }
 
     const conversation = ensureConversationForPeer(
       peer,
@@ -7781,9 +7778,7 @@
         rttSync: call.rttSync
       });
       setCallStatus(t("call.ringing", "Ringing..."));
-      if (!isTotalConversationCall(call)) {
-        addMessage("self", callStartedText(call), "jingle");
-      }
+      addCallNotificationMessage(call, "started", callStartedText(call));
     } catch (error) {
       setCallStatus(`${t("call.failed", "Call failed")}: ${error.message}`);
       cleanupCall(false, "failed");
@@ -7961,7 +7956,10 @@
     call.incomingOffer = envelope.sdp;
     state.call = call;
     updateCallUi();
-    const conversation = ensureConversationForPeer(call.peer, "contact", displayNameForJid(call.peer));
+    const conversation = ensureConversationForPeer(
+      call.peer,
+      envelope.conversationKind === "group" || call.peer.includes("@conference.") ? "group" : "contact",
+      displayNameForJid(call.peer));
     if (conversation) {
       applyEnvelopeIdentity(conversation, envelope);
       state.activeConversationId = conversation.id;
@@ -7974,9 +7972,7 @@
       info: "ringing"
     });
     setCallStatus(`${t("call.incoming", "Incoming call from")} ${displayNameForJid(call.peer)}`);
-    if (!isTotalConversationCall(call)) {
-      addMessage("peer", incomingCallTitle(call), "jingle", call.peer, null, conversation?.id ?? null);
-    }
+    addCallNotificationMessage(call, "started", incomingCallTitle(call), conversation);
     renderConversations();
     renderActiveConversation();
     updateCallUi();
@@ -8829,6 +8825,50 @@
     refreshOpenTabPanel();
   }
 
+  function addCallNotificationMessage(call, status, text, conversationOverride = null) {
+    if (!call) {
+      return null;
+    }
+
+    const conversation = conversationOverride
+      || state.conversations.find((item) => addressMatches(item.peer, call.peer))
+      || ensureConversationForPeer(call.peer, call.peer.includes("@conference.") ? "group" : "contact", displayNameForJid(call.peer));
+    if (!conversation) {
+      return null;
+    }
+
+    const direction = call.role === "caller" ? "self" : "peer";
+    const messageStatus = status === "missed" ? "call-missed" : "jingle";
+    const message = addMessage(
+      direction,
+      text,
+      messageStatus,
+      direction === "peer" ? call.peer : null,
+      null,
+      conversation.id);
+    if (message) {
+      const startedAt = call.historyStartedAt instanceof Date ? call.historyStartedAt : new Date();
+      message.callInfo = {
+        status,
+        mediaKind: call.mediaKind,
+        rttEnabled: call.rttEnabled,
+        durationSeconds: Math.round(Math.max(0, Date.now() - startedAt.getTime()) / 1000),
+        peer: call.peer
+      };
+      if (conversation.id === state.activeConversationId) {
+        renderActiveConversation();
+      }
+    }
+    return message;
+  }
+
+  function missedCallText(call) {
+    const title = isTotalConversationCall(call)
+      ? t("button.call_total_conversation", "Total conversation")
+      : (call?.mediaKind === "video" ? t("button.call_audio_video", "Audio + video") : t("button.call_audio", "Audio"));
+    return `${t("call.missed", "Missed call")} - ${title}`;
+  }
+
   function cleanupCall(notifyRemote, historyStatus = "ended") {
     const call = state.call;
     if (!call) {
@@ -8837,6 +8877,9 @@
     }
 
     persistConversationHistoryCall(call, historyStatus);
+    if (historyStatus === "missed") {
+      addCallNotificationMessage(call, "missed", missedCallText(call));
+    }
 
     if (notifyRemote) {
       sendJingleEnvelope("session-terminate", {
