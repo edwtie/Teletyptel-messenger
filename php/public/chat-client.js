@@ -11704,7 +11704,9 @@
 
     const existing = linkPreviewCache.get(url);
     const card = createLinkPreviewElement(url, existing?.preview || null, existing?.error || "");
-    body.appendChild(card);
+    if (card) {
+      body.appendChild(card);
+    }
     if (existing) {
       return;
     }
@@ -11742,11 +11744,20 @@
       if (card.dataset.previewUrl !== url) {
         return;
       }
-      card.replaceWith(createLinkPreviewElement(url, preview, error));
+      const replacement = createLinkPreviewElement(url, preview, error);
+      if (replacement) {
+        card.replaceWith(replacement);
+      } else {
+        card.remove();
+      }
     });
   }
 
   function createLinkPreviewElement(url, preview = null, error = "") {
+    if (error || (!preview && error)) {
+      return null;
+    }
+
     const wrapper = document.createElement("a");
     wrapper.className = "link-preview-card";
     wrapper.href = preview?.url || url;
@@ -11763,12 +11774,8 @@
       return wrapper;
     }
 
-    if (error || (!preview?.title && !preview?.description && !preview?.image)) {
-      const fallback = document.createElement("span");
-      fallback.className = "link-preview-url";
-      fallback.textContent = url;
-      wrapper.appendChild(fallback);
-      return wrapper;
+    if (!preview?.title && !preview?.description && !preview?.image) {
+      return null;
     }
 
     if (preview.image) {
@@ -11782,14 +11789,22 @@
 
     const text = document.createElement("span");
     text.className = "link-preview-text";
-    const title = document.createElement("strong");
-    title.textContent = preview.title || preview.siteName || url;
-    const description = document.createElement("small");
-    description.textContent = preview.description || preview.siteName || url;
+    const titleText = String(preview.title || "").trim();
+    const descriptionText = String(preview.description || "").trim();
+    if (titleText) {
+      const title = document.createElement("strong");
+      title.textContent = titleText;
+      text.appendChild(title);
+    }
+    if (descriptionText && descriptionText !== titleText) {
+      const description = document.createElement("small");
+      description.textContent = descriptionText;
+      text.appendChild(description);
+    }
     const site = document.createElement("span");
     site.className = "link-preview-site";
     site.textContent = preview.siteName || new URL(preview.url || url).hostname;
-    text.append(title, description, site);
+    text.appendChild(site);
     wrapper.appendChild(text);
     return wrapper;
   }

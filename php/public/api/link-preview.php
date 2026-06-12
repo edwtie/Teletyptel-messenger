@@ -17,6 +17,11 @@ try {
     }
 
     $html = fetchPreviewHtml($url);
+    if ($html === '' && isYouTubeUrl($url)) {
+        $preview = fetchYouTubePreview($url);
+        jsonPreview(['ok' => true, 'preview' => $preview]);
+        return;
+    }
     if ($html === '') {
         jsonPreview(['ok' => false, 'error' => 'fetch_failed'], 502);
         return;
@@ -24,7 +29,7 @@ try {
 
     $preview = parsePreviewHtml($html, $url);
     if (previewNeedsFallback($preview) && isYouTubeUrl($url)) {
-        $preview = array_merge($preview, fetchYouTubeOEmbedPreview($url));
+        $preview = array_merge($preview, fetchYouTubePreview($url));
     }
     jsonPreview(['ok' => true, 'preview' => $preview]);
 } catch (Throwable $error) {
@@ -162,6 +167,57 @@ function fetchYouTubeOEmbedPreview(string $url): array
         'image' => absolutizePreviewUrl((string)($data['thumbnail_url'] ?? ''), $url),
         'siteName' => 'YouTube',
     ];
+}
+
+function fetchYouTubePreview(string $url): array
+{
+    $preview = fetchYouTubeOEmbedPreview($url);
+    if (!previewNeedsFallback($preview)) {
+        return $preview;
+    }
+
+    $videoId = extractYouTubeVideoId($url);
+    if ($videoId === '') {
+        return $preview;
+    }
+
+    return array_merge([
+        'title' => '',
+        'description' => '',
+        'image' => 'https://i.ytimg.com/vi/' . rawurlencode($videoId) . '/hqdefault.jpg',
+        'siteName' => 'YouTube',
+    ], $preview);
+}
+
+function extractYouTubeVideoId(string $url): string
+{
+    $parts = parse_url($url);
+    if (!is_array($parts)) {
+        return '';
+    }
+
+    $host = strtolower((string)($parts['host'] ?? ''));
+    $path = trim((string)($parts['path'] ?? ''), '/');
+    if ($host === 'youtu.be') {
+        return cleanYouTubeVideoId(strtok($path, '/') ?: '');
+    }
+
+    parse_str((string)($parts['query'] ?? ''), $query);
+    if (isset($query['v'])) {
+        return cleanYouTubeVideoId((string)$query['v']);
+    }
+
+    $segments = $path === '' ? [] : explode('/', $path);
+    if (in_array($segments[0] ?? '', ['shorts', 'live', 'embed'], true)) {
+        return cleanYouTubeVideoId($segments[1] ?? '');
+    }
+
+    return '';
+}
+
+function cleanYouTubeVideoId(string $value): string
+{
+    return preg_match('/^[a-zA-Z0-9_-]{6,32}$/', $value) === 1 ? $value : '';
 }
 
 function absolutizePreviewUrl(string $url, string $baseUrl): string

@@ -2793,6 +2793,10 @@ body[data-theme="dark"] .link-preview-loading {
   padding: 6px;
 }
 
+.attachment-card.video {
+  width: min(100%, 680px);
+}
+
 .attachment-card.audio .attachment-icon {
   background: #f97316;
 }
@@ -2804,12 +2808,16 @@ body[data-theme="dark"] .link-preview-loading {
 .attachment-audio-player,
 .attachment-video-player {
   width: 100%;
-  min-width: 220px;
+  min-width: 0;
   margin-top: 0;
 }
 
 .attachment-video-player {
-  max-height: 260px;
+  display: block;
+  aspect-ratio: 16 / 9;
+  height: clamp(180px, 36vw, 382px);
+  max-height: none;
+  object-fit: cover;
   border-radius: 6px;
   background: #0b1220;
 }

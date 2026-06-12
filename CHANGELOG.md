@@ -293,6 +293,11 @@
 - The history tab is now a separate Total Conversation/call log: it hides the
   normal composer, uses a light history workspace and no longer mixes ordinary
   chat messages into TC history.
+- Link previews now avoid duplicate URL fallback cards and YouTube links get a
+  thumbnail fallback from the video id when normal Open Graph/oEmbed metadata is
+  incomplete.
+- Video message playback now fills a compact 16:9 preview area instead of
+  showing contain-style black bars.
 - Old public product names were replaced with TeleTypTel in visible UI text,
   language files, project metadata, XSF draft entries and public documentation.
 - Cross-platform protocol tests no longer assume separate TCP reads for XMPP
