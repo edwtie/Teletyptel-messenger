@@ -81,6 +81,13 @@ function readAccount(): void
 {
     $accountId = cleanText($_GET['accountId'] ?? 'local-edward', 96);
     if (!isCurrentServerSession($accountId) && !consumeOAuthLoginToken($accountId, cleanText($_GET['loginToken'] ?? '', 255))) {
+        $sessionAccountId = cleanText($_SESSION['teletyptel_account_id'] ?? '', 96);
+        if ($sessionAccountId !== '') {
+            $accountId = $sessionAccountId;
+        }
+    }
+
+    if (!isCurrentServerSession($accountId)) {
         http_response_code(401);
         echo json_encode(['ok' => false, 'error' => 'not_authenticated']);
         return;

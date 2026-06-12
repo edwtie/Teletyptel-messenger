@@ -1599,8 +1599,10 @@
       applyAccountProfile(account);
       databaseLoaded = await loadDatabaseAccount(account.accountId, oauthLoginToken);
       if (databaseLoaded) {
-        if (oauthAccountId) {
+        if (oauthAccountId || state.account.savedInDatabase) {
           storeServerAccountBrowserSession(state.account);
+        }
+        if (oauthAccountId) {
           cleanOauthUrl();
         }
       }
