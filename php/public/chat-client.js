@@ -3871,6 +3871,7 @@
     container.append(title, meta, actions);
 
     if (entry.kind === "call") {
+      renderHistoryMedia(container, entry.source.media);
       renderHistoryTranscript(container, entry.source.transcript);
     } else {
       const body = document.createElement("p");
@@ -3878,6 +3879,23 @@
       body.textContent = entry.source.text || "";
       container.appendChild(body);
     }
+  }
+
+  function renderHistoryMedia(container, media) {
+    const items = Array.isArray(media) ? media.filter((item) => item?.url) : [];
+    if (!items.length) {
+      return;
+    }
+
+    const list = document.createElement("div");
+    list.className = "history-media";
+    for (const item of items) {
+      list.appendChild(createAttachmentElement({
+        ...item,
+        kind: item.kind || classifyAttachment(item)
+      }));
+    }
+    container.appendChild(list);
   }
 
   function renderHistoryTranscript(container, transcript) {
@@ -7022,6 +7040,7 @@
       messageId: outgoingId,
       replaceId: edit?.replaceId ?? null
     })) {
+      recordTotalConversationText(state.call, "self", text, currentFromJid(), { final: true });
       if (edit) {
         applyMessageCorrection(edit.conversation, edit.replaceId, text, "self", outgoingId);
         clearMessageEdit();
@@ -7102,6 +7121,7 @@
     state.previousText = text;
     updateLocalRttDraftMessage();
     updateTotalConversationTextPanel();
+    recordTotalConversationText(activeJingleRttSyncCall(), "self", text, currentFromJid());
     if (sendJingleRttSyncPacket("edit", text, { actions, previousText })) {
       return;
     }
@@ -8421,6 +8441,16 @@
       remoteVideoMuted: false,
       rttChannel: null,
       rttSync: rttEnabled ? createJingleRttSyncDescriptor(sid, "offered") : null,
+      transcript: [],
+      transcriptDrafts: {
+        self: null,
+        peer: null
+      },
+      media: [],
+      recorder: null,
+      recordingChunks: [],
+      recordingMimeType: "",
+      historyEntry: null,
       incomingOffer: null,
       pendingCandidates: [],
       remoteDescriptionSet: false,
@@ -8548,6 +8578,7 @@
       watchCallVideoTrack(call, event.track);
       updateVideoElementSource(el.remoteVideo, call.remoteStream);
       el.callPanel.hidden = false;
+      startTotalConversationRecorder(call);
       updateCallUi();
     });
 
@@ -8562,6 +8593,128 @@
     });
 
     return pc;
+  }
+
+  function startTotalConversationRecorder(call) {
+    if (!isTotalConversationCall(call) || call.recorder || typeof MediaRecorder === "undefined") {
+      return;
+    }
+
+    const tracks = totalConversationRecordingTracks(call);
+    if (!tracks.length) {
+      return;
+    }
+
+    const stream = new MediaStream(tracks);
+    const mimeType = supportedRecordingMimeType([
+      "video/webm;codecs=vp9,opus",
+      "video/webm;codecs=vp8,opus",
+      "video/webm",
+      "video/mp4"
+    ]);
+
+    try {
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      call.recorder = recorder;
+      call.recordingChunks = [];
+      call.recordingMimeType = recorder.mimeType || mimeType || "video/webm";
+      recorder.addEventListener("dataavailable", (event) => {
+        if (event.data && event.data.size > 0) {
+          call.recordingChunks.push(event.data);
+        }
+      });
+      recorder.addEventListener("stop", () => {
+        uploadTotalConversationRecording(call).catch((error) => {
+          appendDebug("tc-recording-upload-error", error.message || String(error));
+        });
+      });
+      recorder.start(1000);
+      appendDebug("tc-recording", `Started ${call.recordingMimeType}`);
+    } catch (error) {
+      appendDebug("tc-recording-error", error.message || String(error));
+      call.recorder = null;
+      call.recordingChunks = [];
+      call.recordingMimeType = "";
+    }
+  }
+
+  function totalConversationRecordingTracks(call) {
+    const tracks = [];
+    const remoteVideo = activeVideoTracks(call?.remoteStream)[0];
+    const localVideo = activeVideoTracks(call?.localStream)[0];
+    if (remoteVideo) {
+      tracks.push(remoteVideo);
+    } else if (localVideo) {
+      tracks.push(localVideo);
+    }
+
+    for (const track of call?.remoteStream?.getAudioTracks?.() || []) {
+      if (track.readyState === "live") {
+        tracks.push(track);
+      }
+    }
+    for (const track of call?.localStream?.getAudioTracks?.() || []) {
+      if (track.readyState === "live") {
+        tracks.push(track);
+      }
+    }
+    return tracks;
+  }
+
+  function supportedRecordingMimeType(candidates) {
+    if (typeof MediaRecorder === "undefined" || typeof MediaRecorder.isTypeSupported !== "function") {
+      return "";
+    }
+
+    return candidates.find((candidate) => MediaRecorder.isTypeSupported(candidate)) || "";
+  }
+
+  function stopTotalConversationRecorder(call) {
+    if (call?.recorder?.state === "recording") {
+      try {
+        call.recorder.stop();
+      } catch (error) {
+        appendDebug("tc-recording-stop-error", error.message || String(error));
+      }
+    }
+  }
+
+  async function uploadTotalConversationRecording(call) {
+    const chunks = Array.isArray(call?.recordingChunks) ? call.recordingChunks : [];
+    if (!chunks.length) {
+      return;
+    }
+
+    const mimeType = call.recordingMimeType || "video/webm";
+    const extension = videoFileExtension(mimeType);
+    const fileName = `total-conversation-${voiceTimestamp()}.${extension}`;
+    const blob = new Blob(chunks, { type: mimeType });
+    if (!blob.size) {
+      return;
+    }
+
+    const file = new File([blob], fileName, { type: mimeType });
+    const payload = file.size > uploadChunkSize
+      ? await uploadFileInChunks(file)
+      : await uploadFileDirect(file);
+    if (!payload?.file) {
+      return;
+    }
+
+    call.media = Array.isArray(call.media) ? call.media : [];
+    call.media.push({
+      ...payload.file,
+      kind: "video",
+      role: "total-conversation-recording",
+      recordedAt: new Date().toISOString()
+    });
+
+    if (call.historyEntry) {
+      call.historyEntry.media = call.media;
+      upsertConversationHistoryCall(call.historyEntry);
+      postConversationHistoryEntry(call.historyEntry);
+    }
+    appendDebug("tc-recording", `Saved ${fileName}`);
   }
 
   function configureJingleRttSyncChannel(call, channel) {
@@ -8741,6 +8894,7 @@
     conversation.remoteText = applyT140Delta(conversation.remoteText || "", payload);
     conversation.remoteFrom = call.peer;
     conversation.remoteDraftUpdatedAt = new Date();
+    recordTotalConversationText(call, "peer", conversation.remoteText, conversation.remoteFrom);
     conversation.clientState = "active";
     conversation.clientStateUpdatedAt = new Date();
     setPeerPresence(conversation.peer, "online");
@@ -8818,6 +8972,9 @@
     conversation.remoteText = packet.event === "reset" ? text : text;
     conversation.remoteFrom = packet.from || call.peer;
     conversation.remoteDraftUpdatedAt = new Date(packet.timestamp || Date.now());
+    recordTotalConversationText(call, "peer", conversation.remoteText, conversation.remoteFrom, {
+      timestamp: conversation.remoteDraftUpdatedAt.toISOString()
+    });
     conversation.clientState = "active";
     conversation.clientStateUpdatedAt = new Date();
     setPeerPresence(conversation.peer, "online");
@@ -8834,6 +8991,10 @@
     conversation.remoteText = "";
     conversation.remoteFrom = packet.from || call.peer;
     conversation.remoteDraftUpdatedAt = null;
+    recordTotalConversationText(call, "peer", String(packet.text ?? ""), conversation.remoteFrom, {
+      timestamp: packet.timestamp || new Date().toISOString(),
+      final: true
+    });
     conversation.clientState = "active";
     conversation.clientStateUpdatedAt = new Date();
     setPeerPresence(conversation.peer, "online");
@@ -9098,6 +9259,62 @@
     updateCallUi();
   }
 
+  function totalConversationTranscript(call, conversation, startedAt) {
+    const buffered = Array.isArray(call?.transcript) ? [...call.transcript] : [];
+    for (const draft of Object.values(call?.transcriptDrafts || {})) {
+      if (draft?.text?.trim()) {
+        buffered.push({ ...draft, final: false });
+      }
+    }
+
+    const fromMessages = conversation ? conversationHistoryTranscript(conversation, startedAt) : [];
+    const seen = new Set();
+    return [...fromMessages, ...buffered]
+      .filter((line) => String(line.text || "").trim() !== "")
+      .map((line) => ({
+        direction: line.direction === "self" ? "self" : "peer",
+        from: line.from || "",
+        text: String(line.text || ""),
+        timestamp: line.timestamp || new Date().toISOString(),
+        final: line.final === true
+      }))
+      .filter((line) => {
+        const key = `${line.direction}\n${line.from}\n${line.text}`;
+        if (seen.has(key)) {
+          return false;
+        }
+        seen.add(key);
+        return true;
+      })
+      .slice(-200);
+  }
+
+  function recordTotalConversationText(call, direction, text, from = "", options = {}) {
+    if (!isTotalConversationCall(call)) {
+      return;
+    }
+
+    const value = String(text ?? "");
+    const key = direction === "self" ? "self" : "peer";
+    const line = {
+      direction: key,
+      from,
+      text: value,
+      timestamp: options.timestamp || new Date().toISOString(),
+      final: options.final === true
+    };
+
+    if (line.final) {
+      if (line.text.trim()) {
+        call.transcript.push(line);
+      }
+      call.transcriptDrafts[key] = null;
+      return;
+    }
+
+    call.transcriptDrafts[key] = line.text.trim() ? line : null;
+  }
+
   function persistConversationHistoryCall(call, status = "ended") {
     if (!state.historySettings.saveTotalConversation || !state.account?.accountId || !isTotalConversationCall(call)) {
       return;
@@ -9118,12 +9335,21 @@
       startedAt: startedAt.toISOString(),
       endedAt: endedAt.toISOString(),
       durationSeconds: Math.round(Math.max(0, endedAt.getTime() - startedAt.getTime()) / 1000),
-      transcript: conversation ? conversationHistoryTranscript(conversation, startedAt) : [],
-      media: [],
+      transcript: totalConversationTranscript(call, conversation, startedAt),
+      media: Array.isArray(call.media) ? call.media : [],
       note: t("history.tc_saved_note", "Total Conversation saved in conversation history.")
     });
 
+    call.historyEntry = entry;
     upsertConversationHistoryCall(entry);
+    postConversationHistoryEntry(entry);
+  }
+
+  function postConversationHistoryEntry(entry) {
+    if (!state.account?.accountId || !entry) {
+      return;
+    }
+
     postHistory({
       action: "save_call",
       accountId: state.account.accountId,
@@ -9245,6 +9471,7 @@
     }
 
     persistConversationHistoryCall(call, historyStatus);
+    stopTotalConversationRecorder(call);
     if (historyStatus === "missed") {
       addCallNotificationMessage(call, "missed", missedCallText(call));
     }

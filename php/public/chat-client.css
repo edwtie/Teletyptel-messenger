@@ -2135,6 +2135,15 @@ body:not([data-chat-background="none"]) .message-body {
   gap: 8px;
 }
 
+.history-media {
+  display: grid;
+  gap: 8px;
+}
+
+.history-media .attachment-card {
+  margin-top: 0;
+}
+
 .history-transcript-line {
   display: grid;
   gap: 3px;
