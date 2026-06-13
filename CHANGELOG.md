@@ -302,6 +302,8 @@
   of dropping to the bottom of tall video cards.
 - Total Conversation history now buffers live RTT text during the call and can
   attach an automatic call recording to the saved TC history entry.
+- Total Conversation call recording now preserves audio explicitly, including
+  audio-only recordings when no video track is available.
 - Old public product names were replaced with TeleTypTel in visible UI text,
   language files, project metadata, XSF draft entries and public documentation.
 - Cross-platform protocol tests no longer assume separate TCP reads for XMPP

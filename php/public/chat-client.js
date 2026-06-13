@@ -8448,8 +8448,10 @@
       },
       media: [],
       recorder: null,
+      recordingStartTimer: null,
       recordingChunks: [],
       recordingMimeType: "",
+      recordingKind: "",
       historyEntry: null,
       incomingOffer: null,
       pendingCandidates: [],
@@ -8578,7 +8580,7 @@
       watchCallVideoTrack(call, event.track);
       updateVideoElementSource(el.remoteVideo, call.remoteStream);
       el.callPanel.hidden = false;
-      startTotalConversationRecorder(call);
+      scheduleTotalConversationRecorder(call);
       updateCallUi();
     });
 
@@ -8595,29 +8597,39 @@
     return pc;
   }
 
+  function scheduleTotalConversationRecorder(call) {
+    if (!isTotalConversationCall(call) || call.recorder || call.recordingStartTimer || typeof MediaRecorder === "undefined") {
+      return;
+    }
+
+    call.recordingStartTimer = setTimeout(() => {
+      call.recordingStartTimer = null;
+      startTotalConversationRecorder(call);
+    }, 600);
+  }
+
   function startTotalConversationRecorder(call) {
     if (!isTotalConversationCall(call) || call.recorder || typeof MediaRecorder === "undefined") {
       return;
     }
 
-    const tracks = totalConversationRecordingTracks(call);
+    const recordingSource = totalConversationRecordingSource(call);
+    const tracks = recordingSource.tracks;
     if (!tracks.length) {
       return;
     }
 
     const stream = new MediaStream(tracks);
-    const mimeType = supportedRecordingMimeType([
-      "video/webm;codecs=vp9,opus",
-      "video/webm;codecs=vp8,opus",
-      "video/webm",
-      "video/mp4"
-    ]);
+    const mimeType = recordingSource.kind === "video"
+      ? preferredVideoRecordingMimeType()
+      : preferredVoiceRecordingMimeType();
 
     try {
       const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
       call.recorder = recorder;
       call.recordingChunks = [];
-      call.recordingMimeType = recorder.mimeType || mimeType || "video/webm";
+      call.recordingKind = recordingSource.kind;
+      call.recordingMimeType = recorder.mimeType || mimeType || (recordingSource.kind === "video" ? "video/webm" : "audio/webm");
       recorder.addEventListener("dataavailable", (event) => {
         if (event.data && event.data.size > 0) {
           call.recordingChunks.push(event.data);
@@ -8629,16 +8641,17 @@
         });
       });
       recorder.start(1000);
-      appendDebug("tc-recording", `Started ${call.recordingMimeType}`);
+      appendDebug("tc-recording", `Started ${call.recordingKind} ${call.recordingMimeType}`);
     } catch (error) {
       appendDebug("tc-recording-error", error.message || String(error));
       call.recorder = null;
       call.recordingChunks = [];
       call.recordingMimeType = "";
+      call.recordingKind = "";
     }
   }
 
-  function totalConversationRecordingTracks(call) {
+  function totalConversationRecordingSource(call) {
     const tracks = [];
     const remoteVideo = activeVideoTracks(call?.remoteStream)[0];
     const localVideo = activeVideoTracks(call?.localStream)[0];
@@ -8658,18 +8671,17 @@
         tracks.push(track);
       }
     }
-    return tracks;
-  }
-
-  function supportedRecordingMimeType(candidates) {
-    if (typeof MediaRecorder === "undefined" || typeof MediaRecorder.isTypeSupported !== "function") {
-      return "";
-    }
-
-    return candidates.find((candidate) => MediaRecorder.isTypeSupported(candidate)) || "";
+    return {
+      kind: tracks.some((track) => track.kind === "video") ? "video" : "audio",
+      tracks
+    };
   }
 
   function stopTotalConversationRecorder(call) {
+    if (call?.recordingStartTimer) {
+      clearTimeout(call.recordingStartTimer);
+      call.recordingStartTimer = null;
+    }
     if (call?.recorder?.state === "recording") {
       try {
         call.recorder.stop();
@@ -8685,8 +8697,9 @@
       return;
     }
 
-    const mimeType = call.recordingMimeType || "video/webm";
-    const extension = videoFileExtension(mimeType);
+    const kind = call.recordingKind === "audio" ? "audio" : "video";
+    const mimeType = call.recordingMimeType || (kind === "video" ? "video/webm" : "audio/webm");
+    const extension = kind === "video" ? videoFileExtension(mimeType) : voiceFileExtension(mimeType);
     const fileName = `total-conversation-${voiceTimestamp()}.${extension}`;
     const blob = new Blob(chunks, { type: mimeType });
     if (!blob.size) {
@@ -8704,7 +8717,7 @@
     call.media = Array.isArray(call.media) ? call.media : [];
     call.media.push({
       ...payload.file,
-      kind: "video",
+      kind,
       role: "total-conversation-recording",
       recordedAt: new Date().toISOString()
     });
