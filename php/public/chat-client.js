@@ -3884,6 +3884,10 @@
   function renderHistoryMedia(container, media) {
     const items = Array.isArray(media) ? media.filter((item) => item?.url) : [];
     if (!items.length) {
+      const empty = document.createElement("p");
+      empty.className = "history-empty";
+      empty.textContent = t("history.no_media", "Nog geen audio/video-opname bewaard.");
+      container.appendChild(empty);
       return;
     }
 
@@ -8585,6 +8589,7 @@
     pc.addEventListener("connectionstatechange", () => {
       if (pc.connectionState === "connected") {
         setCallStatus(jingleRttSyncStatusText(call));
+        scheduleTotalConversationRecorder(call);
       } else if (pc.connectionState === "failed") {
         setCallStatus(t("call.failed", "Call failed"));
       } else if (pc.connectionState === "disconnected") {
@@ -9058,6 +9063,7 @@
       call.localStream = await navigator.mediaDevices.getUserMedia(createMediaConstraints(call.mediaKind));
       markMediaCaptureTransition("get-user-media-ready", 8000);
       await refreshMediaDevices(false);
+      scheduleTotalConversationRecorder(call);
     } catch (error) {
       if (!wantsVideo) {
         throw error;
@@ -9071,6 +9077,7 @@
           markMediaCaptureTransition("get-user-media-ready", 8000);
           setMediaStatus(t("media.default_fallback", "Selected device was unavailable; using browser defaults."));
           await refreshMediaDevices(false);
+          scheduleTotalConversationRecorder(call);
         } catch (fallbackError) {
           appendDebug("media", `Default video fallback failed: ${fallbackError.message}`);
         }
@@ -9089,6 +9096,7 @@
       markMediaCaptureTransition("get-user-media-audio-fallback", 12000);
       call.localStream = await navigator.mediaDevices.getUserMedia(createMediaConstraints("audio"));
       markMediaCaptureTransition("get-user-media-ready", 8000);
+      scheduleTotalConversationRecorder(call);
     }
 
     updateVideoElementSource(el.localVideo, call.localStream);

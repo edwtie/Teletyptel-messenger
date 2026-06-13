@@ -310,6 +310,9 @@
   call rows, metadata and transcript/detail text.
 - Jingle RTT transcript buffering now happens inside the Jingle RTT send path,
   so TC history captures live RTT text without depending on normal chat messages.
+- Total Conversation recording is scheduled when local media is ready, when
+  remote tracks arrive and when the peer connection connects, plus history now
+  shows an explicit empty recording state when no media was saved.
 - Old public product names were replaced with TeleTypTel in visible UI text,
   language files, project metadata, XSF draft entries and public documentation.
 - Cross-platform protocol tests no longer assume separate TCP reads for XMPP
