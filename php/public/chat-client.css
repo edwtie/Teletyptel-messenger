@@ -2093,7 +2093,14 @@ body:not([data-chat-background="none"]) .message-body {
 
 .history-item.selected {
   border-color: #2563eb;
-  background: #dbeafe;
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.history-item.selected .history-item-title,
+.history-item.selected .history-item-meta,
+.history-item.selected .history-item-preview {
+  color: #ffffff;
 }
 
 .history-item-title,

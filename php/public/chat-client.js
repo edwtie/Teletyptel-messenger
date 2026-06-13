@@ -7040,7 +7040,6 @@
       messageId: outgoingId,
       replaceId: edit?.replaceId ?? null
     })) {
-      recordTotalConversationText(state.call, "self", text, currentFromJid(), { final: true });
       if (edit) {
         applyMessageCorrection(edit.conversation, edit.replaceId, text, "self", outgoingId);
         clearMessageEdit();
@@ -7121,7 +7120,6 @@
     state.previousText = text;
     updateLocalRttDraftMessage();
     updateTotalConversationTextPanel();
-    recordTotalConversationText(activeJingleRttSyncCall(), "self", text, currentFromJid());
     if (sendJingleRttSyncPacket("edit", text, { actions, previousText })) {
       return;
     }
@@ -8806,6 +8804,7 @@
           appendDebug("jingle-rtt-t140-out", `<t140 sid="${escapeXml(call.sid)}">${escapeXml(t140Delta)}</t140>`);
         }
 
+        recordTotalConversationText(call, "self", text, currentFromJid());
         return true;
       }
     }
@@ -8836,6 +8835,10 @@
     try {
       call.rttChannel.send(JSON.stringify(packet));
       appendDebug("jingle-rtt-out", createJingleRttPacketDebugXml(packet));
+      recordTotalConversationText(call, "self", text, currentFromJid(), {
+        timestamp: packet.timestamp,
+        final: eventName === "message"
+      });
       return true;
     } catch (error) {
       call.rttSync.state = "fallback";
@@ -9318,7 +9321,13 @@
 
     if (line.final) {
       if (line.text.trim()) {
-        call.transcript.push(line);
+        const duplicate = call.transcript.some((item) =>
+          item.direction === line.direction
+          && item.from === line.from
+          && item.text === line.text);
+        if (!duplicate) {
+          call.transcript.push(line);
+        }
       }
       call.transcriptDrafts[key] = null;
       return;
