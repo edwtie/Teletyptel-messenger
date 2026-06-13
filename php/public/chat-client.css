@@ -4559,6 +4559,58 @@ body[data-theme] .call-media-icon-button:disabled {
   opacity: 1;
 }
 
+body[data-theme="dark"] .tab-panel.history-panel,
+body[data-theme="dark"] .history-card.provider-card,
+body[data-theme="dark"] .history-settings,
+body[data-theme="dark"] .history-list,
+body[data-theme="dark"] .history-detail {
+  background: #f8fbff;
+  color: #0f172a;
+}
+
+body[data-theme="dark"] .history-card.provider-card,
+body[data-theme="dark"] .history-settings,
+body[data-theme="dark"] .history-list,
+body[data-theme="dark"] .history-detail,
+body[data-theme="dark"] .history-item,
+body[data-theme="dark"] .history-transcript-line {
+  border-color: #bfd7ff;
+}
+
+body[data-theme="dark"] .history-toggle,
+body[data-theme="dark"] .history-retention,
+body[data-theme="dark"] .history-detail h3,
+body[data-theme="dark"] .history-transcript-line strong,
+body[data-theme="dark"] .history-message-text,
+body[data-theme="dark"] .history-transcript-line p {
+  color: #0f172a;
+}
+
+body[data-theme="dark"] .history-item {
+  background: #eef5ff;
+  color: #0f172a;
+}
+
+body[data-theme="dark"] .history-item.selected {
+  border-color: #1d4ed8;
+  background: #2563eb;
+  color: #ffffff;
+}
+
+body[data-theme="dark"] .history-item.selected .history-item-title,
+body[data-theme="dark"] .history-item.selected .history-item-meta,
+body[data-theme="dark"] .history-item.selected .history-item-preview {
+  color: #ffffff;
+}
+
+body[data-theme="dark"] .history-item-meta,
+body[data-theme="dark"] .history-item-preview,
+body[data-theme="dark"] .history-detail-meta,
+body[data-theme="dark"] .history-empty,
+body[data-theme="dark"] .history-group {
+  color: #475569;
+}
+
 @media (max-width: 720px) {
   body.call-active .app-shell {
     grid-template-rows: auto minmax(0, 1fr);
