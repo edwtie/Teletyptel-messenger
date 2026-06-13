@@ -2013,6 +2013,7 @@
     message.edited = item.edited === true;
     message.retracted = item.retracted === true;
     message.retraction = item.retraction || null;
+    message.callInfo = item.callInfo && typeof item.callInfo === "object" ? item.callInfo : null;
     const timestamp = new Date(item.timestamp || Date.now());
     message.timestamp = Number.isNaN(timestamp.valueOf()) ? new Date() : timestamp;
     return conversation;
@@ -2041,6 +2042,7 @@
       status: message.status || "",
       attachment: message.attachment || null,
       location: message.location || null,
+      callInfo: message.callInfo || null,
       stylingDisabled: message.stylingDisabled === true,
       edited: message.edited === true,
       retracted: message.retracted === true,
@@ -8443,6 +8445,7 @@
       remoteVideoMuted: false,
       rttChannel: null,
       rttSync: rttEnabled ? createJingleRttSyncDescriptor(sid, "offered") : null,
+      notificationMessageId: "",
       transcript: [],
       transcriptDrafts: {
         self: null,
@@ -9461,14 +9464,18 @@
     }
 
     const direction = call.role === "caller" ? "self" : "peer";
-    const messageStatus = status === "missed" ? "call-missed" : "jingle";
+    const messageStatus = callNotificationMessageStatus(status);
     const message = addMessage(
       direction,
       text,
       messageStatus,
       direction === "peer" ? call.peer : null,
       null,
-      conversation.id);
+      conversation.id,
+      null,
+      null,
+      false,
+      false);
     if (message) {
       const startedAt = call.historyStartedAt instanceof Date ? call.historyStartedAt : new Date();
       message.callInfo = {
@@ -9478,6 +9485,8 @@
         durationSeconds: Math.round(Math.max(0, Date.now() - startedAt.getTime()) / 1000),
         peer: call.peer
       };
+      call.notificationMessageId = message.xmppId || message.id;
+      persistHistoryMessage(conversation, message);
       if (conversation.id === state.activeConversationId) {
         renderActiveConversation();
       }
@@ -9485,11 +9494,76 @@
     return message;
   }
 
+  function callNotificationMessageStatus(status) {
+    if (status === "missed") {
+      return "call-missed";
+    }
+    if (status === "failed") {
+      return "call-failed";
+    }
+    if (status === "rejected") {
+      return "call-rejected";
+    }
+    if (status === "ended") {
+      return "call-ended";
+    }
+    return "jingle";
+  }
+
   function missedCallText(call) {
     const title = isTotalConversationCall(call)
       ? t("button.call_total_conversation", "Total conversation")
       : (call?.mediaKind === "video" ? t("button.call_audio_video", "Audio + video") : t("button.call_audio", "Audio"));
     return `${t("call.missed", "Missed call")} - ${title}`;
+  }
+
+  function callEndedText(call, status) {
+    const title = isTotalConversationCall(call)
+      ? t("button.call_total_conversation", "Total conversation")
+      : (call?.mediaKind === "video" ? t("button.call_audio_video", "Audio + video") : t("button.call_audio", "Audio"));
+    if (status === "failed") {
+      return `${title} - ${t("history.status_failed", "mislukt")}`;
+    }
+    if (status === "rejected") {
+      return `${title} - ${t("history.status_rejected", "geweigerd")}`;
+    }
+    if (status === "missed") {
+      return missedCallText(call);
+    }
+    return `${title} - ${t("history.status_ended", "beeindigd")}`;
+  }
+
+  function updateCallNotificationMessage(call, status) {
+    if (!call?.notificationMessageId) {
+      return false;
+    }
+
+    const conversation = state.conversations.find((item) => addressMatches(item.peer, call.peer));
+    if (!conversation) {
+      return false;
+    }
+
+    const message = conversation.messages.find((item) => item.id === call.notificationMessageId || item.xmppId === call.notificationMessageId);
+    if (!message) {
+      return false;
+    }
+
+    const startedAt = call.historyStartedAt instanceof Date ? call.historyStartedAt : new Date();
+    message.text = callEndedText(call, status);
+    message.status = callNotificationMessageStatus(status);
+    message.callInfo = {
+      status,
+      mediaKind: call.mediaKind,
+      rttEnabled: call.rttEnabled,
+      durationSeconds: Math.round(Math.max(0, Date.now() - startedAt.getTime()) / 1000),
+      peer: call.peer
+    };
+    persistHistoryMessage(conversation, message);
+    if (conversation.id === state.activeConversationId) {
+      renderActiveConversation();
+    }
+    renderConversations();
+    return true;
   }
 
   function cleanupCall(notifyRemote, historyStatus = "ended") {
@@ -9501,8 +9575,11 @@
 
     persistConversationHistoryCall(call, historyStatus);
     stopTotalConversationRecorder(call);
-    if (historyStatus === "missed") {
+    const updatedNotification = updateCallNotificationMessage(call, historyStatus);
+    if (historyStatus === "missed" && !updatedNotification) {
       addCallNotificationMessage(call, "missed", missedCallText(call));
+    } else if (!updatedNotification) {
+      addCallNotificationMessage(call, historyStatus, callEndedText(call, historyStatus));
     }
 
     if (notifyRemote) {

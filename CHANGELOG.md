@@ -313,6 +313,8 @@
 - Total Conversation recording is scheduled when local media is ready, when
   remote tracks arrive and when the peer connection connects, plus history now
   shows an explicit empty recording state when no media was saved.
+- Total Conversation call cards in the normal chat history now update from
+  started to ended/missed/failed with duration and keep that state after refresh.
 - Old public product names were replaced with TeleTypTel in visible UI text,
   language files, project metadata, XSF draft entries and public documentation.
 - Cross-platform protocol tests no longer assume separate TCP reads for XMPP

@@ -174,6 +174,7 @@ CREATE TABLE IF NOT EXISTS message_history (
   status VARCHAR(64) NOT NULL DEFAULT '',
   attachment_json MEDIUMTEXT NULL,
   location_json MEDIUMTEXT NULL,
+  call_info_json MEDIUMTEXT NULL,
   styling_disabled TINYINT(1) NOT NULL DEFAULT 0,
   edited TINYINT(1) NOT NULL DEFAULT 0,
   retracted TINYINT(1) NOT NULL DEFAULT 0,

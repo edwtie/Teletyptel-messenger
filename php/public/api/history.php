@@ -123,11 +123,11 @@ function saveHistoryMessage(PDO $pdo, string $accountId, array $input): void
     $statement = $pdo->prepare(
         'INSERT INTO message_history (
             account_id, conversation_peer, conversation_name, conversation_kind, message_id,
-            direction, sender_jid, text, status, attachment_json, location_json,
+            direction, sender_jid, text, status, attachment_json, location_json, call_info_json,
             styling_disabled, edited, retracted, retraction_json, message_timestamp
         ) VALUES (
             :account_id, :conversation_peer, :conversation_name, :conversation_kind, :message_id,
-            :direction, :sender_jid, :text, :status, :attachment_json, :location_json,
+            :direction, :sender_jid, :text, :status, :attachment_json, :location_json, :call_info_json,
             :styling_disabled, :edited, :retracted, :retraction_json, :message_timestamp
         )
         ON DUPLICATE KEY UPDATE
@@ -140,6 +140,7 @@ function saveHistoryMessage(PDO $pdo, string $accountId, array $input): void
             status = VALUES(status),
             attachment_json = VALUES(attachment_json),
             location_json = VALUES(location_json),
+            call_info_json = VALUES(call_info_json),
             styling_disabled = VALUES(styling_disabled),
             edited = VALUES(edited),
             retracted = VALUES(retracted),
@@ -158,6 +159,7 @@ function saveHistoryMessage(PDO $pdo, string $accountId, array $input): void
         'status' => cleanHistoryText($input['status'] ?? '', 64),
         'attachment_json' => encodeHistoryJson($input['attachment'] ?? null),
         'location_json' => encodeHistoryJson($input['location'] ?? null),
+        'call_info_json' => encodeHistoryJson($input['callInfo'] ?? null),
         'styling_disabled' => ($input['stylingDisabled'] ?? false) === true ? 1 : 0,
         'edited' => ($input['edited'] ?? false) === true ? 1 : 0,
         'retracted' => ($input['retracted'] ?? false) === true ? 1 : 0,
@@ -185,6 +187,7 @@ function deleteHistoryMessage(PDO $pdo, string $accountId, array $input): void
              status = :status,
              attachment_json = NULL,
              location_json = NULL,
+             call_info_json = NULL,
              retraction_json = :retraction_json
          WHERE account_id = :account_id
            AND message_id = :message_id'
@@ -274,6 +277,7 @@ function ensureMessageHistorySchema(PDO $pdo): void
             status VARCHAR(64) NOT NULL DEFAULT "",
             attachment_json MEDIUMTEXT NULL,
             location_json MEDIUMTEXT NULL,
+            call_info_json MEDIUMTEXT NULL,
             styling_disabled TINYINT(1) NOT NULL DEFAULT 0,
             edited TINYINT(1) NOT NULL DEFAULT 0,
             retracted TINYINT(1) NOT NULL DEFAULT 0,
@@ -285,6 +289,7 @@ function ensureMessageHistorySchema(PDO $pdo): void
             KEY idx_message_history_account_peer_time (account_id, conversation_peer(120), message_timestamp)
         ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
     );
+    ensureHistoryColumn($pdo, 'message_history', 'call_info_json', 'MEDIUMTEXT NULL');
 }
 
 function ensureConversationHistorySchema(PDO $pdo): void
@@ -314,6 +319,16 @@ function ensureConversationHistorySchema(PDO $pdo): void
     );
 }
 
+function ensureHistoryColumn(PDO $pdo, string $table, string $column, string $definition): void
+{
+    $statement = $pdo->prepare('SHOW COLUMNS FROM `' . $table . '` LIKE :column');
+    $statement->execute(['column' => $column]);
+    if ($statement->fetch()) {
+        return;
+    }
+    $pdo->exec('ALTER TABLE `' . $table . '` ADD COLUMN `' . $column . '` ' . $definition);
+}
+
 function historyRowToClient(array $row): array
 {
     return [
@@ -327,6 +342,7 @@ function historyRowToClient(array $row): array
         'status' => $row['status'],
         'attachment' => decodeHistoryJson($row['attachment_json'] ?? null),
         'location' => decodeHistoryJson($row['location_json'] ?? null),
+        'callInfo' => decodeHistoryJson($row['call_info_json'] ?? null),
         'stylingDisabled' => (bool)$row['styling_disabled'],
         'edited' => (bool)$row['edited'],
         'retracted' => (bool)$row['retracted'],
