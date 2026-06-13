@@ -9272,7 +9272,7 @@
     updateCallUi();
   }
 
-  function totalConversationTranscript(call, conversation, startedAt) {
+  function totalConversationTranscript(call) {
     const buffered = Array.isArray(call?.transcript) ? [...call.transcript] : [];
     for (const draft of Object.values(call?.transcriptDrafts || {})) {
       if (draft?.text?.trim()) {
@@ -9280,9 +9280,8 @@
       }
     }
 
-    const fromMessages = conversation ? conversationHistoryTranscript(conversation, startedAt) : [];
     const seen = new Set();
-    return [...fromMessages, ...buffered]
+    return buffered
       .filter((line) => String(line.text || "").trim() !== "")
       .map((line) => ({
         direction: line.direction === "self" ? "self" : "peer",
@@ -9348,7 +9347,7 @@
       startedAt: startedAt.toISOString(),
       endedAt: endedAt.toISOString(),
       durationSeconds: Math.round(Math.max(0, endedAt.getTime() - startedAt.getTime()) / 1000),
-      transcript: totalConversationTranscript(call, conversation, startedAt),
+      transcript: totalConversationTranscript(call),
       media: Array.isArray(call.media) ? call.media : [],
       note: t("history.tc_saved_note", "Total Conversation saved in conversation history.")
     });

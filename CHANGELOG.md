@@ -304,6 +304,8 @@
   attach an automatic call recording to the saved TC history entry.
 - Total Conversation call recording now preserves audio explicitly, including
   audio-only recordings when no video track is available.
+- Total Conversation transcripts now come from the active Jingle RTT/datachannel
+  session only, keeping TC history separate from ordinary chat history.
 - Old public product names were replaced with TeleTypTel in visible UI text,
   language files, project metadata, XSF draft entries and public documentation.
 - Cross-platform protocol tests no longer assume separate TCP reads for XMPP
