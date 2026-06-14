@@ -11490,11 +11490,7 @@
       return date.toLocaleDateString(undefined, { weekday: "long" });
     }
 
-    const options = { day: "numeric", month: "long" };
-    if (date.getFullYear() !== today.getFullYear()) {
-      options.year = "numeric";
-    }
-    return date.toLocaleDateString(undefined, options);
+    return date.toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" });
   }
 
   function normalizeMessageDate(value) {
