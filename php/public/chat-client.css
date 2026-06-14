@@ -3040,6 +3040,10 @@ body[data-theme="dark"] .link-preview-loading {
   padding: 0;
   font-size: 17px;
   line-height: 1;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-2px);
+  transition: opacity .12s ease, transform .12s ease;
 }
 
 .message.self .message-reaction-button {
@@ -3050,6 +3054,22 @@ body[data-theme="dark"] .link-preview-loading {
 .message-reaction-button:focus-visible {
   background: #ffffff;
   color: #0f172a;
+}
+
+.message:hover .message-reaction-button,
+.message:focus-within .message-reaction-button,
+.message-reaction-button:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+@media (hover: none), (pointer: coarse) {
+  .message-reaction-button {
+    opacity: 1;
+    pointer-events: auto;
+    transform: none;
+  }
 }
 
 .message-reactions {

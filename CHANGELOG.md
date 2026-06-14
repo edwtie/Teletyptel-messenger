@@ -48,6 +48,8 @@
   chips, XEP-0359 origin IDs for stable message targeting and persisted
   reaction storage for later MAM fastening collation. The reaction `+` action
   reuses the existing TeleTypTel smiley picker.
+- Message reaction controls now appear on hover/focus on pointer devices to
+  keep the chat view cleaner.
 - Interactive location sharing UI with map preview, share duration up to eight
   hours, Google Maps/OpenStreetMap provider setting, browser geolocation
   permission handling and single live location card updates instead of duplicate
