@@ -106,6 +106,7 @@ history.status_missed=gemist
 history.status_rejected=geweigerd
 history.status_failed=mislukt
 history.tc_saved_note=Totale Conversatie bewaard in gespreksgeschiedenis.
+history.watch_back=Terugkijken
 button.location_export_pidf=PIDF-LO exporteren
 button.location_share=Locatie delen
 button.zoom_in=Inzoomen

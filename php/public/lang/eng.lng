@@ -106,6 +106,7 @@ history.status_missed=missed
 history.status_rejected=rejected
 history.status_failed=failed
 history.tc_saved_note=Total Conversation saved in conversation history.
+history.watch_back=Watch back
 button.location_export_pidf=Export PIDF-LO
 button.location_share=Share location
 button.zoom_in=Zoom in

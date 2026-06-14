@@ -2609,7 +2609,7 @@ body:not([data-chat-background="none"]) .message-body {
 
 .call-message-card {
   display: grid;
-  grid-template-columns: 42px minmax(0, 1fr);
+  grid-template-columns: 42px minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
   min-width: min(280px, 64vw);
@@ -2655,6 +2655,26 @@ body:not([data-chat-background="none"]) .message-body {
 .call-message-text span {
   color: #334155;
   font-size: 13px;
+}
+
+.call-message-history-button {
+  border: 1px solid rgba(37, 99, 235, .45);
+  border-radius: 6px;
+  background: rgba(239, 246, 255, .9);
+  color: #1d4ed8;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 6px 9px;
+  white-space: nowrap;
+}
+
+.call-message-history-button:hover,
+.call-message-history-button:focus-visible {
+  background: #dbeafe;
+  outline: 2px solid rgba(37, 99, 235, .35);
+  outline-offset: 2px;
 }
 
 .message-link {

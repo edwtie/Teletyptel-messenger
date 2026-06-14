@@ -9480,6 +9480,7 @@
       const startedAt = call.historyStartedAt instanceof Date ? call.historyStartedAt : new Date();
       message.callInfo = {
         status,
+        callId: call.sid,
         mediaKind: call.mediaKind,
         rttEnabled: call.rttEnabled,
         durationSeconds: Math.round(Math.max(0, Date.now() - startedAt.getTime()) / 1000),
@@ -9553,6 +9554,7 @@
     message.status = callNotificationMessageStatus(status);
     message.callInfo = {
       status,
+      callId: call.sid,
       mediaKind: call.mediaKind,
       rttEnabled: call.rttEnabled,
       durationSeconds: Math.round(Math.max(0, Date.now() - startedAt.getTime()) / 1000),
@@ -9564,6 +9566,19 @@
     }
     renderConversations();
     return true;
+  }
+
+  async function openConversationHistoryCall(callId) {
+    const normalizedId = String(callId || "").trim();
+    if (!normalizedId) {
+      return;
+    }
+
+    if (!state.conversationHistory.loaded) {
+      await loadConversationHistory();
+    }
+    state.conversationHistory.selectedId = `call:${normalizedId}`;
+    activateTab("history");
   }
 
   function cleanupCall(notifyRemote, historyStatus = "ended") {
@@ -11445,6 +11460,19 @@
     text.append(title, meta);
 
     card.append(icon, text);
+    const callInfo = message.callInfo || {};
+    if (callInfo.callId && message.status === "call-ended") {
+      const historyButton = document.createElement("button");
+      historyButton.type = "button";
+      historyButton.className = "call-message-history-button";
+      historyButton.textContent = t("history.watch_back", "Terugkijken");
+      historyButton.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        openConversationHistoryCall(callInfo.callId);
+      });
+      card.appendChild(historyButton);
+    }
     return card;
   }
 
