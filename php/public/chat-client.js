@@ -11483,6 +11483,13 @@
       return t("history.yesterday", "Gisteren");
     }
 
+    const weekAgo = new Date(today);
+    weekAgo.setHours(0, 0, 0, 0);
+    weekAgo.setDate(weekAgo.getDate() - 6);
+    if (date >= weekAgo) {
+      return date.toLocaleDateString(undefined, { weekday: "long" });
+    }
+
     const options = { day: "numeric", month: "long" };
     if (date.getFullYear() !== today.getFullYear()) {
       options.year = "numeric";
