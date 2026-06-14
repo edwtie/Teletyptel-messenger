@@ -42,6 +42,8 @@
   yesterday, seven extra weekday labels and older dates in the message stream.
 - Conversation list rows now show the latest message preview instead of only
   presence metadata.
+- Empty conversation previews show a last-seen time after a contact sends an
+  offline presence update.
 - Interactive location sharing UI with map preview, share duration up to eight
   hours, Google Maps/OpenStreetMap provider setting, browser geolocation
   permission handling and single live location card updates instead of duplicate

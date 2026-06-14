@@ -424,6 +424,7 @@
         meta: "Offline",
         clientState: null,
         clientStateUpdatedAt: null,
+        lastSeenAt: null,
         messages: [],
         remoteText: "",
         remoteFrom: "",
@@ -440,6 +441,7 @@
         meta: "Offline",
         clientState: null,
         clientStateUpdatedAt: null,
+        lastSeenAt: null,
         messages: [],
         remoteText: "",
         remoteFrom: "",
@@ -456,6 +458,7 @@
         meta: "Group",
         clientState: null,
         clientStateUpdatedAt: null,
+        lastSeenAt: null,
         messages: [],
         remoteText: "",
         remoteFrom: "",
@@ -7679,6 +7682,7 @@
     if (presence === "offline") {
       conversation.clientState = null;
       conversation.clientStateUpdatedAt = null;
+      conversation.lastSeenAt = new Date();
     }
     renderConversations();
     renderActiveConversation();
@@ -11263,16 +11267,25 @@
   function conversationListPreviewText(conversation) {
     const message = lastConversationPreviewMessage(conversation);
     if (!message) {
-      return conversationMeta(conversation);
+      return conversationListFallbackMeta(conversation);
     }
 
     const body = conversationPreviewBody(message);
     if (!body) {
-      return conversationMeta(conversation);
+      return conversationListFallbackMeta(conversation);
     }
 
     const prefix = conversationPreviewPrefix(conversation, message);
     return prefix ? `${prefix}: ${body}` : body;
+  }
+
+  function conversationListFallbackMeta(conversation) {
+    if (conversation.presence === "offline" && conversation.lastSeenAt) {
+      return t("presence.last_seen", "laatst gezien: {0}")
+        .replace("{0}", formatLastSeen(conversation.lastSeenAt));
+    }
+
+    return conversationMeta(conversation);
   }
 
   function lastConversationPreviewMessage(conversation) {
@@ -11363,6 +11376,7 @@
       presence: kind === "group" ? "group" : "offline",
       clientState: null,
       clientStateUpdatedAt: null,
+      lastSeenAt: null,
       meta: "",
       messages: [],
       remoteText: "",
@@ -11405,6 +11419,7 @@
     if (presence === "offline") {
       conversation.clientState = null;
       conversation.clientStateUpdatedAt = null;
+      conversation.lastSeenAt = new Date();
     }
     renderConversations();
   }
@@ -13425,6 +13440,23 @@
 
   function formatTime(date) {
     return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  }
+
+  function formatLastSeen(value) {
+    const date = normalizeMessageDate(value);
+    const time = formatTime(date);
+    const today = new Date();
+    if (date.toDateString() === today.toDateString()) {
+      return t("presence.today_at", "vandaag om {0}").replace("{0}", time);
+    }
+
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    if (date.toDateString() === yesterday.toDateString()) {
+      return t("presence.yesterday_at", "gisteren om {0}").replace("{0}", time);
+    }
+
+    return date.toLocaleString(undefined, { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" });
   }
 
   function formatBytes(value) {
