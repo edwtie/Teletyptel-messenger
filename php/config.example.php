@@ -45,6 +45,16 @@ return [
         'tls_port' => 5061,
         'module' => 'ejabberd_sip / mod_sip',
     ],
+    'webrtc' => [
+        // STUN helps browsers discover their public network address.
+        // TURN is required for reliable calls/text-telephone use across strict NATs and mobile networks.
+        'stun_urls' => 'stun:stun.l.google.com:19302',
+        'turn_urls' => '',
+        'turn_username' => '',
+        'turn_credential' => '',
+        // Use "relay" to force TURN-only media during production diagnostics.
+        'ice_transport_policy' => 'all',
+    ],
     'oauth' => [
         // Used when social login creates or links a TeleTypTel account.
         'xmpp_domain' => 'localhost',

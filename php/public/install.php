@@ -21,6 +21,11 @@ $state = [
     'xmpp_websocket' => defaultXmppWebSocket(),
     'xmpp_domain' => defaultXmppDomain(),
     'relay_port' => '8787',
+    'stun_urls' => 'stun:stun.l.google.com:19302',
+    'turn_urls' => '',
+    'turn_username' => '',
+    'turn_credential' => '',
+    'ice_transport_policy' => 'all',
     'admin_name' => 'TeleTypTel beheerder',
     'admin_email' => '',
     'admin_password' => '',
@@ -100,6 +105,18 @@ function validateInstallInput(array $state, array &$errors): void
         if (!preg_match('/^wss?:\/\//i', $state[$key])) {
             $errors[] = "Veld '{$key}' moet beginnen met ws:// of wss://.";
         }
+    }
+
+    foreach (['stun_urls', 'turn_urls'] as $key) {
+        foreach (preg_split('/[\r\n,]+/', $state[$key]) ?: [] as $url) {
+            $url = trim((string)$url);
+            if ($url !== '' && !preg_match('/^(stuns?|turns?):/i', $url)) {
+                $errors[] = "Veld '{$key}' mag alleen stun:, stuns:, turn: of turns: URL's bevatten.";
+            }
+        }
+    }
+    if (!in_array($state['ice_transport_policy'], ['all', 'relay'], true)) {
+        $errors[] = "Veld 'ice_transport_policy' moet all of relay zijn.";
     }
 
     if (!filter_var($state['admin_email'], FILTER_VALIDATE_EMAIL)) {
@@ -334,6 +351,13 @@ function writeConfig(string $configPath, array $state): void
         . arrayEntry('tls_port', 5061, false)
         . arrayEntry('module', 'ejabberd_sip / mod_sip')
         . "    ],\n"
+        . "    'webrtc' => [\n"
+        . arrayEntry('stun_urls', $state['stun_urls'])
+        . arrayEntry('turn_urls', $state['turn_urls'])
+        . arrayEntry('turn_username', $state['turn_username'])
+        . arrayEntry('turn_credential', $state['turn_credential'])
+        . arrayEntry('ice_transport_policy', $state['ice_transport_policy'])
+        . "    ],\n"
         . "    'admin' => [\n"
         . arrayEntry('token', '')
         . "    ],\n"
@@ -396,6 +420,7 @@ function loadExistingConfig(string $configPath): ?array
     $apple = is_array($oauth['apple'] ?? null) ? $oauth['apple'] : [];
     $auth0 = is_array($oauth['auth0'] ?? null) ? $oauth['auth0'] : [];
     $relay = is_array($config['relay'] ?? null) ? $config['relay'] : [];
+    $webrtc = is_array($config['webrtc'] ?? null) ? $config['webrtc'] : [];
 
     return [
         'host' => (string)($mysql['host'] ?? '127.0.0.1'),
@@ -412,6 +437,11 @@ function loadExistingConfig(string $configPath): ?array
         'xmpp_websocket' => (string)($oauth['xmpp_websocket'] ?? defaultXmppWebSocket()),
         'xmpp_domain' => (string)($oauth['xmpp_domain'] ?? defaultXmppDomain()),
         'relay_port' => (string)relayPortFromUrl((string)($relay['websocket'] ?? defaultRelayWebSocket())),
+        'stun_urls' => (string)($webrtc['stun_urls'] ?? 'stun:stun.l.google.com:19302'),
+        'turn_urls' => (string)($webrtc['turn_urls'] ?? ''),
+        'turn_username' => (string)($webrtc['turn_username'] ?? ''),
+        'turn_credential' => (string)($webrtc['turn_credential'] ?? ''),
+        'ice_transport_policy' => (string)($webrtc['ice_transport_policy'] ?? 'all'),
         'admin_name' => 'TeleTypTel beheerder',
         'admin_email' => '',
         'admin_password' => '',
@@ -773,6 +803,18 @@ function renderInstallPage(array $state, array $messages, array $errors, bool $i
           <?= input('relay_port', 'RTT relay poort', $state['relay_port'], 'number') ?>
           <?= input('xmpp_websocket', 'XMPP WebSocket', $state['xmpp_websocket'], 'text', 'full') ?>
           <?= input('xmpp_domain', 'XMPP domein', $state['xmpp_domain'], 'text', 'full') ?>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>WebRTC STUN/TURN</legend>
+        <p class="small">Voor betrouwbare beeldbellen en teksttelefonie over mobiel internet/NAT is TURN sterk aanbevolen. Meerdere URL's mogen met komma's of nieuwe regels.</p>
+        <div class="grid">
+          <?= input('stun_urls', 'STUN URL(s)', $state['stun_urls'], 'text', 'full') ?>
+          <?= input('turn_urls', 'TURN URL(s)', $state['turn_urls'], 'text', 'full') ?>
+          <?= input('turn_username', 'TURN gebruiker', $state['turn_username']) ?>
+          <?= input('turn_credential', 'TURN wachtwoord/secret', $state['turn_credential'], 'password') ?>
+          <?= input('ice_transport_policy', 'ICE transport policy (all/relay)', $state['ice_transport_policy']) ?>
         </div>
       </fieldset>
 

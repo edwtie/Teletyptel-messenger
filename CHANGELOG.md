@@ -325,6 +325,9 @@
 - RTT datachannel fallback no longer shows a technical fallback/error message
   during Total Conversation; the user-facing call status stays connected while
   diagnostics remain in the debug log.
+- WebRTC calls now load STUN/TURN ICE server settings from a server-side RTC
+  config API, with installer/config support and extra diagnostics for ICE,
+  SCTP, SDP datachannel negotiation and RTT datachannel state.
 - Old public product names were replaced with TeleTypTel in visible UI text,
   language files, project metadata, XSF draft entries and public documentation.
 - Cross-platform protocol tests no longer assume separate TCP reads for XMPP

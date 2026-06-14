@@ -1,5 +1,5 @@
-const CACHE_NAME = "teletyptel-webclient-v224";
-const BUILD_VERSION = "20260614-hide-rtt-datachannel-fallback";
+const CACHE_NAME = "teletyptel-webclient-v225";
+const BUILD_VERSION = "20260614-webrtc-ice-diagnostics";
 const ASSETS = [
   "chat.html",
   "dev.html",

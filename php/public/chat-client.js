@@ -67,6 +67,7 @@
   const accountApiPath = "api/account.php";
   const historyApiPath = "api/history.php";
   const linkPreviewApiPath = "api/link-preview.php";
+  const rtcConfigApiPath = "api/rtc-config.php";
   const uploadApiPath = "api/upload.php";
   const uploadChunkSize = 1_310_720;
   const languageBasePath = "lang/";
@@ -270,6 +271,12 @@
     passwordResetToken: locationSearchParams.get("reset") || "",
     developerMode,
     provider: null,
+    rtcConfig: {
+      iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+      iceTransportPolicy: "all",
+      bundlePolicy: "balanced",
+      rtcpMuxPolicy: "require"
+    },
     translations: new Map(),
     languageCode: "eng",
     sessionProfile,
@@ -1623,6 +1630,7 @@
       await loadMessageHistory();
       await loadConversationHistory();
       await loadLanguage(state.account.preferredLanguage ?? "eng");
+      await loadRtcConfig();
       const provider = await fetchJson(`config/providers/${encodeURIComponent(state.account.providerId)}.json`);
       state.provider = provider;
       await loadGoogleMapsConfig();
@@ -1637,6 +1645,7 @@
       el.providerSummary.textContent = t("provider.unavailable", "Provider manifest unavailable.");
       appendDebug("config-error", error.message);
       await loadLanguage(state.account?.preferredLanguage ?? "eng");
+      await loadRtcConfig();
       await loadGoogleMapsConfig();
       renderTabs();
       showAccountStartIfRequired(!databaseLoaded);
@@ -1911,6 +1920,23 @@
     } catch (error) {
       appendDebug("history-error", error.message);
       return false;
+    }
+  }
+
+  async function loadRtcConfig() {
+    try {
+      const config = await fetchJson(rtcConfigApiPath);
+      if (Array.isArray(config.iceServers)) {
+        state.rtcConfig = {
+          iceServers: config.iceServers,
+          iceTransportPolicy: config.iceTransportPolicy === "relay" ? "relay" : "all",
+          bundlePolicy: ["balanced", "max-bundle", "max-compat"].includes(config.bundlePolicy) ? config.bundlePolicy : "balanced",
+          rtcpMuxPolicy: config.rtcpMuxPolicy === "negotiate" ? "negotiate" : "require"
+        };
+      }
+      appendDebug("rtc-config", rtcConfigDebugSummary(state.rtcConfig));
+    } catch (error) {
+      appendDebug("rtc-config-error", error.message || String(error));
     }
   }
 
@@ -8168,7 +8194,9 @@
       await openLocalMedia(call);
       createPeerConnection(call);
       const offer = await call.pc.createOffer();
+      appendSdpDebug("offer-created", offer.sdp);
       await call.pc.setLocalDescription(offer);
+      appendSdpDebug("offer-local", call.pc.localDescription?.sdp);
       await ensureRelayConnectedForJingle();
       sendJingleEnvelope("session-initiate", {
         sid: call.sid,
@@ -8196,10 +8224,13 @@
       await openLocalMedia(call);
       createPeerConnection(call);
       await call.pc.setRemoteDescription({ type: "offer", sdp: call.incomingOffer });
+      appendSdpDebug("offer-remote", call.incomingOffer);
       call.remoteDescriptionSet = true;
       await flushPendingIceCandidates(call);
       const answer = await call.pc.createAnswer();
+      appendSdpDebug("answer-created", answer.sdp);
       await call.pc.setLocalDescription(answer);
+      appendSdpDebug("answer-local", call.pc.localDescription?.sdp);
       await ensureRelayConnectedForJingle();
       sendJingleEnvelope("session-accept", {
         sid: call.sid,
@@ -8391,6 +8422,7 @@
         call.rttSync = normalizeJingleRttSyncDescriptor(envelope.rttSync || call.rttSync, call.sid, "accepted");
       }
       await call.pc.setRemoteDescription({ type: "answer", sdp: envelope.sdp });
+      appendSdpDebug("answer-remote", envelope.sdp);
       call.remoteDescriptionSet = true;
       await flushPendingIceCandidates(call);
       setCallStatus(jingleRttSyncStatusText(call));
@@ -8548,8 +8580,9 @@
       return call.pc;
     }
 
-    const pc = new RTCPeerConnection({ iceServers: [] });
+    const pc = new RTCPeerConnection(rtcPeerConnectionConfig());
     call.pc = pc;
+    appendDebug("webrtc-config", rtcConfigDebugSummary(state.rtcConfig));
 
     pc.addEventListener("datachannel", (event) => {
       if (event.channel?.label === jingleRttSyncDataChannelLabel) {
@@ -8577,6 +8610,7 @@
         return;
       }
 
+      appendDebug("webrtc-ice-candidate", candidateDebugSummary(event.candidate));
       sendJingleEnvelope("transport-info", {
         sid: call.sid,
         mediaKind: call.mediaKind,
@@ -8598,6 +8632,7 @@
     });
 
     pc.addEventListener("connectionstatechange", () => {
+      appendWebRtcStateDebug(call, "connectionstatechange");
       if (pc.connectionState === "connected") {
         setCallStatus(jingleRttSyncStatusText(call));
         scheduleTotalConversationRecorder(call);
@@ -8607,8 +8642,61 @@
         setCallStatus(t("call.disconnected", "Call disconnected"));
       }
     });
+    pc.addEventListener("iceconnectionstatechange", () => appendWebRtcStateDebug(call, "iceconnectionstatechange"));
+    pc.addEventListener("icegatheringstatechange", () => appendWebRtcStateDebug(call, "icegatheringstatechange"));
+    pc.addEventListener("signalingstatechange", () => appendWebRtcStateDebug(call, "signalingstatechange"));
 
     return pc;
+  }
+
+  function rtcPeerConnectionConfig() {
+    const config = state.rtcConfig || {};
+    return {
+      iceServers: Array.isArray(config.iceServers) ? config.iceServers : [],
+      iceTransportPolicy: config.iceTransportPolicy === "relay" ? "relay" : "all",
+      bundlePolicy: ["balanced", "max-bundle", "max-compat"].includes(config.bundlePolicy) ? config.bundlePolicy : "balanced",
+      rtcpMuxPolicy: config.rtcpMuxPolicy === "negotiate" ? "negotiate" : "require"
+    };
+  }
+
+  function rtcConfigDebugSummary(config) {
+    const servers = Array.isArray(config?.iceServers) ? config.iceServers : [];
+    const parts = servers.map((server) => {
+      const urls = Array.isArray(server.urls) ? server.urls : [server.urls];
+      return urls.filter(Boolean).map((url) => String(url).replace(/\/\/([^:@]+):([^@]+)@/g, "//***:***@")).join(",");
+    }).filter(Boolean);
+    return `iceServers=${parts.length ? parts.join(" | ") : "none"} policy=${config?.iceTransportPolicy || "all"}`;
+  }
+
+  function appendWebRtcStateDebug(call, reason) {
+    const pc = call?.pc;
+    if (!pc) {
+      return;
+    }
+
+    appendDebug(
+      "webrtc-state",
+      `${reason} sid=${call.sid} connection=${pc.connectionState} ice=${pc.iceConnectionState}/${pc.iceGatheringState} signaling=${pc.signalingState} sctp=${pc.sctp?.transport?.state || pc.sctp?.state || "n/a"} rtt=${call.rttChannel?.readyState || "none"}`
+    );
+  }
+
+  function candidateDebugSummary(candidate) {
+    const text = String(candidate?.candidate || "");
+    const type = text.match(/\btyp\s+(\w+)/)?.[1] || "unknown";
+    const protocol = text.match(/\b(udp|tcp)\b/i)?.[1] || "";
+    return `type=${type}${protocol ? ` protocol=${protocol.toLowerCase()}` : ""}`;
+  }
+
+  function appendSdpDebug(label, sdp) {
+    const text = String(sdp || "");
+    const hasDataChannel = /^m=application\s/m.test(text) || /webrtc-datachannel/i.test(text);
+    const media = Array.from(text.matchAll(/^m=([a-z]+)/gmi), (match) => match[1]).join(",");
+    appendDebug("webrtc-sdp", `${label} media=${media || "none"} datachannel=${hasDataChannel ? "yes" : "no"}`);
+  }
+
+  function dataChannelDebugSummary(call, channel) {
+    const pc = call?.pc;
+    return `sid=${call?.sid || "-"} label=${channel?.label || "-"} id=${channel?.id ?? "-"} ready=${channel?.readyState || "-"} protocol=${channel?.protocol || "-"} negotiated=${channel?.negotiated ? "true" : "false"} buffered=${channel?.bufferedAmount ?? "-"} sctp=${pc?.sctp?.transport?.state || pc?.sctp?.state || "n/a"}`;
   }
 
   function scheduleTotalConversationRecorder(call) {
@@ -8762,6 +8850,7 @@
     call.rttSync = normalizeJingleRttSyncDescriptor(call.rttSync, call.sid, "negotiating");
     call.rttSync.label = channel.label || jingleRttSyncDataChannelLabel;
     call.rttSync.state = channel.readyState === "open" ? "connected" : "negotiating";
+    appendDebug("jingle-rtt", `Datachannel configured ${dataChannelDebugSummary(call, channel)}`);
 
     channel.addEventListener("open", () => {
       if (!state.call || state.call.sid !== call.sid) {
@@ -8770,7 +8859,7 @@
 
       call.rttSync.state = "connected";
       setCallStatus(t("call.connected_total", "Total conversation connected - live text synchronized"));
-      appendDebug("jingle-rtt", `Datachannel open sid=${call.sid}`);
+      appendDebug("jingle-rtt", `Datachannel open ${dataChannelDebugSummary(call, channel)}`);
       updateCallUi();
     });
 
@@ -8781,13 +8870,13 @@
 
       call.rttSync.state = "fallback";
       setCallStatus(t("call.connected_total", "Total conversation connected - live text synchronized"));
-      appendDebug("jingle-rtt", `Datachannel closed sid=${call.sid}`);
+      appendDebug("jingle-rtt", `Datachannel closed ${dataChannelDebugSummary(call, channel)}`);
       updateCallUi();
     });
 
-    channel.addEventListener("error", () => {
+    channel.addEventListener("error", (event) => {
       call.rttSync.state = "fallback";
-      appendDebug("jingle-rtt-error", `Datachannel error sid=${call.sid}`);
+      appendDebug("jingle-rtt-error", `Datachannel error ${dataChannelDebugSummary(call, channel)} ${event?.error?.message || ""}`.trim());
     });
 
     channel.addEventListener("message", (event) => {
