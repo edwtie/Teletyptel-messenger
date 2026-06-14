@@ -31,6 +31,8 @@ function readHistory(): void
 {
     $accountId = cleanHistoryText($_GET['accountId'] ?? '', 96);
     $pdo = Database::connect();
+    ensureMessageHistorySchema($pdo);
+    ensureConversationHistorySchema($pdo);
     if (!canReadHistorySession($pdo, $accountId, cleanHistoryText($_GET['loginToken'] ?? '', 255))) {
         http_response_code(401);
         echo json_encode(['ok' => false, 'error' => 'not_authenticated']);
@@ -38,8 +40,6 @@ function readHistory(): void
     }
 
     $limit = max(1, min(2000, (int)($_GET['limit'] ?? 500)));
-    ensureMessageHistorySchema($pdo);
-    ensureConversationHistorySchema($pdo);
     $accountIds = historyAccountIds($pdo, $accountId);
     if (cleanHistoryText($_GET['type'] ?? '', 32) === 'calls') {
         readConversationHistory($pdo, $accountIds, $limit);
@@ -317,16 +317,41 @@ function ensureConversationHistorySchema(PDO $pdo): void
             KEY idx_conversation_history_account_peer_time (account_id, conversation_peer(120), started_at)
         ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
     );
+    ensureHistoryColumn($pdo, 'conversation_history', 'conversation_name', 'VARCHAR(255) NOT NULL DEFAULT ""');
+    ensureHistoryColumn($pdo, 'conversation_history', 'conversation_kind', 'VARCHAR(32) NOT NULL DEFAULT "contact"');
+    ensureHistoryColumn($pdo, 'conversation_history', 'direction', 'VARCHAR(16) NOT NULL DEFAULT "peer"');
+    ensureHistoryColumn($pdo, 'conversation_history', 'call_type', 'VARCHAR(32) NOT NULL DEFAULT "total"');
+    ensureHistoryColumn($pdo, 'conversation_history', 'status', 'VARCHAR(32) NOT NULL DEFAULT "ended"');
+    ensureHistoryColumn($pdo, 'conversation_history', 'ended_at', 'DATETIME(3) NULL');
+    ensureHistoryColumn($pdo, 'conversation_history', 'duration_seconds', 'INT UNSIGNED NOT NULL DEFAULT 0');
+    ensureHistoryColumn($pdo, 'conversation_history', 'transcript_json', 'MEDIUMTEXT NULL');
+    ensureHistoryColumn($pdo, 'conversation_history', 'media_json', 'MEDIUMTEXT NULL');
+    ensureHistoryColumn($pdo, 'conversation_history', 'note', 'TEXT NULL');
 }
 
 function ensureHistoryColumn(PDO $pdo, string $table, string $column, string $definition): void
 {
-    $statement = $pdo->prepare('SHOW COLUMNS FROM `' . $table . '` LIKE :column');
-    $statement->execute(['column' => $column]);
+    $statement = $pdo->prepare(
+        'SELECT 1
+         FROM INFORMATION_SCHEMA.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE()
+           AND TABLE_NAME = :table
+           AND COLUMN_NAME = :column
+         LIMIT 1'
+    );
+    $statement->execute([
+        'table' => $table,
+        'column' => $column,
+    ]);
     if ($statement->fetch()) {
         return;
     }
-    $pdo->exec('ALTER TABLE `' . $table . '` ADD COLUMN `' . $column . '` ' . $definition);
+    $pdo->exec('ALTER TABLE `' . historyIdentifier($table) . '` ADD COLUMN `' . historyIdentifier($column) . '` ' . $definition);
+}
+
+function historyIdentifier(string $value): string
+{
+    return str_replace('`', '``', $value);
 }
 
 function historyRowToClient(array $row): array

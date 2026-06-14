@@ -317,6 +317,8 @@
   started to ended/missed/failed with duration and keep that state after refresh.
 - Ended Total Conversation call cards now include a watch-back action that opens
   the matching Total Conversation history entry.
+- History schema repair now uses an INFORMATION_SCHEMA column check and also
+  repairs older Total Conversation history tables before reading call history.
 - Old public product names were replaced with TeleTypTel in visible UI text,
   language files, project metadata, XSF draft entries and public documentation.
 - Cross-platform protocol tests no longer assume separate TCP reads for XMPP
