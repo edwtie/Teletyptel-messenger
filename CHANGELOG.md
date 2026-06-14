@@ -319,6 +319,9 @@
   the matching Total Conversation history entry.
 - History schema repair now uses an INFORMATION_SCHEMA column check and also
   repairs older Total Conversation history tables before reading call history.
+- Total Conversation history now also captures RTT text when Jingle RTT sync
+  falls back to the relay/XEP-0301 path, so transcripts are not empty after a
+  datachannel failure.
 - Old public product names were replaced with TeleTypTel in visible UI text,
   language files, project metadata, XSF draft entries and public documentation.
 - Cross-platform protocol tests no longer assume separate TCP reads for XMPP

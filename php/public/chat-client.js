@@ -7074,6 +7074,9 @@
     }
     state.relaySocket.send(JSON.stringify(envelope));
     appendDebug("relay-out", JSON.stringify(redactEnvelopeForLog(envelope)));
+    recordTotalConversationTextForConversation(activeConversation(), "self", text, currentFromJid(), {
+      final: true
+    });
     if (edit) {
       applyMessageCorrection(edit.conversation, edit.replaceId, text, "self", outgoingId);
       clearMessageEdit();
@@ -7150,6 +7153,7 @@
     }
     state.relaySocket.send(JSON.stringify(envelope));
     appendDebug("rtt-out", xml);
+    recordTotalConversationTextForConversation(activeConversation(), "self", text, currentFromJid());
   }
 
   function createRelayEnvelope(type, text, xml, to = null) {
@@ -7586,6 +7590,9 @@
       conversation.clientState = "active";
       conversation.clientStateUpdatedAt = new Date();
       setPeerPresence(conversation.peer, "online");
+      recordTotalConversationTextForConversation(conversation, "peer", envelope.text ?? "", conversation.remoteFrom, {
+        final: true
+      });
       if (envelope.replaceId) {
         applyMessageCorrection(
           conversation,
@@ -7624,6 +7631,7 @@
     conversation.clientState = "active";
     conversation.clientStateUpdatedAt = new Date();
     setPeerPresence(conversation.peer, "online");
+    recordTotalConversationTextForConversation(conversation, "peer", conversation.remoteText, conversation.remoteFrom);
     updateRemoteDraftMessage(conversation.id);
   }
 
@@ -9345,6 +9353,15 @@
     }
 
     call.transcriptDrafts[key] = line.text.trim() ? line : null;
+  }
+
+  function recordTotalConversationTextForConversation(conversation, direction, text, from = "", options = {}) {
+    const call = state.call;
+    if (!conversation || !isTotalConversationCall(call) || !addressMatches(conversation.peer, call.peer)) {
+      return;
+    }
+
+    recordTotalConversationText(call, direction, text, from, options);
   }
 
   function persistConversationHistoryCall(call, status = "ended") {
