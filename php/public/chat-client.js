@@ -412,6 +412,7 @@
     contextConversationId: null,
     contextMessage: null,
     reactionMessageId: null,
+    smileyPickerMode: "composer",
     accountGateRequired: !hasInitialAccountProfile,
     accountDialogMode: !hasInitialAccountProfile ? "signin" : "settings",
     conversations: [
@@ -6345,13 +6346,17 @@
     closeCallMenus();
     closeAttachmentMenu();
     closeSmileyPicker();
+    state.smileyPickerMode = "composer";
+    el.smileyPickerPanel.classList.remove("reaction-mode");
     el.smileyPickerPanel.hidden = !shouldOpen;
     el.emojiButton.setAttribute("aria-expanded", shouldOpen ? "true" : "false");
+    el.smileyPickerPanel.style.left = "";
+    el.smileyPickerPanel.style.top = "";
     syncEmojiButtonState();
   }
 
   function closeSmileyPickerOnOutsideClick(event) {
-    if (event.target instanceof Element && event.target.closest(".smiley-menu")) {
+    if (event.target instanceof Element && event.target.closest(".smiley-menu, .message-reaction-picker, .message-reaction-button")) {
       return;
     }
 
@@ -6367,6 +6372,10 @@
   function closeSmileyPicker() {
     el.smileyPickerPanel.hidden = true;
     el.emojiButton.setAttribute("aria-expanded", "false");
+    state.smileyPickerMode = "composer";
+    el.smileyPickerPanel.classList.remove("reaction-mode");
+    el.smileyPickerPanel.style.left = "";
+    el.smileyPickerPanel.style.top = "";
     syncEmojiButtonState();
   }
 
@@ -6375,6 +6384,13 @@
       ? event.target.closest("[data-smiley-code]")
       : null;
     if (!(button instanceof HTMLButtonElement)) {
+      return;
+    }
+
+    if (state.smileyPickerMode === "reaction") {
+      reactWithSmileyCode(button.dataset.smileyCode ?? "");
+      closeMessageReactionPicker();
+      closeSmileyPicker();
       return;
     }
 
@@ -11894,11 +11910,7 @@
     customButton.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
-      const emoji = prompt(t("reaction.custom_prompt", "Reaction emoji"), "👍");
-      if (emoji) {
-        toggleMessageReaction(message, emoji.trim());
-      }
-      closeMessageReactionPicker();
+      openReactionSmileyPicker(message, customButton);
     });
     picker.appendChild(customButton);
     document.body.appendChild(picker);
@@ -11923,6 +11935,26 @@
     if (event.key === "Escape") {
       closeMessageReactionPicker();
     }
+  }
+
+  function openReactionSmileyPicker(message, anchor) {
+    state.reactionMessageId = message.id;
+    state.smileyPickerMode = "reaction";
+    el.smileyPickerPanel.classList.add("reaction-mode");
+    el.smileyPickerPanel.hidden = false;
+    el.emojiButton.setAttribute("aria-expanded", "false");
+    const rect = anchor.getBoundingClientRect();
+    el.smileyPickerPanel.style.left = `${Math.min(window.innerWidth - el.smileyPickerPanel.offsetWidth - 8, Math.max(8, rect.left))}px`;
+    el.smileyPickerPanel.style.top = `${Math.max(8, rect.bottom + 8)}px`;
+    syncEmojiButtonState();
+  }
+
+  function reactWithSmileyCode(code) {
+    const message = findMessageById(state.reactionMessageId);
+    if (!message || !code) {
+      return;
+    }
+    toggleMessageReaction(message, code);
   }
 
   function toggleMessageReaction(message, emoji) {
@@ -12015,6 +12047,20 @@
 
   function conversationForMessage(message) {
     return state.conversations.find((conversation) => conversation.messages.includes(message)) || null;
+  }
+
+  function findMessageById(messageId) {
+    const id = String(messageId || "");
+    if (!id) {
+      return null;
+    }
+    for (const conversation of state.conversations) {
+      const message = findConversationMessageByAnyId(conversation, id);
+      if (message) {
+        return message;
+      }
+    }
+    return null;
   }
 
   function reactionActorId() {

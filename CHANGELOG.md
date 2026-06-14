@@ -46,7 +46,8 @@
   offline presence update.
 - Chat messages now support XEP-0444 Message Reactions with compact reaction
   chips, XEP-0359 origin IDs for stable message targeting and persisted
-  reaction storage for later MAM fastening collation.
+  reaction storage for later MAM fastening collation. The reaction `+` action
+  reuses the existing TeleTypTel smiley picker.
 - Interactive location sharing UI with map preview, share duration up to eight
   hours, Google Maps/OpenStreetMap provider setting, browser geolocation
   permission handling and single live location card updates instead of duplicate

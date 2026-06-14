@@ -1,5 +1,5 @@
-const CACHE_NAME = "teletyptel-webclient-v232";
-const BUILD_VERSION = "20260614-xep-0444-reactions";
+const CACHE_NAME = "teletyptel-webclient-v233";
+const BUILD_VERSION = "20260614-reaction-smiley-picker";
 const ASSETS = [
   "chat.html",
   "dev.html",

@@ -3813,6 +3813,12 @@ body.viewport-phone.call-active .call-panel.tc-text-full .tc-text-line p {
   display: none;
 }
 
+.smiley-picker-panel.reaction-mode {
+  position: fixed;
+  bottom: auto;
+  transform: none;
+}
+
 .smiley-picker-option {
   display: grid;
   place-items: center;

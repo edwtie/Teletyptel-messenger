@@ -338,7 +338,6 @@ message.forwarded_prefix=Forwarded
 message.retract_fallback=/me retracted a previous message, but your client does not support message retraction.
 reaction.add=React
 reaction.toggle=Toggle reaction
-reaction.custom_prompt=Reaction emoji
 account.default_profile=Default account profile
 account.local_saved=Server account session saved
 account.database_saved=Server account saved

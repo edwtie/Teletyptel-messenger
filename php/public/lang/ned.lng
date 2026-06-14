@@ -338,7 +338,6 @@ message.forwarded_prefix=Doorgestuurd
 message.retract_fallback=/me heeft een eerder bericht ingetrokken, maar uw client ondersteunt berichtintrekking niet.
 reaction.add=Reactie toevoegen
 reaction.toggle=Reactie wisselen
-reaction.custom_prompt=Reactie-emoji
 account.default_profile=Standaard accountprofiel
 account.local_saved=Serveraccountsessie opgeslagen
 account.database_saved=Serveraccount opgeslagen
