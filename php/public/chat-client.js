@@ -11465,7 +11465,10 @@
       const historyButton = document.createElement("button");
       historyButton.type = "button";
       historyButton.className = "call-message-history-button";
-      historyButton.textContent = t("history.watch_back", "Terugkijken");
+      const label = t("history.watch_back", "Terugkijken");
+      historyButton.title = label;
+      historyButton.setAttribute("aria-label", label);
+      historyButton.appendChild(createMaterialIcon("event"));
       historyButton.addEventListener("click", (event) => {
         event.preventDefault();
         event.stopPropagation();
