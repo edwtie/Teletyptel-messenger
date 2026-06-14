@@ -11750,19 +11750,24 @@
       body.appendChild(createLocationElement(message.location, message));
     }
     appendLinkPreviewIfNeeded(body, message);
-    const reactions = createMessageReactionsElement(message);
-    const reactionButton = createMessageReactionButton(message);
+    const reactionNodes = canReactToMessage(message)
+      ? [createMessageReactionsElement(message), createMessageReactionButton(message)]
+      : [];
 
     if (!shouldShowMessageAvatar(message)) {
-      item.replaceChildren(meta, body, reactions, reactionButton);
+      item.replaceChildren(meta, body, ...reactionNodes);
       return;
     }
 
     const content = document.createElement("div");
     content.className = "message-content";
-    content.append(meta, body, reactions, reactionButton);
+    content.append(meta, body, ...reactionNodes);
     const avatar = createAvatarElement(messageAvatarSource(message), "message-avatar");
     item.replaceChildren(avatar, content);
+  }
+
+  function canReactToMessage(message) {
+    return Boolean(message) && !message.draft && !message.retracted && !isCallMessage(message);
   }
 
   function createMessageReactionButton(message) {
@@ -11959,7 +11964,7 @@
 
   function toggleMessageReaction(message, emoji) {
     const normalizedEmoji = String(emoji || "").trim();
-    if (!normalizedEmoji || !message || message.draft || message.retracted) {
+    if (!normalizedEmoji || !canReactToMessage(message)) {
       return;
     }
 
