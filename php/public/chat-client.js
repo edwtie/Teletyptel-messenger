@@ -11483,10 +11483,16 @@
       return t("history.yesterday", "Gisteren");
     }
 
-    const weekAgo = new Date(today);
-    weekAgo.setHours(0, 0, 0, 0);
-    weekAgo.setDate(weekAgo.getDate() - 6);
-    if (date >= weekAgo) {
+    const dayBeforeYesterday = new Date(today);
+    dayBeforeYesterday.setDate(today.getDate() - 2);
+    if (date.toDateString() === dayBeforeYesterday.toDateString()) {
+      return t("history.day_before_yesterday", "Eergisteren");
+    }
+
+    const tenDaysAgo = new Date(today);
+    tenDaysAgo.setHours(0, 0, 0, 0);
+    tenDaysAgo.setDate(tenDaysAgo.getDate() - 9);
+    if (date >= tenDaysAgo) {
       return date.toLocaleDateString(undefined, { weekday: "long" });
     }
 

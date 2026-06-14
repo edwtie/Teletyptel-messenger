@@ -38,8 +38,8 @@
 - Database-backed chat history for completed messages, edited messages,
   retractions, attachments and location cards, so browser sessions can reload
   conversation state instead of only showing transient relay text.
-- Chat timeline date separators now show today, yesterday, weekday labels for
-  the past week and older dates in the message stream.
+- Chat timeline date separators now show today, yesterday, the day before
+  yesterday, seven extra weekday labels and older dates in the message stream.
 - Interactive location sharing UI with map preview, share duration up to eight
   hours, Google Maps/OpenStreetMap provider setting, browser geolocation
   permission handling and single live location card updates instead of duplicate

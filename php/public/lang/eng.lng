@@ -97,6 +97,7 @@ history.no_transcript=No text transcript saved yet.
 history.no_media=No audio/video recording saved yet.
 history.today=Today
 history.yesterday=Yesterday
+history.day_before_yesterday=The day before yesterday
 history.this_week=This week
 history.earlier=Earlier
 history.sent=Sent
