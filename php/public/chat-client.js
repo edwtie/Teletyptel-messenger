@@ -10601,7 +10601,7 @@
       const name = document.createElement("strong");
       const meta = document.createElement("span");
       name.textContent = conversationDisplayName(conversation);
-      meta.textContent = conversationMeta(conversation);
+      meta.textContent = conversationListPreviewText(conversation);
       text.append(name, meta);
       const presence = document.createElement("span");
       presence.className = `presence-dot presence-${conversationPresence(conversation)}`;
@@ -11258,6 +11258,66 @@
         ? t("presence.online_inactive", "Online - inactive")
         : t("presence.online", "Online")
       : t("presence.offline", "Offline");
+  }
+
+  function conversationListPreviewText(conversation) {
+    const message = lastConversationPreviewMessage(conversation);
+    if (!message) {
+      return conversationMeta(conversation);
+    }
+
+    const body = conversationPreviewBody(message);
+    if (!body) {
+      return conversationMeta(conversation);
+    }
+
+    const prefix = conversationPreviewPrefix(conversation, message);
+    return prefix ? `${prefix}: ${body}` : body;
+  }
+
+  function lastConversationPreviewMessage(conversation) {
+    for (let index = conversation.messages.length - 1; index >= 0; index--) {
+      const message = conversation.messages[index];
+      if (!message?.draft) {
+        return message;
+      }
+    }
+    return null;
+  }
+
+  function conversationPreviewPrefix(conversation, message) {
+    if (message.direction === "self") {
+      return t("tc.local_label", "Ik");
+    }
+
+    if (conversation.kind === "group") {
+      return message.senderDisplayName || displayNameForJid(message.from);
+    }
+
+    return "";
+  }
+
+  function conversationPreviewBody(message) {
+    if (message.retracted) {
+      return retractedMessageText(message.retraction);
+    }
+
+    if (isCallMessage(message)) {
+      const text = visibleMessageText(message) || t("button.call_total_conversation", "Totale conversatie");
+      const meta = callMessageMetaText(message);
+      return meta ? `${text} - ${meta}` : text;
+    }
+
+    if (message.attachment) {
+      const kind = message.attachment.kind || classifyAttachment(message.attachment);
+      return attachmentKindText(kind);
+    }
+
+    if (message.location) {
+      return message.text || t("location.shared_message", "Locatie gedeeld");
+    }
+
+    return String(message.text || "").replace(/\s+/g, " ").trim();
   }
 
   function conversationDisplayName(conversation) {
