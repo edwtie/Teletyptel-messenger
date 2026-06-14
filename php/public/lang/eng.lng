@@ -96,6 +96,7 @@ history.select=Choose a call on the left to review.
 history.no_transcript=No text transcript saved yet.
 history.no_media=No audio/video recording saved yet.
 history.today=Today
+history.yesterday=Yesterday
 history.this_week=This week
 history.earlier=Earlier
 history.sent=Sent

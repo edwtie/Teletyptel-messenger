@@ -2534,6 +2534,30 @@ body:not([data-chat-background="none"]) .message-body {
   margin-bottom: 12px;
 }
 
+.message-date-separator {
+  display: flex;
+  justify-content: center;
+  margin: 8px 0 14px;
+}
+
+.message-date-separator span {
+  border: 1px solid rgba(61, 91, 128, .18);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, .9);
+  box-shadow: 0 1px 4px rgba(15, 23, 42, .08);
+  color: #475569;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+body[data-theme="dark"] .message-date-separator span {
+  border-color: rgba(148, 163, 184, .28);
+  background: rgba(15, 23, 42, .86);
+  color: #cbd5e1;
+}
+
 .message.self {
   margin-left: auto;
 }

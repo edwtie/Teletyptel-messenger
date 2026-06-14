@@ -96,6 +96,7 @@ history.select=Kies links een oproep om terug te lezen.
 history.no_transcript=Nog geen teksttranscript bewaard.
 history.no_media=Nog geen audio/video-opname bewaard.
 history.today=Vandaag
+history.yesterday=Gisteren
 history.this_week=Deze week
 history.earlier=Eerder
 history.sent=Verzonden

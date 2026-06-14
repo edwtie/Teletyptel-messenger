@@ -10551,7 +10551,7 @@
       return;
     }
 
-    el.messageTimeline.appendChild(createMessageElement(message));
+    appendMessageElementToTimeline(message);
     el.messageTimeline.scrollTop = el.messageTimeline.scrollHeight;
   }
 
@@ -10666,11 +10666,11 @@
     el.messageTimeline.replaceChildren();
 
     for (const message of conversation.messages) {
-      el.messageTimeline.appendChild(createMessageElement(message));
+      appendMessageElementToTimeline(message);
     }
 
     if (conversation.remoteText) {
-      el.messageTimeline.appendChild(createMessageElement({
+      appendMessageElementToTimeline({
         direction: "peer",
         from: conversation.remoteFrom,
         text: conversation.remoteText,
@@ -10680,7 +10680,7 @@
         senderDisplayName: conversation.remoteIdentity?.displayName || null,
         senderAvatarColor: conversation.remoteIdentity?.avatarColor || null,
         senderAvatarDataUrl: conversation.remoteIdentity?.avatarDataUrl || null
-      }));
+      });
       el.remoteDraft.hidden = false;
       el.remoteDraftName.textContent = displayNameForJid(conversation.remoteFrom || conversation.peer);
       el.remoteDraftPreviousText.textContent = lastPeerConversationText(conversation);
@@ -10711,6 +10711,7 @@
     const existing = el.messageTimeline.querySelector('[data-remote-draft="true"]');
     if (!conversation.remoteText) {
       existing?.remove();
+      cleanupOrphanMessageDateSeparators();
       el.remoteDraft.hidden = true;
       el.remoteDraftPreviousText.textContent = "";
       el.remoteDraftText.textContent = "";
@@ -10739,7 +10740,7 @@
     };
 
     if (!existing) {
-      el.messageTimeline.appendChild(createMessageElement(message));
+      appendMessageElementToTimeline(message);
       el.messageTimeline.scrollTop = el.messageTimeline.scrollHeight;
       updateTotalConversationTextPanel(conversation);
       return;
@@ -10754,12 +10755,14 @@
     const existing = el.messageTimeline.querySelector('[data-local-draft="true"]');
     if (!conversation || conversation.id !== state.activeConversationId || !el.rttToggle.checked) {
       existing?.remove();
+      cleanupOrphanMessageDateSeparators();
       return;
     }
 
     const text = el.messageInput.value;
     if (!text) {
       existing?.remove();
+      cleanupOrphanMessageDateSeparators();
       return;
     }
 
@@ -10777,7 +10780,7 @@
     };
 
     if (!existing) {
-      el.messageTimeline.appendChild(createMessageElement(message));
+      appendMessageElementToTimeline(message);
     } else {
       updateMessageElement(existing, message);
     }
@@ -10789,6 +10792,7 @@
 
   function clearLocalRttDraftMessage() {
     el.messageTimeline.querySelector('[data-local-draft="true"]')?.remove();
+    cleanupOrphanMessageDateSeparators();
   }
 
   function updateTotalConversationTextPanel(conversation = activeConversation()) {
@@ -11402,6 +11406,7 @@
   function createMessageElement(message) {
     const item = document.createElement("article");
     applyMessageElementClass(item, message);
+    item.dataset.dateKey = messageDayKey(message.timestamp);
     if (message.id) {
       item.dataset.messageId = message.id;
     }
@@ -11409,6 +11414,85 @@
     applyMessageDraftDataset(item, message);
     renderMessageElementChildren(item, message);
     return item;
+  }
+
+  function appendMessageElementToTimeline(message) {
+    appendMessageDateSeparatorIfNeeded(message.timestamp);
+    el.messageTimeline.appendChild(createMessageElement(message));
+  }
+
+  function appendMessageDateSeparatorIfNeeded(value) {
+    const key = messageDayKey(value);
+    if (!key || lastTimelineDateKey() === key) {
+      return;
+    }
+
+    const separator = document.createElement("div");
+    separator.className = "message-date-separator";
+    separator.dataset.dateKey = key;
+    separator.setAttribute("role", "separator");
+    const label = document.createElement("span");
+    label.textContent = messageDateSeparatorLabel(value);
+    separator.appendChild(label);
+    el.messageTimeline.appendChild(separator);
+  }
+
+  function lastTimelineDateKey() {
+    for (let node = el.messageTimeline.lastElementChild; node; node = node.previousElementSibling) {
+      if (node.dataset?.dateKey) {
+        return node.dataset.dateKey;
+      }
+    }
+    return "";
+  }
+
+  function cleanupOrphanMessageDateSeparators() {
+    const separators = Array.from(el.messageTimeline.querySelectorAll(".message-date-separator"));
+    for (const separator of separators) {
+      let hasMessage = false;
+      for (let node = separator.nextElementSibling; node; node = node.nextElementSibling) {
+        if (node.classList.contains("message-date-separator")) {
+          break;
+        }
+        if (node.classList.contains("message")) {
+          hasMessage = true;
+          break;
+        }
+      }
+      if (!hasMessage) {
+        separator.remove();
+      }
+    }
+  }
+
+  function messageDayKey(value) {
+    const date = normalizeMessageDate(value);
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  }
+
+  function messageDateSeparatorLabel(value) {
+    const date = normalizeMessageDate(value);
+    const today = new Date();
+    if (date.toDateString() === today.toDateString()) {
+      return t("history.today", "Vandaag");
+    }
+
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    if (date.toDateString() === yesterday.toDateString()) {
+      return t("history.yesterday", "Gisteren");
+    }
+
+    const options = { day: "numeric", month: "long" };
+    if (date.getFullYear() !== today.getFullYear()) {
+      options.year = "numeric";
+    }
+    return date.toLocaleDateString(undefined, options);
+  }
+
+  function normalizeMessageDate(value) {
+    const date = value instanceof Date ? value : new Date(value || Date.now());
+    return Number.isNaN(date.getTime()) ? new Date() : date;
   }
 
   function updateLiveLocationMessageElement(message) {
@@ -11444,6 +11528,7 @@
 
   function updateMessageElement(item, message) {
     applyMessageElementClass(item, message);
+    item.dataset.dateKey = messageDayKey(message.timestamp);
     if (message.id) {
       item.dataset.messageId = message.id;
     }
