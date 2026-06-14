@@ -49,6 +49,7 @@
     .flatMap((smiley) => smiley.codes.map((code) => ({ code, smiley })))
     .sort((a, b) => b.code.length - a.code.length || a.code.localeCompare(b.code));
   const smileyBasePath = "smileys/";
+  const quickReactionEmojis = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
   const callModeDefinitions = {
     audio: { mediaKind: "audio", rttEnabled: false },
     video: { mediaKind: "video", rttEnabled: false },
@@ -410,6 +411,7 @@
     },
     contextConversationId: null,
     contextMessage: null,
+    reactionMessageId: null,
     accountGateRequired: !hasInitialAccountProfile,
     accountDialogMode: !hasInitialAccountProfile ? "signin" : "settings",
     conversations: [
@@ -872,12 +874,14 @@
     document.addEventListener("click", closeSmileyPickerOnOutsideClick);
     document.addEventListener("click", closeConversationContextMenuOnOutsideClick);
     document.addEventListener("click", closeMessageContextMenuOnOutsideClick);
+    document.addEventListener("click", closeMessageReactionPickerOnOutsideClick);
     document.addEventListener("keydown", closeCallMenusOnEscape);
     document.addEventListener("keydown", closeAttachmentMenuOnEscape);
     document.addEventListener("keydown", closeSmileyPickerOnEscape);
     document.addEventListener("keydown", closeConversationContextMenuOnEscape);
     document.addEventListener("keydown", closeContactProfileDialogOnEscape);
     document.addEventListener("keydown", closeMessageContextMenuOnEscape);
+    document.addEventListener("keydown", closeMessageReactionPickerOnEscape);
     document.addEventListener("keydown", closeAccountDialogOnEscape);
     document.addEventListener("keydown", closeAvatarCropDialogOnEscape);
     document.addEventListener("keydown", closeLocationShareDialogOnEscape);
@@ -886,11 +890,13 @@
     document.addEventListener("keydown", closeMapViewerOnEscape);
     window.addEventListener("resize", closeConversationContextMenu);
     window.addEventListener("resize", closeMessageContextMenu);
+    window.addEventListener("resize", closeMessageReactionPicker);
     window.addEventListener("resize", () => handleViewportChange("resize"));
     window.addEventListener("orientationchange", () => handleViewportChange("orientationchange"));
     window.visualViewport?.addEventListener("resize", () => handleViewportChange("visual-viewport-resize"));
     window.addEventListener("scroll", closeConversationContextMenu, true);
     window.addEventListener("scroll", closeMessageContextMenu, true);
+    window.addEventListener("scroll", closeMessageReactionPicker, true);
     document.addEventListener("visibilitychange", handleVisibilityLifecycleChange);
     window.addEventListener("focus", () => setClientLifecycleState("active", "focus"));
     window.addEventListener("blur", handleWindowLifecycleBlur);
@@ -2043,6 +2049,7 @@
     message.retracted = item.retracted === true;
     message.retraction = item.retraction || null;
     message.callInfo = item.callInfo && typeof item.callInfo === "object" ? item.callInfo : null;
+    message.reactions = normalizeMessageReactions(item.reactions);
     const timestamp = new Date(item.timestamp || Date.now());
     message.timestamp = Number.isNaN(timestamp.valueOf()) ? new Date() : timestamp;
     return conversation;
@@ -2076,6 +2083,7 @@
       edited: message.edited === true,
       retracted: message.retracted === true,
       retraction: message.retraction || null,
+      reactions: normalizeMessageReactions(message.reactions),
       timestamp: message.timestamp instanceof Date ? message.timestamp.toISOString() : new Date().toISOString()
     });
   }
@@ -6783,6 +6791,18 @@
       }
 
       conversation.presence = "online";
+      const reactionsElement = message.getElementsByTagNameNS("urn:xmpp:reactions:0", "reactions")[0];
+      if (reactionsElement) {
+        applyMessageReaction(
+          conversation,
+          reactionsElement.getAttribute("id") || "",
+          from,
+          Array.from(reactionsElement.getElementsByTagNameNS("urn:xmpp:reactions:0", "reaction"))
+            .map((item) => item.textContent || "")
+            .filter(Boolean));
+        continue;
+      }
+
       const retractElement = message.getElementsByTagNameNS("urn:xmpp:message-retract:1", "retract")[0];
       const tombstoneElement = message.getElementsByTagNameNS("urn:xmpp:message-retract:1", "retracted")[0];
       if (retractElement) {
@@ -6810,7 +6830,7 @@
 
       const replaceElement = message.getElementsByTagNameNS("urn:xmpp:message-correct:0", "replace")[0];
       const replaceId = replaceElement?.getAttribute("id") || "";
-      const messageId = message.getAttribute("id") || null;
+      const messageId = stableXmppMessageId(message);
       const stylingDisabled = Boolean(message.getElementsByTagNameNS("urn:xmpp:styling:0", "unstyled")[0]);
       if (replaceId) {
         applyMessageCorrection(conversation, replaceId, bodyElement.textContent || "", "peer", messageId, from, stylingDisabled);
@@ -6818,6 +6838,16 @@
         addMessage("peer", bodyElement.textContent || "", "received", from, null, conversation.id, null, messageId, stylingDisabled);
       }
     }
+  }
+
+  function stableXmppMessageId(message) {
+    const originId = message.getElementsByTagNameNS("urn:xmpp:sid:0", "origin-id")[0]?.getAttribute("id") || "";
+    if (originId) {
+      return originId;
+    }
+
+    const stanzaId = message.getElementsByTagNameNS("urn:xmpp:sid:0", "stanza-id")[0]?.getAttribute("id") || "";
+    return stanzaId || message.getAttribute("id") || null;
   }
 
   function handleXmppSessionFrame(text) {
@@ -7561,7 +7591,7 @@
       return;
     }
 
-    if (envelope.type !== "rtt" && envelope.type !== "message" && envelope.type !== "message-delete" && envelope.type !== "jingle" && envelope.type !== "presence" && envelope.type !== "client-state" && envelope.type !== "location") {
+    if (envelope.type !== "rtt" && envelope.type !== "message" && envelope.type !== "message-delete" && envelope.type !== "message-reaction" && envelope.type !== "jingle" && envelope.type !== "presence" && envelope.type !== "client-state" && envelope.type !== "location") {
       appendDebug("relay-skip", `Unsupported envelope type ${envelope.type || "unknown"}`);
       return;
     }
@@ -7602,6 +7632,11 @@
 
     if (envelope.type === "message-delete") {
       handleRelayMessageDelete(envelope);
+      return;
+    }
+
+    if (envelope.type === "message-reaction") {
+      handleRelayMessageReaction(envelope);
       return;
     }
 
@@ -7731,6 +7766,23 @@
     conversation.clientStateUpdatedAt = new Date();
     setPeerPresence(conversation.peer, "online");
     applyMessageRetraction(conversation, targetId, null, conversation.remoteFrom);
+  }
+
+  function handleRelayMessageReaction(envelope) {
+    const conversation = conversationForEnvelope(envelope);
+    if (!conversation) {
+      return;
+    }
+
+    applyEnvelopeIdentity(conversation, envelope);
+    conversation.presence = "online";
+    conversation.clientState = "active";
+    conversation.clientStateUpdatedAt = new Date();
+    applyMessageReaction(
+      conversation,
+      String(envelope.reactionTargetId || ""),
+      envelopeFrom(envelope),
+      Array.isArray(envelope.reactions) ? envelope.reactions : []);
   }
 
   function handleLocationEnvelope(envelope) {
@@ -10476,6 +10528,7 @@
       retracted: false,
       retraction: null,
       edited: false,
+      reactions: {},
       timestamp: new Date()
     };
 
@@ -11681,17 +11734,56 @@
       body.appendChild(createLocationElement(message.location, message));
     }
     appendLinkPreviewIfNeeded(body, message);
+    const reactions = createMessageReactionsElement(message);
+    const reactionButton = createMessageReactionButton(message);
 
     if (!shouldShowMessageAvatar(message)) {
-      item.replaceChildren(meta, body);
+      item.replaceChildren(meta, body, reactions, reactionButton);
       return;
     }
 
     const content = document.createElement("div");
     content.className = "message-content";
-    content.append(meta, body);
+    content.append(meta, body, reactions, reactionButton);
     const avatar = createAvatarElement(messageAvatarSource(message), "message-avatar");
     item.replaceChildren(avatar, content);
+  }
+
+  function createMessageReactionButton(message) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "message-reaction-button";
+    button.title = t("reaction.add", "React");
+    button.setAttribute("aria-label", t("reaction.add", "React"));
+    button.textContent = "☺";
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      openMessageReactionPicker(message, button);
+    });
+    return button;
+  }
+
+  function createMessageReactionsElement(message) {
+    const wrapper = document.createElement("div");
+    wrapper.className = "message-reactions";
+    const counts = aggregateMessageReactions(message.reactions);
+    wrapper.hidden = counts.length === 0;
+    for (const item of counts) {
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "message-reaction-chip";
+      chip.textContent = item.count > 1 ? `${item.emoji} ${item.count}` : item.emoji;
+      chip.title = t("reaction.toggle", "Toggle reaction");
+      chip.setAttribute("aria-label", t("reaction.toggle", "Toggle reaction"));
+      chip.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        toggleMessageReaction(message, item.emoji);
+      });
+      wrapper.appendChild(chip);
+    }
+    return wrapper;
   }
 
   function visibleMessageText(message) {
@@ -11773,6 +11865,191 @@
       return t("call.started", "Oproep gestart");
     }
     return t("history.status_ended", "beeindigd");
+  }
+
+  function openMessageReactionPicker(message, anchor) {
+    closeMessageReactionPicker();
+    state.reactionMessageId = message.id;
+    const picker = document.createElement("div");
+    picker.className = "message-reaction-picker";
+    picker.dataset.messageId = message.id;
+    picker.setAttribute("role", "menu");
+    for (const emoji of quickReactionEmojis) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = emoji;
+      button.setAttribute("role", "menuitem");
+      button.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        toggleMessageReaction(message, emoji);
+        closeMessageReactionPicker();
+      });
+      picker.appendChild(button);
+    }
+    const customButton = document.createElement("button");
+    customButton.type = "button";
+    customButton.textContent = "+";
+    customButton.setAttribute("role", "menuitem");
+    customButton.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const emoji = prompt(t("reaction.custom_prompt", "Reaction emoji"), "👍");
+      if (emoji) {
+        toggleMessageReaction(message, emoji.trim());
+      }
+      closeMessageReactionPicker();
+    });
+    picker.appendChild(customButton);
+    document.body.appendChild(picker);
+    const rect = anchor.getBoundingClientRect();
+    picker.style.left = `${Math.min(window.innerWidth - picker.offsetWidth - 8, Math.max(8, rect.left))}px`;
+    picker.style.top = `${Math.max(8, rect.top - picker.offsetHeight - 8)}px`;
+  }
+
+  function closeMessageReactionPicker() {
+    document.querySelector(".message-reaction-picker")?.remove();
+    state.reactionMessageId = null;
+  }
+
+  function closeMessageReactionPickerOnOutsideClick(event) {
+    if (event.target instanceof Element && event.target.closest(".message-reaction-picker, .message-reaction-button")) {
+      return;
+    }
+    closeMessageReactionPicker();
+  }
+
+  function closeMessageReactionPickerOnEscape(event) {
+    if (event.key === "Escape") {
+      closeMessageReactionPicker();
+    }
+  }
+
+  function toggleMessageReaction(message, emoji) {
+    const normalizedEmoji = String(emoji || "").trim();
+    if (!normalizedEmoji || !message || message.draft || message.retracted) {
+      return;
+    }
+
+    const conversation = conversationForMessage(message);
+    if (!conversation) {
+      return;
+    }
+
+    const actor = reactionActorId();
+    const reactions = normalizeMessageReactions(message.reactions);
+    const current = Array.isArray(reactions[actor]) ? reactions[actor] : [];
+    reactions[actor] = current.includes(normalizedEmoji)
+      ? current.filter((item) => item !== normalizedEmoji)
+      : [...current, normalizedEmoji];
+    if (!reactions[actor].length) {
+      delete reactions[actor];
+    }
+
+    applyMessageReaction(conversation, message.xmppId || message.id, actor, reactions[actor] || []);
+    sendMessageReaction(conversation, message, reactions[actor] || []);
+  }
+
+  function sendMessageReaction(conversation, message, reactions) {
+    const targetId = message.xmppId || message.id;
+    if (!targetId) {
+      return;
+    }
+
+    if (state.mode === "xmpp" && state.xmppSocket?.readyState === WebSocket.OPEN && state.xmppSession?.authenticated) {
+      sendXmppStanza(createMessageReactionStanza(conversation.peer, targetId, reactions), "<message reactions=\"redacted\"/>");
+      return;
+    }
+
+    if (state.relaySocket?.readyState === WebSocket.OPEN) {
+      const envelope = createRelayEnvelope("message-reaction", "", "", conversation.peer);
+      envelope.reactionTargetId = targetId;
+      envelope.reactions = reactions;
+      state.relaySocket.send(JSON.stringify(envelope));
+      appendDebug("relay-out", JSON.stringify(redactEnvelopeForLog(envelope)));
+    }
+  }
+
+  function createMessageReactionStanza(to, targetId, reactions) {
+    const id = createMessageId("react");
+    const reactionXml = reactions
+      .map((emoji) => `<reaction>${escapeXml(emoji)}</reaction>`)
+      .join("");
+    return `<message xmlns="jabber:client" type="chat" from="${escapeXml(currentXmppFromJid())}" to="${escapeXml(to)}" id="${escapeXml(id)}"><reactions xmlns="urn:xmpp:reactions:0" id="${escapeXml(targetId)}">${reactionXml}</reactions><store xmlns="urn:xmpp:hints"/></message>`;
+  }
+
+  function applyMessageReaction(conversation, targetId, actor, reactions, persist = true) {
+    const message = findConversationMessageByAnyId(conversation, targetId);
+    if (!message) {
+      return;
+    }
+
+    const actorId = bareJid(actor || "").toLowerCase() || reactionActorId();
+    const normalized = normalizeMessageReactions(message.reactions);
+    const list = Array.from(new Set((Array.isArray(reactions) ? reactions : [])
+      .map((item) => String(item || "").trim())
+      .filter(Boolean))).slice(0, 12);
+    if (list.length) {
+      normalized[actorId] = list;
+    } else {
+      delete normalized[actorId];
+    }
+    message.reactions = normalized;
+
+    if (conversation.id === state.activeConversationId) {
+      renderActiveConversation();
+    }
+    renderConversations();
+    if (persist) {
+      persistHistoryMessage(conversation, message);
+    }
+  }
+
+  function findConversationMessageByAnyId(conversation, targetId) {
+    const id = String(targetId || "");
+    if (!conversation || !id) {
+      return null;
+    }
+    return conversation.messages.find((item) => item.id === id || item.xmppId === id) || null;
+  }
+
+  function conversationForMessage(message) {
+    return state.conversations.find((conversation) => conversation.messages.includes(message)) || null;
+  }
+
+  function reactionActorId() {
+    return currentBareJid() || bareJid(currentFromJid()).toLowerCase() || "self";
+  }
+
+  function normalizeMessageReactions(value) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      return {};
+    }
+
+    const normalized = {};
+    for (const [actor, reactions] of Object.entries(value)) {
+      const actorId = bareJid(actor || "").toLowerCase() || String(actor || "").trim();
+      const list = Array.from(new Set((Array.isArray(reactions) ? reactions : [])
+        .map((item) => String(item || "").trim())
+        .filter(Boolean))).slice(0, 12);
+      if (actorId && list.length) {
+        normalized[actorId] = list;
+      }
+    }
+    return normalized;
+  }
+
+  function aggregateMessageReactions(value) {
+    const counts = new Map();
+    const reactions = normalizeMessageReactions(value);
+    for (const list of Object.values(reactions)) {
+      for (const emoji of list) {
+        counts.set(emoji, (counts.get(emoji) || 0) + 1);
+      }
+    }
+    return Array.from(counts.entries())
+      .map(([emoji, count]) => ({ emoji, count }))
+      .sort((left, right) => right.count - left.count || left.emoji.localeCompare(right.emoji));
   }
 
   function shouldShowMessageAvatar(message) {
@@ -13314,7 +13591,8 @@
       ? `<replace xmlns="urn:xmpp:message-correct:0" id="${escapeXml(replaceId)}"/>`
       : "";
     const unstyled = stylingDisabled ? `<unstyled xmlns="urn:xmpp:styling:0"/>` : "";
-    return `<message xmlns="jabber:client" type="chat" from="${escapeXml(currentXmppFromJid())}" to="${escapeXml(to)}" id="${escapeXml(id)}"><body>${escapeXml(text)}</body>${replace}${unstyled}</message>`;
+    const originId = `<origin-id xmlns="urn:xmpp:sid:0" id="${escapeXml(id)}"/>`;
+    return `<message xmlns="jabber:client" type="chat" from="${escapeXml(currentXmppFromJid())}" to="${escapeXml(to)}" id="${escapeXml(id)}"><body>${escapeXml(text)}</body>${originId}${replace}${unstyled}</message>`;
   }
 
   function createMessageRetractionStanza(to, targetId, id = createMessageId("retract")) {

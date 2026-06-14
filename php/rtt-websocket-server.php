@@ -124,7 +124,7 @@ while (true) {
             if ($message === null) {
                 @fwrite($socket, encodeWebSocketFrame(json_encode([
                     'type' => 'error',
-                    'message' => 'Only JSON RTT, message, delete, presence, client state, heartbeat, location or Jingle call snapshots are accepted.'
+                    'message' => 'Only JSON RTT, message, delete, reaction, presence, client state, heartbeat, location or Jingle call snapshots are accepted.'
                 ], JSON_UNESCAPED_SLASHES)));
                 continue;
             }
@@ -371,6 +371,34 @@ function isAllowedRttEnvelope(array $json): bool
         return isset($json['targetMessageId'])
             && is_string($json['targetMessageId'])
             && $json['targetMessageId'] !== '';
+    }
+
+    if ($type === 'message-reaction') {
+        foreach (['from', 'to', 'reactionTargetId', 'messageId', 'clientId', 'conversationKind'] as $field) {
+            if (!isset($json[$field])) {
+                continue;
+            }
+
+            if (!is_string($json[$field]) || strlen($json[$field]) > 512) {
+                return false;
+            }
+        }
+
+        if (!isset($json['reactionTargetId']) || !is_string($json['reactionTargetId']) || $json['reactionTargetId'] === '') {
+            return false;
+        }
+
+        if (!isset($json['reactions']) || !is_array($json['reactions']) || count($json['reactions']) > 12) {
+            return false;
+        }
+
+        foreach ($json['reactions'] as $reaction) {
+            if (!is_string($reaction) || trim($reaction) === '' || strlen($reaction) > 64) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     if ($type === 'presence') {
