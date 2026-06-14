@@ -322,6 +322,9 @@
 - Total Conversation history now also captures RTT text when Jingle RTT sync
   falls back to the relay/XEP-0301 path, so transcripts are not empty after a
   datachannel failure.
+- RTT datachannel fallback no longer shows a technical fallback/error message
+  during Total Conversation; the user-facing call status stays connected while
+  diagnostics remain in the debug log.
 - Old public product names were replaced with TeleTypTel in visible UI text,
   language files, project metadata, XSF draft entries and public documentation.
 - Cross-platform protocol tests no longer assume separate TCP reads for XMPP

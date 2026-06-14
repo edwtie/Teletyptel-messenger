@@ -8780,7 +8780,7 @@
       }
 
       call.rttSync.state = "fallback";
-      setCallStatus(t("call.rtt_sync_fallback", "Call connected - live text fallback uses XEP-0301"));
+      setCallStatus(t("call.connected_total", "Total conversation connected - live text synchronized"));
       appendDebug("jingle-rtt", `Datachannel closed sid=${call.sid}`);
       updateCallUi();
     });
@@ -10168,7 +10168,7 @@
     }
 
     if (call?.rttSync?.state === "fallback") {
-      return t("call.rtt_sync_fallback", "Call connected - live text fallback uses XEP-0301");
+      return t("call.connected_total", "Total conversation connected - live text synchronized");
     }
 
     return t("call.connected", "Call connected");
