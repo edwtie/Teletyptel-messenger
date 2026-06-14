@@ -50,6 +50,8 @@
   reuses the existing TeleTypTel smiley picker.
 - Message reaction controls now appear on hover/focus on pointer devices to
   keep the chat view cleaner.
+- Message reaction controls now float beside the message bubble instead of
+  taking an extra row in the conversation.
 - Interactive location sharing UI with map preview, share duration up to eight
   hours, Google Maps/OpenStreetMap provider setting, browser geolocation
   permission handling and single live location card updates instead of duplicate

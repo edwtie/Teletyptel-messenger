@@ -2565,7 +2565,7 @@ body[data-theme="dark"] .message-date-separator span {
 .message.with-avatar {
   grid-template-columns: 34px minmax(0, 1fr);
   align-items: start;
-  max-width: min(82ch, 88%);
+  max-width: min(82ch, calc(88% - 38px));
 }
 
 .message.with-avatar.self {
@@ -2583,6 +2583,7 @@ body[data-theme="dark"] .message-date-separator span {
 }
 
 .message.with-avatar .message-content {
+  position: relative;
   display: grid;
   gap: 4px;
   min-width: 0;
@@ -3029,6 +3030,10 @@ body[data-theme="dark"] .link-preview-loading {
 }
 
 .message-reaction-button {
+  position: absolute;
+  top: 50%;
+  right: -38px;
+  z-index: 2;
   justify-self: start;
   width: 28px;
   height: 28px;
@@ -3042,11 +3047,13 @@ body[data-theme="dark"] .link-preview-loading {
   line-height: 1;
   opacity: 0;
   pointer-events: none;
-  transform: translateY(-2px);
+  transform: translateY(-50%) scale(.94);
   transition: opacity .12s ease, transform .12s ease;
 }
 
 .message.self .message-reaction-button {
+  right: auto;
+  left: -38px;
   justify-self: end;
 }
 
@@ -3061,14 +3068,14 @@ body[data-theme="dark"] .link-preview-loading {
 .message-reaction-button:focus-visible {
   opacity: 1;
   pointer-events: auto;
-  transform: translateY(0);
+  transform: translateY(-50%) scale(1);
 }
 
 @media (hover: none), (pointer: coarse) {
   .message-reaction-button {
     opacity: 1;
     pointer-events: auto;
-    transform: none;
+    transform: translateY(-50%) scale(1);
   }
 }
 

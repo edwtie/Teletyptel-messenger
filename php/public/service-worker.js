@@ -1,5 +1,5 @@
-const CACHE_NAME = "teletyptel-webclient-v234";
-const BUILD_VERSION = "20260614-hover-message-reactions";
+const CACHE_NAME = "teletyptel-webclient-v235";
+const BUILD_VERSION = "20260614-floating-reaction-control";
 const ASSETS = [
   "chat.html",
   "dev.html",
