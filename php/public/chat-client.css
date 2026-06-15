@@ -3047,6 +3047,9 @@ body[data-theme="dark"] .link-preview-loading {
   right: -44px;
   z-index: 2;
   justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 34px;
   height: 34px;
   min-height: 34px;
@@ -3055,6 +3058,7 @@ body[data-theme="dark"] .link-preview-loading {
   background: rgba(255, 255, 255, .86);
   color: #475569;
   padding: 0;
+  font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif;
   font-size: 20px;
   line-height: 1;
   opacity: 0;
