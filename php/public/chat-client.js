@@ -11752,26 +11752,29 @@
     appendLinkPreviewIfNeeded(body, message);
     const reactionButton = canReactToMessage(message) ? createMessageReactionButton(message) : null;
     const reactionsElement = canReactToMessage(message) ? createMessageReactionsElement(message) : null;
-    const bodyWrap = createMessageBodyWrap(body, reactionButton);
+    const bodyWrap = createMessageBodyWrap(body, reactionButton, reactionsElement);
 
     if (!shouldShowMessageAvatar(message)) {
-      item.replaceChildren(meta, bodyWrap, ...(reactionsElement ? [reactionsElement] : []));
+      item.replaceChildren(meta, bodyWrap);
       return;
     }
 
     const content = document.createElement("div");
     content.className = "message-content";
-    content.append(meta, bodyWrap, ...(reactionsElement ? [reactionsElement] : []));
+    content.append(meta, bodyWrap);
     const avatar = createAvatarElement(messageAvatarSource(message), "message-avatar");
     item.replaceChildren(avatar, content);
   }
 
-  function createMessageBodyWrap(body, reactionButton) {
+  function createMessageBodyWrap(body, reactionButton, reactionsElement) {
     const wrap = document.createElement("div");
     wrap.className = "message-body-wrap";
     wrap.appendChild(body);
     if (reactionButton) {
       wrap.appendChild(reactionButton);
+    }
+    if (reactionsElement) {
+      wrap.appendChild(reactionsElement);
     }
     return wrap;
   }

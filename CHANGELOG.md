@@ -70,6 +70,8 @@
   removes it.
 - The floating reaction button is anchored to the message bubble, so its
   position no longer changes when reaction chips are shown below the message.
+- Message reaction chips now attach to the bottom edge of the message bubble
+  instead of rendering as a separate row.
 - Interactive location sharing UI with map preview, share duration up to eight
   hours, Google Maps/OpenStreetMap provider setting, browser geolocation
   permission handling and single live location card updates instead of duplicate

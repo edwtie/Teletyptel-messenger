@@ -3047,6 +3047,10 @@ body[data-theme="dark"] .link-preview-loading {
   min-width: 0;
 }
 
+.message-body-wrap:has(.message-reactions:not([hidden])) {
+  margin-bottom: 13px;
+}
+
 .message-reaction-button {
   position: absolute;
   top: 50%;
@@ -3105,13 +3109,19 @@ body[data-theme="dark"] .link-preview-loading {
 }
 
 .message-reactions {
+  position: absolute;
+  bottom: -13px;
+  left: 10px;
+  z-index: 3;
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  margin-top: -2px;
+  max-width: calc(100% - 20px);
 }
 
 .message.self .message-reactions {
+  right: 10px;
+  left: auto;
   justify-content: flex-end;
 }
 
