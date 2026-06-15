@@ -66,6 +66,23 @@ bosh
 muc
 ```
 
+TeleTypTel's installer generates `php/install-runtime/configure-linux-ejabberd-mam.sh`
+and `php/install-runtime/teletyptel-ejabberd-mam.yml`. The MAM helper inserts
+this module block under the top-level `modules:` section and reloads ejabberd:
+
+```yaml
+modules:
+  mod_mam:
+    db_type: sql
+    default: always
+    assume_mam_usage: true
+    request_activates_archiving: false
+```
+
+`db_type: sql` requires ejabberd SQL storage to be configured. Use this for the
+provider path so normal chat history comes from XEP-0313 MAM instead of the
+TeleTypTel relay fallback.
+
 Useful optional modules:
 
 ```text

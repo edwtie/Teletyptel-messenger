@@ -604,6 +604,69 @@ function writeRuntimeScripts(string $runtimePath, string $rootPath, array $state
 
     $ejabberdInstallPath = $runtimePath . DIRECTORY_SEPARATOR . 'install-linux-ejabberd.sh';
     $domain = shellQuote($state['xmpp_domain']);
+    $mamSnippetPath = $runtimePath . DIRECTORY_SEPARATOR . 'teletyptel-ejabberd-mam.yml';
+    $mamSnippet = "# TeleTypTel ejabberd MAM module fragment\n"
+        . "# Merge this under the existing top-level `modules:` section in /etc/ejabberd/ejabberd.yml.\n"
+        . "# `db_type: sql` requires ejabberd SQL storage to be configured.\n"
+        . "  mod_mam:\n"
+        . "    db_type: sql\n"
+        . "    default: always\n"
+        . "    assume_mam_usage: true\n"
+        . "    request_activates_archiving: false\n";
+    file_put_contents($mamSnippetPath, $mamSnippet, LOCK_EX);
+
+    $ejabberdMamPath = $runtimePath . DIRECTORY_SEPARATOR . 'configure-linux-ejabberd-mam.sh';
+    $ejabberdMam = "#!/usr/bin/env sh\n"
+        . "set -eu\n"
+        . "CONFIG=\${EJABBERD_CONFIG:-/etc/ejabberd/ejabberd.yml}\n"
+        . "if [ ! -f \"\$CONFIG\" ]; then\n"
+        . "  echo \"ejabberd config not found: \$CONFIG\"\n"
+        . "  exit 1\n"
+        . "fi\n"
+        . "if grep -Eq '^[[:space:]]*mod_mam:' \"\$CONFIG\"; then\n"
+        . "  echo \"mod_mam is already present in \$CONFIG\"\n"
+        . "else\n"
+        . "  BACKUP=\"\$CONFIG.teletyptel-mam-\$(date +%Y%m%d%H%M%S).bak\"\n"
+        . "  sudo cp \"\$CONFIG\" \"\$BACKUP\"\n"
+        . "  TMP=\$(mktemp)\n"
+        . "  awk '\n"
+        . "    BEGIN { inserted = 0 }\n"
+        . "    /^modules:[[:space:]]*$/ && inserted == 0 {\n"
+        . "      print\n"
+        . "      print \"  mod_mam:\"\n"
+        . "      print \"    db_type: sql\"\n"
+        . "      print \"    default: always\"\n"
+        . "      print \"    assume_mam_usage: true\"\n"
+        . "      print \"    request_activates_archiving: false\"\n"
+        . "      inserted = 1\n"
+        . "      next\n"
+        . "    }\n"
+        . "    { print }\n"
+        . "    END {\n"
+        . "      if (inserted == 0) {\n"
+        . "        print \"\"\n"
+        . "        print \"modules:\"\n"
+        . "        print \"  mod_mam:\"\n"
+        . "        print \"    db_type: sql\"\n"
+        . "        print \"    default: always\"\n"
+        . "        print \"    assume_mam_usage: true\"\n"
+        . "        print \"    request_activates_archiving: false\"\n"
+        . "      }\n"
+        . "    }\n"
+        . "  ' \"\$CONFIG\" > \"\$TMP\"\n"
+        . "  sudo cp \"\$TMP\" \"\$CONFIG\"\n"
+        . "  rm -f \"\$TMP\"\n"
+        . "  echo \"mod_mam inserted. Backup: \$BACKUP\"\n"
+        . "fi\n"
+        . "if command -v ejabberdctl >/dev/null 2>&1; then\n"
+        . "  sudo ejabberdctl reload_config || sudo systemctl restart ejabberd\n"
+        . "else\n"
+        . "  sudo systemctl restart ejabberd\n"
+        . "fi\n"
+        . "sudo systemctl status ejabberd --no-pager\n";
+    file_put_contents($ejabberdMamPath, $ejabberdMam, LOCK_EX);
+    @chmod($ejabberdMamPath, 0755);
+
     $ejabberdInstall = "#!/usr/bin/env sh\n"
         . "set -eu\n"
         . "DOMAIN={$domain}\n"
@@ -624,12 +687,12 @@ function writeRuntimeScripts(string $runtimePath, string $rootPath, array $state
         . "fi\n"
         . "sudo systemctl enable --now ejabberd\n"
         . "sudo systemctl status ejabberd --no-pager\n"
-        . "echo \"Next: add host/domain \${DOMAIN} and required modules in /etc/ejabberd/ejabberd.yml.\"\n"
+        . "sudo sh {$linuxRoot}/install-runtime/configure-linux-ejabberd-mam.sh\n"
         . "echo \"Recommended modules: mod_roster, mod_muc, mod_mam, mod_pubsub, mod_http_upload, mod_register, mod_websocket, mod_bosh.\"\n";
     file_put_contents($ejabberdInstallPath, $ejabberdInstall, LOCK_EX);
     @chmod($ejabberdInstallPath, 0755);
 
-    return [$cmdPath, $shPath, $servicePath, $installShPath, $ejabberdInstallPath];
+    return [$cmdPath, $shPath, $servicePath, $installShPath, $ejabberdInstallPath, $ejabberdMamPath, $mamSnippetPath];
 }
 
 function shellQuote(string $value): string
@@ -872,8 +935,11 @@ sudo systemctl status teletyptel-rtt-relay.service</pre>
     <p>Als de systeemcheck ejabberd niet vindt, gebruik dan na installatie het gegenereerde Linux-script:</p>
     <pre>cd /var/www/teletyptel
 sudo sh php/install-runtime/install-linux-ejabberd.sh</pre>
-    <p>Daarna moet <code>/etc/ejabberd/ejabberd.yml</code> nog het juiste domein en modules krijgen.</p>
-    <p class="small">Aanbevolen modules: roster, MUC, MAM, PubSub/PEP, HTTP upload, register, WebSocket en BOSH. Voor echte video/spraak komt later ook TURN/coturn erbij.</p>
+    <p>Dit script installeert ejabberd en roept daarna <code>configure-linux-ejabberd-mam.sh</code> aan. Die helper maakt eerst een backup van <code>/etc/ejabberd/ejabberd.yml</code>, zet <code>mod_mam</code> onder <code>modules</code> en herlaadt ejabberd.</p>
+    <p>Alleen MAM opnieuw toepassen:</p>
+    <pre>cd /var/www/teletyptel
+sudo sh php/install-runtime/configure-linux-ejabberd-mam.sh</pre>
+    <p class="small">MAM gebruikt <code>db_type: sql</code> en <code>default: always</code>. Zorg dus dat ejabberd SQL-storage is ingesteld. Aanbevolen modules daarnaast: roster, MUC, PubSub/PEP, HTTP upload, register, WebSocket en BOSH. Voor echte video/spraak komt later ook TURN/coturn erbij.</p>
   </section>
 </main>
 </body>
