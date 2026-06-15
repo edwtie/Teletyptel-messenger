@@ -11776,7 +11776,7 @@
     button.className = "message-reaction-button";
     button.title = t("reaction.add", "React");
     button.setAttribute("aria-label", t("reaction.add", "React"));
-    button.textContent = "☺";
+    button.appendChild(createMaterialIcon("mood"));
     button.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();

@@ -1,5 +1,5 @@
-const CACHE_NAME = "teletyptel-webclient-v239";
-const BUILD_VERSION = "20260615-reaction-button-center";
+const CACHE_NAME = "teletyptel-webclient-v240";
+const BUILD_VERSION = "20260615-reaction-button-icon";
 const ASSETS = [
   "chat.html",
   "dev.html",

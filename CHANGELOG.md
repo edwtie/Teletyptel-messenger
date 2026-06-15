@@ -61,6 +61,8 @@
   message bubble instead of flowing onto a second line.
 - The floating message reaction button now centers its smiley glyph inside the
   circular control.
+- The floating message reaction button now uses the shared mood SVG icon
+  instead of an emoji glyph, keeping it visually centered and compact.
 - Interactive location sharing UI with map preview, share duration up to eight
   hours, Google Maps/OpenStreetMap provider setting, browser geolocation
   permission handling and single live location card updates instead of duplicate
