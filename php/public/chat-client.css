@@ -2924,6 +2924,9 @@ body[data-theme="dark"] .link-preview-loading {
 .attachment-card.video {
   width: min(100%, 500px);
   box-sizing: border-box;
+  border-color: transparent;
+  background: transparent;
+  padding: 0;
 }
 
 .attachment-card.audio .attachment-icon {
