@@ -2922,7 +2922,7 @@ body[data-theme="dark"] .link-preview-loading {
 }
 
 .attachment-card.video {
-  width: min(100%, 500px);
+  width: min(100%, 510px);
   box-sizing: border-box;
   border-color: #5c7598;
   background: transparent;
