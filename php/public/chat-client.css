@@ -2624,9 +2624,17 @@ body[data-theme="dark"] .message-date-separator span {
   text-align: right;
 }
 
-.message.has-inline-meta > .message-meta,
-.message.has-inline-meta .message-content > .message-meta {
+.message.has-inline-meta:not(.group-message) > .message-meta,
+.message.has-inline-meta:not(.group-message) .message-content > .message-meta {
   display: none;
+}
+
+.message.group-message.has-inline-meta .message-meta {
+  margin-top: -1px;
+  padding: 0 4px;
+  color: #475569;
+  font-size: 12px;
+  line-height: 1.25;
 }
 
 .message.draft .message-body {

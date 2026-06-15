@@ -12367,15 +12367,21 @@
     const bodyWrap = createMessageBodyWrap(body, reactionButton, reactionsElement);
 
     if (!shouldShowMessageAvatar(message)) {
-      item.replaceChildren(meta, bodyWrap);
+      item.replaceChildren(...messageContentChildren(message, meta, bodyWrap));
       return;
     }
 
     const content = document.createElement("div");
     content.className = "message-content";
-    content.append(meta, bodyWrap);
+    content.append(...messageContentChildren(message, meta, bodyWrap));
     const avatar = createAvatarElement(messageAvatarSource(message), "message-avatar");
     item.replaceChildren(avatar, content);
+  }
+
+  function messageContentChildren(message, meta, bodyWrap) {
+    return shouldShowGroupSenderMeta(message)
+      ? [bodyWrap, meta]
+      : [meta, bodyWrap];
   }
 
   function createMessageBodyWrap(body, reactionButton, reactionsElement) {
@@ -12402,6 +12408,12 @@
   function shouldRenderMessageBubbleTail(message) {
     return shouldRenderInlineMessageMeta(message)
       && !message.retracted;
+  }
+
+  function shouldShowGroupSenderMeta(message) {
+    return Boolean(message)
+      && activeConversation()?.kind === "group"
+      && shouldRenderInlineMessageMeta(message);
   }
 
   function appendInlineMessageMeta(body, message) {
@@ -12812,6 +12824,12 @@
   }
 
   function messageMetaText(message) {
+    if (shouldShowGroupSenderMeta(message)) {
+      return message.direction === "self"
+        ? currentSenderName()
+        : message.senderDisplayName || displayNameForJid(message.from);
+    }
+
     const sender = message.direction === "self"
       ? currentSenderName()
       : message.senderDisplayName || displayNameForJid(message.from);
