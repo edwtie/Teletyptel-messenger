@@ -597,8 +597,13 @@ assertTrue(XmppJingleFileTransfer::parseTransport($jingleUsedTransport)['candida
 $jingleActivatedTransport = XmppJingleFileTransfer::s5bTransportElement('vj3hs98y', activated: 'xmdh4b7i');
 assertTrue(XmppJingleFileTransfer::parseTransport($jingleActivatedTransport)['activated'] === 'xmdh4b7i', 'Jingle S5B activated parse failed.');
 
-$jingle = XmppJingle::sessionInfo('j1', 'tester@localhost/web', 'sid123', XmppJingle::rttSyncInfo('sync', 'nl'));
-assertTrue(str_contains($jingle, XmppXml::JINGLE_RTT_SYNC_NS), 'Jingle RTT sync failed.');
+$jingle = XmppJingle::sessionInfo('j1', 'tester@localhost/web', 'sid123', XmppJingle::rttSyncInfo('co-session', maxSkewMs: 700, finality: 'mixed'));
+assertTrue(
+    str_contains($jingle, XmppXml::JINGLE_RTT_SYNC_NS)
+    && str_contains($jingle, 'sync-mode="co-session"')
+    && !str_contains($jingle, 'lang='),
+    'Jingle RTT sync failed.'
+);
 
 $features = XmppFeatures::supportedNamespaces();
 assertTrue(isset($features['XEP-0301 Real-Time Text']), 'Feature list missing XEP-0301.');

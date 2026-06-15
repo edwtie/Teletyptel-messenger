@@ -85,6 +85,7 @@
   const teletyptelCallInfoNamespace = "urn:teletyptel:call-info:0";
   const jingleHistoryNamespace = "urn:xmpp:jingle-history:0";
   const jingleRttSyncNamespace = "urn:xmpp:jingle:apps:rtt-sync:0";
+  const jingleGroupingNamespace = "urn:xmpp:jingle:apps:grouping:0";
   const jingleRttSyncDataChannelLabel = "rtt";
   const jingleRttSyncMaxSkewMs = 700;
   const t140Backspace = "\b";
@@ -9146,9 +9147,6 @@
       label: jingleRttSyncDataChannelLabel,
       role: "conversation",
       source: "human",
-      lang: jingleRttSyncLanguage(),
-      syncGroup: jingleRttSyncGroup(sid),
-      syncReference: "audio",
       syncMode: "co-session",
       maxSkewMs: jingleRttSyncMaxSkewMs,
       finality: "mixed",
@@ -9168,21 +9166,9 @@
       ...value,
       namespace: value.namespace || jingleRttSyncNamespace,
       label: value.label || jingleRttSyncDataChannelLabel,
-      lang: value.lang || fallback.lang,
-      syncGroup: value.syncGroup || fallback.syncGroup,
       state: value.state || stateName,
       sequence: Number.isInteger(value.sequence) ? value.sequence : 0
     };
-  }
-
-  function jingleRttSyncLanguage() {
-    return normalizeLanguageCode(state.languageCode || el.languageInput.value) === "ned"
-      ? "nl-NL"
-      : "en";
-  }
-
-  function jingleRttSyncGroup(sid) {
-    return `tc-${String(sid || "call").replace(/[^a-zA-Z0-9_-]/g, "-")}`;
   }
 
   function createPeerConnection(call) {
@@ -9532,11 +9518,8 @@
       sid: call.sid,
       from: currentFromJid(),
       to: call.peer,
-      lang: call.rttSync.lang || jingleRttSyncLanguage(),
       role: call.rttSync.role,
       source: call.rttSync.source,
-      syncGroup: call.rttSync.syncGroup || jingleRttSyncGroup(call.sid),
-      syncReference: call.rttSync.syncReference,
       syncMode: call.rttSync.syncMode,
       maxSkewMs: call.rttSync.maxSkewMs,
       seq: call.rttSync.sequence++,
@@ -10430,8 +10413,11 @@
     let payload = "";
 
     if (action === "session-initiate" || action === "session-accept") {
-      payload = createJingleContentXml("audio", "audio")
-        + (envelope.mediaKind === "video" ? createJingleContentXml("video", "video") : "")
+      const hasVideo = envelope.mediaKind === "video";
+      const hasText = Boolean(envelope.rttSync);
+      payload = createJingleGroupingXml({ hasVideo, hasText })
+        + createJingleContentXml("audio", "audio")
+        + (hasVideo ? createJingleContentXml("video", "video") : "")
         + (envelope.rttSync ? createJingleRttSyncContentXml(envelope) : "");
     } else if (action === "transport-info") {
       payload = `<content creator="initiator" name="${escapeXml(envelope.mediaKind || "audio")}"><transport xmlns="urn:xmpp:jingle:transports:ice-udp:1">${createJingleCandidateXml(envelope.candidate)}</transport></content>`;
@@ -10458,6 +10444,18 @@
     return `<content creator="initiator" name="${name}" senders="both"><description xmlns="urn:xmpp:jingle:apps:rtp:1" media="${media}">${payload}</description><transport xmlns="urn:xmpp:jingle:transports:ice-udp:1"><fingerprint xmlns="urn:xmpp:jingle:apps:dtls:0" hash="sha-256" setup="actpass">browser-managed</fingerprint></transport></content>`;
   }
 
+  function createJingleGroupingXml({ hasVideo = false, hasText = false } = {}) {
+    if (!hasText) {
+      return "";
+    }
+
+    const contents = ['<content name="audio"/>']
+      .concat(hasVideo ? ['<content name="video"/>'] : [])
+      .concat('<content name="text"/>')
+      .join("");
+    return `<group xmlns="${jingleGroupingNamespace}" semantics="LS">${contents}</group>`;
+  }
+
   function createJingleRttSyncContentXml(envelope) {
     if (!envelope.rttSync) {
       return "";
@@ -10469,9 +10467,6 @@
       `label="${escapeXml(rttSync.label)}"`,
       `role="${escapeXml(rttSync.role)}"`,
       `source="${escapeXml(rttSync.source)}"`,
-      `lang="${escapeXml(rttSync.lang)}"`,
-      `sync-group="${escapeXml(rttSync.syncGroup)}"`,
-      `sync-reference="${escapeXml(rttSync.syncReference)}"`,
       `sync-mode="${escapeXml(rttSync.syncMode)}"`,
       `max-skew="${escapeXml(rttSync.maxSkewMs)}"`,
       `finality="${escapeXml(rttSync.finality)}"`
@@ -10486,7 +10481,6 @@
       `event="${escapeXml(packet.event || "edit")}"`,
       `sid="${escapeXml(packet.sid || "")}"`,
       `seq="${escapeXml(packet.seq ?? "")}"`,
-      `sync-group="${escapeXml(packet.syncGroup || "")}"`,
       `sync-mode="${escapeXml(packet.syncMode || "co-session")}"`
     ].join(" ");
     const actions = packet.actions ? `<actions>${packet.actions}</actions>` : "";

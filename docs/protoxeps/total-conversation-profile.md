@@ -295,11 +295,15 @@ Teletyptel implementation status:
 All call-scoped media and context must be bound by:
 
 ```text
-peer JID + Jingle sid + content name + optional sync-group
+peer JID + Jingle sid + content name
 ```
 
 The peer JID alone is not enough. A single contact can have multiple devices,
 browser sessions, simultaneous calls or fallback chat paths.
+
+When audio, video and text contents need to be presented as one synchronized
+conversation, clients should use XEP-0338 Jingle Grouping Framework instead of
+RTT-specific grouping attributes.
 
 ## Session Model
 

@@ -137,12 +137,21 @@ final class XmppJingle
         ];
     }
 
-    public static function rttSyncInfo(string $mode = 'sync', ?string $language = null): string
+    public static function rttSyncInfo(
+        string $syncMode = 'co-session',
+        string $role = 'conversation',
+        ?string $source = 'human',
+        ?int $maxSkewMs = null,
+        ?string $finality = null
+    ): string
     {
         return '<rtt-sync' . XmppXml::attributes([
             'xmlns' => XmppXml::JINGLE_RTT_SYNC_NS,
-            'mode' => $mode,
-            'lang' => $language,
+            'role' => $role,
+            'source' => $source,
+            'sync-mode' => $syncMode,
+            'max-skew' => $maxSkewMs,
+            'finality' => $finality,
         ]) . '/>';
     }
 

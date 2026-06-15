@@ -119,11 +119,13 @@ The likely submission model is one discovery feature,
 The binding identity is:
 
 ```text
-peer JID + Jingle sid + content name + optional sync-group
+peer JID + Jingle sid + content name
 ```
 
 Using only the peer JID is not enough, because the same contact can have
 multiple devices, browser sessions, fallback chat streams or simultaneous calls.
+When a call presents audio, video and text as one Total Conversation, TeleTypTel
+uses XEP-0338 grouping instead of RTT-specific grouping attributes.
 
 Total Conversation layers:
 
@@ -593,10 +595,17 @@ Initial implementation status:
 
 The web client also implements the current ProtoXEP direction for Jingle
 synchronized RTT. A Jingle call advertises an extra `text` content with
-`urn:xmpp:jingle:apps:rtt-sync:0`, then opens a reliable WebRTC datachannel
-named `rtt`. While that channel is open, live drafts and final chat text are
-sent as `jingle-rtt` packets in the same call context. If the channel is not
-available, the client falls back to normal XEP-0301 relay RTT.
+`urn:xmpp:jingle:apps:rtt-sync:0`, groups audio/video/text with XEP-0338 when
+RTT is offered, then opens a reliable WebRTC datachannel named `rtt`. While that
+channel is open, live drafts and final chat text are sent in the same call
+context. If the channel is not available, the client falls back to normal
+XEP-0301 relay RTT.
+
+The current ProtoXEP direction no longer uses `lang`, `sync-group` or
+`sync-reference` as `rtt-sync` attributes. RTP/T.140 can already be represented
+with XEP-0167 without `rtt-sync`; the `rtt-sync` element is extra metadata for
+role, source, synchronization mode, skew and finality. Language negotiation
+belongs in a future RFC 8373 Jingle mapping.
 
 The same `rtt` datachannel now also listens for raw T.140 text payloads. That
 means a peer that sends plain UTF-8 T.140 characters, including backspace/delete
