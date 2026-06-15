@@ -12924,20 +12924,53 @@
       player.addEventListener("click", (event) => event.stopPropagation());
       wrapper.append(player, downloadButton);
     } else if (kind === "video") {
+      const stage = document.createElement("div");
+      stage.className = "attachment-video-stage video-preview-loading";
+      const placeholder = document.createElement("span");
+      placeholder.className = "attachment-video-placeholder";
+      placeholder.appendChild(createMaterialIcon("videocam"));
       const player = document.createElement("video");
       player.className = "attachment-video-player";
       player.controls = true;
-      player.preload = "metadata";
+      player.preload = "auto";
       player.playsInline = true;
       player.src = attachment.url;
       player.addEventListener("click", (event) => event.stopPropagation());
-      wrapper.append(player, downloadButton);
+      setupAttachmentVideoPreview(player, stage);
+      stage.append(player, placeholder);
+      wrapper.append(stage, downloadButton);
     } else {
       wrapper.append(icon, text, downloadButton);
     }
     renderMaterialIcons(wrapper);
 
     return wrapper;
+  }
+
+  function setupAttachmentVideoPreview(player, stage) {
+    const markReady = () => {
+      stage.classList.remove("video-preview-loading");
+      stage.classList.add("video-preview-ready");
+    };
+    const seekPreviewFrame = () => {
+      if (player.dataset.previewSeeked === "true") {
+        return;
+      }
+      player.dataset.previewSeeked = "true";
+      const duration = Number.isFinite(player.duration) && player.duration > 0 ? player.duration : 1;
+      const previewTime = Math.min(0.1, Math.max(0, duration - 0.05));
+      try {
+        player.currentTime = previewTime;
+      } catch {
+        markReady();
+      }
+    };
+
+    player.addEventListener("loadedmetadata", seekPreviewFrame, { once: true });
+    player.addEventListener("loadeddata", markReady, { once: true });
+    player.addEventListener("canplay", markReady, { once: true });
+    player.addEventListener("seeked", markReady, { once: true });
+    player.addEventListener("error", markReady, { once: true });
   }
 
   function attachmentMetaText(attachment, kind) {

@@ -2890,14 +2890,46 @@ body[data-theme="dark"] .link-preview-loading {
   margin-top: 0;
 }
 
-.attachment-video-player {
-  display: block;
+.attachment-video-stage {
+  position: relative;
+  overflow: hidden;
   aspect-ratio: 16 / 9;
   height: clamp(180px, 36vw, 382px);
   max-height: none;
-  object-fit: cover;
   border-radius: 6px;
-  background: #0b1220;
+  background: linear-gradient(135deg, rgba(219, 234, 254, .96), rgba(240, 253, 244, .94));
+}
+
+.attachment-video-player {
+  display: block;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+  background: transparent;
+  opacity: 1;
+  transition: opacity .12s ease;
+}
+
+.attachment-video-stage.video-preview-loading .attachment-video-player {
+  opacity: 0;
+}
+
+.attachment-video-placeholder {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #2563eb;
+  pointer-events: none;
+}
+
+.attachment-video-placeholder .material-icon-svg {
+  width: 48px;
+  height: 48px;
+}
+
+.attachment-video-stage.video-preview-ready .attachment-video-placeholder {
+  display: none;
 }
 
 .attachment-preview {

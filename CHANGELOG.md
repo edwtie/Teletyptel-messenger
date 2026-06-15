@@ -87,6 +87,8 @@
 - Clients now resync stored read acknowledgements and local reactions after
   history load, relay reconnect and conversation selection, allowing older
   loaded messages to catch up when both sides are online again.
+- Video message cards now preload and seek to an initial preview frame with a
+  light placeholder, avoiding a black rectangle before playback starts.
 - Interactive location sharing UI with map preview, share duration up to eight
   hours, Google Maps/OpenStreetMap provider setting, browser geolocation
   permission handling and single live location card updates instead of duplicate
