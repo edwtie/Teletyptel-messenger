@@ -75,6 +75,8 @@
 - XMPP chat messages now request XEP-0184 delivery receipts and XEP-0333 chat
   markers, reply with received/displayed acknowledgements for incoming
   messages and show WhatsApp-style sent, delivered and read check marks.
+- Delivery/read markers and reactions now match message IDs across all loaded
+  conversations, making them resilient to bare/full JID differences.
 - Interactive location sharing UI with map preview, share duration up to eight
   hours, Google Maps/OpenStreetMap provider setting, browser geolocation
   permission handling and single live location card updates instead of duplicate

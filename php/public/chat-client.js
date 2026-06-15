@@ -6891,22 +6891,25 @@
   }
 
   function applyMessageDeliveryMarker(conversation, messageId, status) {
-    if (!conversation || !messageId || !status) {
+    if (!messageId || !status) {
       return;
     }
 
-    const message = conversation.messages.find((item) => item.direction === "self" && (item.xmppId === messageId || item.id === messageId));
-    if (!message) {
+    const match = findMessageRecordByAnyId(messageId, {
+      conversation,
+      direction: "self"
+    });
+    if (!match) {
       return;
     }
 
     const order = { sent: 1, delivered: 2, displayed: 3 };
-    if ((order[status] || 0) <= (order[message.deliveryStatus] || 0)) {
+    if ((order[status] || 0) <= (order[match.message.deliveryStatus] || 0)) {
       return;
     }
 
-    message.deliveryStatus = status;
-    updateMessageElementById(message);
+    match.message.deliveryStatus = status;
+    updateMessageElementById(match.message);
   }
 
   function handleXmppSessionFrame(text) {
@@ -12102,29 +12105,29 @@
   }
 
   function applyMessageReaction(conversation, targetId, actor, reactions, persist = true) {
-    const message = findConversationMessageByAnyId(conversation, targetId);
-    if (!message) {
+    const match = findMessageRecordByAnyId(targetId, { conversation });
+    if (!match) {
       return;
     }
 
     const actorId = bareJid(actor || "").toLowerCase() || reactionActorId();
-    const normalized = normalizeMessageReactions(message.reactions);
+    const normalized = normalizeMessageReactions(match.message.reactions);
     const list = Array.from(new Set((Array.isArray(reactions) ? reactions : [])
       .map((item) => String(item || "").trim())
-      .filter(Boolean))).slice(0, 12);
+      .filter(Boolean))).slice(0, 1);
     if (list.length) {
       normalized[actorId] = list;
     } else {
       delete normalized[actorId];
     }
-    message.reactions = normalized;
+    match.message.reactions = normalized;
 
-    if (conversation.id === state.activeConversationId) {
+    if (match.conversation.id === state.activeConversationId) {
       renderActiveConversation();
     }
     renderConversations();
     if (persist) {
-      persistHistoryMessage(conversation, message);
+      persistHistoryMessage(match.conversation, match.message);
     }
   }
 
@@ -12134,6 +12137,35 @@
       return null;
     }
     return conversation.messages.find((item) => item.id === id || item.xmppId === id) || null;
+  }
+
+  function findMessageRecordByAnyId(targetId, options = {}) {
+    const id = String(targetId || "");
+    if (!id) {
+      return null;
+    }
+
+    const direction = options.direction || "";
+    const matches = (message) => (!direction || message.direction === direction)
+      && (message.id === id || message.xmppId === id);
+    const preferredConversation = options.conversation || null;
+    if (preferredConversation) {
+      const message = preferredConversation.messages.find(matches);
+      if (message) {
+        return { conversation: preferredConversation, message };
+      }
+    }
+
+    for (const conversation of state.conversations) {
+      if (conversation === preferredConversation) {
+        continue;
+      }
+      const message = conversation.messages.find(matches);
+      if (message) {
+        return { conversation, message };
+      }
+    }
+    return null;
   }
 
   function conversationForMessage(message) {
