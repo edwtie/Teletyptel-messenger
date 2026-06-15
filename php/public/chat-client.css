@@ -2582,6 +2582,10 @@ body[data-theme="dark"] .message-date-separator span {
   font-size: 12px;
 }
 
+.message.with-avatar.has-bubble-tail .message-avatar {
+  margin-top: 4px;
+}
+
 .message.with-avatar .message-content {
   position: relative;
   display: grid;
@@ -2642,13 +2646,13 @@ body[data-theme="dark"] .message-date-separator span {
   overflow-wrap: anywhere;
 }
 
-.message.with-avatar.has-inline-meta:not(.self) .message-body::before,
-.message.with-avatar.has-inline-meta:not(.self) .message-body::after,
-.message.with-avatar.has-inline-meta.self .message-body::before,
-.message.with-avatar.has-inline-meta.self .message-body::after {
+.message.with-avatar.has-bubble-tail:not(.self) .message-body::before,
+.message.with-avatar.has-bubble-tail:not(.self) .message-body::after,
+.message.with-avatar.has-bubble-tail.self .message-body::before,
+.message.with-avatar.has-bubble-tail.self .message-body::after {
   content: "";
   position: absolute;
-  top: 10px;
+  top: 11px;
   width: 0;
   height: 0;
   border-top: 8px solid transparent;
@@ -2656,22 +2660,22 @@ body[data-theme="dark"] .message-date-separator span {
   pointer-events: none;
 }
 
-.message.with-avatar.has-inline-meta:not(.self) .message-body::before {
+.message.with-avatar.has-bubble-tail:not(.self) .message-body::before {
   left: -9px;
   border-right: 9px solid #3f536d;
 }
 
-.message.with-avatar.has-inline-meta:not(.self) .message-body::after {
+.message.with-avatar.has-bubble-tail:not(.self) .message-body::after {
   left: -7px;
   border-right: 8px solid var(--bubble-peer);
 }
 
-.message.with-avatar.has-inline-meta.self .message-body::before {
+.message.with-avatar.has-bubble-tail.self .message-body::before {
   right: -9px;
   border-left: 9px solid #1d8d68;
 }
 
-.message.with-avatar.has-inline-meta.self .message-body::after {
+.message.with-avatar.has-bubble-tail.self .message-body::after {
   right: -7px;
   border-left: 8px solid var(--bubble-self);
 }
@@ -2914,6 +2918,7 @@ body[data-theme="dark"] .link-preview-loading {
 
 .attachment-card.video {
   width: min(100%, 680px);
+  box-sizing: border-box;
 }
 
 .attachment-card.audio .attachment-icon {

@@ -12321,6 +12321,7 @@
       + (message.draft ? " draft" : "")
       + (message.retracted ? " retracted" : "")
       + (shouldRenderInlineMessageMeta(message) ? " has-inline-meta" : "")
+      + (shouldRenderMessageBubbleTail(message) ? " has-bubble-tail" : "")
       + (withAvatar ? " with-avatar" : "")
       + (activeConversation()?.kind === "group" ? " group-message" : "");
   }
@@ -12396,6 +12397,11 @@
 
   function shouldRenderInlineMessageMeta(message) {
     return Boolean(message) && !message.draft && !isCallMessage(message);
+  }
+
+  function shouldRenderMessageBubbleTail(message) {
+    return shouldRenderInlineMessageMeta(message)
+      && !message.retracted;
   }
 
   function appendInlineMessageMeta(body, message) {
