@@ -3110,6 +3110,10 @@ body[data-theme="dark"] .link-preview-loading {
 }
 
 .message-reaction-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
   min-height: 24px;
   border-color: rgba(79, 140, 255, .32);
   border-radius: 999px;
@@ -3117,6 +3121,17 @@ body[data-theme="dark"] .link-preview-loading {
   padding: 1px 8px;
   font-size: 15px;
   line-height: 1;
+}
+
+.message-reaction-chip .smiley-image {
+  max-width: 20px;
+  height: 20px;
+  margin: 0;
+}
+
+.message-reaction-count {
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .message-reaction-picker {

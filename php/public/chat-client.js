@@ -11794,7 +11794,7 @@
       const chip = document.createElement("button");
       chip.type = "button";
       chip.className = "message-reaction-chip";
-      chip.textContent = item.count > 1 ? `${item.emoji} ${item.count}` : item.emoji;
+      appendReactionChipContent(chip, item);
       chip.title = t("reaction.toggle", "Toggle reaction");
       chip.setAttribute("aria-label", t("reaction.toggle", "Toggle reaction"));
       chip.addEventListener("click", (event) => {
@@ -11805,6 +11805,23 @@
       wrapper.appendChild(chip);
     }
     return wrapper;
+  }
+
+  function appendReactionChipContent(chip, item) {
+    const value = String(item?.emoji || "");
+    const tokens = tokenizeSmilies(value);
+    if (tokens.length === 1 && tokens[0].kind === "smiley") {
+      chip.appendChild(createSmileyImage(tokens[0]));
+    } else {
+      chip.appendChild(document.createTextNode(value));
+    }
+
+    if (item.count > 1) {
+      const count = document.createElement("span");
+      count.className = "message-reaction-count";
+      count.textContent = String(item.count);
+      chip.appendChild(count);
+    }
   }
 
   function visibleMessageText(message) {
