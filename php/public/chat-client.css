@@ -2567,16 +2567,18 @@ body[data-theme="dark"] .message-date-separator span {
   column-gap: 10px;
   align-items: start;
   max-width: min(82ch, calc(88% - 44px));
-  margin-left: 6px;
+  margin-left: 12px;
 }
 
 .message.with-avatar.self {
   grid-template-columns: minmax(0, 1fr) 34px;
   margin-left: auto;
-  margin-right: 6px;
+  margin-right: 12px;
 }
 
 .message.with-avatar .message-avatar {
+  position: relative;
+  z-index: 2;
   width: 30px;
   height: 30px;
   align-self: start;
