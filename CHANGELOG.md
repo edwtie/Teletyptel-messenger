@@ -84,6 +84,9 @@
   so WhatsApp-style check marks also work outside direct XMPP mode.
 - Message history now persists delivered/read state so check marks survive
   reloads for newly acknowledged messages.
+- Clients now resync stored read acknowledgements and local reactions after
+  history load, relay reconnect and conversation selection, allowing older
+  loaded messages to catch up when both sides are online again.
 - Interactive location sharing UI with map preview, share duration up to eight
   hours, Google Maps/OpenStreetMap provider setting, browser geolocation
   permission handling and single live location card updates instead of duplicate

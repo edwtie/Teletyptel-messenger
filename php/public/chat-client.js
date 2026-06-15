@@ -412,6 +412,7 @@
     contextConversationId: null,
     contextMessage: null,
     reactionMessageId: null,
+    messageStateSync: new Map(),
     smileyPickerMode: "composer",
     accountGateRequired: !hasInitialAccountProfile,
     accountDialogMode: !hasInitialAccountProfile ? "signin" : "settings",
@@ -1925,6 +1926,7 @@
 
       renderConversations();
       renderActiveConversation();
+      syncAllConversationMessageState("history");
       appendDebug("history", `Loaded ${payload.messages.length} messages from ${result.accountId}, restored ${restored}: ${Array.from(restoredByPeer, ([peer, count]) => `${peer}=${count}`).join(", ")}`);
       return true;
     } catch (error) {
@@ -4789,6 +4791,7 @@
       setInfrastructurePresence("online");
       sendPresence("online", { probe: true });
       flushClientLifecycleState("relay-open", true);
+      syncAllConversationMessageState("relay-open");
       sendRttReset();
     });
 
@@ -7912,6 +7915,85 @@
     appendDebug("relay-ack-out", `${ack} ${targetId}`);
   }
 
+  function syncAllConversationMessageState(reason = "manual") {
+    for (const conversation of state.conversations) {
+      syncConversationMessageState(conversation, reason);
+    }
+  }
+
+  function syncConversationMessageState(conversation, reason = "manual") {
+    if (!conversation || isOwnContact(conversation) || isBlockedConversation(conversation)) {
+      return;
+    }
+
+    const now = Date.now();
+    const syncKey = `${conversation.id}:${state.mode}`;
+    const lastSync = state.messageStateSync.get(syncKey) || 0;
+    if (now - lastSync < 5000) {
+      return;
+    }
+    let sent = 0;
+    for (const message of conversation.messages) {
+      const targetId = bestMessageTargetId(message);
+      if (!targetId) {
+        continue;
+      }
+
+      if (message.direction === "peer") {
+        sent += sendStoredMessageReadState(conversation, targetId);
+      }
+
+      if (sendStoredOwnReaction(conversation, message, targetId)) {
+        sent += 1;
+      }
+    }
+
+    if (sent > 0) {
+      state.messageStateSync.set(syncKey, now);
+      appendDebug("message-state-sync", `${reason} ${conversation.peer}: ${sent}`);
+    }
+  }
+
+  function sendStoredMessageReadState(conversation, targetId) {
+    if (state.mode === "xmpp" && state.xmppSocket?.readyState === WebSocket.OPEN && state.xmppSession?.authenticated) {
+      sendXmppStanza(createDeliveryReceiptStanza(conversation.peer, targetId), "<message receipt=\"sync\"/>");
+      sendXmppStanza(createDisplayedMarkerStanza(conversation.peer, targetId), "<message marker=\"sync\"/>");
+      return 2;
+    }
+
+    if (state.relaySocket?.readyState === WebSocket.OPEN) {
+      sendRelayMessageAcknowledgement(conversation, targetId, "delivered");
+      sendRelayMessageAcknowledgement(conversation, targetId, "displayed");
+      return 2;
+    }
+
+    return 0;
+  }
+
+  function sendStoredOwnReaction(conversation, message, targetId) {
+    const reactions = normalizeMessageReactions(message.reactions)[reactionActorId()] || [];
+    if (!reactions.length) {
+      return false;
+    }
+
+    if (state.mode === "xmpp" && state.xmppSocket?.readyState === WebSocket.OPEN && state.xmppSession?.authenticated) {
+      sendXmppStanza(createMessageReactionStanza(conversation.peer, targetId, reactions), "<message reactions=\"sync\"/>");
+      return true;
+    }
+
+    if (state.relaySocket?.readyState === WebSocket.OPEN) {
+      const envelope = createRelayEnvelope("message-reaction", "", "", conversation.peer);
+      envelope.reactionTargetId = targetId;
+      envelope.reactions = reactions;
+      envelope.messageId = createMessageId("react-sync");
+      state.relaySocket.send(JSON.stringify(envelope));
+      appendDebug("relay-reaction-sync-out", targetId);
+      return true;
+    }
+
+    return false;
+  }
+
   function handleLocationEnvelope(envelope) {
     const conversation = conversationForEnvelope(envelope);
     if (!conversation) {
@@ -10805,6 +10887,7 @@
         }
         renderConversations();
         renderActiveConversation();
+        syncConversationMessageState(conversation, "select");
         el.messageInput.focus();
       });
       button.addEventListener("contextmenu", (event) => showConversationContextMenu(event, conversation, button));
