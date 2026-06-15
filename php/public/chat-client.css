@@ -2630,11 +2630,15 @@ body[data-theme="dark"] .message-date-separator span {
 }
 
 .message.group-message.has-inline-meta .message-meta {
-  margin-top: -1px;
+  margin-top: 2px;
   padding: 0 4px;
   color: #475569;
   font-size: 12px;
   line-height: 1.25;
+}
+
+.message.group-message.has-inline-meta.self .message-meta {
+  padding-right: 8px;
 }
 
 .message.draft .message-body {

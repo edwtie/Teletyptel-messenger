@@ -12841,6 +12841,10 @@
 
   function renderMessageMeta(meta, message) {
     meta.replaceChildren(document.createTextNode(messageMetaText(message)));
+    if (shouldShowGroupSenderMeta(message)) {
+      return;
+    }
+
     const receipt = messageReceiptLabel(message);
     if (!receipt) {
       return;
