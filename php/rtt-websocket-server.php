@@ -401,6 +401,23 @@ function isAllowedRttEnvelope(array $json): bool
         return true;
     }
 
+    if ($type === 'message-ack') {
+        foreach (['from', 'to', 'targetMessageId', 'messageId', 'clientId', 'conversationKind', 'ack'] as $field) {
+            if (!isset($json[$field])) {
+                continue;
+            }
+
+            if (!is_string($json[$field]) || strlen($json[$field]) > 512) {
+                return false;
+            }
+        }
+
+        return isset($json['targetMessageId'], $json['ack'])
+            && is_string($json['targetMessageId'])
+            && $json['targetMessageId'] !== ''
+            && in_array($json['ack'], ['delivered', 'displayed'], true);
+    }
+
     if ($type === 'presence') {
         $presence = $json['presence'] ?? null;
         if (!is_string($presence) || !in_array($presence, ['online', 'offline'], true)) {

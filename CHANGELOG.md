@@ -80,6 +80,8 @@
 - Messages now retain stanza `id`, XEP-0359 `origin-id` and `stanza-id`
   aliases, so receipts, displayed markers, corrections, retractions and
   reactions can resolve the same message even when peers target different IDs.
+- Relay chat now supports `message-ack` envelopes for delivered/read state,
+  so WhatsApp-style check marks also work outside direct XMPP mode.
 - Interactive location sharing UI with map preview, share duration up to eight
   hours, Google Maps/OpenStreetMap provider setting, browser geolocation
   permission handling and single live location card updates instead of duplicate

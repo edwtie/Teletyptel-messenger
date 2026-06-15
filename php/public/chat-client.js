@@ -6809,13 +6809,17 @@
       conversation.presence = "online";
       const receiptElement = message.getElementsByTagNameNS("urn:xmpp:receipts", "received")[0];
       if (receiptElement) {
-        applyMessageDeliveryMarker(conversation, receiptElement.getAttribute("id") || "", "delivered");
+        const receiptId = receiptElement.getAttribute("id") || "";
+        appendDebug("xmpp-receipt-in", `${from} received ${receiptId}`);
+        applyMessageDeliveryMarker(conversation, receiptId, "delivered");
         continue;
       }
 
       const displayedElement = message.getElementsByTagNameNS("urn:xmpp:chat-markers:0", "displayed")[0];
       if (displayedElement) {
-        applyMessageDeliveryMarker(conversation, displayedElement.getAttribute("id") || "", "displayed");
+        const displayedId = displayedElement.getAttribute("id") || "";
+        appendDebug("xmpp-marker-in", `${from} displayed ${displayedId}`);
+        applyMessageDeliveryMarker(conversation, displayedId, "displayed");
         continue;
       }
 
@@ -6906,8 +6910,10 @@
     }
 
     if (receiptRequested) {
+      appendDebug("xmpp-receipt-out", `received ${messageId} to ${to}`);
       sendXmppStanza(createDeliveryReceiptStanza(to, messageId), "<message receipt=\"received\"/>");
     }
+    appendDebug("xmpp-marker-out", `displayed ${messageId} to ${to}`);
     sendXmppStanza(createDisplayedMarkerStanza(to, messageId), "<message marker=\"displayed\"/>");
   }
 
@@ -6921,6 +6927,7 @@
       direction: "self"
     });
     if (!match) {
+      appendDebug("message-ack-miss", `${status} ${messageId}`);
       return;
     }
 
@@ -7674,7 +7681,7 @@
       return;
     }
 
-    if (envelope.type !== "rtt" && envelope.type !== "message" && envelope.type !== "message-delete" && envelope.type !== "message-reaction" && envelope.type !== "jingle" && envelope.type !== "presence" && envelope.type !== "client-state" && envelope.type !== "location") {
+    if (envelope.type !== "rtt" && envelope.type !== "message" && envelope.type !== "message-delete" && envelope.type !== "message-reaction" && envelope.type !== "message-ack" && envelope.type !== "jingle" && envelope.type !== "presence" && envelope.type !== "client-state" && envelope.type !== "location") {
       appendDebug("relay-skip", `Unsupported envelope type ${envelope.type || "unknown"}`);
       return;
     }
@@ -7723,6 +7730,11 @@
       return;
     }
 
+    if (envelope.type === "message-ack") {
+      handleRelayMessageAck(envelope);
+      return;
+    }
+
     if (envelope.type === "message") {
       const conversation = conversationForEnvelope(envelope);
       if (!conversation) {
@@ -7737,6 +7749,7 @@
       conversation.clientState = "active";
       conversation.clientStateUpdatedAt = new Date();
       setPeerPresence(conversation.peer, "online");
+      sendRelayMessageAcknowledgements(conversation, envelope);
       recordTotalConversationTextForConversation(conversation, "peer", envelope.text ?? "", conversation.remoteFrom, {
         final: true
       });
@@ -7866,6 +7879,35 @@
       String(envelope.reactionTargetId || ""),
       envelopeFrom(envelope),
       Array.isArray(envelope.reactions) ? envelope.reactions : []);
+  }
+
+  function handleRelayMessageAck(envelope) {
+    const conversation = conversationForEnvelope(envelope);
+    const ack = String(envelope.ack || "");
+    if (!conversation || (ack !== "delivered" && ack !== "displayed")) {
+      return;
+    }
+
+    applyMessageDeliveryMarker(conversation, String(envelope.targetMessageId || ""), ack);
+  }
+
+  function sendRelayMessageAcknowledgements(conversation, envelope) {
+    const targetId = typeof envelope.messageId === "string" ? envelope.messageId : "";
+    if (!targetId || state.relaySocket?.readyState !== WebSocket.OPEN || isOwnPeer(envelopeFrom(envelope))) {
+      return;
+    }
+
+    sendRelayMessageAcknowledgement(conversation, targetId, "delivered");
+    sendRelayMessageAcknowledgement(conversation, targetId, "displayed");
+  }
+
+  function sendRelayMessageAcknowledgement(conversation, targetId, ack) {
+    const envelope = createRelayEnvelope("message-ack", "", "", conversation.peer);
+    envelope.targetMessageId = targetId;
+    envelope.messageId = createMessageId(`ack-${ack}`);
+    envelope.ack = ack;
+    state.relaySocket.send(JSON.stringify(envelope));
+    appendDebug("relay-ack-out", `${ack} ${targetId}`);
   }
 
   function handleLocationEnvelope(envelope) {
