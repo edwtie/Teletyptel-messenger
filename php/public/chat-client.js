@@ -77,6 +77,12 @@
   const geolocNamespace = "http://jabber.org/protocol/geoloc";
   const xmppStreamManagementNamespace = "urn:xmpp:sm:3";
   const xmppStreamManagementResumeMaxAgeMs = 10 * 60 * 1000;
+  const xmppMamNamespace = "urn:xmpp:mam:2";
+  const xmppForwardNamespace = "urn:xmpp:forward:0";
+  const xmppDelayNamespace = "urn:xmpp:delay";
+  const xmppDataFormsNamespace = "jabber:x:data";
+  const xmppRsmNamespace = "http://jabber.org/protocol/rsm";
+  const teletyptelCallInfoNamespace = "urn:teletyptel:call-info:0";
   const jingleRttSyncNamespace = "urn:xmpp:jingle:apps:rtt-sync:0";
   const jingleRttSyncDataChannelLabel = "rtt";
   const jingleRttSyncMaxSkewMs = 700;
@@ -413,6 +419,12 @@
     contextMessage: null,
     reactionMessageId: null,
     messageStateSync: new Map(),
+    xmppMam: {
+      pending: false,
+      lastStartedAt: 0,
+      loaded: false,
+      timerId: null
+    },
     smileyPickerMode: "composer",
     accountGateRequired: !hasInitialAccountProfile,
     accountDialogMode: !hasInitialAccountProfile ? "signin" : "settings",
@@ -2096,7 +2108,7 @@
   }
 
   function persistRecipientHistoryMessage(conversation, message, payload) {
-    if (conversation.kind !== "contact" || message.direction !== "self" || isOwnPeer(conversation.peer)) {
+    if (state.mode === "xmpp" || conversation.kind !== "contact" || message.direction !== "self" || isOwnPeer(conversation.peer)) {
       return;
     }
 
@@ -6772,6 +6784,56 @@
     flushClientLifecycleState("xmpp-ready", true);
     setConnectionStatus(t("status.xmpp_connected", "XMPP connected"), "good");
     updateComposerAvailability();
+    syncXmppMamArchive("xmpp-ready");
+  }
+
+  function syncXmppMamArchive(reason = "manual") {
+    if (state.mode !== "xmpp"
+      || state.xmppSocket?.readyState !== WebSocket.OPEN
+      || !state.xmppSession?.authenticated
+      || state.xmppMam.pending) {
+      return false;
+    }
+
+    const now = Date.now();
+    if (now - state.xmppMam.lastStartedAt < 15000) {
+      return false;
+    }
+
+    state.xmppMam.pending = true;
+    state.xmppMam.lastStartedAt = now;
+    const id = createMessageId("mam");
+    const queryId = createMessageId("mamq");
+    const xml = createXmppMamQueryStanza(id, queryId, { max: 200 });
+    appendDebug("xmpp-mam", `query ${reason} ${queryId}`);
+    window.clearTimeout(state.xmppMam.timerId);
+    state.xmppMam.timerId = window.setTimeout(() => {
+      if (!state.xmppMam.pending) {
+        return;
+      }
+      state.xmppMam.pending = false;
+      appendDebug("xmpp-mam", "query timeout or unsupported");
+    }, 8000);
+    return sendXmppStanza(xml, `<iq type="set" id="${id}"><query xmlns="${xmppMamNamespace}" queryid="${queryId}">...</query></iq>`);
+  }
+
+  function createXmppMamQueryStanza(id, queryId, options = {}) {
+    const max = Math.max(1, Math.min(500, Number(options.max || 100)));
+    const fields = [
+      `<field var="FORM_TYPE" type="hidden"><value>${xmppMamNamespace}</value></field>`
+    ];
+    if (options.with) {
+      fields.push(`<field var="with"><value>${escapeXml(options.with)}</value></field>`);
+    }
+    if (options.start) {
+      fields.push(`<field var="start"><value>${escapeXml(options.start)}</value></field>`);
+    }
+    if (options.end) {
+      fields.push(`<field var="end"><value>${escapeXml(options.end)}</value></field>`);
+    }
+
+    const paging = `<set xmlns="${xmppRsmNamespace}"><max>${max}</max></set>`;
+    return `<iq xmlns="jabber:client" type="set" id="${escapeXml(id)}"><query xmlns="${xmppMamNamespace}" queryid="${escapeXml(queryId)}"><x xmlns="${xmppDataFormsNamespace}" type="submit">${fields.join("")}</x>${paging}</query></iq>`;
   }
 
   function base64Utf8(value) {
@@ -6816,8 +6878,13 @@
       return;
     }
 
-    const messages = Array.from(doc.getElementsByTagNameNS("jabber:client", "message"));
+    const messages = Array.from(doc.documentElement?.children || [])
+      .filter((element) => element.localName === "message" && element.namespaceURI === "jabber:client");
     for (const message of messages) {
+      if (handleXmppMamResultMessage(message)) {
+        continue;
+      }
+
       const from = message.getAttribute("from") || "";
       if (!from || isOwnPeer(from)) {
         continue;
@@ -6892,8 +6959,122 @@
       } else {
         const addedMessage = addMessage("peer", bodyElement.textContent || "", "received", from, null, conversation.id, null, messageId, stylingDisabled);
         setMessageXmppIdentifiers(addedMessage, xmppMessageIdentifiers(message));
+        if (addedMessage) {
+          addedMessage.callInfo = parseXmppCallInfo(message);
+          if (addedMessage.callInfo) {
+            addedMessage.status = callNotificationMessageStatus(addedMessage.callInfo.status);
+            updateMessageElementById(addedMessage);
+          }
+        }
       }
     }
+  }
+
+  function handleXmppMamResultMessage(message) {
+    const result = message.getElementsByTagNameNS(xmppMamNamespace, "result")[0];
+    if (!result) {
+      return false;
+    }
+
+    const forwarded = result.getElementsByTagNameNS(xmppForwardNamespace, "forwarded")[0];
+    const archivedMessage = forwarded?.getElementsByTagNameNS("jabber:client", "message")[0];
+    const bodyElement = archivedMessage?.getElementsByTagNameNS("jabber:client", "body")[0];
+    if (!archivedMessage || !bodyElement) {
+      return true;
+    }
+
+    restoreXmppMamArchivedMessage(archivedMessage, result, forwarded);
+    return true;
+  }
+
+  function restoreXmppMamArchivedMessage(message, result, forwarded) {
+    const type = message.getAttribute("type") || "chat";
+    const from = message.getAttribute("from") || "";
+    const to = message.getAttribute("to") || "";
+    const direction = isOwnPeer(from) ? "self" : "peer";
+    const peer = type === "groupchat"
+      ? bareJid(from)
+      : direction === "self"
+        ? bareJid(to)
+        : bareJid(from);
+    if (!peer || isOwnPeer(peer)) {
+      return null;
+    }
+
+    const conversation = ensureConversationForPeer(
+      peer,
+      type === "groupchat" ? "group" : "contact",
+      displayNameForJid(peer));
+    if (!conversation) {
+      return null;
+    }
+
+    const messageId = stableXmppMessageId(message) || result.getAttribute("id") || "";
+    const existing = messageId
+      ? findMessageRecordByAnyId(messageId, { conversation })
+      : null;
+    if (existing) {
+      return existing.message;
+    }
+
+    const delay = forwarded?.getElementsByTagNameNS(xmppDelayNamespace, "delay")[0];
+    const timestamp = parseXmppTimestamp(delay?.getAttribute("stamp") || "");
+    const stylingDisabled = Boolean(message.getElementsByTagNameNS("urn:xmpp:styling:0", "unstyled")[0]);
+    const added = addMessage(
+      direction,
+      message.getElementsByTagNameNS("jabber:client", "body")[0]?.textContent || "",
+      direction === "self" ? "sent" : "received",
+      direction === "peer" ? from : null,
+      null,
+      conversation.id,
+      null,
+      messageId || null,
+      stylingDisabled,
+      false);
+    if (!added) {
+      return null;
+    }
+
+    setMessageXmppIdentifiers(added, xmppMessageIdentifiers(message));
+    added.xmppStanzaId = added.xmppStanzaId || result.getAttribute("id") || "";
+    added.callInfo = parseXmppCallInfo(message);
+    if (added.callInfo) {
+      added.status = callNotificationMessageStatus(added.callInfo.status);
+    }
+    if (timestamp) {
+      added.timestamp = timestamp;
+    }
+    appendDebug("xmpp-mam", `${conversation.peer} ${direction} ${messageId || result.getAttribute("id") || "-"}`);
+    renderConversations();
+    if (conversation.id === state.activeConversationId) {
+      renderActiveConversation();
+    }
+    return added;
+  }
+
+  function parseXmppTimestamp(value) {
+    if (!value) {
+      return null;
+    }
+
+    const timestamp = new Date(value);
+    return Number.isNaN(timestamp.valueOf()) ? null : timestamp;
+  }
+
+  function parseXmppCallInfo(message) {
+    const element = message.getElementsByTagNameNS(teletyptelCallInfoNamespace, "call-info")[0];
+    if (!element) {
+      return null;
+    }
+
+    return {
+      status: element.getAttribute("status") || "",
+      callId: element.getAttribute("call-id") || "",
+      mediaKind: element.getAttribute("media-kind") || "",
+      rttEnabled: element.getAttribute("rtt-enabled") === "true",
+      durationSeconds: Math.max(0, Number(element.getAttribute("duration-seconds") || 0)),
+      peer: element.getAttribute("peer") || ""
+    };
   }
 
   function stableXmppMessageId(message) {
@@ -6980,6 +7161,7 @@
 
     trackIncomingXmppStanzas(doc);
     handleXmppStreamManagement(doc);
+    handleXmppMamFin(doc);
 
     const features = doc.getElementsByTagNameNS("http://etherx.jabber.org/streams", "features")[0];
     if (features) {
@@ -7009,6 +7191,21 @@
     if (bindResult) {
       completeXmppBind(bindResult);
     }
+  }
+
+  function handleXmppMamFin(doc) {
+    const fin = doc.getElementsByTagNameNS(xmppMamNamespace, "fin")[0];
+    if (!fin) {
+      return false;
+    }
+
+    state.xmppMam.pending = false;
+    state.xmppMam.loaded = true;
+    window.clearTimeout(state.xmppMam.timerId);
+    state.xmppMam.timerId = null;
+    appendDebug("xmpp-mam", `fin complete=${fin.getAttribute("complete") || "false"}`);
+    syncAllConversationMessageState("mam-load");
+    return true;
   }
 
   function handleXmppFeatures(features) {
@@ -9853,6 +10050,7 @@
 
     const direction = call.role === "caller" ? "self" : "peer";
     const messageStatus = callNotificationMessageStatus(status);
+    const notificationMessageId = `call-${call.sid}`;
     const message = addMessage(
       direction,
       text,
@@ -9861,7 +10059,7 @@
       null,
       conversation.id,
       null,
-      null,
+      notificationMessageId,
       false,
       false);
     if (message) {
@@ -9876,6 +10074,7 @@
       };
       call.notificationMessageId = message.xmppId || message.id;
       persistHistoryMessage(conversation, message);
+      sendXmppCallNotificationMessage(conversation, message);
       if (conversation.id === state.activeConversationId) {
         renderActiveConversation();
       }
@@ -9949,11 +10148,42 @@
       peer: call.peer
     };
     persistHistoryMessage(conversation, message);
+    sendXmppCallNotificationMessage(conversation, message, true);
     if (conversation.id === state.activeConversationId) {
       renderActiveConversation();
     }
     renderConversations();
     return true;
+  }
+
+  function sendXmppCallNotificationMessage(conversation, message, correction = false) {
+    if (state.mode !== "xmpp"
+      || state.xmppSocket?.readyState !== WebSocket.OPEN
+      || !state.xmppSession?.authenticated
+      || conversation.kind !== "contact"
+      || message.direction !== "self"
+      || isOwnPeer(conversation.peer)) {
+      return false;
+    }
+
+    const messageId = correction ? createMessageId("call-update") : bestMessageTargetId(message) || createMessageId("call");
+    const replaceId = correction ? bestMessageTargetId(message) : null;
+    const xml = createMessageStanza(
+      message.text || "",
+      messageId,
+      replaceId,
+      false,
+      conversation.peer,
+      createXmppCallInfoElement(message.callInfo));
+    return sendXmppStanza(xml, `<message type="chat" call-info="${message.callInfo?.status || ""}">...</message>`);
+  }
+
+  function createXmppCallInfoElement(callInfo) {
+    if (!callInfo || typeof callInfo !== "object") {
+      return "";
+    }
+
+    return `<call-info xmlns="${teletyptelCallInfoNamespace}" status="${escapeXml(callInfo.status || "")}" call-id="${escapeXml(callInfo.callId || "")}" media-kind="${escapeXml(callInfo.mediaKind || "")}" rtt-enabled="${callInfo.rttEnabled === true ? "true" : "false"}" duration-seconds="${escapeXml(Math.max(0, Number(callInfo.durationSeconds || 0)))}" peer="${escapeXml(callInfo.peer || "")}"/>`;
   }
 
   async function openConversationHistoryCall(callId) {
@@ -14014,7 +14244,7 @@
     return xml;
   }
 
-  function createMessageStanza(text, id = createMessageId("msg"), replaceId = null, stylingDisabled = false, to = el.peerInput.value) {
+  function createMessageStanza(text, id = createMessageId("msg"), replaceId = null, stylingDisabled = false, to = el.peerInput.value, extraXml = "") {
     const replace = replaceId
       ? `<replace xmlns="urn:xmpp:message-correct:0" id="${escapeXml(replaceId)}"/>`
       : "";
@@ -14022,7 +14252,7 @@
     const originId = `<origin-id xmlns="urn:xmpp:sid:0" id="${escapeXml(id)}"/>`;
     const receiptRequest = replaceId ? "" : `<request xmlns="urn:xmpp:receipts"/>`;
     const markable = replaceId ? "" : `<markable xmlns="urn:xmpp:chat-markers:0"/>`;
-    return `<message xmlns="jabber:client" type="chat" from="${escapeXml(currentXmppFromJid())}" to="${escapeXml(to)}" id="${escapeXml(id)}"><body>${escapeXml(text)}</body>${originId}${replace}${unstyled}${receiptRequest}${markable}</message>`;
+    return `<message xmlns="jabber:client" type="chat" from="${escapeXml(currentXmppFromJid())}" to="${escapeXml(to)}" id="${escapeXml(id)}"><body>${escapeXml(text)}</body>${originId}${replace}${unstyled}${extraXml || ""}${receiptRequest}${markable}</message>`;
   }
 
   function createDeliveryReceiptStanza(to, messageId, id = createMessageId("receipt")) {

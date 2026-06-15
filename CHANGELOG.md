@@ -92,6 +92,13 @@
 - One-to-one chat now stores a recipient history copy for known offline
   contacts, so messages sent while the recipient is offline appear after their
   next sign-in.
+- XMPP mode now queries XEP-0313 MAM after login, restores forwarded archived
+  chat messages from ejabberd-compatible archives and keeps the PHP recipient
+  history copy limited to relay/PoC mode.
+- Total Conversation call notifications are also sent as regular XMPP chat
+  messages with TeleTypTel call metadata, allowing ejabberd `mod_mam` to archive
+  call started/ended/missed markers while audio/video/RTT records remain in the
+  TeleTypTel TC archive.
 - Interactive location sharing UI with map preview, share duration up to eight
   hours, Google Maps/OpenStreetMap provider setting, browser geolocation
   permission handling and single live location card updates instead of duplicate

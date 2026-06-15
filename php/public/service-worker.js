@@ -1,5 +1,5 @@
-const CACHE_NAME = "teletyptel-webclient-v251";
-const BUILD_VERSION = "20260615-offline-recipient-history";
+const CACHE_NAME = "teletyptel-webclient-v252";
+const BUILD_VERSION = "20260615-xmpp-mam-sync";
 const ASSETS = [
   "chat.html",
   "dev.html",
