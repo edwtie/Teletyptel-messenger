@@ -2645,6 +2645,10 @@ body[data-theme="dark"] .message-date-separator span {
   color: #166534;
 }
 
+.message-text-content {
+  display: inline;
+}
+
 .message.draft .message-body {
   border-style: dashed;
 }

@@ -12306,7 +12306,7 @@
       renderMessageMeta(meta, message);
     }
 
-    const body = item.querySelector(".message-body");
+    const body = item.querySelector(".message-text-content") || item.querySelector(".message-body");
     if (body) {
       renderRichText(body, message.text, message.stylingDisabled);
       return;
@@ -12353,7 +12353,10 @@
     if (isCallMessage(message)) {
       body.appendChild(createCallMessageCard(message));
     } else {
-      renderRichText(body, visibleMessageText(message), message.stylingDisabled);
+      const textContent = document.createElement("span");
+      textContent.className = "message-text-content";
+      renderRichText(textContent, visibleMessageText(message), message.stylingDisabled);
+      body.appendChild(textContent);
     }
     if (!message.retracted && message.attachment) {
       body.appendChild(createAttachmentElement(message.attachment));
