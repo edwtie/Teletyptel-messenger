@@ -54,6 +54,9 @@
   taking an extra row in the conversation.
 - Reaction controls are hidden on call status cards so they do not overlap TC
   history actions.
+- Message reaction controls now have a wider invisible hover hit area and a
+  larger smiley button, making the floating reaction control reachable when
+  moving from the message bubble.
 - Interactive location sharing UI with map preview, share duration up to eight
   hours, Google Maps/OpenStreetMap provider setting, browser geolocation
   permission handling and single live location card updates instead of duplicate

@@ -2565,7 +2565,7 @@ body[data-theme="dark"] .message-date-separator span {
 .message.with-avatar {
   grid-template-columns: 34px minmax(0, 1fr);
   align-items: start;
-  max-width: min(82ch, calc(88% - 38px));
+  max-width: min(82ch, calc(88% - 44px));
 }
 
 .message.with-avatar.self {
@@ -2587,6 +2587,18 @@ body[data-theme="dark"] .message-date-separator span {
   display: grid;
   gap: 4px;
   min-width: 0;
+}
+
+.message.with-avatar .message-content::before {
+  content: "";
+  position: absolute;
+  inset: 0 -48px;
+  z-index: 0;
+}
+
+.message.with-avatar .message-content > * {
+  position: relative;
+  z-index: 1;
 }
 
 .message.with-avatar.self .message-avatar {
@@ -3032,18 +3044,18 @@ body[data-theme="dark"] .link-preview-loading {
 .message-reaction-button {
   position: absolute;
   top: 50%;
-  right: -38px;
+  right: -44px;
   z-index: 2;
   justify-self: start;
-  width: 28px;
-  height: 28px;
-  min-height: 28px;
+  width: 34px;
+  height: 34px;
+  min-height: 34px;
   border-color: rgba(79, 140, 255, .35);
   border-radius: 999px;
   background: rgba(255, 255, 255, .86);
   color: #475569;
   padding: 0;
-  font-size: 17px;
+  font-size: 20px;
   line-height: 1;
   opacity: 0;
   pointer-events: none;
@@ -3053,7 +3065,7 @@ body[data-theme="dark"] .link-preview-loading {
 
 .message.self .message-reaction-button {
   right: auto;
-  left: -38px;
+  left: -44px;
   justify-self: end;
 }
 
