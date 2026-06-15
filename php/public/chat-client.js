@@ -2051,6 +2051,7 @@
     message.retraction = item.retraction || null;
     message.callInfo = item.callInfo && typeof item.callInfo === "object" ? item.callInfo : null;
     message.reactions = normalizeMessageReactions(item.reactions);
+    message.deliveryStatus = normalizeDeliveryStatus(item.deliveryStatus, message.direction);
     const timestamp = new Date(item.timestamp || Date.now());
     message.timestamp = Number.isNaN(timestamp.valueOf()) ? new Date() : timestamp;
     return conversation;
@@ -2085,6 +2086,7 @@
       retracted: message.retracted === true,
       retraction: message.retraction || null,
       reactions: normalizeMessageReactions(message.reactions),
+      deliveryStatus: normalizeDeliveryStatus(message.deliveryStatus, message.direction),
       timestamp: message.timestamp instanceof Date ? message.timestamp.toISOString() : new Date().toISOString()
     });
   }
@@ -12340,7 +12342,7 @@
       return null;
     }
 
-    switch (message.deliveryStatus || "sent") {
+    switch (normalizeDeliveryStatus(message.deliveryStatus, message.direction)) {
       case "displayed":
         return { state: "displayed", label: "✓✓", title: t("receipt.displayed", "Gelezen") };
       case "delivered":
@@ -12349,6 +12351,14 @@
       default:
         return { state: "sent", label: "✓", title: t("receipt.sent", "Verzonden") };
     }
+  }
+
+  function normalizeDeliveryStatus(value, direction = "self") {
+    const status = String(value || "");
+    if (["sent", "delivered", "displayed"].includes(status)) {
+      return status;
+    }
+    return direction === "self" ? "sent" : "";
   }
 
   function messageAvatarSource(message) {

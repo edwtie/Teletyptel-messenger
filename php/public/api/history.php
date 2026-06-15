@@ -124,11 +124,11 @@ function saveHistoryMessage(PDO $pdo, string $accountId, array $input): void
         'INSERT INTO message_history (
             account_id, conversation_peer, conversation_name, conversation_kind, message_id,
             direction, sender_jid, text, status, attachment_json, location_json, call_info_json,
-            styling_disabled, edited, retracted, retraction_json, reactions_json, message_timestamp
+            styling_disabled, edited, retracted, retraction_json, reactions_json, delivery_status, message_timestamp
         ) VALUES (
             :account_id, :conversation_peer, :conversation_name, :conversation_kind, :message_id,
             :direction, :sender_jid, :text, :status, :attachment_json, :location_json, :call_info_json,
-            :styling_disabled, :edited, :retracted, :retraction_json, :reactions_json, :message_timestamp
+            :styling_disabled, :edited, :retracted, :retraction_json, :reactions_json, :delivery_status, :message_timestamp
         )
         ON DUPLICATE KEY UPDATE
             conversation_peer = VALUES(conversation_peer),
@@ -146,6 +146,7 @@ function saveHistoryMessage(PDO $pdo, string $accountId, array $input): void
             retracted = VALUES(retracted),
             retraction_json = VALUES(retraction_json),
             reactions_json = VALUES(reactions_json),
+            delivery_status = VALUES(delivery_status),
             message_timestamp = VALUES(message_timestamp)'
     );
     $statement->execute([
@@ -166,6 +167,7 @@ function saveHistoryMessage(PDO $pdo, string $accountId, array $input): void
         'retracted' => ($input['retracted'] ?? false) === true ? 1 : 0,
         'retraction_json' => encodeHistoryJson($input['retraction'] ?? null),
         'reactions_json' => encodeHistoryJson($input['reactions'] ?? null),
+        'delivery_status' => normalizeDeliveryStatus($input['deliveryStatus'] ?? ''),
         'message_timestamp' => normalizeHistoryTimestamp($input['timestamp'] ?? null),
     ]);
 
@@ -285,6 +287,7 @@ function ensureMessageHistorySchema(PDO $pdo): void
             retracted TINYINT(1) NOT NULL DEFAULT 0,
             retraction_json MEDIUMTEXT NULL,
             reactions_json MEDIUMTEXT NULL,
+            delivery_status VARCHAR(32) NOT NULL DEFAULT "",
             message_timestamp DATETIME(3) NOT NULL,
             created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -294,6 +297,7 @@ function ensureMessageHistorySchema(PDO $pdo): void
     );
     ensureHistoryColumn($pdo, 'message_history', 'call_info_json', 'MEDIUMTEXT NULL');
     ensureHistoryColumn($pdo, 'message_history', 'reactions_json', 'MEDIUMTEXT NULL');
+    ensureHistoryColumn($pdo, 'message_history', 'delivery_status', 'VARCHAR(32) NOT NULL DEFAULT ""');
 }
 
 function ensureConversationHistorySchema(PDO $pdo): void
@@ -377,6 +381,7 @@ function historyRowToClient(array $row): array
         'retracted' => (bool)$row['retracted'],
         'retraction' => decodeHistoryJson($row['retraction_json'] ?? null),
         'reactions' => decodeHistoryJson($row['reactions_json'] ?? null) ?: [],
+        'deliveryStatus' => $row['delivery_status'] ?? '',
         'timestamp' => $row['message_timestamp'],
     ];
 }
@@ -609,6 +614,12 @@ function normalizeCallStatus(mixed $value): string
 {
     $status = (string)$value;
     return in_array($status, ['started', 'ended', 'missed', 'rejected', 'failed'], true) ? $status : 'ended';
+}
+
+function normalizeDeliveryStatus(mixed $value): string
+{
+    $status = (string)$value;
+    return in_array($status, ['sent', 'delivered', 'displayed'], true) ? $status : '';
 }
 
 function cleanHistoryText(mixed $value, int $maxLength): string

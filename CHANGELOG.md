@@ -82,6 +82,8 @@
   reactions can resolve the same message even when peers target different IDs.
 - Relay chat now supports `message-ack` envelopes for delivered/read state,
   so WhatsApp-style check marks also work outside direct XMPP mode.
+- Message history now persists delivered/read state so check marks survive
+  reloads for newly acknowledged messages.
 - Interactive location sharing UI with map preview, share duration up to eight
   hours, Google Maps/OpenStreetMap provider setting, browser geolocation
   permission handling and single live location card updates instead of duplicate

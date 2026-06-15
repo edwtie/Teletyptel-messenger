@@ -1,5 +1,5 @@
-const CACHE_NAME = "teletyptel-webclient-v247";
-const BUILD_VERSION = "20260615-relay-message-acks";
+const CACHE_NAME = "teletyptel-webclient-v248";
+const BUILD_VERSION = "20260615-persist-message-acks";
 const ASSETS = [
   "chat.html",
   "dev.html",
