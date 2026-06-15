@@ -89,6 +89,10 @@ function writeHistory(): void
         saveConversationHistory($pdo, $accountId, $input);
         return;
     }
+    if ($action === 'save_recipient') {
+        saveRecipientHistoryMessage($pdo, $accountId, $input);
+        return;
+    }
 
     saveHistoryMessage($pdo, $accountId, $input);
 }
@@ -263,6 +267,33 @@ function saveConversationHistory(PDO $pdo, string $accountId, array $input): voi
     ]);
 
     echo json_encode(['ok' => true]);
+}
+
+function saveRecipientHistoryMessage(PDO $pdo, string $senderAccountId, array $input): void
+{
+    $recipientPeer = historyBareJid(cleanHistoryText($input['recipientPeer'] ?? $input['conversationPeer'] ?? '', 255));
+    $senderPeer = historyBareJid(cleanHistoryText($input['senderPeer'] ?? $input['from'] ?? '', 255));
+    if ($recipientPeer === '' || $senderPeer === '') {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'missing_recipient']);
+        return;
+    }
+
+    $recipientAccountId = findHistoryRecipientAccountId($pdo, $recipientPeer);
+    if ($recipientAccountId === '' || $recipientAccountId === $senderAccountId) {
+        echo json_encode(['ok' => true, 'stored' => false]);
+        return;
+    }
+
+    $recipientInput = $input;
+    $recipientInput['conversationPeer'] = $senderPeer;
+    $recipientInput['conversationName'] = cleanHistoryText($input['senderName'] ?? $senderPeer, 255);
+    $recipientInput['conversationKind'] = 'contact';
+    $recipientInput['direction'] = 'peer';
+    $recipientInput['from'] = $senderPeer;
+    $recipientInput['status'] = cleanHistoryText($input['recipientStatus'] ?? 'offline', 64);
+    $recipientInput['deliveryStatus'] = '';
+    saveHistoryMessage($pdo, $recipientAccountId, $recipientInput);
 }
 
 function ensureMessageHistorySchema(PDO $pdo): void
@@ -508,6 +539,50 @@ function historyAccountProfile(PDO $pdo, string $accountId): array
     $statement = $pdo->prepare('SELECT account_id, jid, provider_id FROM account_profiles WHERE account_id = :account_id LIMIT 1');
     $statement->execute(['account_id' => $accountId]);
     return $statement->fetch() ?: [];
+}
+
+function findHistoryRecipientAccountId(PDO $pdo, string $peer): string
+{
+    $peer = historyBareJid($peer);
+    if ($peer === '') {
+        return '';
+    }
+
+    $statement = $pdo->prepare('SELECT account_id FROM account_profiles WHERE LOWER(jid) = :jid LIMIT 1');
+    $statement->execute(['jid' => $peer]);
+    $accountId = cleanHistoryText($statement->fetchColumn() ?: '', 96);
+    if ($accountId !== '') {
+        return $accountId;
+    }
+
+    $statement = $pdo->prepare(
+        'SELECT account_id
+         FROM account_identities
+         WHERE LOWER(email) = :email
+           AND email_verified = 1
+         ORDER BY last_used_at DESC, linked_at DESC
+         LIMIT 1'
+    );
+    $statement->execute(['email' => $peer]);
+    $accountId = cleanHistoryText($statement->fetchColumn() ?: '', 96);
+    if ($accountId !== '') {
+        return $accountId;
+    }
+
+    $localpart = historyJidLocalpart($peer);
+    if ($localpart === '') {
+        return '';
+    }
+
+    $statement = $pdo->prepare(
+        'SELECT account_id
+         FROM account_profiles
+         WHERE LOWER(jid) = :oauth_jid
+           AND provider_id IN ("google", "facebook", "apple", "auth0")
+         LIMIT 1'
+    );
+    $statement->execute(['oauth_jid' => $localpart . '@localhost']);
+    return cleanHistoryText($statement->fetchColumn() ?: '', 96);
 }
 
 function historyVerifiedIdentityEmails(PDO $pdo, string $accountId): array

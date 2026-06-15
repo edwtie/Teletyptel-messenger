@@ -2069,7 +2069,7 @@
       return;
     }
 
-    postHistory({
+    const payload = {
       action: "save",
       accountId: state.account.accountId,
       conversationPeer: conversation.peer,
@@ -2090,6 +2090,23 @@
       reactions: normalizeMessageReactions(message.reactions),
       deliveryStatus: normalizeDeliveryStatus(message.deliveryStatus, message.direction),
       timestamp: message.timestamp instanceof Date ? message.timestamp.toISOString() : new Date().toISOString()
+    };
+    postHistory(payload);
+    persistRecipientHistoryMessage(conversation, message, payload);
+  }
+
+  function persistRecipientHistoryMessage(conversation, message, payload) {
+    if (conversation.kind !== "contact" || message.direction !== "self" || isOwnPeer(conversation.peer)) {
+      return;
+    }
+
+    postHistory({
+      ...payload,
+      action: "save_recipient",
+      recipientPeer: conversation.peer,
+      senderPeer: currentBareJid(),
+      senderName: currentSenderName(),
+      recipientStatus: "offline"
     });
   }
 

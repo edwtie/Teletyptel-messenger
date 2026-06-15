@@ -89,6 +89,9 @@
   loaded messages to catch up when both sides are online again.
 - Video message cards now preload and seek to an initial preview frame with a
   light placeholder, avoiding a black rectangle before playback starts.
+- One-to-one chat now stores a recipient history copy for known offline
+  contacts, so messages sent while the recipient is offline appear after their
+  next sign-in.
 - Interactive location sharing UI with map preview, share duration up to eight
   hours, Google Maps/OpenStreetMap provider setting, browser geolocation
   permission handling and single live location card updates instead of duplicate
