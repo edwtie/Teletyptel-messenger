@@ -2924,9 +2924,10 @@ body[data-theme="dark"] .link-preview-loading {
 .attachment-card.video {
   width: min(100%, 500px);
   box-sizing: border-box;
-  border-color: transparent;
+  border-color: #5c7598;
   background: transparent;
-  padding: 0;
+  padding: 3px;
+  overflow: hidden;
 }
 
 .attachment-card.audio .attachment-icon {
@@ -2951,7 +2952,7 @@ body[data-theme="dark"] .link-preview-loading {
   aspect-ratio: 16 / 9;
   height: clamp(145px, 27vw, 282px);
   max-height: none;
-  border: 1px solid #5c7598;
+  border: 0;
   border-radius: 6px;
   background: linear-gradient(135deg, rgba(219, 234, 254, .96), rgba(240, 253, 244, .94));
 }
