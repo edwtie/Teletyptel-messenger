@@ -72,6 +72,9 @@
   position no longer changes when reaction chips are shown below the message.
 - Message reaction chips now attach to the bottom edge of the message bubble
   instead of rendering as a separate row.
+- XMPP chat messages now request XEP-0184 delivery receipts and XEP-0333 chat
+  markers, reply with received/displayed acknowledgements for incoming
+  messages and show WhatsApp-style sent, delivered and read check marks.
 - Interactive location sharing UI with map preview, share duration up to eight
   hours, Google Maps/OpenStreetMap provider setting, browser geolocation
   permission handling and single live location card updates instead of duplicate

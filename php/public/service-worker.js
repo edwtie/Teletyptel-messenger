@@ -1,5 +1,5 @@
-const CACHE_NAME = "teletyptel-webclient-v243";
-const BUILD_VERSION = "20260615-reaction-chip-overlay";
+const CACHE_NAME = "teletyptel-webclient-v244";
+const BUILD_VERSION = "20260615-message-receipts";
 const ASSETS = [
   "chat.html",
   "dev.html",

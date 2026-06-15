@@ -3029,6 +3029,18 @@ body[data-theme="dark"] .link-preview-loading {
   font-size: 12px;
 }
 
+.message-receipt {
+  display: inline-block;
+  color: #64748b;
+  font-weight: 700;
+  letter-spacing: 0;
+  vertical-align: baseline;
+}
+
+.message-receipt-displayed {
+  color: #0ea5e9;
+}
+
 .message-actions {
   display: flex;
   justify-content: flex-end;

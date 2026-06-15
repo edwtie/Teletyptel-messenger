@@ -6807,6 +6807,18 @@
       }
 
       conversation.presence = "online";
+      const receiptElement = message.getElementsByTagNameNS("urn:xmpp:receipts", "received")[0];
+      if (receiptElement) {
+        applyMessageDeliveryMarker(conversation, receiptElement.getAttribute("id") || "", "delivered");
+        continue;
+      }
+
+      const displayedElement = message.getElementsByTagNameNS("urn:xmpp:chat-markers:0", "displayed")[0];
+      if (displayedElement) {
+        applyMessageDeliveryMarker(conversation, displayedElement.getAttribute("id") || "", "displayed");
+        continue;
+      }
+
       const reactionsElement = message.getElementsByTagNameNS("urn:xmpp:reactions:0", "reactions")[0];
       if (reactionsElement) {
         applyMessageReaction(
@@ -6848,6 +6860,7 @@
       const replaceId = replaceElement?.getAttribute("id") || "";
       const messageId = stableXmppMessageId(message);
       const stylingDisabled = Boolean(message.getElementsByTagNameNS("urn:xmpp:styling:0", "unstyled")[0]);
+      sendXmppMessageAcknowledgements(from, messageId, Boolean(message.getElementsByTagNameNS("urn:xmpp:receipts", "request")[0]));
       if (replaceId) {
         applyMessageCorrection(conversation, replaceId, bodyElement.textContent || "", "peer", messageId, from, stylingDisabled);
       } else {
@@ -6864,6 +6877,36 @@
 
     const stanzaId = message.getElementsByTagNameNS("urn:xmpp:sid:0", "stanza-id")[0]?.getAttribute("id") || "";
     return stanzaId || message.getAttribute("id") || null;
+  }
+
+  function sendXmppMessageAcknowledgements(to, messageId, receiptRequested) {
+    if (!messageId || state.mode !== "xmpp" || state.xmppSocket?.readyState !== WebSocket.OPEN || !state.xmppSession?.authenticated) {
+      return;
+    }
+
+    if (receiptRequested) {
+      sendXmppStanza(createDeliveryReceiptStanza(to, messageId), "<message receipt=\"received\"/>");
+    }
+    sendXmppStanza(createDisplayedMarkerStanza(to, messageId), "<message marker=\"displayed\"/>");
+  }
+
+  function applyMessageDeliveryMarker(conversation, messageId, status) {
+    if (!conversation || !messageId || !status) {
+      return;
+    }
+
+    const message = conversation.messages.find((item) => item.direction === "self" && (item.xmppId === messageId || item.id === messageId));
+    if (!message) {
+      return;
+    }
+
+    const order = { sent: 1, delivered: 2, displayed: 3 };
+    if ((order[status] || 0) <= (order[message.deliveryStatus] || 0)) {
+      return;
+    }
+
+    message.deliveryStatus = status;
+    updateMessageElementById(message);
   }
 
   function handleXmppSessionFrame(text) {
@@ -7071,7 +7114,7 @@
         applyMessageCorrection(edit.conversation, edit.replaceId, text, "self", outgoingId);
         clearMessageEdit();
       } else {
-        addMessage("self", text, "RFC 7395", null, null, null, null, outgoingId);
+        addMessage("self", text, "RFC 7395", null, null, null, null, outgoingId, false, true, null, "sent");
       }
       el.messageInput.value = "";
       syncComposerActionButtons();
@@ -10520,7 +10563,7 @@
     return `${prefix}-${token}`;
   }
 
-  function addMessage(direction, text, status, from = null, attachment = null, conversationId = null, location = null, xmppId = null, stylingDisabled = false, persist = true, senderIdentity = null) {
+  function addMessage(direction, text, status, from = null, attachment = null, conversationId = null, location = null, xmppId = null, stylingDisabled = false, persist = true, senderIdentity = null, deliveryStatus = null) {
     const conversation = conversationId
       ? state.conversations.find((item) => item.id === conversationId)
       : activeConversation();
@@ -10545,6 +10588,7 @@
       retraction: null,
       edited: false,
       reactions: {},
+      deliveryStatus: deliveryStatus || (direction === "self" ? "sent" : ""),
       timestamp: new Date()
     };
 
@@ -11659,7 +11703,7 @@
     applyMessageElementClass(item, message);
     const meta = item.querySelector(".message-meta");
     if (meta) {
-      meta.textContent = messageMetaText(message);
+      renderMessageMeta(meta, message);
     }
 
     const body = item.querySelector(".message-body");
@@ -11693,10 +11737,24 @@
     renderMessageElementChildren(item, message);
   }
 
+  function updateMessageElementById(message) {
+    if (!message || activeConversation()?.messages?.includes(message) !== true) {
+      renderConversations();
+      return;
+    }
+
+    const item = Array.from(el.messageTimeline.querySelectorAll("[data-message-id]"))
+      .find((element) => element.dataset.messageId === message.id);
+    if (item) {
+      updateMessageElement(item, message);
+    }
+    renderConversations();
+  }
+
   function updateDraftMessageElement(item, message) {
     const meta = item.querySelector(".message-meta");
     if (meta) {
-      meta.textContent = messageMetaText(message);
+      renderMessageMeta(meta, message);
     }
 
     const body = item.querySelector(".message-body");
@@ -11734,7 +11792,7 @@
   function renderMessageElementChildren(item, message) {
     const meta = document.createElement("div");
     meta.className = "message-meta";
-    meta.textContent = messageMetaText(message);
+    renderMessageMeta(meta, message);
 
     const body = document.createElement("div");
     body.className = "message-body";
@@ -12143,6 +12201,37 @@
       ? `${message.status} (${t("message.edited", "edited")})`
       : message.status;
     return `${sender} - ${status} - ${formatTime(message.timestamp)}`;
+  }
+
+  function renderMessageMeta(meta, message) {
+    meta.replaceChildren(document.createTextNode(messageMetaText(message)));
+    const receipt = messageReceiptLabel(message);
+    if (!receipt) {
+      return;
+    }
+
+    const indicator = document.createElement("span");
+    indicator.className = `message-receipt message-receipt-${receipt.state}`;
+    indicator.textContent = receipt.label;
+    indicator.title = receipt.title;
+    indicator.setAttribute("aria-label", receipt.title);
+    meta.append(" ", indicator);
+  }
+
+  function messageReceiptLabel(message) {
+    if (message?.direction !== "self") {
+      return null;
+    }
+
+    switch (message.deliveryStatus || "sent") {
+      case "displayed":
+        return { state: "displayed", label: "✓✓", title: t("receipt.displayed", "Gelezen") };
+      case "delivered":
+        return { state: "delivered", label: "✓✓", title: t("receipt.delivered", "Afgeleverd") };
+      case "sent":
+      default:
+        return { state: "sent", label: "✓", title: t("receipt.sent", "Verzonden") };
+    }
   }
 
   function messageAvatarSource(message) {
@@ -13671,7 +13760,17 @@
       : "";
     const unstyled = stylingDisabled ? `<unstyled xmlns="urn:xmpp:styling:0"/>` : "";
     const originId = `<origin-id xmlns="urn:xmpp:sid:0" id="${escapeXml(id)}"/>`;
-    return `<message xmlns="jabber:client" type="chat" from="${escapeXml(currentXmppFromJid())}" to="${escapeXml(to)}" id="${escapeXml(id)}"><body>${escapeXml(text)}</body>${originId}${replace}${unstyled}</message>`;
+    const receiptRequest = replaceId ? "" : `<request xmlns="urn:xmpp:receipts"/>`;
+    const markable = replaceId ? "" : `<markable xmlns="urn:xmpp:chat-markers:0"/>`;
+    return `<message xmlns="jabber:client" type="chat" from="${escapeXml(currentXmppFromJid())}" to="${escapeXml(to)}" id="${escapeXml(id)}"><body>${escapeXml(text)}</body>${originId}${replace}${unstyled}${receiptRequest}${markable}</message>`;
+  }
+
+  function createDeliveryReceiptStanza(to, messageId, id = createMessageId("receipt")) {
+    return `<message xmlns="jabber:client" type="chat" from="${escapeXml(currentXmppFromJid())}" to="${escapeXml(to)}" id="${escapeXml(id)}"><received xmlns="urn:xmpp:receipts" id="${escapeXml(messageId)}"/></message>`;
+  }
+
+  function createDisplayedMarkerStanza(to, messageId, id = createMessageId("displayed")) {
+    return `<message xmlns="jabber:client" type="chat" from="${escapeXml(currentXmppFromJid())}" to="${escapeXml(to)}" id="${escapeXml(id)}"><displayed xmlns="urn:xmpp:chat-markers:0" id="${escapeXml(messageId)}"/><store xmlns="urn:xmpp:hints"/></message>`;
   }
 
   function createMessageRetractionStanza(to, targetId, id = createMessageId("retract")) {
