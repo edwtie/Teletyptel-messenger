@@ -2591,6 +2591,15 @@ body[data-theme="dark"] .message-date-separator span {
   margin-top: 4px;
 }
 
+.message-avatar-clickable {
+  cursor: pointer;
+}
+
+.message-avatar-clickable:hover,
+.message-avatar-clickable:focus-visible {
+  box-shadow: 0 0 0 3px rgba(79, 140, 255, .28);
+}
+
 .message.with-avatar .message-content {
   position: relative;
   display: grid;

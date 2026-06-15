@@ -12381,7 +12381,75 @@
     content.className = "message-content";
     content.append(...messageContentChildren(message, meta, bodyWrap));
     const avatar = createAvatarElement(messageAvatarSource(message), "message-avatar");
+    makeMessageAvatarInteractive(avatar, message);
     item.replaceChildren(avatar, content);
+  }
+
+  function makeMessageAvatarInteractive(avatar, message) {
+    if (!avatar || !message) {
+      return;
+    }
+
+    avatar.classList.add("message-avatar-clickable");
+    avatar.removeAttribute("aria-hidden");
+    avatar.setAttribute("role", "button");
+    avatar.tabIndex = 0;
+    avatar.title = t("button.view_profile", "View profile");
+    avatar.setAttribute("aria-label", t("button.view_profile", "View profile"));
+    avatar.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      openMessageAvatarProfile(message);
+    });
+    avatar.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+      openMessageAvatarProfile(message);
+    });
+  }
+
+  function openMessageAvatarProfile(message) {
+    if (message?.direction === "self") {
+      openAccountDialog({ mode: "profile" });
+      return;
+    }
+
+    const conversation = conversationForMessageProfile(message);
+    if (!conversation || isInfrastructurePeer(conversation.peer)) {
+      return;
+    }
+
+    openContactProfileDialog(conversation);
+  }
+
+  function conversationForMessageProfile(message) {
+    const peer = bareJid(message?.from || "");
+    if (!peer && !message?.senderDisplayName) {
+      return activeConversation();
+    }
+
+    const existing = state.conversations.find((conversation) => {
+      return conversation.kind === "contact" && addressMatches(conversation.peer, peer);
+    });
+    if (existing) {
+      return existing;
+    }
+
+    return {
+      id: `message-profile:${peer || message.senderDisplayName || "unknown"}`,
+      kind: "contact",
+      name: message.senderDisplayName || displayNameForJid(peer),
+      displayName: message.senderDisplayName || displayNameForJid(peer),
+      peer,
+      email: peer,
+      presence: "",
+      avatarColor: message.senderAvatarColor || avatarColorFor(peer || message.senderDisplayName || "message-profile"),
+      avatarDataUrl: message.senderAvatarDataUrl || ""
+    };
   }
 
   function messageContentChildren(message, meta, bodyWrap) {
