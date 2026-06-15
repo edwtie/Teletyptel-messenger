@@ -75,6 +75,13 @@
 - XMPP chat messages now request XEP-0184 delivery receipts and XEP-0333 chat
   markers, reply with received/displayed acknowledgements for incoming
   messages and show WhatsApp-style sent, delivered and read check marks.
+- Chat bubbles now keep timestamps and delivery/read check marks inside the
+  bubble, add compact WhatsApp-style bubble tails, keep avatars clear of the
+  tail/hover layer and render group sender names as the first line inside group
+  bubbles.
+- Video message bubbles now use a compact framed preview with corrected
+  510px media-card sizing, tighter video height and aligned card padding so
+  the video frame no longer protrudes behind the player.
 - Delivery/read markers and reactions now match message IDs across all loaded
   conversations, making them resilient to bare/full JID differences.
 - Messages now retain stanza `id`, XEP-0359 `origin-id` and `stanza-id`
