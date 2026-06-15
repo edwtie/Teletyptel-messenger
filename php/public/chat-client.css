@@ -2596,7 +2596,7 @@ body[data-theme="dark"] .message-date-separator span {
   z-index: 0;
 }
 
-.message.with-avatar .message-content > :not(.message-reaction-button) {
+.message.with-avatar .message-content > * {
   position: relative;
   z-index: 1;
 }
@@ -3039,6 +3039,12 @@ body[data-theme="dark"] .link-preview-loading {
   min-height: 26px;
   padding: 3px 9px;
   font-size: 12px;
+}
+
+.message-body-wrap {
+  position: relative;
+  display: grid;
+  min-width: 0;
 }
 
 .message-reaction-button {

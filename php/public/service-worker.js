@@ -1,5 +1,5 @@
-const CACHE_NAME = "teletyptel-webclient-v241";
-const BUILD_VERSION = "20260615-reaction-chip-smileys";
+const CACHE_NAME = "teletyptel-webclient-v242";
+const BUILD_VERSION = "20260615-single-reaction";
 const ASSETS = [
   "chat.html",
   "dev.html",

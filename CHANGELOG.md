@@ -65,6 +65,11 @@
   instead of an emoji glyph, keeping it visually centered and compact.
 - Message reaction chips now render TeleTypTel smiley codes as smiley images
   instead of showing the raw text code.
+- Each account can now keep only one reaction on the same message; choosing a
+  different smiley replaces the previous reaction, while choosing the same one
+  removes it.
+- The floating reaction button is anchored to the message bubble, so its
+  position no longer changes when reaction chips are shown below the message.
 - Interactive location sharing UI with map preview, share duration up to eight
   hours, Google Maps/OpenStreetMap provider setting, browser geolocation
   permission handling and single live location card updates instead of duplicate

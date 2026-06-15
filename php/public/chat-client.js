@@ -11750,20 +11750,30 @@
       body.appendChild(createLocationElement(message.location, message));
     }
     appendLinkPreviewIfNeeded(body, message);
-    const reactionNodes = canReactToMessage(message)
-      ? [createMessageReactionsElement(message), createMessageReactionButton(message)]
-      : [];
+    const reactionButton = canReactToMessage(message) ? createMessageReactionButton(message) : null;
+    const reactionsElement = canReactToMessage(message) ? createMessageReactionsElement(message) : null;
+    const bodyWrap = createMessageBodyWrap(body, reactionButton);
 
     if (!shouldShowMessageAvatar(message)) {
-      item.replaceChildren(meta, body, ...reactionNodes);
+      item.replaceChildren(meta, bodyWrap, ...(reactionsElement ? [reactionsElement] : []));
       return;
     }
 
     const content = document.createElement("div");
     content.className = "message-content";
-    content.append(meta, body, ...reactionNodes);
+    content.append(meta, bodyWrap, ...(reactionsElement ? [reactionsElement] : []));
     const avatar = createAvatarElement(messageAvatarSource(message), "message-avatar");
     item.replaceChildren(avatar, content);
+  }
+
+  function createMessageBodyWrap(body, reactionButton) {
+    const wrap = document.createElement("div");
+    wrap.className = "message-body-wrap";
+    wrap.appendChild(body);
+    if (reactionButton) {
+      wrap.appendChild(reactionButton);
+    }
+    return wrap;
   }
 
   function canReactToMessage(message) {
@@ -11993,9 +12003,7 @@
     const actor = reactionActorId();
     const reactions = normalizeMessageReactions(message.reactions);
     const current = Array.isArray(reactions[actor]) ? reactions[actor] : [];
-    reactions[actor] = current.includes(normalizedEmoji)
-      ? current.filter((item) => item !== normalizedEmoji)
-      : [...current, normalizedEmoji];
+    reactions[actor] = current.includes(normalizedEmoji) ? [] : [normalizedEmoji];
     if (!reactions[actor].length) {
       delete reactions[actor];
     }
