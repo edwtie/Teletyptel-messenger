@@ -2922,7 +2922,7 @@ body[data-theme="dark"] .link-preview-loading {
 }
 
 .attachment-card.video {
-  width: min(100%, 560px);
+  width: min(100%, 500px);
   box-sizing: border-box;
 }
 
@@ -2945,7 +2945,7 @@ body[data-theme="dark"] .link-preview-loading {
   position: relative;
   overflow: hidden;
   aspect-ratio: 16 / 9;
-  height: clamp(160px, 30vw, 315px);
+  height: clamp(145px, 27vw, 282px);
   max-height: none;
   border-radius: 6px;
   background: linear-gradient(135deg, rgba(219, 234, 254, .96), rgba(240, 253, 244, .94));
