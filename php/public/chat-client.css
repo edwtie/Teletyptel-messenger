@@ -2596,7 +2596,7 @@ body[data-theme="dark"] .message-date-separator span {
   z-index: 0;
 }
 
-.message.with-avatar .message-content > * {
+.message.with-avatar .message-content > :not(.message-reaction-button) {
   position: relative;
   z-index: 1;
 }

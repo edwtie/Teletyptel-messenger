@@ -57,6 +57,8 @@
 - Message reaction controls now have a wider invisible hover hit area and a
   larger smiley button, making the floating reaction control reachable when
   moving from the message bubble.
+- The floating message reaction button stays absolutely positioned beside the
+  message bubble instead of flowing onto a second line.
 - Interactive location sharing UI with map preview, share duration up to eight
   hours, Google Maps/OpenStreetMap provider setting, browser geolocation
   permission handling and single live location card updates instead of duplicate
