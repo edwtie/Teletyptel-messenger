@@ -12320,6 +12320,7 @@
     item.className = "message " + message.direction
       + (message.draft ? " draft" : "")
       + (message.retracted ? " retracted" : "")
+      + (shouldRenderInlineMessageMeta(message) ? " has-inline-meta" : "")
       + (withAvatar ? " with-avatar" : "")
       + (activeConversation()?.kind === "group" ? " group-message" : "");
   }
@@ -12357,6 +12358,9 @@
       body.appendChild(createLocationElement(message.location, message));
     }
     appendLinkPreviewIfNeeded(body, message);
+    if (shouldRenderInlineMessageMeta(message)) {
+      appendInlineMessageMeta(body, message);
+    }
     const reactionButton = canReactToMessage(message) ? createMessageReactionButton(message) : null;
     const reactionsElement = canReactToMessage(message) ? createMessageReactionsElement(message) : null;
     const bodyWrap = createMessageBodyWrap(body, reactionButton, reactionsElement);
@@ -12388,6 +12392,17 @@
 
   function canReactToMessage(message) {
     return Boolean(message) && !message.draft && !message.retracted && !isCallMessage(message);
+  }
+
+  function shouldRenderInlineMessageMeta(message) {
+    return Boolean(message) && !message.draft && !isCallMessage(message);
+  }
+
+  function appendInlineMessageMeta(body, message) {
+    const inlineMeta = document.createElement("span");
+    inlineMeta.className = "message-inline-meta";
+    renderInlineMessageMeta(inlineMeta, message);
+    body.append(" ", inlineMeta);
   }
 
   function createMessageReactionButton(message) {
@@ -12802,6 +12817,21 @@
 
   function renderMessageMeta(meta, message) {
     meta.replaceChildren(document.createTextNode(messageMetaText(message)));
+    const receipt = messageReceiptLabel(message);
+    if (!receipt) {
+      return;
+    }
+
+    const indicator = document.createElement("span");
+    indicator.className = `message-receipt message-receipt-${receipt.state}`;
+    indicator.textContent = receipt.label;
+    indicator.title = receipt.title;
+    indicator.setAttribute("aria-label", receipt.title);
+    meta.append(" ", indicator);
+  }
+
+  function renderInlineMessageMeta(meta, message) {
+    meta.replaceChildren(document.createTextNode(formatTime(message.timestamp)));
     const receipt = messageReceiptLabel(message);
     if (!receipt) {
       return;

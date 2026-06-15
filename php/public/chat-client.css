@@ -2615,6 +2615,11 @@ body[data-theme="dark"] .message-date-separator span {
   text-align: right;
 }
 
+.message.has-inline-meta > .message-meta,
+.message.has-inline-meta .message-content > .message-meta {
+  display: none;
+}
+
 .message.draft .message-body {
   border-style: dashed;
 }
@@ -2627,6 +2632,7 @@ body[data-theme="dark"] .message-date-separator span {
 }
 
 .message-body {
+  display: flow-root;
   border: 1px solid #3f536d;
   border-radius: var(--radius);
   background: var(--bubble-peer);
@@ -3059,6 +3065,22 @@ body[data-theme="dark"] .link-preview-loading {
 .message-meta {
   color: var(--muted);
   font-size: 12px;
+}
+
+.message-inline-meta {
+  float: right;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin: 4px 0 0 10px;
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.message.self .message-inline-meta {
+  color: #15803d;
 }
 
 .message-receipt {
