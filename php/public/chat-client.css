@@ -2564,13 +2564,16 @@ body[data-theme="dark"] .message-date-separator span {
 
 .message.with-avatar {
   grid-template-columns: 34px minmax(0, 1fr);
+  column-gap: 10px;
   align-items: start;
   max-width: min(82ch, calc(88% - 44px));
+  margin-left: 6px;
 }
 
 .message.with-avatar.self {
   grid-template-columns: minmax(0, 1fr) 34px;
   margin-left: auto;
+  margin-right: 6px;
 }
 
 .message.with-avatar .message-avatar {
