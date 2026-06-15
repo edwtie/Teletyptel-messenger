@@ -127,11 +127,11 @@ function saveHistoryMessage(PDO $pdo, string $accountId, array $input): void
     $statement = $pdo->prepare(
         'INSERT INTO message_history (
             account_id, conversation_peer, conversation_name, conversation_kind, message_id,
-            direction, sender_jid, text, status, attachment_json, location_json, call_info_json,
+            direction, sender_jid, text, status, attachment_json, location_json, call_info_json, jingle_history_json,
             styling_disabled, edited, retracted, retraction_json, reactions_json, delivery_status, message_timestamp
         ) VALUES (
             :account_id, :conversation_peer, :conversation_name, :conversation_kind, :message_id,
-            :direction, :sender_jid, :text, :status, :attachment_json, :location_json, :call_info_json,
+            :direction, :sender_jid, :text, :status, :attachment_json, :location_json, :call_info_json, :jingle_history_json,
             :styling_disabled, :edited, :retracted, :retraction_json, :reactions_json, :delivery_status, :message_timestamp
         )
         ON DUPLICATE KEY UPDATE
@@ -145,6 +145,7 @@ function saveHistoryMessage(PDO $pdo, string $accountId, array $input): void
             attachment_json = VALUES(attachment_json),
             location_json = VALUES(location_json),
             call_info_json = VALUES(call_info_json),
+            jingle_history_json = VALUES(jingle_history_json),
             styling_disabled = VALUES(styling_disabled),
             edited = VALUES(edited),
             retracted = VALUES(retracted),
@@ -166,6 +167,7 @@ function saveHistoryMessage(PDO $pdo, string $accountId, array $input): void
         'attachment_json' => encodeHistoryJson($input['attachment'] ?? null),
         'location_json' => encodeHistoryJson($input['location'] ?? null),
         'call_info_json' => encodeHistoryJson($input['callInfo'] ?? null),
+        'jingle_history_json' => encodeHistoryJson($input['jingleHistory'] ?? null),
         'styling_disabled' => ($input['stylingDisabled'] ?? false) === true ? 1 : 0,
         'edited' => ($input['edited'] ?? false) === true ? 1 : 0,
         'retracted' => ($input['retracted'] ?? false) === true ? 1 : 0,
@@ -313,6 +315,7 @@ function ensureMessageHistorySchema(PDO $pdo): void
             attachment_json MEDIUMTEXT NULL,
             location_json MEDIUMTEXT NULL,
             call_info_json MEDIUMTEXT NULL,
+            jingle_history_json MEDIUMTEXT NULL,
             styling_disabled TINYINT(1) NOT NULL DEFAULT 0,
             edited TINYINT(1) NOT NULL DEFAULT 0,
             retracted TINYINT(1) NOT NULL DEFAULT 0,
@@ -327,6 +330,7 @@ function ensureMessageHistorySchema(PDO $pdo): void
         ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
     );
     ensureHistoryColumn($pdo, 'message_history', 'call_info_json', 'MEDIUMTEXT NULL');
+    ensureHistoryColumn($pdo, 'message_history', 'jingle_history_json', 'MEDIUMTEXT NULL');
     ensureHistoryColumn($pdo, 'message_history', 'reactions_json', 'MEDIUMTEXT NULL');
     ensureHistoryColumn($pdo, 'message_history', 'delivery_status', 'VARCHAR(32) NOT NULL DEFAULT ""');
 }
@@ -407,6 +411,7 @@ function historyRowToClient(array $row): array
         'attachment' => decodeHistoryJson($row['attachment_json'] ?? null),
         'location' => decodeHistoryJson($row['location_json'] ?? null),
         'callInfo' => decodeHistoryJson($row['call_info_json'] ?? null),
+        'jingleHistory' => decodeHistoryJson($row['jingle_history_json'] ?? null),
         'stylingDisabled' => (bool)$row['styling_disabled'],
         'edited' => (bool)$row['edited'],
         'retracted' => (bool)$row['retracted'],

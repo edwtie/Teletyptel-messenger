@@ -83,6 +83,7 @@
   const xmppDataFormsNamespace = "jabber:x:data";
   const xmppRsmNamespace = "http://jabber.org/protocol/rsm";
   const teletyptelCallInfoNamespace = "urn:teletyptel:call-info:0";
+  const jingleHistoryNamespace = "urn:xmpp:jingle-history:0";
   const jingleRttSyncNamespace = "urn:xmpp:jingle:apps:rtt-sync:0";
   const jingleRttSyncDataChannelLabel = "rtt";
   const jingleRttSyncMaxSkewMs = 700;
@@ -2064,6 +2065,7 @@
     message.retracted = item.retracted === true;
     message.retraction = item.retraction || null;
     message.callInfo = item.callInfo && typeof item.callInfo === "object" ? item.callInfo : null;
+    message.jingleHistory = item.jingleHistory && typeof item.jingleHistory === "object" ? item.jingleHistory : null;
     message.reactions = normalizeMessageReactions(item.reactions);
     message.deliveryStatus = normalizeDeliveryStatus(item.deliveryStatus, message.direction);
     const timestamp = new Date(item.timestamp || Date.now());
@@ -2095,6 +2097,7 @@
       attachment: message.attachment || null,
       location: message.location || null,
       callInfo: message.callInfo || null,
+      jingleHistory: message.jingleHistory || null,
       stylingDisabled: message.stylingDisabled === true,
       edited: message.edited === true,
       retracted: message.retracted === true,
@@ -6961,6 +6964,12 @@
         setMessageXmppIdentifiers(addedMessage, xmppMessageIdentifiers(message));
         if (addedMessage) {
           addedMessage.callInfo = parseXmppCallInfo(message);
+          addedMessage.jingleHistory = parseXmppJingleHistory(message);
+          if (!addedMessage.callInfo && addedMessage.jingleHistory) {
+            addedMessage.callInfo = callInfoFromJingleHistory(addedMessage.jingleHistory, from);
+          } else if (addedMessage.callInfo && !addedMessage.jingleHistory) {
+            addedMessage.jingleHistory = createJingleHistoryEventFromCallInfo(addedMessage.callInfo, addedMessage.direction);
+          }
           if (addedMessage.callInfo) {
             addedMessage.status = callNotificationMessageStatus(addedMessage.callInfo.status);
             updateMessageElementById(addedMessage);
@@ -7038,6 +7047,12 @@
     setMessageXmppIdentifiers(added, xmppMessageIdentifiers(message));
     added.xmppStanzaId = added.xmppStanzaId || result.getAttribute("id") || "";
     added.callInfo = parseXmppCallInfo(message);
+    added.jingleHistory = parseXmppJingleHistory(message);
+    if (!added.callInfo && added.jingleHistory) {
+      added.callInfo = callInfoFromJingleHistory(added.jingleHistory, direction === "peer" ? from : peer);
+    } else if (added.callInfo && !added.jingleHistory) {
+      added.jingleHistory = createJingleHistoryEventFromCallInfo(added.callInfo, added.direction);
+    }
     if (added.callInfo) {
       added.status = callNotificationMessageStatus(added.callInfo.status);
     }
@@ -7073,8 +7088,124 @@
       mediaKind: element.getAttribute("media-kind") || "",
       rttEnabled: element.getAttribute("rtt-enabled") === "true",
       durationSeconds: Math.max(0, Number(element.getAttribute("duration-seconds") || 0)),
-      peer: element.getAttribute("peer") || ""
+      peer: element.getAttribute("peer") || "",
+      startedAt: element.getAttribute("started-at") || "",
+      endedAt: element.getAttribute("ended-at") || ""
     };
+  }
+
+  function createJingleHistoryEventFromCallInfo(callInfo, messageDirection = "self") {
+    const api = jingleHistoryApi();
+    if (!api?.normalizeJingleHistoryEvent || !callInfo || typeof callInfo !== "object") {
+      return null;
+    }
+
+    const disposition = jingleDispositionFromCallStatus(callInfo.status);
+    if (!disposition) {
+      return null;
+    }
+
+    const startedAt = parseXmppTimestamp(callInfo.startedAt || "") || null;
+    const endedAt = parseXmppTimestamp(callInfo.endedAt || "") || null;
+    const event = {
+      sid: callInfo.callId || createMessageId("call"),
+      direction: messageDirection === "self" ? "outgoing" : "incoming",
+      disposition,
+      media: jingleHistoryMediaFromCallInfo(callInfo),
+      profile: jingleHistoryProfileFromCallInfo(callInfo),
+      started: startedAt ? startedAt.toISOString() : undefined,
+      ended: endedAt ? endedAt.toISOString() : undefined,
+      duration: Math.max(0, Number(callInfo.durationSeconds || 0)),
+      recording: "none",
+      transcript: callInfo.rttEnabled === true ? "local" : "none",
+      peerJid: callInfo.peer || "",
+      encrypted: false,
+      consent: "none",
+      createdAt: new Date().toISOString()
+    };
+
+    try {
+      return api.normalizeJingleHistoryEvent(event);
+    } catch (error) {
+      appendDebug("jingle-history-error", error.message || String(error));
+      return null;
+    }
+  }
+
+  function jingleDispositionFromCallStatus(status) {
+    switch (status) {
+      case "ended":
+        return "completed";
+      case "missed":
+        return "missed";
+      case "rejected":
+        return "declined";
+      case "failed":
+        return "failed";
+      default:
+        return "";
+    }
+  }
+
+  function jingleHistoryMediaFromCallInfo(callInfo) {
+    const media = ["audio"];
+    if (callInfo.mediaKind === "video") {
+      media.push("video");
+    }
+    if (callInfo.rttEnabled === true) {
+      media.push("rtt", "captions");
+    }
+    return media;
+  }
+
+  function jingleHistoryProfileFromCallInfo(callInfo) {
+    if (callInfo.rttEnabled === true) {
+      return "total-conversation";
+    }
+    return callInfo.mediaKind === "video" ? "video" : "audio";
+  }
+
+  function parseXmppJingleHistory(message) {
+    const element = message.getElementsByTagNameNS(jingleHistoryNamespace, "jingle-history")[0];
+    const api = jingleHistoryApi();
+    return element && api?.parseJingleHistory ? api.parseJingleHistory(element) : null;
+  }
+
+  function jingleHistoryApi() {
+    return globalThis.TeleTypTelJingleHistory || null;
+  }
+
+  function callInfoFromJingleHistory(event, peer = "") {
+    if (!event) {
+      return null;
+    }
+
+    return {
+      status: callStatusFromJingleDisposition(event.disposition),
+      callId: event.sid || "",
+      mediaKind: event.media?.includes("video") ? "video" : "audio",
+      rttEnabled: event.media?.includes("rtt") || event.profile === "total-conversation",
+      durationSeconds: Math.max(0, Number(event.duration || 0)),
+      peer: event.peerJid || peer || "",
+      startedAt: event.started || "",
+      endedAt: event.ended || ""
+    };
+  }
+
+  function callStatusFromJingleDisposition(disposition) {
+    switch (disposition) {
+      case "missed":
+      case "timeout":
+        return "missed";
+      case "declined":
+        return "rejected";
+      case "failed":
+      case "busy":
+      case "cancelled":
+        return "failed";
+      default:
+        return "ended";
+    }
   }
 
   function stableXmppMessageId(message) {
@@ -10070,8 +10201,11 @@
         mediaKind: call.mediaKind,
         rttEnabled: call.rttEnabled,
         durationSeconds: Math.round(Math.max(0, Date.now() - startedAt.getTime()) / 1000),
-        peer: call.peer
+        peer: call.peer,
+        startedAt: startedAt.toISOString(),
+        endedAt: ""
       };
+      message.jingleHistory = createJingleHistoryEventFromCallInfo(message.callInfo, message.direction);
       call.notificationMessageId = message.xmppId || message.id;
       persistHistoryMessage(conversation, message);
       sendXmppCallNotificationMessage(conversation, message);
@@ -10145,8 +10279,11 @@
       mediaKind: call.mediaKind,
       rttEnabled: call.rttEnabled,
       durationSeconds: Math.round(Math.max(0, Date.now() - startedAt.getTime()) / 1000),
-      peer: call.peer
+      peer: call.peer,
+      startedAt: startedAt.toISOString(),
+      endedAt: new Date().toISOString()
     };
+    message.jingleHistory = createJingleHistoryEventFromCallInfo(message.callInfo, message.direction);
     persistHistoryMessage(conversation, message);
     sendXmppCallNotificationMessage(conversation, message, true);
     if (conversation.id === state.activeConversationId) {
@@ -10174,7 +10311,7 @@
       replaceId,
       false,
       conversation.peer,
-      createXmppCallInfoElement(message.callInfo));
+      createXmppCallInfoElement(message.callInfo) + createXmppJingleHistoryElement(message.jingleHistory));
     return sendXmppStanza(xml, `<message type="chat" call-info="${message.callInfo?.status || ""}">...</message>`);
   }
 
@@ -10183,7 +10320,23 @@
       return "";
     }
 
-    return `<call-info xmlns="${teletyptelCallInfoNamespace}" status="${escapeXml(callInfo.status || "")}" call-id="${escapeXml(callInfo.callId || "")}" media-kind="${escapeXml(callInfo.mediaKind || "")}" rtt-enabled="${callInfo.rttEnabled === true ? "true" : "false"}" duration-seconds="${escapeXml(Math.max(0, Number(callInfo.durationSeconds || 0)))}" peer="${escapeXml(callInfo.peer || "")}"/>`;
+    const startedAt = callInfo.startedAt ? ` started-at="${escapeXml(callInfo.startedAt)}"` : "";
+    const endedAt = callInfo.endedAt ? ` ended-at="${escapeXml(callInfo.endedAt)}"` : "";
+    return `<call-info xmlns="${teletyptelCallInfoNamespace}" status="${escapeXml(callInfo.status || "")}" call-id="${escapeXml(callInfo.callId || "")}" media-kind="${escapeXml(callInfo.mediaKind || "")}" rtt-enabled="${callInfo.rttEnabled === true ? "true" : "false"}" duration-seconds="${escapeXml(Math.max(0, Number(callInfo.durationSeconds || 0)))}" peer="${escapeXml(callInfo.peer || "")}"${startedAt}${endedAt}/>`;
+  }
+
+  function createXmppJingleHistoryElement(event) {
+    const api = jingleHistoryApi();
+    if (!api?.jingleHistoryXml || !event || event.localOnly === true) {
+      return "";
+    }
+
+    try {
+      return api.jingleHistoryXml(event);
+    } catch (error) {
+      appendDebug("jingle-history-error", error.message || String(error));
+      return "";
+    }
   }
 
   async function openConversationHistoryCall(callId) {
@@ -10981,6 +11134,7 @@
       xmppOriginId: xmppId || "",
       xmppStanzaId: "",
       stylingDisabled,
+      jingleHistory: null,
       senderDisplayName: senderIdentity?.displayName || null,
       senderAvatarColor: senderIdentity?.avatarColor || null,
       senderAvatarDataUrl: isValidAvatarDataUrl(senderIdentity?.avatarDataUrl) ? senderIdentity.avatarDataUrl : null,

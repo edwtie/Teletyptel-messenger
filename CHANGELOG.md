@@ -99,6 +99,10 @@
   messages with TeleTypTel call metadata, allowing ejabberd `mod_mam` to archive
   call started/ended/missed markers while audio/video/RTT records remain in the
   TeleTypTel TC archive.
+- Experimental protoXEP Jingle Session History support adds
+  `urn:xmpp:jingle-history:0` call-summary metadata, parser/serializer,
+  message builder, renderer, local-only payload support and MAM-friendly call
+  event messages for completed, missed, declined and failed calls.
 - The installer now generates an ejabberd MAM helper that enables `mod_mam`
   with always-on XEP-0313 archiving, detects `/etc` and `/opt` ejabberd config
   paths, replaces existing `mod_mam` blocks and only auto-selects SQL storage
