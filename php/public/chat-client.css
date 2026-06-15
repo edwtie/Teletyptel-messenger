@@ -2566,7 +2566,7 @@ body[data-theme="dark"] .message-date-separator span {
   grid-template-columns: 34px minmax(0, 1fr);
   column-gap: 10px;
   align-items: start;
-  max-width: min(82ch, calc(88% - 44px));
+  max-width: min(72ch, calc(84% - 56px));
   margin-left: 12px;
 }
 
@@ -2922,7 +2922,7 @@ body[data-theme="dark"] .link-preview-loading {
 }
 
 .attachment-card.video {
-  width: min(100%, 680px);
+  width: min(100%, 560px);
   box-sizing: border-box;
 }
 
@@ -2945,7 +2945,7 @@ body[data-theme="dark"] .link-preview-loading {
   position: relative;
   overflow: hidden;
   aspect-ratio: 16 / 9;
-  height: clamp(180px, 36vw, 382px);
+  height: clamp(160px, 30vw, 315px);
   max-height: none;
   border-radius: 6px;
   background: linear-gradient(135deg, rgba(219, 234, 254, .96), rgba(240, 253, 244, .94));
