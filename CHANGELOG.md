@@ -100,7 +100,9 @@
   call started/ended/missed markers while audio/video/RTT records remain in the
   TeleTypTel TC archive.
 - The installer now generates an ejabberd MAM helper that enables `mod_mam`
-  with SQL-backed, always-on XEP-0313 archiving for the provider path.
+  with always-on XEP-0313 archiving, detects `/etc` and `/opt` ejabberd config
+  paths, replaces existing `mod_mam` blocks and only auto-selects SQL storage
+  when the ejabberd config already uses SQL.
 - Interactive location sharing UI with map preview, share duration up to eight
   hours, Google Maps/OpenStreetMap provider setting, browser geolocation
   permission handling and single live location card updates instead of duplicate

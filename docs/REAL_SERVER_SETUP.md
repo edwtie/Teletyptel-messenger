@@ -67,8 +67,11 @@ muc
 ```
 
 TeleTypTel's installer generates `php/install-runtime/configure-linux-ejabberd-mam.sh`
-and `php/install-runtime/teletyptel-ejabberd-mam.yml`. The MAM helper inserts
-this module block under the top-level `modules:` section and reloads ejabberd:
+and `php/install-runtime/teletyptel-ejabberd-mam.yml`. The MAM helper detects
+both `/etc/ejabberd/ejabberd.yml` and the official Docker-style
+`/opt/ejabberd/conf/ejabberd.yml`, replaces an existing `mod_mam` block or
+inserts this module block under the top-level `modules:` section, then reloads
+ejabberd:
 
 ```yaml
 modules:
@@ -79,9 +82,20 @@ modules:
     request_activates_archiving: false
 ```
 
-`db_type: sql` requires ejabberd SQL storage to be configured. Use this for the
-provider path so normal chat history comes from XEP-0313 MAM instead of the
-TeleTypTel relay fallback.
+The helper uses `db_type: sql` automatically when the ejabberd config already
+contains SQL settings such as `default_db: sql`, `sql_type:` or `sql_server:`.
+Otherwise it uses `mnesia` for local smoke tests. Force the production provider
+path with:
+
+```sh
+EJABBERD_MAM_DB_TYPE=sql sudo sh php/install-runtime/configure-linux-ejabberd-mam.sh
+```
+
+SQL-backed MAM requires MySQL/MariaDB to be reachable from the ejabberd process.
+If logs show `p1_mysql_conn` connection refused or timeout, fix the SQL host,
+port and container networking first; otherwise SQL-backed MAM and other SQL
+modules can fail during startup. Once SQL is healthy, normal chat history comes
+from XEP-0313 MAM instead of the TeleTypTel relay fallback.
 
 Useful optional modules:
 
