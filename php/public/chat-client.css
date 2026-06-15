@@ -2633,12 +2633,47 @@ body[data-theme="dark"] .message-date-separator span {
 
 .message-body {
   display: flow-root;
+  position: relative;
   border: 1px solid #3f536d;
   border-radius: var(--radius);
   background: var(--bubble-peer);
   padding: 8px 10px;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+.message.with-avatar.has-inline-meta:not(.self) .message-body::before,
+.message.with-avatar.has-inline-meta:not(.self) .message-body::after,
+.message.with-avatar.has-inline-meta.self .message-body::before,
+.message.with-avatar.has-inline-meta.self .message-body::after {
+  content: "";
+  position: absolute;
+  top: 10px;
+  width: 0;
+  height: 0;
+  border-top: 8px solid transparent;
+  border-bottom: 8px solid transparent;
+  pointer-events: none;
+}
+
+.message.with-avatar.has-inline-meta:not(.self) .message-body::before {
+  left: -9px;
+  border-right: 9px solid #3f536d;
+}
+
+.message.with-avatar.has-inline-meta:not(.self) .message-body::after {
+  left: -7px;
+  border-right: 8px solid var(--bubble-peer);
+}
+
+.message.with-avatar.has-inline-meta.self .message-body::before {
+  right: -9px;
+  border-left: 9px solid #1d8d68;
+}
+
+.message.with-avatar.has-inline-meta.self .message-body::after {
+  right: -7px;
+  border-left: 8px solid var(--bubble-self);
 }
 
 .message-body code {
