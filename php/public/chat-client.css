@@ -2624,21 +2624,25 @@ body[data-theme="dark"] .message-date-separator span {
   text-align: right;
 }
 
-.message.has-inline-meta:not(.group-message) > .message-meta,
-.message.has-inline-meta:not(.group-message) .message-content > .message-meta {
+.message.has-inline-meta > .message-meta,
+.message.has-inline-meta .message-content > .message-meta {
   display: none;
 }
 
-.message.group-message.has-inline-meta .message-meta {
-  margin-top: 2px;
-  padding: 0 4px;
-  color: #475569;
+.message-group-sender-label {
+  display: block;
+  margin: 0 0 4px;
+  color: #0f766e;
   font-size: 12px;
+  font-weight: 800;
   line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.message.group-message.has-inline-meta.self .message-meta {
-  padding-right: 8px;
+.message.self .message-group-sender-label {
+  color: #166534;
 }
 
 .message.draft .message-body {

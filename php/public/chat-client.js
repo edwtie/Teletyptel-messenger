@@ -12347,6 +12347,9 @@
 
     const body = document.createElement("div");
     body.className = "message-body";
+    if (shouldRenderGroupSenderInBubble(message)) {
+      appendGroupSenderLabel(body, message);
+    }
     if (isCallMessage(message)) {
       body.appendChild(createCallMessageCard(message));
     } else {
@@ -12379,9 +12382,7 @@
   }
 
   function messageContentChildren(message, meta, bodyWrap) {
-    return shouldShowGroupSenderMeta(message)
-      ? [bodyWrap, meta]
-      : [meta, bodyWrap];
+    return [meta, bodyWrap];
   }
 
   function createMessageBodyWrap(body, reactionButton, reactionsElement) {
@@ -12410,10 +12411,19 @@
       && !message.retracted;
   }
 
-  function shouldShowGroupSenderMeta(message) {
+  function shouldRenderGroupSenderInBubble(message) {
     return Boolean(message)
       && activeConversation()?.kind === "group"
       && shouldRenderInlineMessageMeta(message);
+  }
+
+  function appendGroupSenderLabel(body, message) {
+    const label = document.createElement("span");
+    label.className = "message-group-sender-label";
+    label.textContent = message.direction === "self"
+      ? currentSenderName()
+      : message.senderDisplayName || displayNameForJid(message.from);
+    body.appendChild(label);
   }
 
   function appendInlineMessageMeta(body, message) {
@@ -12824,12 +12834,6 @@
   }
 
   function messageMetaText(message) {
-    if (shouldShowGroupSenderMeta(message)) {
-      return message.direction === "self"
-        ? currentSenderName()
-        : message.senderDisplayName || displayNameForJid(message.from);
-    }
-
     const sender = message.direction === "self"
       ? currentSenderName()
       : message.senderDisplayName || displayNameForJid(message.from);
@@ -12841,10 +12845,6 @@
 
   function renderMessageMeta(meta, message) {
     meta.replaceChildren(document.createTextNode(messageMetaText(message)));
-    if (shouldShowGroupSenderMeta(message)) {
-      return;
-    }
-
     const receipt = messageReceiptLabel(message);
     if (!receipt) {
       return;
