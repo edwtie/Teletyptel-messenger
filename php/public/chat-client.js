@@ -2027,7 +2027,7 @@
     }
 
     const messageId = String(item.messageId || "").trim();
-    if (messageId && conversation.messages.some((message) => message.xmppId === messageId || message.id === messageId)) {
+    if (messageId && conversation.messages.some((message) => messageMatchesAnyId(message, messageId))) {
       return null;
     }
 
@@ -2061,7 +2061,7 @@
       return;
     }
 
-    const messageId = message.xmppId || message.id;
+    const messageId = bestMessageTargetId(message);
     if (!messageId) {
       return;
     }
@@ -2094,7 +2094,7 @@
       return;
     }
 
-    const messageId = message.xmppId || message.id;
+    const messageId = bestMessageTargetId(message);
     if (!messageId) {
       return;
     }
@@ -6864,7 +6864,8 @@
       if (replaceId) {
         applyMessageCorrection(conversation, replaceId, bodyElement.textContent || "", "peer", messageId, from, stylingDisabled);
       } else {
-        addMessage("peer", bodyElement.textContent || "", "received", from, null, conversation.id, null, messageId, stylingDisabled);
+        const addedMessage = addMessage("peer", bodyElement.textContent || "", "received", from, null, conversation.id, null, messageId, stylingDisabled);
+        setMessageXmppIdentifiers(addedMessage, xmppMessageIdentifiers(message));
       }
     }
   }
@@ -6877,6 +6878,26 @@
 
     const stanzaId = message.getElementsByTagNameNS("urn:xmpp:sid:0", "stanza-id")[0]?.getAttribute("id") || "";
     return stanzaId || message.getAttribute("id") || null;
+  }
+
+  function xmppMessageIdentifiers(messageElement) {
+    const messageId = messageElement?.getAttribute("id") || "";
+    const originId = messageElement?.getElementsByTagNameNS("urn:xmpp:sid:0", "origin-id")[0]?.getAttribute("id") || "";
+    const stanzaId = messageElement?.getElementsByTagNameNS("urn:xmpp:sid:0", "stanza-id")[0]?.getAttribute("id") || "";
+    return { messageId, originId, stanzaId };
+  }
+
+  function setMessageXmppIdentifiers(message, identifiers) {
+    if (!message || !identifiers) {
+      return;
+    }
+
+    message.xmppMessageId = identifiers.messageId || message.xmppMessageId || "";
+    message.xmppOriginId = identifiers.originId || message.xmppOriginId || "";
+    message.xmppStanzaId = identifiers.stanzaId || message.xmppStanzaId || "";
+    if (!message.xmppId) {
+      message.xmppId = message.xmppOriginId || message.xmppStanzaId || message.xmppMessageId || "";
+    }
   }
 
   function sendXmppMessageAcknowledgements(to, messageId, receiptRequested) {
@@ -10431,7 +10452,7 @@
     return {
       conversation,
       message,
-      replaceId: state.editingMessage.replaceId || message.xmppId || message.id
+      replaceId: state.editingMessage.replaceId || bestMessageTargetId(message)
     };
   }
 
@@ -10449,7 +10470,7 @@
     state.editingMessage = {
       conversationId: conversation.id,
       messageId: message.id,
-      replaceId: message.xmppId || message.id
+      replaceId: bestMessageTargetId(message)
     };
     el.messageInput.value = message.text;
     syncComposerActionButtons();
@@ -10469,8 +10490,7 @@
   }
 
   function applyMessageCorrection(conversation, replaceId, text, direction, newId = null, from = null, stylingDisabled = false) {
-    const message = conversation.messages.find((item) =>
-      (item.xmppId && item.xmppId === replaceId) || item.id === replaceId);
+    const message = conversation.messages.find((item) => messageMatchesAnyId(item, replaceId));
     if (!message) {
       addMessage(direction, text, "edited", from, null, conversation.id, null, newId, stylingDisabled);
       return;
@@ -10482,6 +10502,8 @@
     message.status = "edited";
     if (newId) {
       message.xmppId = newId;
+      message.xmppMessageId = newId;
+      message.xmppOriginId = newId;
     }
     if (from) {
       message.from = from;
@@ -10500,8 +10522,7 @@
       return;
     }
 
-    const message = conversation.messages.find((item) =>
-      (item.xmppId && item.xmppId === targetId) || item.id === targetId);
+    const message = conversation.messages.find((item) => messageMatchesAnyId(item, targetId));
     if (!message) {
       addMessage(
         "peer",
@@ -10583,6 +10604,9 @@
       location,
       status,
       xmppId,
+      xmppMessageId: xmppId || "",
+      xmppOriginId: xmppId || "",
+      xmppStanzaId: "",
       stylingDisabled,
       senderDisplayName: senderIdentity?.displayName || null,
       senderAvatarColor: senderIdentity?.avatarColor || null,
@@ -12072,12 +12096,12 @@
       delete reactions[actor];
     }
 
-    applyMessageReaction(conversation, message.xmppId || message.id, actor, reactions[actor] || []);
+    applyMessageReaction(conversation, bestMessageTargetId(message), actor, reactions[actor] || []);
     sendMessageReaction(conversation, message, reactions[actor] || []);
   }
 
   function sendMessageReaction(conversation, message, reactions) {
-    const targetId = message.xmppId || message.id;
+    const targetId = bestMessageTargetId(message);
     if (!targetId) {
       return;
     }
@@ -12136,7 +12160,22 @@
     if (!conversation || !id) {
       return null;
     }
-    return conversation.messages.find((item) => item.id === id || item.xmppId === id) || null;
+    return conversation.messages.find((item) => messageMatchesAnyId(item, id)) || null;
+  }
+
+  function messageMatchesAnyId(message, targetId) {
+    const id = String(targetId || "");
+    if (!message || !id) {
+      return false;
+    }
+
+    return [
+      message.id,
+      message.xmppId,
+      message.xmppMessageId,
+      message.xmppOriginId,
+      message.xmppStanzaId
+    ].some((value) => String(value || "") === id);
   }
 
   function findMessageRecordByAnyId(targetId, options = {}) {
@@ -12147,7 +12186,7 @@
 
     const direction = options.direction || "";
     const matches = (message) => (!direction || message.direction === direction)
-      && (message.id === id || message.xmppId === id);
+      && messageMatchesAnyId(message, id);
     const preferredConversation = options.conversation || null;
     if (preferredConversation) {
       const message = preferredConversation.messages.find(matches);
@@ -12188,6 +12227,10 @@
 
   function reactionActorId() {
     return currentBareJid() || bareJid(currentFromJid()).toLowerCase() || "self";
+  }
+
+  function bestMessageTargetId(message) {
+    return message?.xmppOriginId || message?.xmppId || message?.xmppStanzaId || message?.xmppMessageId || message?.id || "";
   }
 
   function normalizeMessageReactions(value) {
