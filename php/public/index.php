@@ -272,6 +272,7 @@ function e(string $value): string
     .quiet-note,
     .quick-links,
     .story,
+    .teaser-film,
     .tester-call {
       border: 1px solid rgba(191, 215, 255, .82);
       border-radius: 8px;
@@ -291,6 +292,7 @@ function e(string $value): string
     }
 
     .story,
+    .teaser-film,
     .tester-call {
       display: grid;
       gap: 10px;
@@ -298,6 +300,7 @@ function e(string $value): string
     }
 
     .story h2,
+    .teaser-film h2,
     .tester-call h2 {
       margin: 0;
       font-size: clamp(26px, 4vw, 42px);
@@ -306,12 +309,96 @@ function e(string $value): string
     }
 
     .story p,
+    .teaser-film p,
     .tester-call p {
       margin: 0;
       max-width: 860px;
       color: var(--muted);
       font-size: 17px;
       line-height: 1.5;
+    }
+
+    .film-stage {
+      position: relative;
+      display: grid;
+      gap: 14px;
+      overflow: hidden;
+      min-height: 320px;
+      border: 1px solid rgba(191, 215, 255, .76);
+      border-radius: 12px;
+      background:
+        linear-gradient(110deg, rgba(255, 255, 255, .96), rgba(238, 245, 255, .8) 52%, rgba(255, 255, 255, .52)),
+        url("assets/backgrounds/teletyptel-bg-wide-3.png") center right / cover no-repeat;
+      padding: 20px;
+    }
+
+    .film-stage::before {
+      content: "";
+      position: absolute;
+      inset: -20% -20% 0 24%;
+      background: linear-gradient(118deg, transparent 0 34%, rgba(255, 255, 255, .88) 44%, rgba(255, 255, 255, .24) 56%, transparent 68%);
+      pointer-events: none;
+    }
+
+    .film-strip {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      align-items: stretch;
+    }
+
+    .film-scene {
+      display: grid;
+      align-content: space-between;
+      gap: 20px;
+      min-height: 230px;
+      border: 1px solid rgba(191, 215, 255, .84);
+      border-radius: 10px;
+      background: rgba(255, 255, 255, .78);
+      padding: 16px;
+      box-shadow: 0 18px 48px rgba(37, 99, 235, .1);
+    }
+
+    .film-scene span {
+      color: var(--accent);
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .film-scene strong {
+      color: #071526;
+      font-size: clamp(22px, 3vw, 34px);
+      line-height: 1.08;
+    }
+
+    .film-scene p {
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    .chat-bubbles {
+      display: grid;
+      gap: 8px;
+      align-content: start;
+    }
+
+    .bubble {
+      width: fit-content;
+      max-width: 92%;
+      border-radius: 12px;
+      background: #eef5ff;
+      color: #26364d;
+      padding: 8px 10px;
+      font-size: 14px;
+      line-height: 1.25;
+    }
+
+    .bubble.self {
+      justify-self: end;
+      background: #dbeafe;
+      color: #12376d;
     }
 
     .tester-call {
@@ -397,6 +484,10 @@ function e(string $value): string
       .tester-points {
         grid-template-columns: minmax(0, 1fr);
       }
+
+      .film-strip {
+        grid-template-columns: minmax(0, 1fr);
+      }
     }
   </style>
 </head>
@@ -436,6 +527,42 @@ function e(string $value): string
       <section class="quiet-note" aria-label="Beperkte onthulling">
         <strong>Nog niet volledig onthuld</strong>
         <p>We houden de details bewust klein totdat de eerste testgroep klaarstaat. Eerst testen, dan pas groot naar buiten.</p>
+      </section>
+
+      <section class="teaser-film" aria-labelledby="film-title">
+        <h2 id="film-title">Het filmpje begint stil.</h2>
+        <p>Doven appen. Vrienden komen erbij. Iedereen probeert elkaar te volgen. Dan verschijnt langzaam iets nieuws.</p>
+        <div class="film-stage" aria-label="Teaserfilm scènes">
+          <div class="film-strip">
+            <article class="film-scene">
+              <span>Scene 1</span>
+              <strong>Appen gaat door.</strong>
+              <div class="chat-bubbles" aria-hidden="true">
+                <div class="bubble">Ben je er?</div>
+                <div class="bubble self">Ja, ik lees mee.</div>
+              </div>
+              <p>Doven gebruiken wat er is. Snel, bekend, maar niet altijd gemaakt voor elk gesprek.</p>
+            </article>
+            <article class="film-scene">
+              <span>Scene 2</span>
+              <strong>Vrienden haken aan.</strong>
+              <div class="chat-bubbles" aria-hidden="true">
+                <div class="bubble">Ik kom erbij.</div>
+                <div class="bubble self">Wacht, ik typ nog.</div>
+              </div>
+              <p>Gesprekken lopen door elkaar. Iedereen wil meedoen, maar duidelijkheid blijft belangrijk.</p>
+            </article>
+            <article class="film-scene">
+              <span>Scene 3</span>
+              <strong>Dan gaat het licht aan.</strong>
+              <div class="chat-bubbles" aria-hidden="true">
+                <div class="bubble">TeleTypTel?</div>
+                <div class="bubble self">Binnenkort.</div>
+              </div>
+              <p>Een vertrouwd idee keert terug met nieuwe technologie. Nog even geheim.</p>
+            </article>
+          </div>
+        </div>
       </section>
 
       <section id="testers" class="tester-call" aria-labelledby="tester-title">
