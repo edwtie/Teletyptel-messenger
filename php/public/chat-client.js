@@ -428,6 +428,8 @@
     accountReady: false,
     pendingMucAvatarConversationId: null,
     contactProfileRequestId: 0,
+    publicProfileCache: new Map(),
+    publicProfileRequests: new Set(),
     security: {
       twoFactorVerificationId: 0,
       twoFactorMethod: "authenticator",
@@ -5825,11 +5827,43 @@
     return payload.ok && payload.profile ? payload.profile : null;
   }
 
+  function ensurePublicProfileForConversation(conversation) {
+    const jid = bareJid(conversation?.peer || "");
+    if (!conversation || conversation.kind === "group" || !jid || isInfrastructurePeer(jid) || !state.account?.accountId) {
+      return;
+    }
+    if (isValidAvatarDataUrl(conversation.avatarDataUrl) || state.publicProfileRequests.has(jid)) {
+      return;
+    }
+    if (state.publicProfileCache.has(jid)) {
+      const cached = state.publicProfileCache.get(jid);
+      if (cached) {
+        applyPublicProfileToConversation(conversation, cached);
+      }
+      return;
+    }
+
+    state.publicProfileRequests.add(jid);
+    loadPublicContactProfile(conversation)
+      .then((profile) => {
+        state.publicProfileCache.set(jid, profile || null);
+        if (profile) {
+          applyPublicProfileToConversation(conversation, profile);
+        }
+      })
+      .catch((error) => appendDebug("profile-avatar-error", error.message || String(error)))
+      .finally(() => state.publicProfileRequests.delete(jid));
+  }
+
   function applyPublicProfileToConversation(conversation, profile) {
     if (!conversation || !profile) {
       return;
     }
 
+    const profileJid = bareJid(profile.jid || conversation.peer || "");
+    if (profileJid) {
+      state.publicProfileCache.set(profileJid, profile);
+    }
     conversation.email = profile.email || conversation.email || "";
     conversation.phoneNumber = profile.phoneNumber || conversation.phoneNumber || "";
     if (isValidAvatarDataUrl(profile.avatarDataUrl)) {
@@ -5841,6 +5875,9 @@
     }
 
     renderConversations();
+    if (conversation.id === state.activeConversationId) {
+      renderActiveConversation();
+    }
   }
 
   function showMessageContextMenu(event, message, anchor = null) {
@@ -12706,6 +12743,7 @@
       if (query && !conversationMatchesSearch(conversation, query)) {
         continue;
       }
+      ensurePublicProfileForConversation(conversation);
 
       const button = document.createElement("button");
       button.type = "button";
@@ -12725,6 +12763,7 @@
       button.append(avatar, text, unread, presence);
       button.addEventListener("click", () => {
         selectConversation(conversation);
+        ensurePublicProfileForConversation(conversation);
         el.peerInput.value = conversation.peer;
         state.previousText = "";
         el.messageInput.value = "";
