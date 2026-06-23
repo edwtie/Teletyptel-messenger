@@ -1529,9 +1529,10 @@ body.conversation-open .chat-panel {
 .app-tabs {
   grid-row: 1;
   overflow-x: auto;
-  border-bottom: 1px solid #314159;
+  border-bottom: 1px solid rgba(49, 65, 89, .38);
   padding: 8px 14px;
-  background: #111b2a;
+  background: rgba(255, 255, 255, .72);
+  backdrop-filter: blur(6px);
 }
 
 .app-tabs button {
@@ -1544,7 +1545,9 @@ body.conversation-open .chat-panel {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  border-bottom: 1px solid #314159;
+  border-bottom: 1px solid rgba(49, 65, 89, .38);
+  background: rgba(255, 255, 255, .68);
+  backdrop-filter: blur(6px);
   padding: 12px 14px;
 }
 
@@ -5468,9 +5471,16 @@ body[data-theme="light"] .chat-panel {
 body[data-theme="light"] .topbar,
 body[data-theme="light"] .conversation-list,
 body[data-theme="light"] .detail-panel,
-body[data-theme="light"] .remote-draft,
-body[data-theme="light"] .app-tabs {
+body[data-theme="light"] .remote-draft {
   background: #ffffff;
+}
+
+body[data-theme="light"] .app-tabs {
+  background: rgba(255, 255, 255, .72);
+}
+
+body[data-theme="light"] .chat-header {
+  background: rgba(255, 255, 255, .68);
 }
 
 body[data-theme="light"] .composer {
@@ -5646,7 +5656,11 @@ body[data-theme="dark"] .app-tabs {
 }
 
 body[data-theme="dark"] .app-tabs {
-  background: #111b2a;
+  background: rgba(17, 27, 42, .78);
+}
+
+body[data-theme="dark"] .chat-header {
+  background: rgba(21, 31, 45, .72);
 }
 
 body[data-theme="dark"] .voice-preview-panel {
