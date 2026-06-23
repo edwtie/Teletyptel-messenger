@@ -3031,10 +3031,13 @@ body[data-theme="dark"] .message-date-separator span {
   margin-top: 4px;
 }
 
+.avatar-clickable,
 .message-avatar-clickable {
   cursor: pointer;
 }
 
+.avatar-clickable:hover,
+.avatar-clickable:focus-visible,
 .message-avatar-clickable:hover,
 .message-avatar-clickable:focus-visible {
   box-shadow: 0 0 0 3px rgba(79, 140, 255, .28);

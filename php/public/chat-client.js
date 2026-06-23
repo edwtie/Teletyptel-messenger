@@ -876,6 +876,8 @@
     el.inviteConversationButton.addEventListener("click", inviteContactToActiveGroup);
     el.conversationSearchInput.addEventListener("input", renderConversations);
     el.backToContactsButton.addEventListener("click", closeActiveConversation);
+    el.activeConversationAvatar.addEventListener("click", openActiveConversationAvatarProfile);
+    el.activeConversationAvatar.addEventListener("keydown", handleActiveConversationAvatarKeydown);
     el.contextProfileButton.addEventListener("click", openContextConversationProfile);
     el.contextRoomAvatarButton.addEventListener("click", chooseContextRoomAvatar);
     el.contextMuteNotificationsButton.addEventListener("click", toggleMuteContextConversationNotifications);
@@ -5793,6 +5795,25 @@
 
     closeConversationContextMenu();
     openContactProfileDialog(conversation);
+  }
+
+  function openActiveConversationAvatarProfile() {
+    const conversation = activeConversation();
+    if (canViewContactProfile(conversation)) {
+      openContactProfileDialog(conversation);
+      return;
+    }
+
+    openAccountDialog({ mode: "profile" });
+  }
+
+  function handleActiveConversationAvatarKeydown(event) {
+    if (event.key !== "Enter" && event.key !== " ") {
+      return;
+    }
+
+    event.preventDefault();
+    openActiveConversationAvatarProfile();
   }
 
   function openContactProfileDialog(conversation) {
@@ -12913,6 +12934,18 @@
     renderActiveConversation();
   }
 
+  function syncActiveConversationAvatarButton(conversation) {
+    const label = canViewContactProfile(conversation)
+      ? t("button.view_profile", "View profile")
+      : t("button.profile", "Profile");
+    el.activeConversationAvatar.classList.add("avatar-clickable");
+    el.activeConversationAvatar.removeAttribute("aria-hidden");
+    el.activeConversationAvatar.setAttribute("role", "button");
+    el.activeConversationAvatar.tabIndex = 0;
+    el.activeConversationAvatar.title = label;
+    el.activeConversationAvatar.setAttribute("aria-label", label);
+  }
+
   function renderActiveConversation() {
     const conversation = activeConversation();
     document.body.classList.toggle("conversation-open", Boolean(conversation));
@@ -12921,6 +12954,7 @@
         displayName: "TX",
         avatarColor: "#2563eb"
       });
+      syncActiveConversationAvatarButton(null);
       el.activeConversationName.textContent = t("conversation.none_title", "Select a contact");
       el.activeConversationMeta.textContent = t("conversation.none_meta", "Click a contact to open the chat room.");
       el.messageTimeline.replaceChildren(createNoConversationElement());
@@ -12935,6 +12969,7 @@
     el.activeConversationName.textContent = conversationDisplayName(conversation);
     el.activeConversationMeta.textContent = conversationMeta(conversation);
     renderAvatarInto(el.activeConversationAvatar, conversation);
+    syncActiveConversationAvatarButton(conversation);
     el.messageTimeline.replaceChildren();
 
     for (const message of conversation.messages) {
@@ -12994,6 +13029,7 @@
     el.activeConversationName.textContent = conversationDisplayName(conversation);
     el.activeConversationMeta.textContent = conversationMeta(conversation);
     renderAvatarInto(el.activeConversationAvatar, conversation);
+    syncActiveConversationAvatarButton(conversation);
     el.remoteDraft.hidden = false;
     el.remoteDraftName.textContent = displayNameForJid(conversation.remoteFrom || conversation.peer);
     el.remoteDraftPreviousText.textContent = lastPeerConversationText(conversation);
