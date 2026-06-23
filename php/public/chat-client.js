@@ -809,6 +809,7 @@
   document.body.classList.toggle("account-gate", state.accountGateRequired);
   document.body.classList.toggle("developer-mode", state.developerMode);
   applyDeviceDetection();
+  configureInlineVideoPlayback();
   updateDeveloperPanelVisibility();
   bindEvents();
   el.sessionProfileInput.value = state.sessionProfile;
@@ -1275,6 +1276,19 @@
     document.body.classList.add(`device-${device.deviceClass}`);
     applyViewportDetection();
     appendDebug("device", `${device.platform}/${device.deviceClass}: ${device.userAgent}`);
+  }
+
+  function configureInlineVideoPlayback() {
+    [
+      el.remoteVideo,
+      el.localVideo,
+      el.videoPreviewVideo,
+      el.videoPreviewDialogVideo
+    ].forEach((video) => {
+      if (video) {
+        video.playsInline = true;
+      }
+    });
   }
 
   function applyViewportDetection() {

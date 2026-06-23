@@ -197,8 +197,8 @@
         </div>
 
         <section id="callPanel" class="call-panel" hidden aria-label="Call media">
-          <video id="remoteVideo" autoplay playsinline></video>
-          <video id="localVideo" autoplay muted playsinline></video>
+          <video id="remoteVideo" autoplay></video>
+          <video id="localVideo" autoplay muted></video>
           <div id="callResizeHandle" class="call-resize-handle" role="separator" aria-orientation="horizontal" aria-label="Resize call video" title="Resize call video"></div>
           <div class="call-media-controls" role="toolbar" aria-label="Call audio controls">
             <button id="toggleCameraButton" class="icon-button call-media-icon-button" type="button" disabled title="Turn camera off" aria-label="Turn camera off" data-i18n-title="button.turn_camera_off" data-i18n-aria-label="button.turn_camera_off">
@@ -370,7 +370,7 @@
               <span id="videoPreviewStatus" data-i18n="video.ready">Video message ready</span>
             </button>
             <div class="video-preview-stage">
-              <video id="videoPreviewVideo" muted playsinline autoplay></video>
+              <video id="videoPreviewVideo" muted autoplay></video>
             </div>
             <div class="voice-preview-actions video-preview-actions">
               <button id="cancelVideoMessageButton" class="icon-button voice-action-button voice-action-cancel" type="button" title="Cancel" aria-label="Cancel" data-i18n-title="button.cancel" data-i18n-aria-label="button.cancel">
@@ -948,7 +948,7 @@
           <strong id="videoPreviewDialogTitle" data-i18n="video.preview_title">Video preview</strong>
           <button id="closeVideoPreviewDialogButton" class="icon-button" type="button" aria-label="Close" data-i18n-aria-label="button.close">x</button>
         </div>
-      <video id="videoPreviewDialogVideo" controls playsinline></video>
+      <video id="videoPreviewDialogVideo" controls></video>
       <div class="video-preview-dialog-actions">
         <label class="video-recorder-camera">
           <span class="material-icon" data-icon="videocam" aria-hidden="true"></span>
@@ -1071,8 +1071,8 @@
     <button id="messageContextForwardButton" type="button" role="menuitem" data-i18n="button.forward_message">Forward</button>
   </div>
 
-  <script src="vendor/qrcode.js?v=20260623-theme-meta"></script>
+  <script src="vendor/qrcode.js?v=20260623-inline-video"></script>
   <script src="jingle-history.js?v=20260615-jingle-history"></script>
-  <script src="chat-client.js?v=20260623-theme-meta"></script>
+  <script src="chat-client.js?v=20260623-inline-video"></script>
 </body>
 </html>
