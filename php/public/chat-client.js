@@ -715,6 +715,7 @@
     dialogXmppUrlInput: byId("dialogXmppUrlInput"),
     dialogProviderInput: byId("dialogProviderInput"),
     dialogLanguageInput: byId("dialogLanguageInput"),
+    settingsLanguageInput: byId("settingsLanguageInput"),
     dialogPeerInput: byId("dialogPeerInput"),
     dialogPhoneInput: byId("dialogPhoneInput"),
     dialogBirthDateInput: byId("dialogBirthDateInput"),
@@ -1134,7 +1135,9 @@
     });
     el.passwordInput.addEventListener("input", updateAccountPasswordStatus);
     el.rememberPasswordToggle.addEventListener("change", updateAccountPasswordStatus);
-    el.languageInput.addEventListener("change", () => loadLanguage(el.languageInput.value));
+    el.languageInput.addEventListener("change", () => handleLanguageInputChanged(el.languageInput.value));
+    el.dialogLanguageInput.addEventListener("change", () => handleLanguageInputChanged(el.dialogLanguageInput.value));
+    el.settingsLanguageInput.addEventListener("change", () => handleLanguageInputChanged(el.settingsLanguageInput.value));
     el.xmppOpenButton.addEventListener("click", connectXmppWebSocket);
     el.xmppCloseButton.addEventListener("click", closeXmppWebSocket);
     el.clearLogButton.addEventListener("click", () => {
@@ -1894,7 +1897,7 @@
   async function loadLanguage(code) {
     const normalized = normalizeLanguageCode(code);
     state.languageCode = normalized;
-    el.languageInput.value = normalized;
+    syncLanguageInputs(normalized);
 
     try {
       const text = await fetchText(`${languageBasePath}${encodeURIComponent(normalized)}.lng`);
@@ -2144,6 +2147,24 @@
     }
   }
 
+  function syncLanguageInputs(code) {
+    const normalized = normalizeLanguageCode(code);
+    [el.languageInput, el.dialogLanguageInput, el.settingsLanguageInput].forEach((input) => {
+      if (input) {
+        input.value = normalized;
+      }
+    });
+  }
+
+  function handleLanguageInputChanged(code) {
+    const normalized = normalizeLanguageCode(code);
+    syncLanguageInputs(normalized);
+    if (state.account) {
+      state.account.preferredLanguage = normalized;
+    }
+    loadLanguage(normalized).catch((error) => appendDebug("lng-error", error.message || String(error)));
+  }
+
   async function loadRtcConfig() {
     try {
       const config = await fetchJson(rtcConfigApiPath);
@@ -2387,7 +2408,7 @@
     if (state.account) {
       state.account.birthDate = normalizeBirthDate(account.birthDate ?? state.account.birthDate ?? "");
     }
-    el.languageInput.value = normalizeLanguageCode(account.preferredLanguage ?? "eng");
+    syncLanguageInputs(account.preferredLanguage ?? "eng");
     el.providerInput.value = account.providerId ?? "";
     el.relayUrlInput.value = "";
     el.xmppUrlInput.value = normalizeLocalXmppWebSocketUrlForCurrentHost(account.xmppWebSocket ?? el.xmppUrlInput.value);
@@ -2934,7 +2955,7 @@
     el.dialogRelayUrlInput.value = el.relayUrlInput.value;
     el.dialogXmppUrlInput.value = el.xmppUrlInput.value;
     el.dialogProviderInput.value = el.providerInput.value;
-    el.dialogLanguageInput.value = el.languageInput.value;
+    syncLanguageInputs(el.languageInput.value);
     el.dialogPeerInput.value = el.peerInput.value;
     el.dialogPhoneInput.value = el.phoneInput.value;
     el.dialogBirthDateInput.value = normalizeBirthDate(state.account?.birthDate ?? "");
@@ -3101,7 +3122,7 @@
     el.relayUrlInput.value = "";
     el.xmppUrlInput.value = xmppWebSocket;
     el.providerInput.value = el.dialogProviderInput.value.trim() || "example-provider";
-    el.languageInput.value = normalizeLanguageCode(el.dialogLanguageInput.value);
+    syncLanguageInputs(el.dialogLanguageInput.value);
     el.peerInput.value = el.dialogPeerInput.value.trim() || el.peerInput.value;
     el.phoneInput.value = el.dialogPhoneInput.value.trim();
     const birthDate = normalizeBirthDate(el.dialogBirthDateInput.value);
