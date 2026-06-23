@@ -8607,6 +8607,10 @@
       image.src = dataUrl;
       image.alt = "";
       image.decoding = "async";
+      image.addEventListener("error", () => {
+        container.replaceChildren();
+        container.textContent = initials;
+      }, { once: true });
       container.appendChild(image);
       return;
     }
