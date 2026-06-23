@@ -13467,12 +13467,23 @@
       renderSettingsPanels();
     }
 
-    if (state.activeTabId === "chat" || el.tabPanel.hidden) {
+    if (state.activeTabId === "chat") {
       return;
     }
 
     const tab = allTabs().find((item) => item.id === state.activeTabId);
-    if (tab) {
+    if (!tab) {
+      return;
+    }
+
+    if (isHistoryTab(tab)) {
+      if (!el.historyPage.hidden) {
+        renderHistoryPage(tab);
+      }
+      return;
+    }
+
+    if (!el.tabPanel.hidden) {
       renderTabPanel(tab);
     }
   }
