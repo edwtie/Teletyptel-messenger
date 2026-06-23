@@ -63,10 +63,10 @@ function e(string $value): string
       align-items: center;
       justify-content: space-between;
       gap: 16px;
-      border-bottom: 1px solid #d8e6ff;
-      background: rgba(255, 255, 255, .94);
-      padding: 10px 22px;
-      backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(216, 230, 255, .76);
+      background: rgba(255, 255, 255, .72);
+      padding: 12px 24px;
+      backdrop-filter: blur(18px);
     }
 
     .brand {
@@ -88,10 +88,10 @@ function e(string $value): string
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      border: 1px solid #bbf7d0;
+      border: 1px solid rgba(191, 215, 255, .86);
       border-radius: 6px;
-      background: #f0fdf4;
-      color: #14532d;
+      background: rgba(255, 255, 255, .74);
+      color: #334155;
       padding: 7px 10px;
       font-size: 14px;
       white-space: nowrap;
@@ -127,11 +127,42 @@ function e(string $value): string
       overflow: hidden;
       border-bottom: 1px solid #d8e6ff;
       background:
-        linear-gradient(90deg, rgba(248, 251, 255, .98) 0%, rgba(248, 251, 255, .86) 46%, rgba(248, 251, 255, .18) 100%),
+        linear-gradient(90deg, rgba(248, 251, 255, .99) 0%, rgba(248, 251, 255, .9) 48%, rgba(248, 251, 255, .2) 100%),
         url("assets/backgrounds/teletyptel-bg-wide-1.png") center right / cover no-repeat;
     }
 
+    .hero::before {
+      content: "";
+      position: absolute;
+      inset: -18% -8% 0 30%;
+      background:
+        linear-gradient(112deg, transparent 0 34%, rgba(255, 255, 255, .84) 43%, rgba(255, 255, 255, .36) 49%, transparent 62%),
+        linear-gradient(122deg, transparent 0 52%, rgba(37, 99, 235, .1) 59%, transparent 70%);
+      filter: blur(.4px);
+      pointer-events: none;
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      right: clamp(22px, 9vw, 160px);
+      bottom: 0;
+      width: min(360px, 34vw);
+      height: min(500px, 58vh);
+      border: 1px solid rgba(191, 215, 255, .58);
+      border-bottom: 0;
+      border-radius: 34px 34px 0 0;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, .54), rgba(255, 255, 255, .16)),
+        linear-gradient(135deg, rgba(37, 99, 235, .14), rgba(242, 140, 24, .1));
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, .76), 0 24px 80px rgba(37, 99, 235, .16);
+      opacity: .58;
+      pointer-events: none;
+    }
+
     .hero-inner {
+      position: relative;
+      z-index: 1;
       display: grid;
       gap: 22px;
       width: min(1120px, calc(100% - 44px));
@@ -151,11 +182,23 @@ function e(string $value): string
       letter-spacing: 0;
     }
 
+    .teaser-mark {
+      display: inline-flex;
+      width: fit-content;
+      border: 1px solid rgba(191, 215, 255, .9);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, .72);
+      color: #334155;
+      padding: 7px 12px;
+      font-size: 14px;
+      font-weight: 800;
+    }
+
     .return-line {
       margin: 0;
-      max-width: 900px;
+      max-width: 940px;
       color: #071526;
-      font-size: clamp(34px, 5.6vw, 68px);
+      font-size: clamp(40px, 6.6vw, 84px);
       font-weight: 900;
       line-height: 1.02;
       letter-spacing: 0;
@@ -200,6 +243,7 @@ function e(string $value): string
       padding: 10px 16px;
       font-weight: 700;
       text-decoration: none;
+      box-shadow: 0 10px 28px rgba(37, 99, 235, .12);
     }
 
     .button.primary {
@@ -229,10 +273,11 @@ function e(string $value): string
     .quick-links,
     .story,
     .tester-call {
-      border: 1px solid var(--line);
+      border: 1px solid rgba(191, 215, 255, .82);
       border-radius: 8px;
-      background: var(--panel);
+      background: rgba(255, 255, 255, .82);
       padding: 16px;
+      box-shadow: 0 18px 54px rgba(37, 99, 235, .08);
     }
 
     .quiet-note strong {
@@ -271,7 +316,7 @@ function e(string $value): string
 
     .tester-call {
       background:
-        linear-gradient(90deg, rgba(238, 245, 255, .98), rgba(255, 255, 255, .92)),
+        linear-gradient(90deg, rgba(248, 251, 255, .96), rgba(255, 255, 255, .82)),
         url("assets/backgrounds/teletyptel-bg-wide-2.png") center right / cover no-repeat;
     }
 
@@ -330,8 +375,19 @@ function e(string $value): string
       .hero {
         min-height: auto;
         background:
-          linear-gradient(180deg, rgba(248, 251, 255, .98) 0%, rgba(248, 251, 255, .82) 58%, rgba(248, 251, 255, .35) 100%),
+          linear-gradient(180deg, rgba(248, 251, 255, .99) 0%, rgba(248, 251, 255, .86) 58%, rgba(248, 251, 255, .4) 100%),
           url("assets/backgrounds/teletyptel-bg-mobile.png") center bottom / cover no-repeat;
+      }
+
+      .hero::before {
+        inset: 0 -60% 18% 8%;
+      }
+
+      .hero::after {
+        right: 18px;
+        width: 180px;
+        height: 260px;
+        opacity: .34;
       }
 
       .hero-inner {
@@ -359,10 +415,10 @@ function e(string $value): string
     <section class="hero" aria-labelledby="hero-title">
       <div class="hero-inner">
         <div class="hero-copy">
-          <span class="eyebrow">Binnenkort meer</span>
+          <span class="teaser-mark">Beperkte testgroep opent binnenkort</span>
           <h1 id="hero-title">TeleTypTel</h1>
           <p class="return-line">We zijn <span>TERUG</span> met nieuwste technologie.</p>
-          <p>Een vertrouwd idee keert terug in een nieuwe vorm. We onthullen stap voor stap meer.</p>
+          <p>Een vertrouwd idee keert terug in een nieuwe vorm. Nog niet alles wordt onthuld, maar het licht gaat langzaam aan.</p>
         </div>
         <div class="actions" aria-label="Snel starten">
           <a class="button primary" href="<?php echo e($testerMailto); ?>">Inschrijven als tester</a>
