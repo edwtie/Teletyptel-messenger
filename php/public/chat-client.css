@@ -2315,6 +2315,7 @@ body:not([data-chat-background="none"]) .message-body {
 
 .tab-panel {
   grid-row: 5;
+  grid-column: 1 / -1;
   min-height: 0;
   overflow: auto;
   padding: 16px;
