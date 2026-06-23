@@ -3846,8 +3846,8 @@ body[data-theme="dark"] .message-reaction-picker {
 
 .composer {
   grid-row: 7;
-  border-top: 1px solid rgba(148, 163, 184, .28);
-  background: rgba(241, 245, 249, .92);
+  border-top: 0;
+  background: transparent;
   padding: 8px 16px 10px;
 }
 
@@ -5627,7 +5627,6 @@ body[data-theme="dark"] .chat-panel {
 body[data-theme="dark"] .topbar,
 body[data-theme="dark"] .conversation-list,
 body[data-theme="dark"] .detail-panel,
-body[data-theme="dark"] .composer,
 body[data-theme="dark"] .remote-draft,
 body[data-theme="dark"] .app-tabs {
   background: #151f2d;
