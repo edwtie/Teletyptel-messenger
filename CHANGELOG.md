@@ -340,6 +340,8 @@
   to recognize successful ejabberd WebSocket sessions in the ejabberd log.
 - Web client smoke with two real accounts now covers RTT, presence and normal
   chat.
+- Phone Safari/WebView audio/video call smoke with two real accounts now passes,
+  including camera permission, local preview and reconnect behavior.
 - XSF/software-directory notes now describe only the current evaluation scope
   and avoid claiming Android/iOS or formal XEP-0479 compliance before release
   validation.

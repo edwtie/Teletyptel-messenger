@@ -188,7 +188,7 @@ item is implemented, tested and documented.
 - [x] XEP-0363 file upload discovery, slot, PUT and attachment smoke passed.
 - [x] Web client RTT, presence and normal chat passed with the two real accounts.
 - [ ] Browser audio/video call passed between the two real accounts.
-- [ ] Browser audio/video call passed on iPhone Safari/WebView with the two real
+- [x] Browser audio/video call passed on iPhone Safari/WebView with the two real
   accounts, including camera permission, local preview and reconnect behavior.
 - [ ] Existing Jingle-capable client interop smoke completed or explicitly
   recorded as unavailable for this release.
