@@ -157,8 +157,8 @@
               <span id="callStatus" class="call-status" role="status" aria-live="polite" data-i18n="call.idle">No call</span>
             </div>
             <div class="mode-switch developer-only" role="tablist" aria-label="Transport mode">
-              <button id="relayModeButton" type="button" hidden data-i18n="mode.relay">Relay</button>
-              <button id="xmppModeButton" type="button" class="selected">XMPP</button>
+              <button id="relayModeButton" type="button" hidden role="tab" aria-selected="false" data-i18n="mode.relay">Relay</button>
+              <button id="xmppModeButton" type="button" class="selected" role="tab" aria-selected="true">XMPP</button>
             </div>
           </div>
         </div>
@@ -1072,8 +1072,8 @@
     <button id="messageContextForwardButton" type="button" role="menuitem" data-i18n="button.forward_message">Forward</button>
   </div>
 
-  <script src="vendor/qrcode.js?v=20260623-timeout-toggle"></script>
+  <script src="vendor/qrcode.js?v=20260623-aria-tabs"></script>
   <script src="jingle-history.js?v=20260615-jingle-history"></script>
-  <script src="chat-client.js?v=20260623-timeout-toggle"></script>
+  <script src="chat-client.js?v=20260623-aria-tabs"></script>
 </body>
 </html>

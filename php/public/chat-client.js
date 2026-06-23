@@ -1787,6 +1787,8 @@
     state.mode = mode;
     el.relayModeButton.classList.toggle("selected", mode === "relay");
     el.xmppModeButton.classList.toggle("selected", mode === "xmpp");
+    el.relayModeButton.setAttribute("aria-selected", mode === "relay" ? "true" : "false");
+    el.xmppModeButton.setAttribute("aria-selected", mode === "xmpp" ? "true" : "false");
     setDefaultComposerState();
     updateComposerAvailability();
   }

@@ -1,5 +1,5 @@
-const CACHE_NAME = "teletyptel-webclient-v326";
-const BUILD_VERSION = "20260623-timeout-toggle";
+const CACHE_NAME = "teletyptel-webclient-v327";
+const BUILD_VERSION = "20260623-aria-tabs";
 const ASSETS = [
   "chat.html",
   "dev.html",
