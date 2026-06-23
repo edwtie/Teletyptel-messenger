@@ -5403,10 +5403,13 @@ body[data-theme="dark"] .attachment-menu-panel button:hover:not(:disabled) {
   .topbar,
   .conversation-list,
   .detail-panel,
-  .composer,
   .remote-draft,
   .app-tabs {
     background: #ffffff;
+  }
+
+  .composer {
+    background: transparent;
   }
 
   .provider-card {
@@ -5458,10 +5461,13 @@ body[data-theme="light"] .chat-panel {
 body[data-theme="light"] .topbar,
 body[data-theme="light"] .conversation-list,
 body[data-theme="light"] .detail-panel,
-body[data-theme="light"] .composer,
 body[data-theme="light"] .remote-draft,
 body[data-theme="light"] .app-tabs {
   background: #ffffff;
+}
+
+body[data-theme="light"] .composer {
+  background: transparent;
 }
 
 body[data-theme="light"] .drop-overlay {
