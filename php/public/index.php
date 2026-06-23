@@ -6,6 +6,10 @@ $installed = is_file($configPath);
 $chatUrl = 'chat.html';
 $installUrl = 'install.php';
 $adminUrl = 'admin.php';
+$testerEmail = 'contact@teletolk.nl';
+$testerMailto = 'mailto:' . $testerEmail
+    . '?subject=' . rawurlencode('Aanmelding tester TeleTypTel')
+    . '&body=' . rawurlencode("Hallo TeleTypTel,\n\nIk wil mij aanmelden als tester.\n\nNaam:\nE-mail:\nIk kan testen met: telefoon / tablet / computer\nToegankelijkheidsbehoefte of ervaring:\n\nGroet,");
 
 function e(string $value): string
 {
@@ -147,6 +151,20 @@ function e(string $value): string
       letter-spacing: 0;
     }
 
+    .return-line {
+      margin: 0;
+      max-width: 900px;
+      color: #071526;
+      font-size: clamp(34px, 5.6vw, 68px);
+      font-weight: 900;
+      line-height: 1.02;
+      letter-spacing: 0;
+    }
+
+    .return-line span {
+      color: var(--orange);
+    }
+
     h1 {
       margin: 0;
       color: #071526;
@@ -215,7 +233,9 @@ function e(string $value): string
 
     .feature,
     .notice,
-    .quick-links {
+    .quick-links,
+    .story,
+    .tester-call {
       border: 1px solid var(--line);
       border-radius: 8px;
       background: var(--panel);
@@ -237,6 +257,54 @@ function e(string $value): string
       margin: 0;
       color: var(--muted);
       line-height: 1.45;
+    }
+
+    .story,
+    .tester-call {
+      display: grid;
+      gap: 10px;
+      padding: 20px;
+    }
+
+    .story h2,
+    .tester-call h2 {
+      margin: 0;
+      font-size: clamp(26px, 4vw, 42px);
+      line-height: 1.08;
+      letter-spacing: 0;
+    }
+
+    .story p,
+    .tester-call p {
+      margin: 0;
+      max-width: 860px;
+      color: var(--muted);
+      font-size: 17px;
+      line-height: 1.5;
+    }
+
+    .tester-call {
+      background:
+        linear-gradient(90deg, rgba(238, 245, 255, .98), rgba(255, 255, 255, .92)),
+        url("assets/backgrounds/teletyptel-bg-wide-2.png") center right / cover no-repeat;
+    }
+
+    .tester-points {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin: 4px 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .tester-points li {
+      border: 1px solid #d8e6ff;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, .86);
+      padding: 12px;
+      color: #26364d;
+      font-weight: 700;
     }
 
     .quick-links {
@@ -286,6 +354,10 @@ function e(string $value): string
       .feature-grid {
         grid-template-columns: minmax(0, 1fr);
       }
+
+      .tester-points {
+        grid-template-columns: minmax(0, 1fr);
+      }
     }
   </style>
 </head>
@@ -306,6 +378,7 @@ function e(string $value): string
         <div class="hero-copy">
           <span class="eyebrow">Realtime tekst, chat en Total Conversation</span>
           <h1 id="hero-title">TeleTypTel</h1>
+          <p class="return-line">We zijn <span>TERUG</span> met nieuwste technologie.</p>
           <p>Een toegankelijke communicatie-app voor teksttelefonie, RTT, gesprekken, groepen en bewaarde Total Conversation-geschiedenis.</p>
         </div>
         <div class="actions" aria-label="Snel starten">
@@ -319,6 +392,11 @@ function e(string $value): string
     </section>
 
     <section class="content" aria-label="TeleTypTel informatie">
+      <section class="story" aria-labelledby="history-title">
+        <h2 id="history-title">Geschiedenis van TeleTypTel</h2>
+        <p>TeleTypTel bouwt voort op het oude idee van teksttelefonie: direct kunnen typen, lezen en reageren wanneer gewone spraak niet vanzelfsprekend is. Met moderne webtechnologie, XMPP, realtime tekst en Total Conversation brengen we dat idee opnieuw terug voor telefoons, tablets en computers.</p>
+      </section>
+
       <div class="feature-grid">
         <article class="feature">
           <strong>Voor doven en slechthorenden</strong>
@@ -339,10 +417,24 @@ function e(string $value): string
         <p>TeleTypTel is in opbouw richting beta. Test eerst lokaal of op de ontwikkelomgeving voordat je naar een VPS of productieomgeving gaat.</p>
       </section>
 
+      <section class="tester-call" aria-labelledby="tester-title">
+        <h2 id="tester-title">We zoeken testers</h2>
+        <p>Voor de volgende stap zoeken we een beperkte groep testers. We willen testen op telefoons, tablets en computers, met extra aandacht voor toegankelijkheid, realtime tekst, bellen en Total Conversation.</p>
+        <ul class="tester-points">
+          <li>Telefoons</li>
+          <li>Tablets</li>
+          <li>Computers en laptops</li>
+        </ul>
+        <div class="actions">
+          <a class="button primary" href="<?php echo e($testerMailto); ?>">Inschrijven als tester</a>
+          <a class="button" href="<?php echo e($chatUrl); ?>">TeleTypTel bekijken</a>
+        </div>
+      </section>
+
       <section class="quick-links" aria-label="Beheer">
         <div>
-          <strong>Beheer en installatie</strong>
-          <span>Gebruik de beheerlinks alleen op een vertrouwde server.</span>
+          <strong>Voor beheerders</strong>
+          <span>Installatie en beheer zijn bedoeld voor een vertrouwde server.</span>
         </div>
         <nav class="link-row" aria-label="Beheerlinks">
           <a class="button" href="<?php echo e($installUrl); ?>">Installatie</a>
