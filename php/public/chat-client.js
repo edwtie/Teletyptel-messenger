@@ -5837,8 +5837,8 @@
     }
     if (state.publicProfileCache.has(jid)) {
       const cached = state.publicProfileCache.get(jid);
-      if (cached) {
-        applyPublicProfileToConversation(conversation, cached);
+      if (cached && conversation.publicProfileLoadedJid !== jid) {
+        applyPublicProfileToConversation(conversation, cached, { render: false });
       }
       return;
     }
@@ -5855,7 +5855,7 @@
       .finally(() => state.publicProfileRequests.delete(jid));
   }
 
-  function applyPublicProfileToConversation(conversation, profile) {
+  function applyPublicProfileToConversation(conversation, profile, options = {}) {
     if (!conversation || !profile) {
       return;
     }
@@ -5873,10 +5873,13 @@
     if (profile.avatarColor) {
       conversation.avatarColor = profile.avatarColor;
     }
+    conversation.publicProfileLoadedJid = profileJid || bareJid(conversation.peer || "");
 
-    renderConversations();
-    if (conversation.id === state.activeConversationId) {
-      renderActiveConversation();
+    if (options.render !== false) {
+      renderConversations();
+      if (conversation.id === state.activeConversationId) {
+        renderActiveConversation();
+      }
     }
   }
 

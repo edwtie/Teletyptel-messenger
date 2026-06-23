@@ -1,5 +1,5 @@
-const CACHE_NAME = "teletyptel-webclient-v319";
-const BUILD_VERSION = "20260623-contact-avatar-load";
+const CACHE_NAME = "teletyptel-webclient-v320";
+const BUILD_VERSION = "20260623-avatar-recursion-fix";
 const ASSETS = [
   "chat.html",
   "dev.html",
