@@ -1343,7 +1343,7 @@ body.developer-mode .developer-only {
 
 .conversation-item {
   display: grid;
-  grid-template-columns: 34px minmax(0, 1fr) minmax(58px, auto) minmax(28px, auto) 14px;
+  grid-template-columns: 34px minmax(0, 1fr) minmax(94px, auto);
   align-items: center;
   column-gap: 8px;
   width: 100%;
@@ -1371,6 +1371,15 @@ body.developer-mode .developer-only {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.conversation-row-meta {
+  display: grid;
+  grid-template-columns: minmax(42px, auto) minmax(22px, auto) 10px;
+  align-items: center;
+  justify-content: end;
+  column-gap: 10px;
+  min-width: 94px;
 }
 
 .conversation-time {
@@ -1405,7 +1414,7 @@ body.developer-mode .developer-only {
 }
 
 .presence-dot {
-  justify-self: center;
+  justify-self: end;
   width: 10px;
   height: 10px;
   border: 1px solid rgba(255, 255, 255, .55);

@@ -12856,7 +12856,10 @@
       const presence = document.createElement("span");
       presence.className = `presence-dot presence-${conversationPresence(conversation)}`;
       const unread = createConversationUnreadBadge(conversation);
-      button.append(avatar, text, time, unread, presence);
+      const rowMeta = document.createElement("span");
+      rowMeta.className = "conversation-row-meta";
+      rowMeta.append(time, unread, presence);
+      button.append(avatar, text, rowMeta);
       button.addEventListener("click", () => {
         selectConversation(conversation);
         ensurePublicProfileForConversation(conversation);
