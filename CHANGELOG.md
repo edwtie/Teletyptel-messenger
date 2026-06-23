@@ -285,7 +285,8 @@
 - Mobile voice-message preview now removes the redundant custom play/pause
   button and keeps the audio controls plus actions on one row.
 - Message URLs now render as links without smiley replacement inside the URL,
-  and link-preview fetching uses a browser-like request header for sites such as YouTube.
+  and link-preview fetching uses a browser-like request header for sites such
+  as YouTube.
 - Link-preview cards now use a lighter WhatsApp-style surface in the default
   chat theme instead of the previous dark block.
 - Attachment cards now expose downloading through a small dedicated icon button
