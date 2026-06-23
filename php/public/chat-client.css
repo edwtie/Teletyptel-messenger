@@ -2390,9 +2390,11 @@ body:not([data-chat-background="none"]) .message-body {
   box-sizing: border-box;
   width: 100%;
   max-width: none;
-  border-color: #bfd7ff;
-  background: #f8fbff;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   color: #0f172a;
+  padding: 0;
 }
 
 .history-page .tab-panel-header {
