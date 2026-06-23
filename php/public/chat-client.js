@@ -4381,6 +4381,7 @@
     renderTabs();
 
     if (tabId === "chat") {
+      document.body.classList.remove("history-page-active");
       el.messageTimeline.hidden = false;
       el.tabPanel.hidden = true;
       el.composerForm.hidden = false;
@@ -4393,6 +4394,7 @@
       return;
     }
 
+    document.body.classList.toggle("history-page-active", isHistoryTab(tab));
     el.messageTimeline.hidden = true;
     el.tabPanel.hidden = false;
     el.composerForm.hidden = true;

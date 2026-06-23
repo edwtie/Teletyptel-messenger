@@ -1224,6 +1224,17 @@ body.developer-mode.conversation-open .client-grid {
   grid-template-columns: var(--conversation-list-width) minmax(0, 1fr) 330px;
 }
 
+body.history-page-active.conversation-open .client-grid,
+body.history-page-active.developer-mode.conversation-open .client-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+body.history-page-active .client-grid::before {
+  inset: 0;
+  background: #f8fbff;
+  background-image: none;
+}
+
 .conversation-list,
 .detail-panel {
   position: relative;
@@ -1240,6 +1251,11 @@ body.developer-mode.conversation-open .client-grid {
 
 body.conversation-open .conversation-list {
   border-right: 1px solid #314159;
+}
+
+body.history-page-active .conversation-list,
+body.history-page-active .detail-panel {
+  display: none;
 }
 
 .detail-panel {
@@ -2344,6 +2360,31 @@ body:not([data-chat-background="none"]) .message-body {
 
 .tab-panel.history-panel {
   background: #f8fbff;
+}
+
+body.history-page-active .chat-panel {
+  display: grid;
+  grid-column: 1;
+  grid-template-rows: minmax(0, 1fr);
+  background: #f8fbff;
+  background-image: none;
+}
+
+body.history-page-active .app-tabs,
+body.history-page-active .chat-header,
+body.history-page-active .incoming-call,
+body.history-page-active .incoming-call-dialog,
+body.history-page-active .call-panel,
+body.history-page-active .message-timeline,
+body.history-page-active .remote-draft,
+body.history-page-active .composer {
+  display: none !important;
+}
+
+body.history-page-active .tab-panel.history-panel {
+  grid-row: 1;
+  grid-column: 1;
+  padding: 20px 24px;
 }
 
 .history-card.provider-card {
