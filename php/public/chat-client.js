@@ -4630,7 +4630,7 @@
     const retention = document.createElement("label");
     retention.className = "history-retention";
     const retentionText = document.createElement("span");
-    retentionText.textContent = t("history.retention", "Bewaartermijn");
+    retentionText.textContent = t("history.retention", "Bewaartermijn max.");
     const select = document.createElement("select");
     for (const [value, label] of historyRetentionOptions()) {
       const option = document.createElement("option");
