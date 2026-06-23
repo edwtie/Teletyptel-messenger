@@ -344,7 +344,7 @@ function e(string $value): string
       position: relative;
       z-index: 1;
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
       gap: 12px;
       align-items: stretch;
     }
@@ -530,36 +530,45 @@ function e(string $value): string
       </section>
 
       <section class="teaser-film" aria-labelledby="film-title">
-        <h2 id="film-title">Het filmpje begint stil.</h2>
-        <p>Doven appen. Vrienden komen erbij. Iedereen probeert elkaar te volgen. Dan verschijnt langzaam iets nieuws.</p>
+        <h2 id="film-title">Eerst zeggen ze: nee.</h2>
+        <p>Teksttelefoon klinkt ouderwets. WhatsApp en video zijn al normaal. Dan verschijnt TeleTypTel als modern systeem met alles bij elkaar.</p>
         <div class="film-stage" aria-label="Teaserfilm scènes">
           <div class="film-strip">
             <article class="film-scene">
               <span>Scene 1</span>
-              <strong>Appen gaat door.</strong>
+              <strong>Teksttelefoon? Nee.</strong>
               <div class="chat-bubbles" aria-hidden="true">
-                <div class="bubble">Ben je er?</div>
-                <div class="bubble self">Ja, ik lees mee.</div>
+                <div class="bubble">Dat is ouderwets.</div>
+                <div class="bubble self">Wij appen gewoon.</div>
               </div>
-              <p>Doven gebruiken wat er is. Snel, bekend, maar niet altijd gemaakt voor elk gesprek.</p>
+              <p>De eerste reactie is duidelijk. Niemand wil terug naar een apart hulpmiddel.</p>
             </article>
             <article class="film-scene">
               <span>Scene 2</span>
-              <strong>Vrienden haken aan.</strong>
+              <strong>Video hebben we al.</strong>
               <div class="chat-bubbles" aria-hidden="true">
-                <div class="bubble">Ik kom erbij.</div>
-                <div class="bubble self">Wacht, ik typ nog.</div>
+                <div class="bubble">WhatsApp werkt toch?</div>
+                <div class="bubble self">Met vrienden wel.</div>
               </div>
-              <p>Gesprekken lopen door elkaar. Iedereen wil meedoen, maar duidelijkheid blijft belangrijk.</p>
+              <p>Gebarende doven herkennen video. De vraag is niet of video bestaat, maar wanneer gewone apps tekortschieten.</p>
             </article>
             <article class="film-scene">
               <span>Scene 3</span>
-              <strong>Dan gaat het licht aan.</strong>
+              <strong>Dan moet je bellen.</strong>
               <div class="chat-bubbles" aria-hidden="true">
-                <div class="bubble">TeleTypTel?</div>
-                <div class="bubble self">Binnenkort.</div>
+                <div class="bubble">Arts, werk, gemeente?</div>
+                <div class="bubble self">En teletolk?</div>
               </div>
-              <p>Een vertrouwd idee keert terug met nieuwe technologie. Nog even geheim.</p>
+              <p>Dan gaat het niet om gezellig appen, maar om bereikbaarheid, tekst, beeld, tolk en zekerheid.</p>
+            </article>
+            <article class="film-scene">
+              <span>Onthulling</span>
+              <strong>TeleTypTel systeem.</strong>
+              <div class="chat-bubbles" aria-hidden="true">
+                <div class="bubble">Wacht... dit lijkt modern.</div>
+                <div class="bubble self">Alles zit erin.</div>
+              </div>
+              <p>WhatsApp-achtig in gebruik, maar gebouwd voor toegankelijke gesprekken. De testgroep krijgt het als eerste te zien.</p>
             </article>
           </div>
         </div>
