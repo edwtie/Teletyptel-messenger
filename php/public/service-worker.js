@@ -1,11 +1,12 @@
-const CACHE_NAME = "teletyptel-webclient-v320";
-const BUILD_VERSION = "20260623-avatar-recursion-fix";
+const CACHE_NAME = "teletyptel-webclient-v321";
+const BUILD_VERSION = "20260623-favicon";
 const ASSETS = [
   "chat.html",
   "dev.html",
   `chat-client.css?v=${BUILD_VERSION}`,
   `chat-client.js?v=${BUILD_VERSION}`,
   `vendor/qrcode.js?v=${BUILD_VERSION}`,
+  "favicon.ico",
   "manifest.webmanifest",
   "assets/brand/teletyptel-logo-header.png",
   "assets/brand/teletyptel-logo-header@2x.png",
