@@ -1472,7 +1472,13 @@ body.developer-mode .developer-only {
   grid-template-rows: auto auto auto auto minmax(0, 1fr) auto auto;
   min-width: 0;
   min-height: 0;
-  background: #0f1724;
+  background-color: #0f1724;
+  background-image:
+    linear-gradient(var(--chat-background-overlay), var(--chat-background-overlay)),
+    var(--chat-background-image);
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
 }
 
 body.conversation-open .chat-panel {
@@ -2254,11 +2260,7 @@ body.tc-call-active.call-active .call-panel.no-remote-video.local-video-main {
   grid-row: 5;
   min-height: 0;
   overflow: auto;
-  background-color: #0b1220;
-  background-image: linear-gradient(var(--chat-background-overlay), var(--chat-background-overlay)), var(--chat-background-image);
-  background-position: center;
-  background-repeat: no-repeat;
-  background-size: cover;
+  background: transparent;
   padding: 16px;
 }
 
@@ -5397,7 +5399,7 @@ body[data-theme="dark"] .attachment-menu-panel button:hover:not(:disabled) {
 
   body,
   .chat-panel {
-    background: #eef2f7;
+    background-color: #eef2f7;
   }
 
   .topbar,
@@ -5455,7 +5457,7 @@ body[data-theme="light"] {
 
 body[data-theme="light"],
 body[data-theme="light"] .chat-panel {
-  background: #eef2f7;
+  background-color: #eef2f7;
 }
 
 body[data-theme="light"] .topbar,
@@ -5627,7 +5629,7 @@ body[data-theme="dark"] {
 
 body[data-theme="dark"],
 body[data-theme="dark"] .chat-panel {
-  background: #0f1724;
+  background-color: #0f1724;
 }
 
 body[data-theme="dark"] .topbar,
