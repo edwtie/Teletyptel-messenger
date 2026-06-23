@@ -10,6 +10,8 @@
   --muted: #b6c2d1;
   --accent: #4f8cff;
   --accent-strong: #2563eb;
+  --focus-ring: #4f8cff;
+  --focus-shadow: rgba(79, 140, 255, .26);
   --good: #20c970;
   --warn: #f0b429;
   --danger: #ef4444;
@@ -54,7 +56,7 @@ textarea {
   left: 14px;
   top: 14px;
   z-index: 1000;
-  border: 2px solid #fbbf24;
+  border: 2px solid var(--focus-ring);
   border-radius: 8px;
   background: #ffffff;
   color: #071526;
@@ -91,9 +93,9 @@ button:disabled {
 }
 
 :where(button, input, select, textarea, summary, a, [role="button"], [role="menuitem"], .conversation-item, .message-body, .attachment-card, .location-card):focus-visible {
-  outline: 3px solid #fbbf24;
+  outline: 3px solid var(--focus-ring);
   outline-offset: 2px;
-  box-shadow: 0 0 0 5px rgba(251, 191, 36, .24);
+  box-shadow: 0 0 0 5px var(--focus-shadow);
 }
 
 .chat-header,
@@ -3849,8 +3851,8 @@ body[data-theme="dark"] .message-reaction-picker {
 }
 
 .composer-input-row:focus-within {
-  border-color: #fbbf24;
-  box-shadow: 0 0 0 3px rgba(251, 191, 36, .22);
+  border-color: var(--focus-ring);
+  box-shadow: 0 0 0 3px var(--focus-shadow);
 }
 
 .composer-round-button,
@@ -3902,8 +3904,8 @@ body[data-theme="dark"] .message-reaction-picker {
 .voice-preview-panel.recording {
   grid-template-columns: minmax(0, 1fr) auto;
   min-height: 48px;
-  border-color: #fbbf24;
-  box-shadow: 0 0 0 3px rgba(251, 191, 36, .22);
+  border-color: var(--focus-ring);
+  box-shadow: 0 0 0 3px var(--focus-shadow);
 }
 
 .voice-preview-panel[hidden] {
@@ -4098,8 +4100,8 @@ body[data-theme="dark"] .message-reaction-picker {
 }
 
 .video-preview-panel.recording {
-  border-color: #fbbf24;
-  box-shadow: 0 0 0 3px rgba(251, 191, 36, .22);
+  border-color: var(--focus-ring);
+  box-shadow: 0 0 0 3px var(--focus-shadow);
 }
 
 .video-preview-summary {
