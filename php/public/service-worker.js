@@ -1,5 +1,5 @@
-const CACHE_NAME = "teletyptel-webclient-v316";
-const BUILD_VERSION = "20260623-blue-focus";
+const CACHE_NAME = "teletyptel-webclient-v317";
+const BUILD_VERSION = "20260623-search-focus";
 const ASSETS = [
   "chat.html",
   "dev.html",

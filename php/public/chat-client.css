@@ -1296,6 +1296,12 @@ body.developer-mode .developer-only {
   outline: 0;
 }
 
+.conversation-search input:focus,
+.conversation-search input:focus-visible {
+  outline: 0;
+  box-shadow: none;
+}
+
 .conversation-search input::placeholder {
   color: #6b7c94;
 }
