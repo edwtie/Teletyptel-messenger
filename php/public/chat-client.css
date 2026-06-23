@@ -1224,6 +1224,7 @@ body.developer-mode.conversation-open .client-grid {
   grid-template-columns: var(--conversation-list-width) minmax(0, 1fr) 330px;
 }
 
+body.history-page-active .client-grid,
 body.history-page-active.conversation-open .client-grid,
 body.history-page-active.developer-mode.conversation-open .client-grid {
   grid-template-columns: minmax(0, 1fr);
@@ -1262,6 +1263,7 @@ body.history-page-active .detail-panel {
   position: relative;
   z-index: 1;
   display: grid;
+  grid-column: 1 / -1;
   grid-template-rows: auto minmax(0, 1fr);
   gap: 14px;
   min-width: 0;
