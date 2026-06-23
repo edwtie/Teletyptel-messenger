@@ -12760,10 +12760,16 @@
       name.textContent = conversationDisplayName(conversation);
       meta.textContent = conversationListPreviewText(conversation);
       text.append(name, meta);
+      const time = document.createElement("span");
+      time.className = "conversation-time";
+      time.textContent = conversationListTimeText(conversation);
+      if (!time.textContent) {
+        time.hidden = true;
+      }
       const presence = document.createElement("span");
       presence.className = `presence-dot presence-${conversationPresence(conversation)}`;
       const unread = createConversationUnreadBadge(conversation);
-      button.append(avatar, text, unread, presence);
+      button.append(avatar, text, time, unread, presence);
       button.addEventListener("click", () => {
         selectConversation(conversation);
         ensurePublicProfileForConversation(conversation);
@@ -13546,6 +13552,22 @@
 
     const prefix = conversationPreviewPrefix(conversation, message);
     return prefix ? `${prefix}: ${body}` : body;
+  }
+
+  function conversationListTimeText(conversation) {
+    const message = lastConversationPreviewMessage(conversation);
+    const timestamp = message?.timestamp || conversation.lastSeenAt || null;
+    if (!timestamp) {
+      return "";
+    }
+
+    const date = normalizeMessageDate(timestamp);
+    const today = new Date();
+    if (date.toDateString() === today.toDateString()) {
+      return formatTime(date);
+    }
+
+    return date.toLocaleDateString(undefined, { day: "2-digit", month: "2-digit" });
   }
 
   function conversationListFallbackMeta(conversation) {

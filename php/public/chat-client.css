@@ -1343,9 +1343,9 @@ body.developer-mode .developer-only {
 
 .conversation-item {
   display: grid;
-  grid-template-columns: 34px minmax(0, 1fr) minmax(28px, auto) 14px;
+  grid-template-columns: 34px minmax(0, 1fr) minmax(42px, auto) minmax(28px, auto) 14px;
   align-items: center;
-  column-gap: 12px;
+  column-gap: 8px;
   width: 100%;
   text-align: left;
   border-color: transparent;
@@ -1371,6 +1371,18 @@ body.developer-mode .developer-only {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.conversation-time {
+  justify-self: end;
+  color: #48617f;
+  font-size: 11px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.conversation-time[hidden] {
+  display: none;
 }
 
 .conversation-unread-badge {
@@ -1425,6 +1437,10 @@ body.developer-mode .developer-only {
 
 .conversation-item.selected span {
   color: var(--selection-muted);
+}
+
+.conversation-item.selected .conversation-time {
+  color: rgba(255, 255, 255, .78);
 }
 
 .conversation-item.selected .conversation-unread-badge {
