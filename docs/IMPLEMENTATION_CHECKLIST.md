@@ -18,6 +18,9 @@ item is implemented, tested and documented.
   user-facing docs and public evaluation path are complete.
 - [x] XEP-0479 compliance notes separate repository evidence from formal
   compliance claims.
+- [x] Public homepage/teaser material is kept outside the software repository;
+  `php/public/index.php` is ignored so website copy is not published with the
+  app source.
 - [ ] Public hosted Teletyptel service is live with production account,
   abuse/rate-limit, moderation and backup policies.
 
@@ -129,7 +132,12 @@ item is implemented, tested and documented.
 - [x] Backend Authorization Code + PKCE flow for Google login.
 - [x] Backend Authorization Code + PKCE flow for Facebook login.
 - [x] Backend Authorization Code + PKCE flow for Apple login.
-- [ ] Live social-login smoke with real Google/Facebook/Apple provider configuration.
+- [x] Web client exposes Facebook sign-in plus account linking/unlinking in the
+  account security dialog.
+- [x] Live Facebook social-login smoke passed with the dev Meta app and
+  `https://dev.teletyptel.nl/api/auth/facebook/callback` redirect URI.
+- [ ] Live Google social-login smoke with production/dev provider configuration.
+- [ ] Live Apple social-login smoke with production/dev provider configuration.
 - [x] Database schema and compatibility migration for `accounts`, `account_identities`, `account_credentials` and `account_xmpp`.
 - [ ] Security UI for active clients/grants and revoke access.
 - [ ] XMPP server OAuth discovery and OAUTHBEARER live-server smoke.
