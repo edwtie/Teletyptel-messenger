@@ -402,6 +402,8 @@
 
 ### Fixed
 
+- Inactivity timeout now forces the login dialog after signing out the local
+  session instead of only disconnecting silently.
 - Refreshing the web client no longer briefly shows the login screen for a
   stored account session, reducing the grey/login flash during normal reloads.
 - Signing out now really clears the remembered browser account session, password

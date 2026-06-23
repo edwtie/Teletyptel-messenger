@@ -2471,7 +2471,10 @@
     }
 
     state.sessionTimeoutInProgress = true;
-    logoutAccount({ message: t("account.session_expired", "Session expired after inactivity. Sign in again.") })
+    logoutAccount({
+      message: t("account.session_expired", "Session expired after inactivity. Sign in again."),
+      forceLogin: true
+    })
       .finally(() => {
         state.sessionTimeoutInProgress = false;
       });
@@ -2479,7 +2482,8 @@
 
   function requestLoginRequired(message = "", options = {}) {
     const text = message || t("account.disconnected_login_required", "Connection closed. Sign in to continue.");
-    if (options.openLogin === false || shouldSuppressAutomaticLoginDialog(options)) {
+    const forceLogin = options.forceLogin === true;
+    if (!forceLogin && (options.openLogin === false || shouldSuppressAutomaticLoginDialog(options))) {
       setAccountGateRequired(false);
       if (!el.accountDialog.hidden && effectiveAccountDialogMode() === "signin") {
         closeAccountDialog();
@@ -3840,7 +3844,9 @@
     sendLogoutAccountSession()
       .then(() => appendDebug("account", "Server account session cleared"))
       .catch((error) => appendDebug("account-logout-error", error.message));
-    disconnectAll(options.message || t("account.signed_out", "Signed out. Sign in to continue."));
+    disconnectAll(options.message || t("account.signed_out", "Signed out. Sign in to continue."), {
+      forceLogin: options.forceLogin === true
+    });
   }
 
   function sendLogoutAccountSession() {
@@ -5564,7 +5570,11 @@
     });
   }
 
-  function disconnectAll(message = null) {
+  function disconnectAll(message = null, options = {}) {
+    if (message instanceof Event) {
+      message = null;
+    }
+
     state.intentionalDisconnect = true;
     clearTimeout(state.clientLifecycle.transientReconnectTimer);
     state.clientLifecycle.transientReconnectTimer = null;
@@ -5582,7 +5592,7 @@
 
     closeXmppWebSocket();
     updateConnectButtonAvailability();
-    returnToLoginScreenAfterDisconnect(message);
+    returnToLoginScreenAfterDisconnect(message, options);
   }
 
   function returnToLoginScreenAfterDisconnect(message, options = {}) {
