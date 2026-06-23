@@ -1,5 +1,5 @@
-const CACHE_NAME = "teletyptel-webclient-v323";
-const BUILD_VERSION = "20260623-conversation-time";
+const CACHE_NAME = "teletyptel-webclient-v324";
+const BUILD_VERSION = "20260623-conversation-date-label";
 const ASSETS = [
   "chat.html",
   "dev.html",

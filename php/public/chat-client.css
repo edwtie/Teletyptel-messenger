@@ -1343,7 +1343,7 @@ body.developer-mode .developer-only {
 
 .conversation-item {
   display: grid;
-  grid-template-columns: 34px minmax(0, 1fr) minmax(42px, auto) minmax(28px, auto) 14px;
+  grid-template-columns: 34px minmax(0, 1fr) minmax(58px, auto) minmax(28px, auto) 14px;
   align-items: center;
   column-gap: 8px;
   width: 100%;
@@ -1376,7 +1376,7 @@ body.developer-mode .developer-only {
 .conversation-time {
   justify-self: end;
   color: #48617f;
-  font-size: 11px;
+  font-size: 10px;
   line-height: 1;
   white-space: nowrap;
 }

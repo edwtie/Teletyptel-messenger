@@ -13561,13 +13561,36 @@
       return "";
     }
 
-    const date = normalizeMessageDate(timestamp);
+    return conversationListDateLabel(timestamp);
+  }
+
+  function conversationListDateLabel(value) {
+    const date = normalizeMessageDate(value);
     const today = new Date();
     if (date.toDateString() === today.toDateString()) {
       return formatTime(date);
     }
 
-    return date.toLocaleDateString(undefined, { day: "2-digit", month: "2-digit" });
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    if (date.toDateString() === yesterday.toDateString()) {
+      return t("history.yesterday", "Yesterday");
+    }
+
+    const dayBeforeYesterday = new Date(today);
+    dayBeforeYesterday.setDate(today.getDate() - 2);
+    if (date.toDateString() === dayBeforeYesterday.toDateString()) {
+      return t("history.day_before_yesterday", "The day before yesterday");
+    }
+
+    const weekAgo = new Date(today);
+    weekAgo.setHours(0, 0, 0, 0);
+    weekAgo.setDate(weekAgo.getDate() - 6);
+    if (date >= weekAgo) {
+      return date.toLocaleDateString(undefined, { weekday: "long" });
+    }
+
+    return date.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
   }
 
   function conversationListFallbackMeta(conversation) {
