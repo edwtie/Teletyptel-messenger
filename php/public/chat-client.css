@@ -2569,11 +2569,11 @@ body:not([data-chat-background="none"]) .message-body {
 .history-help-button {
   display: inline-grid;
   place-items: center;
-  width: 28px;
-  min-width: 28px;
-  height: 28px;
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
   border-radius: 6px;
-  padding: 0;
+  padding: 0 !important;
   font-weight: 800;
 }
 
