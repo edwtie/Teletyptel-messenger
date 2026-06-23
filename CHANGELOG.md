@@ -111,9 +111,10 @@
   message builder, renderer, local-only payload support and MAM-friendly call
   event messages for completed, missed, declined and failed calls.
 - The installer now generates an ejabberd MAM helper that enables `mod_mam`
-  with always-on XEP-0313 archiving, detects `/etc` and `/opt` ejabberd config
-  paths, replaces existing `mod_mam` blocks and only auto-selects SQL storage
-  when the ejabberd config already uses SQL.
+  with always-on XEP-0313 one-to-one archiving, enables `mod_muc`
+  `default_room_options.mam` for group chat archives, detects `/etc` and
+  `/opt` ejabberd config paths, replaces existing `mod_mam` blocks and only
+  auto-selects SQL storage when the ejabberd config already uses SQL.
 - Interactive location sharing UI with map preview, share duration up to eight
   hours, Google Maps/OpenStreetMap provider setting, browser geolocation
   permission handling and single live location card updates instead of duplicate
@@ -299,9 +300,37 @@
 - Product copy now presents TeleTypTel as an open messenger and Total
   Conversation platform instead of the older "Tiedragon XMPP Messenger" working
   name.
+- Account login, saved sessions and logout handling are simplified so a stored
+  account can reconnect without a visible login-screen flash, explicit sign-out
+  clears the local and server account session, and inactive sessions expire
+  after a fixed idle timeout.
+- The account/settings dialog is reorganized into a clearer fixed-size menu
+  layout with separate profile/security and app/server settings areas, plain
+  text-style navigation, read-only server fields while connected and clearer
+  status text for saved database accounts.
+- Account security now includes interactive current/new/repeat password
+  validation, stricter password rule feedback, two-factor login/setup flow
+  text and Google account connect/disconnect status in the profile/security
+  area.
+- Browser notifications now cover incoming chat messages, message reactions and
+  incoming calls, while respecting global Do Not Disturb and per-conversation
+  notification mute settings.
+- Global Do Not Disturb is now visible in presence/status, suppresses browser
+  notifications and rejects incoming Jingle calls as busy, while per-contact
+  notification mute stays private and does not block calls.
 - Production server direction is documented as ejabberd plus coturn and
   production modules for roster, MUC, MAM, PubSub/PEP, HTTP upload, TURN/STUN
   discovery and optional SIP-gateway work.
+- Web setup documentation now treats ejabberd XMPP WebSocket
+  (`wss://localhost:5443/websocket/`) as the normal browser route in README,
+  Getting Started, User Guide and Real Server Setup.
+- Installer copy and system checks now show ejabberd `/websocket` on port 5443
+  as the normal route and describe the PHP RTT relay as an optional legacy
+  RTT/RFC7395 smoke-test path.
+- Installer validation no longer requires a relay WebSocket URL, so
+  `relay_websocket` can stay empty when TeleTypTel uses ejabberd directly.
+- Real Server Setup now documents the `xmpp-websocket-smoke.php` check and how
+  to recognize successful ejabberd WebSocket sessions in the ejabberd log.
 - XSF/software-directory notes now describe only the current evaluation scope
   and avoid claiming Android/iOS or formal XEP-0479 compliance before release
   validation.
@@ -337,10 +366,25 @@
   operations, public signup policy, moderation, backups and monitoring before a
   production launch.
 - Browser chat, profile, history, attachment, location and Total Conversation
-  flows run through the TeleTypTel PHP web/API layer and local relay today.
-  Standards-based XMPP pieces are available in the PHP/C# libraries, LocalServer
-  and real-server smoke tools, but the browser UI is not yet a full federated
-  direct-XMPP client for arbitrary providers.
+  flows run through the TeleTypTel PHP web/API layer and ejabberd WebSocket for
+  the current local path. Standards-based XMPP pieces are available in the
+  PHP/C# libraries, LocalServer and real-server smoke tools, but the browser UI
+  is not yet a full federated direct-XMPP client for arbitrary providers.
+- Browser notifications depend on browser permission, active service worker
+  state and foreground/background rules. They are useful for beta testing, but
+  production mobile push still needs Web Push/APNs/FCM work.
+- Do Not Disturb and per-conversation notification mute are client-side
+  behavior today. Global DND is advertised through presence and rejects incoming
+  browser Jingle calls, but provider-wide policy enforcement still belongs on
+  the server side.
+- The simplified login/session flow is intended for beta evaluation. Public
+  service deployment still needs production rate limiting, session policy,
+  audit logging and abuse monitoring.
+- The settings/profile split is clearer, but final mobile layouts, accessibility
+  review and full keyboard/screen-reader QA remain release work.
+- Jingle calling works in the local browser path, but interoperability against
+  existing XMPP/Jingle clients and TURN-only network conditions still needs
+  hosted ejabberd/coturn smoke testing.
 - OMEMO/Double Ratchet work is intentionally audit-gated: wire helpers,
   envelopes, local key models and experimental PHP/C# ratchet code exist, but
   production end-to-end encryption must wait for independent review, stable test
@@ -358,6 +402,12 @@
 
 ### Fixed
 
+- Refreshing the web client no longer briefly shows the login screen for a
+  stored account session, reducing the grey/login flash during normal reloads.
+- Signing out now really clears the remembered browser account session, password
+  state and server session before returning to the login gate.
+- The reconnect/login availability path no longer references the missing
+  `hasStoredAccountSession` helper during disconnect/login failure handling.
 - Google OAuth sessions can load chat history again: the history schema now fits
   older MySQL index limits, Total Conversation history is part of the install
   schema, and the Google provider manifest no longer 404s.

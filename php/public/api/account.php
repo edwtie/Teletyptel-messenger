@@ -4,6 +4,8 @@ declare(strict_types=1);
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'Database.php';
 
 const TELETYPTEL_OAUTH_HANDOFF_TTL_SECONDS = 2592000;
+const TELETYPTEL_2FA_PENDING_ACCOUNT_SESSION_KEY = 'teletyptel_2fa_pending_account_id';
+const TELETYPTEL_2FA_PENDING_PASSWORD_SESSION_KEY = 'teletyptel_2fa_pending_password';
 
 session_start();
 header('Content-Type: application/json; charset=utf-8');
@@ -38,6 +40,11 @@ function writeAccount(): void
 
     if (($input['action'] ?? 'save') === 'login') {
         loginAccount($input);
+        return;
+    }
+
+    if (($input['action'] ?? 'save') === 'logout') {
+        logoutAccountSession();
         return;
     }
 
@@ -76,6 +83,16 @@ function writeAccount(): void
         return;
     }
 
+    if (($input['action'] ?? 'save') === 'verify_login_two_factor') {
+        verifyLoginTwoFactor($input);
+        return;
+    }
+
+    if (($input['action'] ?? 'save') === 'unlink_identity') {
+        unlinkIdentity($input);
+        return;
+    }
+
     saveAccount($input);
 }
 
@@ -90,6 +107,11 @@ function readAccount(): void
     }
 
     if (!isCurrentServerSession($accountId)) {
+        if (isPendingTwoFactorLoginSession($accountId)) {
+            echo json_encode(twoFactorLoginChallengePayload($accountId), JSON_UNESCAPED_SLASHES);
+            return;
+        }
+
         http_response_code(401);
         echo json_encode(['ok' => false, 'error' => 'not_authenticated']);
         return;
@@ -113,7 +135,18 @@ function readAccount(): void
         return;
     }
 
+    $row = ensureProviderXmppPassword($pdo, $row);
     echo json_encode(['ok' => true, 'account' => rowToAccount($row)], JSON_UNESCAPED_SLASHES);
+}
+
+function logoutAccountSession(): void
+{
+    unset(
+        $_SESSION['teletyptel_account_id'],
+        $_SESSION[TELETYPTEL_2FA_PENDING_ACCOUNT_SESSION_KEY],
+        $_SESSION[TELETYPTEL_2FA_PENDING_PASSWORD_SESSION_KEY]
+    );
+    echo json_encode(['ok' => true], JSON_UNESCAPED_SLASHES);
 }
 
 function readPublicProfile(PDO $pdo, string $jid): void
@@ -159,7 +192,14 @@ function consumeOAuthLoginToken(string $accountId, string $token): bool
 
         if (($payload['account_id'] ?? '') === $accountId
             && hash_equals((string)($payload['token_hash'] ?? ''), hash('sha256', $token))) {
-            $_SESSION['teletyptel_account_id'] = $accountId;
+            $pdo = Database::connect();
+            ensureAccountProfileSchema($pdo);
+            if (accountRequiresTwoFactor($pdo, $accountId)) {
+                beginTwoFactorLoginSession($accountId);
+            } else {
+                $_SESSION['teletyptel_account_id'] = $accountId;
+                clearTwoFactorLoginSession();
+            }
             return true;
         }
     }
@@ -190,12 +230,12 @@ function loginAccount(array $input): void
                 'jid' => $jid,
                 'password' => $password,
                 'rememberPassword' => false,
-                'relayWebSocket' => cleanText($input['relayWebSocket'] ?? ($row['relay_websocket'] ?? 'ws://127.0.0.1:8787'), 255),
+                'relayWebSocket' => cleanText($input['relayWebSocket'] ?? ($row['relay_websocket'] ?? ''), 255),
                 'xmppHost' => cleanText($input['xmppHost'] ?? ($row['xmpp_host'] ?? domainFromJid($jid)), 255),
                 'xmppDomain' => cleanText($input['xmppDomain'] ?? ($row['xmpp_domain'] ?? domainFromJid($jid)), 255),
                 'xmppPort' => (int)($input['xmppPort'] ?? ($row['xmpp_port'] ?? 5222)),
-                'xmppTlsMode' => cleanText($input['xmppTlsMode'] ?? ($row['xmpp_tls_mode'] ?? 'starttls'), 32),
-                'xmppWebSocket' => cleanText($input['xmppWebSocket'] ?? ($row['xmpp_websocket'] ?? 'ws://127.0.0.1:8787'), 255),
+                'xmppTlsMode' => cleanText($input['xmppTlsMode'] ?? ($row['xmpp_tls_mode'] ?? 'websocket'), 32),
+                'xmppWebSocket' => cleanText($input['xmppWebSocket'] ?? ($row['xmpp_websocket'] ?? 'wss://localhost:5443/websocket/'), 255),
             ], is_array($row) ? $row : null);
             persistAccount($pdo, $account);
             $statement = $pdo->prepare('SELECT * FROM account_profiles WHERE account_id = :account_id');
@@ -211,8 +251,17 @@ function loginAccount(array $input): void
         return;
     }
 
+    if (accountRequiresTwoFactor($pdo, (string)$row['account_id'])) {
+        beginTwoFactorLoginSession((string)$row['account_id'], $password);
+        echo json_encode(twoFactorLoginChallengePayload((string)$row['account_id']), JSON_UNESCAPED_SLASHES);
+        return;
+    }
+
     $_SESSION['teletyptel_account_id'] = $row['account_id'];
-    echo json_encode(['ok' => true, 'account' => rowToAccount($row)], JSON_UNESCAPED_SLASHES);
+    clearTwoFactorLoginSession();
+    $account = rowToAccount($row);
+    $account['password'] = $password;
+    echo json_encode(['ok' => true, 'account' => $account], JSON_UNESCAPED_SLASHES);
 }
 
 function saveAccount(array $input): void
@@ -226,7 +275,21 @@ function saveAccount(array $input): void
         return;
     }
 
+    $currentPassword = cleanText($input['currentPassword'] ?? '', 1024);
+    if ($existing && $currentPassword !== '' && !verifyAccountPassword($pdo, $existing, $currentPassword)) {
+        http_response_code(401);
+        echo json_encode(['ok' => false, 'error' => 'invalid_current_password']);
+        return;
+    }
+
     $account = normalizeAccount($input, $existing);
+    $plainPassword = cleanText($input['password'] ?? '', 1024);
+    if ($plainPassword !== '' && !syncLocalXmppPassword((string)$account['jid'], $plainPassword)) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => 'xmpp_password_sync_failed']);
+        return;
+    }
+
     persistAccount($pdo, $account);
 
     $_SESSION['teletyptel_account_id'] = $account['account_id'];
@@ -274,9 +337,9 @@ function createAccount(array $input): void
         'xmppHost' => $domain,
         'xmppDomain' => $domain,
         'xmppPort' => 5222,
-        'xmppTlsMode' => cleanText($input['xmppTlsMode'] ?? 'starttls', 32),
-        'xmppWebSocket' => cleanText($input['xmppWebSocket'] ?? 'ws://127.0.0.1:8787', 255),
-        'relayWebSocket' => cleanText($input['relayWebSocket'] ?? 'ws://127.0.0.1:8787', 255),
+        'xmppTlsMode' => cleanText($input['xmppTlsMode'] ?? 'websocket', 32),
+        'xmppWebSocket' => cleanText($input['xmppWebSocket'] ?? 'wss://localhost:5443/websocket/', 255),
+        'relayWebSocket' => cleanText($input['relayWebSocket'] ?? '', 255),
     ]));
 }
 
@@ -385,9 +448,9 @@ function resetPassword(array $input): void
             'xmppHost' => domainFromJid($jid),
             'xmppDomain' => domainFromJid($jid),
             'xmppPort' => 5222,
-            'xmppTlsMode' => 'starttls',
-            'xmppWebSocket' => 'ws://127.0.0.1:8787',
-            'relayWebSocket' => 'ws://127.0.0.1:8787',
+            'xmppTlsMode' => 'websocket',
+            'xmppWebSocket' => 'wss://localhost:5443/websocket/',
+            'relayWebSocket' => '',
         ], null);
         persistAccount($pdo, $account);
         $existing = findExistingAccount($pdo, ['jid' => $jid]);
@@ -744,6 +807,112 @@ function confirmAuthenticatorTwoFactorSetup(array $input): void
     ], JSON_UNESCAPED_SLASHES);
 }
 
+function verifyLoginTwoFactor(array $input): void
+{
+    $accountId = cleanText($input['accountId'] ?? ($_SESSION[TELETYPTEL_2FA_PENDING_ACCOUNT_SESSION_KEY] ?? ''), 96);
+    $code = preg_replace('/\D+/', '', (string)($input['code'] ?? '')) ?? '';
+    if ($accountId === '' || !isPendingTwoFactorLoginSession($accountId)) {
+        http_response_code(401);
+        echo json_encode(['ok' => false, 'error' => 'two_factor_login_missing']);
+        return;
+    }
+
+    if (strlen($code) !== 6) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'invalid_verification_code']);
+        return;
+    }
+
+    $pdo = Database::connect();
+    ensureAccountProfileSchema($pdo);
+    ensureIdentityVerificationSchema($pdo);
+    $statement = $pdo->prepare(
+        'SELECT two_factor_enabled, two_factor_method, two_factor_secret
+         FROM account_security_settings
+         WHERE account_id = :account_id
+         LIMIT 1'
+    );
+    $statement->execute(['account_id' => $accountId]);
+    $security = $statement->fetch();
+    if (!is_array($security) || !(bool)$security['two_factor_enabled']) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'two_factor_not_enabled']);
+        return;
+    }
+
+    $method = cleanText($security['two_factor_method'] ?? 'authenticator', 32);
+    $verified = false;
+    if ($method === 'authenticator') {
+        $verified = totpVerifyCode(cleanText($security['two_factor_secret'] ?? '', 128), $code);
+    } elseif ($method === 'email_code') {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'unsupported_two_factor_method']);
+        return;
+    }
+
+    if (!$verified) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'invalid_verification_code']);
+        return;
+    }
+
+    $statement = $pdo->prepare('SELECT * FROM account_profiles WHERE account_id = :account_id LIMIT 1');
+    $statement->execute(['account_id' => $accountId]);
+    $row = $statement->fetch();
+    if (!is_array($row)) {
+        http_response_code(404);
+        echo json_encode(['ok' => false, 'error' => 'account_not_found']);
+        return;
+    }
+
+    $row = ensureProviderXmppPassword($pdo, $row);
+    $_SESSION['teletyptel_account_id'] = $accountId;
+    $password = cleanText($_SESSION[TELETYPTEL_2FA_PENDING_PASSWORD_SESSION_KEY] ?? '', 1024);
+    clearTwoFactorLoginSession();
+    $account = rowToAccount($row);
+    if ($password !== '') {
+        $account['password'] = $password;
+    }
+    echo json_encode(['ok' => true, 'account' => $account], JSON_UNESCAPED_SLASHES);
+}
+
+function unlinkIdentity(array $input): void
+{
+    $accountId = cleanText($input['accountId'] ?? ($_SESSION['teletyptel_account_id'] ?? ''), 96);
+    $provider = strtolower(cleanText($input['provider'] ?? '', 32));
+    if ($accountId === '' || !isCurrentServerSession($accountId)) {
+        http_response_code(401);
+        echo json_encode(['ok' => false, 'error' => 'not_authenticated']);
+        return;
+    }
+
+    if (!in_array($provider, ['google', 'auth0', 'facebook', 'apple'], true)) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'unsupported_identity_provider']);
+        return;
+    }
+
+    $pdo = Database::connect();
+    ensureAccountProfileSchema($pdo);
+    $pdo->prepare('DELETE FROM account_identities WHERE account_id = :account_id AND provider = :provider')
+        ->execute(['account_id' => $accountId, 'provider' => $provider]);
+    $pdo->prepare('UPDATE account_profiles SET provider_id = "local" WHERE account_id = :account_id AND provider_id = :provider')
+        ->execute(['account_id' => $accountId, 'provider' => $provider]);
+    $pdo->prepare('UPDATE accounts SET provider_id = "local" WHERE account_id = :account_id AND provider_id = :provider')
+        ->execute(['account_id' => $accountId, 'provider' => $provider]);
+
+    $statement = $pdo->prepare('SELECT * FROM account_profiles WHERE account_id = :account_id LIMIT 1');
+    $statement->execute(['account_id' => $accountId]);
+    $row = $statement->fetch();
+    if (!is_array($row)) {
+        http_response_code(404);
+        echo json_encode(['ok' => false, 'error' => 'account_not_found']);
+        return;
+    }
+
+    echo json_encode(['ok' => true, 'account' => rowToAccount($row)], JSON_UNESCAPED_SLASHES);
+}
+
 function persistAccount(PDO $pdo, array $account): void
 {
     ensureAccountIdentitySchema($pdo);
@@ -764,7 +933,7 @@ function persistAccount(PDO $pdo, array $account): void
         ON DUPLICATE KEY UPDATE
             jid = VALUES(jid),
             display_name = VALUES(display_name),
-            password_secret = "",
+            password_secret = VALUES(password_secret),
             password_hash = VALUES(password_hash),
             remember_password = VALUES(remember_password),
             phone_number = VALUES(phone_number),
@@ -863,14 +1032,21 @@ function normalizeAccount(array $input, ?array $existing): array
         ? cleanText($existing['account_id'] ?? accountIdFromJid($jid), 96)
         : accountIdFromJid($jid);
     $displayName = cleanText($input['displayName'] ?? displayNameFromJid($jid), 120);
+    $rememberPassword = ($input['rememberPassword'] ?? false) === true;
+    $passwordSecret = '';
+    if ($password !== '' && $rememberPassword) {
+        $passwordSecret = $password;
+    } elseif ($password === '' && is_array($existing)) {
+        $passwordSecret = (string)($existing['password_secret'] ?? '');
+    }
 
     return [
         'account_id' => $accountId,
         'jid' => $jid,
         'display_name' => $displayName,
-        'password_secret' => '',
+        'password_secret' => $passwordSecret,
         'password_hash' => $passwordHash,
-        'remember_password' => ($input['rememberPassword'] ?? false) === true ? 1 : 0,
+        'remember_password' => $rememberPassword ? 1 : 0,
         'phone_number' => cleanText($input['phoneNumber'] ?? '', 64),
         'birth_date' => normalizeBirthDate($input['birthDate'] ?? ''),
         'provider_id' => cleanText($input['providerId'] ?? 'example-provider', 96),
@@ -878,13 +1054,13 @@ function normalizeAccount(array $input, ?array $existing): array
         'preferred_language' => cleanText($input['preferredLanguage'] ?? 'nl', 16),
         'live_rtt_enabled' => boolToTinyInt($input['liveRttEnabled'] ?? true),
         'show_smileys' => boolToTinyInt($input['showSmileys'] ?? true),
-        'relay_websocket' => cleanText($input['relayWebSocket'] ?? 'ws://127.0.0.1:8787', 255),
+        'relay_websocket' => cleanText($input['relayWebSocket'] ?? '', 255),
         'xmpp_websocket' => $xmppWebSocket,
         'xmpp_host' => $xmppHost,
         'xmpp_port' => normalizePort($input['xmppPort'] ?? 5222),
         'xmpp_domain' => $xmppDomain,
         'xmpp_tls_mode' => normalizeTlsMode($input['xmppTlsMode'] ?? 'websocket'),
-        'peer' => cleanText($input['peer'] ?? 'relay@localhost', 255),
+        'peer' => cleanText($input['peer'] ?? 'tester@localhost', 255),
         'avatar_data_url' => cleanText($input['avatarDataUrl'] ?? '', 524288),
         'avatar_color' => normalizeColor($input['avatarColor'] ?? '#2563eb'),
     ];
@@ -893,6 +1069,7 @@ function normalizeAccount(array $input, ?array $existing): array
 function rowToAccount(array $row): array
 {
     $security = accountSecuritySummary((string)$row['account_id']);
+    $linkedIdentities = linkedIdentitySummary((string)$row['account_id']);
     return [
         'accountId' => $row['account_id'],
         'jid' => $row['jid'],
@@ -911,14 +1088,68 @@ function rowToAccount(array $row): array
         'xmppHost' => $row['xmpp_host'] ?? '',
         'xmppPort' => (int)($row['xmpp_port'] ?? 5222),
         'xmppDomain' => $row['xmpp_domain'] ?? '',
-        'xmppTlsMode' => $row['xmpp_tls_mode'] ?? 'starttls',
+        'xmppTlsMode' => $row['xmpp_tls_mode'] ?? 'websocket',
         'peer' => $row['peer'],
         'avatarDataUrl' => $row['avatar_data_url'] ?? '',
         'avatarColor' => $row['avatar_color'] ?? '#2563eb',
         'twoFactorEnabled' => $security['twoFactorEnabled'],
         'twoFactorMethod' => $security['twoFactorMethod'],
+        'linkedIdentities' => $linkedIdentities,
         'savedInDatabase' => true,
     ];
+}
+
+function ensureProviderXmppPassword(PDO $pdo, array $row): array
+{
+    $provider = strtolower((string)($row['provider_id'] ?? ''));
+    if (!in_array($provider, ['google', 'facebook', 'apple', 'auth0'], true)) {
+        return $row;
+    }
+
+    if ((string)($row['password_secret'] ?? '') !== '' && (bool)($row['remember_password'] ?? false)) {
+        return $row;
+    }
+
+    $password = base64Url(random_bytes(32));
+    $passwordHash = password_hash($password, PASSWORD_DEFAULT);
+    $jid = bareJid((string)($row['jid'] ?? ''));
+    if ($jid === '') {
+        return $row;
+    }
+
+    if (!updateXmppSqlPassword($jid, $password)) {
+        $parts = explode('@', $jid, 2);
+        if (count($parts) !== 2 || !createXmppSqlAccount($parts[0], $password)) {
+            return $row;
+        }
+    }
+
+    $statement = $pdo->prepare(
+        'UPDATE account_profiles
+         SET password_secret = :password_secret,
+             password_hash = :password_hash,
+             remember_password = 1
+         WHERE account_id = :account_id'
+    );
+    $statement->execute([
+        'password_secret' => $password,
+        'password_hash' => $passwordHash,
+        'account_id' => $row['account_id'],
+    ]);
+    $statement = $pdo->prepare(
+        'INSERT INTO account_credentials (account_id, password_hash, password_updated_at)
+         VALUES (:account_id, :password_hash, NOW())
+         ON DUPLICATE KEY UPDATE password_hash = VALUES(password_hash), password_updated_at = NOW()'
+    );
+    $statement->execute([
+        'account_id' => $row['account_id'],
+        'password_hash' => $passwordHash,
+    ]);
+
+    $row['password_secret'] = $password;
+    $row['password_hash'] = $passwordHash;
+    $row['remember_password'] = 1;
+    return $row;
 }
 
 function rowToPublicProfile(PDO $pdo, array $row): array
@@ -958,6 +1189,7 @@ function publicEmailForAccount(PDO $pdo, string $accountId, string $fallbackJid)
 function accountToClient(array $account): array
 {
     $security = accountSecuritySummary((string)$account['account_id']);
+    $linkedIdentities = linkedIdentitySummary((string)$account['account_id']);
     return [
         'accountId' => $account['account_id'],
         'jid' => $account['jid'],
@@ -981,8 +1213,71 @@ function accountToClient(array $account): array
         'avatarColor' => $account['avatar_color'] ?? '#2563eb',
         'twoFactorEnabled' => $security['twoFactorEnabled'],
         'twoFactorMethod' => $security['twoFactorMethod'],
+        'linkedIdentities' => $linkedIdentities,
         'savedInDatabase' => true,
     ];
+}
+
+function linkedIdentitySummary(string $accountId): array
+{
+    $summary = [
+        'google' => [
+            'linked' => false,
+            'email' => '',
+            'emailVerified' => false,
+            'displayName' => '',
+            'linkedAt' => '',
+            'lastUsedAt' => '',
+        ],
+    ];
+    if ($accountId === '') {
+        return $summary;
+    }
+
+    try {
+        $pdo = Database::connect();
+        ensureAccountIdentitySchema($pdo);
+        $statement = $pdo->prepare(
+            'SELECT provider, email, email_verified, display_name, linked_at, last_used_at
+             FROM account_identities
+             WHERE account_id = :account_id
+             ORDER BY provider ASC, last_used_at DESC, linked_at DESC'
+        );
+        $statement->execute(['account_id' => $accountId]);
+        while ($row = $statement->fetch()) {
+            if (!is_array($row)) {
+                continue;
+            }
+
+            $provider = strtolower((string)$row['provider']);
+            if (!array_key_exists($provider, $summary)) {
+                $summary[$provider] = [
+                    'linked' => false,
+                    'email' => '',
+                    'emailVerified' => false,
+                    'displayName' => '',
+                    'linkedAt' => '',
+                    'lastUsedAt' => '',
+                ];
+            }
+
+            if ($summary[$provider]['linked'] === true) {
+                continue;
+            }
+
+            $summary[$provider] = [
+                'linked' => true,
+                'email' => (string)($row['email'] ?? ''),
+                'emailVerified' => (bool)($row['email_verified'] ?? false),
+                'displayName' => (string)($row['display_name'] ?? ''),
+                'linkedAt' => (string)($row['linked_at'] ?? ''),
+                'lastUsedAt' => (string)($row['last_used_at'] ?? ''),
+            ];
+        }
+    } catch (Throwable) {
+    }
+
+    return $summary;
 }
 
 function accountSecuritySummary(string $accountId): array
@@ -1015,6 +1310,57 @@ function accountSecuritySummary(string $accountId): array
     }
 }
 
+function accountRequiresTwoFactor(PDO $pdo, string $accountId): bool
+{
+    if ($accountId === '') {
+        return false;
+    }
+
+    ensureIdentityVerificationSchema($pdo);
+    $statement = $pdo->prepare(
+        'SELECT two_factor_enabled
+         FROM account_security_settings
+         WHERE account_id = :account_id
+         LIMIT 1'
+    );
+    $statement->execute(['account_id' => $accountId]);
+    $row = $statement->fetch();
+    return is_array($row) && (bool)$row['two_factor_enabled'];
+}
+
+function beginTwoFactorLoginSession(string $accountId, string $password = ''): void
+{
+    unset($_SESSION['teletyptel_account_id']);
+    $_SESSION[TELETYPTEL_2FA_PENDING_ACCOUNT_SESSION_KEY] = $accountId;
+    if ($password !== '') {
+        $_SESSION[TELETYPTEL_2FA_PENDING_PASSWORD_SESSION_KEY] = $password;
+    } else {
+        unset($_SESSION[TELETYPTEL_2FA_PENDING_PASSWORD_SESSION_KEY]);
+    }
+}
+
+function isPendingTwoFactorLoginSession(string $accountId): bool
+{
+    return $accountId !== ''
+        && hash_equals((string)($_SESSION[TELETYPTEL_2FA_PENDING_ACCOUNT_SESSION_KEY] ?? ''), $accountId);
+}
+
+function clearTwoFactorLoginSession(): void
+{
+    unset($_SESSION[TELETYPTEL_2FA_PENDING_ACCOUNT_SESSION_KEY], $_SESSION[TELETYPTEL_2FA_PENDING_PASSWORD_SESSION_KEY]);
+}
+
+function twoFactorLoginChallengePayload(string $accountId): array
+{
+    $summary = accountSecuritySummary($accountId);
+    return [
+        'ok' => true,
+        'twoFactorRequired' => true,
+        'accountId' => $accountId,
+        'method' => $summary['twoFactorMethod'] ?: 'authenticator',
+    ];
+}
+
 function ensureAccountProfileSchema(PDO $pdo): void
 {
     static $checked = false;
@@ -1028,7 +1374,7 @@ function ensureAccountProfileSchema(PDO $pdo): void
     ensureColumn($pdo, 'xmpp_host', "xmpp_host VARCHAR(255) NOT NULL DEFAULT 'localhost'");
     ensureColumn($pdo, 'xmpp_port', 'xmpp_port INT NOT NULL DEFAULT 5222');
     ensureColumn($pdo, 'xmpp_domain', "xmpp_domain VARCHAR(255) NOT NULL DEFAULT 'localhost'");
-    ensureColumn($pdo, 'xmpp_tls_mode', "xmpp_tls_mode VARCHAR(32) NOT NULL DEFAULT 'starttls'");
+    ensureColumn($pdo, 'xmpp_tls_mode', "xmpp_tls_mode VARCHAR(32) NOT NULL DEFAULT 'websocket'");
     ensureColumn($pdo, 'live_rtt_enabled', 'live_rtt_enabled TINYINT(1) NOT NULL DEFAULT 1');
     ensureColumn($pdo, 'show_smileys', 'show_smileys TINYINT(1) NOT NULL DEFAULT 1');
     ensureColumn($pdo, 'birth_date', 'birth_date VARCHAR(10) NOT NULL DEFAULT \'\'');
@@ -1094,9 +1440,9 @@ function ensureAccountIdentitySchema(PDO $pdo): void
             xmpp_domain VARCHAR(255) NOT NULL DEFAULT "localhost",
             xmpp_host VARCHAR(255) NOT NULL DEFAULT "localhost",
             xmpp_port INT NOT NULL DEFAULT 5222,
-            xmpp_tls_mode VARCHAR(32) NOT NULL DEFAULT "starttls",
-            xmpp_websocket VARCHAR(255) NOT NULL DEFAULT "ws://127.0.0.1:8787",
-            peer VARCHAR(255) NOT NULL DEFAULT "relay@localhost",
+            xmpp_tls_mode VARCHAR(32) NOT NULL DEFAULT "websocket",
+            xmpp_websocket VARCHAR(255) NOT NULL DEFAULT "wss://localhost:5443/websocket/",
+            peer VARCHAR(255) NOT NULL DEFAULT "tester@localhost",
             created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             UNIQUE KEY uq_account_xmpp_jid (xmpp_jid),
@@ -1127,8 +1473,8 @@ function migrateAccountIdentityTables(PDO $pdo): void
     ensureTableColumn($pdo, 'account_identities', 'last_used_at', 'last_used_at DATETIME NULL');
     ensureTableColumn($pdo, 'account_credentials', 'password_updated_at', 'password_updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP');
     ensureTableColumn($pdo, 'account_xmpp', 'xmpp_port', 'xmpp_port INT NOT NULL DEFAULT 5222');
-    ensureTableColumn($pdo, 'account_xmpp', 'xmpp_tls_mode', 'xmpp_tls_mode VARCHAR(32) NOT NULL DEFAULT "starttls"');
-    ensureTableColumn($pdo, 'account_xmpp', 'peer', 'peer VARCHAR(255) NOT NULL DEFAULT "relay@localhost"');
+    ensureTableColumn($pdo, 'account_xmpp', 'xmpp_tls_mode', 'xmpp_tls_mode VARCHAR(32) NOT NULL DEFAULT "websocket"');
+    ensureTableColumn($pdo, 'account_xmpp', 'peer', 'peer VARCHAR(255) NOT NULL DEFAULT "tester@localhost"');
 }
 
 function persistAccountIdentityModel(PDO $pdo, array $account): void
@@ -1238,9 +1584,9 @@ function backfillAccountIdentityModel(PDO $pdo): void
             'xmpp_domain' => $row['xmpp_domain'] ?? domainFromJid((string)$row['jid']),
             'xmpp_host' => $row['xmpp_host'] ?? domainFromJid((string)$row['jid']),
             'xmpp_port' => (int)($row['xmpp_port'] ?? 5222),
-            'xmpp_tls_mode' => $row['xmpp_tls_mode'] ?? 'starttls',
-            'xmpp_websocket' => $row['xmpp_websocket'] ?? 'ws://127.0.0.1:8787',
-            'peer' => $row['peer'] ?? 'relay@localhost',
+            'xmpp_tls_mode' => $row['xmpp_tls_mode'] ?? 'websocket',
+            'xmpp_websocket' => $row['xmpp_websocket'] ?? 'wss://localhost:5443/websocket/',
+            'peer' => $row['peer'] ?? 'tester@localhost',
         ]);
     }
 }
@@ -1357,7 +1703,7 @@ function ensureIdentityVerificationSchema(PDO $pdo): void
             user_agent VARCHAR(255) NOT NULL DEFAULT "",
             created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             UNIQUE KEY uq_account_verification_code_hash (code_hash),
-            KEY idx_account_verification_identifier (identifier(190), purpose, created_at),
+            KEY idx_account_verification_identifier (identifier(150), purpose, created_at),
             KEY idx_account_verification_account (account_id, created_at)
         )'
     );
@@ -1646,7 +1992,27 @@ function updateXmppSqlPassword(string $jid, string $password): bool
         'password' => $password,
         'username' => $parts[0],
     ]);
-    return $statement->rowCount() > 0;
+    if ($statement->rowCount() > 0) {
+        return true;
+    }
+
+    $exists = $pdo->prepare('SELECT username FROM users WHERE username = :username LIMIT 1');
+    $exists->execute(['username' => $parts[0]]);
+    return is_array($exists->fetch());
+}
+
+function syncLocalXmppPassword(string $jid, string $password): bool
+{
+    if ($password === '' || !isLocalXmppDomain(domainFromJid($jid))) {
+        return true;
+    }
+
+    if (updateXmppSqlPassword($jid, $password)) {
+        return true;
+    }
+
+    $parts = explode('@', bareJid($jid), 2);
+    return count($parts) === 2 && createXmppSqlAccount($parts[0], $password);
 }
 
 function buildPasswordResetLink(string $token): string
@@ -1967,6 +2333,11 @@ function appConfig(): array
 function bareJid(string $jid): string
 {
     return strtolower(trim(explode('/', $jid, 2)[0]));
+}
+
+function base64Url(string $bytes): string
+{
+    return rtrim(strtr(base64_encode($bytes), '+/', '-_'), '=');
 }
 
 function cleanText(mixed $value, int $maxLength): string

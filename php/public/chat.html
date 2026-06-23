@@ -14,9 +14,9 @@
     }
   </script>
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="chat-client.css?v=20260615-xmpp-mam-sync">
+  <link rel="stylesheet" href="chat-client.css?v=20260622-contact-search">
 </head>
-<body>
+<body class="account-booting">
   <a class="skip-link" href="#messageInput" data-i18n="button.skip_to_message">Skip to message</a>
   <div class="app-shell">
     <header class="topbar">
@@ -65,8 +65,16 @@
           <span class="material-icon" data-icon="settings" aria-hidden="true"></span>
           <span class="sr-only" data-i18n="button.settings">Settings</span>
         </button>
+        <button id="doNotDisturbButton" class="icon-button top-icon-button" type="button" title="Do not disturb" aria-label="Do not disturb" data-i18n-title="button.do_not_disturb" data-i18n-aria-label="button.do_not_disturb">
+          <span class="material-icon" data-icon="notificationsOff" aria-hidden="true"></span>
+          <span class="sr-only" data-i18n="button.do_not_disturb">Do not disturb</span>
+        </button>
+        <button id="logoutButton" class="icon-button top-icon-button logout-icon-button" type="button" title="Sign out" aria-label="Sign out" data-i18n-title="button.logout" data-i18n-aria-label="button.logout">
+          <span class="material-icon" data-icon="logout" aria-hidden="true"></span>
+          <span class="sr-only" data-i18n="button.logout">Sign out</span>
+        </button>
         <button id="connectButton" class="developer-only" type="button" data-i18n="button.connect">Connect</button>
-        <button id="disconnectButton" class="icon-button disconnect-icon-button" type="button" disabled hidden title="Disconnect" aria-label="Disconnect" data-i18n-title="button.disconnect" data-i18n-aria-label="button.disconnect">
+        <button id="disconnectButton" class="icon-button disconnect-icon-button developer-only" type="button" disabled hidden title="Disconnect" aria-label="Disconnect" data-i18n-title="button.disconnect" data-i18n-aria-label="button.disconnect">
           <span class="material-icon" data-icon="callEnd" aria-hidden="true"></span>
           <span class="sr-only" data-i18n="button.disconnect">Disconnect</span>
         </button>
@@ -78,6 +86,10 @@
         <div class="section-heading">
           <span data-i18n="section.conversations">Conversations</span>
         </div>
+        <label class="conversation-search">
+          <span class="material-icon" data-icon="search" aria-hidden="true"></span>
+          <input id="conversationSearchInput" type="search" autocomplete="off" spellcheck="false" placeholder="Search contacts" data-i18n-placeholder="placeholder.search_contacts" aria-label="Search contacts" data-i18n-aria-label="placeholder.search_contacts">
+        </label>
         <div id="conversationItems" class="conversation-items"></div>
         <div class="conversation-actions">
           <button id="addConversationButton" type="button" data-i18n="button.new_contact">New contact</button>
@@ -100,8 +112,8 @@
             <button id="backToContactsButton" class="back-to-contacts" type="button" data-i18n="button.back_to_contacts">Contacts</button>
             <div id="activeConversationAvatar" class="avatar avatar-header" aria-hidden="true">R</div>
             <div>
-            <h2 id="activeConversationName">Relay room</h2>
-            <span id="activeConversationMeta">Local PHP relay</span>
+            <h2 id="activeConversationName">Tester</h2>
+            <span id="activeConversationMeta">XMPP via ejabberd</span>
             </div>
           </div>
           <div class="chat-header-actions">
@@ -128,8 +140,14 @@
                 <span class="material-icon" data-icon="rtt" aria-hidden="true"></span>
                 <span class="sr-only" data-i18n="button.enable_rtt">Real-time text</span>
               </button>
-              <button id="answerCallButton" type="button" hidden data-i18n="button.answer_call">Answer</button>
-              <button id="rejectCallButton" type="button" hidden data-i18n="button.reject_call">Reject</button>
+              <button id="answerCallButton" class="call-answer-button" type="button" hidden>
+                <span class="material-icon" data-icon="call" aria-hidden="true"></span>
+                <span data-i18n="button.answer_call">Answer</span>
+              </button>
+              <button id="rejectCallButton" class="call-reject-button" type="button" hidden>
+                <span class="material-icon" data-icon="callEnd" aria-hidden="true"></span>
+                <span data-i18n="button.reject_call">Reject</span>
+              </button>
               <button id="hangupCallButton" class="icon-button call-mode-button hangup-icon-button" type="button" disabled title="Hang up" aria-label="Hang up" data-i18n-title="button.hangup_call" data-i18n-aria-label="button.hangup_call">
                 <span class="material-icon" data-icon="callEnd" aria-hidden="true"></span>
                 <span class="sr-only" data-i18n="button.hangup_call">Hang up</span>
@@ -137,8 +155,8 @@
               <span id="callStatus" class="call-status" role="status" aria-live="polite" data-i18n="call.idle">No call</span>
             </div>
             <div class="mode-switch developer-only" role="tablist" aria-label="Transport mode">
-              <button id="relayModeButton" type="button" class="selected" data-i18n="mode.relay">Relay</button>
-              <button id="xmppModeButton" type="button">RFC 7395</button>
+              <button id="relayModeButton" type="button" hidden data-i18n="mode.relay">Relay</button>
+              <button id="xmppModeButton" type="button" class="selected">XMPP</button>
             </div>
           </div>
         </div>
@@ -149,8 +167,14 @@
             <span id="incomingCallText">Incoming call from remote</span>
           </div>
           <div class="incoming-call-actions">
-            <button id="incomingAnswerButton" type="button" data-i18n="button.answer_call">Answer</button>
-            <button id="incomingRejectButton" type="button" data-i18n="button.reject_call">Reject</button>
+            <button id="incomingAnswerButton" class="call-answer-button" type="button">
+              <span class="material-icon" data-icon="call" aria-hidden="true"></span>
+              <span data-i18n="button.answer_call">Answer</span>
+            </button>
+            <button id="incomingRejectButton" class="call-reject-button" type="button">
+              <span class="material-icon" data-icon="callEnd" aria-hidden="true"></span>
+              <span data-i18n="button.reject_call">Reject</span>
+            </button>
           </div>
         </section>
 
@@ -159,8 +183,14 @@
             <strong id="incomingCallDialogTitle">Incoming video call</strong>
             <span id="incomingCallDialogText">Incoming call from remote</span>
             <div class="incoming-call-actions">
-              <button id="dialogAnswerButton" type="button" data-i18n="button.answer_call">Answer</button>
-              <button id="dialogRejectButton" type="button" data-i18n="button.reject_call">Reject</button>
+              <button id="dialogAnswerButton" class="call-answer-button" type="button">
+                <span class="material-icon" data-icon="call" aria-hidden="true"></span>
+                <span data-i18n="button.answer_call">Answer</span>
+              </button>
+              <button id="dialogRejectButton" class="call-reject-button" type="button">
+                <span class="material-icon" data-icon="callEnd" aria-hidden="true"></span>
+                <span data-i18n="button.reject_call">Reject</span>
+              </button>
             </div>
           </div>
         </div>
@@ -185,6 +215,10 @@
             <button id="toggleTotalConversationTextButton" class="icon-button call-media-icon-button" type="button" disabled title="Hide real-time text" aria-label="Hide real-time text" data-i18n-title="button.hide_tc_text" data-i18n-aria-label="button.hide_tc_text">
               <span class="material-icon" data-icon="rtt" aria-hidden="true"></span>
               <span class="sr-only" data-i18n="button.hide_tc_text">Hide real-time text</span>
+            </button>
+            <button id="hangupCallPanelButton" class="icon-button call-media-icon-button hangup-icon-button call-panel-hangup-button" type="button" disabled hidden title="Hang up" aria-label="Hang up" data-i18n-title="button.hangup_call" data-i18n-aria-label="button.hangup_call">
+              <span class="material-icon" data-icon="callEnd" aria-hidden="true"></span>
+              <span class="sr-only" data-i18n="button.hangup_call">Hang up</span>
             </button>
             <div class="call-device-controls" aria-label="Media devices">
               <label class="call-device-select ios-hidden-call-device" title="Camera" data-i18n-title="media.camera">
@@ -376,7 +410,7 @@
           </div>
           <label>
             <span data-i18n="label.relay_websocket">Relay WebSocket</span>
-            <input id="relayUrlInput" value="ws://127.0.0.1:8787">
+            <input id="relayUrlInput" value="" disabled>
           </label>
           <label>
             <span data-i18n="label.display_name">Display name</span>
@@ -410,7 +444,7 @@
           </label>
           <label>
             <span data-i18n="label.peer">Peer</span>
-            <input id="peerInput" value="relay@localhost">
+            <input id="peerInput" value="tester@localhost">
           </label>
           <label>
             <span data-i18n="label.phone">Phone</span>
@@ -447,12 +481,12 @@
           <label>
             <span data-i18n="label.video_quality">Video quality</span>
             <select id="videoQualityInput">
-              <option value="default" data-i18n="quality.default">1080 default</option>
-              <option value="qvga">240</option>
-              <option value="vga">480</option>
-              <option value="hd">720</option>
-              <option value="fullhd">1080</option>
-              <option value="uhd">4K</option>
+              <option value="default" data-i18n="quality.default">Auto</option>
+              <option value="qvga">240p</option>
+              <option value="vga">480p</option>
+              <option value="hd">720p</option>
+              <option value="fullhd">1080p HD</option>
+              <option value="uhd">1440p 4K</option>
             </select>
           </label>
           <label class="ios-facing-control">
@@ -480,7 +514,7 @@
           <h2>RFC 7395</h2>
           <label>
             XMPP WebSocket
-            <input id="xmppUrlInput" value="ws://127.0.0.1:8787">
+            <input id="xmppUrlInput" value="wss://localhost:5443/websocket/">
           </label>
           <div class="button-row">
             <button id="xmppOpenButton" type="button" data-i18n="button.open_stream">Open stream</button>
@@ -510,41 +544,63 @@
       </div>
       <div class="modal-body account-dialog-body">
         <div id="dialogAccountStatus" class="dialog-status" role="status" aria-live="polite"></div>
+        <div id="accountSettingsLayout" class="account-settings-layout">
+          <nav id="accountSettingsMenu" class="account-settings-menu" aria-label="Settings sections" data-i18n-aria-label="account.settings_menu">
+            <button type="button" data-account-panel="profile" data-i18n="section.profile">Profile</button>
+            <button type="button" data-account-panel="security" data-i18n="section.security">Security</button>
+            <button type="button" data-account-panel="app-security" data-i18n="section.security">Security</button>
+            <button type="button" data-account-panel="preferences" data-i18n="section.preferences">Preferences</button>
+            <button type="button" data-account-panel="media" data-i18n="section.media">Media</button>
+            <button type="button" data-account-panel="server" data-i18n="section.server_settings">Server settings</button>
+            <button type="button" data-account-panel="accessibility" data-i18n="tab.accessibility">Accessibility</button>
+          </nav>
 
-        <section class="modal-section account-auth-section">
-          <h3 id="dialogRealAccountTitle" data-i18n="section.real_account">Real account</h3>
-          <div class="account-dialog-grid">
-            <label class="account-start-hidden">
-              <span data-i18n="label.browser_session">Browser session</span>
-              <input id="dialogSessionProfileInput" autocomplete="off">
-            </label>
-            <label>
-              <span data-i18n="label.email">E-mail</span>
-              <input id="dialogJidInput" autocomplete="username" inputmode="email">
-            </label>
-            <label>
-              <span data-i18n="label.password">Password</span>
-              <input id="dialogPasswordInput" type="password" autocomplete="current-password">
-            </label>
-            <button id="dialogForgotPasswordButton" class="link-button account-forgot-password" type="button" data-i18n="button.forgot_password">Forgot password?</button>
-            <div class="social-login-row">
-              <button id="dialogGoogleLoginButton" class="social-login-button google-login-button" type="button">
-                <span class="social-login-mark" aria-hidden="true">G</span>
-                <span data-i18n="button.continue_google">Continue with Google</span>
-              </button>
-              <button id="dialogAuth0LoginButton" class="social-login-button auth0-login-button" type="button">
-                <span class="social-login-mark" aria-hidden="true">A0</span>
-                <span data-i18n="button.continue_auth0">Continue with Auth0</span>
-              </button>
+          <section class="modal-section account-auth-section">
+            <h3 id="dialogRealAccountTitle" data-i18n="section.real_account">Real account</h3>
+            <div class="account-dialog-grid">
+              <label class="account-start-hidden">
+                <span data-i18n="label.browser_session">Browser session</span>
+                <input id="dialogSessionProfileInput" autocomplete="off">
+              </label>
+              <label>
+                <span data-i18n="label.email">E-mail</span>
+                <input id="dialogJidInput" autocomplete="username" inputmode="email">
+              </label>
+              <label>
+                <span data-i18n="label.password">Password</span>
+                <input id="dialogPasswordInput" type="password" autocomplete="current-password">
+              </label>
+              <button id="dialogForgotPasswordButton" class="link-button account-forgot-password" type="button" data-i18n="button.forgot_password">Forgot password?</button>
+              <div class="social-login-row">
+                <button id="dialogGoogleLoginButton" class="social-login-button google-login-button" type="button">
+                  <span class="social-login-mark" aria-hidden="true">G</span>
+                  <span data-i18n="button.continue_google">Continue with Google</span>
+                </button>
+                <button id="dialogAuth0LoginButton" class="social-login-button auth0-login-button" type="button">
+                  <span class="social-login-mark" aria-hidden="true">A0</span>
+                  <span data-i18n="button.continue_auth0">Continue with Auth0</span>
+                </button>
+              </div>
+              <label class="toggle modal-toggle">
+                <input id="dialogRememberPasswordToggle" type="checkbox">
+                <span data-i18n="option.remember_password">Save account</span>
+              </label>
             </div>
-            <label class="toggle modal-toggle">
-              <input id="dialogRememberPasswordToggle" type="checkbox">
-              <span data-i18n="option.remember_password">Save account</span>
-            </label>
-          </div>
-        </section>
+            <div id="loginTwoFactorSection" class="login-two-factor-section" hidden>
+              <div class="security-status" data-i18n="account.login_two_factor_prompt">Enter the 6-digit authenticator code to finish signing in.</div>
+              <div class="account-dialog-grid security-code-grid">
+                <label>
+                  <span data-i18n="label.two_factor_code">2FA code</span>
+                  <input id="loginTwoFactorCodeInput" autocomplete="one-time-code" inputmode="numeric" pattern="[0-9]*" maxlength="6">
+                </label>
+                <div class="button-row">
+                  <button id="verifyLoginTwoFactorButton" type="button" data-i18n="button.verify_two_factor">Verify 2FA</button>
+                </div>
+              </div>
+            </div>
+          </section>
 
-        <section class="modal-section account-profile-section">
+        <section class="modal-section account-profile-section" data-settings-panel="profile">
           <h3 data-i18n="section.profile">Profile</h3>
           <div class="avatar-editor">
             <div id="dialogAccountAvatarPreview" class="avatar avatar-large" aria-hidden="true">E</div>
@@ -583,8 +639,42 @@
           </div>
         </section>
 
-        <section id="accountSecuritySection" class="modal-section account-security-section account-settings-section">
+        <section id="accountSecuritySection" class="modal-section account-security-section" data-settings-panel="security">
           <h3 data-i18n="section.security">Security</h3>
+          <div class="security-password-grid">
+            <div class="password-fields-row">
+              <label>
+                <span data-i18n="label.current_password">Current password</span>
+                <input id="dialogCurrentPasswordInput" type="password" autocomplete="current-password">
+              </label>
+              <label>
+                <span data-i18n="label.new_password">New password</span>
+                <input id="dialogNewPasswordInput" type="password" autocomplete="new-password">
+              </label>
+              <label>
+                <span data-i18n="label.repeat_password">Repeat password</span>
+                <input id="dialogRepeatPasswordInput" type="password" autocomplete="new-password">
+              </label>
+            </div>
+            <div id="passwordRulesPanel" class="password-rules-panel" aria-live="polite"></div>
+            <div class="password-actions-row">
+              <label class="toggle modal-toggle">
+                <input id="dialogRememberNewPasswordToggle" type="checkbox" checked>
+                <span data-i18n="option.remember_password">Save account</span>
+              </label>
+              <button id="changePasswordButton" type="button" data-i18n="button.change_password">Change password</button>
+            </div>
+          </div>
+          <div class="identity-link-panel">
+            <div>
+              <strong data-i18n="account.google_link_title">Google account</strong>
+              <div id="googleLinkStatus" class="security-status" role="status" aria-live="polite" data-i18n="account.google_not_linked">Google is not linked.</div>
+            </div>
+            <div class="button-row">
+              <button id="linkGoogleButton" type="button" data-i18n="button.link_google">Link Google</button>
+              <button id="unlinkGoogleButton" type="button" data-i18n="button.unlink_google">Unlink Google</button>
+            </div>
+          </div>
           <div id="twoFactorStatus" class="security-status" role="status" aria-live="polite" data-i18n="account.two_factor_off">2FA is off.</div>
           <div id="twoFactorQrPanel" class="two-factor-qr-panel" hidden>
             <div id="twoFactorQrCode" class="two-factor-qr-code" aria-label="Authenticator QR code" data-i18n-aria-label="account.two_factor_qr"></div>
@@ -605,7 +695,7 @@
           </div>
         </section>
 
-        <section class="modal-section account-preferences-section account-settings-section">
+        <section class="modal-section account-preferences-section account-settings-section" data-settings-panel="preferences">
           <h3 data-i18n="section.preferences">Preferences</h3>
           <div class="account-dialog-grid">
             <label class="toggle modal-toggle">
@@ -626,7 +716,33 @@
           </div>
         </section>
 
-        <section class="modal-section account-settings-section account-media-section">
+        <section class="modal-section app-security-section account-settings-section" data-settings-panel="app-security">
+          <h3 data-i18n="section.security">Security</h3>
+          <div class="identity-link-panel">
+            <div>
+              <strong data-i18n="settings.security_session_title">Session and sign-out</strong>
+              <div class="security-status" data-i18n="settings.security_session_text">Signing out clears the local account session and the server session.</div>
+            </div>
+            <div class="button-row">
+              <button type="button" id="settingsLogoutButton" data-i18n="button.logout">Sign out</button>
+            </div>
+          </div>
+          <div class="identity-link-panel">
+            <div>
+              <strong data-i18n="settings.security_local_title">Local data</strong>
+              <div class="security-status" data-i18n="settings.security_local_text">This browser stores account session, media choices and app preferences locally.</div>
+            </div>
+          </div>
+          <div class="identity-link-panel">
+            <div>
+              <strong data-i18n="settings.security_permissions_title">Permissions</strong>
+              <div class="security-status" data-i18n="settings.security_permissions_text">Camera, microphone and location access stay under browser control.</div>
+            </div>
+          </div>
+          <div id="dialogContactsPanel" class="settings-panel"></div>
+        </section>
+
+        <section class="modal-section account-settings-section account-media-section" data-settings-panel="media">
           <h3 data-i18n="section.media">Media</h3>
           <div class="account-dialog-grid">
             <label class="ios-hidden-device-setting">
@@ -640,12 +756,12 @@
             <label>
               <span data-i18n="label.video_quality">Video quality</span>
               <select id="dialogVideoQualityInput">
-                <option value="default" data-i18n="quality.default">1080 default</option>
-                <option value="qvga">240</option>
-                <option value="vga">480</option>
-                <option value="hd">720</option>
-                <option value="fullhd">1080</option>
-                <option value="uhd">4K</option>
+                <option value="default" data-i18n="quality.default">Auto</option>
+                <option value="qvga">240p</option>
+                <option value="vga">480p</option>
+                <option value="hd">720p</option>
+                <option value="fullhd">1080p HD</option>
+                <option value="uhd">1440p 4K</option>
               </select>
             </label>
             <label class="ios-facing-control">
@@ -666,7 +782,7 @@
 
         <details id="dialogAdvancedDetails" class="modal-section account-advanced account-settings-section">
           <summary data-i18n="account.advanced_settings">Advanced settings</summary>
-          <section class="modal-section">
+          <section class="modal-section" data-settings-panel="server">
             <h3 data-i18n="section.server_settings">Server settings</h3>
             <p id="dialogServerSettingsLockNote" class="server-settings-lock-note" hidden data-i18n="account.server_settings_locked">Server settings are read-only while connected. Disconnect to change them.</p>
             <div class="account-dialog-grid">
@@ -705,7 +821,7 @@
             </div>
           </section>
 
-          <section class="modal-section">
+          <section class="modal-section" data-settings-panel="server">
             <h3 data-i18n="section.chat_defaults">Chat defaults</h3>
             <div class="account-dialog-grid">
               <label>
@@ -726,16 +842,12 @@
             </div>
           </section>
 
-          <section class="modal-section">
-            <h3 data-i18n="tab.contacts">Contacts</h3>
-            <div id="dialogContactsPanel" class="settings-panel"></div>
-          </section>
-
-          <section class="modal-section">
+          <section class="modal-section" data-settings-panel="accessibility">
             <h3 data-i18n="tab.accessibility">Accessibility</h3>
             <div id="dialogAccessibilityPanel" class="settings-panel"></div>
           </section>
         </details>
+        </div>
       </div>
       <div class="modal-actions">
         <button id="dialogCreateAccountButton" type="button" data-i18n="button.create_account">Create account</button>
@@ -826,25 +938,37 @@
   </div>
 
   <div id="videoPreviewDialog" class="video-preview-dialog-shell" hidden role="dialog" aria-modal="true" aria-labelledby="videoPreviewDialogTitle">
-    <div class="video-preview-dialog-card">
-      <div class="video-preview-dialog-header">
-        <strong id="videoPreviewDialogTitle" data-i18n="video.preview_title">Video preview</strong>
-        <button id="closeVideoPreviewDialogButton" class="icon-button" type="button" aria-label="Close" data-i18n-aria-label="button.close">x</button>
-      </div>
-      <label class="video-recorder-quality">
-        <span class="material-icon" data-icon="highQuality" aria-hidden="true"></span>
-        <span class="sr-only" data-i18n="label.video_quality">Video quality</span>
-        <select id="videoRecorderQualityInput">
-          <option value="default" data-i18n="quality.default">1080 default</option>
-          <option value="qvga">240</option>
-          <option value="vga">480</option>
-          <option value="hd">720</option>
-          <option value="fullhd">1080</option>
-          <option value="uhd">4K</option>
-        </select>
-      </label>
+      <div class="video-preview-dialog-card">
+        <div class="video-preview-dialog-header">
+          <strong id="videoPreviewDialogTitle" data-i18n="video.preview_title">Video preview</strong>
+          <button id="closeVideoPreviewDialogButton" class="icon-button" type="button" aria-label="Close" data-i18n-aria-label="button.close">x</button>
+        </div>
       <video id="videoPreviewDialogVideo" controls playsinline></video>
       <div class="video-preview-dialog-actions">
+        <label class="video-recorder-camera">
+          <span class="material-icon" data-icon="videocam" aria-hidden="true"></span>
+          <span class="sr-only" data-i18n="label.camera">Camera</span>
+          <button id="videoRecorderCameraButton" class="video-camera-button" type="button" aria-haspopup="listbox" aria-expanded="false">
+            <span id="videoRecorderCameraLabel">Camera</span>
+          </button>
+        </label>
+        <div id="videoRecorderCameraMenu" class="video-camera-menu" role="listbox" hidden></div>
+        <label class="video-recorder-quality">
+          <span class="material-icon" data-icon="qualityTune" aria-hidden="true"></span>
+          <span class="sr-only" data-i18n="label.video_quality">Video quality</span>
+          <select id="videoRecorderQualityInput" class="video-recorder-quality-native" tabindex="-1" aria-hidden="true">
+            <option value="default" data-i18n="quality.default">Auto</option>
+            <option value="uhd" data-badge="4K">1440p</option>
+            <option value="fullhd" data-badge="HD">1080p</option>
+            <option value="hd">720p</option>
+            <option value="vga">480p</option>
+            <option value="qvga">240p</option>
+          </select>
+          <button id="videoRecorderQualityButton" class="video-quality-button" type="button" aria-haspopup="listbox" aria-expanded="false">
+            <span id="videoRecorderQualityLabel">Auto</span>
+          </button>
+        </label>
+        <div id="videoRecorderQualityMenu" class="video-quality-menu" role="listbox" hidden></div>
         <button id="startVideoRecordingButton" class="icon-button voice-action-button voice-action-primary" type="button" title="Start recording" aria-label="Start recording" data-i18n-title="video.start_recording" data-i18n-aria-label="video.start_recording">
           <span class="material-icon" data-icon="videocam" aria-hidden="true"></span>
           <span class="sr-only" data-i18n="video.start_recording">Start recording</span>
@@ -891,6 +1015,7 @@
   <div id="conversationContextMenu" class="context-menu" hidden role="menu" aria-label="Contact menu">
     <button id="contextProfileButton" type="button" role="menuitem" data-i18n="button.view_profile">View profile</button>
     <button id="contextRoomAvatarButton" type="button" role="menuitem" data-i18n="button.group_avatar">Group avatar...</button>
+    <button id="contextMuteNotificationsButton" type="button" role="menuitem" data-i18n="button.mute_notifications">Mute notifications</button>
     <button id="contextBlockButton" class="danger-action" type="button" role="menuitem" data-i18n="button.block_contact">Block</button>
   </div>
   <input id="mucAvatarFileInput" class="file-input" type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" aria-label="Choose group avatar" data-i18n-aria-label="button.group_avatar">
@@ -941,8 +1066,8 @@
     <button id="messageContextForwardButton" type="button" role="menuitem" data-i18n="button.forward_message">Forward</button>
   </div>
 
-  <script src="vendor/qrcode.js?v=20260615-xmpp-mam-sync"></script>
+  <script src="vendor/qrcode.js?v=20260622-contact-search"></script>
   <script src="jingle-history.js?v=20260615-jingle-history"></script>
-  <script src="chat-client.js?v=20260615-jingle-history"></script>
+  <script src="chat-client.js?v=20260622-contact-search"></script>
 </body>
 </html>

@@ -160,6 +160,26 @@ button:disabled {
   flex: 0 0 38px;
 }
 
+.logout-icon-button {
+  margin-left: 2px;
+  margin-right: 2px;
+  border-color: #fecaca !important;
+  background: #fff1f2 !important;
+  color: #b91c1c !important;
+}
+
+.logout-icon-button:hover:not(:disabled),
+.logout-icon-button:focus-visible {
+  border-color: #ef4444 !important;
+  background: #fee2e2 !important;
+  color: #991b1b !important;
+}
+
+.logout-icon-button:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
 .top-menu summary::-webkit-details-marker {
   display: none;
 }
@@ -244,6 +264,14 @@ body.modal-open {
   overflow: hidden;
 }
 
+body.account-booting .app-shell {
+  visibility: hidden;
+}
+
+body.account-booting .modal-shell {
+  display: none !important;
+}
+
 body.account-gate .app-shell {
   visibility: hidden;
 }
@@ -323,6 +351,143 @@ body.account-gate .modal-shell {
   font-size: 15px;
 }
 
+.account-settings-menu {
+  display: none;
+  gap: 6px;
+  z-index: 2;
+  align-self: stretch;
+  min-height: 0;
+  max-height: none;
+  overflow: auto;
+  border-right: 1px solid var(--line);
+  background: var(--panel-strong);
+  padding: 12px;
+}
+
+.account-settings-menu button {
+  justify-content: flex-start;
+  min-height: 40px;
+  width: 100%;
+  border: 0;
+  border-left: 3px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  font-weight: 600;
+  text-align: left;
+  padding: 8px 10px;
+}
+
+.account-settings-menu button:hover,
+.account-settings-menu button:focus-visible {
+  background: rgba(37, 99, 235, .08);
+  color: var(--accent);
+}
+
+.account-settings-menu button.selected {
+  border-left-color: var(--accent);
+  background: transparent;
+  color: var(--accent);
+}
+
+.account-menu-dialog .account-settings-menu {
+  display: grid;
+}
+
+.account-settings-layout {
+  display: contents;
+}
+
+.account-menu-dialog .account-dialog-card {
+  width: min(980px, calc(100vw - 32px));
+  height: min(760px, calc(100vh - 32px));
+}
+
+.account-menu-dialog .account-dialog-body {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 0;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0;
+  background: var(--surface-muted);
+}
+
+.account-menu-dialog .dialog-status {
+  grid-row: 1;
+  margin: 16px 16px 0;
+  min-height: 34px;
+  max-height: 52px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.account-menu-dialog .account-settings-layout {
+  display: grid;
+  grid-row: 2;
+  grid-template-columns: minmax(180px, 230px) minmax(0, 1fr);
+  min-height: 0;
+  overflow: hidden;
+}
+
+.account-menu-dialog .account-settings-menu {
+  grid-column: 1;
+  position: sticky;
+  top: 0;
+  align-self: start;
+  max-height: 100%;
+}
+
+.account-menu-dialog .modal-section[data-settings-panel] {
+  display: none;
+}
+
+.account-menu-dialog .modal-section[data-settings-panel].active-settings-panel {
+  display: block;
+  grid-column: 2;
+  margin-bottom: 0;
+  min-height: 0;
+  overflow: auto;
+  border-left: 1px solid var(--line);
+  background: var(--panel);
+  padding: 18px 20px 22px;
+}
+
+.account-menu-dialog .account-advanced {
+  grid-column: 2;
+  margin: 0;
+  overflow: auto;
+  border-left: 1px solid var(--line);
+  background: var(--panel);
+  padding: 18px 20px 22px;
+}
+
+.account-menu-dialog .modal-section[data-settings-panel].active-settings-panel > * + *,
+.account-menu-dialog .account-advanced > * + * {
+  margin-top: 10px;
+}
+
+.account-menu-dialog .modal-section[data-settings-panel] h3 {
+  color: var(--text);
+  font-size: 20px;
+  line-height: 1.2;
+  margin-bottom: 8px;
+}
+
+.account-menu-dialog .modal-section[data-settings-panel] > .account-dialog-grid,
+.account-menu-dialog .modal-section[data-settings-panel] > .avatar-editor,
+.account-menu-dialog .modal-section[data-settings-panel] > .settings-panel,
+.account-menu-dialog .modal-section[data-settings-panel] > .security-password-grid,
+.account-menu-dialog .modal-section[data-settings-panel] > .identity-link-panel,
+.account-menu-dialog .modal-section[data-settings-panel] > .two-factor-qr-panel,
+.account-menu-dialog .modal-section[data-settings-panel] > .security-code-grid,
+.account-menu-dialog .modal-section[data-settings-panel] > .media-status,
+.account-menu-dialog .modal-section[data-settings-panel] > .button-row,
+.account-menu-dialog .modal-section[data-settings-panel] > .server-settings-lock-note {
+  max-width: 680px;
+}
+
 .account-advanced {
   margin-top: 2px;
 }
@@ -368,6 +533,135 @@ body.account-gate .modal-shell {
   grid-column: 1 / -1;
   display: inline-flex;
   justify-content: flex-start;
+}
+
+.account-security-section {
+  gap: 12px;
+}
+
+.security-password-grid {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-strong);
+  padding: 12px;
+}
+
+.password-fields-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.password-fields-row label {
+  display: grid;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.password-rules-panel {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3px 14px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  padding: 7px 10px;
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.password-rule {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+}
+
+.password-rule.valid {
+  color: #16a34a;
+  font-weight: 700;
+}
+
+.password-rule.invalid {
+  color: #991b1b;
+}
+
+.password-rule-marker {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.password-rule.valid .password-rule-marker {
+  background: #16a34a;
+  color: #ffffff;
+}
+
+.password-rule.invalid .password-rule-marker {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.password-actions-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.password-actions-row .modal-toggle {
+  display: inline-flex;
+  width: auto;
+  min-width: 0;
+}
+
+.password-actions-row button {
+  min-width: 180px;
+}
+
+.login-two-factor-section {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-strong);
+  padding: 12px;
+}
+
+.login-two-factor-section[hidden] {
+  display: none;
+}
+
+.identity-link-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-strong);
+  padding: 12px;
+}
+
+.identity-link-panel > div:first-child {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.identity-link-panel .button-row {
+  flex: 0 0 auto;
 }
 
 .two-factor-qr-panel {
@@ -642,6 +936,18 @@ body.account-gate .modal-shell {
   display: none;
 }
 
+.account-menu-dialog.profile-dialog .account-profile-section.active-settings-panel {
+  display: block;
+}
+
+.account-menu-dialog.settings-dialog .account-advanced {
+  display: block;
+}
+
+.account-menu-dialog .account-advanced summary {
+  display: none;
+}
+
 .server-setting-readonly {
   opacity: .72;
 }
@@ -727,14 +1033,6 @@ select.server-setting-readonly {
   height: 22px;
 }
 
-.disconnect-icon-button .material-icon {
-  width: 35px;
-  height: 30px;
-}
-
-
-
-
 .sr-only {
   position: absolute;
   overflow: hidden;
@@ -780,7 +1078,7 @@ textarea {
   gap: 16px;
   border-bottom: 1px solid #314159;
   background: #151f2d;
-  padding: 8px 14px;
+  padding: 8px 18px 8px 14px;
 }
 
 .brand {
@@ -879,6 +1177,13 @@ textarea {
   gap: 8px;
 }
 
+.top-actions {
+  min-width: 0;
+  flex: 0 0 auto;
+  justify-content: flex-end;
+  overflow: visible;
+}
+
 .client-grid {
   --conversation-list-width: 420px;
   position: relative;
@@ -906,12 +1211,11 @@ textarea {
 }
 
 body.conversation-open .client-grid {
-  --conversation-list-width: 260px;
-  grid-template-columns: 260px minmax(0, 1fr);
+  grid-template-columns: var(--conversation-list-width) minmax(0, 1fr);
 }
 
 body.developer-mode.conversation-open .client-grid {
-  grid-template-columns: 260px minmax(0, 1fr) 330px;
+  grid-template-columns: var(--conversation-list-width) minmax(0, 1fr) 330px;
 }
 
 .conversation-list,
@@ -957,9 +1261,52 @@ body.developer-mode .developer-only {
   margin-bottom: 10px;
 }
 
+.conversation-search {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  border: 1px solid #c9d8ef;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, .82);
+  padding: 7px 10px;
+  color: #48617f;
+}
+
+.conversation-search:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, .18);
+}
+
+.conversation-search .material-icon {
+  width: 18px;
+  height: 18px;
+  color: inherit;
+}
+
+.conversation-search input {
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: #0f172a;
+  outline: 0;
+}
+
+.conversation-search input::placeholder {
+  color: #6b7c94;
+}
+
 .conversation-items {
   display: grid;
   gap: 6px;
+}
+
+.conversation-empty {
+  margin: 8px 4px;
+  color: #48617f;
+  font-size: 14px;
 }
 
 .conversation-actions {
@@ -984,9 +1331,9 @@ body.developer-mode .developer-only {
 
 .conversation-item {
   display: grid;
-  grid-template-columns: 34px minmax(0, 1fr) 12px;
+  grid-template-columns: 34px minmax(0, 1fr) minmax(28px, auto) 14px;
   align-items: center;
-  column-gap: 10px;
+  column-gap: 12px;
   width: 100%;
   text-align: left;
   border-color: transparent;
@@ -1014,7 +1361,27 @@ body.developer-mode .developer-only {
   white-space: nowrap;
 }
 
+.conversation-unread-badge {
+  display: inline-grid;
+  place-items: center;
+  justify-self: end;
+  min-width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--accent-strong);
+  color: #ffffff;
+  padding: 0 7px;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.conversation-unread-badge[hidden] {
+  display: none;
+}
+
 .presence-dot {
+  justify-self: center;
   width: 10px;
   height: 10px;
   border: 1px solid rgba(255, 255, 255, .55);
@@ -1046,6 +1413,13 @@ body.developer-mode .developer-only {
 
 .conversation-item.selected span {
   color: var(--selection-muted);
+}
+
+.conversation-item.selected .conversation-unread-badge {
+  border: 1px solid rgba(255, 255, 255, .85);
+  background: #2563eb;
+  color: #ffffff;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, .22);
 }
 
 .conversation-item.selected .avatar {
@@ -1179,6 +1553,38 @@ body.conversation-open .chat-panel {
   color: #ffffff !important;
 }
 
+.call-answer-button,
+.call-reject-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 34px;
+  font-weight: 800;
+}
+
+.call-answer-button {
+  border-color: #22c55e !important;
+  background: #16a34a !important;
+  color: #ffffff !important;
+}
+
+.call-reject-button {
+  border-color: #ef4444 !important;
+  background: #dc2626 !important;
+  color: #ffffff !important;
+}
+
+.call-answer-button:hover:not(:disabled) {
+  background: #15803d !important;
+  color: #ffffff !important;
+}
+
+.call-reject-button:hover:not(:disabled) {
+  background: #b91c1c !important;
+  color: #ffffff !important;
+}
+
 .disconnect-icon-button:not(:disabled),
 .hangup-icon-button:not(:disabled) {
   box-shadow: inset 0 -2px 0 rgba(220, 38, 38, .7);
@@ -1196,6 +1602,12 @@ body.conversation-open .chat-panel {
 .hangup-icon-button:hover:not(:disabled) {
   background: #b91c1c !important;
   color: #ffffff !important;
+}
+
+.call-panel-hangup-button {
+  width: 46px;
+  min-width: 46px;
+  height: 38px;
 }
 
 .total-conversation-button {
@@ -2728,7 +3140,8 @@ body[data-theme="dark"] .message-date-separator span {
   grid-template-columns: 42px minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
-  min-width: min(280px, 64vw);
+  width: min(100%, 360px);
+  min-width: 0;
 }
 
 .call-message-icon {
@@ -3763,7 +4176,8 @@ body[data-theme="dark"] .message-reaction-picker {
   display: grid;
   place-items: center;
   background: rgba(2, 6, 23, .7);
-  padding: 24px;
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  overflow: auto;
 }
 
 .video-preview-dialog-shell[hidden] {
@@ -3772,14 +4186,16 @@ body[data-theme="dark"] .message-reaction-picker {
 
 .video-preview-dialog-card {
   display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   gap: 10px;
   width: min(960px, calc(100vw - 48px));
-  max-height: calc(100dvh - 48px);
+  max-height: calc(min(100svh, var(--visual-viewport-height, 100svh)) - 32px);
   border: 1px solid rgba(147, 197, 253, .65);
   border-radius: 10px;
   background: #07111f;
   padding: 10px;
   box-shadow: 0 24px 80px rgba(0, 0, 0, .5);
+  overflow: hidden;
 }
 
 .video-preview-dialog-header {
@@ -3790,49 +4206,244 @@ body[data-theme="dark"] .message-reaction-picker {
   color: #eff6ff;
 }
 
-.video-recorder-quality {
+.video-preview-dialog-header strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.video-recorder-quality,
+.video-recorder-camera {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
-  justify-self: end;
-  gap: 6px;
+  gap: 4px;
   color: #dbeafe;
   font-size: 11px;
 }
 
-.video-recorder-quality .material-icon {
-  width: 20px;
-  height: 20px;
-  color: #dbeafe;
+.video-recorder-camera {
+  margin-right: 4px;
 }
 
-.video-recorder-quality select {
-  width: 96px;
-  height: 30px;
-  border: 1px solid rgba(147, 197, 253, .65);
-  border-radius: 8px;
-  padding: 0 6px;
-  background: #f8fbff;
-  color: #0f172a;
+.video-recorder-quality {
+  margin-right: auto;
+}
+
+.video-preview-dialog-card {
+  position: relative;
+}
+
+.video-recorder-quality .material-icon,
+.video-recorder-camera .material-icon {
+  width: 17px;
+  height: 17px;
+  color: #cbd5e1;
+}
+
+.video-recorder-quality-native {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.video-quality-button,
+.video-camera-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 84px;
+  height: 24px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 0 7px 0 8px;
+  background: #020617 !important;
+  color: #ffffff !important;
+  cursor: pointer;
   font: inherit;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.video-camera-button {
+  min-width: 96px;
+  max-width: 150px;
+}
+
+.video-quality-button span,
+.video-camera-button span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.video-quality-button:hover:not(:disabled),
+.video-camera-button:hover:not(:disabled) {
+  border-color: transparent;
+  background: #0f172a !important;
+  color: #ffffff !important;
+}
+
+.video-quality-button:active,
+.video-quality-button[aria-expanded="true"],
+.video-camera-button:active,
+.video-camera-button[aria-expanded="true"] {
+  border-color: transparent;
+  background: #020617 !important;
+  color: #ffffff !important;
+}
+
+.video-quality-button[aria-expanded="true"]::after,
+.video-camera-button[aria-expanded="true"]::after {
+  color: #60a5fa;
+}
+
+.video-quality-button::after,
+.video-camera-button::after {
+  content: "›";
+  margin-left: 7px;
+  color: #60a5fa;
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.video-quality-label {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
+  white-space: nowrap;
+}
+
+.video-quality-badge {
+  color: #94a3b8;
+  font-size: .62em;
+  font-weight: 700;
+  line-height: 1;
+  transform: translateY(-.42em);
+}
+
+.video-quality-button:focus-visible,
+.video-camera-button:focus-visible {
+  outline: none;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.video-quality-button:disabled,
+.video-camera-button:disabled {
+  cursor: default;
+  opacity: .65;
+}
+
+.video-quality-menu,
+.video-camera-menu {
+  position: absolute;
+  bottom: 58px;
+  left: 12px;
+  z-index: 4;
+  display: grid;
+  gap: 2px;
+  width: 142px;
+  max-height: min(320px, calc(var(--visual-viewport-height, 100svh) - 180px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid rgba(148, 163, 184, .2);
+  border-radius: 10px;
+  background: rgba(15, 23, 42, .94);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, .48);
+  backdrop-filter: blur(10px);
+  padding: 6px;
+  justify-items: start;
+}
+
+.video-camera-menu {
+  left: 116px;
+  width: min(220px, calc(100% - 128px));
+}
+
+.video-quality-menu[hidden],
+.video-camera-menu[hidden] {
+  display: none;
+}
+
+.video-quality-menu .video-quality-option,
+.video-camera-menu .video-camera-option {
+  appearance: none;
+  display: inline-grid;
+  grid-template-columns: 18px auto;
+  align-items: center;
+  gap: 8px;
+  justify-self: start;
+  width: auto;
+  min-height: 34px;
+  border: 0 !important;
+  border-radius: 7px;
+  background: transparent !important;
+  color: #e5edf7;
+  cursor: pointer;
+  padding: 0 10px;
+  font: inherit;
+  text-align: left;
+  box-shadow: none !important;
+}
+
+.video-quality-menu .video-quality-option::before,
+.video-camera-menu .video-camera-option::before {
+  content: "";
+  color: #ffffff;
+  font-weight: 800;
+}
+
+.video-quality-menu .video-quality-option:hover,
+.video-quality-menu .video-quality-option:focus-visible,
+.video-camera-menu .video-camera-option:hover,
+.video-camera-menu .video-camera-option:focus-visible {
+  outline: none;
+  background: rgba(15, 23, 42, .88) !important;
+  color: #93c5fd;
+}
+
+.video-quality-menu .video-quality-option[aria-selected="true"],
+.video-camera-menu .video-camera-option[aria-selected="true"] {
+  background: #020617 !important;
+  color: #60a5fa;
+}
+
+.video-quality-menu .video-quality-option[aria-selected="true"]::before,
+.video-camera-menu .video-camera-option[aria-selected="true"]::before {
+  content: "✓";
+  color: #60a5fa;
 }
 
 .video-preview-dialog-card video {
   display: block;
   width: 100%;
-  max-height: calc(100dvh - 130px);
+  height: 100%;
+  min-height: 0;
+  max-height: calc(min(100svh, var(--visual-viewport-height, 100svh)) - 154px);
   border-radius: 8px;
   background: #020617;
+  object-fit: contain;
 }
 
 .video-preview-dialog-actions {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
   gap: 8px;
-  flex-wrap: wrap;
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
-.video-preview-dialog-actions button {
+.video-preview-dialog-actions .video-recorder-quality {
+  margin-right: auto;
+}
+
+.video-preview-dialog-actions > button {
   width: 42px;
   min-width: 42px;
   height: 42px;
@@ -3933,6 +4544,118 @@ body.viewport-phone .video-preview-panel {
 
 body.viewport-phone .video-preview-stage video {
   max-height: min(320px, 44dvh);
+}
+
+body.viewport-phone .video-preview-dialog-shell {
+  place-items: start center;
+  padding: 10px 12px max(76px, env(safe-area-inset-bottom));
+}
+
+body.viewport-phone .video-preview-dialog-card {
+  width: min(100%, calc(100vw - 24px));
+  max-height: calc(min(100svh, var(--visual-viewport-height, 100svh)) - 24px);
+  border-radius: 8px;
+  gap: 8px;
+}
+
+body.viewport-phone .video-preview-dialog-header {
+  align-items: center;
+}
+
+body.viewport-phone .video-quality-menu {
+  bottom: 52px;
+  left: 10px;
+  width: min(142px, calc(100% - 20px));
+}
+
+body.viewport-phone .video-camera-menu {
+  bottom: 52px;
+  left: 10px;
+  width: min(220px, calc(100% - 20px));
+}
+
+body.device-ios .video-camera-button,
+body.device-android .video-camera-button {
+  min-width: 28px;
+  width: 28px;
+  padding: 0 6px;
+}
+
+body.device-ios .video-camera-button span,
+body.device-android .video-camera-button span {
+  display: none;
+}
+
+body.device-ios .video-camera-button::after,
+body.device-android .video-camera-button::after {
+  margin-left: 0;
+}
+
+body.viewport-phone .video-preview-dialog-card video {
+  max-height: min(62svh, calc(min(100svh, var(--visual-viewport-height, 100svh)) - 190px));
+}
+
+body.viewport-phone .video-preview-dialog-actions {
+  justify-content: flex-end;
+  gap: 5px;
+  padding-bottom: 0;
+}
+
+body.viewport-phone .video-preview-dialog-actions > button {
+  width: 38px;
+  min-width: 38px;
+  height: 38px;
+}
+
+body.viewport-phone .message {
+  max-width: calc(100% - 24px);
+}
+
+body.viewport-phone .message.with-avatar {
+  grid-template-columns: 30px minmax(0, 1fr);
+  column-gap: 8px;
+  max-width: calc(100% - 16px);
+  margin-left: 6px;
+}
+
+body.viewport-phone .message.with-avatar.self {
+  grid-template-columns: minmax(0, 1fr) 30px;
+  margin-right: 6px;
+}
+
+body.viewport-phone .message.with-avatar .message-avatar {
+  width: 28px;
+  height: 28px;
+  margin-top: 18px;
+  font-size: 11px;
+}
+
+body.viewport-phone .message.with-avatar:has(.call-message-card) .message-avatar {
+  margin-top: 24px;
+}
+
+body.viewport-phone .message-body:has(.call-message-card) {
+  width: 100%;
+  padding: 8px;
+}
+
+body.viewport-phone .call-message-card {
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+  gap: 8px;
+  width: 100%;
+}
+
+body.viewport-phone .call-message-icon {
+  width: 36px;
+  height: 36px;
+}
+
+body.viewport-phone .call-message-text strong {
+  font-size: 14px;
+}
+
+body.viewport-phone .call-message-text span {
+  font-size: 12px;
 }
 
 body.viewport-phone .client-grid,
@@ -4484,6 +5207,74 @@ body[data-theme="dark"] .attachment-menu-panel button:hover:not(:disabled) {
     padding-inline: 8px;
   }
 
+  .account-settings-menu {
+    display: none;
+    grid-auto-flow: column;
+    grid-auto-columns: max-content;
+    grid-template-columns: none;
+    overflow-x: auto;
+    min-height: 0;
+    max-height: none;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+    margin: -4px 0 12px;
+    padding: 0 0 10px;
+    scrollbar-width: thin;
+  }
+
+  .account-menu-dialog .account-settings-menu {
+    display: grid;
+    position: static;
+    max-height: none;
+  }
+
+  .account-menu-dialog .account-dialog-body {
+    display: block;
+    padding: 16px;
+    background: var(--panel);
+    overflow: auto;
+  }
+
+  .account-menu-dialog .account-settings-layout {
+    display: block;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .account-menu-dialog .account-dialog-card {
+    height: auto;
+  }
+
+  .account-settings-menu button {
+    justify-content: center;
+    min-width: 112px;
+    white-space: nowrap;
+    text-align: center;
+  }
+
+  body[data-theme] .account-settings-menu button,
+  body[data-theme] .account-settings-menu button:hover:not(:disabled),
+  body[data-theme] .account-settings-menu button.selected {
+    justify-content: center;
+    min-width: 112px;
+    white-space: nowrap;
+    text-align: center;
+  }
+
+  .account-menu-dialog .modal-section[data-settings-panel].active-settings-panel,
+  .account-menu-dialog .account-advanced {
+    grid-column: auto;
+    min-height: 0;
+    border-left: 0;
+    background: transparent;
+    padding: 0;
+    overflow: visible;
+  }
+
+  .account-menu-dialog .dialog-status {
+    margin: 0 0 12px;
+  }
+
   .call-controls .call-mode-button {
     flex: 0 0 38px;
   }
@@ -4502,6 +5293,20 @@ body[data-theme="dark"] .attachment-menu-panel button:hover:not(:disabled) {
 
   .account-dialog-grid {
     grid-template-columns: 1fr;
+  }
+
+  .password-fields-row,
+  .password-rules-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .password-actions-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .password-actions-row button {
+    width: 100%;
   }
 
   .two-factor-qr-panel {
@@ -4925,6 +5730,33 @@ body[data-theme] .call-media-icon-button:disabled {
   background: #991b1b !important;
   color: #ffffff !important;
   opacity: 1;
+}
+
+body[data-theme] .account-settings-menu button,
+body[data-theme] .account-settings-menu button:hover:not(:disabled),
+body[data-theme] .account-settings-menu button.selected {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 40px;
+  border: 0;
+  border-left: 3px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  padding: 8px 10px;
+  text-align: left;
+}
+
+body[data-theme] .account-settings-menu button:hover:not(:disabled),
+body[data-theme] .account-settings-menu button:focus-visible {
+  background: rgba(37, 99, 235, .08);
+  color: var(--accent);
+}
+
+body[data-theme] .account-settings-menu button.selected {
+  border-left-color: var(--accent);
+  color: var(--accent);
 }
 
 body[data-theme="dark"] .tab-panel.history-panel,

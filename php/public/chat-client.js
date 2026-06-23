@@ -61,6 +61,8 @@
   const mediaSettingsStorageKey = "teletyptel.mediaSettings";
   const callVideoHeightStorageKey = "teletyptel.callVideoHeight";
   const blockedJidsStorageKeyBase = "teletyptel.blockedJids";
+  const mutedNotificationJidsStorageKeyBase = "teletyptel.mutedNotificationJids";
+  const doNotDisturbStorageKey = "teletyptel.doNotDisturb";
   const xmppStreamManagementStorageKeyBase = "teletyptel.xmppStreamManagement";
   const locationSettingsStorageKeyBase = "teletyptel.locationSettings";
   const chatBackgroundStorageKeyBase = "teletyptel.chatBackground";
@@ -83,6 +85,7 @@
   const xmppDataFormsNamespace = "jabber:x:data";
   const xmppRsmNamespace = "http://jabber.org/protocol/rsm";
   const teletyptelCallInfoNamespace = "urn:teletyptel:call-info:0";
+  const teletyptelJingleSignalNamespace = "urn:teletyptel:jingle-signal:0";
   const jingleHistoryNamespace = "urn:xmpp:jingle-history:0";
   const jingleRttSyncNamespace = "urn:xmpp:jingle:apps:rtt-sync:0";
   const jingleGroupingNamespace = "urn:xmpp:jingle:apps:grouping:0";
@@ -92,6 +95,9 @@
   const t140Delete = "\u007f";
   const locationStaleAfterMs = 5 * 60 * 1000;
   const websocketHeartbeatMs = 25 * 1000;
+  const sessionInactivityTimeoutMs = 30 * 60 * 1000;
+  const sessionActivityThrottleMs = 15 * 1000;
+  const sessionActivityEvents = ["pointerdown", "keydown", "input", "scroll", "touchstart"];
   const locationDurationOptions = [
     [15 * 60 * 1000, "location.duration_15m"],
     [30 * 60 * 1000, "location.duration_30m"],
@@ -120,6 +126,14 @@
     callEnd: {
       viewBox: "0 -960 960 960",
       paths: ["M480-520q112 0 213 38.5T872-372q15 15 20.5 34.5T892-298l-35 92q-8 22-27 34t-43 8l-146-22q-18-3-30-16t-12-31v-84q-29-12-59-18t-60-6q-31 0-60.5 6T361-317v84q0 18-12 31t-30 16l-146 22q-24 4-43-8t-27-34l-35-92q-7-20-1-40t21-34q78-71 179-109.5T480-520Z"]
+    },
+    logout: {
+      viewBox: "0 -960 960 960",
+      paths: ["M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h280v80H200v560h280v80H200Zm440-160-55-58 102-102H360v-80h327L585-622l55-58 200 200-200 200Z"]
+    },
+    notificationsOff: {
+      viewBox: "0 -960 960 960",
+      paths: ["M160-200v-80h80v-280q0-83 50-147.5T420-792v-28q0-25 17.5-42.5T480-880q25 0 42.5 17.5T540-820v28q30 8 56 24t46 39l-58 58q-19-22-46-35.5T480-720q-66 0-113 47t-47 113v280h326L160-766l56-56 608 608-56 56-84-82H160Zm320 120q-33 0-56.5-23.5T400-160h160q0 33-23.5 56.5T480-80Zm240-342-80-80v-58q0-28-10-53t-28-46l57-57q29 32 45 72t16 84v138Z"]
     },
     videocam: {
       viewBox: "0 -960 960 960",
@@ -159,6 +173,10 @@
     highQuality: {
       viewBox: "0 -960 960 960",
       paths: ["M160-200q-33 0-56.5-23.5T80-280v-400q0-33 23.5-56.5T160-760h640q33 0 56.5 23.5T880-680v400q0 33-23.5 56.5T800-200H160Zm0-80h640v-400H160v400Zm80-80h80v-120h120v120h80v-320h-80v120H320v-120h-80v320Zm360 0h100q50 0 85-35t35-85v-80q0-50-35-85t-85-35H600v320Zm80-80v-160h20q17 0 28.5 11.5T740-560v80q0 17-11.5 28.5T700-440h-20ZM160-280v-400 400Z"]
+    },
+    qualityTune: {
+      viewBox: "0 -960 960 960",
+      paths: ["M440-120v-240h80v80h320v80H520v80h-80Zm-320-80v-80h240v80H120Zm160-160v-80H120v-80h160v-80h80v240h-80Zm160-80v-80h400v80H440Zm160-160v-240h80v80h160v80H680v80h-80Zm-480-80v-80h400v80H120Z"]
     },
     locationOff: {
       viewBox: "0 -960 960 960",
@@ -270,13 +288,16 @@
   const oauthLoginToken = locationSearchParams.get("loginToken") || "";
 
   const state = {
-    mode: "relay",
+    mode: "xmpp",
     theme: loadTheme(),
     relaySocket: null,
     xmppSocket: null,
     xmppSession: null,
     intentionalDisconnect: false,
+    xmppAuthRefreshAttempted: false,
     account: null,
+    pendingLoginTwoFactor: null,
+    accountSettingsPanel: "profile",
     passwordResetToken: locationSearchParams.get("reset") || "",
     developerMode,
     provider: null,
@@ -367,6 +388,8 @@
     mediaSettings: loadMediaSettings(),
     mediaDevices: [],
     mediaPreviewStream: null,
+    incomingCallNotification: null,
+    incomingCallNotificationSid: "",
     voiceRecorder: {
       recorder: null,
       stream: null,
@@ -386,6 +409,7 @@
     videoRecorder: {
       recorder: null,
       stream: null,
+      previewStream: null,
       chunks: [],
       blob: null,
       objectUrl: "",
@@ -395,6 +419,8 @@
       cancelled: false
     },
     blockedJids: new Set(loadBlockedJids(sessionProfile)),
+    mutedNotificationJids: new Set(loadMutedNotificationJids(sessionProfile)),
+    doNotDisturb: localStorage.getItem(doNotDisturbStorageKey) === "1",
     accountReady: false,
     pendingMucAvatarConversationId: null,
     contactProfileRequestId: 0,
@@ -425,29 +451,20 @@
       pending: false,
       lastStartedAt: 0,
       loaded: false,
+      resultCount: 0,
+      fallbackHistoryReloaded: false,
       timerId: null
     },
     smileyPickerMode: "composer",
-    accountGateRequired: !hasInitialAccountProfile,
+    accountBooting: true,
+    accountGateRequired: false,
     accountDialogMode: !hasInitialAccountProfile ? "signin" : "settings",
+    suppressAutoLoginDialog: hasInitialAccountProfile,
+    sessionIdleTimerId: null,
+    sessionLastActivityAt: Date.now(),
+    sessionLastActivityRecordedAt: 0,
+    sessionTimeoutInProgress: false,
     conversations: [
-      {
-        id: "relay",
-        name: "Relay room",
-        nameKey: "conversation.relay_room",
-        peer: "relay@localhost",
-        kind: "contact",
-        avatarColor: "#0f766e",
-        presence: "offline",
-        meta: "Offline",
-        clientState: null,
-        clientStateUpdatedAt: null,
-        lastSeenAt: null,
-        messages: [],
-        remoteText: "",
-        remoteFrom: "",
-        remoteDraftUpdatedAt: null
-      },
       {
         id: "tester",
         name: "Tester",
@@ -461,6 +478,7 @@
         clientStateUpdatedAt: null,
         lastSeenAt: null,
         messages: [],
+        unreadCount: 0,
         remoteText: "",
         remoteFrom: "",
         remoteDraftUpdatedAt: null
@@ -478,6 +496,7 @@
         clientStateUpdatedAt: null,
         lastSeenAt: null,
         messages: [],
+        unreadCount: 0,
         remoteText: "",
         remoteFrom: "",
         remoteDraftUpdatedAt: null
@@ -497,6 +516,8 @@
     historyButton: byId("historyButton"),
     profileButton: byId("profileButton"),
     accountButton: byId("accountButton"),
+    doNotDisturbButton: byId("doNotDisturbButton"),
+    logoutButton: byId("logoutButton"),
     connectButton: byId("connectButton"),
     disconnectButton: byId("disconnectButton"),
     addConversationButton: byId("addConversationButton"),
@@ -506,6 +527,7 @@
     conversationContextMenu: byId("conversationContextMenu"),
     contextProfileButton: byId("contextProfileButton"),
     contextRoomAvatarButton: byId("contextRoomAvatarButton"),
+    contextMuteNotificationsButton: byId("contextMuteNotificationsButton"),
     contextBlockButton: byId("contextBlockButton"),
     mucAvatarFileInput: byId("mucAvatarFileInput"),
     contactProfileDialog: byId("contactProfileDialog"),
@@ -526,6 +548,7 @@
     messageContextDownloadButton: byId("messageContextDownloadButton"),
     messageContextForwardButton: byId("messageContextForwardButton"),
     conversationItems: byId("conversationItems"),
+    conversationSearchInput: byId("conversationSearchInput"),
     backToContactsButton: byId("backToContactsButton"),
     activeConversationAvatar: byId("activeConversationAvatar"),
     activeConversationName: byId("activeConversationName"),
@@ -555,6 +578,7 @@
     muteMicrophoneButton: byId("muteMicrophoneButton"),
     muteRemoteAudioButton: byId("muteRemoteAudioButton"),
     toggleTotalConversationTextButton: byId("toggleTotalConversationTextButton"),
+    hangupCallPanelButton: byId("hangupCallPanelButton"),
     remoteVolumeInput: byId("remoteVolumeInput"),
     remoteVolumeValue: byId("remoteVolumeValue"),
     totalConversationTextPanel: byId("totalConversationTextPanel"),
@@ -605,6 +629,12 @@
     videoPreviewDialogTitle: byId("videoPreviewDialogTitle"),
     videoPreviewDialogVideo: byId("videoPreviewDialogVideo"),
     videoRecorderQualityInput: byId("videoRecorderQualityInput"),
+    videoRecorderQualityButton: byId("videoRecorderQualityButton"),
+    videoRecorderQualityLabel: byId("videoRecorderQualityLabel"),
+    videoRecorderQualityMenu: byId("videoRecorderQualityMenu"),
+    videoRecorderCameraButton: byId("videoRecorderCameraButton"),
+    videoRecorderCameraLabel: byId("videoRecorderCameraLabel"),
+    videoRecorderCameraMenu: byId("videoRecorderCameraMenu"),
     closeVideoPreviewDialogButton: byId("closeVideoPreviewDialogButton"),
     startVideoRecordingButton: byId("startVideoRecordingButton"),
     dialogCancelVideoMessageButton: byId("dialogCancelVideoMessageButton"),
@@ -667,6 +697,9 @@
     dialogPasswordInput: byId("dialogPasswordInput"),
     dialogForgotPasswordButton: byId("dialogForgotPasswordButton"),
     dialogRememberPasswordToggle: byId("dialogRememberPasswordToggle"),
+    loginTwoFactorSection: byId("loginTwoFactorSection"),
+    loginTwoFactorCodeInput: byId("loginTwoFactorCodeInput"),
+    verifyLoginTwoFactorButton: byId("verifyLoginTwoFactorButton"),
     dialogXmppDomainInput: byId("dialogXmppDomainInput"),
     dialogXmppHostInput: byId("dialogXmppHostInput"),
     dialogXmppPortInput: byId("dialogXmppPortInput"),
@@ -679,6 +712,15 @@
     dialogPhoneInput: byId("dialogPhoneInput"),
     dialogBirthDateInput: byId("dialogBirthDateInput"),
     accountSecuritySection: byId("accountSecuritySection"),
+    dialogCurrentPasswordInput: byId("dialogCurrentPasswordInput"),
+    dialogNewPasswordInput: byId("dialogNewPasswordInput"),
+    dialogRepeatPasswordInput: byId("dialogRepeatPasswordInput"),
+    passwordRulesPanel: byId("passwordRulesPanel"),
+    dialogRememberNewPasswordToggle: byId("dialogRememberNewPasswordToggle"),
+    changePasswordButton: byId("changePasswordButton"),
+    googleLinkStatus: byId("googleLinkStatus"),
+    linkGoogleButton: byId("linkGoogleButton"),
+    unlinkGoogleButton: byId("unlinkGoogleButton"),
     twoFactorStatus: byId("twoFactorStatus"),
     twoFactorQrPanel: byId("twoFactorQrPanel"),
     twoFactorQrCode: byId("twoFactorQrCode"),
@@ -704,6 +746,7 @@
     dialogAccessibilityPanel: byId("dialogAccessibilityPanel"),
     dialogServerSettingsLockNote: byId("dialogServerSettingsLockNote"),
     dialogAccountStatus: byId("dialogAccountStatus"),
+    accountSettingsMenu: byId("accountSettingsMenu"),
     dialogCreateAccountButton: byId("dialogCreateAccountButton"),
     dialogGoogleLoginButton: byId("dialogGoogleLoginButton"),
     dialogAuth0LoginButton: byId("dialogAuth0LoginButton"),
@@ -711,6 +754,7 @@
     dialogConnectButton: byId("dialogConnectButton"),
     dialogResetPasswordButton: byId("dialogResetPasswordButton"),
     dialogServerSettingsButton: byId("dialogServerSettingsButton"),
+    settingsLogoutButton: byId("settingsLogoutButton"),
     locationShareDialog: byId("locationShareDialog"),
     locationShareStatus: byId("locationShareStatus"),
     locationShareMap: byId("locationShareMap"),
@@ -754,6 +798,7 @@
     debugLog: byId("debugLog")
   };
 
+  document.body.classList.toggle("account-booting", state.accountBooting);
   document.body.classList.toggle("account-gate", state.accountGateRequired);
   document.body.classList.toggle("developer-mode", state.developerMode);
   applyDeviceDetection();
@@ -772,12 +817,14 @@
   updateComposerAvailability();
   updateServerSettingsReadonly();
   updateConnectButtonAvailability();
+  syncDoNotDisturbButton();
   resetServiceWorkerCachesIfRequested();
   loadPlatformConfig();
   applyMediaSettingsToControls();
   refreshMediaDevices(false);
   registerServiceWorker();
   setupMobileLifecycle();
+  setupSessionInactivityTimeout();
 
   async function resetServiceWorkerCachesIfRequested() {
     if (!resetServiceWorker || !("serviceWorker" in navigator)) {
@@ -807,14 +854,22 @@
     el.historyButton.addEventListener("click", () => activateTab("history"));
     el.profileButton.addEventListener("click", () => openAccountDialog({ mode: "profile" }));
     el.accountButton.addEventListener("click", () => openAccountDialog({ mode: "settings" }));
-    el.connectButton.addEventListener("click", connectRelay);
+    el.doNotDisturbButton.addEventListener("click", toggleDoNotDisturb);
+    el.logoutButton.addEventListener("click", logoutAccount);
+    el.settingsLogoutButton.addEventListener("click", logoutAccount);
+    el.connectButton.addEventListener("click", () => {
+      requestCallNotificationPermissionFromGesture();
+      connectXmppWebSocket();
+    });
     el.disconnectButton.addEventListener("click", disconnectAll);
     el.addConversationButton.addEventListener("click", addConversation);
     el.addGroupButton.addEventListener("click", addGroupConversation);
     el.inviteConversationButton.addEventListener("click", inviteContactToActiveGroup);
+    el.conversationSearchInput.addEventListener("input", renderConversations);
     el.backToContactsButton.addEventListener("click", closeActiveConversation);
     el.contextProfileButton.addEventListener("click", openContextConversationProfile);
     el.contextRoomAvatarButton.addEventListener("click", chooseContextRoomAvatar);
+    el.contextMuteNotificationsButton.addEventListener("click", toggleMuteContextConversationNotifications);
     el.contextBlockButton.addEventListener("click", toggleBlockContextConversation);
     el.mucAvatarFileInput.addEventListener("change", handleMucAvatarFileSelected);
     el.conversationContextMenu.addEventListener("click", (event) => event.stopPropagation());
@@ -826,9 +881,18 @@
     el.messageContextDeleteButton.addEventListener("click", deleteContextMessage);
     el.messageContextDownloadButton.addEventListener("click", downloadContextMessageAttachment);
     el.messageContextForwardButton.addEventListener("click", forwardContextMessage);
-    el.startAudioCallOption.addEventListener("click", () => startCallFromMenu("audio"));
-    el.startVideoCallOption.addEventListener("click", () => startCallFromMenu("video"));
-    el.startTotalCallOption.addEventListener("click", () => startCallFromMenu("total"));
+    el.startAudioCallOption.addEventListener("click", () => {
+      requestCallNotificationPermissionFromGesture();
+      startCallFromMenu("audio");
+    });
+    el.startVideoCallOption.addEventListener("click", () => {
+      requestCallNotificationPermissionFromGesture();
+      startCallFromMenu("video");
+    });
+    el.startTotalCallOption.addEventListener("click", () => {
+      requestCallNotificationPermissionFromGesture();
+      startCallFromMenu("total");
+    });
     el.answerCallButton.addEventListener("click", answerIncomingCall);
     el.rejectCallButton.addEventListener("click", rejectIncomingCall);
     el.incomingAnswerButton.addEventListener("click", answerIncomingCall);
@@ -836,6 +900,7 @@
     el.dialogAnswerButton.addEventListener("click", answerIncomingCall);
     el.dialogRejectButton.addEventListener("click", rejectIncomingCall);
     el.hangupCallButton.addEventListener("click", hangupCall);
+    el.hangupCallPanelButton.addEventListener("click", hangupCall);
     el.toggleCameraButton.addEventListener("click", toggleCameraVideo);
     el.muteMicrophoneButton.addEventListener("click", toggleMicrophoneMute);
     el.muteRemoteAudioButton.addEventListener("click", toggleRemoteAudioMute);
@@ -846,7 +911,7 @@
     el.callVideoFacingInput.addEventListener("change", () => handleMediaSettingsChange("video", "call"));
     el.callMicrophoneInput.addEventListener("change", () => handleMediaSettingsChange("audio", "call"));
     el.remoteVolumeInput.addEventListener("input", saveRemoteVolumeFromControl);
-    el.relayModeButton.addEventListener("click", () => setMode("relay"));
+    el.relayModeButton.addEventListener("click", () => setMode("xmpp"));
     el.xmppModeButton.addEventListener("click", () => setMode("xmpp"));
     el.closeTabPanelButton.addEventListener("click", () => activateTab("chat"));
     el.resetRttButton.addEventListener("click", sendRttReset);
@@ -922,6 +987,9 @@
     document.addEventListener("pause", () => setClientLifecycleState("inactive", "app-pause", { force: true }));
     document.addEventListener("resume", () => setClientLifecycleState("active", "app-resume"));
     window.addEventListener("teletyptel:lifecycle", handleNativeLifecycleEvent);
+    for (const eventName of sessionActivityEvents) {
+      document.addEventListener(eventName, recordSessionActivity, { passive: true, capture: true });
+    }
     el.composerForm.addEventListener("submit", sendComposerMessage);
     el.messageInput.addEventListener("input", handleComposerInput);
     el.messageInput.addEventListener("keydown", handleComposerKeydown);
@@ -937,6 +1005,9 @@
     el.accountDialog.addEventListener("click", closeAccountDialogOnBackdrop);
     el.closeAccountDialogButton.addEventListener("click", closeAccountDialog);
     el.cancelAccountDialogButton.addEventListener("click", closeAccountDialog);
+    el.accountSettingsMenu.querySelectorAll("[data-account-panel]").forEach((button) => {
+      button.addEventListener("click", () => setAccountSettingsPanel(button.dataset.accountPanel || "profile"));
+    });
     el.dialogCreateAccountButton.addEventListener("click", createAccountFromDialog);
     el.dialogGoogleLoginButton.addEventListener("click", startGoogleLoginFromDialog);
     el.dialogAuth0LoginButton.addEventListener("click", startAuth0LoginFromDialog);
@@ -944,6 +1015,16 @@
     el.dialogConnectButton.addEventListener("click", () => saveAccountDialogProfile(true));
     el.dialogForgotPasswordButton.addEventListener("click", requestPasswordResetFromDialog);
     el.dialogResetPasswordButton.addEventListener("click", resetPasswordFromDialog);
+    el.verifyLoginTwoFactorButton.addEventListener("click", verifyLoginTwoFactorFromDialog);
+    el.loginTwoFactorCodeInput.addEventListener("input", () => {
+      el.verifyLoginTwoFactorButton.disabled = el.loginTwoFactorCodeInput.value.replace(/\D+/g, "").length !== 6;
+    });
+    el.changePasswordButton.addEventListener("click", changePasswordFromSecuritySection);
+    el.dialogCurrentPasswordInput.addEventListener("input", updatePasswordRulesPanel);
+    el.dialogNewPasswordInput.addEventListener("input", updatePasswordRulesPanel);
+    el.dialogRepeatPasswordInput.addEventListener("input", updatePasswordRulesPanel);
+    el.linkGoogleButton.addEventListener("click", startGoogleLinkFromDialog);
+    el.unlinkGoogleButton.addEventListener("click", unlinkGoogleFromDialog);
     el.requestTwoFactorButton.addEventListener("click", requestTwoFactorSetupFromDialog);
     el.confirmTwoFactorButton.addEventListener("click", confirmTwoFactorSetupFromDialog);
     el.dialogServerSettingsButton.addEventListener("click", openDialogServerSettings);
@@ -982,6 +1063,12 @@
     el.microphoneInput.addEventListener("change", () => handleMediaSettingsChange("audio"));
     el.videoQualityInput.addEventListener("change", () => handleMediaSettingsChange("video"));
     el.videoRecorderQualityInput.addEventListener("change", () => handleMediaSettingsChange("video", "recorder"));
+    el.videoRecorderQualityButton?.addEventListener("click", toggleVideoRecorderQualityMenu);
+    el.videoRecorderQualityMenu?.addEventListener("click", handleVideoRecorderQualityMenuClick);
+    el.videoRecorderCameraButton?.addEventListener("click", toggleVideoRecorderCameraMenu);
+    el.videoRecorderCameraMenu?.addEventListener("click", handleVideoRecorderCameraMenuClick);
+    document.addEventListener("click", closeVideoRecorderQualityMenuOnOutsideClick);
+    document.addEventListener("keydown", closeVideoRecorderQualityMenuOnEscape);
     el.videoMessageFacingInput.addEventListener("change", () => handleMediaSettingsChange("video"));
     el.refreshMediaButton.addEventListener("click", () => refreshMediaDevices(true));
     el.previewMediaButton.addEventListener("click", previewMedia);
@@ -1173,6 +1260,7 @@
 
   function applyViewportDetection() {
     const metrics = currentViewportMetrics();
+    document.documentElement.style.setProperty("--visual-viewport-height", `${metrics.height}px`);
     const viewportClass = metrics.width <= 640
       ? "phone"
       : metrics.width <= 1024
@@ -1264,6 +1352,7 @@
       createClientStateXml(clientState),
       "relay@localhost");
     envelope.clientState = clientState;
+    envelope.notificationState = state.doNotDisturb ? "dnd" : "available";
     envelope.reason = reason;
     envelope.sentAt = new Date().toISOString();
     state.relaySocket.send(JSON.stringify(envelope));
@@ -1355,6 +1444,11 @@
     return normalized === "default" ? blockedJidsStorageKeyBase : `${blockedJidsStorageKeyBase}.${normalized}`;
   }
 
+  function mutedNotificationJidsStorageKeyFor(profile) {
+    const normalized = sanitizeSessionProfile(profile);
+    return normalized === "default" ? mutedNotificationJidsStorageKeyBase : `${mutedNotificationJidsStorageKeyBase}.${normalized}`;
+  }
+
   function xmppStreamManagementStorageKeyFor(profile) {
     const normalized = sanitizeSessionProfile(profile);
     return normalized === "default" ? xmppStreamManagementStorageKeyBase : `${xmppStreamManagementStorageKeyBase}.${normalized}`;
@@ -1396,6 +1490,29 @@
     localStorage.setItem(
       blockedJidsStorageKeyFor(state.sessionProfile),
       JSON.stringify(Array.from(state.blockedJids).sort()));
+  }
+
+  function loadMutedNotificationJids(profile) {
+    const saved = localStorage.getItem(mutedNotificationJidsStorageKeyFor(profile));
+    if (!saved) {
+      return [];
+    }
+
+    try {
+      const parsed = JSON.parse(saved);
+      return Array.isArray(parsed)
+        ? parsed.map(normalizeBlockJid).filter(Boolean)
+        : [];
+    } catch {
+      localStorage.removeItem(mutedNotificationJidsStorageKeyFor(profile));
+      return [];
+    }
+  }
+
+  function saveMutedNotificationJids() {
+    localStorage.setItem(
+      mutedNotificationJidsStorageKeyFor(state.sessionProfile),
+      JSON.stringify(Array.from(state.mutedNotificationJids).sort()));
   }
 
   function loadLocationSettings(profile) {
@@ -1574,6 +1691,37 @@
     el.viewMenu.removeAttribute("open");
   }
 
+  function toggleDoNotDisturb() {
+    state.doNotDisturb = !state.doNotDisturb;
+    localStorage.setItem(doNotDisturbStorageKey, state.doNotDisturb ? "1" : "0");
+    if (state.doNotDisturb) {
+      closeIncomingCallBrowserNotification();
+    }
+    syncDoNotDisturbButton();
+    sendPresence("online");
+    flushClientLifecycleState("do-not-disturb", true);
+    setConnectionStatus(state.doNotDisturb
+      ? t("status.do_not_disturb_on", "Do not disturb is on. Browser notifications are muted.")
+      : t("status.do_not_disturb_off", "Do not disturb is off. Browser notifications are enabled."), state.doNotDisturb ? "warn" : "good");
+  }
+
+  function syncDoNotDisturbButton() {
+    if (!el.doNotDisturbButton) {
+      return;
+    }
+
+    const label = state.doNotDisturb
+      ? t("button.do_not_disturb_on", "Do not disturb on")
+      : t("button.do_not_disturb", "Do not disturb");
+    el.doNotDisturbButton.classList.toggle("selected", state.doNotDisturb);
+    el.doNotDisturbButton.title = label;
+    el.doNotDisturbButton.setAttribute("aria-label", label);
+    const srText = el.doNotDisturbButton.querySelector(".sr-only");
+    if (srText) {
+      srText.textContent = label;
+    }
+  }
+
   function loadChatBackground(profile) {
     return normalizeChatBackground(localStorage.getItem(chatBackgroundStorageKeyFor(profile)));
   }
@@ -1625,8 +1773,8 @@
   }
 
   function applyNetworkDefaultsForCurrentHost() {
-    el.relayUrlInput.value = normalizeLocalWebSocketUrlForCurrentHost(el.relayUrlInput.value, 8787);
-    el.xmppUrlInput.value = normalizeLocalWebSocketUrlForCurrentHost(el.xmppUrlInput.value, 8787);
+    el.relayUrlInput.value = "";
+    el.xmppUrlInput.value = normalizeLocalXmppWebSocketUrlForCurrentHost(el.xmppUrlInput.value);
   }
 
   async function loadPlatformConfig() {
@@ -1634,6 +1782,8 @@
     let databaseLoaded = false;
     try {
       savedAccount = loadSavedAccountProfile();
+      const hasSavedAccountSession = Boolean(savedAccount?.accountId || savedAccount?.jid);
+      state.suppressAutoLoginDialog = hasSavedAccountSession;
       const account = mergeAccountProfiles(
         applySessionAccountDefaults(await fetchJson("config/account-profile.json"), savedAccount),
         savedAccount);
@@ -1661,9 +1811,12 @@
       await loadGoogleMapsConfig();
       renderProvider();
       renderTabs();
-      showAccountStartIfRequired(!databaseLoaded);
-      setAccountReady(databaseLoaded);
-      autoConnectIfReady();
+      setAccountBooting(false);
+      showAccountStartIfRequired(!databaseLoaded && !state.pendingLoginTwoFactor && !hasSavedAccountSession);
+      setAccountReady(databaseLoaded || hasSavedAccountSession);
+      if (databaseLoaded || state.account?.password) {
+        autoConnectIfReady();
+      }
       openPasswordResetDialogIfRequested();
       appendDebug("config", `Loaded provider ${provider.providerId}`);
     } catch (error) {
@@ -1673,9 +1826,14 @@
       await loadRtcConfig();
       await loadGoogleMapsConfig();
       renderTabs();
-      showAccountStartIfRequired(!databaseLoaded);
-      setAccountReady(databaseLoaded);
-      autoConnectIfReady();
+      setAccountBooting(false);
+      const hasSavedAccountSession = Boolean(savedAccount?.accountId || savedAccount?.jid || hasStoredAccountSession());
+      state.suppressAutoLoginDialog = hasSavedAccountSession;
+      showAccountStartIfRequired(!databaseLoaded && !state.pendingLoginTwoFactor && !hasSavedAccountSession);
+      setAccountReady(databaseLoaded || hasSavedAccountSession);
+      if (databaseLoaded || state.account?.password) {
+        autoConnectIfReady();
+      }
       openPasswordResetDialogIfRequested();
     }
   }
@@ -1895,6 +2053,11 @@
       }
 
       const payload = await response.json();
+      if (payload.ok && payload.twoFactorRequired) {
+        showLoginTwoFactorChallenge(payload, { oauth: Boolean(loginToken), connectAfterSave: true });
+        return false;
+      }
+
       if (payload.ok && payload.account) {
         state.account = {
           ...state.account,
@@ -2183,19 +2346,21 @@
     el.rttToggle.checked = account.liveRttEnabled !== false;
     el.smileyToggle.checked = account.showSmileys !== false;
     syncRttToolbarState();
-    el.peerInput.value = account.peer ?? el.peerInput.value;
+    el.peerInput.value = account.peer && !addressMatches(account.peer, "relay@localhost")
+      ? account.peer
+      : "tester@localhost";
     el.phoneInput.value = account.phoneNumber ?? "";
     if (state.account) {
       state.account.birthDate = normalizeBirthDate(account.birthDate ?? state.account.birthDate ?? "");
     }
     el.languageInput.value = normalizeLanguageCode(account.preferredLanguage ?? "eng");
     el.providerInput.value = account.providerId ?? "";
-    el.relayUrlInput.value = normalizeLocalWebSocketUrlForCurrentHost(account.relayWebSocket ?? el.relayUrlInput.value, 8787);
-    el.xmppUrlInput.value = normalizeLocalWebSocketUrlForCurrentHost(account.xmppWebSocket ?? el.xmppUrlInput.value, 8787);
+    el.relayUrlInput.value = "";
+    el.xmppUrlInput.value = normalizeLocalXmppWebSocketUrlForCurrentHost(account.xmppWebSocket ?? el.xmppUrlInput.value);
     state.account.xmppHost = account.xmppHost ?? state.account.xmppHost ?? domainFromJid(account.jid ?? "");
     state.account.xmppPort = account.xmppPort ?? state.account.xmppPort ?? 5222;
     state.account.xmppDomain = account.xmppDomain ?? state.account.xmppDomain ?? domainFromJid(account.jid ?? "");
-    state.account.xmppTlsMode = account.xmppTlsMode ?? state.account.xmppTlsMode ?? "starttls";
+    state.account.xmppTlsMode = "websocket";
     updateAccountStatus(account.savedInDatabase === true ? t("account.database_loaded", "Server account loaded") : t("account.default_profile", "Default account profile"));
     updateAccountAvatarPreview();
     updateRelayConversationMeta();
@@ -2203,11 +2368,129 @@
     syncAccountDialogFromControls();
   }
 
-  function showAccountStartIfRequired(required) {
-    setAccountGateRequired(required);
-    if (required) {
-      openAccountDialog({ required: true });
+  function refreshDatabaseAccountAfterXmppAuthFailure() {
+    if (state.xmppAuthRefreshAttempted
+      || !state.account?.accountId
+      || state.account?.savedInDatabase !== true) {
+      return false;
     }
+
+    state.xmppAuthRefreshAttempted = true;
+    const accountId = state.account.accountId;
+    const loginToken = accountLoginToken(state.account);
+    appendDebug("xmpp-auth", "Refreshing server account after auth failure");
+    state.intentionalDisconnect = true;
+    closeXmppWebSocket();
+    loadDatabaseAccount(accountId, loginToken)
+      .then((loaded) => {
+        if (!loaded || !state.account?.password) {
+          returnToLoginScreenAfterDisconnect(t("account.invalid_credentials", "The server rejected this email or password."));
+          return;
+        }
+
+        setAccountReady(true);
+        state.intentionalDisconnect = false;
+        connectXmppWebSocket();
+      })
+      .catch((error) => {
+        appendDebug("xmpp-auth-refresh-error", error.message);
+        returnToLoginScreenAfterDisconnect(t("account.invalid_credentials", "The server rejected this email or password."));
+      });
+    return true;
+  }
+
+  function showAccountStartIfRequired(required) {
+    if (required) {
+      requestLoginRequired(t("account.start_required", "Sign in or create an account before Teletyptel opens."));
+      return;
+    }
+
+    setAccountGateRequired(false);
+  }
+
+  function shouldSuppressAutomaticLoginDialog(options = {}) {
+    if (options.forceLogin === true || state.pendingLoginTwoFactor) {
+      return false;
+    }
+
+    return state.suppressAutoLoginDialog === true
+      && (hasStoredAccountSession() || Boolean(state.account?.accountId || state.account?.jid));
+  }
+
+  function setupSessionInactivityTimeout() {
+    recordSessionActivity({ force: true });
+  }
+
+  function recordSessionActivity(options = {}) {
+    if (state.sessionTimeoutInProgress) {
+      return;
+    }
+
+    const now = Date.now();
+    if (options.force !== true && now - state.sessionLastActivityRecordedAt < sessionActivityThrottleMs) {
+      return;
+    }
+
+    state.sessionLastActivityAt = now;
+    state.sessionLastActivityRecordedAt = now;
+    scheduleSessionInactivityTimeout();
+  }
+
+  function scheduleSessionInactivityTimeout() {
+    window.clearTimeout(state.sessionIdleTimerId);
+    state.sessionIdleTimerId = null;
+    if (!hasAccountSessionForInactivityTimeout()) {
+      return;
+    }
+
+    const elapsed = Date.now() - state.sessionLastActivityAt;
+    const delay = Math.max(1000, sessionInactivityTimeoutMs - elapsed);
+    state.sessionIdleTimerId = window.setTimeout(handleSessionInactivityTimeout, delay);
+  }
+
+  function hasAccountSessionForInactivityTimeout() {
+    return !state.accountGateRequired
+      && Boolean(state.account?.accountId || state.account?.jid || hasStoredAccountSession());
+  }
+
+  function handleSessionInactivityTimeout() {
+    if (!hasAccountSessionForInactivityTimeout()) {
+      return;
+    }
+
+    const elapsed = Date.now() - state.sessionLastActivityAt;
+    if (elapsed < sessionInactivityTimeoutMs) {
+      scheduleSessionInactivityTimeout();
+      return;
+    }
+
+    state.sessionTimeoutInProgress = true;
+    logoutAccount({ message: t("account.session_expired", "Session expired after inactivity. Sign in again.") })
+      .finally(() => {
+        state.sessionTimeoutInProgress = false;
+      });
+  }
+
+  function requestLoginRequired(message = "", options = {}) {
+    const text = message || t("account.disconnected_login_required", "Connection closed. Sign in to continue.");
+    if (options.openLogin === false || shouldSuppressAutomaticLoginDialog(options)) {
+      setAccountGateRequired(false);
+      if (!el.accountDialog.hidden && effectiveAccountDialogMode() === "signin") {
+        closeAccountDialog();
+      }
+      updateAccountStatus(text);
+      updateConnectButtonAvailability();
+      return false;
+    }
+
+    openAccountDialog({ required: true, forceLogin: true });
+    el.dialogAccountStatus.textContent = text;
+    return true;
+  }
+
+  function setAccountBooting(booting) {
+    state.accountBooting = booting === true;
+    document.body.classList.toggle("account-booting", state.accountBooting);
   }
 
   function setAccountGateRequired(required) {
@@ -2237,6 +2520,11 @@
       : (options.required === true
         ? "signin"
         : (options.mode === "profile" ? "profile" : "settings"));
+    if (state.accountDialogMode === "profile") {
+      ensureAccountSettingsPanel("profile");
+    } else if (state.accountDialogMode === "settings") {
+      ensureAccountSettingsPanel(state.accountSettingsPanel === "profile" ? "preferences" : state.accountSettingsPanel);
+    }
     if (options.required === true) {
       setAccountGateRequired(true);
     } else {
@@ -2255,10 +2543,7 @@
     el.accountDialog.hidden = false;
     document.body.classList.add("modal-open");
     window.setTimeout(() => {
-      const focusTarget = mode === "profile"
-        ? el.dialogDisplayNameInput
-        : (mode === "settings" ? (el.dialogCameraInput || el.dialogChatBackgroundInput) : (mode === "reset" ? el.dialogPasswordInput : el.dialogJidInput));
-      focusTarget.focus();
+      accountDialogFocusTarget(mode).focus();
     }, 0);
   }
 
@@ -2281,13 +2566,19 @@
     el.accountDialog.classList.toggle("profile-dialog", profileMode);
     el.accountDialog.classList.toggle("settings-dialog", settingsMode);
     el.accountDialog.classList.toggle("server-settings-visible", settingsMode);
+    const loginTwoFactorMode = Boolean(state.pendingLoginTwoFactor);
+    el.accountDialog.classList.toggle("account-menu-dialog", !startMode && !resetMode && !loginTwoFactorMode);
     el.accountDialogTitle.textContent = resetMode
       ? t("account.reset_title", "Reset password")
+      : loginTwoFactorMode
+      ? t("account.login_two_factor_title", "Two-factor check")
       : startMode
       ? t("account.start_title", "Sign in")
       : (profileMode ? t("account.profile_title", "Profile") : t("account.settings_title", "Settings"));
     el.accountDialogSubtitle.textContent = resetMode
       ? t("account.reset_subtitle", "Use the reset link from your e-mail and choose a new password.")
+      : loginTwoFactorMode
+      ? t("account.login_two_factor_subtitle", "Use the code from your authenticator app.")
       : startMode
       ? t("account.start_subtitle", "Use your XMPP account. New users can create an account.")
       : (profileMode
@@ -2298,6 +2589,7 @@
       : startMode
       ? t("section.sign_in", "Sign in")
       : t("section.real_account", "Real account");
+    ensureAccountSettingsPanel(profileMode ? state.accountSettingsPanel : (settingsMode ? state.accountSettingsPanel : "profile"));
     el.dialogAdvancedDetails.open = settingsMode;
     el.accountSecuritySection.hidden = startMode || resetMode;
     el.dialogSaveAccountButton.hidden = startMode || resetMode;
@@ -2306,23 +2598,36 @@
     el.dialogForgotPasswordButton.hidden = resetMode;
     el.dialogGoogleLoginButton.closest(".social-login-row").hidden = resetMode || !startMode;
     el.dialogCreateAccountButton.hidden = resetMode;
+    el.loginTwoFactorSection.hidden = !loginTwoFactorMode;
+    el.verifyLoginTwoFactorButton.disabled = !loginTwoFactorMode || el.loginTwoFactorCodeInput.value.replace(/\D+/g, "").length !== 6;
     el.dialogRememberPasswordToggle.closest("label").hidden = resetMode;
     el.dialogPasswordInput.autocomplete = resetMode ? "new-password" : "current-password";
     el.dialogConnectButton.textContent = startMode
       ? t("button.sign_in", "Sign in")
       : t("button.save_connect", "Save and connect");
+    el.dialogSaveAccountButton.textContent = profileMode
+      ? t("button.save_profile", "Save profile")
+      : t("button.save_settings", "Save settings");
     if (!resetMode) {
-      el.dialogCreateAccountButton.hidden = false;
+      el.dialogCreateAccountButton.hidden = loginTwoFactorMode;
       el.dialogCreateAccountButton.textContent = startMode
         ? t("button.sign_up", "New account")
         : t("button.create_account", "Create account");
     }
-    el.dialogServerSettingsButton.hidden = profileMode || resetMode;
+    if (loginTwoFactorMode) {
+      el.dialogSaveAccountButton.hidden = true;
+      el.dialogConnectButton.hidden = true;
+      el.dialogForgotPasswordButton.hidden = true;
+      el.dialogGoogleLoginButton.closest(".social-login-row").hidden = true;
+    }
+    el.dialogServerSettingsButton.hidden = profileMode || settingsMode || resetMode;
+    renderAccountSettingsMenu();
     updateServerSettingsReadonly();
   }
 
   function openDialogServerSettings() {
     state.accountDialogMode = "settings";
+    setAccountSettingsPanel("server", { focus: false });
     updateAccountDialogMode();
     el.accountDialog.classList.add("server-settings-visible");
     el.dialogAdvancedDetails.open = true;
@@ -2334,10 +2639,120 @@
     }, 120);
   }
 
+  function accountDialogPanelsForMode(mode = effectiveAccountDialogMode()) {
+    if (mode === "profile") {
+      return ["profile", "security"];
+    }
+
+    if (mode === "settings") {
+      return ["preferences", "app-security", "media", "server", "accessibility"];
+    }
+
+    return [];
+  }
+
+  function ensureAccountSettingsPanel(preferred = state.accountSettingsPanel) {
+    const panels = accountDialogPanelsForMode();
+    if (!panels.length) {
+      state.accountSettingsPanel = preferred || "profile";
+      return;
+    }
+
+    state.accountSettingsPanel = panels.includes(preferred) ? preferred : panels[0];
+  }
+
+  function setAccountSettingsPanel(panel, options = {}) {
+    state.accountSettingsPanel = panel;
+    ensureAccountSettingsPanel(panel);
+    renderAccountSettingsMenu();
+    if (options.focus !== false) {
+      window.setTimeout(() => accountDialogFocusTarget(effectiveAccountDialogMode()).focus({ preventScroll: true }), 0);
+    }
+  }
+
+  function renderAccountSettingsMenu() {
+    if (!el.accountSettingsMenu) {
+      return;
+    }
+
+    const mode = effectiveAccountDialogMode();
+    const panels = accountDialogPanelsForMode(mode);
+    const menuVisible = panels.length > 0 && !state.pendingLoginTwoFactor;
+    el.accountSettingsMenu.hidden = !menuVisible;
+    el.accountSettingsMenu.querySelectorAll("[data-account-panel]").forEach((button) => {
+      const panel = button.dataset.accountPanel || "";
+      button.hidden = !panels.includes(panel);
+      button.classList.toggle("selected", panel === state.accountSettingsPanel);
+      button.setAttribute("aria-current", panel === state.accountSettingsPanel ? "page" : "false");
+    });
+
+    el.accountDialog.querySelectorAll("[data-settings-panel]").forEach((panelEl) => {
+      panelEl.classList.toggle("active-settings-panel", panelEl.dataset.settingsPanel === state.accountSettingsPanel);
+    });
+    el.dialogAdvancedDetails.open = mode === "settings";
+  }
+
+  function accountDialogFocusTarget(mode) {
+    if (mode === "reset") {
+      return el.dialogPasswordInput;
+    }
+
+    if (mode === "signin") {
+      return el.dialogJidInput;
+    }
+
+    const byPanel = {
+      profile: el.dialogDisplayNameInput,
+      security: el.dialogCurrentPasswordInput,
+      preferences: el.rttToggle,
+      "app-security": el.settingsLogoutButton,
+      media: el.dialogCameraInput || el.dialogMicrophoneInput,
+      server: serverSettingsControls().find((control) => !control.disabled) || el.dialogXmppDomainInput,
+      accessibility: el.dialogAccessibilityPanel
+    };
+    return byPanel[state.accountSettingsPanel] || el.dialogDisplayNameInput || el.dialogJidInput;
+  }
+
   function startGoogleLoginFromDialog() {
     updateAccountStatus(t("account.google_redirecting", "Opening Google sign-in..."));
     const target = new URL("api/auth/google/start", location.href);
     location.assign(target.toString());
+  }
+
+  function startGoogleLinkFromDialog() {
+    if (!state.account?.accountId || state.account?.savedInDatabase !== true) {
+      el.dialogAccountStatus.textContent = t("account.save_before_google_link", "Save and sign in before linking Google.");
+      el.dialogAccountStatus.scrollIntoView({ block: "nearest" });
+      return;
+    }
+
+    updateAccountStatus(t("account.google_link_redirecting", "Opening Google linking..."));
+    const target = new URL("api/auth/google/start", location.href);
+    target.searchParams.set("mode", "link");
+    location.assign(target.toString());
+  }
+
+  async function unlinkGoogleFromDialog() {
+    if (!state.account?.accountId || state.account?.savedInDatabase !== true) {
+      return;
+    }
+
+    setAccountDialogBusy(true, t("account.google_unlinking", "Unlinking Google..."));
+    try {
+      const payload = await postAccountAction({
+        action: "unlink_identity",
+        accountId: state.account.accountId,
+        provider: "google"
+      });
+      state.account = { ...state.account, ...payload.account, savedInDatabase: true };
+      updateLinkedIdentityStatus();
+      updateAccountStatus(t("account.google_unlinked", "Google has been unlinked."));
+      el.dialogAccountStatus.textContent = t("account.google_unlinked", "Google has been unlinked.");
+    } catch (error) {
+      showAccountDialogError(error);
+    } finally {
+      setAccountDialogBusy(false);
+    }
   }
 
   async function loadConversationHistory() {
@@ -2463,10 +2878,16 @@
       : stripGeneratedResourceSuffix(el.jidInput.value.trim());
     el.dialogPasswordInput.value = el.passwordInput.value;
     el.dialogRememberPasswordToggle.checked = el.rememberPasswordToggle.checked || state.accountGateRequired;
+    el.dialogCurrentPasswordInput.value = "";
+    el.dialogNewPasswordInput.value = "";
+    el.dialogRepeatPasswordInput.value = "";
+    el.dialogRememberNewPasswordToggle.checked = el.dialogRememberPasswordToggle.checked;
+    updatePasswordRulesPanel();
+    updateLinkedIdentityStatus();
     el.dialogXmppDomainInput.value = state.account?.xmppDomain || domainFromJid(el.dialogJidInput.value);
     el.dialogXmppHostInput.value = state.account?.xmppHost || el.dialogXmppDomainInput.value || "localhost";
     el.dialogXmppPortInput.value = String(state.account?.xmppPort || 5222);
-    el.dialogXmppTlsModeInput.value = normalizeTlsMode(state.account?.xmppTlsMode || "starttls");
+    el.dialogXmppTlsModeInput.value = "websocket";
     el.dialogRelayUrlInput.value = el.relayUrlInput.value;
     el.dialogXmppUrlInput.value = el.xmppUrlInput.value;
     el.dialogProviderInput.value = el.providerInput.value;
@@ -2478,6 +2899,65 @@
     el.dialogMapProviderInput.value = normalizeMapProvider(state.location.settings.mapProvider);
     updateTwoFactorStatus();
     renderMediaDeviceSelects();
+  }
+
+  function showLoginTwoFactorChallenge(payload, options = {}) {
+    state.pendingLoginTwoFactor = {
+      accountId: String(payload.accountId || ""),
+      method: payload.method || "authenticator",
+      profile: options.profile || currentAccountProfile(),
+      connectAfterSave: options.connectAfterSave !== false,
+      oauth: options.oauth === true
+    };
+    state.accountDialogMode = "signin";
+    setAccountGateRequired(true);
+    el.loginTwoFactorCodeInput.value = "";
+    syncAccountDialogFromControls();
+    updateAccountDialogMode();
+    el.dialogAccountStatus.textContent = t("account.login_two_factor_prompt", "Enter the 6-digit authenticator code to finish signing in.");
+    el.accountDialog.hidden = false;
+    document.body.classList.add("modal-open");
+    window.setTimeout(() => el.loginTwoFactorCodeInput.focus(), 0);
+  }
+
+  async function verifyLoginTwoFactorFromDialog() {
+    const pending = state.pendingLoginTwoFactor;
+    const code = el.loginTwoFactorCodeInput.value.replace(/\D+/g, "");
+    if (!pending || code.length !== 6) {
+      el.loginTwoFactorCodeInput.focus();
+      el.dialogAccountStatus.textContent = t("account.two_factor_code_required", "Enter the 6-digit code first.");
+      return;
+    }
+
+    setAccountDialogBusy(true, t("account.login_two_factor_verifying", "Checking 2FA code..."));
+    try {
+      const payload = await postAccountAction({
+        action: "verify_login_two_factor",
+        accountId: pending.accountId,
+        code
+      });
+      if (!payload.account) {
+        throw new Error(t("account.login_two_factor_failed", "2FA login failed."));
+      }
+
+      await applyDatabaseAccount(payload.account, pending.profile || currentAccountProfile());
+      state.pendingLoginTwoFactor = null;
+      setAccountGateRequired(false);
+      setAccountReady(true);
+      recordSessionActivity({ force: true });
+      closeAccountDialog();
+      if (pending.oauth) {
+        cleanOauthUrl();
+      }
+      if (pending.connectAfterSave) {
+        autoConnectIfReady();
+      }
+    } catch (error) {
+      showAccountDialogError(error);
+    } finally {
+      setAccountDialogBusy(false);
+      updateAccountDialogMode();
+    }
   }
 
   function updateTwoFactorStatus(message = "") {
@@ -2501,6 +2981,25 @@
     el.twoFactorSecretText.textContent = hasQr ? state.security.twoFactorManualSecret : "";
   }
 
+  function updateLinkedIdentityStatus() {
+    if (!el.googleLinkStatus) {
+      return;
+    }
+
+    const google = state.account?.linkedIdentities?.google || null;
+    const linked = google?.linked === true;
+    const email = String(google?.email || "").trim();
+    el.googleLinkStatus.textContent = linked
+      ? (email
+        ? t("account.google_linked_email", "Google linked: {email}").replace("{email}", email)
+        : t("account.google_linked", "Google is linked."))
+      : t("account.google_not_linked", "Google is not linked.");
+    el.linkGoogleButton.hidden = linked;
+    el.unlinkGoogleButton.hidden = !linked;
+    el.linkGoogleButton.disabled = state.account?.savedInDatabase !== true;
+    el.unlinkGoogleButton.disabled = state.account?.savedInDatabase !== true;
+  }
+
   function renderTwoFactorQrCode(uri) {
     state.security.twoFactorOtpauthUri = uri || "";
     el.twoFactorQrCode.textContent = "";
@@ -2515,10 +3014,15 @@
       return;
     }
 
-    const qr = qrcode(0, "M");
-    qr.addData(uri);
-    qr.make();
-    el.twoFactorQrCode.innerHTML = qr.createSvgTag(4, 0);
+    try {
+      const qr = qrcode(0, "M");
+      qr.addData(uri);
+      qr.make();
+      el.twoFactorQrCode.innerHTML = qr.createSvgTag(4, 0);
+    } catch (error) {
+      appendDebug("two-factor-qr-error", error.message || String(error));
+      el.twoFactorQrCode.textContent = t("account.two_factor_qr_unavailable", "QR generator unavailable.");
+    }
     updateTwoFactorStatus();
   }
 
@@ -2537,7 +3041,7 @@
     const xmppPort = normalizeXmppPort(el.dialogXmppPortInput.value);
     let xmppDomain = el.dialogXmppDomainInput.value.trim() || domainFromJid(jid);
     let xmppHost = el.dialogXmppHostInput.value.trim() || xmppDomain;
-    const xmppWebSocket = normalizeLocalWebSocketUrlForCurrentHost(el.dialogXmppUrlInput.value.trim() || el.xmppUrlInput.value, 8787);
+    const xmppWebSocket = normalizeLocalXmppWebSocketUrlForCurrentHost(el.dialogXmppUrlInput.value.trim() || el.xmppUrlInput.value);
     if (isLocalAccountDomain(xmppHost) || isLocalXmppWebSocketUrl(xmppWebSocket)) {
       xmppDomain = "localhost";
       xmppHost = "localhost";
@@ -2551,7 +3055,7 @@
     el.dialogJidInput.value = jid;
     el.passwordInput.value = el.dialogPasswordInput.value;
     el.rememberPasswordToggle.checked = el.dialogRememberPasswordToggle.checked;
-    el.relayUrlInput.value = normalizeLocalWebSocketUrlForCurrentHost(el.dialogRelayUrlInput.value.trim() || el.relayUrlInput.value, 8787);
+    el.relayUrlInput.value = "";
     el.xmppUrlInput.value = xmppWebSocket;
     el.providerInput.value = el.dialogProviderInput.value.trim() || "example-provider";
     el.languageInput.value = normalizeLanguageCode(el.dialogLanguageInput.value);
@@ -2693,6 +3197,103 @@
     }
   }
 
+  async function changePasswordFromSecuritySection() {
+    const currentPassword = el.dialogCurrentPasswordInput.value;
+    const password = el.dialogNewPasswordInput.value;
+    const repeatedPassword = el.dialogRepeatPasswordInput.value;
+    const validation = passwordValidationState(currentPassword, password, repeatedPassword);
+    if (!currentPassword) {
+      showAccountDialogError(accountDialogError("dialogCurrentPasswordInput", t("account.current_password_required", "Enter your current password first.")));
+      return;
+    }
+
+    if (!password) {
+      showAccountDialogError(accountDialogError("dialogNewPasswordInput", t("account.password_required", "Enter a password for a real server account.")));
+      return;
+    }
+
+    if (password !== repeatedPassword) {
+      showAccountDialogError(accountDialogError("dialogRepeatPasswordInput", t("account.password_repeat_mismatch", "The repeated password does not match.")));
+      return;
+    }
+
+    if (!validation.valid) {
+      showAccountDialogError(accountDialogError("dialogNewPasswordInput", t("account.password_rules_incomplete", "The new password does not meet all security rules.")));
+      updatePasswordRulesPanel();
+      return;
+    }
+
+    setAccountDialogBusy(true, t("account.changing_password", "Changing password..."));
+    try {
+      el.dialogPasswordInput.value = password;
+      el.passwordInput.value = password;
+      el.dialogRememberPasswordToggle.checked = el.dialogRememberNewPasswordToggle.checked;
+      el.rememberPasswordToggle.checked = el.dialogRememberNewPasswordToggle.checked;
+      if (state.account) {
+        state.account.password = password;
+        state.account.rememberPassword = el.dialogRememberNewPasswordToggle.checked;
+      }
+
+      applyAccountDialogToControls({ requirePassword: true });
+      const profile = currentAccountProfile();
+      const account = await saveDatabaseAccount({ ...profile, currentPassword }, "save");
+      state.account = { ...state.account, ...profile, ...account, password, savedInDatabase: true };
+      storeServerAccountSession(state.account, profile.rememberPassword);
+      updateAccountAvatarPreview();
+      updateRelayConversationMeta();
+      reconcileContactsForCurrentAccount();
+      updateAccountStatus(t("account.password_changed", "Password changed"));
+      setAccountReady(true);
+      el.dialogCurrentPasswordInput.value = "";
+      el.dialogNewPasswordInput.value = "";
+      el.dialogRepeatPasswordInput.value = "";
+      updatePasswordRulesPanel();
+      el.dialogAccountStatus.textContent = accountDialogStatusText("account.password_changed", "Password changed");
+      syncAccountDialogFromControls();
+    } catch (error) {
+      showAccountDialogError(error);
+    } finally {
+      setAccountDialogBusy(false);
+    }
+  }
+
+  function passwordValidationState(currentPassword = el.dialogCurrentPasswordInput.value, password = el.dialogNewPasswordInput.value, repeatedPassword = el.dialogRepeatPasswordInput.value) {
+    const rules = [
+      { id: "length", ok: password.length >= 10, text: t("password.rule_length", "At least 10 characters") },
+      { id: "lower", ok: /[a-z]/.test(password), text: t("password.rule_lower", "At least one lowercase letter") },
+      { id: "upper", ok: /[A-Z]/.test(password), text: t("password.rule_upper", "At least one uppercase letter") },
+      { id: "number", ok: /\d/.test(password), text: t("password.rule_number", "At least one number") },
+      { id: "symbol", ok: /[^A-Za-z0-9]/.test(password), text: t("password.rule_symbol", "At least one special character") },
+      { id: "repeat", ok: password !== "" && password === repeatedPassword, text: t("password.rule_repeat", "Repeated password matches") },
+      { id: "different", ok: currentPassword !== "" && password !== "" && currentPassword !== password, text: t("password.rule_different", "Different from current password") }
+    ];
+    return {
+      rules,
+      valid: rules.every((rule) => rule.ok)
+    };
+  }
+
+  function updatePasswordRulesPanel() {
+    if (!el.passwordRulesPanel || !el.changePasswordButton) {
+      return;
+    }
+
+    const validation = passwordValidationState();
+    el.passwordRulesPanel.replaceChildren(...validation.rules.map((rule) => {
+      const item = document.createElement("div");
+      item.className = `password-rule ${rule.ok ? "valid" : "invalid"}`;
+      const marker = document.createElement("span");
+      marker.className = "password-rule-marker";
+      marker.textContent = rule.ok ? "✓" : "";
+      marker.setAttribute("aria-hidden", "true");
+      const label = document.createElement("span");
+      label.textContent = rule.text;
+      item.append(marker, label);
+      return item;
+    }));
+    el.changePasswordButton.disabled = !validation.valid;
+  }
+
   async function requestTwoFactorSetupFromDialog() {
     if (!state.account?.accountId || state.account?.savedInDatabase !== true) {
       el.dialogAccountStatus.textContent = t("account.save_before_2fa", "Save and sign in before enabling 2FA.");
@@ -2778,6 +3379,10 @@
       const wasGateRequired = state.accountGateRequired;
       applyAccountDialogToControls({ requirePassword: wasGateRequired });
       const result = await saveAccountProfile(wasGateRequired ? "login" : "save");
+      if (result?.twoFactorRequired) {
+        showLoginTwoFactorChallenge(result, { profile: result.profile, connectAfterSave: connectAfterSave || wasGateRequired });
+        return;
+      }
       await loadLanguage(el.languageInput.value);
       el.dialogAccountStatus.textContent = accountDialogStatusText("account.database_saved", "Server account saved");
       syncAccountDialogFromControls();
@@ -2801,8 +3406,13 @@
     el.dialogCreateAccountButton.disabled = busy;
     el.dialogSaveAccountButton.disabled = busy;
     el.dialogConnectButton.disabled = busy;
+    el.verifyLoginTwoFactorButton.disabled = busy || !state.pendingLoginTwoFactor || el.loginTwoFactorCodeInput.value.replace(/\D+/g, "").length !== 6;
+    el.changePasswordButton.disabled = busy || !passwordValidationState().valid;
+    el.linkGoogleButton.disabled = busy || state.account?.savedInDatabase !== true;
+    el.unlinkGoogleButton.disabled = busy || state.account?.savedInDatabase !== true;
     el.requestTwoFactorButton.disabled = busy || state.account?.twoFactorEnabled === true;
-    el.confirmTwoFactorButton.disabled = busy || state.account?.twoFactorEnabled === true || state.security.twoFactorVerificationId <= 0;
+    const hasAuthenticatorQr = state.account?.twoFactorEnabled !== true && state.security.twoFactorOtpauthUri !== "";
+    el.confirmTwoFactorButton.disabled = busy || state.account?.twoFactorEnabled === true || (!hasAuthenticatorQr && state.security.twoFactorVerificationId <= 0);
     if (text) {
       el.dialogAccountStatus.textContent = text;
       el.dialogAccountStatus.scrollIntoView({ block: "nearest" });
@@ -2882,6 +3492,7 @@
       presence: "offline",
       meta: "Offline",
       messages: [],
+      unreadCount: 0,
       remoteText: "",
       remoteFrom: "",
       remoteDraftUpdatedAt: null
@@ -2936,7 +3547,9 @@
       accountId: `local-${state.sessionProfile}`,
       displayName: sessionProfileToDisplayName(state.sessionProfile),
       jid: `${localPart}@localhost/web`,
-      peer: defaultAccount.peer ?? "relay@localhost"
+      peer: defaultAccount.peer && !addressMatches(defaultAccount.peer, "relay@localhost")
+        ? defaultAccount.peer
+        : "tester@localhost"
     };
   }
 
@@ -3005,12 +3618,12 @@
       providerId: el.providerInput.value.trim() || state.account?.providerId || "example-provider",
       accessibilityProfileId: state.account?.accessibilityProfileId ?? "default-live-text",
       preferredLanguage: el.languageInput.value,
-      relayWebSocket: normalizeLocalWebSocketUrlForCurrentHost(el.relayUrlInput.value.trim(), 8787),
-      xmppWebSocket: normalizeLocalWebSocketUrlForCurrentHost(el.xmppUrlInput.value.trim(), 8787),
+      relayWebSocket: "",
+      xmppWebSocket: normalizeLocalXmppWebSocketUrlForCurrentHost(el.xmppUrlInput.value.trim()),
       xmppHost: state.account?.xmppHost || domainFromJid(el.jidInput.value.trim()),
       xmppPort: state.account?.xmppPort || 5222,
       xmppDomain: state.account?.xmppDomain || domainFromJid(el.jidInput.value.trim()),
-      xmppTlsMode: normalizeTlsMode(state.account?.xmppTlsMode || "starttls"),
+      xmppTlsMode: "websocket",
       peer: el.peerInput.value.trim()
     };
   }
@@ -3023,6 +3636,15 @@
   async function saveAccountProfile(action = "save") {
     const profile = currentAccountProfile();
     const account = await saveDatabaseAccount(profile, action);
+    if (account?.twoFactorRequired) {
+      return { ...account, profile };
+    }
+
+    await applyDatabaseAccount(account, profile);
+    return { profile: state.account, databaseSaved: true };
+  }
+
+  async function applyDatabaseAccount(account, profile = currentAccountProfile()) {
     state.account = { ...state.account, ...profile, ...account, savedInDatabase: true };
     storeServerAccountSession(state.account, profile.rememberPassword);
     el.jidInput.value = createUniqueJid(state.account.jid);
@@ -3032,9 +3654,9 @@
     updateAccountStatus(t("account.database_saved", "Server account saved"));
     appendDebug("account", `Server saved ${el.jidInput.value}`);
     setAccountReady(true);
+    recordSessionActivity({ force: true });
     await loadMessageHistory();
     await loadConversationHistory();
-    return { profile: state.account, databaseSaved: true };
   }
 
   async function saveDatabaseAccount(profile, action = "save") {
@@ -3049,6 +3671,11 @@
     const payload = await response.json();
     if (!response.ok || !payload.ok) {
       throw new Error(accountApiErrorText(payload.error || `account API returned ${response.status}`, payload));
+    }
+
+    if (payload.twoFactorRequired) {
+      appendDebug("account-db", `2FA required for ${payload.accountId || profile.jid}`);
+      return payload;
     }
 
     appendDebug("account-db", `Saved ${payload.account.jid}`);
@@ -3094,6 +3721,10 @@
       return t("account.invalid_credentials", "The server rejected this email or password.");
     }
 
+    if (error === "invalid_current_password") {
+      return t("account.invalid_current_password", "The current password is not correct.");
+    }
+
     if (error === "not_authenticated") {
       return t("account.not_authenticated", "Sign in again before loading this server account.");
     }
@@ -3124,6 +3755,10 @@
 
     if (error === "two_factor_setup_missing") {
       return t("account.two_factor_setup_missing", "Create a new QR code before entering the 2FA code.");
+    }
+
+    if (error === "unsupported_identity_provider") {
+      return t("account.unsupported_identity_provider", "This account link is not supported.");
     }
 
     if (error === "password_required") {
@@ -3169,6 +3804,58 @@
     updateAccountStatus(t("account.reset_reload", "Account reset; reload to restore defaults"));
     appendDebug("account", "Server account session cleared");
     location.reload();
+  }
+
+  function clearAccountSessionForCurrentProfile() {
+    localStorage.removeItem(accountStorageKeyFor(state.sessionProfile));
+    sessionStorage.removeItem(accountStorageKeyFor(state.sessionProfile));
+    sessionStorage.removeItem(clientInstanceStorageKeyFor(state.sessionProfile));
+    clearStoredXmppStreamManagement();
+    cleanOauthUrl();
+  }
+
+  async function logoutAccount(options = {}) {
+    state.suppressAutoLoginDialog = false;
+    window.clearTimeout(state.sessionIdleTimerId);
+    state.sessionIdleTimerId = null;
+    clearAccountSessionForCurrentProfile();
+    if (state.account) {
+      state.account.password = "";
+      state.account.loginToken = "";
+      state.account.rememberPassword = false;
+      state.account.savedInSession = false;
+    }
+    el.passwordInput.value = "";
+    el.dialogPasswordInput.value = "";
+    el.rememberPasswordToggle.checked = false;
+    el.dialogRememberPasswordToggle.checked = false;
+    appendDebug("account", "Signed out and cleared local account session");
+    setAccountReady(false);
+    sendLogoutAccountSession()
+      .then(() => appendDebug("account", "Server account session cleared"))
+      .catch((error) => appendDebug("account-logout-error", error.message));
+    disconnectAll(options.message || t("account.signed_out", "Signed out. Sign in to continue."));
+  }
+
+  function sendLogoutAccountSession() {
+    const body = JSON.stringify({ action: "logout" });
+    if (navigator.sendBeacon) {
+      const sent = navigator.sendBeacon(accountApiPath, new Blob([body], { type: "application/json" }));
+      if (sent) {
+        return Promise.resolve();
+      }
+    }
+
+    return fetch(accountApiPath, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body,
+      keepalive: true
+    }).then((response) => {
+      if (!response.ok) {
+        throw new Error(`logout API returned ${response.status}`);
+      }
+    });
   }
 
   function handleAccountIdentityChanged() {
@@ -3535,9 +4222,14 @@
       return t("account.database_loaded", "Server account loaded");
     }
 
-    return (localStorage.getItem(accountStorageKeyFor(state.sessionProfile)) || sessionStorage.getItem(accountStorageKeyFor(state.sessionProfile)))
+    return hasStoredAccountSession()
       ? t("account.server_session", "Server account session")
       : t("account.default_profile", "Default account profile");
+  }
+
+  function hasStoredAccountSession() {
+    const key = accountStorageKeyFor(state.sessionProfile);
+    return Boolean(localStorage.getItem(key) || sessionStorage.getItem(key));
   }
 
   function renderProvider() {
@@ -4737,11 +5429,7 @@
         return;
       }
 
-      if (kind === "xmpp") {
-        connectXmppWebSocket();
-      } else {
-        connectRelay();
-      }
+      connectXmppWebSocket();
     }, 1000);
     return true;
   }
@@ -4799,7 +5487,7 @@
 
   function connectRelay() {
     if (!state.accountReady || state.accountGateRequired) {
-      openAccountDialog({ required: true });
+      requestLoginRequired(t("account.start_required", "Sign in or create an account before Teletyptel opens."), { forceLogin: true });
       return;
     }
 
@@ -4870,7 +5558,7 @@
     });
   }
 
-  function disconnectAll() {
+  function disconnectAll(message = null) {
     state.intentionalDisconnect = true;
     clearTimeout(state.clientLifecycle.transientReconnectTimer);
     state.clientLifecycle.transientReconnectTimer = null;
@@ -4888,10 +5576,10 @@
 
     closeXmppWebSocket();
     updateConnectButtonAvailability();
-    returnToLoginScreenAfterDisconnect();
+    returnToLoginScreenAfterDisconnect(message);
   }
 
-  function returnToLoginScreenAfterDisconnect(message) {
+  function returnToLoginScreenAfterDisconnect(message, options = {}) {
     state.intentionalDisconnect = true;
     clearTimeout(state.clientLifecycle.transientReconnectTimer);
     state.clientLifecycle.transientReconnectTimer = null;
@@ -4924,9 +5612,7 @@
     renderConversations();
     renderActiveConversation();
     setConnectionStatus(t("status.disconnected", "Disconnected"), "warn");
-    setAccountGateRequired(true);
-    openAccountDialog({ required: true });
-    el.dialogAccountStatus.textContent = message || t("account.disconnected_login_required", "Connection closed. Sign in to continue.");
+    requestLoginRequired(message, options);
     updateConnectButtonAvailability();
   }
 
@@ -5253,7 +5939,7 @@
     }
 
     if (target.conversation.id !== state.activeConversationId) {
-      selectConversation(target.conversation.id);
+      selectConversation(target.conversation);
     }
     startMessageEdit(target.message.id);
   }
@@ -5956,17 +6642,15 @@
       openVideoRecorderDialog({ reset: false });
     }
     try {
-      let stream;
-      try {
-        stream = await navigator.mediaDevices.getUserMedia(createVideoMessageConstraints());
-      } catch {
-        stream = await navigator.mediaDevices.getUserMedia(createVideoMessageConstraints(true));
-      }
+      const stream = state.videoRecorder.previewStream || await requestVideoMessageStream();
+      state.videoRecorder.stream = stream;
 
       const mimeType = preferredVideoRecordingMimeType();
       const options = mimeType ? { mimeType } : undefined;
       const recorder = new MediaRecorder(stream, options);
-      state.videoRecorder.stream = stream;
+      if (state.videoRecorder.previewStream === stream) {
+        state.videoRecorder.previewStream = null;
+      }
       state.videoRecorder.recorder = recorder;
       state.videoRecorder.mimeType = recorder.mimeType || mimeType || "video/webm";
       state.videoRecorder.chunks = [];
@@ -6003,10 +6687,58 @@
       updateVideoRecordingTimer();
     } catch (error) {
       stopVideoStream();
+      stopVideoPreviewStream();
       updateVideoRecordingUi(false);
       updateVideoDialogActionButtons("setup");
       setConnectionStatus(`${t("video.record_failed", "Could not start video recording")}: ${error.message}`, "danger");
       appendDebug("video-record-error", error.message || String(error));
+    }
+  }
+
+  async function requestVideoMessageStream() {
+    try {
+      return await navigator.mediaDevices.getUserMedia(createVideoMessageConstraints());
+    } catch {
+      return await navigator.mediaDevices.getUserMedia(createVideoMessageConstraints(true));
+    }
+  }
+
+  async function startVideoDialogPreview() {
+    if (state.videoRecorder.blob || state.videoRecorder.objectUrl || state.videoRecorder.recorder?.state === "recording") {
+      return;
+    }
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setConnectionStatus(mediaAccessUnavailableMessage(), "danger");
+      return;
+    }
+
+    stopVideoPreviewStream();
+    try {
+      markMediaCaptureTransition("video-dialog-preview", 12000);
+      const stream = await requestVideoMessageStream();
+      if (el.videoPreviewDialog.hidden
+        || state.videoRecorder.blob
+        || state.videoRecorder.recorder?.state === "recording") {
+        stopStream(stream);
+        return;
+      }
+
+      state.videoRecorder.previewStream = stream;
+      el.videoPreviewDialogVideo.pause();
+      el.videoPreviewDialogVideo.removeAttribute("src");
+      el.videoPreviewDialogVideo.srcObject = stream;
+      el.videoPreviewDialogVideo.muted = true;
+      el.videoPreviewDialogVideo.defaultMuted = true;
+      el.videoPreviewDialogVideo.controls = false;
+      el.videoPreviewDialogVideo.autoplay = true;
+      el.videoPreviewDialogVideo.playsInline = true;
+      await el.videoPreviewDialogVideo.play?.();
+      await refreshMediaDevices(false);
+    } catch (error) {
+      stopVideoPreviewStream();
+      setConnectionStatus(`${t("media.preview_failed", "Preview failed")}: ${error.message}`, "danger");
+      appendDebug("video-dialog-preview-error", error.message || String(error));
     }
   }
 
@@ -6124,7 +6856,6 @@
 
     clearRecordedVideoMessage();
     openVideoRecorderDialog({ reset: false });
-    await startVideoRecording();
   }
 
   function cancelVideoMessage() {
@@ -6141,6 +6872,7 @@
   function clearRecordedVideoMessage() {
     clearVideoTimer();
     stopVideoStream();
+    stopVideoPreviewStream();
     if (state.videoRecorder.objectUrl) {
       URL.revokeObjectURL(state.videoRecorder.objectUrl);
     }
@@ -6181,6 +6913,16 @@
     el.videoMessageButton.classList.toggle("recording", recording);
     el.videoMessageButton.setAttribute("aria-pressed", recording ? "true" : "false");
     el.videoRecorderQualityInput.disabled = recording;
+    if (el.videoRecorderQualityButton) {
+      el.videoRecorderQualityButton.disabled = recording;
+    }
+    if (el.videoRecorderCameraButton) {
+      el.videoRecorderCameraButton.disabled = recording;
+    }
+    if (recording) {
+      closeVideoRecorderQualityMenu();
+      closeVideoRecorderCameraMenu();
+    }
     const icon = el.videoMessageButton.querySelector("[data-icon]");
     if (icon) {
       icon.dataset.icon = recording ? "videocamOff" : "videocam";
@@ -6325,6 +7067,13 @@
       stopStream(state.videoRecorder.stream);
     }
     state.videoRecorder.stream = null;
+  }
+
+  function stopVideoPreviewStream() {
+    if (state.videoRecorder.previewStream) {
+      stopStream(state.videoRecorder.previewStream);
+    }
+    state.videoRecorder.previewStream = null;
   }
 
   function preferredVoiceRecordingMimeType() {
@@ -6501,7 +7250,7 @@
     }
 
     state.intentionalDisconnect = false;
-    const url = normalizeXmppWebSocketUrl(normalizeLocalWebSocketUrlForCurrentHost(el.xmppUrlInput.value.trim(), 8787));
+    const url = normalizeXmppWebSocketUrl(normalizeLocalXmppWebSocketUrlForCurrentHost(el.xmppUrlInput.value.trim()));
     el.xmppUrlInput.value = url;
     const socket = new WebSocket(url, "xmpp");
     state.xmppSocket = socket;
@@ -6715,7 +7464,7 @@
     const password = state.account?.password || el.passwordInput.value || "";
     if (!password) {
       setConnectionStatus(t("account.password_required", "Enter a password for a real server account."), "danger");
-      returnToLoginScreenAfterDisconnect(t("account.password_required", "Enter a password for a real server account."));
+      returnToLoginScreenAfterDisconnect(t("account.password_required", "Enter a password for a real server account."), { openLogin: false });
       closeXmppWebSocket();
       return;
     }
@@ -6781,9 +7530,15 @@
       return;
     }
 
+    state.xmppAuthRefreshAttempted = false;
     state.xmppSession.phase = "ready";
-    const presence = '<presence xmlns="jabber:client"/>';
-    sendXmppStanza(presence);
+    sendPresence("online");
+    for (const conversation of state.conversations) {
+      if (conversation.kind === "group") {
+        conversation.mucJoined = false;
+      }
+    }
+    joinActiveXmppGroupConversation();
     startXmppHeartbeat();
     flushClientLifecycleState("xmpp-ready", true);
     setConnectionStatus(t("status.xmpp_connected", "XMPP connected"), "good");
@@ -6806,6 +7561,7 @@
 
     state.xmppMam.pending = true;
     state.xmppMam.lastStartedAt = now;
+    state.xmppMam.resultCount = 0;
     const id = createMessageId("mam");
     const queryId = createMessageId("mamq");
     const xml = createXmppMamQueryStanza(id, queryId, { max: 200 });
@@ -6817,6 +7573,7 @@
       }
       state.xmppMam.pending = false;
       appendDebug("xmpp-mam", "query timeout or unsupported");
+      reloadLocalHistoryAfterEmptyMam("timeout");
     }, 8000);
     return sendXmppStanza(xml, `<iq type="set" id="${id}"><query xmlns="${xmppMamNamespace}" queryid="${queryId}">...</query></iq>`);
   }
@@ -6849,6 +7606,12 @@
     return btoa(binary);
   }
 
+  function utf8FromBase64(value) {
+    const binary = atob(String(value || ""));
+    const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+    return new TextDecoder().decode(bytes);
+  }
+
   function closeXmppWebSocket() {
     if (!state.xmppSocket) {
       return;
@@ -6867,7 +7630,7 @@
   function handleXmppIncomingFrame(xmlText) {
     const text = String(xmlText ?? "");
     handleXmppSessionFrame(text);
-    if (!text.includes("<message")) {
+    if (!text.includes("<message") && !text.includes("<presence")) {
       return;
     }
 
@@ -6882,6 +7645,12 @@
       return;
     }
 
+    const presences = Array.from(doc.documentElement?.children || [])
+      .filter((element) => element.localName === "presence" && element.namespaceURI === "jabber:client");
+    for (const presence of presences) {
+      handleXmppPresenceElement(presence);
+    }
+
     const messages = Array.from(doc.documentElement?.children || [])
       .filter((element) => element.localName === "message" && element.namespaceURI === "jabber:client");
     for (const message of messages) {
@@ -6889,12 +7658,19 @@
         continue;
       }
 
+      const type = message.getAttribute("type") || "chat";
       const from = message.getAttribute("from") || "";
-      if (!from || isOwnPeer(from)) {
+      if (!from || (!isXmppGroupchatType(type) && isOwnPeer(from))) {
         continue;
       }
 
-      const conversation = ensureConversationForPeer(from, "contact", displayNameForJid(from));
+      if (handleXmppJingleSignalMessage(message, from)) {
+        continue;
+      }
+
+      const conversationPeer = isXmppGroupchatType(type) ? bareJid(from) : from;
+      const conversationKind = isXmppGroupchatType(type) ? "group" : "contact";
+      const conversation = ensureConversationForPeer(conversationPeer, conversationKind, displayNameForJid(conversationPeer));
       if (!conversation) {
         continue;
       }
@@ -6957,7 +7733,13 @@
       const replaceId = replaceElement?.getAttribute("id") || "";
       const messageId = stableXmppMessageId(message);
       const stylingDisabled = Boolean(message.getElementsByTagNameNS("urn:xmpp:styling:0", "unstyled")[0]);
-      sendXmppMessageAcknowledgements(from, messageId, Boolean(message.getElementsByTagNameNS("urn:xmpp:receipts", "request")[0]));
+      if (isXmppOwnGroupchatEcho(from, type)) {
+        continue;
+      }
+
+      if (!isXmppGroupchatType(type)) {
+        sendXmppMessageAcknowledgements(from, messageId, Boolean(message.getElementsByTagNameNS("urn:xmpp:receipts", "request")[0]));
+      }
       if (replaceId) {
         applyMessageCorrection(conversation, replaceId, bodyElement.textContent || "", "peer", messageId, from, stylingDisabled);
       } else {
@@ -6993,16 +7775,55 @@
       return true;
     }
 
-    restoreXmppMamArchivedMessage(archivedMessage, result, forwarded);
+    if (restoreXmppMamArchivedMessage(archivedMessage, result, forwarded)) {
+      state.xmppMam.resultCount += 1;
+    }
     return true;
+  }
+
+  function handleXmppJingleSignalMessage(message, from) {
+    const signal = message.getElementsByTagNameNS(teletyptelJingleSignalNamespace, "signal")[0];
+    if (!signal) {
+      return false;
+    }
+
+    const envelope = decodeXmppJingleSignal(signal);
+    if (!envelope) {
+      appendDebug("jingle-xmpp-error", "Invalid XMPP Jingle signal payload");
+      return true;
+    }
+
+    if (envelope.clientId && envelope.clientId === state.clientInstance.id) {
+      appendDebug("jingle-xmpp-skip", "Ignored own XMPP Jingle signal echo");
+      return true;
+    }
+
+    envelope.type = "jingle";
+    envelope.from = envelope.from || from;
+    envelope.to = envelope.to || currentFromJid();
+    if (isXmppGroupchatType(message.getAttribute("type"))) {
+      envelope.conversationKind = "group";
+      envelope.roomJid = envelope.roomJid || bareJid(from);
+    }
+    appendDebug("jingle-xmpp-in", `${envelope.action || "jingle"} sid=${envelope.sid || "-"} from=${bareJid(from)}`);
+    handleJingleEnvelope(envelope);
+    return true;
+  }
+
+  function decodeXmppJingleSignal(signal) {
+    try {
+      return JSON.parse(utf8FromBase64(signal.textContent || ""));
+    } catch {
+      return null;
+    }
   }
 
   function restoreXmppMamArchivedMessage(message, result, forwarded) {
     const type = message.getAttribute("type") || "chat";
     const from = message.getAttribute("from") || "";
     const to = message.getAttribute("to") || "";
-    const direction = isOwnPeer(from) ? "self" : "peer";
-    const peer = type === "groupchat"
+    const direction = isOwnPeer(from) || isXmppOwnGroupchatEcho(from, type) ? "self" : "peer";
+    const peer = isXmppGroupchatType(type)
       ? bareJid(from)
       : direction === "self"
         ? bareJid(to)
@@ -7060,6 +7881,7 @@
     if (timestamp) {
       added.timestamp = timestamp;
     }
+    persistHistoryMessage(conversation, added);
     appendDebug("xmpp-mam", `${conversation.peer} ${direction} ${messageId || result.getAttribute("id") || "-"}`);
     renderConversations();
     if (conversation.id === state.activeConversationId) {
@@ -7311,6 +8133,10 @@
     if (failure) {
       setConnectionStatus(t("status.xmpp_auth_failed", "XMPP authentication failed"), "danger");
       appendDebug("xmpp-auth", failure.textContent || "failed");
+      if (refreshDatabaseAccountAfterXmppAuthFailure()) {
+        return;
+      }
+
       returnToLoginScreenAfterDisconnect(t("account.invalid_credentials", "The server rejected this email or password."));
       closeXmppWebSocket();
       return;
@@ -7336,8 +8162,25 @@
     window.clearTimeout(state.xmppMam.timerId);
     state.xmppMam.timerId = null;
     appendDebug("xmpp-mam", `fin complete=${fin.getAttribute("complete") || "false"}`);
+    if (state.xmppMam.resultCount === 0) {
+      reloadLocalHistoryAfterEmptyMam("empty");
+    }
     syncAllConversationMessageState("mam-load");
     return true;
+  }
+
+  function reloadLocalHistoryAfterEmptyMam(reason) {
+    if (state.xmppMam.fallbackHistoryReloaded) {
+      return;
+    }
+
+    state.xmppMam.fallbackHistoryReloaded = true;
+    appendDebug("xmpp-mam", `no archive messages (${reason}); reloading local history fallback`);
+    loadMessageHistory().then((loaded) => {
+      if (loaded) {
+        appendDebug("history", "Local history fallback restored after empty MAM.");
+      }
+    }).catch((error) => appendDebug("history-error", error.message || String(error)));
   }
 
   function handleXmppFeatures(features) {
@@ -7490,7 +8333,10 @@
     const edit = activeEditTarget();
     const outgoingId = createMessageId(edit ? "edit" : "msg");
     if (state.mode === "xmpp" && state.xmppSocket?.readyState === WebSocket.OPEN && state.xmppSession?.authenticated) {
-      const xml = createMessageStanza(text, outgoingId, edit?.replaceId ?? null);
+      const conversation = activeConversation();
+      joinXmppGroupConversation(conversation);
+      const messageType = conversation?.kind === "group" ? "groupchat" : "chat";
+      const xml = createMessageStanza(text, outgoingId, edit?.replaceId ?? null, false, currentToJid(), "", messageType);
       sendXmppStanza(xml);
       if (edit) {
         applyMessageCorrection(edit.conversation, edit.replaceId, text, "self", outgoingId);
@@ -7671,16 +8517,33 @@
   }
 
   function sendPresence(presence, options = {}) {
-    if (!isRelayConnected()) {
-      return;
+    const normalizedPresence = presence === "offline" ? "offline" : "online";
+    const notificationState = normalizedPresence === "online" && state.doNotDisturb ? "dnd" : "available";
+    if (isRelayConnected()) {
+      const envelope = createRelayEnvelope("presence", "", "", "relay@localhost");
+      envelope.presence = normalizedPresence;
+      envelope.notificationState = notificationState;
+      envelope.probe = options.probe === true;
+      envelope.responseTo = options.responseTo || null;
+      state.relaySocket.send(JSON.stringify(envelope));
+      appendDebug("presence-out", `${envelope.presence}/${notificationState} ${envelope.probe ? "probe" : "announce"}`);
     }
 
-    const envelope = createRelayEnvelope("presence", "", "", "relay@localhost");
-    envelope.presence = presence === "offline" ? "offline" : "online";
-    envelope.probe = options.probe === true;
-    envelope.responseTo = options.responseTo || null;
-    state.relaySocket.send(JSON.stringify(envelope));
-    appendDebug("presence-out", `${envelope.presence} ${envelope.probe ? "probe" : "announce"}`);
+    if (state.xmppSocket?.readyState === WebSocket.OPEN && state.xmppSession?.authenticated) {
+      sendXmppStanza(createXmppPresenceStanza(normalizedPresence, notificationState), `<presence ${normalizedPresence}/${notificationState}/>`);
+    }
+  }
+
+  function createXmppPresenceStanza(presence, notificationState) {
+    if (presence === "offline") {
+      return '<presence xmlns="jabber:client" type="unavailable"/>';
+    }
+
+    const show = notificationState === "dnd" ? "<show>dnd</show>" : "";
+    const status = notificationState === "dnd"
+      ? `<status>${escapeXml(t("presence.do_not_disturb", "Do not disturb"))}</status>`
+      : "";
+    return `<presence xmlns="jabber:client">${show}${status}</presence>`;
   }
 
   function currentSenderName() {
@@ -7977,7 +8840,60 @@
       return conversation.peer;
     }
 
-    return el.peerInput.value.trim() || "relay@localhost";
+    return el.peerInput.value.trim() || "tester@localhost";
+  }
+
+  function xmppMucNickname() {
+    const from = bareJid(currentFromJid());
+    return sanitizeXmppResource(currentSenderName())
+      || sanitizeXmppResource(from.split("@")[0])
+      || `web-${state.clientInstance.resourceSuffix}`;
+  }
+
+  function sanitizeXmppResource(value) {
+    return String(value || "")
+      .trim()
+      .replace(/[<>&"']/g, "")
+      .replace(/\s+/g, "-")
+      .slice(0, 48);
+  }
+
+  function resourceFromJid(jid) {
+    const value = String(jid || "");
+    return value.includes("/") ? value.split("/").slice(1).join("/") : "";
+  }
+
+  function isXmppGroupchatType(type) {
+    return String(type || "").toLowerCase() === "groupchat";
+  }
+
+  function isXmppOwnGroupchatEcho(from, type) {
+    return isXmppGroupchatType(type) && resourceFromJid(from).toLowerCase() === xmppMucNickname().toLowerCase();
+  }
+
+  function joinActiveXmppGroupConversation() {
+    joinXmppGroupConversation(activeConversation());
+  }
+
+  function joinXmppGroupConversation(conversation) {
+    if (conversation?.kind !== "group"
+      || state.mode !== "xmpp"
+      || state.xmppSocket?.readyState !== WebSocket.OPEN
+      || !state.xmppSession?.authenticated
+      || conversation.mucJoined) {
+      return false;
+    }
+
+    const room = bareJid(conversation.peer);
+    if (!room) {
+      return false;
+    }
+
+    const occupant = `${room}/${xmppMucNickname()}`;
+    const xml = `<presence xmlns="jabber:client" to="${escapeXml(occupant)}"><x xmlns="http://jabber.org/protocol/muc"><history maxchars="0"/></x></presence>`;
+    const sent = sendXmppStanza(xml, `<presence to="${escapeXml(room)}/..." muc="join"/>`);
+    conversation.mucJoined = sent || conversation.mucJoined;
+    return sent;
   }
 
   function envelopeFrom(envelope) {
@@ -8161,10 +9077,15 @@
     applyEnvelopeIdentity(conversation, envelope);
 
     conversation.presence = presence;
+    conversation.clientState = envelope.notificationState === "dnd" ? "dnd" : conversation.clientState;
+    conversation.clientStateUpdatedAt = envelope.notificationState === "dnd" ? new Date() : conversation.clientStateUpdatedAt;
     if (presence === "offline") {
       conversation.clientState = null;
       conversation.clientStateUpdatedAt = null;
       conversation.lastSeenAt = new Date();
+    } else if (envelope.notificationState !== "dnd" && conversation.clientState === "dnd") {
+      conversation.clientState = "active";
+      conversation.clientStateUpdatedAt = new Date();
     }
     renderConversations();
     renderActiveConversation();
@@ -8180,7 +9101,9 @@
       return;
     }
 
-    const clientState = envelope.clientState === "inactive" ? "inactive" : "active";
+    const clientState = envelope.notificationState === "dnd"
+      ? "dnd"
+      : (envelope.clientState === "inactive" ? "inactive" : "active");
     const conversation = ensureConversationForPeer(from, "contact", envelope.displayName || displayNameForJid(from));
     if (!conversation) {
       return;
@@ -8502,7 +9425,7 @@
     const visibleDevices = devices.filter((device) => shouldShowMediaDeviceOption(device, devices));
     select.replaceChildren(new Option(defaultLabel, ""));
     visibleDevices.forEach((device, index) => {
-      select.appendChild(new Option(device.label || `${fallbackLabel} ${index + 1}`, device.deviceId));
+      select.appendChild(new Option(cleanMediaDeviceLabel(device.label) || `${fallbackLabel} ${index + 1}`, device.deviceId));
     });
 
     select.value = visibleDevices.some((device) => device.deviceId === selectedValue)
@@ -8525,6 +9448,8 @@
         select.value = videoQuality;
       }
     }
+    updateVideoRecorderQualityPicker();
+    updateVideoRecorderCameraPicker();
     const facingMode = normalizeVideoFacingMode(state.mediaSettings.videoMessageFacingMode);
     for (const select of [el.videoMessageFacingInput, el.dialogVideoMessageFacingInput, el.callVideoFacingInput]) {
       if (select) {
@@ -8532,6 +9457,246 @@
       }
     }
     syncCallVideoFacingToggle();
+  }
+
+  function updateVideoRecorderQualityPicker() {
+    const select = el.videoRecorderQualityInput;
+    const button = el.videoRecorderQualityButton;
+    const label = el.videoRecorderQualityLabel;
+    const menu = el.videoRecorderQualityMenu;
+    if (!select || !button || !label || !menu) {
+      return;
+    }
+
+    if (!select.value && select.options.length) {
+      select.value = "default";
+    }
+
+    const selectedOption = select.selectedOptions?.[0] || select.options[select.selectedIndex] || select.options[0];
+    label.replaceChildren(createVideoQualityLabel(selectedOption));
+    button.setAttribute("aria-label", `${t("label.video_quality", "Video quality")}: ${videoQualityOptionText(selectedOption)}`);
+    menu.replaceChildren(...Array.from(select.options).map((option) => {
+      const item = document.createElement("button");
+      item.type = "button";
+      item.className = "video-quality-option";
+      item.dataset.value = option.value;
+      item.setAttribute("role", "option");
+      item.setAttribute("aria-selected", option.value === select.value ? "true" : "false");
+      item.appendChild(createVideoQualityLabel(option));
+      return item;
+    }));
+  }
+
+  function createVideoQualityLabel(option) {
+    const wrapper = document.createElement("span");
+    wrapper.className = "video-quality-label";
+    const text = document.createElement("span");
+    text.textContent = option?.textContent || "Auto";
+    wrapper.appendChild(text);
+    const badgeValue = option?.dataset?.badge || "";
+    if (badgeValue) {
+      const badge = document.createElement("span");
+      badge.className = "video-quality-badge";
+      badge.textContent = badgeValue;
+      wrapper.appendChild(badge);
+    }
+    return wrapper;
+  }
+
+  function videoQualityOptionText(option) {
+    const text = option?.textContent || "Auto";
+    const badge = option?.dataset?.badge || "";
+    return badge ? `${text} ${badge}` : text;
+  }
+
+  function toggleVideoRecorderQualityMenu(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!el.videoRecorderQualityMenu || !el.videoRecorderQualityButton) {
+      return;
+    }
+
+    const open = el.videoRecorderQualityMenu.hidden;
+    updateVideoRecorderQualityPicker();
+    closeVideoRecorderCameraMenu();
+    if (open) {
+      positionVideoRecorderMenu(el.videoRecorderQualityMenu, el.videoRecorderQualityButton);
+    }
+    el.videoRecorderQualityMenu.hidden = !open;
+    el.videoRecorderQualityButton.setAttribute("aria-expanded", open ? "true" : "false");
+  }
+
+  function closeVideoRecorderQualityMenu() {
+    if (!el.videoRecorderQualityMenu || el.videoRecorderQualityMenu.hidden) {
+      return;
+    }
+
+    el.videoRecorderQualityMenu.hidden = true;
+    el.videoRecorderQualityButton?.setAttribute("aria-expanded", "false");
+  }
+
+  function closeVideoRecorderQualityMenuOnOutsideClick(event) {
+    if (event.target?.closest?.(".video-recorder-quality, .video-quality-menu, .video-recorder-camera, .video-camera-menu")) {
+      return;
+    }
+    closeVideoRecorderQualityMenu();
+    closeVideoRecorderCameraMenu();
+  }
+
+  function closeVideoRecorderQualityMenuOnEscape(event) {
+    if (event.key === "Escape") {
+      closeVideoRecorderQualityMenu();
+      closeVideoRecorderCameraMenu();
+    }
+  }
+
+  function handleVideoRecorderQualityMenuClick(event) {
+    const option = event.target?.closest?.(".video-quality-option");
+    if (!option || !el.videoRecorderQualityInput) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    el.videoRecorderQualityInput.value = option.dataset.value || "default";
+    el.videoRecorderQualityInput.dispatchEvent(new Event("change", { bubbles: true }));
+    updateVideoRecorderQualityPicker();
+    closeVideoRecorderQualityMenu();
+    el.videoRecorderQualityButton?.focus();
+  }
+
+  function updateVideoRecorderCameraPicker() {
+    const button = el.videoRecorderCameraButton;
+    const label = el.videoRecorderCameraLabel;
+    const menu = el.videoRecorderCameraMenu;
+    if (!button || !label || !menu) {
+      return;
+    }
+
+    const options = videoRecorderCameraOptions();
+    const selected = options.find((option) => option.selected) || options[0];
+    label.textContent = selected?.label || t("media.camera", "Camera");
+    button.setAttribute("aria-label", `${t("label.camera", "Camera")}: ${label.textContent}`);
+    menu.replaceChildren(...options.map((option) => {
+      const item = document.createElement("button");
+      item.type = "button";
+      item.className = "video-camera-option";
+      item.dataset.value = option.value;
+      item.dataset.mode = option.mode;
+      item.setAttribute("role", "option");
+      item.setAttribute("aria-selected", option === selected ? "true" : "false");
+      item.textContent = option.label;
+      return item;
+    }));
+  }
+
+  function videoRecorderCameraOptions() {
+    if (usesFacingCameraPicker()) {
+      const mode = normalizeVideoFacingMode(state.mediaSettings.videoMessageFacingMode);
+      return [
+        { mode: "facing", value: "user", label: t("camera.front", "Front camera"), selected: mode === "user" },
+        { mode: "facing", value: "environment", label: t("camera.back", "Back camera"), selected: mode === "environment" }
+      ];
+    }
+
+    const cameras = state.mediaDevices
+      .filter((device) => device.kind === "videoinput")
+      .filter((device) => shouldShowMediaDeviceOption(device, state.mediaDevices.filter((item) => item.kind === "videoinput")));
+    const selectedDeviceId = normalizeSelectedMediaDeviceId(state.mediaSettings.cameraDeviceId, "videoinput");
+    return [
+      {
+        mode: "device",
+        value: "",
+        label: t("media.default_camera", "Default camera"),
+        selected: !selectedDeviceId
+      },
+      ...cameras.map((device, index) => ({
+        mode: "device",
+        value: device.deviceId,
+        label: cleanMediaDeviceLabel(device.label) || `${t("media.camera", "Camera")} ${index + 1}`,
+        selected: selectedDeviceId === device.deviceId
+      }))
+    ];
+  }
+
+  function cleanMediaDeviceLabel(label) {
+    return String(label || "")
+      .replace(/\s*\([0-9a-f]{4}:[0-9a-f]{4}\)\s*$/i, "")
+      .replace(/\s*\[[0-9a-f]{4}:[0-9a-f]{4}\]\s*$/i, "")
+      .trim();
+  }
+
+  function usesFacingCameraPicker() {
+    return document.body.dataset.platform === "ios"
+      || document.body.dataset.platform === "android"
+      || (isPhoneViewport() && state.mediaDevices.filter((device) => device.kind === "videoinput").length <= 2);
+  }
+
+  function toggleVideoRecorderCameraMenu(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!el.videoRecorderCameraMenu || !el.videoRecorderCameraButton) {
+      return;
+    }
+
+    const open = el.videoRecorderCameraMenu.hidden;
+    updateVideoRecorderCameraPicker();
+    closeVideoRecorderQualityMenu();
+    if (open) {
+      positionVideoRecorderMenu(el.videoRecorderCameraMenu, el.videoRecorderCameraButton);
+    }
+    el.videoRecorderCameraMenu.hidden = !open;
+    el.videoRecorderCameraButton.setAttribute("aria-expanded", open ? "true" : "false");
+  }
+
+  function positionVideoRecorderMenu(menu, button) {
+    const card = el.videoPreviewDialog?.querySelector(".video-preview-dialog-card");
+    if (!menu || !button || !card) {
+      return;
+    }
+
+    menu.hidden = false;
+    const cardRect = card.getBoundingClientRect();
+    const buttonRect = button.getBoundingClientRect();
+    const menuRect = menu.getBoundingClientRect();
+    const gap = 8;
+    const minLeft = 10;
+    const maxLeft = Math.max(minLeft, cardRect.width - menuRect.width - minLeft);
+    const preferredLeft = buttonRect.left - cardRect.left;
+    const left = Math.max(minLeft, Math.min(maxLeft, preferredLeft));
+    const bottom = Math.max(48, cardRect.bottom - buttonRect.top + gap);
+    menu.style.left = `${Math.round(left)}px`;
+    menu.style.bottom = `${Math.round(bottom)}px`;
+  }
+
+  function closeVideoRecorderCameraMenu() {
+    if (!el.videoRecorderCameraMenu || el.videoRecorderCameraMenu.hidden) {
+      return;
+    }
+
+    el.videoRecorderCameraMenu.hidden = true;
+    el.videoRecorderCameraButton?.setAttribute("aria-expanded", "false");
+  }
+
+  function handleVideoRecorderCameraMenuClick(event) {
+    const option = event.target?.closest?.(".video-camera-option");
+    if (!option) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    if (option.dataset.mode === "facing") {
+      if (el.videoMessageFacingInput) {
+        el.videoMessageFacingInput.value = option.dataset.value || "user";
+      }
+    } else if (el.cameraInput) {
+      el.cameraInput.value = option.dataset.value || "";
+    }
+    handleMediaSettingsChange("video", "recorder");
+    updateVideoRecorderCameraPicker();
+    closeVideoRecorderCameraMenu();
+    el.videoRecorderCameraButton?.focus();
   }
 
   async function toggleCallVideoFacingMode() {
@@ -8630,6 +9795,15 @@
 
   async function handleMediaSettingsChange(kind, source = "main") {
     saveMediaSettingsFromControls(false, source);
+    if ((source === "dialog" || source === "recorder")
+      && state.videoRecorder.previewStream
+      && !state.videoRecorder.blob
+      && state.videoRecorder.recorder?.state !== "recording") {
+      startVideoDialogPreview();
+      setMediaStatus(t("media.saved", "Media settings saved. They are used for the next call or preview."));
+      return;
+    }
+
     const call = state.call;
     if (!call?.localStream || !call.pc) {
       setMediaStatus(t("media.saved", "Media settings saved. They are used for the next call or preview."));
@@ -8801,14 +9975,14 @@
     setCallStatus(t("call.starting", "Starting call..."));
 
     try {
-      await ensureRelayConnectedForJingle(5000);
+      await ensureXmppCallSignalingReady();
       await openLocalMedia(call);
       createPeerConnection(call);
       const offer = await call.pc.createOffer();
       appendSdpDebug("offer-created", offer.sdp);
       await call.pc.setLocalDescription(offer);
       appendSdpDebug("offer-local", call.pc.localDescription?.sdp);
-      await ensureRelayConnectedForJingle();
+      await ensureXmppCallSignalingReady();
       sendJingleEnvelope("session-initiate", {
         sid: call.sid,
         mediaKind: call.mediaKind,
@@ -8842,7 +10016,7 @@
       appendSdpDebug("answer-created", answer.sdp);
       await call.pc.setLocalDescription(answer);
       appendSdpDebug("answer-local", call.pc.localDescription?.sdp);
-      await ensureRelayConnectedForJingle();
+      await ensureXmppCallSignalingReady();
       sendJingleEnvelope("session-accept", {
         sid: call.sid,
         mediaKind: call.mediaKind,
@@ -8851,6 +10025,7 @@
         rttSync: call.rttSync
       });
       call.incomingOffer = null;
+      closeIncomingCallBrowserNotification();
       setCallStatus(jingleRttSyncStatusText(call));
       updateCallUi();
     } catch (error) {
@@ -8875,6 +10050,7 @@
       reason: "decline",
       reasonText: t("call.rejected", "Call rejected")
     });
+    closeIncomingCallBrowserNotification();
     cleanupCall(false, "rejected");
     setCallStatus(t("call.rejected", "Call rejected"));
   }
@@ -8986,25 +10162,41 @@
       return;
     }
 
+    const callerPeer = envelopeFrom(envelope);
+    if (state.doNotDisturb) {
+      sendJingleEnvelope("session-terminate", {
+        sid: envelope.sid,
+        to: callerPeer,
+        reason: "busy",
+        reasonText: t("call.do_not_disturb", "Do not disturb")
+      });
+      setCallStatus(t("call.do_not_disturb_rejected", "Call rejected because Do not disturb is on."));
+      appendDebug("jingle-dnd", `Rejected incoming call from ${callerPeer || "unknown"}`);
+      return;
+    }
+
+    const roomPeer = groupRoomFromJingleEnvelope(envelope);
     const call = createCallState(
       String(envelope.sid || "td-" + createShortId()),
-      envelopeFrom(envelope),
+      callerPeer,
       "receiver",
       envelope.mediaKind === "video" ? "video" : "audio",
       Boolean(envelope.rttSync));
+    call.roomJid = roomPeer;
     call.rttSync = call.rttEnabled
       ? normalizeJingleRttSyncDescriptor(envelope.rttSync, call.sid, "offered")
       : null;
     call.incomingOffer = envelope.sdp;
     state.call = call;
     updateCallUi();
+    const conversationPeer = roomPeer || call.peer;
     const conversation = ensureConversationForPeer(
-      call.peer,
-      envelope.conversationKind === "group" || call.peer.includes("@conference.") ? "group" : "contact",
-      displayNameForJid(call.peer));
+      conversationPeer,
+      roomPeer ? "group" : "contact",
+      displayNameForJid(conversationPeer));
     if (conversation) {
       applyEnvelopeIdentity(conversation, envelope);
-      state.activeConversationId = conversation.id;
+      selectConversation(conversation);
       el.peerInput.value = conversation.peer;
     }
 
@@ -9027,6 +10219,9 @@
     }
 
     try {
+      if (call.roomJid && envelopeFrom(envelope)) {
+        call.peer = envelopeFrom(envelope);
+      }
       if (envelope.rttSync || call.rttEnabled) {
         call.rttEnabled = true;
         call.callMode = callModeName(call.mediaKind, true);
@@ -9086,6 +10281,7 @@
     return {
       sid,
       peer,
+      roomJid: "",
       role,
       mediaKind,
       callMode: callModeName(mediaKind, rttEnabled),
@@ -9138,6 +10334,160 @@
     return call?.mediaKind === "video"
       ? t("call.video_incoming", "Incoming audio + video call")
       : t("call.audio_incoming", "Incoming audio call");
+  }
+
+  function incomingCallText(call) {
+    return `${t("call.incoming", "Incoming call from")} ${displayNameForJid(call.peer)}`;
+  }
+
+  function selectConversationForPeer(peer) {
+    const conversation = state.conversations.find((item) => addressMatches(item.peer, peer))
+      || ensureConversationForPeer(peer, peer.includes("@conference.") ? "group" : "contact", displayNameForJid(peer));
+    if (conversation) {
+      selectConversation(conversation);
+    }
+  }
+
+  function requestCallNotificationPermissionFromGesture() {
+    if (!("Notification" in window) || Notification.permission !== "default") {
+      return;
+    }
+
+    Notification.requestPermission()
+      .then((permission) => appendDebug("notification", `permission ${permission}`))
+      .catch((error) => appendDebug("notification-error", error.message || String(error)));
+  }
+
+  function showIncomingCallBrowserNotification(call) {
+    if (!call?.incomingOffer || !("Notification" in window) || Notification.permission !== "granted") {
+      return;
+    }
+
+    if (state.doNotDisturb) {
+      return;
+    }
+
+    if (isBlockedPeer(call.peer) || isNotificationMutedPeer(call.peer)) {
+      return;
+    }
+
+    if (state.incomingCallNotificationSid === call.sid && state.incomingCallNotification) {
+      return;
+    }
+
+    closeIncomingCallBrowserNotification();
+    let notification = null;
+    try {
+      notification = new Notification(incomingCallTitle(call), {
+        body: incomingCallText(call),
+        tag: `teletyptel-call-${call.sid}`,
+        renotify: true,
+        requireInteraction: true,
+        icon: "assets/brand/teletyptel-icon-192.png",
+        badge: "assets/brand/teletyptel-icon-192.png"
+      });
+    } catch (error) {
+      appendDebug("notification-error", error.message || String(error));
+      return;
+    }
+    notification.onclick = () => {
+      window.focus();
+      selectConversationForPeer(call.roomJid || call.peer);
+      updateCallUi();
+    };
+    notification.onclose = () => {
+      if (state.incomingCallNotification === notification) {
+        state.incomingCallNotification = null;
+        state.incomingCallNotificationSid = "";
+      }
+    };
+    state.incomingCallNotification = notification;
+    state.incomingCallNotificationSid = call.sid;
+  }
+
+  function showBrowserNotification(title, body, options = {}) {
+    if (!("Notification" in window) || Notification.permission !== "granted") {
+      return;
+    }
+
+    if (state.doNotDisturb) {
+      return;
+    }
+
+    if (options.notificationPeer && (isBlockedPeer(options.notificationPeer) || isNotificationMutedPeer(options.notificationPeer))) {
+      return;
+    }
+
+    try {
+      const notification = new Notification(title, {
+        body,
+        tag: options.tag || "",
+        renotify: options.renotify === true,
+        icon: "assets/brand/teletyptel-icon-192.png",
+        badge: "assets/brand/teletyptel-icon-192.png"
+      });
+      notification.onclick = () => {
+        window.focus();
+        if (options.conversationId) {
+          const conversation = state.conversations.find((item) => item.id === options.conversationId);
+          if (conversation) {
+            selectConversation(conversation);
+          }
+        }
+        notification.close();
+      };
+    } catch (error) {
+      appendDebug("notification-error", error.message || String(error));
+    }
+  }
+
+  function shouldNotifyForConversation(conversation) {
+    return Boolean(conversation)
+      && conversation.id !== state.activeConversationId;
+  }
+
+  function showMessageBrowserNotification(conversation, message) {
+    if (!shouldNotifyForConversation(conversation) || !message || isCallMessage(message)) {
+      return;
+    }
+
+    const sender = message.senderDisplayName || displayNameForJid(message.from || conversation.peer);
+    const title = conversation.kind === "group"
+      ? `${conversationDisplayName(conversation)} - ${sender}`
+      : sender;
+    const body = visibleMessageText(message)
+      || (message.attachment ? t("upload.shared_file", "Shared file") : t("message.new_message", "New message"));
+    showBrowserNotification(title, body, {
+      tag: `teletyptel-message-${conversation.id}`,
+      renotify: true,
+      conversationId: conversation.id,
+      notificationPeer: message.from || conversation.peer
+    });
+  }
+
+  function showReactionBrowserNotification(conversation, message, actor, reactions) {
+    if (!shouldNotifyForConversation(conversation) || !message || !Array.isArray(reactions) || !reactions.length) {
+      return;
+    }
+
+    const sender = displayNameForJid(actor || conversation.peer);
+    const body = t("reaction.notification_body", "{sender} reageerde met {reaction}")
+      .replace("{sender}", sender)
+      .replace("{reaction}", reactions.join(" "));
+    showBrowserNotification(conversationDisplayName(conversation), body, {
+      tag: `teletyptel-reaction-${conversation.id}-${message.id}`,
+      renotify: true,
+      conversationId: conversation.id,
+      notificationPeer: actor || conversation.peer
+    });
+  }
+
+  function closeIncomingCallBrowserNotification() {
+    if (state.incomingCallNotification) {
+      state.incomingCallNotification.close();
+    }
+    state.incomingCallNotification = null;
+    state.incomingCallNotificationSid = "";
   }
 
   function createJingleRttSyncDescriptor(sid, stateName = "offered") {
@@ -9903,7 +11253,7 @@
     }
 
     if (quality === "uhd") {
-      return { width: { ideal: 3840 }, height: { ideal: 2160 }, aspectRatio: { ideal: 16 / 9 } };
+      return { width: { ideal: 2560 }, height: { ideal: 1440 }, aspectRatio: { ideal: 16 / 9 } };
     }
 
     return { width: { ideal: 1920 }, height: { ideal: 1080 }, aspectRatio: { ideal: 16 / 9 } };
@@ -10338,10 +11688,12 @@
   function cleanupCall(notifyRemote, historyStatus = "ended") {
     const call = state.call;
     if (!call) {
+      closeIncomingCallBrowserNotification();
       updateCallUi();
       return;
     }
 
+    closeIncomingCallBrowserNotification();
     persistConversationHistoryCall(call, historyStatus);
     stopTotalConversationRecorder(call);
     const updatedNotification = updateCallNotificationMessage(call, historyStatus);
@@ -10377,16 +11729,14 @@
   }
 
   function sendJingleEnvelope(action, payload = {}) {
-    if (!isRelayConnected()) {
-      appendDebug("jingle-error", "Relay is not connected");
-      return;
-    }
-
+    const active = activeConversation();
+    const roomJid = state.call?.roomJid || (active?.kind === "group" ? active.peer : "");
     const envelope = {
       ...createRelayEnvelope("jingle", "", ""),
       action,
       sid: payload.sid || state.call?.sid || "td-" + createShortId(),
       to: payload.to || state.call?.peer || currentToJid(),
+      roomJid: payload.roomJid || roomJid || null,
       mediaKind: payload.mediaKind || state.call?.mediaKind || "audio",
       info: payload.info || null,
       reason: payload.reason || null,
@@ -10399,8 +11749,46 @@
         : (action === "session-initiate" || action === "session-accept" ? state.call?.rttSync || null : null)
     };
     envelope.xml = createJingleDebugXml(action, envelope);
-    state.relaySocket.send(JSON.stringify(envelope));
-    appendDebug("jingle-out", envelope.xml);
+    if (sendXmppJingleEnvelope(envelope)) {
+      appendDebug("jingle-out", envelope.xml);
+      return;
+    }
+
+    if (isRelayConnected()) {
+      state.relaySocket.send(JSON.stringify(envelope));
+      appendDebug("jingle-out", envelope.xml);
+      return;
+    }
+
+    appendDebug("jingle-error", "No call signaling transport is connected");
+  }
+
+  function sendXmppJingleEnvelope(envelope) {
+    if (state.mode !== "xmpp"
+      || state.xmppSocket?.readyState !== WebSocket.OPEN
+      || !state.xmppSession?.authenticated) {
+      return false;
+    }
+
+    const id = createMessageId("jingle");
+    const to = envelope.to || state.call?.peer || currentToJid();
+    const groupSignal = Boolean(envelope.roomJid && addressMatches(to, envelope.roomJid));
+    if (groupSignal) {
+      const conversation = state.conversations.find((item) => addressMatches(item.peer, envelope.roomJid || to));
+      joinXmppGroupConversation(conversation);
+    }
+    const payload = base64Utf8(JSON.stringify(redactTransientJingleEnvelope(envelope)));
+    const signal = `<signal xmlns="${teletyptelJingleSignalNamespace}" encoding="json-base64">${payload}</signal>`;
+    const messageType = groupSignal ? "groupchat" : "chat";
+    const xml = `<message xmlns="jabber:client" type="${messageType}" from="${escapeXml(currentXmppFromJid())}" to="${escapeXml(to)}" id="${escapeXml(id)}">${signal}<no-store xmlns="urn:xmpp:hints"/></message>`;
+    return sendXmppStanza(xml, `<message type="${messageType}" jingle-signal="${escapeXml(envelope.action || "")}" sid="${escapeXml(envelope.sid || "")}">...</message>`);
+  }
+
+  function redactTransientJingleEnvelope(envelope) {
+    return {
+      ...envelope,
+      xml: envelope.xml || ""
+    };
   }
 
   function createJingleDebugXml(action, envelope) {
@@ -10518,15 +11906,17 @@
     el.incomingCallBanner.hidden = !incoming;
     el.incomingCallDialog.hidden = !incoming;
     if (incoming) {
-      const caller = displayNameForJid(call.peer);
       const title = incomingCallTitle(call);
-      const text = `${t("call.incoming", "Incoming call from")} ${caller}`;
+      const text = incomingCallText(call);
       el.incomingCallTitle.textContent = title;
       el.incomingCallDialogTitle.textContent = title;
       el.incomingCallText.textContent = text;
       el.incomingCallDialogText.textContent = text;
+      showIncomingCallBrowserNotification(call);
       el.incomingCallBanner.scrollIntoView({ block: "nearest" });
       el.dialogAnswerButton.focus();
+    } else {
+      closeIncomingCallBrowserNotification();
     }
 
     el.answerCallButton.hidden = !incoming;
@@ -10535,6 +11925,8 @@
     setCallModeButtonsHidden(Boolean(call));
     el.hangupCallButton.hidden = !call || incoming;
     el.hangupCallButton.disabled = !call;
+    el.hangupCallPanelButton.hidden = !call || incoming;
+    el.hangupCallPanelButton.disabled = !call;
     const hasLocalVideo = hasVideoTrack(call?.localStream);
     const hasRemoteVideo = hasVideoTrack(call?.remoteStream);
     const conversation = activeConversation();
@@ -10830,26 +12222,13 @@
     return new Promise((resolve) => window.setTimeout(resolve, ms));
   }
 
-  async function ensureRelayConnectedForJingle(timeoutMs = 3500) {
-    if (isRelayConnected()) {
-      return;
+  async function ensureXmppCallSignalingReady() {
+    if (state.xmppSocket?.readyState !== WebSocket.OPEN || !state.xmppSession?.authenticated) {
+      connectXmppWebSocket();
+      throw new Error(t("call.xmpp_connect_first", "Connect XMPP first, then start the call again."));
     }
 
-    if (state.accountReady && !state.accountGateRequired && !state.intentionalDisconnect) {
-      connectRelay();
-    }
-
-    const startedAt = Date.now();
-    while (Date.now() - startedAt < timeoutMs) {
-      await wait(100);
-      if (isRelayConnected()) {
-        return;
-      }
-    }
-
-    const relayUrl = normalizeLocalWebSocketUrlForCurrentHost(el.relayUrlInput?.value || "", 8787);
-    appendDebug("jingle-error", `Relay did not connect for call: ${relayUrl}`);
-    throw new Error(`${t("status.not_connected", "Not connected.")} ${relayUrl}`);
+    return true;
   }
 
   function hasActiveMessageTransport() {
@@ -10873,7 +12252,26 @@
       return true;
     }
 
+    const room = groupRoomFromJingleEnvelope(envelope);
+    if (room && addressMatches(envelope.to, room)) {
+      return true;
+    }
+
     return jidMatches(envelope.to, currentFromJid());
+  }
+
+  function groupRoomFromJingleEnvelope(envelope) {
+    const room = bareJid(envelope?.roomJid || "");
+    if (room) {
+      return room;
+    }
+
+    const to = bareJid(envelope?.to || "");
+    if (envelope?.conversationKind === "group" || to.includes("@conference.")) {
+      return to;
+    }
+
+    return "";
   }
 
   function jidMatches(left, right) {
@@ -11143,6 +12541,9 @@
     conversation.messages.push(message);
     if (conversation.id === state.activeConversationId) {
       appendMessageToTimeline(message);
+    } else if (direction === "peer" && persist) {
+      conversation.unreadCount = Math.min((Number(conversation.unreadCount) || 0) + 1, 99);
+      showMessageBrowserNotification(conversation, message);
     }
 
     renderConversations();
@@ -11236,10 +12637,37 @@
       return;
     }
 
-    state.activeConversationId = conversation.id;
+    selectConversation(conversation);
     el.peerInput.value = conversation.peer;
     if (state.activeTabId !== "chat") {
       activateTab("chat");
+    }
+    renderConversations();
+    renderActiveConversation();
+  }
+
+  function handleXmppPresenceElement(presenceElement) {
+    const from = presenceElement.getAttribute("from") || "";
+    if (!from || isOwnPeer(from)) {
+      return;
+    }
+
+    const presence = presenceElement.getAttribute("type") === "unavailable" ? "offline" : "online";
+    const show = presenceElement.getElementsByTagNameNS("jabber:client", "show")[0]?.textContent || "";
+    const peer = bareJid(from);
+    const conversation = ensureConversationForPeer(peer, "contact", displayNameForJid(peer));
+    if (!conversation) {
+      return;
+    }
+
+    conversation.presence = presence;
+    if (presence === "offline") {
+      conversation.clientState = null;
+      conversation.clientStateUpdatedAt = null;
+      conversation.lastSeenAt = new Date();
+    } else {
+      conversation.clientState = show === "dnd" ? "dnd" : "active";
+      conversation.clientStateUpdatedAt = new Date();
     }
     renderConversations();
     renderActiveConversation();
@@ -11249,10 +12677,25 @@
     return state.conversations.find((conversation) => conversation.id === state.activeConversationId) ?? null;
   }
 
+  function selectConversation(conversation) {
+    if (!conversation) {
+      return;
+    }
+
+    state.activeConversationId = conversation.id;
+    conversation.unreadCount = 0;
+    joinXmppGroupConversation(conversation);
+  }
+
   function renderConversations() {
     el.conversationItems.replaceChildren();
+    const query = normalizeConversationSearchText(el.conversationSearchInput.value);
+    let visibleCount = 0;
     for (const conversation of state.conversations) {
       if (isOwnContact(conversation) || isBlockedConversation(conversation)) {
+        continue;
+      }
+      if (query && !conversationMatchesSearch(conversation, query)) {
         continue;
       }
 
@@ -11270,9 +12713,10 @@
       text.append(name, meta);
       const presence = document.createElement("span");
       presence.className = `presence-dot presence-${conversationPresence(conversation)}`;
-      button.append(avatar, text, presence);
+      const unread = createConversationUnreadBadge(conversation);
+      button.append(avatar, text, unread, presence);
       button.addEventListener("click", () => {
-        state.activeConversationId = conversation.id;
+        selectConversation(conversation);
         el.peerInput.value = conversation.peer;
         state.previousText = "";
         el.messageInput.value = "";
@@ -11292,9 +12736,49 @@
         }
       });
       el.conversationItems.appendChild(button);
+      visibleCount += 1;
+    }
+
+    if (!visibleCount && query) {
+      const empty = document.createElement("p");
+      empty.className = "conversation-empty";
+      empty.textContent = t("contacts.search_empty", "No contacts found.");
+      el.conversationItems.appendChild(empty);
     }
 
     updateComposerAvailability();
+  }
+
+  function normalizeConversationSearchText(value) {
+    return String(value || "").trim().toLocaleLowerCase();
+  }
+
+  function conversationMatchesSearch(conversation, query) {
+    const haystack = [
+      conversationDisplayName(conversation),
+      conversation.peer,
+      conversation.kind,
+      conversationListPreviewText(conversation)
+    ]
+      .map(normalizeConversationSearchText)
+      .join(" ");
+    return haystack.includes(query);
+  }
+
+  function createConversationUnreadBadge(conversation) {
+    const badge = document.createElement("span");
+    badge.className = "conversation-unread-badge";
+    const count = Number(conversation?.unreadCount) || 0;
+    if (count <= 0) {
+      badge.hidden = true;
+      badge.setAttribute("aria-hidden", "true");
+      return badge;
+    }
+
+    const label = count > 99 ? "99+" : String(count);
+    badge.textContent = label;
+    badge.setAttribute("aria-label", t("conversation.unread_count", "{0} unread messages").replace("{0}", label));
+    return badge;
   }
 
   function closeActiveConversation() {
@@ -11528,7 +13012,7 @@
     }
 
     const conversation = ensureConversationForPeer(peer, "group", name.trim());
-    state.activeConversationId = conversation.id;
+    selectConversation(conversation);
     el.peerInput.value = conversation.peer;
     renderConversations();
     renderActiveConversation();
@@ -11590,6 +13074,28 @@
     toggleBlockConversation(conversation);
   }
 
+  function toggleMuteContextConversationNotifications() {
+    const conversation = state.conversations.find((item) => item.id === state.contextConversationId) ?? activeConversation();
+    closeConversationContextMenu();
+    toggleMuteConversationNotifications(conversation);
+  }
+
+  function toggleMuteConversationNotifications(conversation) {
+    if (!canMuteConversationNotifications(conversation)) {
+      setConnectionStatus(t("status.select_contact_first", "Select a contact first"), "warn");
+      return;
+    }
+
+    const shouldMute = !isNotificationMutedConversation(conversation);
+    setNotificationMutedPeer(conversation.peer, shouldMute);
+    const statusText = shouldMute
+      ? t("status.notifications_muted", "Notifications muted for {0}")
+      : t("status.notifications_unmuted", "Notifications enabled for {0}");
+    setConnectionStatus(statusText.replace("{0}", conversationDisplayName(conversation)), shouldMute ? "warn" : "good");
+    renderConversations();
+    updateConversationContextMenu();
+  }
+
   function toggleBlockConversation(conversation) {
     if (!canBlockConversation(conversation)) {
       setConnectionStatus(t("status.select_contact_first", "Select a contact first"), "warn");
@@ -11640,16 +13146,39 @@
     saveBlockedJids();
   }
 
+  function setNotificationMutedPeer(peer, muted) {
+    const key = normalizeBlockJid(peer);
+    if (!key) {
+      return;
+    }
+
+    if (muted) {
+      state.mutedNotificationJids.add(key);
+    } else {
+      state.mutedNotificationJids.delete(key);
+    }
+
+    saveMutedNotificationJids();
+  }
+
   function updateConversationContextMenu() {
     const conversation = state.conversations.find((item) => item.id === state.contextConversationId) ?? null;
     const canViewProfile = canViewContactProfile(conversation);
     const canBlock = canBlockConversation(conversation);
+    const canMute = canMuteConversationNotifications(conversation);
     const blocked = isBlockedConversation(conversation);
+    const muted = isNotificationMutedConversation(conversation);
     const canChangeRoomAvatar = canChangeMucAvatar(conversation);
     el.contextProfileButton.hidden = !canViewProfile;
     el.contextProfileButton.disabled = !canViewProfile;
     el.contextRoomAvatarButton.hidden = !canChangeRoomAvatar;
     el.contextRoomAvatarButton.disabled = !canChangeRoomAvatar;
+    el.contextMuteNotificationsButton.disabled = !canMute;
+    el.contextMuteNotificationsButton.hidden = !canMute;
+    el.contextMuteNotificationsButton.textContent = muted
+      ? t("button.unmute_notifications", "Enable notifications")
+      : t("button.mute_notifications", "Mute notifications");
+    el.contextMuteNotificationsButton.classList.toggle("selected", muted);
     el.contextBlockButton.disabled = !canBlock;
     el.contextBlockButton.hidden = !canBlock;
     el.contextBlockButton.textContent = blocked
@@ -11666,8 +13195,19 @@
       && !isInfrastructurePeer(conversation.peer);
   }
 
+  function canMuteConversationNotifications(conversation) {
+    return Boolean(conversation)
+      && conversation.kind === "contact"
+      && !isOwnPeer(conversation.peer)
+      && !isInfrastructurePeer(conversation.peer)
+      && !isBlockedConversation(conversation);
+  }
+
   function canOpenConversationContextMenu(conversation) {
-    return canViewContactProfile(conversation) || canBlockConversation(conversation) || canChangeMucAvatar(conversation);
+    return canViewContactProfile(conversation)
+      || canMuteConversationNotifications(conversation)
+      || canBlockConversation(conversation)
+      || canChangeMucAvatar(conversation);
   }
 
   function canViewContactProfile(conversation) {
@@ -11800,6 +13340,15 @@
     return Boolean(key) && state.blockedJids.has(key);
   }
 
+  function isNotificationMutedConversation(conversation) {
+    return Boolean(conversation) && isNotificationMutedPeer(conversation.peer);
+  }
+
+  function isNotificationMutedPeer(peer) {
+    const key = normalizeBlockJid(peer);
+    return Boolean(key) && state.mutedNotificationJids.has(key);
+  }
+
   function normalizeBlockJid(peer) {
     const bare = bareJid(peer).trim().toLowerCase();
     return bare && !isInfrastructurePeer(bare) ? bare : "";
@@ -11860,6 +13409,12 @@
 
   function setAccountReady(ready) {
     state.accountReady = ready === true;
+    if (state.accountReady) {
+      scheduleSessionInactivityTimeout();
+    } else {
+      window.clearTimeout(state.sessionIdleTimerId);
+      state.sessionIdleTimerId = null;
+    }
     updateConnectButtonAvailability();
     updateComposerAvailability();
   }
@@ -11881,12 +13436,7 @@
         return;
       }
 
-      const preferXmpp = state.mode === "xmpp" || normalizeTlsMode(state.account?.xmppTlsMode) === "websocket";
-      if (preferXmpp) {
-        connectXmppWebSocket();
-      } else {
-        connectRelay();
-      }
+      connectXmppWebSocket();
     }, 0);
   }
 
@@ -11901,8 +13451,9 @@
     const xmppOpen = state.xmppSocket?.readyState === WebSocket.OPEN;
     const connected = relayOpen || xmppOpen;
     el.connectButton.disabled = !state.accountReady || state.accountGateRequired || relayBusy;
-    el.disconnectButton.hidden = !connected;
+    el.disconnectButton.hidden = !state.developerMode || !connected;
     el.disconnectButton.disabled = !connected;
+    el.logoutButton.disabled = state.accountGateRequired && !hasStoredAccountSession();
     updateServerSettingsReadonly();
   }
 
@@ -11920,7 +13471,9 @@
     }
 
     return conversation.presence === "online"
-      ? conversation.clientState === "inactive"
+      ? conversation.clientState === "dnd"
+        ? t("presence.do_not_disturb", "Do not disturb")
+        : conversation.clientState === "inactive"
         ? t("presence.online_inactive", "Online - inactive")
         : t("presence.online", "Online")
       : t("presence.offline", "Offline");
@@ -12781,6 +14334,9 @@
       delete normalized[actorId];
     }
     match.message.reactions = normalized;
+    if (actorId !== reactionActorId() && persist) {
+      showReactionBrowserNotification(match.conversation, match.message, actor, list);
+    }
 
     if (match.conversation.id === state.activeConversationId) {
       renderActiveConversation();
@@ -13067,6 +14623,9 @@
     document.body.classList.add("modal-open");
     updateVideoDialogActionButtons(state.videoRecorder.blob ? "preview" : "setup");
     el.startVideoRecordingButton.focus();
+    if (!state.videoRecorder.blob) {
+      startVideoDialogPreview();
+    }
   }
 
   async function toggleDialogVideoRecording() {
@@ -13112,6 +14671,9 @@
     }
 
     el.videoPreviewDialogVideo.pause();
+    closeVideoRecorderQualityMenu();
+    stopVideoPreviewStream();
+    el.videoPreviewDialogVideo.srcObject = null;
     el.videoPreviewDialog.hidden = true;
     document.body.classList.remove("modal-open");
     updatePreviewPlaybackButton("video");
@@ -14521,15 +16083,16 @@
     return xml;
   }
 
-  function createMessageStanza(text, id = createMessageId("msg"), replaceId = null, stylingDisabled = false, to = el.peerInput.value, extraXml = "") {
+  function createMessageStanza(text, id = createMessageId("msg"), replaceId = null, stylingDisabled = false, to = el.peerInput.value, extraXml = "", type = "chat") {
     const replace = replaceId
       ? `<replace xmlns="urn:xmpp:message-correct:0" id="${escapeXml(replaceId)}"/>`
       : "";
     const unstyled = stylingDisabled ? `<unstyled xmlns="urn:xmpp:styling:0"/>` : "";
     const originId = `<origin-id xmlns="urn:xmpp:sid:0" id="${escapeXml(id)}"/>`;
-    const receiptRequest = replaceId ? "" : `<request xmlns="urn:xmpp:receipts"/>`;
-    const markable = replaceId ? "" : `<markable xmlns="urn:xmpp:chat-markers:0"/>`;
-    return `<message xmlns="jabber:client" type="chat" from="${escapeXml(currentXmppFromJid())}" to="${escapeXml(to)}" id="${escapeXml(id)}"><body>${escapeXml(text)}</body>${originId}${replace}${unstyled}${extraXml || ""}${receiptRequest}${markable}</message>`;
+    const messageType = isXmppGroupchatType(type) ? "groupchat" : "chat";
+    const receiptRequest = replaceId || messageType === "groupchat" ? "" : `<request xmlns="urn:xmpp:receipts"/>`;
+    const markable = replaceId || messageType === "groupchat" ? "" : `<markable xmlns="urn:xmpp:chat-markers:0"/>`;
+    return `<message xmlns="jabber:client" type="${messageType}" from="${escapeXml(currentXmppFromJid())}" to="${escapeXml(to)}" id="${escapeXml(id)}"><body>${escapeXml(text)}</body>${originId}${replace}${unstyled}${extraXml || ""}${receiptRequest}${markable}</message>`;
   }
 
   function createDeliveryReceiptStanza(to, messageId, id = createMessageId("receipt")) {
@@ -14636,6 +16199,24 @@
         }
       }
 
+      return parsed.toString();
+    } catch {
+      return fallback;
+    }
+  }
+
+  function normalizeLocalXmppWebSocketUrlForCurrentHost(url) {
+    const value = String(url ?? "").trim();
+    const fallback = "wss://localhost:5443/websocket/";
+    if (!value || value === "ws://127.0.0.1:8787" || value === "ws://localhost:8787") {
+      return fallback;
+    }
+
+    try {
+      const parsed = new URL(value);
+      if (isLocalAccountDomain(parsed.hostname) && (parsed.port === "8787" || parsed.pathname === "/rtt-relay")) {
+        return fallback;
+      }
       return parsed.toString();
     } catch {
       return fallback;

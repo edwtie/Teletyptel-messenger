@@ -134,7 +134,7 @@ CREATE TABLE IF NOT EXISTS account_verification_codes (
   user_agent VARCHAR(255) NOT NULL DEFAULT '',
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY uq_account_verification_code_hash (code_hash),
-  KEY idx_account_verification_identifier (identifier(190), purpose, created_at),
+  KEY idx_account_verification_identifier (identifier(150), purpose, created_at),
   KEY idx_account_verification_account (account_id, created_at)
 );
 

@@ -126,11 +126,16 @@ started as Windows `.exe` files or Linux apphosts/`.dll` files.
 
 ## Run The Web Chat Demo
 
-Start the PHP relay:
+Start or verify ejabberd. The normal browser route is XMPP over WebSocket on
+ejabberd:
 
-```powershell
-php php/rtt-websocket-server.php
+```text
+wss://localhost:5443/websocket/
 ```
+
+In the ejabberd config this is the HTTP TLS listener with `/websocket` mapped
+to `ejabberd_http_ws`. The PHP RTT relay is not required for the normal browser
+chat when ejabberd is available.
 
 Open the full Alpha 2 web client in two browser windows through localhost.
 Do not open `php/public/chat.html` directly from `C:\...`; the login and
@@ -152,10 +157,10 @@ The `profile` value selects a separate local account store and a separate
 generated XMPP resource. You can also create the second window from the
 Connection panel with **Open second session**.
 
-Connect both windows to:
+Connect both windows to the XMPP WebSocket endpoint:
 
 ```text
-ws://127.0.0.1:8787
+wss://localhost:5443/websocket/
 ```
 
 Type in one window. The other window should show live RTT text while typing and
@@ -163,7 +168,7 @@ then a final message bubble after Enter.
 
 ## Run The Windows App
 
-Start the same PHP relay, then run the WinForms client:
+Run the WinForms client:
 
 ```powershell
 dotnet run --project samples/Tiedragon.XmppMessenger.WinFormsDemo/Tiedragon.XmppMessenger.WinFormsDemo.csproj
@@ -171,9 +176,9 @@ dotnet run --project samples/Tiedragon.XmppMessenger.WinFormsDemo/Tiedragon.Xmpp
 
 The WAMP package publishes this client to `wamp\bin\teletyptel\WindowsApp`.
 
-Use the Relay room for shared-room testing with browser windows. For directed
-one-to-one tests, choose the other participant from the contact list or enter
-the other participant's bare or full JID in the account/settings panel.
+For directed one-to-one tests, choose the other participant from the contact
+list or enter the other participant's bare or full JID in the account/settings
+panel. The legacy Relay room remains useful only for local relay smoke tests.
 
 ## Run Under WAMP On Windows
 
@@ -233,16 +238,23 @@ Open the web client through Apache:
 http://localhost/teletyptel/public/chat.html
 ```
 
-Start the WebSocket relay from a separate terminal. Apache does not start this
-long-running socket process automatically:
+For normal ejabberd testing, the browser should connect to:
+
+```text
+wss://localhost:5443/websocket/
+```
+
+The optional PHP RTT relay is only needed for legacy local RTT/RFC7395
+smoke-tests. If you deliberately test that route, start it from a separate
+terminal; Apache does not start this long-running socket process automatically:
 
 ```powershell
 $php = (Get-ChildItem C:\wamp64\bin\php\php*\php.exe | Sort-Object FullName -Descending | Select-Object -First 1).FullName
 & $php C:\wamp64\www\teletyptel\rtt-websocket-server.php
 ```
 
-Adjust the PHP version folder to your WAMP installation. The browser should
-connect to:
+Adjust the PHP version folder to your WAMP installation. The legacy relay URL
+is:
 
 ```text
 ws://127.0.0.1:8787

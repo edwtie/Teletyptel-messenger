@@ -86,7 +86,7 @@ renderInstallPage($state, $messages, $errors, $installed, $force, $checks, $runt
 
 function validateInstallInput(array $state, array &$errors): void
 {
-    foreach (['host', 'database', 'username', 'xmpp_domain', 'relay_websocket', 'xmpp_websocket'] as $key) {
+    foreach (['host', 'database', 'username', 'xmpp_domain', 'xmpp_websocket'] as $key) {
         if ($state[$key] === '') {
             $errors[] = "Veld '{$key}' is verplicht.";
         }
@@ -102,7 +102,7 @@ function validateInstallInput(array $state, array &$errors): void
     }
 
     foreach (['relay_websocket', 'xmpp_websocket'] as $key) {
-        if (!preg_match('/^wss?:\/\//i', $state[$key])) {
+        if ($state[$key] !== '' && !preg_match('/^wss?:\/\//i', $state[$key])) {
             $errors[] = "Veld '{$key}' moet beginnen met ws:// of wss://.";
         }
     }
@@ -470,16 +470,17 @@ function collectSystemChecks(string $rootPath, string $configPath, string $schem
     $checks[] = checkItem('Schema', $schemaPath, is_file($schemaPath));
     $checks[] = checkItem('Config schrijfbaar', dirname($configPath), is_writable(dirname($configPath)));
     $checks[] = checkItem('Runtime map schrijfbaar', $runtimePath, is_dir($runtimePath) ? is_writable($runtimePath) : is_writable($rootPath));
-    $checks[] = checkItem('RTT relay script', $relayScript, is_file($relayScript));
-    $checks[] = checkItem('RTT relay poort ' . $state['relay_port'], relayPortStatus((int)$state['relay_port']), true);
+    $checks[] = checkItem('XMPP WebSocket', $state['xmpp_websocket'] . ' (normale webclient-route via ejabberd)', $state['xmpp_websocket'] !== '');
+    $checks[] = checkItem('RTT relay script optioneel', $relayScript, is_file($relayScript));
+    $checks[] = checkItem('RTT relay poort optioneel ' . $state['relay_port'], relayPortStatus((int)$state['relay_port']), true);
 
     if (PHP_OS_FAMILY === 'Linux') {
         $checks[] = checkItem('ejabberd', ejabberdStatus(), commandExists('ejabberdctl') || commandExists('ejabberd'));
-        $checks[] = checkItem('Linux service voorbeeld', 'linux/etc/systemd/system/teletyptel-rtt-relay.service', true);
-        $checks[] = checkItem('Aanbevolen WSS route', '/rtt-relay via Apache/Nginx reverse proxy', true);
+        $checks[] = checkItem('Linux relay service voorbeeld', 'alleen nodig voor legacy RTT/RFC7395 relay-tests', true);
+        $checks[] = checkItem('Aanbevolen XMPP WSS route', 'ejabberd /websocket via poort 5443 of reverse proxy', true);
     } elseif (PHP_OS_FAMILY === 'Windows') {
         $checks[] = checkItem('ejabberd', 'controle gebeurt straks op de Linux-server', true);
-        $checks[] = checkItem('Windows startscript', 'scripts/start-rtt-relay.ps1 of gegenereerde .cmd', true);
+        $checks[] = checkItem('Windows relay startscript', 'optioneel voor legacy RTT/RFC7395 relay-tests', true);
     }
 
     return $checks;
@@ -613,7 +614,10 @@ function writeRuntimeScripts(string $runtimePath, string $rootPath, array $state
         . "    db_type: sql\n"
         . "    default: always\n"
         . "    assume_mam_usage: true\n"
-        . "    request_activates_archiving: false\n";
+        . "    request_activates_archiving: false\n"
+        . "  mod_muc:\n"
+        . "    default_room_options:\n"
+        . "      mam: true\n";
     file_put_contents($mamSnippetPath, $mamSnippet, LOCK_EX);
 
     $ejabberdMamPath = $runtimePath . DIRECTORY_SEPARATOR . 'configure-linux-ejabberd-mam.sh';
@@ -660,17 +664,40 @@ function writeRuntimeScripts(string $runtimePath, string $rootPath, array $state
         . "    print \"    assume_mam_usage: true\"\n"
         . "    print \"    request_activates_archiving: false\"\n"
         . "  }\n"
-        . "  BEGIN { inserted = 0; skipping = 0 }\n"
+        . "  function print_muc_mam_if_missing() {\n"
+        . "    if (in_muc == 1 && muc_defaults == 0) {\n"
+        . "      print \"    default_room_options:\"\n"
+        . "      print \"      mam: true\"\n"
+        . "      muc_mam = 1\n"
+        . "    }\n"
+        . "  }\n"
+        . "  BEGIN { inserted = 0; skipping = 0; in_muc = 0; muc_defaults = 0; in_muc_defaults = 0; muc_mam = 0 }\n"
         . "  skipping == 1 && /^  [A-Za-z0-9_]+:/ { skipping = 0 }\n"
         . "  skipping == 1 { next }\n"
         . "  /^  mod_mam:/ && inserted == 0 { print_mam(); inserted = 1; skipping = 1; next }\n"
+        . "  /^  mod_muc:/ { print; in_muc = 1; muc_defaults = 0; in_muc_defaults = 0; next }\n"
+        . "  in_muc == 1 && /^  [A-Za-z0-9_]+:/ { print_muc_mam_if_missing(); in_muc = 0; in_muc_defaults = 0 }\n"
+        . "  in_muc == 1 && /^    default_room_options:/ { print; print \"      mam: true\"; muc_defaults = 1; in_muc_defaults = 1; muc_mam = 1; next }\n"
+        . "  in_muc_defaults == 1 && /^      mam:/ { next }\n"
+        . "  in_muc_defaults == 1 && /^    [A-Za-z0-9_]+:/ { in_muc_defaults = 0 }\n"
         . "  /^modules:[[:space:]]*$/ && inserted == 0 { print; print_mam(); inserted = 1; next }\n"
         . "  { print }\n"
-        . "  END { if (inserted == 0) { print \"\"; print \"modules:\"; print_mam() } }\n"
+        . "  END { print_muc_mam_if_missing(); if (inserted == 0) { print \"\"; print \"modules:\"; print_mam(); print \"  mod_muc:\"; print \"    default_room_options:\"; print \"      mam: true\"; muc_mam = 1 } }\n"
         . "' \"\$CONFIG\" > \"\$TMP\"\n"
         . "sudo cp \"\$TMP\" \"\$CONFIG\"\n"
         . "rm -f \"\$TMP\"\n"
-        . "echo \"mod_mam configured in \$CONFIG with db_type=\$DB_TYPE. Backup: \$BACKUP\"\n"
+        . "if ! grep -Eq '^[[:space:]]*mod_muc:' \"\$CONFIG\"; then\n"
+        . "  TMP=\$(mktemp)\n"
+        . "  awk '\n"
+        . "    BEGIN { inserted = 0 }\n"
+        . "    /^modules:[[:space:]]*$/ && inserted == 0 { print; print \"  mod_muc:\"; print \"    default_room_options:\"; print \"      mam: true\"; inserted = 1; next }\n"
+        . "    { print }\n"
+        . "    END { if (inserted == 0) { print \"\"; print \"modules:\"; print \"  mod_muc:\"; print \"    default_room_options:\"; print \"      mam: true\" } }\n"
+        . "  ' \"\$CONFIG\" > \"\$TMP\"\n"
+        . "  sudo cp \"\$TMP\" \"\$CONFIG\"\n"
+        . "  rm -f \"\$TMP\"\n"
+        . "fi\n"
+        . "echo \"mod_mam configured for one-to-one chat and mod_muc default_room_options.mam enabled for group chat in \$CONFIG with db_type=\$DB_TYPE. Backup: \$BACKUP\"\n"
         . "if command -v ejabberdctl >/dev/null 2>&1; then\n"
         . "  sudo ejabberdctl reload_config || sudo ejabberdctl restart || true\n"
         . "fi\n"
@@ -726,14 +753,12 @@ function relayPortFromUrl(string $url): int
 
 function defaultRelayWebSocket(): string
 {
-    $host = $_SERVER['HTTP_HOST'] ?? '127.0.0.1';
-    return isHttpsRequest() ? "wss://{$host}/rtt-relay" : 'ws://127.0.0.1:8787';
+    return '';
 }
 
 function defaultXmppWebSocket(): string
 {
-    $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-    return isHttpsRequest() ? "wss://{$host}/xmpp-websocket" : 'ws://127.0.0.1:8787';
+    return 'wss://localhost:5443/websocket/';
 }
 
 function defaultXmppDomain(): string
@@ -813,7 +838,7 @@ function renderInstallPage(array $state, array $messages, array $errors, bool $i
 <body>
 <main>
   <h1>TeleTypTel installatie</h1>
-  <p>Controleer de server, maak de database, schrijf <strong>php/config.php</strong>, importeer het schema en maak startbestanden voor de WebSocket-relay.</p>
+  <p>Controleer de server, maak de database, schrijf <strong>php/config.php</strong>, importeer het schema en gebruik ejabberd WebSocket als normale webclient-route.</p>
 
   <section class="checks">
     <h2>Systeemcheck</h2>
@@ -875,9 +900,10 @@ function renderInstallPage(array $state, array $messages, array $errors, bool $i
 
       <fieldset>
         <legend>WebSocket en domein</legend>
+        <p class="small">Normaal gebruikt TeleTypTel de XMPP WebSocket van ejabberd, bijvoorbeeld <code>wss://localhost:5443/websocket/</code>. De RTT relay WebSocket is optioneel en alleen bedoeld voor oude lokale RTT/RFC7395 smoke-tests.</p>
         <div class="grid">
-          <?= input('relay_websocket', 'RTT relay WebSocket', $state['relay_websocket'], 'text', 'full') ?>
-          <?= input('relay_port', 'RTT relay poort', $state['relay_port'], 'number') ?>
+          <?= input('relay_websocket', 'RTT relay WebSocket optioneel', $state['relay_websocket'], 'text', 'full') ?>
+          <?= input('relay_port', 'RTT relay poort optioneel', $state['relay_port'], 'number') ?>
           <?= input('xmpp_websocket', 'XMPP WebSocket', $state['xmpp_websocket'], 'text', 'full') ?>
           <?= input('xmpp_domain', 'XMPP domein', $state['xmpp_domain'], 'text', 'full') ?>
         </div>
@@ -934,14 +960,15 @@ function renderInstallPage(array $state, array $messages, array $errors, bool $i
   <?php endif; ?>
 
   <section class="notice">
-    <h2>WebSocket automatisch starten</h2>
-    <p>Na installatie maakt deze pagina startbestanden in <code><?= e($runtimePath) ?></code>.</p>
-    <p>Windows gebruikt <code>start-rtt-relay.cmd</code>. Linux gebruikt liever systemd:</p>
+    <h2>WebSocket-route</h2>
+    <p>De normale webclient-route is ejabberd XMPP WebSocket: <code><?= e((string)$state['xmpp_websocket']) ?></code>. Controleer dat ejabberd op poort <code>5443</code> luistert en dat <code>/websocket</code> naar <code>ejabberd_http_ws</code> wijst.</p>
+    <p>Na installatie maakt deze pagina nog wel optionele relay-startbestanden in <code><?= e($runtimePath) ?></code> voor oude lokale RTT/RFC7395 smoke-tests.</p>
+    <p>Windows gebruikt daarvoor <code>start-rtt-relay.cmd</code>. Linux gebruikt liever systemd:</p>
     <pre>sudo cp linux/etc/systemd/system/teletyptel-rtt-relay.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now teletyptel-rtt-relay.service
 sudo systemctl status teletyptel-rtt-relay.service</pre>
-    <p class="small">Op productie hoort Apache/Nginx <code>/rtt-relay</code> door te sturen naar <code>127.0.0.1:<?= e((string)$state['relay_port']) ?></code>.</p>
+    <p class="small">Op productie hoort Apache/Nginx vooral de ejabberd-route <code>/websocket</code> of poort <code>5443</code> veilig te publiceren. <code>/rtt-relay</code> is alleen nodig wanneer je de optionele PHP-relay bewust test.</p>
   </section>
 
   <section class="notice">
@@ -949,11 +976,11 @@ sudo systemctl status teletyptel-rtt-relay.service</pre>
     <p>Als de systeemcheck ejabberd niet vindt, gebruik dan na installatie het gegenereerde Linux-script:</p>
     <pre>cd /var/www/teletyptel
 sudo sh php/install-runtime/install-linux-ejabberd.sh</pre>
-    <p>Dit script installeert ejabberd en roept daarna <code>configure-linux-ejabberd-mam.sh</code> aan. Die helper maakt eerst een backup van <code>ejabberd.yml</code>, zoekt automatisch <code>/etc/ejabberd/ejabberd.yml</code> of <code>/opt/ejabberd/conf/ejabberd.yml</code>, zet <code>mod_mam</code> onder <code>modules</code> en herlaadt ejabberd.</p>
+    <p>Dit script installeert ejabberd en roept daarna <code>configure-linux-ejabberd-mam.sh</code> aan. Die helper maakt eerst een backup van <code>ejabberd.yml</code>, zoekt automatisch <code>/etc/ejabberd/ejabberd.yml</code> of <code>/opt/ejabberd/conf/ejabberd.yml</code>, zet <code>mod_mam</code> aan voor 1-op-1 chat, zet <code>mod_muc</code> <code>default_room_options.mam</code> aan voor groepschat en herlaadt ejabberd.</p>
     <p>Alleen MAM opnieuw toepassen:</p>
     <pre>cd /var/www/teletyptel
 sudo sh php/install-runtime/configure-linux-ejabberd-mam.sh</pre>
-    <p class="small">MAM gebruikt <code>default: always</code>. De helper kiest <code>db_type: sql</code> alleen automatisch wanneer de ejabberd-config al SQL gebruikt; anders gebruikt hij <code>mnesia</code> voor lokale test. Forceer productie-SQL met <code>EJABBERD_MAM_DB_TYPE=sql</code>. Aanbevolen modules daarnaast: roster, MUC, PubSub/PEP, HTTP upload, register, WebSocket en BOSH. Voor echte video/spraak komt later ook TURN/coturn erbij.</p>
+    <p class="small">MAM gebruikt <code>default: always</code>. Voor groepen zet de helper <code>mam: true</code> in de standaard kameropties van <code>mod_muc</code>. De helper kiest <code>db_type: sql</code> alleen automatisch wanneer de ejabberd-config al SQL gebruikt; anders gebruikt hij <code>mnesia</code> voor lokale test. Forceer productie-SQL met <code>EJABBERD_MAM_DB_TYPE=sql</code>. Aanbevolen modules daarnaast: roster, PubSub/PEP, HTTP upload, register, WebSocket en BOSH. Voor echte video/spraak komt later ook TURN/coturn erbij.</p>
   </section>
 </main>
 </body>

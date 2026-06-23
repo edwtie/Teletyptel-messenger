@@ -14,20 +14,21 @@ http://127.0.0.1/chat.html
 
 Do not open `php/public/chat.html` directly from `C:\...`; the account login
 uses PHP endpoints and must run through localhost. Use two browser windows to
-test a conversation. Both windows can connect to the same local relay.
+test a conversation. Both windows should use the same ejabberd XMPP WebSocket
+endpoint.
 
 ## Connecting
 
-1. Start `php php/rtt-websocket-server.php`.
-2. Leave the relay URL as `ws://127.0.0.1:8787`.
+1. Start or verify ejabberd.
+2. Leave the XMPP WebSocket URL as `wss://localhost:5443/websocket/`.
 3. Sign in or create an account in the start screen.
 
 The client connects automatically after sign-in. The status in the title bar
-changes when the relay is connected.
+changes when XMPP is connected.
 
 Developer-only transport controls and XML/debug diagnostics are hidden in the
 normal user interface. Open `http://127.0.0.1:8090/chat.html?dev=1` when you
-need the relay/RFC 7395 switch, manual connect button and debug panel.
+need the legacy relay/RFC 7395 switch, manual connect button and debug panel.
 
 ## Sending Messages
 
@@ -38,19 +39,21 @@ need the relay/RFC 7395 switch, manual connect button and debug panel.
 
 ## Modes
 
-- **Relay**: local PHP relay mode for Alpha 2 chat, RTT and WebRTC/Jingle
-  testing.
-- **RFC 7395**: WebSocket framing test mode for XMPP-over-WebSocket experiments.
+- **XMPP WebSocket**: normal browser route through ejabberd, usually
+  `wss://localhost:5443/websocket/`.
+- **Relay**: optional local PHP relay mode for legacy RTT/RFC7395 smoke tests.
+- **RFC 7395**: WebSocket framing test mode for XMPP-over-WebSocket transport
+  experiments.
 
-Relay mode is the normal Alpha 2 browser demo path. Standards-based XMPP flows
-are validated through LocalServer and RealServerSmoke.
+ejabberd WebSocket is the normal browser path. The old PHP relay is kept only
+for local experiments and compatibility smoke tests.
 
 ## Mobile Lifecycle
 
 The browser client sends XEP-0352 active/inactive state automatically when the
-page becomes visible, hidden, focused, blurred, frozen or resumed. In relay mode
-this is visible as `client-state` traffic; in RFC 7395 mode it is sent as
-`<active/>` or `<inactive/>` with `urn:xmpp:csi:0`.
+page becomes visible, hidden, focused, blurred, frozen or resumed. In XMPP mode
+it is sent as `<active/>` or `<inactive/>` with `urn:xmpp:csi:0`; in legacy
+relay mode it is visible as `client-state` traffic.
 
 Future Android, iOS and WebView2 shells can drive the same logic by calling
 `window.TeletyptelLifecycle.setActive()` and
@@ -105,8 +108,9 @@ other XMPP smoke targets.
 ## Current Scope
 
 - No hosted public service yet.
-- The PHP relay is a web edge for local UI, RTT, RFC 7395 and WebRTC/Jingle demo
-  testing; it is not the authoritative XMPP server.
+- ejabberd WebSocket is the normal webclient route. The PHP relay is a local
+  edge for old RTT/RFC7395/WebRTC demo testing only; it is not the authoritative
+  XMPP server.
 - LocalServer covers STARTTLS, SASL, bind, session, roster, presence, MUC,
   XEP-0077 registration including optional local CAPTCHA, XEP-0313 local
   archive, XEP-0363 slot/PUT, vCard, blocking, stream management and
