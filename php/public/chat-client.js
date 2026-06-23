@@ -4646,7 +4646,34 @@
     });
     retention.append(retentionText, select);
     panel.appendChild(retention);
+    panel.appendChild(createHistoryPrivacyHelp());
     return panel;
+  }
+
+  function createHistoryPrivacyHelp() {
+    const wrapper = document.createElement("div");
+    wrapper.className = "history-privacy-help";
+
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "history-help-button";
+    button.textContent = "?";
+    button.setAttribute("aria-label", t("history.privacy_help_label", "AVG uitleg"));
+    button.setAttribute("aria-expanded", "false");
+
+    const text = document.createElement("p");
+    text.className = "history-privacy-text";
+    text.hidden = true;
+    text.textContent = t("history.privacy_help_text", "AVG: bewaar alleen wat nodig is, kies een maximale bewaartermijn en informeer gebruikers dat oproepen, opnames en transcripten kunnen worden bewaard. Verwijder of exporteer gegevens wanneer iemand daar recht op heeft.");
+
+    button.addEventListener("click", () => {
+      const expanded = text.hidden;
+      text.hidden = !expanded;
+      button.setAttribute("aria-expanded", String(expanded));
+    });
+
+    wrapper.append(button, text);
+    return wrapper;
   }
 
   function createHistoryToggle(labelText, checked, onChange) {

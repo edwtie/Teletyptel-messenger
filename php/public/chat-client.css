@@ -2559,6 +2559,32 @@ body:not([data-chat-background="none"]) .message-body {
   padding: 6px 8px;
 }
 
+.history-privacy-help {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.history-help-button {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  padding: 0;
+  font-weight: 800;
+}
+
+.history-privacy-text {
+  max-width: 760px;
+  margin: 0;
+  color: #334155;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
 .history-layout {
   display: grid;
   grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
