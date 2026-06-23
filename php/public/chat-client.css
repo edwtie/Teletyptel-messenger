@@ -2562,16 +2562,15 @@ body:not([data-chat-background="none"]) .message-body {
 .history-layout {
   display: grid;
   grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
-  align-items: start;
   gap: 14px;
   min-height: 360px;
 }
 
 .history-list,
 .history-detail {
-  align-self: start;
   box-sizing: border-box;
   width: 100%;
+  height: 100%;
   min-width: 0;
   border: 1px solid #bfd7ff;
   border-radius: var(--radius);
@@ -2583,7 +2582,6 @@ body:not([data-chat-background="none"]) .message-body {
   display: grid;
   align-content: start;
   gap: 8px;
-  max-height: 62vh;
   overflow: auto;
   overflow-x: hidden;
 }
