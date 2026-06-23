@@ -136,7 +136,7 @@ item is implemented, tested and documented.
   account security dialog.
 - [x] Live Facebook social-login smoke passed with the dev Meta app and
   `https://dev.teletyptel.nl/api/auth/facebook/callback` redirect URI.
-- [ ] Live Google social-login smoke with production/dev provider configuration.
+- [x] Live Google social-login smoke with production/dev provider configuration.
 - [ ] Live Apple social-login smoke with production/dev provider configuration.
 - [x] Database schema and compatibility migration for `accounts`, `account_identities`, `account_credentials` and `account_xmpp`.
 - [ ] Security UI for active clients/grants and revoke access.
