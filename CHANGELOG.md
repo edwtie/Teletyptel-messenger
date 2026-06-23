@@ -360,8 +360,9 @@
 - XEP-0313 one-to-one and MUC archive smoke have public-server evidence; repeat
   against the production TeleTypTel/ejabberd server before making a hosted
   service claim.
-- Live social-login smoke still needs final real Google/Facebook/Apple
-  provider configuration and redirect URLs for the production domain.
+- Facebook social-login smoke has passed on the dev Meta app; Google/Apple
+  live smoke and production-domain redirect URLs still need final release
+  validation.
 - Account security flows are implemented for development/evaluation, but still
   need production hardening, rate limiting, mail-delivery monitoring and abuse
   policy before public signup.
