@@ -16,6 +16,7 @@ php/*screenshot*.png
 php/config.php
 php/config.local.php
 php/storage/
+php/public/index.php
 php/public/config/google-maps.json
 php/public/uploads/*
 !php/public/uploads/.gitkeep
