@@ -4414,11 +4414,11 @@
   }
 
   function renderHistoryPage(tab) {
-    el.historyPageTitle.textContent = tab.title;
-    el.historyPageMeta.textContent = "Teletyptel";
+    el.historyPageTitle.textContent = t("history.title", "Total Conversation geschiedenis");
+    el.historyPageMeta.textContent = t("history.text", "Oproepen, gemiste oproepen en Total Conversation worden los van de gewone chat bewaard.");
     el.historyPageBody.replaceChildren();
     const card = createProviderCard();
-    renderHistoryTab(card);
+    renderHistoryTab(card, { includeIntro: false });
     el.historyPageBody.appendChild(card);
   }
 
@@ -4592,11 +4592,13 @@
     return label;
   }
 
-  function renderHistoryTab(card) {
+  function renderHistoryTab(card, options = {}) {
     card.classList.add("history-card");
-    card.appendChild(createTextBlock(
-      t("history.title", "Total Conversation geschiedenis"),
-      t("history.text", "Oproepen, gemiste oproepen en Total Conversation worden los van de gewone chat bewaard.")));
+    if (options.includeIntro !== false) {
+      card.appendChild(createTextBlock(
+        t("history.title", "Total Conversation geschiedenis"),
+        t("history.text", "Oproepen, gemiste oproepen en Total Conversation worden los van de gewone chat bewaard.")));
+    }
     card.appendChild(createHistorySettingsPanel());
 
     const layout = document.createElement("div");

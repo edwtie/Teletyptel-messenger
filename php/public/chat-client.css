@@ -2579,6 +2579,7 @@ body:not([data-chat-background="none"]) .message-body {
   gap: 8px;
   max-height: 62vh;
   overflow: auto;
+  overflow-x: hidden;
 }
 
 .history-group {
@@ -2590,14 +2591,19 @@ body:not([data-chat-background="none"]) .message-body {
 .history-item {
   display: grid;
   gap: 3px;
+  align-items: start;
+  box-sizing: border-box;
   width: 100%;
   min-width: 0;
+  min-height: 56px;
+  height: auto;
   overflow: hidden;
   border: 1px solid #bfd7ff;
   border-radius: 8px;
   background: #eef5ff;
   color: #0f172a;
   padding: 9px;
+  line-height: 1.25;
   text-align: left;
 }
 
@@ -2623,6 +2629,7 @@ body:not([data-chat-background="none"]) .message-body {
 .history-item-preview {
   display: block;
   min-width: 0;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
