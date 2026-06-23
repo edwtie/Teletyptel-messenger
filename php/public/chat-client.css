@@ -1258,6 +1258,24 @@ body.history-page-active .detail-panel {
   display: none;
 }
 
+.history-page {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  background: #f8fbff;
+  padding: 20px 24px;
+}
+
+body.history-page-active .history-page {
+  display: block;
+}
+
+body.history-page-active .chat-panel {
+  display: none !important;
+}
+
 .detail-panel {
   display: none;
   flex-direction: column;
@@ -2360,31 +2378,6 @@ body:not([data-chat-background="none"]) .message-body {
 
 .tab-panel.history-panel {
   background: #f8fbff;
-}
-
-body.history-page-active .chat-panel {
-  display: grid;
-  grid-column: 1;
-  grid-template-rows: minmax(0, 1fr);
-  background: #f8fbff;
-  background-image: none;
-}
-
-body.history-page-active .app-tabs,
-body.history-page-active .chat-header,
-body.history-page-active .incoming-call,
-body.history-page-active .incoming-call-dialog,
-body.history-page-active .call-panel,
-body.history-page-active .message-timeline,
-body.history-page-active .remote-draft,
-body.history-page-active .composer {
-  display: none !important;
-}
-
-body.history-page-active .tab-panel.history-panel {
-  grid-row: 1;
-  grid-column: 1;
-  padding: 20px 24px;
 }
 
 .history-card.provider-card {

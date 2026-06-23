@@ -15,7 +15,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="favicon.ico" sizes="any">
   <link rel="apple-touch-icon" href="assets/brand/teletyptel-icon-192.png">
-  <link rel="stylesheet" href="chat-client.css?v=20260623-history-page">
+  <link rel="stylesheet" href="chat-client.css?v=20260623-history-main-page">
 </head>
 <body class="account-booting">
   <a class="skip-link" href="#messageInput" data-i18n="button.skip_to_message">Skip to message</a>
@@ -396,6 +396,17 @@
           </div>
           <input id="fileInput" class="file-input" type="file" multiple aria-label="Upload files" data-i18n-aria-label="upload.files">
         </form>
+      </section>
+
+      <section id="historyPage" class="history-page" hidden>
+        <div class="tab-panel-header">
+          <div>
+            <h2 id="historyPageTitle">History</h2>
+            <span id="historyPageMeta">Teletyptel</span>
+          </div>
+          <button id="closeHistoryPageButton" type="button">Back to chat</button>
+        </div>
+        <div id="historyPageBody" class="tab-panel-body"></div>
       </section>
 
       <aside id="developerPanel" class="detail-panel developer-panel" aria-label="Connection and debug" hidden aria-hidden="true">
@@ -1078,8 +1089,8 @@
     <button id="messageContextForwardButton" type="button" role="menuitem" data-i18n="button.forward_message">Forward</button>
   </div>
 
-  <script src="vendor/qrcode.js?v=20260623-history-page"></script>
+  <script src="vendor/qrcode.js?v=20260623-history-main-page"></script>
   <script src="jingle-history.js?v=20260615-jingle-history"></script>
-  <script src="chat-client.js?v=20260623-history-page"></script>
+  <script src="chat-client.js?v=20260623-history-main-page"></script>
 </body>
 </html>

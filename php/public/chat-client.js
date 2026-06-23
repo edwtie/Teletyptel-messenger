@@ -602,6 +602,11 @@
     tabPanelMeta: byId("tabPanelMeta"),
     tabPanelBody: byId("tabPanelBody"),
     closeTabPanelButton: byId("closeTabPanelButton"),
+    historyPage: byId("historyPage"),
+    historyPageTitle: byId("historyPageTitle"),
+    historyPageMeta: byId("historyPageMeta"),
+    historyPageBody: byId("historyPageBody"),
+    closeHistoryPageButton: byId("closeHistoryPageButton"),
     remoteDraft: byId("remoteDraft"),
     remoteDraftName: byId("remoteDraftName"),
     remoteDraftPreviousText: byId("remoteDraftPreviousText"),
@@ -925,6 +930,7 @@
     el.relayModeButton.addEventListener("click", () => setMode("xmpp"));
     el.xmppModeButton.addEventListener("click", () => setMode("xmpp"));
     el.closeTabPanelButton.addEventListener("click", () => activateTab("chat"));
+    el.closeHistoryPageButton.addEventListener("click", () => activateTab("chat"));
     el.resetRttButton.addEventListener("click", sendRttReset);
     el.enableRttButton.addEventListener("click", enableLiveRttFromToolbar);
     el.attachmentMenuButton.addEventListener("click", toggleAttachmentMenu);
@@ -4382,6 +4388,7 @@
 
     if (tabId === "chat") {
       document.body.classList.remove("history-page-active");
+      el.historyPage.hidden = true;
       el.messageTimeline.hidden = false;
       el.tabPanel.hidden = true;
       el.composerForm.hidden = false;
@@ -4396,9 +4403,23 @@
 
     document.body.classList.toggle("history-page-active", isHistoryTab(tab));
     el.messageTimeline.hidden = true;
-    el.tabPanel.hidden = false;
     el.composerForm.hidden = true;
+    el.historyPage.hidden = !isHistoryTab(tab);
+    el.tabPanel.hidden = isHistoryTab(tab);
+    if (isHistoryTab(tab)) {
+      renderHistoryPage(tab);
+      return;
+    }
     renderTabPanel(tab);
+  }
+
+  function renderHistoryPage(tab) {
+    el.historyPageTitle.textContent = tab.title;
+    el.historyPageMeta.textContent = "Teletyptel";
+    el.historyPageBody.replaceChildren();
+    const card = createProviderCard();
+    renderHistoryTab(card);
+    el.historyPageBody.appendChild(card);
   }
 
   function renderTabPanel(tab) {
