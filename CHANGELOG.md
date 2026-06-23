@@ -268,6 +268,8 @@
   Google, Facebook and Apple.
 - The web installer now collects Google, Facebook, Apple and Auth0 provider
   IDs/secrets and writes the matching OAuth callback configuration.
+- The web client now exposes Facebook sign-in plus account linking/unlinking in
+  the account security dialog, matching the existing Google social-login flow.
 - The web admin panel now shows ejabberd/XMPP and SIP gateway readiness,
   including SIP/SIPS port checks for future ejabberd_sip/mod_sip work.
 - The web installer now disables itself after a successful installation by
@@ -307,6 +309,8 @@
   account can reconnect without a visible login-screen flash, explicit sign-out
   clears the local and server account session, and inactive sessions expire
   after a fixed idle timeout.
+- Public homepage and teaser material are kept out of the software repository;
+  `php/public/index.php` is ignored so website copy can live outside GitHub.
 - The account/settings dialog is reorganized into a clearer fixed-size menu
   layout with separate profile/security and app/server settings areas, plain
   text-style navigation, read-only server fields while connected and clearer
