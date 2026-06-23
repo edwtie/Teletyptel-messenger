@@ -1778,9 +1778,6 @@
         ? t("aria.theme_white", "Switch to white mode")
         : t("aria.theme_black", "Switch to black mode"));
     el.themeButton.title = el.themeButton.getAttribute("aria-label");
-    document.querySelector('meta[name="theme-color"]')?.setAttribute(
-      "content",
-      state.theme === "dark" ? "#111827" : "#eef2f7");
   }
 
   function setMode(mode) {
