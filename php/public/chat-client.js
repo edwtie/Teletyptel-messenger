@@ -4418,7 +4418,7 @@
     el.historyPageMeta.textContent = t("history.text", "Oproepen, gemiste oproepen en Total Conversation worden los van de gewone chat bewaard.");
     el.historyPageBody.replaceChildren();
     const card = createProviderCard();
-    renderHistoryTab(card, { includeIntro: false });
+    renderHistoryTab(card, { includeIntro: false, includeSaveToggle: false });
     el.historyPageBody.appendChild(card);
   }
 
@@ -4599,7 +4599,7 @@
         t("history.title", "Total Conversation geschiedenis"),
         t("history.text", "Oproepen, gemiste oproepen en Total Conversation worden los van de gewone chat bewaard.")));
     }
-    card.appendChild(createHistorySettingsPanel());
+    card.appendChild(createHistorySettingsPanel({ includeSaveToggle: options.includeSaveToggle !== false }));
 
     const layout = document.createElement("div");
     layout.className = "history-layout";
@@ -4613,17 +4613,20 @@
     card.appendChild(layout);
   }
 
-  function createHistorySettingsPanel() {
+  function createHistorySettingsPanel(options = {}) {
     const panel = document.createElement("section");
     panel.className = "history-settings";
-    const tcLabel = createHistoryToggle(
-      t("history.save_tc", "Total Conversation bewaren"),
-      state.historySettings.saveTotalConversation,
-      (checked) => {
-        state.historySettings.saveTotalConversation = checked;
-        saveHistorySettings();
-        refreshOpenTabPanel();
-      });
+    if (options.includeSaveToggle !== false) {
+      const tcLabel = createHistoryToggle(
+        t("history.save_tc", "Total Conversation bewaren"),
+        state.historySettings.saveTotalConversation,
+        (checked) => {
+          state.historySettings.saveTotalConversation = checked;
+          saveHistorySettings();
+          refreshOpenTabPanel();
+        });
+      panel.appendChild(tcLabel);
+    }
     const retention = document.createElement("label");
     retention.className = "history-retention";
     const retentionText = document.createElement("span");
@@ -4642,7 +4645,7 @@
       refreshOpenTabPanel();
     });
     retention.append(retentionText, select);
-    panel.append(tcLabel, retention);
+    panel.appendChild(retention);
     return panel;
   }
 
