@@ -1233,6 +1233,14 @@ function linkedIdentitySummary(string $accountId): array
             'linkedAt' => '',
             'lastUsedAt' => '',
         ],
+        'facebook' => [
+            'linked' => false,
+            'email' => '',
+            'emailVerified' => false,
+            'displayName' => '',
+            'linkedAt' => '',
+            'lastUsedAt' => '',
+        ],
     ];
     if ($accountId === '') {
         return $summary;

@@ -737,6 +737,9 @@
     googleLinkStatus: byId("googleLinkStatus"),
     linkGoogleButton: byId("linkGoogleButton"),
     unlinkGoogleButton: byId("unlinkGoogleButton"),
+    facebookLinkStatus: byId("facebookLinkStatus"),
+    linkFacebookButton: byId("linkFacebookButton"),
+    unlinkFacebookButton: byId("unlinkFacebookButton"),
     twoFactorStatus: byId("twoFactorStatus"),
     twoFactorQrPanel: byId("twoFactorQrPanel"),
     twoFactorQrCode: byId("twoFactorQrCode"),
@@ -765,6 +768,7 @@
     accountSettingsMenu: byId("accountSettingsMenu"),
     dialogCreateAccountButton: byId("dialogCreateAccountButton"),
     dialogGoogleLoginButton: byId("dialogGoogleLoginButton"),
+    dialogFacebookLoginButton: byId("dialogFacebookLoginButton"),
     dialogAuth0LoginButton: byId("dialogAuth0LoginButton"),
     dialogSaveAccountButton: byId("dialogSaveAccountButton"),
     dialogConnectButton: byId("dialogConnectButton"),
@@ -1033,6 +1037,7 @@
     });
     el.dialogCreateAccountButton.addEventListener("click", createAccountFromDialog);
     el.dialogGoogleLoginButton.addEventListener("click", startGoogleLoginFromDialog);
+    el.dialogFacebookLoginButton.addEventListener("click", startFacebookLoginFromDialog);
     el.dialogAuth0LoginButton.addEventListener("click", startAuth0LoginFromDialog);
     el.dialogSaveAccountButton.addEventListener("click", () => saveAccountDialogProfile(false));
     el.dialogConnectButton.addEventListener("click", () => saveAccountDialogProfile(true));
@@ -1048,6 +1053,8 @@
     el.dialogRepeatPasswordInput.addEventListener("input", updatePasswordRulesPanel);
     el.linkGoogleButton.addEventListener("click", startGoogleLinkFromDialog);
     el.unlinkGoogleButton.addEventListener("click", unlinkGoogleFromDialog);
+    el.linkFacebookButton.addEventListener("click", startFacebookLinkFromDialog);
+    el.unlinkFacebookButton.addEventListener("click", unlinkFacebookFromDialog);
     el.requestTwoFactorButton.addEventListener("click", requestTwoFactorSetupFromDialog);
     el.confirmTwoFactorButton.addEventListener("click", confirmTwoFactorSetupFromDialog);
     el.dialogServerSettingsButton.addEventListener("click", openDialogServerSettings);
@@ -2792,45 +2799,78 @@
   }
 
   function startGoogleLoginFromDialog() {
-    updateAccountStatus(t("account.google_redirecting", "Opening Google sign-in..."));
-    const target = new URL("api/auth/google/start", location.href);
+    startProviderLoginFromDialog("google");
+  }
+
+  function startFacebookLoginFromDialog() {
+    startProviderLoginFromDialog("facebook");
+  }
+
+  function startProviderLoginFromDialog(provider) {
+    const name = providerDisplayName(provider);
+    updateAccountStatus(t(`account.${provider}_redirecting`, `Opening ${name} sign-in...`));
+    const target = new URL(`api/auth/${provider}/start`, location.href);
     location.assign(target.toString());
   }
 
   function startGoogleLinkFromDialog() {
+    startProviderLinkFromDialog("google");
+  }
+
+  function startFacebookLinkFromDialog() {
+    startProviderLinkFromDialog("facebook");
+  }
+
+  function startProviderLinkFromDialog(provider) {
     if (!state.account?.accountId || state.account?.savedInDatabase !== true) {
-      el.dialogAccountStatus.textContent = t("account.save_before_google_link", "Save and sign in before linking Google.");
+      const name = providerDisplayName(provider);
+      el.dialogAccountStatus.textContent = t(`account.save_before_${provider}_link`, `Save and sign in before linking ${name}.`);
       el.dialogAccountStatus.scrollIntoView({ block: "nearest" });
       return;
     }
 
-    updateAccountStatus(t("account.google_link_redirecting", "Opening Google linking..."));
-    const target = new URL("api/auth/google/start", location.href);
+    const name = providerDisplayName(provider);
+    updateAccountStatus(t(`account.${provider}_link_redirecting`, `Opening ${name} linking...`));
+    const target = new URL(`api/auth/${provider}/start`, location.href);
     target.searchParams.set("mode", "link");
     location.assign(target.toString());
   }
 
   async function unlinkGoogleFromDialog() {
+    await unlinkProviderFromDialog("google");
+  }
+
+  async function unlinkFacebookFromDialog() {
+    await unlinkProviderFromDialog("facebook");
+  }
+
+  async function unlinkProviderFromDialog(provider) {
     if (!state.account?.accountId || state.account?.savedInDatabase !== true) {
       return;
     }
 
-    setAccountDialogBusy(true, t("account.google_unlinking", "Unlinking Google..."));
+    const name = providerDisplayName(provider);
+    setAccountDialogBusy(true, t(`account.${provider}_unlinking`, `Unlinking ${name}...`));
     try {
       const payload = await postAccountAction({
         action: "unlink_identity",
         accountId: state.account.accountId,
-        provider: "google"
+        provider
       });
       state.account = { ...state.account, ...payload.account, savedInDatabase: true };
       updateLinkedIdentityStatus();
-      updateAccountStatus(t("account.google_unlinked", "Google has been unlinked."));
-      el.dialogAccountStatus.textContent = t("account.google_unlinked", "Google has been unlinked.");
+      const message = t(`account.${provider}_unlinked`, `${name} has been unlinked.`);
+      updateAccountStatus(message);
+      el.dialogAccountStatus.textContent = message;
     } catch (error) {
       showAccountDialogError(error);
     } finally {
       setAccountDialogBusy(false);
     }
+  }
+
+  function providerDisplayName(provider) {
+    return provider === "facebook" ? "Facebook" : provider === "google" ? "Google" : provider;
   }
 
   async function loadConversationHistory() {
@@ -3060,22 +3100,28 @@
   }
 
   function updateLinkedIdentityStatus() {
-    if (!el.googleLinkStatus) {
+    updateProviderLinkStatus("google", el.googleLinkStatus, el.linkGoogleButton, el.unlinkGoogleButton);
+    updateProviderLinkStatus("facebook", el.facebookLinkStatus, el.linkFacebookButton, el.unlinkFacebookButton);
+  }
+
+  function updateProviderLinkStatus(provider, statusElement, linkButton, unlinkButton) {
+    if (!statusElement || !linkButton || !unlinkButton) {
       return;
     }
 
-    const google = state.account?.linkedIdentities?.google || null;
-    const linked = google?.linked === true;
-    const email = String(google?.email || "").trim();
-    el.googleLinkStatus.textContent = linked
+    const name = providerDisplayName(provider);
+    const identity = state.account?.linkedIdentities?.[provider] || null;
+    const linked = identity?.linked === true;
+    const email = String(identity?.email || "").trim();
+    statusElement.textContent = linked
       ? (email
-        ? t("account.google_linked_email", "Google linked: {email}").replace("{email}", email)
-        : t("account.google_linked", "Google is linked."))
-      : t("account.google_not_linked", "Google is not linked.");
-    el.linkGoogleButton.hidden = linked;
-    el.unlinkGoogleButton.hidden = !linked;
-    el.linkGoogleButton.disabled = state.account?.savedInDatabase !== true;
-    el.unlinkGoogleButton.disabled = state.account?.savedInDatabase !== true;
+        ? t(`account.${provider}_linked_email`, `${name} linked: {email}`).replace("{email}", email)
+        : t(`account.${provider}_linked`, `${name} is linked.`))
+      : t(`account.${provider}_not_linked`, `${name} is not linked.`);
+    linkButton.hidden = linked;
+    unlinkButton.hidden = !linked;
+    linkButton.disabled = state.account?.savedInDatabase !== true;
+    unlinkButton.disabled = state.account?.savedInDatabase !== true;
   }
 
   function renderTwoFactorQrCode(uri) {
@@ -3489,6 +3535,8 @@
     el.changePasswordButton.disabled = busy || !passwordValidationState().valid;
     el.linkGoogleButton.disabled = busy || state.account?.savedInDatabase !== true;
     el.unlinkGoogleButton.disabled = busy || state.account?.savedInDatabase !== true;
+    el.linkFacebookButton.disabled = busy || state.account?.savedInDatabase !== true;
+    el.unlinkFacebookButton.disabled = busy || state.account?.savedInDatabase !== true;
     el.requestTwoFactorButton.disabled = busy || state.account?.twoFactorEnabled === true;
     const hasAuthenticatorQr = state.account?.twoFactorEnabled !== true && state.security.twoFactorOtpauthUri !== "";
     el.confirmTwoFactorButton.disabled = busy || state.account?.twoFactorEnabled === true || (!hasAuthenticatorQr && state.security.twoFactorVerificationId <= 0);

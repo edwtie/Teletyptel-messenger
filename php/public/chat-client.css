@@ -893,6 +893,8 @@ body.account-gate .modal-shell {
 }
 
 .social-login-row {
+  display: grid;
+  gap: 8px;
   grid-column: 1 / -1;
 }
 
@@ -925,6 +927,14 @@ body.account-gate .modal-shell {
   color: #1a73e8;
   border: 1px solid #d1d5db;
   font: 800 14px/1 Arial, sans-serif;
+}
+
+.facebook-login-mark {
+  background: #1877f2;
+  color: #fff;
+  border-color: #1877f2;
+  font-size: 18px;
+  font-family: Arial, sans-serif;
 }
 
 .profile-dialog .account-auth-section,

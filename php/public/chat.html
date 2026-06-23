@@ -588,6 +588,10 @@
                   <span class="social-login-mark" aria-hidden="true">G</span>
                   <span data-i18n="button.continue_google">Continue with Google</span>
                 </button>
+                <button id="dialogFacebookLoginButton" class="social-login-button facebook-login-button" type="button">
+                  <span class="social-login-mark facebook-login-mark" aria-hidden="true">f</span>
+                  <span data-i18n="button.continue_facebook">Continue with Facebook</span>
+                </button>
                 <button id="dialogAuth0LoginButton" class="social-login-button auth0-login-button" type="button">
                   <span class="social-login-mark" aria-hidden="true">A0</span>
                   <span data-i18n="button.continue_auth0">Continue with Auth0</span>
@@ -685,6 +689,16 @@
             <div class="button-row">
               <button id="linkGoogleButton" type="button" data-i18n="button.link_google">Link Google</button>
               <button id="unlinkGoogleButton" type="button" data-i18n="button.unlink_google">Unlink Google</button>
+            </div>
+          </div>
+          <div class="identity-link-panel">
+            <div>
+              <strong data-i18n="account.facebook_link_title">Facebook account</strong>
+              <div id="facebookLinkStatus" class="security-status" role="status" aria-live="polite" data-i18n="account.facebook_not_linked">Facebook is not linked.</div>
+            </div>
+            <div class="button-row">
+              <button id="linkFacebookButton" type="button" data-i18n="button.link_facebook">Link Facebook</button>
+              <button id="unlinkFacebookButton" type="button" data-i18n="button.unlink_facebook">Unlink Facebook</button>
             </div>
           </div>
           <div id="twoFactorStatus" class="security-status" role="status" aria-live="polite" data-i18n="account.two_factor_off">2FA is off.</div>
