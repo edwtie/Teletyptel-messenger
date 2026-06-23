@@ -242,6 +242,7 @@ mode.relay=Relay
 option.live_rtt=Live RTT
 option.smilies=Smileys
 option.render_smilies=Smilies tonen
+option.session_timeout=Automatisch uitloggen bij inactiviteit
 option.remember_password=Account bewaren
 tc.remote_label=Gesprekspartner
 tc.local_label=Ik

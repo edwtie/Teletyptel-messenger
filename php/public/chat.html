@@ -708,6 +708,10 @@
               <input id="smileyToggle" type="checkbox" checked>
               <span data-i18n="option.render_smilies">Show smileys</span>
             </label>
+            <label class="toggle modal-toggle">
+              <input id="sessionTimeoutToggle" type="checkbox" checked>
+              <span data-i18n="option.session_timeout">Sign out after inactivity</span>
+            </label>
             <label>
               <span data-i18n="label.map_provider">Map provider</span>
               <select id="dialogMapProviderInput">
@@ -1068,8 +1072,8 @@
     <button id="messageContextForwardButton" type="button" role="menuitem" data-i18n="button.forward_message">Forward</button>
   </div>
 
-  <script src="vendor/qrcode.js?v=20260623-conversation-date-label"></script>
+  <script src="vendor/qrcode.js?v=20260623-timeout-toggle"></script>
   <script src="jingle-history.js?v=20260615-jingle-history"></script>
-  <script src="chat-client.js?v=20260623-timeout-login"></script>
+  <script src="chat-client.js?v=20260623-timeout-toggle"></script>
 </body>
 </html>

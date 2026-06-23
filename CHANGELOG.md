@@ -4,6 +4,8 @@
 
 ### Added
 
+- Settings now include an inactivity sign-out toggle, so 24-hour reachable
+  users can keep TeleTypTel open without automatic timeout.
 - Public TeleTypTel branding pass for the web package, Windows demo language
   files, language package manifests, project metadata, XSF entry drafts and
   architecture diagrams. Internal `Tiedragon.XmppMessenger` namespaces and

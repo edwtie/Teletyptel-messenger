@@ -920,13 +920,13 @@ function persistAccount(PDO $pdo, array $account): void
         'INSERT INTO account_profiles (
             account_id, jid, display_name, password_secret, password_hash, remember_password,
             phone_number, birth_date, provider_id, accessibility_profile_id, preferred_language,
-            live_rtt_enabled, show_smileys,
+            live_rtt_enabled, show_smileys, session_timeout_enabled,
             relay_websocket, xmpp_websocket, xmpp_host, xmpp_port, xmpp_domain, xmpp_tls_mode,
             peer, avatar_data_url, avatar_color
         ) VALUES (
             :account_id, :jid, :display_name, :password_secret, :password_hash, :remember_password,
             :phone_number, :birth_date, :provider_id, :accessibility_profile_id, :preferred_language,
-            :live_rtt_enabled, :show_smileys,
+            :live_rtt_enabled, :show_smileys, :session_timeout_enabled,
             :relay_websocket, :xmpp_websocket, :xmpp_host, :xmpp_port, :xmpp_domain, :xmpp_tls_mode,
             :peer, :avatar_data_url, :avatar_color
         )
@@ -943,6 +943,7 @@ function persistAccount(PDO $pdo, array $account): void
             preferred_language = VALUES(preferred_language),
             live_rtt_enabled = VALUES(live_rtt_enabled),
             show_smileys = VALUES(show_smileys),
+            session_timeout_enabled = VALUES(session_timeout_enabled),
             relay_websocket = VALUES(relay_websocket),
             xmpp_websocket = VALUES(xmpp_websocket),
             xmpp_host = VALUES(xmpp_host),
@@ -1054,6 +1055,7 @@ function normalizeAccount(array $input, ?array $existing): array
         'preferred_language' => cleanText($input['preferredLanguage'] ?? 'nl', 16),
         'live_rtt_enabled' => boolToTinyInt($input['liveRttEnabled'] ?? true),
         'show_smileys' => boolToTinyInt($input['showSmileys'] ?? true),
+        'session_timeout_enabled' => boolToTinyInt($input['sessionTimeoutEnabled'] ?? true),
         'relay_websocket' => cleanText($input['relayWebSocket'] ?? '', 255),
         'xmpp_websocket' => $xmppWebSocket,
         'xmpp_host' => $xmppHost,
@@ -1083,6 +1085,7 @@ function rowToAccount(array $row): array
         'preferredLanguage' => $row['preferred_language'],
         'liveRttEnabled' => (bool)($row['live_rtt_enabled'] ?? true),
         'showSmileys' => (bool)($row['show_smileys'] ?? true),
+        'sessionTimeoutEnabled' => (bool)($row['session_timeout_enabled'] ?? true),
         'relayWebSocket' => $row['relay_websocket'],
         'xmppWebSocket' => $row['xmpp_websocket'],
         'xmppHost' => $row['xmpp_host'] ?? '',
@@ -1202,6 +1205,7 @@ function accountToClient(array $account): array
         'preferredLanguage' => $account['preferred_language'],
         'liveRttEnabled' => (bool)$account['live_rtt_enabled'],
         'showSmileys' => (bool)$account['show_smileys'],
+        'sessionTimeoutEnabled' => (bool)($account['session_timeout_enabled'] ?? true),
         'relayWebSocket' => $account['relay_websocket'],
         'xmppWebSocket' => $account['xmpp_websocket'],
         'xmppHost' => $account['xmpp_host'],
@@ -1377,6 +1381,7 @@ function ensureAccountProfileSchema(PDO $pdo): void
     ensureColumn($pdo, 'xmpp_tls_mode', "xmpp_tls_mode VARCHAR(32) NOT NULL DEFAULT 'websocket'");
     ensureColumn($pdo, 'live_rtt_enabled', 'live_rtt_enabled TINYINT(1) NOT NULL DEFAULT 1');
     ensureColumn($pdo, 'show_smileys', 'show_smileys TINYINT(1) NOT NULL DEFAULT 1');
+    ensureColumn($pdo, 'session_timeout_enabled', 'session_timeout_enabled TINYINT(1) NOT NULL DEFAULT 1');
     ensureColumn($pdo, 'birth_date', 'birth_date VARCHAR(10) NOT NULL DEFAULT \'\'');
     ensureAccountIdentitySchema($pdo);
     $checked = true;

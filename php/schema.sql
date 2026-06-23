@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS account_profiles (
   preferred_language VARCHAR(16) NOT NULL DEFAULT 'nl',
   live_rtt_enabled TINYINT(1) NOT NULL DEFAULT 1,
   show_smileys TINYINT(1) NOT NULL DEFAULT 1,
+  session_timeout_enabled TINYINT(1) NOT NULL DEFAULT 1,
   subscription_plan VARCHAR(32) NOT NULL DEFAULT 'free',
   account_status VARCHAR(32) NOT NULL DEFAULT 'active',
   subscription_expires_at DATE NULL,

@@ -242,6 +242,7 @@ mode.relay=Relay
 option.live_rtt=Live RTT
 option.smilies=Smilies
 option.render_smilies=Show smileys
+option.session_timeout=Sign out after inactivity
 option.remember_password=Save account
 tc.remote_label=Other person
 tc.local_label=Me

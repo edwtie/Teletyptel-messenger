@@ -653,6 +653,7 @@
     fileInput: byId("fileInput"),
     rttToggle: byId("rttToggle"),
     smileyToggle: byId("smileyToggle"),
+    sessionTimeoutToggle: byId("sessionTimeoutToggle"),
     composerInputRow: byId("composerInputRow"),
     messageInput: byId("messageInput"),
     sendButton: byId("sendButton"),
@@ -1117,6 +1118,18 @@
         state.account.showSmileys = el.smileyToggle.checked;
       }
       renderActiveConversation();
+    });
+    el.sessionTimeoutToggle.addEventListener("change", () => {
+      if (state.account) {
+        state.account.sessionTimeoutEnabled = el.sessionTimeoutToggle.checked;
+      }
+      if (el.sessionTimeoutToggle.checked) {
+        recordSessionActivity({ force: true });
+        return;
+      }
+
+      window.clearTimeout(state.sessionIdleTimerId);
+      state.sessionIdleTimerId = null;
     });
     el.passwordInput.addEventListener("input", updateAccountPasswordStatus);
     el.rememberPasswordToggle.addEventListener("change", updateAccountPasswordStatus);
@@ -2343,6 +2356,7 @@
       ...state.account,
       avatarDataUrl: account.avatarDataUrl ?? state.account?.avatarDataUrl ?? "",
       avatarColor: account.avatarColor || state.account?.avatarColor || avatarColorFor(account.displayName ?? account.jid ?? state.sessionProfile),
+      sessionTimeoutEnabled: account.sessionTimeoutEnabled !== false,
       twoFactorEnabled: account.twoFactorEnabled === true || state.account?.twoFactorEnabled === true,
       twoFactorMethod: account.twoFactorMethod || state.account?.twoFactorMethod || ""
     };
@@ -2351,6 +2365,7 @@
     el.rememberPasswordToggle.checked = account.rememberPassword === true;
     el.rttToggle.checked = account.liveRttEnabled !== false;
     el.smileyToggle.checked = account.showSmileys !== false;
+    el.sessionTimeoutToggle.checked = account.sessionTimeoutEnabled !== false;
     syncRttToolbarState();
     el.peerInput.value = account.peer && !addressMatches(account.peer, "relay@localhost")
       ? account.peer
@@ -2427,6 +2442,11 @@
     recordSessionActivity({ force: true });
   }
 
+  function isSessionInactivityTimeoutEnabled() {
+    return state.account?.sessionTimeoutEnabled !== false
+      && el.sessionTimeoutToggle?.checked !== false;
+  }
+
   function recordSessionActivity(options = {}) {
     if (state.sessionTimeoutInProgress) {
       return;
@@ -2445,7 +2465,7 @@
   function scheduleSessionInactivityTimeout() {
     window.clearTimeout(state.sessionIdleTimerId);
     state.sessionIdleTimerId = null;
-    if (!hasAccountSessionForInactivityTimeout()) {
+    if (!isSessionInactivityTimeoutEnabled() || !hasAccountSessionForInactivityTimeout()) {
       return;
     }
 
@@ -3088,6 +3108,7 @@
       jid,
       liveRttEnabled: el.rttToggle.checked,
       showSmileys: el.smileyToggle.checked,
+      sessionTimeoutEnabled: el.sessionTimeoutToggle.checked,
       birthDate,
       xmppDomain,
       xmppHost,
@@ -3622,6 +3643,7 @@
       rememberPassword: el.rememberPasswordToggle.checked,
       liveRttEnabled: el.rttToggle.checked,
       showSmileys: el.smileyToggle.checked,
+      sessionTimeoutEnabled: el.sessionTimeoutToggle.checked,
       password: el.passwordInput.value,
       phoneNumber: el.phoneInput.value.trim(),
       birthDate: normalizeBirthDate(state.account?.birthDate ?? el.dialogBirthDateInput?.value ?? ""),
