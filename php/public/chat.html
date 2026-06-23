@@ -1082,6 +1082,24 @@
     </div>
   </div>
 
+  <div id="historyPrivacyDialog" class="modal-shell history-privacy-dialog" hidden role="dialog" aria-modal="true" aria-labelledby="historyPrivacyTitle">
+    <div class="modal-card history-privacy-card">
+      <div class="modal-header">
+        <div>
+          <h2 id="historyPrivacyTitle" data-i18n="history.privacy_dialog_title">AVG en geschiedenis</h2>
+          <span data-i18n="history.privacy_dialog_subtitle">Wat gebeurt er met bewaarde oproepen en transcripten?</span>
+        </div>
+        <button id="closeHistoryPrivacyDialogButton" class="icon-button" type="button" aria-label="Close" data-i18n-aria-label="button.close">x</button>
+      </div>
+      <div class="modal-body history-privacy-body">
+        <p data-i18n="history.privacy_dialog_text">TeleTypTel-medewerkers en het bedrijf lezen uw geschiedenis niet. Geschiedenis is bedoeld voor uzelf en voor de afgesproken bewaartermijn. Alleen bij een wettelijke verplichting, bijvoorbeeld een formeel bevel van politie/justitie of wanneer een rechter gegevens opvraagt, kan verstrekking of aftappen verplicht zijn. Kies daarom een maximale bewaartermijn en bewaar niet langer dan nodig.</p>
+      </div>
+      <div class="modal-actions">
+        <button id="historyPrivacyOkButton" type="button" data-i18n="button.close">Close</button>
+      </div>
+    </div>
+  </div>
+
   <div id="messageContextMenu" class="context-menu message-context-menu" hidden role="menu" aria-label="Message menu">
     <button id="messageContextEditButton" type="button" role="menuitem" data-i18n="button.edit_message">Edit</button>
     <button id="messageContextDeleteButton" class="danger-action" type="button" role="menuitem" data-i18n="button.delete_message">Delete</button>
@@ -1089,8 +1107,8 @@
     <button id="messageContextForwardButton" type="button" role="menuitem" data-i18n="button.forward_message">Forward</button>
   </div>
 
-  <script src="vendor/qrcode.js?v=20260623-history-privacy-help"></script>
+  <script src="vendor/qrcode.js?v=20260623-history-privacy-dialog"></script>
   <script src="jingle-history.js?v=20260615-jingle-history"></script>
-  <script src="chat-client.js?v=20260623-history-privacy-help"></script>
+  <script src="chat-client.js?v=20260623-history-privacy-dialog"></script>
 </body>
 </html>

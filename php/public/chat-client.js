@@ -607,6 +607,9 @@
     historyPageMeta: byId("historyPageMeta"),
     historyPageBody: byId("historyPageBody"),
     closeHistoryPageButton: byId("closeHistoryPageButton"),
+    historyPrivacyDialog: byId("historyPrivacyDialog"),
+    closeHistoryPrivacyDialogButton: byId("closeHistoryPrivacyDialogButton"),
+    historyPrivacyOkButton: byId("historyPrivacyOkButton"),
     remoteDraft: byId("remoteDraft"),
     remoteDraftName: byId("remoteDraftName"),
     remoteDraftPreviousText: byId("remoteDraftPreviousText"),
@@ -931,6 +934,9 @@
     el.xmppModeButton.addEventListener("click", () => setMode("xmpp"));
     el.closeTabPanelButton.addEventListener("click", () => activateTab("chat"));
     el.closeHistoryPageButton.addEventListener("click", () => activateTab("chat"));
+    el.closeHistoryPrivacyDialogButton.addEventListener("click", closeHistoryPrivacyDialog);
+    el.historyPrivacyOkButton.addEventListener("click", closeHistoryPrivacyDialog);
+    el.historyPrivacyDialog.addEventListener("click", closeHistoryPrivacyDialogOnBackdrop);
     el.resetRttButton.addEventListener("click", sendRttReset);
     el.enableRttButton.addEventListener("click", enableLiveRttFromToolbar);
     el.attachmentMenuButton.addEventListener("click", toggleAttachmentMenu);
@@ -4659,21 +4665,26 @@
     button.className = "history-help-button";
     button.textContent = "?";
     button.setAttribute("aria-label", t("history.privacy_help_label", "AVG uitleg"));
-    button.setAttribute("aria-expanded", "false");
+    button.addEventListener("click", openHistoryPrivacyDialog);
 
-    const text = document.createElement("p");
-    text.className = "history-privacy-text";
-    text.hidden = true;
-    text.textContent = t("history.privacy_help_text", "AVG: bewaar alleen wat nodig is, kies een maximale bewaartermijn en informeer gebruikers dat oproepen, opnames en transcripten kunnen worden bewaard. Verwijder of exporteer gegevens wanneer iemand daar recht op heeft.");
-
-    button.addEventListener("click", () => {
-      const expanded = text.hidden;
-      text.hidden = !expanded;
-      button.setAttribute("aria-expanded", String(expanded));
-    });
-
-    wrapper.append(button, text);
+    wrapper.appendChild(button);
     return wrapper;
+  }
+
+  function openHistoryPrivacyDialog() {
+    el.historyPrivacyDialog.hidden = false;
+    document.body.classList.add("modal-open");
+  }
+
+  function closeHistoryPrivacyDialog() {
+    el.historyPrivacyDialog.hidden = true;
+    document.body.classList.remove("modal-open");
+  }
+
+  function closeHistoryPrivacyDialogOnBackdrop(event) {
+    if (event.target === el.historyPrivacyDialog) {
+      closeHistoryPrivacyDialog();
+    }
   }
 
   function createHistoryToggle(labelText, checked, onChange) {
