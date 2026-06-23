@@ -13520,12 +13520,16 @@
       return t("presence.group", "Group");
     }
 
-    return conversation.presence === "online"
-      ? conversation.clientState === "dnd"
+    if (conversation.presence === "online") {
+      return conversation.clientState === "dnd"
         ? t("presence.do_not_disturb", "Do not disturb")
         : conversation.clientState === "inactive"
         ? t("presence.online_inactive", "Online - inactive")
-        : t("presence.online", "Online")
+        : t("presence.online", "Online");
+    }
+
+    return conversation.lastSeenAt
+      ? t("presence.last_seen", "last seen: {0}").replace("{0}", formatLastSeen(conversation.lastSeenAt))
       : t("presence.offline", "Offline");
   }
 
@@ -13545,11 +13549,6 @@
   }
 
   function conversationListFallbackMeta(conversation) {
-    if (conversation.presence === "offline" && conversation.lastSeenAt) {
-      return t("presence.last_seen", "laatst gezien: {0}")
-        .replace("{0}", formatLastSeen(conversation.lastSeenAt));
-    }
-
     return conversationMeta(conversation);
   }
 
@@ -13706,6 +13705,7 @@
         if (presence === "offline") {
           conversation.clientState = null;
           conversation.clientStateUpdatedAt = null;
+          conversation.lastSeenAt = new Date();
         }
       }
     }
