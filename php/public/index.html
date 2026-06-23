@@ -3,16 +3,16 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta http-equiv="refresh" content="0; url=chat.html">
+  <meta http-equiv="refresh" content="0; url=index.php">
   <title>TeleTypTel</title>
-  <link rel="canonical" href="chat.html">
+  <link rel="canonical" href="index.php">
 </head>
 <body>
   <script>
     const params = new URLSearchParams(window.location.search);
-    const target = params.has("reset") ? "reset.html" : "chat.html";
+    const target = params.has("reset") ? "reset.html" : "index.php";
     window.location.replace(target + window.location.search + window.location.hash);
   </script>
-  <p><a href="chat.html">TeleTypTel openen</a></p>
+  <p><a href="index.php">TeleTypTel openen</a></p>
 </body>
 </html>
