@@ -1261,6 +1261,9 @@ body.history-page-active .detail-panel {
 .history-page {
   position: relative;
   z-index: 1;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 14px;
   min-width: 0;
   min-height: 0;
   overflow: auto;
@@ -1269,7 +1272,7 @@ body.history-page-active .detail-panel {
 }
 
 body.history-page-active .history-page {
-  display: block;
+  display: grid;
 }
 
 body.history-page-active .chat-panel {
@@ -2382,9 +2385,20 @@ body:not([data-chat-background="none"]) .message-body {
 
 .history-card.provider-card {
   gap: 14px;
+  width: 100%;
+  max-width: 1400px;
   border-color: #bfd7ff;
   background: #f8fbff;
   color: #0f172a;
+}
+
+.history-page .tab-panel-header {
+  width: 100%;
+  max-width: 1400px;
+}
+
+.history-page .tab-panel-body {
+  width: 100%;
 }
 
 .provider-card dl {
