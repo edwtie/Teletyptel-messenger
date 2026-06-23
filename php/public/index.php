@@ -225,14 +225,7 @@ function e(string $value): string
       margin: 0 auto 44px;
     }
 
-    .feature-grid {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 14px;
-    }
-
-    .feature,
-    .notice,
+    .quiet-note,
     .quick-links,
     .story,
     .tester-call {
@@ -242,18 +235,11 @@ function e(string $value): string
       padding: 16px;
     }
 
-    .feature {
-      display: grid;
-      gap: 8px;
-    }
-
-    .feature strong,
-    .notice strong {
+    .quiet-note strong {
       font-size: 18px;
     }
 
-    .feature p,
-    .notice p {
+    .quiet-note p {
       margin: 0;
       color: var(--muted);
       line-height: 1.45;
@@ -313,6 +299,7 @@ function e(string $value): string
       align-items: center;
       justify-content: space-between;
       gap: 12px;
+      opacity: .78;
     }
 
     .quick-links div {
@@ -351,10 +338,6 @@ function e(string $value): string
         padding: 40px 0 52px;
       }
 
-      .feature-grid {
-        grid-template-columns: minmax(0, 1fr);
-      }
-
       .tester-points {
         grid-template-columns: minmax(0, 1fr);
       }
@@ -376,17 +359,14 @@ function e(string $value): string
     <section class="hero" aria-labelledby="hero-title">
       <div class="hero-inner">
         <div class="hero-copy">
-          <span class="eyebrow">Realtime tekst, chat en Total Conversation</span>
+          <span class="eyebrow">Binnenkort meer</span>
           <h1 id="hero-title">TeleTypTel</h1>
           <p class="return-line">We zijn <span>TERUG</span> met nieuwste technologie.</p>
-          <p>Een toegankelijke communicatie-app voor teksttelefonie, RTT, gesprekken, groepen en bewaarde Total Conversation-geschiedenis.</p>
+          <p>Een vertrouwd idee keert terug in een nieuwe vorm. We onthullen stap voor stap meer.</p>
         </div>
         <div class="actions" aria-label="Snel starten">
-          <a class="button primary" href="<?php echo e($installed ? $chatUrl : $installUrl); ?>">
-            <?php echo $installed ? 'TeleTypTel openen' : 'Installatie starten'; ?>
-          </a>
-          <a class="button" href="<?php echo e($chatUrl); ?>">Webapp openen</a>
-          <a class="button" href="dev.html">Status bekijken</a>
+          <a class="button primary" href="<?php echo e($testerMailto); ?>">Inschrijven als tester</a>
+          <a class="button" href="#testers">Meer over testen</a>
         </div>
       </div>
     </section>
@@ -394,32 +374,17 @@ function e(string $value): string
     <section class="content" aria-label="TeleTypTel informatie">
       <section class="story" aria-labelledby="history-title">
         <h2 id="history-title">Geschiedenis van TeleTypTel</h2>
-        <p>TeleTypTel bouwt voort op het oude idee van teksttelefonie: direct kunnen typen, lezen en reageren wanneer gewone spraak niet vanzelfsprekend is. Met moderne webtechnologie, XMPP, realtime tekst en Total Conversation brengen we dat idee opnieuw terug voor telefoons, tablets en computers.</p>
+        <p>TeleTypTel bouwt voort op het oude idee van teksttelefonie: direct kunnen typen, lezen en reageren wanneer gewone spraak niet vanzelfsprekend is. De nieuwe versie blijft nog even onder de radar, maar de richting is duidelijk: toegankelijk communiceren met moderne technologie.</p>
       </section>
 
-      <div class="feature-grid">
-        <article class="feature">
-          <strong>Voor doven en slechthorenden</strong>
-          <p>RTT en tekstcommunicatie blijven zichtbaar tijdens chat en gesprekken, met aandacht voor toegankelijkheid.</p>
-        </article>
-        <article class="feature">
-          <strong>1-op-1 en groepen</strong>
-          <p>Gebruik XMPP voor contacten, groepsgesprekken en aanwezigheid, klaar voor verdere ejabberd-integratie.</p>
-        </article>
-        <article class="feature">
-          <strong>Geschiedenis met bewaartermijn</strong>
-          <p>Total Conversation-geschiedenis kan worden bewaard met een maximale termijn en AVG-uitleg.</p>
-        </article>
-      </div>
-
-      <section class="notice" aria-label="Beta status">
-        <strong>Beta-opbouw</strong>
-        <p>TeleTypTel is in opbouw richting beta. Test eerst lokaal of op de ontwikkelomgeving voordat je naar een VPS of productieomgeving gaat.</p>
+      <section class="quiet-note" aria-label="Beperkte onthulling">
+        <strong>Nog niet volledig onthuld</strong>
+        <p>We houden de details bewust klein totdat de eerste testgroep klaarstaat. Eerst testen, dan pas groot naar buiten.</p>
       </section>
 
-      <section class="tester-call" aria-labelledby="tester-title">
+      <section id="testers" class="tester-call" aria-labelledby="tester-title">
         <h2 id="tester-title">We zoeken testers</h2>
-        <p>Voor de volgende stap zoeken we een beperkte groep testers. We willen testen op telefoons, tablets en computers, met extra aandacht voor toegankelijkheid, realtime tekst, bellen en Total Conversation.</p>
+        <p>Voor de volgende stap zoeken we een beperkte groep testers. We willen rustig testen op verschillende apparaten, met mensen die duidelijke en toegankelijke communicatie belangrijk vinden.</p>
         <ul class="tester-points">
           <li>Telefoons</li>
           <li>Tablets</li>
@@ -427,7 +392,7 @@ function e(string $value): string
         </ul>
         <div class="actions">
           <a class="button primary" href="<?php echo e($testerMailto); ?>">Inschrijven als tester</a>
-          <a class="button" href="<?php echo e($chatUrl); ?>">TeleTypTel bekijken</a>
+          <a class="button" href="mailto:<?php echo e($testerEmail); ?>">Vraag stellen</a>
         </div>
       </section>
 
