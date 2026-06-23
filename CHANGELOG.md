@@ -338,6 +338,8 @@
   `relay_websocket` can stay empty when TeleTypTel uses ejabberd directly.
 - Real Server Setup now documents the `xmpp-websocket-smoke.php` check and how
   to recognize successful ejabberd WebSocket sessions in the ejabberd log.
+- Web client smoke with two real accounts now covers RTT, presence and normal
+  chat.
 - XSF/software-directory notes now describe only the current evaluation scope
   and avoid claiming Android/iOS or formal XEP-0479 compliance before release
   validation.

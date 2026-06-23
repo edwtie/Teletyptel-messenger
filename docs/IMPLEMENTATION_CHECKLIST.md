@@ -186,7 +186,7 @@ item is implemented, tested and documented.
 - [x] XEP-0215 STUN/TURN discovery checked when advertised by the server.
 - [x] XEP-0308 Last Message Correction smoke passed between two public accounts.
 - [x] XEP-0363 file upload discovery, slot, PUT and attachment smoke passed.
-- [ ] Web client RTT, presence and normal chat passed with the two real accounts.
+- [x] Web client RTT, presence and normal chat passed with the two real accounts.
 - [ ] Browser audio/video call passed between the two real accounts.
 - [ ] Browser audio/video call passed on iPhone Safari/WebView with the two real
   accounts, including camera permission, local preview and reconnect behavior.
