@@ -4708,10 +4708,7 @@
       const meta = document.createElement("span");
       meta.className = "history-item-meta";
       meta.textContent = entry.meta;
-      const preview = document.createElement("span");
-      preview.className = "history-item-preview";
-      preview.textContent = entry.preview;
-      button.append(title, meta, preview);
+      button.append(title, meta);
       container.appendChild(button);
     }
   }
