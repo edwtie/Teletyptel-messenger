@@ -2342,14 +2342,19 @@ body:not([data-chat-background="none"]) .message-body {
 }
 
 .tab-panel.history-panel {
+  position: relative;
+  z-index: 2;
+  grid-row: 2 / 8;
   background: #f8fbff;
 }
 
 .history-card.provider-card {
   gap: 14px;
-  border-color: #bfd7ff;
+  border: 0;
+  border-radius: 0;
   background: #f8fbff;
   color: #0f172a;
+  padding: 0;
 }
 
 .provider-card dl {
@@ -5859,7 +5864,6 @@ body[data-theme] .account-settings-menu button.selected {
 }
 
 body[data-theme="dark"] .tab-panel.history-panel,
-body[data-theme="dark"] .history-card.provider-card,
 body[data-theme="dark"] .history-settings,
 body[data-theme="dark"] .history-list,
 body[data-theme="dark"] .history-detail {
@@ -5867,7 +5871,6 @@ body[data-theme="dark"] .history-detail {
   color: #0f172a;
 }
 
-body[data-theme="dark"] .history-card.provider-card,
 body[data-theme="dark"] .history-settings,
 body[data-theme="dark"] .history-list,
 body[data-theme="dark"] .history-detail,
