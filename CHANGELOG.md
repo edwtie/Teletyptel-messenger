@@ -270,6 +270,9 @@
   the account security dialog, matching the existing Google social-login flow.
 - Social login buttons now use provider-style Google and Facebook logo buttons
   instead of plain letter badges.
+- The Google sign-in button is now rendered through Google Identity Services
+  when a public Google client ID is configured, with the existing server-side
+  OAuth redirect kept as the click target.
 - Auth0 has been removed from the web login UI, installer and supported social
   provider documentation; TeleTypTel now focuses social login on Google,
   Facebook and Apple.

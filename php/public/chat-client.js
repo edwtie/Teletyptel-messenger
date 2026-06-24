@@ -768,6 +768,8 @@
     accountSettingsMenu: byId("accountSettingsMenu"),
     dialogCreateAccountButton: byId("dialogCreateAccountButton"),
     dialogGoogleLoginButton: byId("dialogGoogleLoginButton"),
+    dialogGoogleLoginFallbackButton: byId("dialogGoogleLoginFallbackButton"),
+    dialogGoogleLoginOverlayButton: byId("dialogGoogleLoginOverlayButton"),
     dialogFacebookLoginButton: byId("dialogFacebookLoginButton"),
     dialogSaveAccountButton: byId("dialogSaveAccountButton"),
     dialogConnectButton: byId("dialogConnectButton"),
@@ -840,6 +842,7 @@
   syncDoNotDisturbButton();
   resetServiceWorkerCachesIfRequested();
   loadPlatformConfig();
+  renderGoogleSdkLoginButton();
   applyMediaSettingsToControls();
   refreshMediaDevices(false);
   registerServiceWorker();
@@ -1035,7 +1038,8 @@
       button.addEventListener("click", () => setAccountSettingsPanel(button.dataset.accountPanel || "profile"));
     });
     el.dialogCreateAccountButton.addEventListener("click", createAccountFromDialog);
-    el.dialogGoogleLoginButton.addEventListener("click", startGoogleLoginFromDialog);
+    el.dialogGoogleLoginFallbackButton.addEventListener("click", startGoogleLoginFromDialog);
+    el.dialogGoogleLoginOverlayButton.addEventListener("click", startGoogleLoginFromDialog);
     el.dialogFacebookLoginButton.addEventListener("click", startFacebookLoginFromDialog);
     el.dialogSaveAccountButton.addEventListener("click", () => saveAccountDialogProfile(false));
     el.dialogConnectButton.addEventListener("click", () => saveAccountDialogProfile(true));
@@ -1911,6 +1915,79 @@
         appendDebug("maps", "Google Maps API key loaded from browser storage.");
       }
     }
+  }
+
+  async function renderGoogleSdkLoginButton() {
+    if (!el.dialogGoogleLoginButton || !el.dialogGoogleLoginFallbackButton || !el.dialogGoogleLoginOverlayButton) {
+      return;
+    }
+
+    try {
+      const config = await fetchJson("api/auth/public-config.php");
+      const clientId = String(config?.google?.clientId || "").trim();
+      if (!clientId) {
+        appendDebug("google-sdk", "Google client ID unavailable; using fallback button.");
+        return;
+      }
+
+      await loadExternalScript("https://accounts.google.com/gsi/client", "teletyptel-google-identity");
+      if (!globalThis.google?.accounts?.id?.initialize || !globalThis.google?.accounts?.id?.renderButton) {
+        throw new Error("Google Identity Services unavailable.");
+      }
+
+      globalThis.google.accounts.id.initialize({
+        client_id: clientId,
+        callback: () => startGoogleLoginFromDialog()
+      });
+      globalThis.google.accounts.id.renderButton(el.dialogGoogleLoginButton, {
+        type: "standard",
+        theme: "outline",
+        size: "large",
+        text: "continue_with",
+        shape: "rectangular",
+        logo_alignment: "left",
+        width: Math.max(240, Math.round(el.dialogGoogleLoginButton.getBoundingClientRect().width || 320)),
+        locale: languageCodeForGoogleButton()
+      });
+      el.dialogGoogleLoginFallbackButton.hidden = true;
+      el.dialogGoogleLoginOverlayButton.hidden = false;
+      appendDebug("google-sdk", "Google Identity Services button rendered.");
+    } catch (error) {
+      el.dialogGoogleLoginFallbackButton.hidden = false;
+      el.dialogGoogleLoginOverlayButton.hidden = true;
+      appendDebug("google-sdk-error", error.message || String(error));
+    }
+  }
+
+  function loadExternalScript(src, marker) {
+    const existing = document.querySelector(`script[data-${marker}]`);
+    if (existing) {
+      return existing.dataset.loaded === "true"
+        ? Promise.resolve()
+        : new Promise((resolve, reject) => {
+          existing.addEventListener("load", resolve, { once: true });
+          existing.addEventListener("error", reject, { once: true });
+        });
+    }
+
+    return new Promise((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = src;
+      script.async = true;
+      script.defer = true;
+      script.setAttribute(`data-${marker}`, "true");
+      script.addEventListener("load", () => {
+        script.dataset.loaded = "true";
+        resolve();
+      }, { once: true });
+      script.addEventListener("error", () => reject(new Error(`Failed to load ${src}`)), { once: true });
+      document.head.appendChild(script);
+    });
+  }
+
+  function languageCodeForGoogleButton() {
+    const lang = String(state.account?.preferredLanguage || el.languageInput?.value || document.documentElement.lang || "").toLowerCase();
+    return lang.startsWith("ned") || lang.startsWith("nl") ? "nl" : "en";
   }
 
   async function loadLanguage(code) {
