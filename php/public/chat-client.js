@@ -1949,7 +1949,9 @@
         return;
       }
 
-      await loadExternalScript("https://accounts.google.com/gsi/client", "teletyptel-google-identity");
+      const locale = languageCodeForGoogleButton();
+      el.dialogGoogleLoginButton.dataset.locale = locale;
+      await loadExternalScript(`https://accounts.google.com/gsi/client?hl=${encodeURIComponent(locale)}`, `teletyptel-google-identity-${locale}`);
       if (!globalThis.google?.accounts?.id?.initialize || !globalThis.google?.accounts?.id?.renderButton) {
         throw new Error("Google Identity Services unavailable.");
       }
@@ -1966,7 +1968,7 @@
         shape: "rectangular",
         logo_alignment: "left",
         width: Math.max(240, Math.round(rect.width || 320)),
-        locale: languageCodeForGoogleButton()
+        locale
       });
       window.setTimeout(() => activateGoogleSdkLoginButton(), 500);
     } catch (error) {
