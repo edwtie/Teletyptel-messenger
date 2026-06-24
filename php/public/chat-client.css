@@ -2504,10 +2504,11 @@ body.tc-call-active.call-active .call-panel.no-remote-video.local-video-main {
 
 .scroll-to-latest-symbol {
   display: block;
-  font-size: 26px;
-  font-weight: 700;
-  line-height: 1;
-  transform: translateY(-1px);
+  width: 18px;
+  height: 12px;
+  background: currentColor;
+  mask: url("assets/icons/chevron-down-icon.svg") center / contain no-repeat;
+  -webkit-mask: url("assets/icons/chevron-down-icon.svg") center / contain no-repeat;
 }
 
 .scroll-to-latest-button[hidden] {
