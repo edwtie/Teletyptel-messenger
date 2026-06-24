@@ -949,7 +949,7 @@ body.account-gate .modal-shell {
 .google-sdk-login-overlay:focus,
 .google-sdk-login-overlay:focus-visible,
 .google-sdk-login-overlay:active {
-  background: transparent;
+  background: #202124;
   box-shadow: 0 0 0 2px #d2e3fc;
   outline: 0;
 }
