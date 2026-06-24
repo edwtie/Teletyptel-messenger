@@ -1010,7 +1010,7 @@ body.account-gate .modal-shell {
 
 .facebook-login-mark {
   border: 0;
-  background: rgba(255, 255, 255, .16);
+  background: transparent;
   color: #fff;
 }
 
