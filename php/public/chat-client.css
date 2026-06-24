@@ -931,6 +931,8 @@ body.account-gate .modal-shell {
 }
 
 .google-sdk-login-overlay {
+  appearance: none;
+  -webkit-appearance: none;
   position: absolute;
   inset: 0;
   z-index: 2;
@@ -941,6 +943,15 @@ body.account-gate .modal-shell {
   background: transparent;
   color: transparent;
   cursor: pointer;
+}
+
+.google-sdk-login-overlay:hover,
+.google-sdk-login-overlay:focus,
+.google-sdk-login-overlay:focus-visible,
+.google-sdk-login-overlay:active {
+  background: transparent;
+  box-shadow: 0 0 0 2px #d2e3fc;
+  outline: 0;
 }
 
 .google-sdk-login-overlay[hidden] {
