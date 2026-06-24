@@ -1962,7 +1962,7 @@
         type: "standard",
         theme: "outline",
         size: "large",
-        text: "continue_with",
+        text: "sign_in_with",
         shape: "rectangular",
         logo_alignment: "left",
         width: Math.max(240, Math.round(rect.width || 320)),
