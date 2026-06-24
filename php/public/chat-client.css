@@ -924,17 +924,49 @@ body.account-gate .modal-shell {
   place-items: center;
   border-radius: 999px;
   background: #fff;
-  color: #1a73e8;
   border: 1px solid #d1d5db;
-  font: 800 14px/1 Arial, sans-serif;
+  color: #1a73e8;
+}
+
+.social-login-mark svg {
+  display: block;
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+
+.google-login-button {
+  border-color: #dadce0;
+  background: #fff;
+  color: #1f2937;
+}
+
+.google-login-button:hover,
+.google-login-button:focus-visible {
+  border-color: #c7d2fe;
+  background: #f8fbff;
+}
+
+.google-login-mark {
+  border: 0;
 }
 
 .facebook-login-mark {
+  border: 0;
+  background: rgba(255, 255, 255, .16);
+  color: #fff;
+}
+
+.facebook-login-button {
+  border-color: #1877f2;
   background: #1877f2;
   color: #fff;
-  border-color: #1877f2;
-  font-size: 18px;
-  font-family: Arial, sans-serif;
+}
+
+.facebook-login-button:hover,
+.facebook-login-button:focus-visible {
+  border-color: #166fe5;
+  background: #166fe5;
 }
 
 .profile-dialog .account-auth-section,

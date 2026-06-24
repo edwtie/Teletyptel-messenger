@@ -270,6 +270,8 @@
   IDs/secrets and writes the matching OAuth callback configuration.
 - The web client now exposes Facebook sign-in plus account linking/unlinking in
   the account security dialog, matching the existing Google social-login flow.
+- Social login buttons now use provider-style Google and Facebook logo buttons
+  instead of plain letter badges.
 - The web admin panel now shows ejabberd/XMPP and SIP gateway readiness,
   including SIP/SIPS port checks for future ejabberd_sip/mod_sip work.
 - The web installer now disables itself after a successful installation by
