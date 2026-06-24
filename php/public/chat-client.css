@@ -81,8 +81,8 @@ button {
   cursor: pointer;
 }
 
-button:hover:not(:disabled),
-button.selected {
+button:hover:not(:disabled):not(.social-login-button):not(.google-sdk-login-overlay),
+button.selected:not(.social-login-button):not(.google-sdk-login-overlay) {
   background: var(--accent-strong);
   color: #fff;
 }
@@ -6063,8 +6063,8 @@ body[data-theme="dark"] .context-menu {
   background: #151f2d;
 }
 
-body[data-theme="dark"] button:hover:not(:disabled),
-body[data-theme="dark"] button.selected,
+body[data-theme="dark"] button:hover:not(:disabled):not(.social-login-button):not(.google-sdk-login-overlay),
+body[data-theme="dark"] button.selected:not(.social-login-button):not(.google-sdk-login-overlay),
 body[data-theme="dark"] .top-menu[open] summary,
 body[data-theme="dark"] .top-menu summary:hover {
   background: var(--accent-strong);
