@@ -904,8 +904,22 @@ body.account-gate .modal-shell {
 }
 
 .google-sdk-login-button {
+  position: absolute;
+  inset: 0;
   width: 100%;
   min-height: 40px;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.google-sdk-login-wrap.sdk-ready .google-sdk-login-button {
+  position: static;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.google-sdk-login-wrap.sdk-ready .google-login-button {
+  display: none;
 }
 
 .google-sdk-login-button > div,

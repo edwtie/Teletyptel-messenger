@@ -1920,21 +1920,31 @@
     if (!el.dialogGoogleLoginButton || !el.dialogGoogleLoginFallbackButton || !el.dialogGoogleLoginOverlayButton) {
       return;
     }
-    if (el.dialogGoogleLoginButton.querySelector("iframe")) {
-      el.dialogGoogleLoginFallbackButton.hidden = true;
-      el.dialogGoogleLoginOverlayButton.hidden = false;
+    const wrapper = el.dialogGoogleLoginButton.closest(".google-sdk-login-wrap");
+    const row = el.dialogGoogleLoginButton.closest(".social-login-row");
+    if (row?.hidden) {
+      return;
+    }
+    if (wrapper?.classList.contains("sdk-ready") && el.dialogGoogleLoginButton.querySelector("iframe")) {
       return;
     }
 
     const rect = el.dialogGoogleLoginButton.getBoundingClientRect();
-    if (rect.width < 120 || el.dialogGoogleLoginButton.closest(".social-login-row")?.hidden) {
+    if (rect.width < 120) {
       return;
     }
+
+    wrapper?.classList.remove("sdk-ready");
+    wrapper?.classList.add("sdk-rendering");
+    el.dialogGoogleLoginButton.replaceChildren();
+    el.dialogGoogleLoginFallbackButton.hidden = false;
+    el.dialogGoogleLoginOverlayButton.hidden = true;
 
     try {
       const config = await fetchJson("api/auth/public-config.php");
       const clientId = String(config?.google?.clientId || "").trim();
       if (!clientId) {
+        wrapper?.classList.remove("sdk-rendering");
         appendDebug("google-sdk", "Google client ID unavailable; using fallback button.");
         return;
       }
@@ -1958,13 +1968,40 @@
         width: Math.max(240, Math.round(rect.width || 320)),
         locale: languageCodeForGoogleButton()
       });
-      el.dialogGoogleLoginFallbackButton.hidden = true;
+      window.setTimeout(() => activateGoogleSdkLoginButton(), 500);
+    } catch (error) {
+      resetGoogleSdkLoginButton();
+      appendDebug("google-sdk-error", error.message || String(error));
+    }
+  }
+
+  function activateGoogleSdkLoginButton() {
+    if (!el.dialogGoogleLoginButton || !el.dialogGoogleLoginOverlayButton) {
+      return;
+    }
+    const wrapper = el.dialogGoogleLoginButton.closest(".google-sdk-login-wrap");
+    const iframe = el.dialogGoogleLoginButton.querySelector("iframe");
+    const frameRect = iframe?.getBoundingClientRect();
+    if (iframe && frameRect && frameRect.width >= 180 && frameRect.height >= 32) {
+      wrapper?.classList.remove("sdk-rendering");
+      wrapper?.classList.add("sdk-ready");
       el.dialogGoogleLoginOverlayButton.hidden = false;
       appendDebug("google-sdk", "Google Identity Services button rendered.");
-    } catch (error) {
+      return;
+    }
+    resetGoogleSdkLoginButton();
+    appendDebug("google-sdk", "Google Identity Services button unavailable; using fallback button.");
+  }
+
+  function resetGoogleSdkLoginButton() {
+    const wrapper = el.dialogGoogleLoginButton?.closest(".google-sdk-login-wrap");
+    wrapper?.classList.remove("sdk-rendering", "sdk-ready");
+    el.dialogGoogleLoginButton?.replaceChildren();
+    if (el.dialogGoogleLoginFallbackButton) {
       el.dialogGoogleLoginFallbackButton.hidden = false;
+    }
+    if (el.dialogGoogleLoginOverlayButton) {
       el.dialogGoogleLoginOverlayButton.hidden = true;
-      appendDebug("google-sdk-error", error.message || String(error));
     }
   }
 
