@@ -948,14 +948,14 @@ body.account-gate .modal-shell {
 .google-sdk-login-overlay:hover,
 .google-sdk-login-overlay:active {
   background: transparent;
-  box-shadow: 0 0 0 2px #d2e3fc;
+  box-shadow: none;
   outline: 0;
 }
 
 .google-sdk-login-overlay:focus,
 .google-sdk-login-overlay:focus-visible {
-  background: #202124;
-  box-shadow: 0 0 0 2px #d2e3fc;
+  background: transparent;
+  box-shadow: none;
   outline: 0;
 }
 

@@ -1987,7 +1987,7 @@
     if (iframe && frameRect && frameRect.width >= 36 && frameRect.height >= 32) {
       wrapper?.classList.remove("sdk-rendering");
       wrapper?.classList.add("sdk-ready");
-      el.dialogGoogleLoginOverlayButton.hidden = false;
+      el.dialogGoogleLoginOverlayButton.hidden = true;
       appendDebug("google-sdk", "Google Identity Services button rendered.");
       return;
     }
