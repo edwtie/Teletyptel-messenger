@@ -927,6 +927,10 @@ body.account-gate .modal-shell {
 
 .google-sdk-login-wrap.sdk-ready:hover .google-login-button,
 .google-sdk-login-wrap.sdk-ready:focus-within .google-login-button {
+  --social-button-bg: #202124;
+  --social-button-hover-bg: #202124;
+  --social-button-border: #202124;
+  --social-button-hover-border: #202124;
   display: inline-flex;
   position: absolute;
   inset: 0;
@@ -934,6 +938,11 @@ body.account-gate .modal-shell {
   border-color: #202124;
   background: #202124;
   box-shadow: 0 0 0 2px #d2e3fc;
+}
+
+.google-sdk-login-wrap.sdk-ready:hover .google-login-mark,
+.google-sdk-login-wrap.sdk-ready:focus-within .google-login-mark {
+  background: #202124;
 }
 
 .google-sdk-login-button > div,
