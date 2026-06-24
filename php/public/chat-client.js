@@ -842,7 +842,6 @@
   syncDoNotDisturbButton();
   resetServiceWorkerCachesIfRequested();
   loadPlatformConfig();
-  renderGoogleSdkLoginButton();
   applyMediaSettingsToControls();
   refreshMediaDevices(false);
   registerServiceWorker();
@@ -1921,6 +1920,16 @@
     if (!el.dialogGoogleLoginButton || !el.dialogGoogleLoginFallbackButton || !el.dialogGoogleLoginOverlayButton) {
       return;
     }
+    if (el.dialogGoogleLoginButton.querySelector("iframe")) {
+      el.dialogGoogleLoginFallbackButton.hidden = true;
+      el.dialogGoogleLoginOverlayButton.hidden = false;
+      return;
+    }
+
+    const rect = el.dialogGoogleLoginButton.getBoundingClientRect();
+    if (rect.width < 120 || el.dialogGoogleLoginButton.closest(".social-login-row")?.hidden) {
+      return;
+    }
 
     try {
       const config = await fetchJson("api/auth/public-config.php");
@@ -1946,7 +1955,7 @@
         text: "continue_with",
         shape: "rectangular",
         logo_alignment: "left",
-        width: Math.max(240, Math.round(el.dialogGoogleLoginButton.getBoundingClientRect().width || 320)),
+        width: Math.max(240, Math.round(rect.width || 320)),
         locale: languageCodeForGoogleButton()
       });
       el.dialogGoogleLoginFallbackButton.hidden = true;
@@ -2702,6 +2711,9 @@
         : accountDialogStatusText("account.settings_ready", "Edit app, media and server settings."));
     el.accountDialog.hidden = false;
     document.body.classList.add("modal-open");
+    if (mode === "signin") {
+      window.setTimeout(() => renderGoogleSdkLoginButton(), 0);
+    }
     window.setTimeout(() => {
       accountDialogFocusTarget(mode).focus();
     }, 0);
@@ -2779,6 +2791,8 @@
       el.dialogConnectButton.hidden = true;
       el.dialogForgotPasswordButton.hidden = true;
       el.dialogGoogleLoginButton.closest(".social-login-row").hidden = true;
+    } else if (startMode && !el.accountDialog.hidden) {
+      window.setTimeout(() => renderGoogleSdkLoginButton(), 0);
     }
     el.dialogServerSettingsButton.hidden = profileMode || settingsMode || resetMode;
     renderAccountSettingsMenu();
