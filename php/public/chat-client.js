@@ -1930,7 +1930,7 @@
     }
 
     const rect = el.dialogGoogleLoginButton.getBoundingClientRect();
-    if (rect.width < 120) {
+    if (rect.width < 36) {
       return;
     }
 
@@ -1961,13 +1961,13 @@
         callback: () => startGoogleLoginFromDialog()
       });
       globalThis.google.accounts.id.renderButton(el.dialogGoogleLoginButton, {
-        type: "standard",
+        type: "icon",
         theme: "outline",
         size: "large",
         text: "sign_in_with",
-        shape: "rectangular",
+        shape: "circle",
         logo_alignment: "left",
-        width: Math.max(240, Math.round(rect.width || 320)),
+        width: 44,
         locale
       });
       window.setTimeout(() => activateGoogleSdkLoginButton(), 500);
@@ -1984,7 +1984,7 @@
     const wrapper = el.dialogGoogleLoginButton.closest(".google-sdk-login-wrap");
     const iframe = el.dialogGoogleLoginButton.querySelector("iframe");
     const frameRect = iframe?.getBoundingClientRect();
-    if (iframe && frameRect && frameRect.width >= 180 && frameRect.height >= 32) {
+    if (iframe && frameRect && frameRect.width >= 36 && frameRect.height >= 32) {
       wrapper?.classList.remove("sdk-rendering");
       wrapper?.classList.add("sdk-ready");
       el.dialogGoogleLoginOverlayButton.hidden = false;

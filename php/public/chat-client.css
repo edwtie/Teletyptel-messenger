@@ -893,21 +893,24 @@ body.account-gate .modal-shell {
 }
 
 .social-login-row {
-  display: grid;
-  gap: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
   grid-column: 1 / -1;
 }
 
 .google-sdk-login-wrap {
   position: relative;
-  min-height: 40px;
+  width: 44px;
+  height: 44px;
 }
 
 .google-sdk-login-button {
   position: absolute;
   inset: 0;
   width: 100%;
-  min-height: 40px;
+  height: 44px;
   visibility: hidden;
   pointer-events: none;
 }
@@ -932,8 +935,9 @@ body.account-gate .modal-shell {
   inset: 0;
   z-index: 2;
   width: 100%;
-  min-height: 40px;
+  min-height: 44px;
   border: 0;
+  border-radius: 999px;
   background: transparent;
   color: transparent;
   cursor: pointer;
@@ -944,16 +948,19 @@ body.account-gate .modal-shell {
 }
 
 .social-login-button {
-  width: 100%;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  min-height: 40px;
+  min-height: 44px;
   border: 1px solid var(--border-strong);
+  border-radius: 999px;
   background: var(--surface);
   color: var(--text);
   font-weight: 700;
+  padding: 0;
 }
 
 .social-login-button:hover,
@@ -963,8 +970,8 @@ body.account-gate .modal-shell {
 }
 
 .social-login-mark {
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   display: inline-grid;
   place-items: center;
   border-radius: 999px;
@@ -975,17 +982,15 @@ body.account-gate .modal-shell {
 
 .social-login-mark svg {
   display: block;
-  width: 18px;
-  height: 18px;
+  width: 22px;
+  height: 22px;
 }
 
 .google-login-button {
   justify-content: center;
-  min-height: 40px;
   border-color: #747775;
   background: #fff;
   color: #1f1f1f;
-  padding: 9px 12px;
   font-family: Roboto, Arial, sans-serif;
   font-size: 14px;
   font-weight: 500;
