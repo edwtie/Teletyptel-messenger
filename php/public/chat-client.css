@@ -1011,19 +1011,19 @@ body.account-gate .modal-shell {
 .facebook-login-mark {
   border: 0;
   background: transparent;
-  color: #1877f2;
+  color: #fff;
 }
 
 .facebook-login-button {
-  border-color: #747775;
-  background: #fff;
-  color: #1877f2;
+  border-color: #1877f2;
+  background: #1877f2;
+  color: #fff;
 }
 
 .facebook-login-button:hover,
 .facebook-login-button:focus-visible {
-  border-color: #1877f2;
-  background: #eaf2ff;
+  border-color: #166fe5;
+  background: #166fe5;
 }
 
 .profile-dialog .account-auth-section,
