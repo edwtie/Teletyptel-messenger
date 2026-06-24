@@ -949,7 +949,7 @@ body.account-gate .modal-shell {
 .google-sdk-login-overlay:focus,
 .google-sdk-login-overlay:focus-visible,
 .google-sdk-login-overlay:active {
-  background: #202124;
+  background: transparent;
   box-shadow: 0 0 0 2px #d2e3fc;
   outline: 0;
 }
@@ -1008,12 +1008,14 @@ body.account-gate .modal-shell {
   --google-button-border: #747775;
   --google-button-bg: #fff;
   --google-button-text: #1f1f1f;
+  --google-button-focus-bg: #202124;
+  --google-button-focus-border: #202124;
   --google-button-hover-ring: #d2e3fc;
   --social-button-border: var(--google-button-border);
   --social-button-bg: var(--google-button-bg);
   --social-button-color: var(--google-button-text);
-  --social-button-hover-border: var(--google-button-border);
-  --social-button-hover-bg: var(--google-button-bg);
+  --social-button-hover-border: var(--google-button-focus-border);
+  --social-button-hover-bg: var(--google-button-focus-bg);
   --social-button-hover-color: var(--google-button-text);
   justify-content: center;
   font-family: Roboto, Arial, sans-serif;

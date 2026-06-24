@@ -1962,7 +1962,7 @@
       });
       globalThis.google.accounts.id.renderButton(el.dialogGoogleLoginButton, {
         type: "icon",
-        theme: "outline",
+        theme: "filled_black",
         size: "large",
         text: "sign_in_with",
         shape: "circle",
