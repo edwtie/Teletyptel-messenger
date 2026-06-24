@@ -946,10 +946,15 @@ body.account-gate .modal-shell {
 }
 
 .google-sdk-login-overlay:hover,
-.google-sdk-login-overlay:focus,
-.google-sdk-login-overlay:focus-visible,
 .google-sdk-login-overlay:active {
   background: transparent;
+  box-shadow: 0 0 0 2px #d2e3fc;
+  outline: 0;
+}
+
+.google-sdk-login-overlay:focus,
+.google-sdk-login-overlay:focus-visible {
+  background: #202124;
   box-shadow: 0 0 0 2px #d2e3fc;
   outline: 0;
 }
@@ -1024,8 +1029,15 @@ body.account-gate .modal-shell {
   line-height: 20px;
 }
 
-.google-login-button:hover,
+.google-login-button:hover {
+  --social-button-hover-border: var(--google-button-border);
+  --social-button-hover-bg: var(--google-button-bg);
+  box-shadow: 0 0 0 2px var(--google-button-hover-ring);
+}
+
 .google-login-button:focus-visible {
+  --social-button-hover-border: var(--google-button-focus-border);
+  --social-button-hover-bg: var(--google-button-focus-bg);
   box-shadow: 0 0 0 2px var(--google-button-hover-ring);
 }
 
