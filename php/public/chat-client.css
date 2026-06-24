@@ -2502,6 +2502,14 @@ body.tc-call-active.call-active .call-panel.no-remote-video.local-video-main {
   box-shadow: 0 7px 22px rgba(15, 23, 42, .26), 0 0 0 2px rgba(96, 165, 250, .34);
 }
 
+.scroll-to-latest-symbol {
+  display: block;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1;
+  transform: translateY(-1px);
+}
+
 .scroll-to-latest-button[hidden] {
   display: none;
 }
