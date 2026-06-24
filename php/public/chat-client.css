@@ -5877,8 +5877,8 @@ body[data-theme="light"] .context-menu .danger-action:not(:disabled) {
   color: #991b1b;
 }
 
-body[data-theme="light"] button:hover:not(:disabled),
-body[data-theme="light"] button.selected,
+body[data-theme="light"] button:hover:not(:disabled):not(.social-login-button):not(.google-sdk-login-overlay),
+body[data-theme="light"] button.selected:not(.social-login-button):not(.google-sdk-login-overlay),
 body[data-theme="light"] .top-menu[open] summary,
 body[data-theme="light"] .top-menu summary:hover {
   background: var(--accent-strong);
