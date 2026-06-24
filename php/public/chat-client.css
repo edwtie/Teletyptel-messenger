@@ -1000,7 +1000,8 @@ body.account-gate .modal-shell {
 .google-login-button:hover,
 .google-login-button:focus-visible {
   border-color: #747775;
-  background: #f8fafd;
+  background: #fff;
+  box-shadow: 0 0 0 2px #d2e3fc;
 }
 
 .google-login-mark {
