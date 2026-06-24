@@ -903,7 +903,7 @@ body.account-gate .modal-shell {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 12px;
   min-height: 40px;
   border: 1px solid var(--border-strong);
   background: var(--surface);
@@ -918,13 +918,13 @@ body.account-gate .modal-shell {
 }
 
 .social-login-mark {
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   display: inline-grid;
   place-items: center;
   border-radius: 999px;
   background: #fff;
-  border: 1px solid #d1d5db;
+  border: 0;
   color: #1a73e8;
 }
 
@@ -936,19 +936,27 @@ body.account-gate .modal-shell {
 }
 
 .google-login-button {
-  border-color: #dadce0;
+  justify-content: center;
+  min-height: 40px;
+  border-color: #747775;
   background: #fff;
-  color: #1f2937;
+  color: #1f1f1f;
+  padding: 9px 12px;
+  font-family: Roboto, Arial, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
 }
 
 .google-login-button:hover,
 .google-login-button:focus-visible {
-  border-color: #c7d2fe;
-  background: #f8fbff;
+  border-color: #747775;
+  background: #f8fafd;
 }
 
 .google-login-mark {
-  border: 0;
+  flex: 0 0 20px;
+  background: transparent;
 }
 
 .facebook-login-mark {
