@@ -51,6 +51,7 @@ button.save_settings=Instellingen opslaan
 button.save_profile=Profiel opslaan
 button.save_connect=Opslaan en verbinden
 button.forgot_password=Wachtwoord vergeten?
+button.scroll_latest=Nieuwste berichten
 button.continue_google=Aanmelden met Google
 button.continue_facebook=Aanmelden met Facebook
 button.link_google=Google koppelen

@@ -2479,6 +2479,34 @@ body.tc-call-active.call-active .call-panel.no-remote-video.local-video-main {
   padding: 16px;
 }
 
+.scroll-to-latest-button {
+  grid-row: 5;
+  align-self: end;
+  justify-self: end;
+  z-index: 8;
+  width: 42px;
+  min-width: 42px;
+  height: 42px;
+  margin: 0 22px 18px 0;
+  border: 1px solid rgba(148, 163, 184, .42);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .94);
+  color: #0f172a;
+  box-shadow: 0 5px 18px rgba(15, 23, 42, .22), 0 1px 3px rgba(15, 23, 42, .12);
+  backdrop-filter: blur(8px);
+}
+
+.scroll-to-latest-button:hover:not(:disabled),
+.scroll-to-latest-button:focus-visible {
+  background: #ffffff;
+  color: #2563eb;
+  box-shadow: 0 7px 22px rgba(15, 23, 42, .26), 0 0 0 2px rgba(96, 165, 250, .34);
+}
+
+.scroll-to-latest-button[hidden] {
+  display: none;
+}
+
 body[data-chat-background="auto"],
 body[data-chat-background="wide-1"] {
   --chat-background-image: url("assets/backgrounds/teletyptel-bg-wide-1.png");
@@ -6026,6 +6054,19 @@ body[data-theme="dark"] .composer-input-row {
 body[data-theme="dark"] .composer-input-row:focus-within {
   border-color: transparent;
   box-shadow: 0 3px 12px rgba(0, 0, 0, .42), 0 1px 2px rgba(0, 0, 0, .28);
+}
+
+body[data-theme="dark"] .scroll-to-latest-button {
+  border-color: rgba(148, 163, 184, .36);
+  background: rgba(15, 23, 36, .94);
+  color: #dbeafe;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, .42), 0 1px 3px rgba(0, 0, 0, .28);
+}
+
+body[data-theme="dark"] .scroll-to-latest-button:hover:not(:disabled),
+body[data-theme="dark"] .scroll-to-latest-button:focus-visible {
+  background: rgba(30, 41, 59, .98);
+  color: #93c5fd;
 }
 
 body[data-theme="dark"] .composer-round-button,

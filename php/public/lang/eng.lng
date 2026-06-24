@@ -51,6 +51,7 @@ button.save_settings=Save settings
 button.save_profile=Save profile
 button.save_connect=Save and connect
 button.forgot_password=Forgot password?
+button.scroll_latest=Latest messages
 button.continue_google=Sign in with Google
 button.continue_facebook=Sign in with Facebook
 button.link_google=Link Google

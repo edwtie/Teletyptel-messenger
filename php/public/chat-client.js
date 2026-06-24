@@ -597,6 +597,7 @@
     xmppModeButton: byId("xmppModeButton"),
     dropOverlay: byId("dropOverlay"),
     messageTimeline: byId("messageTimeline"),
+    scrollToLatestButton: byId("scrollToLatestButton"),
     tabPanel: byId("tabPanel"),
     tabPanelTitle: byId("tabPanelTitle"),
     tabPanelMeta: byId("tabPanelMeta"),
@@ -1006,6 +1007,8 @@
     window.addEventListener("scroll", closeConversationContextMenu, true);
     window.addEventListener("scroll", closeMessageContextMenu, true);
     window.addEventListener("scroll", closeMessageReactionPicker, true);
+    el.messageTimeline.addEventListener("scroll", updateScrollToLatestButton, { passive: true });
+    el.scrollToLatestButton.addEventListener("click", scrollMessageTimelineToLatest);
     document.addEventListener("visibilitychange", handleVisibilityLifecycleChange);
     window.addEventListener("focus", () => setClientLifecycleState("active", "focus"));
     window.addEventListener("blur", handleWindowLifecycleBlur);
@@ -12981,12 +12984,29 @@
 
     if (existingDraft) {
       updateMessageElement(existingDraft, message);
-      el.messageTimeline.scrollTop = el.messageTimeline.scrollHeight;
+      scrollMessageTimelineToLatest();
       return;
     }
 
     appendMessageElementToTimeline(message);
-    el.messageTimeline.scrollTop = el.messageTimeline.scrollHeight;
+    scrollMessageTimelineToLatest();
+  }
+
+  function isMessageTimelineNearBottom(threshold = 120) {
+    const distance = el.messageTimeline.scrollHeight - el.messageTimeline.clientHeight - el.messageTimeline.scrollTop;
+    return distance <= threshold;
+  }
+
+  function updateScrollToLatestButton() {
+    if (!el.scrollToLatestButton || el.messageTimeline.hidden) {
+      return;
+    }
+    el.scrollToLatestButton.hidden = !activeConversation() || isMessageTimelineNearBottom();
+  }
+
+  function scrollMessageTimelineToLatest() {
+    el.messageTimeline.scrollTo({ top: el.messageTimeline.scrollHeight, behavior: "smooth" });
+    window.setTimeout(updateScrollToLatestButton, 120);
   }
 
   function addConversation() {
@@ -13199,6 +13219,7 @@
       el.remoteDraftText.textContent = "";
       el.messageInput.value = "";
       updateComposerAvailability();
+      updateScrollToLatestButton();
       return;
     }
 
@@ -13236,7 +13257,7 @@
 
     updateLocalRttDraftMessage(conversation, false);
     updateComposerAvailability();
-    el.messageTimeline.scrollTop = el.messageTimeline.scrollHeight;
+    scrollMessageTimelineToLatest();
     updateTotalConversationTextPanel(conversation);
   }
 
@@ -13285,13 +13306,13 @@
 
     if (!existing) {
       appendMessageElementToTimeline(message);
-      el.messageTimeline.scrollTop = el.messageTimeline.scrollHeight;
+      scrollMessageTimelineToLatest();
       updateTotalConversationTextPanel(conversation);
       return;
     }
 
     updateMessageElement(existing, message);
-    el.messageTimeline.scrollTop = el.messageTimeline.scrollHeight;
+    scrollMessageTimelineToLatest();
     updateTotalConversationTextPanel(conversation);
   }
 
@@ -13330,7 +13351,7 @@
     }
 
     if (scroll) {
-      el.messageTimeline.scrollTop = el.messageTimeline.scrollHeight;
+      scrollMessageTimelineToLatest();
     }
   }
 
