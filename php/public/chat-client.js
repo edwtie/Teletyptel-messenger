@@ -769,7 +769,6 @@
     dialogCreateAccountButton: byId("dialogCreateAccountButton"),
     dialogGoogleLoginButton: byId("dialogGoogleLoginButton"),
     dialogFacebookLoginButton: byId("dialogFacebookLoginButton"),
-    dialogAuth0LoginButton: byId("dialogAuth0LoginButton"),
     dialogSaveAccountButton: byId("dialogSaveAccountButton"),
     dialogConnectButton: byId("dialogConnectButton"),
     dialogResetPasswordButton: byId("dialogResetPasswordButton"),
@@ -1038,7 +1037,6 @@
     el.dialogCreateAccountButton.addEventListener("click", createAccountFromDialog);
     el.dialogGoogleLoginButton.addEventListener("click", startGoogleLoginFromDialog);
     el.dialogFacebookLoginButton.addEventListener("click", startFacebookLoginFromDialog);
-    el.dialogAuth0LoginButton.addEventListener("click", startAuth0LoginFromDialog);
     el.dialogSaveAccountButton.addEventListener("click", () => saveAccountDialogProfile(false));
     el.dialogConnectButton.addEventListener("click", () => saveAccountDialogProfile(true));
     el.dialogForgotPasswordButton.addEventListener("click", requestPasswordResetFromDialog);
@@ -2916,12 +2914,6 @@
       media: Array.isArray(item.media) ? item.media : [],
       note: String(item.note || "")
     };
-  }
-
-  function startAuth0LoginFromDialog() {
-    updateAccountStatus(t("account.auth0_redirecting", "Opening Auth0 sign-in..."));
-    const target = new URL("api/auth/auth0/start", location.href);
-    location.assign(target.toString());
   }
 
   function serverSettingsControls() {

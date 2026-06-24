@@ -886,7 +886,7 @@ function unlinkIdentity(array $input): void
         return;
     }
 
-    if (!in_array($provider, ['google', 'auth0', 'facebook', 'apple'], true)) {
+    if (!in_array($provider, ['google', 'facebook', 'apple'], true)) {
         http_response_code(400);
         echo json_encode(['ok' => false, 'error' => 'unsupported_identity_provider']);
         return;
@@ -1105,7 +1105,7 @@ function rowToAccount(array $row): array
 function ensureProviderXmppPassword(PDO $pdo, array $row): array
 {
     $provider = strtolower((string)($row['provider_id'] ?? ''));
-    if (!in_array($provider, ['google', 'facebook', 'apple', 'auth0'], true)) {
+    if (!in_array($provider, ['google', 'facebook', 'apple'], true)) {
         return $row;
     }
 

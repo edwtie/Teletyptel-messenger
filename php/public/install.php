@@ -36,9 +36,6 @@ $state = [
     'facebook_app_secret' => '',
     'apple_client_id' => '',
     'apple_client_secret' => '',
-    'auth0_domain' => '',
-    'auth0_client_id' => '',
-    'auth0_client_secret' => '',
 ];
 $errors = [];
 $messages = [];
@@ -333,13 +330,6 @@ function writeConfig(string $configPath, array $state): void
         . "            'token_endpoint' => 'https://appleid.apple.com/auth/token',\n"
         . "            'scopes' => ['name', 'email'],\n"
         . "        ],\n"
-        . "        'auth0' => [\n"
-        . "            'auth0_domain' => " . var_export((string)$state['auth0_domain'], true) . ",\n"
-        . "            'client_id' => " . var_export((string)$state['auth0_client_id'], true) . ",\n"
-        . "            'client_secret' => " . var_export((string)$state['auth0_client_secret'], true) . ",\n"
-        . "            'redirect_uri' => " . var_export(defaultProviderRedirectUri('auth0'), true) . ",\n"
-        . "            'scopes' => ['openid', 'email', 'profile'],\n"
-        . "        ],\n"
         . "    ],\n"
         . "    'relay' => [\n"
         . arrayEntry('websocket', $state['relay_websocket'])
@@ -418,7 +408,6 @@ function loadExistingConfig(string $configPath): ?array
     $google = is_array($oauth['google'] ?? null) ? $oauth['google'] : [];
     $facebook = is_array($oauth['facebook'] ?? null) ? $oauth['facebook'] : [];
     $apple = is_array($oauth['apple'] ?? null) ? $oauth['apple'] : [];
-    $auth0 = is_array($oauth['auth0'] ?? null) ? $oauth['auth0'] : [];
     $relay = is_array($config['relay'] ?? null) ? $config['relay'] : [];
     $webrtc = is_array($config['webrtc'] ?? null) ? $config['webrtc'] : [];
 
@@ -452,9 +441,6 @@ function loadExistingConfig(string $configPath): ?array
         'facebook_app_secret' => (string)($facebook['app_secret'] ?? $facebook['client_secret'] ?? ''),
         'apple_client_id' => (string)($apple['client_id'] ?? ''),
         'apple_client_secret' => (string)($apple['client_secret'] ?? ''),
-        'auth0_domain' => (string)($auth0['auth0_domain'] ?? $auth0['domain'] ?? ''),
-        'auth0_client_id' => (string)($auth0['client_id'] ?? ''),
-        'auth0_client_secret' => (string)($auth0['client_secret'] ?? ''),
     ];
 }
 
@@ -767,11 +753,6 @@ function defaultXmppDomain(): string
     return preg_replace('/:\d+$/', '', $host) ?: 'localhost';
 }
 
-function defaultAuth0RedirectUri(): string
-{
-    return defaultProviderRedirectUri('auth0');
-}
-
 function defaultProviderRedirectUri(string $provider): string
 {
     $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
@@ -945,10 +926,6 @@ function renderInstallPage(array $state, array $messages, array $errors, bool $i
           <?= input('apple_client_id', 'Apple client ID', $state['apple_client_id'], 'text', 'full') ?>
           <?= input('apple_client_secret', 'Apple client secret', $state['apple_client_secret'], 'password', 'full') ?>
           <p class="small full">Apple callback: <code><?= e(defaultProviderRedirectUri('apple')) ?></code></p>
-          <?= input('auth0_domain', 'Auth0 domein', $state['auth0_domain'], 'text', 'full') ?>
-          <?= input('auth0_client_id', 'Auth0 client ID', $state['auth0_client_id'], 'text', 'full') ?>
-          <?= input('auth0_client_secret', 'Auth0 client secret', $state['auth0_client_secret'], 'password', 'full') ?>
-          <p class="small full">Auth0 callback: <code><?= e(defaultAuth0RedirectUri()) ?></code></p>
         </div>
       </fieldset>
 

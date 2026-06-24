@@ -264,14 +264,15 @@
 - Web admin panel `admin.php` shows server status, account usage, recent logs
   and early subscription/account-status controls guarded by an installer-created
   admin account, with admin token support kept as an emergency fallback.
-- Auth0 can now be configured as an OpenID Connect login provider alongside
-  Google, Facebook and Apple.
-- The web installer now collects Google, Facebook, Apple and Auth0 provider
+- The web installer now collects Google, Facebook and Apple provider
   IDs/secrets and writes the matching OAuth callback configuration.
 - The web client now exposes Facebook sign-in plus account linking/unlinking in
   the account security dialog, matching the existing Google social-login flow.
 - Social login buttons now use provider-style Google and Facebook logo buttons
   instead of plain letter badges.
+- Auth0 has been removed from the web login UI, installer and supported social
+  provider documentation; TeleTypTel now focuses social login on Google,
+  Facebook and Apple.
 - The web admin panel now shows ejabberd/XMPP and SIP gateway readiness,
   including SIP/SIPS port checks for future ejabberd_sip/mod_sip work.
 - The web installer now disables itself after a successful installation by
