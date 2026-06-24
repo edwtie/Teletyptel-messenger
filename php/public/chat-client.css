@@ -948,6 +948,12 @@ body.account-gate .modal-shell {
 }
 
 .social-login-button {
+  --social-button-border: var(--border-strong);
+  --social-button-bg: var(--surface);
+  --social-button-color: var(--text);
+  --social-button-hover-border: var(--social-button-border);
+  --social-button-hover-bg: var(--social-button-bg);
+  --social-button-hover-color: var(--social-button-color);
   width: 44px;
   height: 44px;
   flex: 0 0 44px;
@@ -955,18 +961,19 @@ body.account-gate .modal-shell {
   align-items: center;
   justify-content: center;
   min-height: 44px;
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--social-button-border);
   border-radius: 999px;
-  background: var(--surface);
-  color: var(--text);
+  background: var(--social-button-bg);
+  color: var(--social-button-color);
   font-weight: 700;
   padding: 0;
 }
 
 .social-login-button:hover,
 .social-login-button:focus-visible {
-  border-color: var(--accent);
-  background: var(--surface-strong);
+  border-color: var(--social-button-hover-border);
+  background: var(--social-button-hover-bg);
+  color: var(--social-button-hover-color);
 }
 
 .social-login-mark {
@@ -987,10 +994,17 @@ body.account-gate .modal-shell {
 }
 
 .google-login-button {
+  --google-button-border: #747775;
+  --google-button-bg: #fff;
+  --google-button-text: #1f1f1f;
+  --google-button-hover-ring: #d2e3fc;
+  --social-button-border: var(--google-button-border);
+  --social-button-bg: var(--google-button-bg);
+  --social-button-color: var(--google-button-text);
+  --social-button-hover-border: var(--google-button-border);
+  --social-button-hover-bg: var(--google-button-bg);
+  --social-button-hover-color: var(--google-button-text);
   justify-content: center;
-  border-color: #747775;
-  background: #fff;
-  color: #1f1f1f;
   font-family: Roboto, Arial, sans-serif;
   font-size: 14px;
   font-weight: 500;
@@ -999,9 +1013,7 @@ body.account-gate .modal-shell {
 
 .google-login-button:hover,
 .google-login-button:focus-visible {
-  border-color: #747775;
-  background: #fff;
-  box-shadow: 0 0 0 2px #d2e3fc;
+  box-shadow: 0 0 0 2px var(--google-button-hover-ring);
 }
 
 .google-login-mark {
@@ -1012,29 +1024,35 @@ body.account-gate .modal-shell {
 .facebook-login-mark {
   border: 0;
   background: transparent;
-  color: #1877f2;
+  color: var(--facebook-blue);
 }
 
 .facebook-login-glyph {
-  fill: #1877f2;
+  fill: var(--facebook-glyph-color);
 }
 
 .facebook-login-button {
-  border-color: #747775;
-  background: #fff;
-  color: #1877f2;
+  --facebook-blue: #1877f2;
+  --facebook-blue-hover: #166fe5;
+  --facebook-button-border: #747775;
+  --facebook-button-bg: #fff;
+  --facebook-glyph-color: var(--facebook-blue);
+  --social-button-border: var(--facebook-button-border);
+  --social-button-bg: var(--facebook-button-bg);
+  --social-button-color: var(--facebook-blue);
+  --social-button-hover-border: var(--facebook-blue-hover);
+  --social-button-hover-bg: var(--facebook-blue-hover);
+  --social-button-hover-color: #fff;
 }
 
 .facebook-login-button:hover,
 .facebook-login-button:focus-visible {
-  border-color: #166fe5;
-  background: #166fe5;
-  color: #fff;
+  --facebook-glyph-color: #fff;
 }
 
 .facebook-login-button:hover .facebook-login-glyph,
 .facebook-login-button:focus-visible .facebook-login-glyph {
-  fill: #fff;
+  fill: var(--facebook-glyph-color);
 }
 
 .profile-dialog .account-auth-section,
