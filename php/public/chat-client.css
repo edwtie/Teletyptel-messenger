@@ -925,6 +925,17 @@ body.account-gate .modal-shell {
   display: none;
 }
 
+.google-sdk-login-wrap.sdk-ready:hover .google-login-button,
+.google-sdk-login-wrap.sdk-ready:focus-within .google-login-button {
+  display: inline-flex;
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  border-color: #202124;
+  background: #202124;
+  box-shadow: 0 0 0 2px #d2e3fc;
+}
+
 .google-sdk-login-button > div,
 .google-sdk-login-button iframe {
   max-width: 100%;
@@ -1030,8 +1041,8 @@ body.account-gate .modal-shell {
 }
 
 .google-login-button:hover {
-  --social-button-hover-border: var(--google-button-border);
-  --social-button-hover-bg: var(--google-button-bg);
+  --social-button-hover-border: var(--google-button-focus-border);
+  --social-button-hover-bg: var(--google-button-focus-bg);
   box-shadow: 0 0 0 2px var(--google-button-hover-ring);
 }
 
