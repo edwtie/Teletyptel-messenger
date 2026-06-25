@@ -162,6 +162,30 @@ button:disabled {
   flex: 0 0 38px;
 }
 
+.top-actions .top-icon-button:hover:not(:disabled) .material-icon,
+.top-actions .top-icon-button:focus-visible .material-icon,
+.top-actions .top-icon-button.selected .material-icon,
+.top-actions .top-icon-button:hover:not(:disabled) .material-icon-svg,
+.top-actions .top-icon-button:focus-visible .material-icon-svg,
+.top-actions .top-icon-button.selected .material-icon-svg {
+  color: #ffffff;
+  fill: #ffffff;
+}
+
+.top-menu[open] summary .contrast-symbol,
+.top-menu summary:hover .contrast-symbol,
+.top-menu summary:focus-visible .contrast-symbol {
+  border-color: #ffffff;
+  background: transparent;
+  color: #ffffff;
+}
+
+.top-menu[open] summary .contrast-symbol span,
+.top-menu summary:hover .contrast-symbol span,
+.top-menu summary:focus-visible .contrast-symbol span {
+  background: #ffffff;
+}
+
 .logout-icon-button {
   margin-left: 2px;
   margin-right: 2px;
