@@ -1160,10 +1160,29 @@ select.server-setting-readonly {
   opacity: 1;
 }
 
-.icon-button.call-mode-button:hover:not(:disabled),
+.icon-button.call-mode-button:hover:not(:disabled) {
+  background: var(--accent-strong);
+  color: #ffffff;
+}
+
+.icon-button.call-mode-button.selected {
+  background: var(--accent-strong);
+  color: #ffffff;
+}
+
 .icon-button.call-media-icon-button:hover:not(:disabled) {
   background: #dbeafe;
   color: #0f3f7c;
+}
+
+.icon-button.call-mode-button:hover:not(:disabled) .material-icon,
+.icon-button.call-mode-button:focus-visible .material-icon,
+.icon-button.call-mode-button.selected .material-icon,
+.icon-button.call-mode-button:hover:not(:disabled) .material-icon-svg,
+.icon-button.call-mode-button:focus-visible .material-icon-svg,
+.icon-button.call-mode-button.selected .material-icon-svg {
+  color: #ffffff;
+  fill: #ffffff;
 }
 
 .icon-label-button {
