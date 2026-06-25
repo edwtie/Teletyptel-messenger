@@ -197,8 +197,16 @@ button:disabled {
 .logout-icon-button:hover:not(:disabled),
 .logout-icon-button:focus-visible {
   border-color: #ef4444 !important;
-  background: #fee2e2 !important;
-  color: #991b1b !important;
+  background: #ef4444 !important;
+  color: #ffffff !important;
+}
+
+.logout-icon-button:hover:not(:disabled) .material-icon,
+.logout-icon-button:focus-visible .material-icon,
+.logout-icon-button:hover:not(:disabled) .material-icon-svg,
+.logout-icon-button:focus-visible .material-icon-svg {
+  color: #ffffff !important;
+  fill: #ffffff !important;
 }
 
 .logout-icon-button:disabled {
