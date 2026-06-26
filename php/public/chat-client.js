@@ -13799,13 +13799,17 @@
       name.textContent = member.name;
       const jid = document.createElement("span");
       jid.textContent = member.jid;
-      identity.append(name, jid);
+      const status = document.createElement("span");
+      status.className = "group-known-member-status";
+      status.textContent = groupMemberStatusText(member);
+      identity.append(name, jid, status);
 
       const actions = document.createElement("div");
       actions.className = "group-known-member-actions";
       const addButton = document.createElement("button");
       addButton.type = "button";
       addButton.textContent = t("button.group_add_member", "Add member");
+      addButton.disabled = member.isMember || member.isAdmin || member.isOwner;
       addButton.addEventListener("click", () => {
         el.groupMemberJidInput.value = member.jid;
         setGroupAffiliationFromDialog(member.jid, "member", t("group.member_added", "Member added."), true);
@@ -13813,6 +13817,7 @@
       const adminButton = document.createElement("button");
       adminButton.type = "button";
       adminButton.textContent = t("button.group_make_admin", "Make admin");
+      adminButton.disabled = member.isAdmin || member.isOwner;
       adminButton.addEventListener("click", () => {
         el.groupAdminJidInput.value = member.jid;
         setGroupAffiliationFromDialog(member.jid, "admin", t("group.admin_added", "Group admin assigned."), false);
@@ -13823,18 +13828,40 @@
     }
   }
 
+  function groupMemberStatusText(member) {
+    if (member.isOwner) {
+      return t("group.status_owner", "Owner");
+    }
+
+    if (member.isAdmin) {
+      return t("group.status_admin", "Admin");
+    }
+
+    if (member.isMember) {
+      return t("group.status_member", "Member");
+    }
+
+    return t("group.status_seen", "Written in group");
+  }
+
   function knownGroupMembers(conversation) {
     const members = new Map();
-    const add = (jid, name = "") => {
+    const memberJids = new Set((conversation?.groupMemberJids || []).map((jid) => bareJid(jid)).filter(Boolean));
+    const adminJids = new Set((conversation?.groupAdminJids || []).map((jid) => bareJid(jid)).filter(Boolean));
+    const ownerJid = bareJid(conversation?.groupOwnerJid || "");
+    const add = (jid, name = "", flags = {}) => {
       const normalized = bareJid(jid);
-      if (!normalized || normalized === bareJid(conversation?.peer || "") || isOwnPeer(normalized)) {
+      if (!normalized || normalized === bareJid(conversation?.peer || "")) {
         return;
       }
 
       const previous = members.get(normalized);
       members.set(normalized, {
         jid: normalized,
-        name: name || previous?.name || displayNameForJid(normalized)
+        name: name || previous?.name || displayNameForJid(normalized),
+        isMember: previous?.isMember || flags.isMember || memberJids.has(normalized),
+        isAdmin: previous?.isAdmin || flags.isAdmin || adminJids.has(normalized),
+        isOwner: previous?.isOwner || flags.isOwner || normalized === ownerJid
       });
     };
 
@@ -13844,10 +13871,13 @@
       }
     }
 
-    add(currentFromJid(), currentSenderName());
-    add(conversation?.groupOwnerJid, currentSenderName());
+    add(currentFromJid(), currentSenderName(), { isOwner: jidMatches(currentFromJid(), conversation?.groupOwnerJid || "") });
+    add(conversation?.groupOwnerJid, currentSenderName(), { isOwner: true });
+    for (const jid of conversation?.groupMemberJids || []) {
+      add(jid, jidMatches(jid, currentFromJid()) ? currentSenderName() : "", { isMember: true });
+    }
     for (const jid of conversation?.groupAdminJids || []) {
-      add(jid, jidMatches(jid, currentFromJid()) ? currentSenderName() : "");
+      add(jid, jidMatches(jid, currentFromJid()) ? currentSenderName() : "", { isAdmin: true });
     }
 
     for (const message of conversation?.messages || []) {
@@ -13950,8 +13980,45 @@
     if (sent && inviteAfterSet) {
       sendXmppDirectInvite(jid, conversation.peer);
     }
+    if (sent) {
+      rememberGroupAffiliation(conversation, jid, affiliation);
+      renderKnownGroupMembers(conversation);
+    }
 
     setGroupManagementStatus(sent ? successText : t("group.admin_action_failed", "Group management command could not be sent."), sent ? "good" : "danger");
+  }
+
+  function rememberGroupAffiliation(conversation, jid, affiliation) {
+    const normalized = bareJid(jid);
+    if (!conversation || !normalized) {
+      return;
+    }
+
+    const members = new Set((conversation.groupMemberJids || []).map((item) => bareJid(item)).filter(Boolean));
+    const admins = new Set((conversation.groupAdminJids || []).map((item) => bareJid(item)).filter(Boolean));
+    if (affiliation === "owner") {
+      conversation.groupOwnerJid = normalized;
+      members.add(normalized);
+      admins.add(normalized);
+    } else if (affiliation === "admin") {
+      members.add(normalized);
+      admins.add(normalized);
+    } else if (affiliation === "member") {
+      members.add(normalized);
+      admins.delete(normalized);
+      if (jidMatches(conversation.groupOwnerJid || "", normalized)) {
+        conversation.groupOwnerJid = "";
+      }
+    } else if (affiliation === "none" || affiliation === "outcast") {
+      members.delete(normalized);
+      admins.delete(normalized);
+      if (jidMatches(conversation.groupOwnerJid || "", normalized)) {
+        conversation.groupOwnerJid = "";
+      }
+    }
+
+    conversation.groupMemberJids = [...members];
+    conversation.groupAdminJids = [...admins];
   }
 
   function sendXmppRoomConfig(roomPeer, fields) {

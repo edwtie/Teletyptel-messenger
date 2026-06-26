@@ -842,6 +842,11 @@ body.account-gate .modal-shell {
   font-size: 13px;
 }
 
+.group-known-member-identity .group-known-member-status {
+  color: var(--accent);
+  font-weight: 700;
+}
+
 .group-known-member-actions {
   display: flex;
   gap: 6px;
