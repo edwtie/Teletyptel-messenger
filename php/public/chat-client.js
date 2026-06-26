@@ -470,6 +470,7 @@
     sessionLastActivityAt: Date.now(),
     sessionLastActivityRecordedAt: 0,
     sessionTimeoutInProgress: false,
+    groupManagementConversationId: null,
     conversations: [
       {
         id: "tester",
@@ -533,9 +534,22 @@
     conversationContextMenu: byId("conversationContextMenu"),
     contextProfileButton: byId("contextProfileButton"),
     contextRoomAvatarButton: byId("contextRoomAvatarButton"),
+    contextGroupManageButton: byId("contextGroupManageButton"),
     contextMuteNotificationsButton: byId("contextMuteNotificationsButton"),
     contextBlockButton: byId("contextBlockButton"),
     mucAvatarFileInput: byId("mucAvatarFileInput"),
+    groupManagementDialog: byId("groupManagementDialog"),
+    groupManagementSubtitle: byId("groupManagementSubtitle"),
+    groupMembersCanInviteToggle: byId("groupMembersCanInviteToggle"),
+    groupApproveMembersToggle: byId("groupApproveMembersToggle"),
+    groupMemberJidInput: byId("groupMemberJidInput"),
+    groupAdminJidInput: byId("groupAdminJidInput"),
+    groupAddMemberButton: byId("groupAddMemberButton"),
+    groupMakeAdminButton: byId("groupMakeAdminButton"),
+    groupRemoveAdminButton: byId("groupRemoveAdminButton"),
+    groupManagementStatus: byId("groupManagementStatus"),
+    closeGroupManagementButton: byId("closeGroupManagementButton"),
+    groupManagementOkButton: byId("groupManagementOkButton"),
     contactProfileDialog: byId("contactProfileDialog"),
     contactProfileTitle: byId("contactProfileTitle"),
     contactProfileSubtitle: byId("contactProfileSubtitle"),
@@ -894,10 +908,19 @@
     el.activeConversationAvatar.addEventListener("keydown", handleActiveConversationAvatarKeydown);
     el.contextProfileButton.addEventListener("click", openContextConversationProfile);
     el.contextRoomAvatarButton.addEventListener("click", chooseContextRoomAvatar);
+    el.contextGroupManageButton.addEventListener("click", openContextGroupManagement);
     el.contextMuteNotificationsButton.addEventListener("click", toggleMuteContextConversationNotifications);
     el.contextBlockButton.addEventListener("click", toggleBlockContextConversation);
     el.mucAvatarFileInput.addEventListener("change", handleMucAvatarFileSelected);
     el.conversationContextMenu.addEventListener("click", (event) => event.stopPropagation());
+    el.closeGroupManagementButton.addEventListener("click", closeGroupManagementDialog);
+    el.groupManagementOkButton.addEventListener("click", closeGroupManagementDialog);
+    el.groupManagementDialog.addEventListener("click", closeGroupManagementDialogOnBackdrop);
+    el.groupMembersCanInviteToggle.addEventListener("change", applyGroupRoomOptionsFromDialog);
+    el.groupApproveMembersToggle.addEventListener("change", applyGroupRoomOptionsFromDialog);
+    el.groupAddMemberButton.addEventListener("click", addGroupMemberFromDialog);
+    el.groupMakeAdminButton.addEventListener("click", makeGroupAdminFromDialog);
+    el.groupRemoveAdminButton.addEventListener("click", removeGroupAdminFromDialog);
     el.closeContactProfileButton.addEventListener("click", closeContactProfileDialog);
     el.contactProfileOkButton.addEventListener("click", closeContactProfileDialog);
     el.contactProfileDialog.addEventListener("click", closeContactProfileDialogOnBackdrop);
@@ -13478,6 +13501,7 @@
       state.relaySocket.send(JSON.stringify(envelope));
       appendDebug("relay-out", JSON.stringify(redactEnvelopeForLog(envelope)));
     }
+    sendXmppDirectInvite(contact.peer, group.peer);
 
     setConnectionStatus(statusText, "good");
     appendDebug("invite", `${statusText} (${contactText})`);
@@ -13584,10 +13608,13 @@
     const blocked = isBlockedConversation(conversation);
     const muted = isNotificationMutedConversation(conversation);
     const canChangeRoomAvatar = canChangeMucAvatar(conversation);
+    const canManageGroup = canManageGroupConversation(conversation);
     el.contextProfileButton.hidden = !canViewProfile;
     el.contextProfileButton.disabled = !canViewProfile;
     el.contextRoomAvatarButton.hidden = !canChangeRoomAvatar;
     el.contextRoomAvatarButton.disabled = !canChangeRoomAvatar;
+    el.contextGroupManageButton.hidden = !canManageGroup;
+    el.contextGroupManageButton.disabled = !canManageGroup;
     el.contextMuteNotificationsButton.disabled = !canMute;
     el.contextMuteNotificationsButton.hidden = !canMute;
     el.contextMuteNotificationsButton.textContent = muted
@@ -13622,7 +13649,8 @@
     return canViewContactProfile(conversation)
       || canMuteConversationNotifications(conversation)
       || canBlockConversation(conversation)
-      || canChangeMucAvatar(conversation);
+      || canChangeMucAvatar(conversation)
+      || canManageGroupConversation(conversation);
   }
 
   function canViewContactProfile(conversation) {
@@ -13636,6 +13664,159 @@
     return Boolean(conversation)
       && conversation.kind === "group"
       && !isBlockedConversation(conversation);
+  }
+
+  function canManageGroupConversation(conversation) {
+    return Boolean(conversation)
+      && conversation.kind === "group"
+      && !isBlockedConversation(conversation);
+  }
+
+  function openContextGroupManagement() {
+    const conversation = state.conversations.find((item) => item.id === state.contextConversationId) ?? null;
+    if (!canManageGroupConversation(conversation)) {
+      return;
+    }
+
+    closeConversationContextMenu();
+    openGroupManagementDialog(conversation);
+  }
+
+  function openGroupManagementDialog(conversation) {
+    state.groupManagementConversationId = conversation.id;
+    el.groupManagementSubtitle.textContent = `${conversationDisplayName(conversation)} - ${bareJid(conversation.peer)}`;
+    el.groupMembersCanInviteToggle.checked = conversation.groupMembersCanInvite !== false;
+    el.groupApproveMembersToggle.checked = conversation.groupApproveMembers === true;
+    el.groupMemberJidInput.value = "";
+    el.groupAdminJidInput.value = "";
+    setGroupManagementStatus(t("group.manage_ready", "Choose what group members and admins may do."), "info");
+    el.groupManagementDialog.hidden = false;
+  }
+
+  function closeGroupManagementDialog() {
+    el.groupManagementDialog.hidden = true;
+  }
+
+  function closeGroupManagementDialogOnBackdrop(event) {
+    if (event.target === el.groupManagementDialog) {
+      closeGroupManagementDialog();
+    }
+  }
+
+  function groupManagementConversation() {
+    const id = state.groupManagementConversationId || state.contextConversationId || state.activeConversationId;
+    return state.conversations.find((conversation) => conversation.id === id && conversation.kind === "group") ?? null;
+  }
+
+  function setGroupManagementStatus(text, level = "info") {
+    el.groupManagementStatus.textContent = text;
+    el.groupManagementStatus.dataset.level = level;
+  }
+
+  function applyGroupRoomOptionsFromDialog() {
+    const conversation = groupManagementConversation();
+    if (!canManageGroupConversation(conversation)) {
+      setGroupManagementStatus(t("status.select_group_first", "Select a group first"), "warn");
+      return;
+    }
+
+    const approveMembers = el.groupApproveMembersToggle.checked;
+    const membersCanInvite = el.groupMembersCanInviteToggle.checked;
+    conversation.groupApproveMembers = approveMembers;
+    conversation.groupMembersCanInvite = membersCanInvite;
+    const sent = sendXmppRoomConfig(conversation.peer, {
+      "muc#roomconfig_membersonly": approveMembers ? "1" : "0",
+      "muc#roomconfig_allowinvites": membersCanInvite ? "1" : "0"
+    });
+    setGroupManagementStatus(sent
+      ? t("group.room_options_sent", "Group settings sent to ejabberd.")
+      : t("group.room_options_failed", "Group settings could not be sent."), sent ? "good" : "danger");
+  }
+
+  function addGroupMemberFromDialog() {
+    const jid = normalizedGroupDialogJid(el.groupMemberJidInput.value);
+    if (!jid) {
+      setGroupManagementStatus(t("group.enter_member_jid", "Enter a member JID."), "warn");
+      return;
+    }
+
+    setGroupAffiliationFromDialog(jid, "member", t("group.member_added", "Member added."), true);
+  }
+
+  function makeGroupAdminFromDialog() {
+    const jid = normalizedGroupDialogJid(el.groupAdminJidInput.value);
+    if (!jid) {
+      setGroupManagementStatus(t("group.enter_admin_jid", "Enter an admin JID."), "warn");
+      return;
+    }
+
+    setGroupAffiliationFromDialog(jid, "admin", t("group.admin_added", "Group admin assigned."), false);
+  }
+
+  function removeGroupAdminFromDialog() {
+    const jid = normalizedGroupDialogJid(el.groupAdminJidInput.value);
+    if (!jid) {
+      setGroupManagementStatus(t("group.enter_admin_jid", "Enter an admin JID."), "warn");
+      return;
+    }
+
+    setGroupAffiliationFromDialog(jid, "member", t("group.admin_removed", "Group admin changed back to member."), false);
+  }
+
+  function normalizedGroupDialogJid(value) {
+    const jid = bareJid(String(value || "").trim());
+    return jid && jid.includes("@") ? jid : "";
+  }
+
+  function setGroupAffiliationFromDialog(jid, affiliation, successText, inviteAfterSet) {
+    const conversation = groupManagementConversation();
+    if (!canManageGroupConversation(conversation)) {
+      setGroupManagementStatus(t("status.select_group_first", "Select a group first"), "warn");
+      return;
+    }
+
+    const sent = sendXmppMucAffiliation(conversation.peer, jid, affiliation);
+    if (sent && inviteAfterSet) {
+      sendXmppDirectInvite(jid, conversation.peer);
+    }
+
+    setGroupManagementStatus(sent ? successText : t("group.admin_action_failed", "Group management command could not be sent."), sent ? "good" : "danger");
+  }
+
+  function sendXmppRoomConfig(roomPeer, fields) {
+    const room = bareJid(roomPeer);
+    if (!room) {
+      return false;
+    }
+
+    const fieldXml = Object.entries(fields)
+      .map(([name, value]) => `<field var="${escapeXml(name)}"><value>${escapeXml(value)}</value></field>`)
+      .join("");
+    const id = createShortId();
+    const xml = `<iq xmlns="jabber:client" type="set" to="${escapeXml(room)}" id="${escapeXml(id)}"><query xmlns="http://jabber.org/protocol/muc#owner"><x xmlns="jabber:x:data" type="submit"><field var="FORM_TYPE" type="hidden"><value>http://jabber.org/protocol/muc#roomconfig</value></field>${fieldXml}</x></query></iq>`;
+    return sendXmppStanza(xml, `<iq type="set" to="${escapeXml(room)}" muc-roomconfig="partial"/>`);
+  }
+
+  function sendXmppMucAffiliation(roomPeer, jid, affiliation) {
+    const room = bareJid(roomPeer);
+    if (!room || !jid || !affiliation) {
+      return false;
+    }
+
+    const id = createShortId();
+    const xml = `<iq xmlns="jabber:client" type="set" to="${escapeXml(room)}" id="${escapeXml(id)}"><query xmlns="http://jabber.org/protocol/muc#admin"><item jid="${escapeXml(jid)}" affiliation="${escapeXml(affiliation)}"/></query></iq>`;
+    return sendXmppStanza(xml, `<iq type="set" to="${escapeXml(room)}" muc-affiliation="${escapeXml(affiliation)}" jid="${escapeXml(jid)}"/>`);
+  }
+
+  function sendXmppDirectInvite(jid, roomPeer) {
+    const room = bareJid(roomPeer);
+    if (!jid || !room) {
+      return false;
+    }
+
+    const reason = t("message.group_invite_reason", "You are invited to this TeleTypTel group.");
+    const xml = `<message xmlns="jabber:client" to="${escapeXml(jid)}"><x xmlns="jabber:x:conference" jid="${escapeXml(room)}" reason="${escapeXml(reason)}"/></message>`;
+    return sendXmppStanza(xml, `<message to="${escapeXml(jid)}" direct-invite="${escapeXml(room)}"/>`);
   }
 
   function chooseContextRoomAvatar() {

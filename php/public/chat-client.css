@@ -749,6 +749,77 @@ body.account-gate .modal-shell {
   width: min(520px, calc(100vw - 32px));
 }
 
+.group-management-card {
+  width: min(640px, calc(100vw - 32px));
+}
+
+.group-management-body {
+  display: grid;
+  gap: 14px;
+}
+
+.group-management-section {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-strong);
+  padding: 12px;
+}
+
+.group-management-section h3 {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.group-management-toggle,
+.group-management-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.group-management-toggle strong {
+  display: block;
+  color: var(--text);
+}
+
+.group-management-toggle small {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.group-management-toggle input {
+  width: 22px;
+  height: 22px;
+}
+
+.group-management-row {
+  grid-template-columns: minmax(180px, 1fr) auto auto;
+}
+
+.group-management-row input {
+  min-width: 0;
+}
+
+@media (max-width: 640px) {
+  .group-management-toggle,
+  .group-management-row {
+    grid-template-columns: 1fr;
+  }
+
+  .group-management-toggle input,
+  .group-management-row button {
+    justify-self: start;
+  }
+}
+
 .contact-profile-body {
   display: grid;
   gap: 14px;

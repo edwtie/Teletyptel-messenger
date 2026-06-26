@@ -4,6 +4,9 @@
 
 ### Added
 
+- Web group management dialog for XMPP MUC rooms: member approval/members-only
+  room options, member invites and assigning or removing group admins via MUC
+  affiliations.
 - Settings now include an inactivity sign-out toggle, so 24-hour reachable
   users can keep TeleTypTel open without automatic timeout.
 - Public TeleTypTel branding pass for the web package, Windows demo language

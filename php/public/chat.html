@@ -15,7 +15,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="favicon.ico" sizes="any">
   <link rel="apple-touch-icon" href="assets/brand/teletyptel-icon-192.png">
-  <link rel="stylesheet" href="chat-client.css?v=20260625-logout-hover-contrast">
+  <link rel="stylesheet" href="chat-client.css?v=20260626-group-management">
 </head>
 <body class="account-booting">
   <a class="skip-link" href="#messageInput" data-i18n="button.skip_to_message">Skip to message</a>
@@ -1066,10 +1066,64 @@
   <div id="conversationContextMenu" class="context-menu" hidden role="menu" aria-label="Contact menu">
     <button id="contextProfileButton" type="button" role="menuitem" data-i18n="button.view_profile">View profile</button>
     <button id="contextRoomAvatarButton" type="button" role="menuitem" data-i18n="button.group_avatar">Group avatar...</button>
+    <button id="contextGroupManageButton" type="button" role="menuitem" data-i18n="button.group_manage">Group management...</button>
     <button id="contextMuteNotificationsButton" type="button" role="menuitem" data-i18n="button.mute_notifications">Mute notifications</button>
     <button id="contextBlockButton" class="danger-action" type="button" role="menuitem" data-i18n="button.block_contact">Block</button>
   </div>
   <input id="mucAvatarFileInput" class="file-input" type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" aria-label="Choose group avatar" data-i18n-aria-label="button.group_avatar">
+
+  <div id="groupManagementDialog" class="modal-shell group-management-dialog" hidden role="dialog" aria-modal="true" aria-labelledby="groupManagementTitle">
+    <div class="modal-card group-management-card">
+      <div class="modal-header">
+        <div>
+          <h2 id="groupManagementTitle" data-i18n="group.manage_title">Group management</h2>
+          <span id="groupManagementSubtitle">support@conference.localhost</span>
+        </div>
+        <button id="closeGroupManagementButton" class="icon-button" type="button" aria-label="Close" data-i18n-aria-label="button.close">x</button>
+      </div>
+      <div class="modal-body group-management-body">
+        <section class="group-management-section">
+          <h3 data-i18n="group.members_can">Members can</h3>
+          <label class="group-management-toggle">
+            <span>
+              <strong data-i18n="group.members_add">Add other members</strong>
+              <small data-i18n="group.members_add_text">When this is off, only group admins can add members.</small>
+            </span>
+            <input id="groupMembersCanInviteToggle" type="checkbox">
+          </label>
+        </section>
+        <section class="group-management-section">
+          <h3 data-i18n="group.admins_can">Admins can</h3>
+          <label class="group-management-toggle">
+            <span>
+              <strong data-i18n="group.approve_members">Approve new members</strong>
+              <small data-i18n="group.approve_members_text">When this is on, new users must be added to the members list before they can join.</small>
+            </span>
+            <input id="groupApproveMembersToggle" type="checkbox">
+          </label>
+        </section>
+        <section class="group-management-section">
+          <h3 data-i18n="group.members">Members</h3>
+          <div class="group-management-row">
+            <input id="groupMemberJidInput" type="email" placeholder="member@localhost" data-i18n-placeholder="group.member_jid_placeholder">
+            <button id="groupAddMemberButton" type="button" data-i18n="button.group_add_member">Add member</button>
+          </div>
+        </section>
+        <section class="group-management-section">
+          <h3 data-i18n="group.admins">Group admins</h3>
+          <div class="group-management-row">
+            <input id="groupAdminJidInput" type="email" placeholder="admin@localhost" data-i18n-placeholder="group.admin_jid_placeholder">
+            <button id="groupMakeAdminButton" type="button" data-i18n="button.group_make_admin">Make admin</button>
+            <button id="groupRemoveAdminButton" type="button" data-i18n="button.group_remove_admin">Remove admin</button>
+          </div>
+        </section>
+        <div id="groupManagementStatus" class="dialog-status" role="status" aria-live="polite"></div>
+      </div>
+      <div class="modal-actions">
+        <button id="groupManagementOkButton" type="button" data-i18n="button.close">Close</button>
+      </div>
+    </div>
+  </div>
 
   <div id="contactProfileDialog" class="modal-shell contact-profile-dialog" hidden role="dialog" aria-modal="true" aria-labelledby="contactProfileTitle">
     <div class="modal-card contact-profile-card">
