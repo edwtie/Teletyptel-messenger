@@ -6058,6 +6058,11 @@
 
   function openActiveConversationAvatarProfile() {
     const conversation = activeConversation();
+    if (canManageGroupConversation(conversation)) {
+      openGroupManagementDialog(conversation);
+      return;
+    }
+
     if (canViewContactProfile(conversation)) {
       openContactProfileDialog(conversation);
       return;
@@ -13214,9 +13219,11 @@
   }
 
   function syncActiveConversationAvatarButton(conversation) {
-    const label = canViewContactProfile(conversation)
-      ? t("button.view_profile", "View profile")
-      : t("button.profile", "Profile");
+    const label = canManageGroupConversation(conversation)
+      ? t("button.group_manage", "Group management...")
+      : (canViewContactProfile(conversation)
+        ? t("button.view_profile", "View profile")
+        : t("button.profile", "Profile"));
     el.activeConversationAvatar.classList.add("avatar-clickable");
     el.activeConversationAvatar.removeAttribute("aria-hidden");
     el.activeConversationAvatar.setAttribute("role", "button");
