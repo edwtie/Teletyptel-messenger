@@ -15,7 +15,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="favicon.ico" sizes="any">
   <link rel="apple-touch-icon" href="assets/brand/teletyptel-icon-192.png">
-  <link rel="stylesheet" href="chat-client.css?v=20260626-group-management">
+  <link rel="stylesheet" href="chat-client.css?v=20260626-known-group-members">
 </head>
 <body class="account-booting">
   <a class="skip-link" href="#messageInput" data-i18n="button.skip_to_message">Skip to message</a>
@@ -1109,17 +1109,22 @@
         <section class="group-management-section">
           <h3 data-i18n="group.members">Members</h3>
           <div class="group-management-row">
-            <input id="groupMemberJidInput" type="email" placeholder="member@localhost" data-i18n-placeholder="group.member_jid_placeholder">
+            <input id="groupMemberJidInput" type="email" list="groupKnownMembersList" placeholder="member@localhost" data-i18n-placeholder="group.member_jid_placeholder">
             <button id="groupAddMemberButton" type="button" data-i18n="button.group_add_member">Add member</button>
           </div>
         </section>
         <section class="group-management-section">
           <h3 data-i18n="group.admins">Group admins</h3>
           <div class="group-management-row">
-            <input id="groupAdminJidInput" type="email" placeholder="admin@localhost" data-i18n-placeholder="group.admin_jid_placeholder">
+            <input id="groupAdminJidInput" type="email" list="groupKnownMembersList" placeholder="admin@localhost" data-i18n-placeholder="group.admin_jid_placeholder">
             <button id="groupMakeAdminButton" type="button" data-i18n="button.group_make_admin">Make admin</button>
             <button id="groupRemoveAdminButton" type="button" data-i18n="button.group_remove_admin">Remove admin</button>
           </div>
+        </section>
+        <section class="group-management-section">
+          <h3 data-i18n="group.known_members">Known members</h3>
+          <div id="groupKnownMembersPanel" class="group-known-members"></div>
+          <datalist id="groupKnownMembersList"></datalist>
         </section>
         <div id="groupManagementStatus" class="dialog-status" role="status" aria-live="polite"></div>
       </div>
@@ -1195,6 +1200,6 @@
 
   <script src="vendor/qrcode.js?v=20260623-history-privacy-copy"></script>
   <script src="jingle-history.js?v=20260615-jingle-history"></script>
-  <script src="chat-client.js?v=20260626-profile-email-field"></script>
+  <script src="chat-client.js?v=20260626-known-group-members"></script>
 </body>
 </html>

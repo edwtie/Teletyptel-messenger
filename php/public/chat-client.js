@@ -547,6 +547,8 @@
     groupAddMemberButton: byId("groupAddMemberButton"),
     groupMakeAdminButton: byId("groupMakeAdminButton"),
     groupRemoveAdminButton: byId("groupRemoveAdminButton"),
+    groupKnownMembersPanel: byId("groupKnownMembersPanel"),
+    groupKnownMembersList: byId("groupKnownMembersList"),
     groupManagementStatus: byId("groupManagementStatus"),
     closeGroupManagementButton: byId("closeGroupManagementButton"),
     groupManagementOkButton: byId("groupManagementOkButton"),
@@ -13707,6 +13709,7 @@
     el.groupApproveMembersToggle.checked = conversation.groupApproveMembers === true;
     el.groupMemberJidInput.value = "";
     el.groupAdminJidInput.value = "";
+    renderKnownGroupMembers(conversation);
     setGroupManagementStatus(t("group.manage_ready", "Choose what group members and admins may do."), "info");
     el.groupManagementDialog.hidden = false;
   }
@@ -13749,6 +13752,86 @@
     setGroupManagementStatus(sent
       ? t("group.room_options_sent", "Group settings sent to ejabberd.")
       : t("group.room_options_failed", "Group settings could not be sent."), sent ? "good" : "danger");
+  }
+
+  function renderKnownGroupMembers(conversation) {
+    const members = knownGroupMembers(conversation);
+    el.groupKnownMembersPanel.replaceChildren();
+    el.groupKnownMembersList.replaceChildren();
+
+    if (!members.length) {
+      const empty = document.createElement("div");
+      empty.className = "group-known-members-empty";
+      empty.textContent = t("group.known_members_empty", "No known members yet. Members will appear here after they write in the group.");
+      el.groupKnownMembersPanel.appendChild(empty);
+      return;
+    }
+
+    for (const member of members) {
+      const option = document.createElement("option");
+      option.value = member.jid;
+      option.label = member.name;
+      el.groupKnownMembersList.appendChild(option);
+
+      const row = document.createElement("div");
+      row.className = "group-known-member";
+
+      const identity = document.createElement("div");
+      identity.className = "group-known-member-identity";
+      const name = document.createElement("strong");
+      name.textContent = member.name;
+      const jid = document.createElement("span");
+      jid.textContent = member.jid;
+      identity.append(name, jid);
+
+      const actions = document.createElement("div");
+      actions.className = "group-known-member-actions";
+      const addButton = document.createElement("button");
+      addButton.type = "button";
+      addButton.textContent = t("button.group_add_member", "Add member");
+      addButton.addEventListener("click", () => {
+        el.groupMemberJidInput.value = member.jid;
+        setGroupAffiliationFromDialog(member.jid, "member", t("group.member_added", "Member added."), true);
+      });
+      const adminButton = document.createElement("button");
+      adminButton.type = "button";
+      adminButton.textContent = t("button.group_make_admin", "Make admin");
+      adminButton.addEventListener("click", () => {
+        el.groupAdminJidInput.value = member.jid;
+        setGroupAffiliationFromDialog(member.jid, "admin", t("group.admin_added", "Group admin assigned."), false);
+      });
+      actions.append(addButton, adminButton);
+      row.append(identity, actions);
+      el.groupKnownMembersPanel.appendChild(row);
+    }
+  }
+
+  function knownGroupMembers(conversation) {
+    const members = new Map();
+    const add = (jid, name = "") => {
+      const normalized = bareJid(jid);
+      if (!normalized || normalized === bareJid(conversation?.peer || "") || isOwnPeer(normalized)) {
+        return;
+      }
+
+      const previous = members.get(normalized);
+      members.set(normalized, {
+        jid: normalized,
+        name: name || previous?.name || displayNameForJid(normalized)
+      });
+    };
+
+    for (const contact of state.conversations) {
+      if (contact.kind === "contact" && !isBlockedConversation(contact)) {
+        add(contact.peer, conversationDisplayName(contact));
+      }
+    }
+
+    for (const message of conversation?.messages || []) {
+      add(message.from, message.senderDisplayName || "");
+    }
+
+    return [...members.values()].sort((left, right) => left.name.localeCompare(right.name, undefined, { sensitivity: "base" }));
   }
 
   function addGroupMemberFromDialog() {

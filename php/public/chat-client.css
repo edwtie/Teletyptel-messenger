@@ -808,14 +808,57 @@ body.account-gate .modal-shell {
   min-width: 0;
 }
 
+.group-known-members {
+  display: grid;
+  gap: 8px;
+}
+
+.group-known-member {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  padding: 8px;
+}
+
+.group-known-member-identity {
+  min-width: 0;
+}
+
+.group-known-member-identity strong,
+.group-known-member-identity span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.group-known-member-identity span,
+.group-known-members-empty {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.group-known-member-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 @media (max-width: 640px) {
   .group-management-toggle,
-  .group-management-row {
+  .group-management-row,
+  .group-known-member {
     grid-template-columns: 1fr;
   }
 
   .group-management-toggle input,
-  .group-management-row button {
+  .group-management-row button,
+  .group-known-member-actions {
     justify-self: start;
   }
 }
