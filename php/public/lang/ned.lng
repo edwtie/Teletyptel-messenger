@@ -376,6 +376,7 @@ group.admin_jid_placeholder=beheerder@localhost
 group.manage_ready=Kies wat groepsleden en beheerders mogen doen.
 group.room_options_sent=Groepsinstellingen verzonden naar ejabberd.
 group.room_options_failed=Groepsinstellingen konden niet worden verzonden.
+group.xmpp_required=Verbind eerst met XMPP voordat u groepsbeheer wijzigt.
 group.enter_member_jid=Vul een JID van een lid in.
 group.enter_admin_jid=Vul een JID van een beheerder in.
 group.member_added=Lid toegevoegd.

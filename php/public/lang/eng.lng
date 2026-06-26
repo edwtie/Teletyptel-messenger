@@ -376,6 +376,7 @@ group.admin_jid_placeholder=admin@localhost
 group.manage_ready=Choose what group members and admins may do.
 group.room_options_sent=Group settings sent to ejabberd.
 group.room_options_failed=Group settings could not be sent.
+group.xmpp_required=Connect XMPP before changing group management.
 group.enter_member_jid=Enter a member JID.
 group.enter_admin_jid=Enter an admin JID.
 group.member_added=Member added.

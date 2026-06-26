@@ -13746,12 +13746,26 @@
 
     const approveMembers = el.groupApproveMembersToggle.checked;
     const membersCanInvite = el.groupMembersCanInviteToggle.checked;
+    const previousApproveMembers = conversation.groupApproveMembers === true;
+    const previousMembersCanInvite = conversation.groupMembersCanInvite !== false;
+    if (!ensureXmppGroupManagementReady(conversation)) {
+      el.groupApproveMembersToggle.checked = previousApproveMembers;
+      el.groupMembersCanInviteToggle.checked = previousMembersCanInvite;
+      return;
+    }
+
     conversation.groupApproveMembers = approveMembers;
     conversation.groupMembersCanInvite = membersCanInvite;
     const sent = sendXmppRoomConfig(conversation.peer, {
       "muc#roomconfig_membersonly": approveMembers ? "1" : "0",
       "muc#roomconfig_allowinvites": membersCanInvite ? "1" : "0"
     });
+    if (!sent) {
+      conversation.groupApproveMembers = previousApproveMembers;
+      conversation.groupMembersCanInvite = previousMembersCanInvite;
+      el.groupApproveMembersToggle.checked = previousApproveMembers;
+      el.groupMembersCanInviteToggle.checked = previousMembersCanInvite;
+    }
     setGroupManagementStatus(sent
       ? t("group.room_options_sent", "Group settings sent to ejabberd.")
       : t("group.room_options_failed", "Group settings could not be sent."), sent ? "good" : "danger");
@@ -13894,13 +13908,41 @@
       return false;
     }
 
+    if (!ensureXmppGroupManagementReady(conversation, { quiet: true })) {
+      return false;
+    }
+
     return sendXmppMucAffiliation(conversation.peer, jid, "owner");
+  }
+
+  function ensureXmppGroupManagementReady(conversation, options = {}) {
+    const ready = state.mode === "xmpp"
+      && state.xmppSocket?.readyState === WebSocket.OPEN
+      && state.xmppSession?.authenticated;
+    if (!ready) {
+      const text = t("group.xmpp_required", "Connect XMPP before changing group management.");
+      if (!options.quiet) {
+        setGroupManagementStatus(text, "danger");
+        setConnectionStatus(text, "danger");
+      }
+      return false;
+    }
+
+    if (conversation?.kind === "group" && !conversation.mucJoined) {
+      joinXmppGroupConversation(conversation);
+    }
+
+    return true;
   }
 
   function setGroupAffiliationFromDialog(jid, affiliation, successText, inviteAfterSet) {
     const conversation = groupManagementConversation();
     if (!canManageGroupConversation(conversation)) {
       setGroupManagementStatus(t("status.select_group_first", "Select a group first"), "warn");
+      return;
+    }
+
+    if (!ensureXmppGroupManagementReady(conversation)) {
       return;
     }
 
