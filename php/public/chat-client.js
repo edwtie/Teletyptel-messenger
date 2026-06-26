@@ -540,6 +540,10 @@
     mucAvatarFileInput: byId("mucAvatarFileInput"),
     groupManagementDialog: byId("groupManagementDialog"),
     groupManagementSubtitle: byId("groupManagementSubtitle"),
+    groupAvatarPreview: byId("groupAvatarPreview"),
+    groupTitleInput: byId("groupTitleInput"),
+    groupSaveTitleButton: byId("groupSaveTitleButton"),
+    groupChangeAvatarButton: byId("groupChangeAvatarButton"),
     groupMembersCanInviteToggle: byId("groupMembersCanInviteToggle"),
     groupApproveMembersToggle: byId("groupApproveMembersToggle"),
     groupMemberJidInput: byId("groupMemberJidInput"),
@@ -919,6 +923,8 @@
     el.closeGroupManagementButton.addEventListener("click", closeGroupManagementDialog);
     el.groupManagementOkButton.addEventListener("click", closeGroupManagementDialog);
     el.groupManagementDialog.addEventListener("click", closeGroupManagementDialogOnBackdrop);
+    el.groupSaveTitleButton.addEventListener("click", saveGroupTitleFromDialog);
+    el.groupChangeAvatarButton.addEventListener("click", chooseGroupAvatarFromDialog);
     el.groupMembersCanInviteToggle.addEventListener("change", applyGroupRoomOptionsFromDialog);
     el.groupApproveMembersToggle.addEventListener("change", applyGroupRoomOptionsFromDialog);
     el.groupAddMemberButton.addEventListener("click", addGroupMemberFromDialog);
@@ -13684,15 +13690,37 @@
   }
 
   function canChangeMucAvatar(conversation) {
-    return Boolean(conversation)
-      && conversation.kind === "group"
-      && !isBlockedConversation(conversation);
+    return canEditGroupDetails(conversation);
   }
 
   function canManageGroupConversation(conversation) {
     return Boolean(conversation)
       && conversation.kind === "group"
       && !isBlockedConversation(conversation);
+  }
+
+  function canEditGroupDetails(conversation) {
+    return canManageGroupConversation(conversation)
+      && (isCurrentUserGroupAdmin(conversation) || !hasKnownGroupRoles(conversation));
+  }
+
+  function hasKnownGroupRoles(conversation) {
+    return Boolean(bareJid(conversation?.groupOwnerJid || ""))
+      || Boolean((conversation?.groupAdminJids || []).some((jid) => bareJid(jid)))
+      || Boolean((conversation?.groupMemberJids || []).some((jid) => bareJid(jid)));
+  }
+
+  function isCurrentUserGroupAdmin(conversation) {
+    const jid = bareJid(currentFromJid());
+    if (!conversation || !jid) {
+      return false;
+    }
+
+    if (jidMatches(conversation.groupOwnerJid || "", jid)) {
+      return true;
+    }
+
+    return (conversation.groupAdminJids || []).some((adminJid) => jidMatches(adminJid, jid));
   }
 
   function openContextGroupManagement() {
@@ -13708,6 +13736,9 @@
   function openGroupManagementDialog(conversation) {
     state.groupManagementConversationId = conversation.id;
     el.groupManagementSubtitle.textContent = `${conversationDisplayName(conversation)} - ${bareJid(conversation.peer)}`;
+    el.groupTitleInput.value = conversationDisplayName(conversation);
+    renderAvatarInto(el.groupAvatarPreview, conversation);
+    updateGroupManagementEditControls(conversation);
     el.groupMembersCanInviteToggle.checked = conversation.groupMembersCanInvite !== false;
     el.groupApproveMembersToggle.checked = conversation.groupApproveMembers === true;
     el.groupMemberJidInput.value = "";
@@ -13715,6 +13746,13 @@
     renderKnownGroupMembers(conversation);
     setGroupManagementStatus(t("group.manage_ready", "Choose what group members and admins may do."), "info");
     el.groupManagementDialog.hidden = false;
+  }
+
+  function updateGroupManagementEditControls(conversation) {
+    const canEdit = canEditGroupDetails(conversation);
+    el.groupTitleInput.disabled = !canEdit;
+    el.groupSaveTitleButton.disabled = !canEdit;
+    el.groupChangeAvatarButton.disabled = !canEdit;
   }
 
   function closeGroupManagementDialog() {
@@ -13735,6 +13773,46 @@
   function setGroupManagementStatus(text, level = "info") {
     el.groupManagementStatus.textContent = text;
     el.groupManagementStatus.dataset.level = level;
+  }
+
+  function saveGroupTitleFromDialog() {
+    const conversation = groupManagementConversation();
+    if (!canManageGroupConversation(conversation)) {
+      setGroupManagementStatus(t("status.select_group_first", "Select a group first"), "warn");
+      return;
+    }
+
+    if (!canEditGroupDetails(conversation)) {
+      setGroupManagementStatus(t("group.admin_required", "Only group admins can change this."), "warn");
+      return;
+    }
+
+    const title = String(el.groupTitleInput.value || "").trim();
+    if (!title) {
+      setGroupManagementStatus(t("group.enter_title", "Enter a group title."), "warn");
+      return;
+    }
+
+    if (!ensureXmppGroupManagementReady(conversation)) {
+      return;
+    }
+
+    const sent = sendXmppRoomConfig(conversation.peer, {
+      "muc#roomconfig_roomname": title
+    });
+    if (sent) {
+      markCurrentUserAsGroupAdmin(conversation);
+      conversation.name = title;
+      delete conversation.nameKey;
+      el.groupManagementSubtitle.textContent = `${conversationDisplayName(conversation)} - ${bareJid(conversation.peer)}`;
+      renderConversations();
+      renderActiveConversation();
+      refreshOpenTabPanel();
+    }
+
+    setGroupManagementStatus(sent
+      ? t("group.title_saved", "Group title saved.")
+      : t("group.title_failed", "Group title could not be sent."), sent ? "good" : "danger");
   }
 
   function applyGroupRoomOptionsFromDialog() {
@@ -13760,6 +13838,10 @@
       "muc#roomconfig_membersonly": approveMembers ? "1" : "0",
       "muc#roomconfig_allowinvites": membersCanInvite ? "1" : "0"
     });
+    if (sent) {
+      markCurrentUserAsGroupAdmin(conversation);
+      updateGroupManagementEditControls(conversation);
+    }
     if (!sent) {
       conversation.groupApproveMembers = previousApproveMembers;
       conversation.groupMembersCanInvite = previousMembersCanInvite;
@@ -13961,6 +14043,17 @@
     }
 
     conversation.groupOwnerJid = jid;
+    conversation.groupMemberJids = Array.from(new Set([...(conversation.groupMemberJids || []), jid]));
+    conversation.groupAdminJids = Array.from(new Set([...(conversation.groupAdminJids || []), jid]));
+  }
+
+  function markCurrentUserAsGroupAdmin(conversation) {
+    const jid = bareJid(currentFromJid());
+    if (!conversation || !jid) {
+      return;
+    }
+
+    conversation.groupMemberJids = Array.from(new Set([...(conversation.groupMemberJids || []), jid]));
     conversation.groupAdminJids = Array.from(new Set([...(conversation.groupAdminJids || []), jid]));
   }
 
@@ -14013,7 +14106,9 @@
       sendXmppDirectInvite(jid, conversation.peer);
     }
     if (sent) {
+      markCurrentUserAsGroupAdmin(conversation);
       rememberGroupAffiliation(conversation, jid, affiliation);
+      updateGroupManagementEditControls(conversation);
       renderKnownGroupMembers(conversation);
     }
 
@@ -14101,6 +14196,23 @@
     el.mucAvatarFileInput.click();
   }
 
+  function chooseGroupAvatarFromDialog() {
+    const conversation = groupManagementConversation();
+    if (!canManageGroupConversation(conversation)) {
+      setGroupManagementStatus(t("status.select_group_first", "Select a group first"), "warn");
+      return;
+    }
+
+    if (!canChangeMucAvatar(conversation)) {
+      setGroupManagementStatus(t("group.admin_required", "Only group admins can change this."), "warn");
+      return;
+    }
+
+    state.pendingMucAvatarConversationId = conversation.id;
+    el.mucAvatarFileInput.value = "";
+    el.mucAvatarFileInput.click();
+  }
+
   function handleMucAvatarFileSelected() {
     const conversationId = state.pendingMucAvatarConversationId || state.contextConversationId;
     const conversation = state.conversations.find((item) => item.id === conversationId) ?? activeConversation();
@@ -14132,7 +14244,12 @@
       conversation.mucAvatarHash = hexBytes(sha1Bytes(dataUrlPayloadBytes(dataUrl)));
       conversation.mucAvatarMediaType = file.type || dataUrlMediaType(dataUrl) || "image/png";
       conversation.mucAvatarUpdatedAt = new Date().toISOString();
+      markCurrentUserAsGroupAdmin(conversation);
       setConnectionStatus(t("status.group_avatar_changed", "Group avatar changed."), "good");
+      if (!el.groupManagementDialog.hidden && state.groupManagementConversationId === conversation.id) {
+        renderAvatarInto(el.groupAvatarPreview, conversation);
+        setGroupManagementStatus(t("status.group_avatar_changed", "Group avatar changed."), "good");
+      }
       appendDebug("muc-avatar", `${conversation.peer} ${conversation.mucAvatarHash}`);
       renderConversations();
       renderActiveConversation();

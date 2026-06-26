@@ -787,6 +787,26 @@ body.account-gate .modal-shell {
   color: var(--text);
 }
 
+.group-details-row {
+  display: grid;
+  grid-template-columns: auto minmax(180px, 1fr) auto auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.group-title-field {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.group-title-field input {
+  width: 100%;
+  min-width: 0;
+}
+
 .group-management-toggle small {
   display: block;
   margin-top: 3px;
@@ -873,12 +893,14 @@ body.account-gate .modal-shell {
 
 @media (max-width: 640px) {
   .group-management-toggle,
+  .group-details-row,
   .group-management-row,
   .group-known-member {
     grid-template-columns: 1fr;
   }
 
   .group-management-toggle input,
+  .group-details-row .avatar,
   .group-management-row button,
   .group-known-member-actions {
     justify-self: start;

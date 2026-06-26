@@ -15,7 +15,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="favicon.ico" sizes="any">
   <link rel="apple-touch-icon" href="assets/brand/teletyptel-icon-192.png">
-  <link rel="stylesheet" href="chat-client.css?v=20260627-group-member-list">
+  <link rel="stylesheet" href="chat-client.css?v=20260627-group-details-admin">
 </head>
 <body class="account-booting">
   <a class="skip-link" href="#messageInput" data-i18n="button.skip_to_message">Skip to message</a>
@@ -1086,6 +1086,18 @@
         <button id="closeGroupManagementButton" class="icon-button" type="button" aria-label="Close" data-i18n-aria-label="button.close">x</button>
       </div>
       <div class="modal-body group-management-body">
+        <section class="group-management-section group-details-section">
+          <h3 data-i18n="group.details">Group details</h3>
+          <div class="group-details-row">
+            <div id="groupAvatarPreview" class="avatar avatar-list" aria-hidden="true"></div>
+            <label class="group-title-field">
+              <span data-i18n="group.title">Group title</span>
+              <input id="groupTitleInput" type="text" maxlength="80">
+            </label>
+            <button id="groupSaveTitleButton" type="button" data-i18n="button.group_save_title">Save title</button>
+            <button id="groupChangeAvatarButton" type="button" data-i18n="button.group_change_avatar">Change avatar</button>
+          </div>
+        </section>
         <section class="group-management-section">
           <h3 data-i18n="group.members_can">Members can</h3>
           <label class="group-management-toggle">
@@ -1200,6 +1212,6 @@
 
   <script src="vendor/qrcode.js?v=20260623-history-privacy-copy"></script>
   <script src="jingle-history.js?v=20260615-jingle-history"></script>
-  <script src="chat-client.js?v=20260627-group-member-list"></script>
+  <script src="chat-client.js?v=20260627-group-details-admin"></script>
 </body>
 </html>
