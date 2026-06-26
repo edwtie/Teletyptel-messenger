@@ -13470,7 +13470,10 @@
     }
 
     const conversation = ensureConversationForPeer(peer, "group", name.trim());
+    markCurrentUserAsGroupOwner(conversation);
     selectConversation(conversation);
+    joinXmppGroupConversation(conversation);
+    assignCurrentUserAsGroupOwner(conversation);
     el.peerInput.value = conversation.peer;
     renderConversations();
     renderActiveConversation();
@@ -13827,6 +13830,12 @@
       }
     }
 
+    add(currentFromJid(), currentSenderName());
+    add(conversation?.groupOwnerJid, currentSenderName());
+    for (const jid of conversation?.groupAdminJids || []) {
+      add(jid, jidMatches(jid, currentFromJid()) ? currentSenderName() : "");
+    }
+
     for (const message of conversation?.messages || []) {
       add(message.from, message.senderDisplayName || "");
     }
@@ -13867,6 +13876,25 @@
   function normalizedGroupDialogJid(value) {
     const jid = bareJid(String(value || "").trim());
     return jid && jid.includes("@") ? jid : "";
+  }
+
+  function markCurrentUserAsGroupOwner(conversation) {
+    const jid = bareJid(currentFromJid());
+    if (!conversation || !jid) {
+      return;
+    }
+
+    conversation.groupOwnerJid = jid;
+    conversation.groupAdminJids = Array.from(new Set([...(conversation.groupAdminJids || []), jid]));
+  }
+
+  function assignCurrentUserAsGroupOwner(conversation) {
+    const jid = bareJid(currentFromJid());
+    if (!conversation || !jid) {
+      return false;
+    }
+
+    return sendXmppMucAffiliation(conversation.peer, jid, "owner");
   }
 
   function setGroupAffiliationFromDialog(jid, affiliation, successText, inviteAfterSet) {
