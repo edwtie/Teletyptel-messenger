@@ -828,7 +828,17 @@ body.account-gate .modal-shell {
   min-width: 0;
 }
 
-.group-known-member-identity strong,
+.group-known-member-identity strong {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.group-known-member-identity strong span:last-child {
+  min-width: 0;
+}
+
 .group-known-member-identity span {
   display: block;
   overflow: hidden;
@@ -845,6 +855,13 @@ body.account-gate .modal-shell {
 .group-known-member-identity .group-known-member-status {
   color: var(--accent);
   font-weight: 700;
+}
+
+.group-member-admin-star {
+  flex: 0 0 auto;
+  color: #f59e0b;
+  font-size: 16px;
+  line-height: 1;
 }
 
 .group-known-member-actions {

@@ -369,6 +369,7 @@ group.approve_members=Nieuwe leden goedkeuren
 group.approve_members_text=Als dit aan staat, moeten nieuwe gebruikers eerst op de ledenlijst staan voordat zij kunnen deelnemen.
 group.members=Leden
 group.admins=Groepsbeheerders
+group.member_list=Ledenlijst
 group.known_members=Bekende leden
 group.known_members_empty=Nog geen bekende leden. Leden verschijnen hier nadat zij in de groep hebben geschreven.
 group.status_owner=Eigenaar

@@ -13796,7 +13796,17 @@
       const identity = document.createElement("div");
       identity.className = "group-known-member-identity";
       const name = document.createElement("strong");
-      name.textContent = member.name;
+      const star = document.createElement("span");
+      star.className = "group-member-admin-star";
+      star.textContent = "★";
+      star.title = member.isOwner
+        ? t("group.status_owner", "Owner")
+        : t("group.status_admin", "Admin");
+      star.setAttribute("aria-label", star.title);
+      star.hidden = !member.isAdmin && !member.isOwner;
+      const nameText = document.createElement("span");
+      nameText.textContent = member.name;
+      name.append(star, nameText);
       const jid = document.createElement("span");
       jid.textContent = member.jid;
       const status = document.createElement("span");
@@ -13884,7 +13894,29 @@
       add(message.from, message.senderDisplayName || "");
     }
 
-    return [...members.values()].sort((left, right) => left.name.localeCompare(right.name, undefined, { sensitivity: "base" }));
+    return [...members.values()].sort((left, right) => {
+      const leftRank = groupMemberRank(left);
+      const rightRank = groupMemberRank(right);
+      return leftRank === rightRank
+        ? left.name.localeCompare(right.name, undefined, { sensitivity: "base" })
+        : leftRank - rightRank;
+    });
+  }
+
+  function groupMemberRank(member) {
+    if (member.isOwner) {
+      return 0;
+    }
+
+    if (member.isAdmin) {
+      return 1;
+    }
+
+    if (member.isMember) {
+      return 2;
+    }
+
+    return 3;
   }
 
   function addGroupMemberFromDialog() {

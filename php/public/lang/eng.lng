@@ -369,6 +369,7 @@ group.approve_members=Approve new members
 group.approve_members_text=When this is on, new users must be added to the members list before they can join.
 group.members=Members
 group.admins=Group admins
+group.member_list=Member list
 group.known_members=Known members
 group.known_members_empty=No known members yet. Members will appear here after they write in the group.
 group.status_owner=Owner
