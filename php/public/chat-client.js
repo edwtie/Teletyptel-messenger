@@ -723,6 +723,7 @@
     dialogAdvancedDetails: byId("dialogAdvancedDetails"),
     dialogSessionProfileInput: byId("dialogSessionProfileInput"),
     dialogDisplayNameInput: byId("dialogDisplayNameInput"),
+    dialogProfileEmailInput: byId("dialogProfileEmailInput"),
     dialogJidInput: byId("dialogJidInput"),
     dialogPasswordInput: byId("dialogPasswordInput"),
     dialogForgotPasswordButton: byId("dialogForgotPasswordButton"),
@@ -1140,6 +1141,9 @@
     el.peerInput.addEventListener("change", updateRelayConversationMeta);
     el.displayNameInput.addEventListener("change", handleAccountIdentityChanged);
     el.jidInput.addEventListener("change", handleAccountIdentityChanged);
+    el.dialogProfileEmailInput.addEventListener("change", () => {
+      el.dialogJidInput.value = el.dialogProfileEmailInput.value.trim();
+    });
     el.avatarColorInput.addEventListener("input", () => handleAvatarColorChanged("main"));
     el.chooseAvatarButton.addEventListener("click", () => el.avatarFileInput.click());
     el.avatarFileInput.addEventListener("change", () => handleAvatarFileSelected(el.avatarFileInput));
@@ -3142,6 +3146,7 @@
     el.dialogJidInput.value = state.accountGateRequired && !hasStoredAccount
       ? ""
       : stripGeneratedResourceSuffix(el.jidInput.value.trim());
+    el.dialogProfileEmailInput.value = el.dialogJidInput.value;
     el.dialogPasswordInput.value = el.passwordInput.value;
     el.dialogRememberPasswordToggle.checked = el.rememberPasswordToggle.checked || state.accountGateRequired;
     el.dialogCurrentPasswordInput.value = "";
@@ -3299,6 +3304,11 @@
   }
 
   function applyAccountDialogToControls(options = {}) {
+    const profileEmail = stripGeneratedResourceSuffix(el.dialogProfileEmailInput.value.trim());
+    if (profileEmail) {
+      el.dialogJidInput.value = profileEmail;
+    }
+
     const jid = normalizeJidInput(stripGeneratedResourceSuffix(el.dialogJidInput.value.trim()));
     const displayName = el.dialogDisplayNameInput.value.trim();
 
@@ -3325,6 +3335,7 @@
     el.displayNameInput.value = displayName || jid.split("@")[0] || "Teletyptel";
     el.jidInput.value = jid;
     el.dialogJidInput.value = jid;
+    el.dialogProfileEmailInput.value = jid;
     el.passwordInput.value = el.dialogPasswordInput.value;
     el.rememberPasswordToggle.checked = el.dialogRememberPasswordToggle.checked;
     el.relayUrlInput.value = "";
