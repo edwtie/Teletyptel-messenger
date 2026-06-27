@@ -15,7 +15,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="favicon.ico" sizes="any">
   <link rel="apple-touch-icon" href="assets/brand/teletyptel-icon-192.png">
-  <link rel="stylesheet" href="chat-client.css?v=20260627-group-avatar-crop">
+  <link rel="stylesheet" href="chat-client.css?v=20260627-group-info">
 </head>
 <body class="account-booting">
   <a class="skip-link" href="#messageInput" data-i18n="button.skip_to_message">Skip to message</a>
@@ -1124,10 +1124,25 @@
           </label>
         </section>
         <section class="group-management-section" data-group-panel="members">
+          <h3 data-i18n="group.info">Group information</h3>
+          <div id="groupInfoText" class="group-info-text"></div>
+        </section>
+        <section class="group-management-section" data-group-panel="members">
           <h3 data-i18n="group.members">Members</h3>
           <div class="group-management-row">
             <input id="groupMemberJidInput" type="email" list="groupKnownMembersList" placeholder="member@localhost" data-i18n-placeholder="group.member_jid_placeholder">
             <button id="groupAddMemberButton" type="button" data-i18n="button.group_add_member">Add member</button>
+          </div>
+        </section>
+        <section class="group-management-section" data-group-panel="tools">
+          <h3 data-i18n="group.info">Group information</h3>
+          <label class="group-info-field">
+            <span data-i18n="group.info_text">Information text</span>
+            <textarea id="groupDescriptionInput" rows="4" maxlength="1000"></textarea>
+          </label>
+          <div class="group-management-row group-management-row-actions">
+            <span></span>
+            <button id="groupSaveInfoButton" type="button" data-i18n="button.group_save_info">Save information</button>
           </div>
         </section>
         <section class="group-management-section" data-group-panel="tools">
@@ -1221,6 +1236,6 @@
 
   <script src="vendor/qrcode.js?v=20260623-history-privacy-copy"></script>
   <script src="jingle-history.js?v=20260615-jingle-history"></script>
-  <script src="chat-client.js?v=20260627-group-avatar-crop"></script>
+  <script src="chat-client.js?v=20260627-group-info"></script>
 </body>
 </html>

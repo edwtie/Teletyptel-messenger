@@ -78,13 +78,13 @@ function writeGroupMetadata(): void
     ensureGroupMetadataSchema($pdo);
     $statement = $pdo->prepare(
         'INSERT INTO group_metadata (
-            account_id, room_jid, room_name, avatar_data_url, avatar_color,
+            account_id, room_jid, room_name, room_description, avatar_data_url, avatar_color,
             avatar_hash, avatar_media_type, avatar_updated_at,
             owner_jid, admin_jids_json, member_jids_json,
             banned_jids_json,
             approve_members, members_can_invite
         ) VALUES (
-            :account_id, :room_jid, :room_name, :avatar_data_url, :avatar_color,
+            :account_id, :room_jid, :room_name, :room_description, :avatar_data_url, :avatar_color,
             :avatar_hash, :avatar_media_type, :avatar_updated_at,
             :owner_jid, :admin_jids_json, :member_jids_json,
             :banned_jids_json,
@@ -92,6 +92,7 @@ function writeGroupMetadata(): void
         )
         ON DUPLICATE KEY UPDATE
             room_name = VALUES(room_name),
+            room_description = VALUES(room_description),
             avatar_data_url = VALUES(avatar_data_url),
             avatar_color = VALUES(avatar_color),
             avatar_hash = VALUES(avatar_hash),
@@ -109,6 +110,7 @@ function writeGroupMetadata(): void
         'account_id' => $accountId,
         'room_jid' => $roomJid,
         'room_name' => cleanGroupText($input['roomName'] ?? '', 255),
+        'room_description' => cleanGroupText($input['roomDescription'] ?? '', 4000),
         'avatar_data_url' => cleanGroupText($input['avatarDataUrl'] ?? '', 524288),
         'avatar_color' => normalizeGroupColor($input['avatarColor'] ?? '#2563eb'),
         'avatar_hash' => cleanGroupText($input['avatarHash'] ?? '', 80),
@@ -133,6 +135,7 @@ function ensureGroupMetadataSchema(PDO $pdo): void
             account_id VARCHAR(96) NOT NULL,
             room_jid VARCHAR(255) NOT NULL,
             room_name VARCHAR(255) NOT NULL DEFAULT "",
+            room_description TEXT NULL,
             avatar_data_url MEDIUMTEXT NULL,
             avatar_color VARCHAR(32) NOT NULL DEFAULT "#2563eb",
             avatar_hash VARCHAR(80) NOT NULL DEFAULT "",
@@ -150,6 +153,7 @@ function ensureGroupMetadataSchema(PDO $pdo): void
             KEY idx_group_metadata_account_updated (account_id, updated_at)
         ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
     );
+    ensureGroupMetadataColumn($pdo, 'room_description', 'room_description TEXT NULL');
     ensureGroupMetadataColumn($pdo, 'banned_jids_json', 'banned_jids_json MEDIUMTEXT NULL');
 }
 
@@ -158,6 +162,7 @@ function groupMetadataRowToClient(array $row): array
     return [
         'roomJid' => $row['room_jid'],
         'roomName' => $row['room_name'],
+        'roomDescription' => $row['room_description'] ?? '',
         'avatarDataUrl' => $row['avatar_data_url'] ?? '',
         'avatarColor' => $row['avatar_color'] ?? '#2563eb',
         'avatarHash' => $row['avatar_hash'] ?? '',

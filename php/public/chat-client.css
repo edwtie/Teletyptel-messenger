@@ -833,6 +833,34 @@ body.account-gate .modal-shell {
   min-width: 0;
 }
 
+.group-info-field {
+  display: grid;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.group-info-field textarea {
+  width: 100%;
+  min-width: 0;
+  resize: vertical;
+}
+
+.group-info-text {
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  padding: 10px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.group-management-row-actions {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
 .group-management-toggle small {
   display: block;
   margin-top: 3px;

@@ -549,7 +549,10 @@
     groupBlacklistTabButton: byId("groupBlacklistTabButton"),
     groupAvatarPreview: byId("groupAvatarPreview"),
     groupTitleInput: byId("groupTitleInput"),
+    groupDescriptionInput: byId("groupDescriptionInput"),
+    groupInfoText: byId("groupInfoText"),
     groupSaveTitleButton: byId("groupSaveTitleButton"),
+    groupSaveInfoButton: byId("groupSaveInfoButton"),
     groupChangeAvatarButton: byId("groupChangeAvatarButton"),
     groupMembersCanInviteToggle: byId("groupMembersCanInviteToggle"),
     groupApproveMembersToggle: byId("groupApproveMembersToggle"),
@@ -937,6 +940,7 @@
     el.groupAvatarPreview.addEventListener("click", chooseGroupAvatarFromDialog);
     el.groupAvatarPreview.addEventListener("keydown", handleGroupAvatarPreviewKeydown);
     el.groupSaveTitleButton.addEventListener("click", saveGroupTitleFromDialog);
+    el.groupSaveInfoButton.addEventListener("click", saveGroupInfoFromDialog);
     el.groupChangeAvatarButton.addEventListener("click", chooseGroupAvatarFromDialog);
     el.groupMembersCanInviteToggle.addEventListener("change", applyGroupRoomOptionsFromDialog);
     el.groupApproveMembersToggle.addEventListener("change", applyGroupRoomOptionsFromDialog);
@@ -2632,6 +2636,7 @@
       conversation.name = record.roomName.trim();
       delete conversation.nameKey;
     }
+    conversation.groupDescription = String(record.roomDescription || "");
     if (isValidAvatarImageSource(record.avatarDataUrl || "")) {
       conversation.avatarDataUrl = record.avatarDataUrl;
     }
@@ -2679,6 +2684,7 @@
       loginToken: accountLoginToken(),
       roomJid: bareJid(conversation.peer),
       roomName: conversationDisplayName(conversation),
+      roomDescription: String(conversation.groupDescription || ""),
       avatarDataUrl: isValidAvatarImageSource(conversation.avatarDataUrl || "") ? conversation.avatarDataUrl : "",
       avatarColor: normalizeAvatarColor(conversation.avatarColor || ""),
       avatarHash: conversation.mucAvatarHash || "",
@@ -13896,6 +13902,7 @@
     state.groupManagementConversationId = conversation.id;
     el.groupManagementSubtitle.textContent = `${conversationDisplayName(conversation)} - ${bareJid(conversation.peer)}`;
     el.groupTitleInput.value = conversationDisplayName(conversation);
+    syncGroupDescriptionControls(conversation);
     renderAvatarInto(el.groupAvatarPreview, conversation);
     updateGroupManagementEditControls(conversation);
     el.groupMembersCanInviteToggle.checked = conversation.groupMembersCanInvite !== false;
@@ -13940,6 +13947,8 @@
     const canEdit = canEditGroupDetails(conversation);
     el.groupTitleInput.disabled = !canEdit;
     el.groupSaveTitleButton.disabled = !canEdit;
+    el.groupDescriptionInput.disabled = !canEdit;
+    el.groupSaveInfoButton.disabled = !canEdit;
     el.groupChangeAvatarButton.disabled = !canEdit;
     el.groupAvatarPreview.classList.toggle("avatar-clickable", canEdit);
     el.groupAvatarPreview.tabIndex = canEdit ? 0 : -1;
@@ -13972,6 +13981,12 @@
   function setGroupManagementStatus(text, level = "info") {
     el.groupManagementStatus.textContent = text;
     el.groupManagementStatus.dataset.level = level;
+  }
+
+  function syncGroupDescriptionControls(conversation) {
+    const description = String(conversation?.groupDescription || "");
+    el.groupDescriptionInput.value = description;
+    el.groupInfoText.textContent = description || t("group.info_empty", "No group information yet.");
   }
 
   function saveGroupTitleFromDialog() {
@@ -14013,6 +14028,38 @@
     setGroupManagementStatus(sent
       ? t("group.title_saved", "Group title saved.")
       : t("group.title_failed", "Group title could not be sent."), sent ? "good" : "danger");
+  }
+
+  function saveGroupInfoFromDialog() {
+    const conversation = groupManagementConversation();
+    if (!canManageGroupConversation(conversation)) {
+      setGroupManagementStatus(t("status.select_group_first", "Select a group first"), "warn");
+      return;
+    }
+
+    if (!canEditGroupDetails(conversation)) {
+      setGroupManagementStatus(t("group.admin_required", "Only group admins can change this."), "warn");
+      return;
+    }
+
+    const description = String(el.groupDescriptionInput.value || "").trim();
+    if (!ensureXmppGroupManagementReady(conversation)) {
+      return;
+    }
+
+    const sent = sendXmppRoomConfig(conversation.peer, {
+      "muc#roomconfig_roomdesc": description
+    });
+    if (sent) {
+      markCurrentUserAsGroupAdmin(conversation);
+      conversation.groupDescription = description;
+      syncGroupDescriptionControls(conversation);
+      persistGroupMetadata(conversation);
+    }
+
+    setGroupManagementStatus(sent
+      ? t("group.info_saved", "Group information saved.")
+      : t("group.info_failed", "Group information could not be sent."), sent ? "good" : "danger");
   }
 
   function applyGroupRoomOptionsFromDialog() {
