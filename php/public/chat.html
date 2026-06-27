@@ -15,7 +15,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="favicon.ico" sizes="any">
   <link rel="apple-touch-icon" href="assets/brand/teletyptel-icon-192.png">
-  <link rel="stylesheet" href="chat-client.css?v=20260627-group-tabs">
+  <link rel="stylesheet" href="chat-client.css?v=20260627-group-avatar-edit">
 </head>
 <body class="account-booting">
   <a class="skip-link" href="#messageInput" data-i18n="button.skip_to_message">Skip to message</a>
@@ -1094,7 +1094,7 @@
         <section class="group-management-section group-details-section" data-group-panel="tools">
           <h3 data-i18n="group.details">Group details</h3>
           <div class="group-details-row">
-            <div id="groupAvatarPreview" class="avatar avatar-list" aria-hidden="true"></div>
+            <div id="groupAvatarPreview" class="avatar avatar-list avatar-clickable" role="button" tabindex="0" aria-label="Change group avatar" data-i18n-aria-label="button.group_change_avatar"></div>
             <label class="group-title-field">
               <span data-i18n="group.title">Group title</span>
               <input id="groupTitleInput" type="text" maxlength="80">
@@ -1221,6 +1221,6 @@
 
   <script src="vendor/qrcode.js?v=20260623-history-privacy-copy"></script>
   <script src="jingle-history.js?v=20260615-jingle-history"></script>
-  <script src="chat-client.js?v=20260627-group-tabs"></script>
+  <script src="chat-client.js?v=20260627-group-avatar-edit"></script>
 </body>
 </html>

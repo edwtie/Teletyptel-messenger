@@ -932,6 +932,8 @@
     el.groupMembersTabButton.addEventListener("click", () => setGroupManagementTab("members"));
     el.groupAdminToolsTabButton.addEventListener("click", () => setGroupManagementTab("tools"));
     el.groupBlacklistTabButton.addEventListener("click", () => setGroupManagementTab("blacklist"));
+    el.groupAvatarPreview.addEventListener("click", chooseGroupAvatarFromDialog);
+    el.groupAvatarPreview.addEventListener("keydown", handleGroupAvatarPreviewKeydown);
     el.groupSaveTitleButton.addEventListener("click", saveGroupTitleFromDialog);
     el.groupChangeAvatarButton.addEventListener("click", chooseGroupAvatarFromDialog);
     el.groupMembersCanInviteToggle.addEventListener("change", applyGroupRoomOptionsFromDialog);
@@ -6212,7 +6214,7 @@
   function openActiveConversationAvatarProfile() {
     const conversation = activeConversation();
     if (canManageGroupConversation(conversation)) {
-      openGroupManagementDialog(conversation);
+      openGroupManagementDialog(conversation, { tab: canEditGroupDetails(conversation) ? "tools" : "members" });
       return;
     }
 
@@ -13868,7 +13870,7 @@
     openGroupManagementDialog(conversation);
   }
 
-  function openGroupManagementDialog(conversation) {
+  function openGroupManagementDialog(conversation, options = {}) {
     state.groupManagementConversationId = conversation.id;
     el.groupManagementSubtitle.textContent = `${conversationDisplayName(conversation)} - ${bareJid(conversation.peer)}`;
     el.groupTitleInput.value = conversationDisplayName(conversation);
@@ -13880,7 +13882,7 @@
     el.groupAdminJidInput.value = "";
     renderKnownGroupMembers(conversation);
     updateGroupManagementTabAccess(conversation);
-    setGroupManagementTab("members");
+    setGroupManagementTab(options.tab || "members");
     setGroupManagementStatus(t("group.manage_ready", "Choose what group members and admins may do."), "info");
     el.groupManagementDialog.hidden = false;
   }
@@ -13917,6 +13919,17 @@
     el.groupTitleInput.disabled = !canEdit;
     el.groupSaveTitleButton.disabled = !canEdit;
     el.groupChangeAvatarButton.disabled = !canEdit;
+    el.groupAvatarPreview.classList.toggle("avatar-clickable", canEdit);
+    el.groupAvatarPreview.tabIndex = canEdit ? 0 : -1;
+  }
+
+  function handleGroupAvatarPreviewKeydown(event) {
+    if (event.key !== "Enter" && event.key !== " ") {
+      return;
+    }
+
+    event.preventDefault();
+    chooseGroupAvatarFromDialog();
   }
 
   function closeGroupManagementDialog() {
