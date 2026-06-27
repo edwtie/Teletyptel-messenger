@@ -14183,14 +14183,12 @@
   }
 
   function appendGroupMemberBadge(actions, member) {
-    if (!member.isBanned && !member.isMember && !member.isAdmin && !member.isOwner) {
+    if (!member.isBanned) {
       return;
     }
 
     const badge = document.createElement("span");
-    badge.className = member.isBanned
-      ? "group-member-role-badge group-member-role-badge-danger"
-      : "group-member-role-badge";
+    badge.className = "group-member-role-badge group-member-role-badge-danger";
     badge.textContent = groupMemberStatusText(member);
     actions.appendChild(badge);
   }
