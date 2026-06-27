@@ -2630,7 +2630,7 @@
       conversation.name = record.roomName.trim();
       delete conversation.nameKey;
     }
-    if (isValidAvatarDataUrl(record.avatarDataUrl || "")) {
+    if (isValidAvatarImageSource(record.avatarDataUrl || "")) {
       conversation.avatarDataUrl = record.avatarDataUrl;
     }
     if (typeof record.avatarColor === "string" && record.avatarColor.trim()) {
@@ -2677,7 +2677,7 @@
       loginToken: accountLoginToken(),
       roomJid: bareJid(conversation.peer),
       roomName: conversationDisplayName(conversation),
-      avatarDataUrl: isValidAvatarDataUrl(conversation.avatarDataUrl || "") ? conversation.avatarDataUrl : "",
+      avatarDataUrl: isValidAvatarImageSource(conversation.avatarDataUrl || "") ? conversation.avatarDataUrl : "",
       avatarColor: normalizeAvatarColor(conversation.avatarColor || ""),
       avatarHash: conversation.mucAvatarHash || "",
       avatarMediaType: conversation.mucAvatarMediaType || "",
@@ -9145,12 +9145,12 @@
     }
 
     container.replaceChildren();
-    const { dataUrl, color, initials } = avatarVisual(source);
+    const { imageSrc, color, initials } = avatarVisual(source);
     container.style.setProperty("--avatar-bg", color);
     container.title = source?.displayName || source?.name || source?.peer || initials;
-    if (dataUrl) {
+    if (imageSrc) {
       const image = document.createElement("img");
-      image.src = dataUrl;
+      image.src = imageSrc;
       image.alt = "";
       image.decoding = "async";
       image.addEventListener("error", () => {
@@ -9175,10 +9175,10 @@
   function avatarVisual(source) {
     const name = source?.displayName || (source ? conversationDisplayName(source) : "") || source?.name || source?.peer || "TX";
     const avatarDataUrl = source?.avatarDataUrl || source?.roomAvatarDataUrl || "";
-    const dataUrl = isValidAvatarDataUrl(avatarDataUrl) ? avatarDataUrl : "";
+    const imageSrc = isValidAvatarImageSource(avatarDataUrl) ? avatarDataUrl : "";
     const color = normalizeAvatarColor(source?.avatarColor || avatarColorFor(`${name}:${source?.peer ?? ""}`));
     return {
-      dataUrl,
+      imageSrc,
       color,
       initials: avatarInitials(name)
     };
@@ -9346,6 +9346,14 @@
   function isValidAvatarDataUrl(value) {
     const text = String(value || "");
     return text.length <= avatarMaxBytes * 2 && /^data:image\/(?:png|jpeg|jpg|gif|webp|svg\+xml);base64,/i.test(text);
+  }
+
+  function isValidAvatarFileUrl(value) {
+    return /^api\/file\.php\?id=[a-f0-9]{32}$/i.test(String(value || "").trim());
+  }
+
+  function isValidAvatarImageSource(value) {
+    return isValidAvatarDataUrl(value) || isValidAvatarFileUrl(value);
   }
 
   function isAvatarSourceDataUrl(value) {
@@ -14491,7 +14499,7 @@
     el.mucAvatarFileInput.click();
   }
 
-  function handleMucAvatarFileSelected() {
+  async function handleMucAvatarFileSelected() {
     const conversationId = state.pendingMucAvatarConversationId || state.contextConversationId;
     const conversation = state.conversations.find((item) => item.id === conversationId) ?? activeConversation();
     state.pendingMucAvatarConversationId = null;
@@ -14505,22 +14513,25 @@
       return;
     }
 
-    if (file.size > avatarMaxBytes) {
-      setConnectionStatus(t("avatar.file_too_large", "Avatar file is too large. Choose an image up to 256 KB."), "warn");
+    if (file.size > avatarSourceMaxBytes) {
+      setConnectionStatus(t("avatar.source_too_large", "Avatar photo is too large. Choose an image up to 5 MB."), "warn");
       return;
     }
 
-    const reader = new FileReader();
-    reader.addEventListener("load", () => {
-      const dataUrl = String(reader.result ?? "");
-      if (!isValidAvatarDataUrl(dataUrl)) {
-        setConnectionStatus(t("avatar.read_failed", "Avatar could not be read."), "danger");
-        return;
+    setConnectionStatus(t("button.uploading", "Uploading..."), "warn");
+    try {
+      const [payload, bytes] = await Promise.all([
+        uploadFileDirect(file),
+        file.arrayBuffer()
+      ]);
+      const avatarUrl = String(payload?.file?.url || "");
+      if (!isValidAvatarFileUrl(avatarUrl)) {
+        throw new Error("uploaded avatar URL is invalid");
       }
 
-      conversation.avatarDataUrl = dataUrl;
-      conversation.mucAvatarHash = hexBytes(sha1Bytes(dataUrlPayloadBytes(dataUrl)));
-      conversation.mucAvatarMediaType = file.type || dataUrlMediaType(dataUrl) || "image/png";
+      conversation.avatarDataUrl = avatarUrl;
+      conversation.mucAvatarHash = hexBytes(sha1Bytes([...new Uint8Array(bytes)]));
+      conversation.mucAvatarMediaType = file.type || "image/png";
       conversation.mucAvatarUpdatedAt = new Date().toISOString();
       markCurrentUserAsGroupAdmin(conversation);
       setConnectionStatus(t("status.group_avatar_changed", "Group avatar changed."), "good");
@@ -14533,9 +14544,10 @@
       renderActiveConversation();
       refreshOpenTabPanel();
       persistGroupMetadata(conversation);
-    });
-    reader.addEventListener("error", () => setConnectionStatus(t("avatar.read_failed", "Avatar could not be read."), "danger"));
-    reader.readAsDataURL(file);
+    } catch (error) {
+      appendDebug("muc-avatar-error", error.message);
+      setConnectionStatus(`${t("upload.failed", "Upload failed")}: ${file.name}`, "danger");
+    }
   }
 
   function refreshOpenTabPanel() {
