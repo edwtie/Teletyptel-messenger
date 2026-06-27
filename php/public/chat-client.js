@@ -2632,6 +2632,7 @@
     conversation.groupOwnerJid = bareJid(record.ownerJid || "");
     conversation.groupAdminJids = normalizeGroupMetadataJids(record.adminJids);
     conversation.groupMemberJids = normalizeGroupMetadataJids(record.memberJids);
+    conversation.groupBannedJids = normalizeGroupMetadataJids(record.bannedJids);
     conversation.groupApproveMembers = record.approveMembers === true;
     conversation.groupMembersCanInvite = record.membersCanInvite !== false;
   }
@@ -2674,6 +2675,7 @@
       ownerJid: bareJid(conversation.groupOwnerJid || ""),
       adminJids: normalizeGroupMetadataJids(conversation.groupAdminJids || []),
       memberJids: normalizeGroupMetadataJids(conversation.groupMemberJids || []),
+      bannedJids: normalizeGroupMetadataJids(conversation.groupBannedJids || []),
       approveMembers: conversation.groupApproveMembers === true,
       membersCanInvite: conversation.groupMembersCanInvite !== false
     };
@@ -14025,7 +14027,12 @@
 
       const actions = document.createElement("div");
       actions.className = "group-known-member-actions";
-      if (member.isMember || member.isAdmin || member.isOwner) {
+      if (member.isBanned) {
+        const badge = document.createElement("span");
+        badge.className = "group-member-role-badge group-member-role-badge-danger";
+        badge.textContent = groupMemberStatusText(member);
+        actions.appendChild(badge);
+      } else if (member.isMember || member.isAdmin || member.isOwner) {
         const badge = document.createElement("span");
         badge.className = "group-member-role-badge";
         badge.textContent = groupMemberStatusText(member);
@@ -14039,7 +14046,7 @@
         el.groupMemberJidInput.value = member.jid;
         setGroupAffiliationFromDialog(member.jid, "member", t("group.member_added", "Member added."), true);
       });
-      if (!member.isMember && !member.isAdmin && !member.isOwner) {
+      if (!member.isMember && !member.isAdmin && !member.isOwner && !member.isBanned) {
         actions.appendChild(addButton);
       }
 
@@ -14050,8 +14057,25 @@
         el.groupAdminJidInput.value = member.jid;
         setGroupAffiliationFromDialog(member.jid, "admin", t("group.admin_added", "Group admin assigned."), false);
       });
-      if (!member.isAdmin && !member.isOwner) {
+      if (!member.isAdmin && !member.isOwner && !member.isBanned) {
         actions.appendChild(adminButton);
+      }
+
+      const banButton = document.createElement("button");
+      banButton.type = "button";
+      banButton.className = "danger-action";
+      banButton.textContent = member.isBanned
+        ? t("button.group_unban_member", "Unban")
+        : t("button.group_ban_member", "Ban");
+      banButton.addEventListener("click", () => {
+        const affiliation = member.isBanned ? "none" : "outcast";
+        const message = member.isBanned
+          ? t("group.member_unbanned", "Ban removed.")
+          : t("group.member_banned", "Member banned.");
+        setGroupAffiliationFromDialog(member.jid, affiliation, message, false);
+      });
+      if (!member.isOwner && !member.isSelf) {
+        actions.appendChild(banButton);
       }
       row.append(identity, actions);
       el.groupKnownMembersPanel.appendChild(row);
@@ -14059,6 +14083,10 @@
   }
 
   function groupMemberStatusText(member) {
+    if (member.isBanned) {
+      return t("group.status_banned", "Banned");
+    }
+
     if (member.isOwner) {
       return t("group.status_owner", "Owner");
     }
@@ -14078,7 +14106,9 @@
     const members = new Map();
     const memberJids = new Set((conversation?.groupMemberJids || []).map((jid) => bareJid(jid)).filter(Boolean));
     const adminJids = new Set((conversation?.groupAdminJids || []).map((jid) => bareJid(jid)).filter(Boolean));
+    const bannedJids = new Set((conversation?.groupBannedJids || []).map((jid) => bareJid(jid)).filter(Boolean));
     const ownerJid = bareJid(conversation?.groupOwnerJid || "");
+    const currentJid = bareJid(currentFromJid());
     const add = (jid, name = "", flags = {}) => {
       const normalized = bareJid(jid);
       if (!normalized || normalized === bareJid(conversation?.peer || "")) {
@@ -14091,7 +14121,9 @@
         name: name || previous?.name || displayNameForJid(normalized),
         isMember: previous?.isMember || flags.isMember || memberJids.has(normalized),
         isAdmin: previous?.isAdmin || flags.isAdmin || adminJids.has(normalized),
-        isOwner: previous?.isOwner || flags.isOwner || normalized === ownerJid
+        isOwner: previous?.isOwner || flags.isOwner || normalized === ownerJid,
+        isBanned: previous?.isBanned || flags.isBanned || bannedJids.has(normalized),
+        isSelf: previous?.isSelf || normalized === currentJid
       });
     };
 
@@ -14108,6 +14140,9 @@
     }
     for (const jid of conversation?.groupAdminJids || []) {
       add(jid, jidMatches(jid, currentFromJid()) ? currentSenderName() : "", { isAdmin: true });
+    }
+    for (const jid of conversation?.groupBannedJids || []) {
+      add(jid, "", { isBanned: true });
     }
 
     for (const message of conversation?.messages || []) {
@@ -14136,7 +14171,11 @@
       return 2;
     }
 
-    return 3;
+    if (member.isBanned) {
+      return 3;
+    }
+
+    return 4;
   }
 
   function addGroupMemberFromDialog() {
@@ -14183,6 +14222,7 @@
     conversation.groupOwnerJid = jid;
     conversation.groupMemberJids = Array.from(new Set([...(conversation.groupMemberJids || []), jid]));
     conversation.groupAdminJids = Array.from(new Set([...(conversation.groupAdminJids || []), jid]));
+    conversation.groupBannedJids = (conversation.groupBannedJids || []).filter((item) => !jidMatches(item, jid));
   }
 
   function markCurrentUserAsGroupAdmin(conversation) {
@@ -14193,6 +14233,7 @@
 
     conversation.groupMemberJids = Array.from(new Set([...(conversation.groupMemberJids || []), jid]));
     conversation.groupAdminJids = Array.from(new Set([...(conversation.groupAdminJids || []), jid]));
+    conversation.groupBannedJids = (conversation.groupBannedJids || []).filter((item) => !jidMatches(item, jid));
   }
 
   function assignCurrentUserAsGroupOwner(conversation) {
@@ -14262,22 +14303,34 @@
 
     const members = new Set((conversation.groupMemberJids || []).map((item) => bareJid(item)).filter(Boolean));
     const admins = new Set((conversation.groupAdminJids || []).map((item) => bareJid(item)).filter(Boolean));
+    const banned = new Set((conversation.groupBannedJids || []).map((item) => bareJid(item)).filter(Boolean));
     if (affiliation === "owner") {
       conversation.groupOwnerJid = normalized;
       members.add(normalized);
       admins.add(normalized);
+      banned.delete(normalized);
     } else if (affiliation === "admin") {
       members.add(normalized);
       admins.add(normalized);
+      banned.delete(normalized);
     } else if (affiliation === "member") {
       members.add(normalized);
       admins.delete(normalized);
+      banned.delete(normalized);
       if (jidMatches(conversation.groupOwnerJid || "", normalized)) {
         conversation.groupOwnerJid = "";
       }
-    } else if (affiliation === "none" || affiliation === "outcast") {
+    } else if (affiliation === "outcast") {
       members.delete(normalized);
       admins.delete(normalized);
+      banned.add(normalized);
+      if (jidMatches(conversation.groupOwnerJid || "", normalized)) {
+        conversation.groupOwnerJid = "";
+      }
+    } else if (affiliation === "none") {
+      members.delete(normalized);
+      admins.delete(normalized);
+      banned.delete(normalized);
       if (jidMatches(conversation.groupOwnerJid || "", normalized)) {
         conversation.groupOwnerJid = "";
       }
@@ -14285,6 +14338,7 @@
 
     conversation.groupMemberJids = [...members];
     conversation.groupAdminJids = [...admins];
+    conversation.groupBannedJids = [...banned];
   }
 
   function sendXmppRoomConfig(roomPeer, fields) {

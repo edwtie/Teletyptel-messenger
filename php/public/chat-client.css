@@ -904,6 +904,12 @@ body.account-gate .modal-shell {
   font-weight: 700;
 }
 
+.group-member-role-badge-danger {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
 @media (max-width: 640px) {
   .group-management-toggle,
   .group-details-row,

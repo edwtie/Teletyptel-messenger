@@ -81,11 +81,13 @@ function writeGroupMetadata(): void
             account_id, room_jid, room_name, avatar_data_url, avatar_color,
             avatar_hash, avatar_media_type, avatar_updated_at,
             owner_jid, admin_jids_json, member_jids_json,
+            banned_jids_json,
             approve_members, members_can_invite
         ) VALUES (
             :account_id, :room_jid, :room_name, :avatar_data_url, :avatar_color,
             :avatar_hash, :avatar_media_type, :avatar_updated_at,
             :owner_jid, :admin_jids_json, :member_jids_json,
+            :banned_jids_json,
             :approve_members, :members_can_invite
         )
         ON DUPLICATE KEY UPDATE
@@ -98,6 +100,7 @@ function writeGroupMetadata(): void
             owner_jid = VALUES(owner_jid),
             admin_jids_json = VALUES(admin_jids_json),
             member_jids_json = VALUES(member_jids_json),
+            banned_jids_json = VALUES(banned_jids_json),
             approve_members = VALUES(approve_members),
             members_can_invite = VALUES(members_can_invite),
             updated_at = CURRENT_TIMESTAMP'
@@ -114,6 +117,7 @@ function writeGroupMetadata(): void
         'owner_jid' => groupBareJid(cleanGroupText($input['ownerJid'] ?? '', 255)),
         'admin_jids_json' => json_encode(normalizeGroupJidList($input['adminJids'] ?? []), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
         'member_jids_json' => json_encode(normalizeGroupJidList($input['memberJids'] ?? []), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+        'banned_jids_json' => json_encode(normalizeGroupJidList($input['bannedJids'] ?? []), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
         'approve_members' => !empty($input['approveMembers']) ? 1 : 0,
         'members_can_invite' => array_key_exists('membersCanInvite', $input) && !$input['membersCanInvite'] ? 0 : 1,
     ]);
@@ -137,6 +141,7 @@ function ensureGroupMetadataSchema(PDO $pdo): void
             owner_jid VARCHAR(255) NOT NULL DEFAULT "",
             admin_jids_json MEDIUMTEXT NULL,
             member_jids_json MEDIUMTEXT NULL,
+            banned_jids_json MEDIUMTEXT NULL,
             approve_members TINYINT(1) NOT NULL DEFAULT 0,
             members_can_invite TINYINT(1) NOT NULL DEFAULT 1,
             created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -145,6 +150,7 @@ function ensureGroupMetadataSchema(PDO $pdo): void
             KEY idx_group_metadata_account_updated (account_id, updated_at)
         ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
     );
+    ensureGroupMetadataColumn($pdo, 'banned_jids_json', 'banned_jids_json MEDIUMTEXT NULL');
 }
 
 function groupMetadataRowToClient(array $row): array
@@ -160,9 +166,20 @@ function groupMetadataRowToClient(array $row): array
         'ownerJid' => $row['owner_jid'] ?? '',
         'adminJids' => normalizeGroupJidList(decodeGroupJson($row['admin_jids_json'] ?? null)),
         'memberJids' => normalizeGroupJidList(decodeGroupJson($row['member_jids_json'] ?? null)),
+        'bannedJids' => normalizeGroupJidList(decodeGroupJson($row['banned_jids_json'] ?? null)),
         'approveMembers' => (bool)$row['approve_members'],
         'membersCanInvite' => (bool)$row['members_can_invite'],
     ];
+}
+
+function ensureGroupMetadataColumn(PDO $pdo, string $column, string $definition): void
+{
+    $statement = $pdo->query('SHOW COLUMNS FROM group_metadata LIKE ' . $pdo->quote($column));
+    if ($statement && $statement->fetch()) {
+        return;
+    }
+
+    $pdo->exec('ALTER TABLE group_metadata ADD COLUMN ' . $definition);
 }
 
 function canUseGroupMetadataSession(string $accountId, string $loginToken = ''): bool
