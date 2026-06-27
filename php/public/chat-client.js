@@ -356,7 +356,9 @@
       startX: 0,
       startY: 0,
       startOffsetX: 0,
-      startOffsetY: 0
+      startOffsetY: 0,
+      target: "account",
+      conversationId: null
     },
     avatarCrop: {
       image: null,
@@ -4352,16 +4354,18 @@
         return;
       }
 
-      openAvatarCropDialog(dataUrl);
+      openAvatarCropDialog(dataUrl, { target: "account" });
     });
     reader.addEventListener("error", () => updateAccountStatus(t("avatar.read_failed", "Avatar could not be read.")));
     reader.readAsDataURL(file);
   }
 
-  function openAvatarCropDialog(dataUrl) {
+  function openAvatarCropDialog(dataUrl, options = {}) {
     const image = new Image();
     image.addEventListener("load", () => {
       state.avatarCrop.image = image;
+      state.avatarCrop.target = options.target || "account";
+      state.avatarCrop.conversationId = options.conversationId || null;
       resetAvatarCrop();
       el.avatarCropDialog.hidden = false;
       document.body.classList.add("modal-open");
@@ -4512,7 +4516,7 @@
     el.avatarCropCanvas.classList.remove("dragging");
   }
 
-  function applyAvatarCrop() {
+  async function applyAvatarCrop() {
     const image = state.avatarCrop.image;
     if (!image) {
       return;
@@ -4534,6 +4538,14 @@
     const sourceSize = Math.min(image.naturalWidth - sourceX, image.naturalHeight - sourceY, cropSize / state.avatarCrop.scale);
     context.drawImage(image, sourceX, sourceY, sourceSize, sourceSize, 0, 0, outputSize, outputSize);
     const dataUrl = canvas.toDataURL("image/jpeg", .9);
+    if (state.avatarCrop.target === "group") {
+      const conversation = state.conversations.find((item) => item.id === state.avatarCrop.conversationId) ?? null;
+      if (await setGroupAvatarFromCroppedCanvas(conversation, canvas)) {
+        closeAvatarCropDialog();
+      }
+      return;
+    }
+
     setAccountAvatarDataUrl(dataUrl);
     closeAvatarCropDialog();
   }
@@ -4556,6 +4568,8 @@
   function closeAvatarCropDialog() {
     el.avatarCropDialog.hidden = true;
     state.avatarCrop.image = null;
+    state.avatarCrop.target = "account";
+    state.avatarCrop.conversationId = null;
     endAvatarCropDrag();
     if (el.accountDialog.hidden) {
       document.body.classList.remove("modal-open");
@@ -14499,7 +14513,7 @@
     el.mucAvatarFileInput.click();
   }
 
-  async function handleMucAvatarFileSelected() {
+  function handleMucAvatarFileSelected() {
     const conversationId = state.pendingMucAvatarConversationId || state.contextConversationId;
     const conversation = state.conversations.find((item) => item.id === conversationId) ?? activeConversation();
     state.pendingMucAvatarConversationId = null;
@@ -14518,11 +14532,33 @@
       return;
     }
 
+    const reader = new FileReader();
+    reader.addEventListener("load", () => {
+      const dataUrl = String(reader.result ?? "");
+      if (!isAvatarSourceDataUrl(dataUrl)) {
+        setConnectionStatus(t("avatar.read_failed", "Avatar could not be read."), "danger");
+        return;
+      }
+
+      openAvatarCropDialog(dataUrl, { target: "group", conversationId: conversation.id });
+    });
+    reader.addEventListener("error", () => setConnectionStatus(t("avatar.read_failed", "Avatar could not be read."), "danger"));
+    reader.readAsDataURL(file);
+  }
+
+  async function setGroupAvatarFromCroppedCanvas(conversation, canvas) {
+    if (!conversation || !canChangeMucAvatar(conversation)) {
+      setConnectionStatus(t("group.admin_required", "Only group admins can change this."), "warn");
+      return false;
+    }
+
     setConnectionStatus(t("button.uploading", "Uploading..."), "warn");
     try {
+      const blob = await canvasToAvatarBlob(canvas);
+      const file = new File([blob], "group-avatar.jpg", { type: "image/jpeg" });
       const [payload, bytes] = await Promise.all([
         uploadFileDirect(file),
-        file.arrayBuffer()
+        blob.arrayBuffer()
       ]);
       const avatarUrl = String(payload?.file?.url || "");
       if (!isValidAvatarFileUrl(avatarUrl)) {
@@ -14531,7 +14567,7 @@
 
       conversation.avatarDataUrl = avatarUrl;
       conversation.mucAvatarHash = hexBytes(sha1Bytes([...new Uint8Array(bytes)]));
-      conversation.mucAvatarMediaType = file.type || "image/png";
+      conversation.mucAvatarMediaType = "image/jpeg";
       conversation.mucAvatarUpdatedAt = new Date().toISOString();
       markCurrentUserAsGroupAdmin(conversation);
       setConnectionStatus(t("status.group_avatar_changed", "Group avatar changed."), "good");
@@ -14544,10 +14580,25 @@
       renderActiveConversation();
       refreshOpenTabPanel();
       persistGroupMetadata(conversation);
+      return true;
     } catch (error) {
       appendDebug("muc-avatar-error", error.message);
-      setConnectionStatus(`${t("upload.failed", "Upload failed")}: ${file.name}`, "danger");
+      setConnectionStatus(t("upload.failed", "Upload failed"), "danger");
+      return false;
     }
+  }
+
+  function canvasToAvatarBlob(canvas) {
+    return new Promise((resolve, reject) => {
+      canvas.toBlob((blob) => {
+        if (blob) {
+          resolve(blob);
+          return;
+        }
+
+        reject(new Error("avatar crop failed"));
+      }, "image/jpeg", .9);
+    });
   }
 
   function refreshOpenTabPanel() {
