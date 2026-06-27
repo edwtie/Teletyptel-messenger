@@ -13898,23 +13898,34 @@
 
       const actions = document.createElement("div");
       actions.className = "group-known-member-actions";
+      if (member.isMember || member.isAdmin || member.isOwner) {
+        const badge = document.createElement("span");
+        badge.className = "group-member-role-badge";
+        badge.textContent = groupMemberStatusText(member);
+        actions.appendChild(badge);
+      }
+
       const addButton = document.createElement("button");
       addButton.type = "button";
       addButton.textContent = t("button.group_add_member", "Add member");
-      addButton.disabled = member.isMember || member.isAdmin || member.isOwner;
       addButton.addEventListener("click", () => {
         el.groupMemberJidInput.value = member.jid;
         setGroupAffiliationFromDialog(member.jid, "member", t("group.member_added", "Member added."), true);
       });
+      if (!member.isMember && !member.isAdmin && !member.isOwner) {
+        actions.appendChild(addButton);
+      }
+
       const adminButton = document.createElement("button");
       adminButton.type = "button";
       adminButton.textContent = t("button.group_make_admin", "Make admin");
-      adminButton.disabled = member.isAdmin || member.isOwner;
       adminButton.addEventListener("click", () => {
         el.groupAdminJidInput.value = member.jid;
         setGroupAffiliationFromDialog(member.jid, "admin", t("group.admin_added", "Group admin assigned."), false);
       });
-      actions.append(addButton, adminButton);
+      if (!member.isAdmin && !member.isOwner) {
+        actions.appendChild(adminButton);
+      }
       row.append(identity, actions);
       el.groupKnownMembersPanel.appendChild(row);
     }

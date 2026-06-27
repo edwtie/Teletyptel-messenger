@@ -891,6 +891,19 @@ body.account-gate .modal-shell {
   justify-content: flex-end;
 }
 
+.group-member-role-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-strong);
+  color: var(--accent);
+  padding: 0 10px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
 @media (max-width: 640px) {
   .group-management-toggle,
   .group-details-row,
