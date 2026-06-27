@@ -561,6 +561,7 @@
     groupAddMemberButton: byId("groupAddMemberButton"),
     groupMakeAdminButton: byId("groupMakeAdminButton"),
     groupRemoveAdminButton: byId("groupRemoveAdminButton"),
+    groupMemberListTitle: byId("groupMemberListTitle"),
     groupKnownMembersPanel: byId("groupKnownMembersPanel"),
     groupBannedMembersPanel: byId("groupBannedMembersPanel"),
     groupKnownMembersList: byId("groupKnownMembersList"),
@@ -14106,6 +14107,7 @@
     const canUseAdminActions = canCurrentUserUseGroupAdminTabs(conversation);
     const visibleMembers = members.filter((member) => !member.isBanned);
     const bannedMembers = members.filter((member) => member.isBanned);
+    el.groupMemberListTitle.textContent = groupMemberListTitle(visibleMembers.length);
     el.groupKnownMembersPanel.replaceChildren();
     el.groupBannedMembersPanel.replaceChildren();
     el.groupKnownMembersList.replaceChildren();
@@ -14138,6 +14140,13 @@
     for (const member of bannedMembers) {
       el.groupBannedMembersPanel.appendChild(createGroupMemberRow(member, "blacklist", canUseAdminActions));
     }
+  }
+
+  function groupMemberListTitle(count) {
+    const template = count === 1
+      ? t("group.member_list_count_one", "Member list - 1 member")
+      : t("group.member_list_count_many", "Member list - {0} members");
+    return template.replace("{0}", String(count));
   }
 
   function createGroupMemberRow(member, mode, canUseAdminActions) {

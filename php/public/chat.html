@@ -15,7 +15,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="favicon.ico" sizes="any">
   <link rel="apple-touch-icon" href="assets/brand/teletyptel-icon-192.png">
-  <link rel="stylesheet" href="chat-client.css?v=20260627-group-info">
+  <link rel="stylesheet" href="chat-client.css?v=20260627-group-member-count">
 </head>
 <body class="account-booting">
   <a class="skip-link" href="#messageInput" data-i18n="button.skip_to_message">Skip to message</a>
@@ -1154,7 +1154,7 @@
           </div>
         </section>
         <section class="group-management-section" data-group-panel="members">
-          <h3 data-i18n="group.member_list">Member list</h3>
+          <h3 id="groupMemberListTitle" data-i18n="group.member_list">Member list</h3>
           <div id="groupKnownMembersPanel" class="group-known-members"></div>
           <datalist id="groupKnownMembersList"></datalist>
         </section>
@@ -1236,6 +1236,6 @@
 
   <script src="vendor/qrcode.js?v=20260623-history-privacy-copy"></script>
   <script src="jingle-history.js?v=20260615-jingle-history"></script>
-  <script src="chat-client.js?v=20260627-group-info"></script>
+  <script src="chat-client.js?v=20260627-group-member-count"></script>
 </body>
 </html>
