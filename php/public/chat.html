@@ -15,7 +15,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="favicon.ico" sizes="any">
   <link rel="apple-touch-icon" href="assets/brand/teletyptel-icon-192.png">
-  <link rel="stylesheet" href="chat-client.css?v=20260627-group-sanctions">
+  <link rel="stylesheet" href="chat-client.css?v=20260627-group-tabs">
 </head>
 <body class="account-booting">
   <a class="skip-link" href="#messageInput" data-i18n="button.skip_to_message">Skip to message</a>
@@ -1086,7 +1086,12 @@
         <button id="closeGroupManagementButton" class="icon-button" type="button" aria-label="Close" data-i18n-aria-label="button.close">x</button>
       </div>
       <div class="modal-body group-management-body">
-        <section class="group-management-section group-details-section">
+        <div class="group-management-tabs" role="tablist" aria-label="Group management tabs" data-i18n-aria-label="group.tabs_label">
+          <button id="groupMembersTabButton" class="selected" type="button" role="tab" aria-selected="true" data-group-tab="members" data-i18n="group.tab_members">Members</button>
+          <button id="groupAdminToolsTabButton" type="button" role="tab" aria-selected="false" data-group-tab="tools" data-i18n="group.tab_admin_tools">Admin tools</button>
+          <button id="groupBlacklistTabButton" type="button" role="tab" aria-selected="false" data-group-tab="blacklist" data-i18n="group.tab_blacklist">Blacklist</button>
+        </div>
+        <section class="group-management-section group-details-section" data-group-panel="tools">
           <h3 data-i18n="group.details">Group details</h3>
           <div class="group-details-row">
             <div id="groupAvatarPreview" class="avatar avatar-list" aria-hidden="true"></div>
@@ -1098,7 +1103,7 @@
             <button id="groupChangeAvatarButton" type="button" data-i18n="button.group_change_avatar">Change avatar</button>
           </div>
         </section>
-        <section class="group-management-section">
+        <section class="group-management-section" data-group-panel="tools">
           <h3 data-i18n="group.members_can">Members can</h3>
           <label class="group-management-toggle">
             <span>
@@ -1108,7 +1113,7 @@
             <input id="groupMembersCanInviteToggle" type="checkbox">
           </label>
         </section>
-        <section class="group-management-section">
+        <section class="group-management-section" data-group-panel="tools">
           <h3 data-i18n="group.admins_can">Admins can</h3>
           <label class="group-management-toggle">
             <span>
@@ -1118,14 +1123,14 @@
             <input id="groupApproveMembersToggle" type="checkbox">
           </label>
         </section>
-        <section class="group-management-section">
+        <section class="group-management-section" data-group-panel="members">
           <h3 data-i18n="group.members">Members</h3>
           <div class="group-management-row">
             <input id="groupMemberJidInput" type="email" list="groupKnownMembersList" placeholder="member@localhost" data-i18n-placeholder="group.member_jid_placeholder">
             <button id="groupAddMemberButton" type="button" data-i18n="button.group_add_member">Add member</button>
           </div>
         </section>
-        <section class="group-management-section">
+        <section class="group-management-section" data-group-panel="tools">
           <h3 data-i18n="group.admins">Group admins</h3>
           <div class="group-management-row">
             <input id="groupAdminJidInput" type="email" list="groupKnownMembersList" placeholder="admin@localhost" data-i18n-placeholder="group.admin_jid_placeholder">
@@ -1133,10 +1138,14 @@
             <button id="groupRemoveAdminButton" type="button" data-i18n="button.group_remove_admin">Remove admin</button>
           </div>
         </section>
-        <section class="group-management-section">
+        <section class="group-management-section" data-group-panel="members">
           <h3 data-i18n="group.member_list">Member list</h3>
           <div id="groupKnownMembersPanel" class="group-known-members"></div>
           <datalist id="groupKnownMembersList"></datalist>
+        </section>
+        <section class="group-management-section" data-group-panel="blacklist" hidden>
+          <h3 data-i18n="group.blacklist">Blacklist</h3>
+          <div id="groupBannedMembersPanel" class="group-known-members"></div>
         </section>
         <div id="groupManagementStatus" class="dialog-status" role="status" aria-live="polite"></div>
       </div>
@@ -1212,6 +1221,6 @@
 
   <script src="vendor/qrcode.js?v=20260623-history-privacy-copy"></script>
   <script src="jingle-history.js?v=20260615-jingle-history"></script>
-  <script src="chat-client.js?v=20260627-group-sanctions"></script>
+  <script src="chat-client.js?v=20260627-group-tabs"></script>
 </body>
 </html>

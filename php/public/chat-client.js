@@ -472,6 +472,7 @@
     sessionLastActivityRecordedAt: 0,
     sessionTimeoutInProgress: false,
     groupManagementConversationId: null,
+    groupManagementTab: "members",
     conversations: [
       {
         id: "tester",
@@ -541,6 +542,9 @@
     mucAvatarFileInput: byId("mucAvatarFileInput"),
     groupManagementDialog: byId("groupManagementDialog"),
     groupManagementSubtitle: byId("groupManagementSubtitle"),
+    groupMembersTabButton: byId("groupMembersTabButton"),
+    groupAdminToolsTabButton: byId("groupAdminToolsTabButton"),
+    groupBlacklistTabButton: byId("groupBlacklistTabButton"),
     groupAvatarPreview: byId("groupAvatarPreview"),
     groupTitleInput: byId("groupTitleInput"),
     groupSaveTitleButton: byId("groupSaveTitleButton"),
@@ -553,6 +557,7 @@
     groupMakeAdminButton: byId("groupMakeAdminButton"),
     groupRemoveAdminButton: byId("groupRemoveAdminButton"),
     groupKnownMembersPanel: byId("groupKnownMembersPanel"),
+    groupBannedMembersPanel: byId("groupBannedMembersPanel"),
     groupKnownMembersList: byId("groupKnownMembersList"),
     groupManagementStatus: byId("groupManagementStatus"),
     closeGroupManagementButton: byId("closeGroupManagementButton"),
@@ -924,6 +929,9 @@
     el.closeGroupManagementButton.addEventListener("click", closeGroupManagementDialog);
     el.groupManagementOkButton.addEventListener("click", closeGroupManagementDialog);
     el.groupManagementDialog.addEventListener("click", closeGroupManagementDialogOnBackdrop);
+    el.groupMembersTabButton.addEventListener("click", () => setGroupManagementTab("members"));
+    el.groupAdminToolsTabButton.addEventListener("click", () => setGroupManagementTab("tools"));
+    el.groupBlacklistTabButton.addEventListener("click", () => setGroupManagementTab("blacklist"));
     el.groupSaveTitleButton.addEventListener("click", saveGroupTitleFromDialog);
     el.groupChangeAvatarButton.addEventListener("click", chooseGroupAvatarFromDialog);
     el.groupMembersCanInviteToggle.addEventListener("change", applyGroupRoomOptionsFromDialog);
@@ -13862,6 +13870,7 @@
 
   function openGroupManagementDialog(conversation) {
     state.groupManagementConversationId = conversation.id;
+    setGroupManagementTab("members");
     el.groupManagementSubtitle.textContent = `${conversationDisplayName(conversation)} - ${bareJid(conversation.peer)}`;
     el.groupTitleInput.value = conversationDisplayName(conversation);
     renderAvatarInto(el.groupAvatarPreview, conversation);
@@ -13873,6 +13882,20 @@
     renderKnownGroupMembers(conversation);
     setGroupManagementStatus(t("group.manage_ready", "Choose what group members and admins may do."), "info");
     el.groupManagementDialog.hidden = false;
+  }
+
+  function setGroupManagementTab(tab) {
+    const nextTab = ["members", "tools", "blacklist"].includes(tab) ? tab : "members";
+    state.groupManagementTab = nextTab;
+    for (const button of [el.groupMembersTabButton, el.groupAdminToolsTabButton, el.groupBlacklistTabButton]) {
+      const selected = button.dataset.groupTab === nextTab;
+      button.classList.toggle("selected", selected);
+      button.setAttribute("aria-selected", selected ? "true" : "false");
+    }
+
+    for (const panel of el.groupManagementDialog.querySelectorAll("[data-group-panel]")) {
+      panel.hidden = panel.dataset.groupPanel !== nextTab;
+    }
   }
 
   function updateGroupManagementEditControls(conversation) {
@@ -13984,101 +14007,131 @@
 
   function renderKnownGroupMembers(conversation) {
     const members = knownGroupMembers(conversation);
+    const visibleMembers = members.filter((member) => !member.isBanned);
+    const bannedMembers = members.filter((member) => member.isBanned);
     el.groupKnownMembersPanel.replaceChildren();
+    el.groupBannedMembersPanel.replaceChildren();
     el.groupKnownMembersList.replaceChildren();
-
-    if (!members.length) {
-      const empty = document.createElement("div");
-      empty.className = "group-known-members-empty";
-      empty.textContent = t("group.known_members_empty", "No known members yet. Members will appear here after they write in the group.");
-      el.groupKnownMembersPanel.appendChild(empty);
-      return;
-    }
 
     for (const member of members) {
       const option = document.createElement("option");
       option.value = member.jid;
       option.label = member.name;
       el.groupKnownMembersList.appendChild(option);
+    }
 
-      const row = document.createElement("div");
-      row.className = "group-known-member";
+    if (!visibleMembers.length) {
+      const empty = document.createElement("div");
+      empty.className = "group-known-members-empty";
+      empty.textContent = t("group.known_members_empty", "No known members yet. Members will appear here after they write in the group.");
+      el.groupKnownMembersPanel.appendChild(empty);
+    }
 
-      const identity = document.createElement("div");
-      identity.className = "group-known-member-identity";
-      const name = document.createElement("strong");
-      const star = document.createElement("span");
-      star.className = "group-member-admin-star";
-      star.textContent = "★";
-      star.title = member.isOwner
-        ? t("group.status_owner", "Owner")
-        : t("group.status_admin", "Admin");
-      star.setAttribute("aria-label", star.title);
-      star.hidden = !member.isAdmin && !member.isOwner;
-      const nameText = document.createElement("span");
-      nameText.textContent = member.name;
-      name.append(star, nameText);
-      const jid = document.createElement("span");
-      jid.textContent = member.jid;
-      const status = document.createElement("span");
-      status.className = "group-known-member-status";
-      status.textContent = groupMemberStatusText(member);
-      identity.append(name, jid, status);
+    for (const member of visibleMembers) {
+      el.groupKnownMembersPanel.appendChild(createGroupMemberRow(member, "members"));
+    }
 
-      const actions = document.createElement("div");
-      actions.className = "group-known-member-actions";
-      if (member.isBanned) {
-        const badge = document.createElement("span");
-        badge.className = "group-member-role-badge group-member-role-badge-danger";
-        badge.textContent = groupMemberStatusText(member);
-        actions.appendChild(badge);
-      } else if (member.isMember || member.isAdmin || member.isOwner) {
-        const badge = document.createElement("span");
-        badge.className = "group-member-role-badge";
-        badge.textContent = groupMemberStatusText(member);
-        actions.appendChild(badge);
-      }
+    if (!bannedMembers.length) {
+      const empty = document.createElement("div");
+      empty.className = "group-known-members-empty";
+      empty.textContent = t("group.blacklist_empty", "No banned members.");
+      el.groupBannedMembersPanel.appendChild(empty);
+    }
 
-      const addButton = document.createElement("button");
-      addButton.type = "button";
-      addButton.textContent = t("button.group_add_member", "Add member");
-      addButton.addEventListener("click", () => {
-        el.groupMemberJidInput.value = member.jid;
-        setGroupAffiliationFromDialog(member.jid, "member", t("group.member_added", "Member added."), true);
+    for (const member of bannedMembers) {
+      el.groupBannedMembersPanel.appendChild(createGroupMemberRow(member, "blacklist"));
+    }
+  }
+
+  function createGroupMemberRow(member, mode) {
+    const row = document.createElement("div");
+    row.className = "group-known-member";
+
+    const identity = document.createElement("div");
+    identity.className = "group-known-member-identity";
+    const name = document.createElement("strong");
+    const star = document.createElement("span");
+    star.className = "group-member-admin-star";
+    star.textContent = "★";
+    star.title = member.isOwner
+      ? t("group.status_owner", "Owner")
+      : t("group.status_admin", "Admin");
+    star.setAttribute("aria-label", star.title);
+    star.hidden = !member.isAdmin && !member.isOwner;
+    const nameText = document.createElement("span");
+    nameText.textContent = member.name;
+    name.append(star, nameText);
+    const jid = document.createElement("span");
+    jid.textContent = member.jid;
+    const status = document.createElement("span");
+    status.className = "group-known-member-status";
+    status.textContent = groupMemberStatusText(member);
+    identity.append(name, jid, status);
+
+    const actions = document.createElement("div");
+    actions.className = "group-known-member-actions";
+    appendGroupMemberBadge(actions, member);
+    appendGroupMemberActions(actions, member, mode);
+    row.append(identity, actions);
+    return row;
+  }
+
+  function appendGroupMemberBadge(actions, member) {
+    if (!member.isBanned && !member.isMember && !member.isAdmin && !member.isOwner) {
+      return;
+    }
+
+    const badge = document.createElement("span");
+    badge.className = member.isBanned
+      ? "group-member-role-badge group-member-role-badge-danger"
+      : "group-member-role-badge";
+    badge.textContent = groupMemberStatusText(member);
+    actions.appendChild(badge);
+  }
+
+  function appendGroupMemberActions(actions, member, mode) {
+    if (mode === "blacklist") {
+      const unbanButton = document.createElement("button");
+      unbanButton.type = "button";
+      unbanButton.textContent = t("button.group_unban_member", "Unban");
+      unbanButton.addEventListener("click", () => {
+        setGroupAffiliationFromDialog(member.jid, "none", t("group.member_unbanned", "Ban removed."), false);
       });
-      if (!member.isMember && !member.isAdmin && !member.isOwner && !member.isBanned) {
-        actions.appendChild(addButton);
-      }
+      actions.appendChild(unbanButton);
+      return;
+    }
 
-      const adminButton = document.createElement("button");
-      adminButton.type = "button";
-      adminButton.textContent = t("button.group_make_admin", "Make admin");
-      adminButton.addEventListener("click", () => {
-        el.groupAdminJidInput.value = member.jid;
-        setGroupAffiliationFromDialog(member.jid, "admin", t("group.admin_added", "Group admin assigned."), false);
-      });
-      if (!member.isAdmin && !member.isOwner && !member.isBanned) {
-        actions.appendChild(adminButton);
-      }
+    const addButton = document.createElement("button");
+    addButton.type = "button";
+    addButton.textContent = t("button.group_add_member", "Add member");
+    addButton.addEventListener("click", () => {
+      el.groupMemberJidInput.value = member.jid;
+      setGroupAffiliationFromDialog(member.jid, "member", t("group.member_added", "Member added."), true);
+    });
+    if (!member.isMember && !member.isAdmin && !member.isOwner && !member.isBanned) {
+      actions.appendChild(addButton);
+    }
 
-      const banButton = document.createElement("button");
-      banButton.type = "button";
-      banButton.className = "danger-action";
-      banButton.textContent = member.isBanned
-        ? t("button.group_unban_member", "Unban")
-        : t("button.group_ban_member", "Ban");
-      banButton.addEventListener("click", () => {
-        const affiliation = member.isBanned ? "none" : "outcast";
-        const message = member.isBanned
-          ? t("group.member_unbanned", "Ban removed.")
-          : t("group.member_banned", "Member banned.");
-        setGroupAffiliationFromDialog(member.jid, affiliation, message, false);
-      });
-      if (!member.isOwner && !member.isSelf) {
-        actions.appendChild(banButton);
-      }
-      row.append(identity, actions);
-      el.groupKnownMembersPanel.appendChild(row);
+    const adminButton = document.createElement("button");
+    adminButton.type = "button";
+    adminButton.textContent = t("button.group_make_admin", "Make admin");
+    adminButton.addEventListener("click", () => {
+      el.groupAdminJidInput.value = member.jid;
+      setGroupAffiliationFromDialog(member.jid, "admin", t("group.admin_added", "Group admin assigned."), false);
+    });
+    if (!member.isAdmin && !member.isOwner && !member.isBanned) {
+      actions.appendChild(adminButton);
+    }
+
+    const banButton = document.createElement("button");
+    banButton.type = "button";
+    banButton.className = "danger-action";
+    banButton.textContent = t("button.group_ban_member", "Ban");
+    banButton.addEventListener("click", () => {
+      setGroupAffiliationFromDialog(member.jid, "outcast", t("group.member_banned", "Member banned."), false);
+    });
+    if (!member.isOwner && !member.isSelf) {
+      actions.appendChild(banButton);
     }
   }
 

@@ -774,6 +774,32 @@ body.account-gate .modal-shell {
   font-weight: 700;
 }
 
+.group-management-tabs {
+  display: flex;
+  gap: 6px;
+  border-bottom: 1px solid var(--line);
+}
+
+.group-management-tabs button {
+  border: 0;
+  border-bottom: 3px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  padding: 8px 10px;
+  font-weight: 700;
+}
+
+.group-management-tabs button:hover:not(:disabled) {
+  background: var(--panel-strong);
+  color: var(--text);
+}
+
+.group-management-tabs button.selected {
+  border-bottom-color: var(--accent);
+  color: var(--accent);
+}
+
 .group-management-toggle,
 .group-management-row {
   display: grid;
