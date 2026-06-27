@@ -69,6 +69,7 @@
   const historySettingsStorageKeyBase = "teletyptel.historySettings";
   const accountApiPath = "api/account.php";
   const historyApiPath = "api/history.php";
+  const groupMetadataApiPath = "api/group-metadata.php";
   const linkPreviewApiPath = "api/link-preview.php";
   const rtcConfigApiPath = "api/rtc-config.php";
   const uploadApiPath = "api/upload.php";
@@ -1899,6 +1900,7 @@
       }
       await loadMessageHistory();
       await loadConversationHistory();
+      await loadGroupMetadata();
       await loadLanguage(state.account.preferredLanguage ?? "eng");
       await loadRtcConfig();
       const provider = await fetchJson(`config/providers/${encodeURIComponent(state.account.providerId)}.json`);
@@ -2375,6 +2377,17 @@
     return query;
   }
 
+  function groupMetadataQueryParams(params = {}) {
+    const query = new URLSearchParams({
+      ...params
+    });
+    const loginToken = accountLoginToken();
+    if (loginToken) {
+      query.set("loginToken", loginToken);
+    }
+    return query;
+  }
+
   function accountLoginToken(account = state.account) {
     return String(oauthLoginToken || account?.loginToken || "").trim();
   }
@@ -2554,6 +2567,116 @@
         appendDebug("history-error", `history API returned ${response.status}`);
       }
     }).catch((error) => appendDebug("history-error", error.message));
+  }
+
+  async function loadGroupMetadata() {
+    if (!state.account?.accountId) {
+      return false;
+    }
+
+    try {
+      const query = groupMetadataQueryParams({ accountId: state.account.accountId });
+      const response = await fetch(`${groupMetadataApiPath}?${query.toString()}`, { cache: "no-store" });
+      if (response.status === 404) {
+        return false;
+      }
+
+      if (!response.ok) {
+        appendDebug("group-metadata-error", `group metadata API returned ${response.status}`);
+        return false;
+      }
+
+      const payload = await response.json();
+      if (!payload.ok || !Array.isArray(payload.groups)) {
+        return false;
+      }
+
+      for (const group of payload.groups) {
+        applyGroupMetadataRecord(group);
+      }
+      renderConversations();
+      renderActiveConversation();
+      refreshOpenTabPanel();
+      appendDebug("group-metadata", `Loaded ${payload.groups.length} groups`);
+      return true;
+    } catch (error) {
+      appendDebug("group-metadata-error", error.message);
+      return false;
+    }
+  }
+
+  function applyGroupMetadataRecord(record) {
+    const roomJid = bareJid(record?.roomJid || "");
+    if (!roomJid) {
+      return;
+    }
+
+    const conversation = ensureConversationForPeer(roomJid, "group", record.roomName || displayNameForJid(roomJid));
+    if (!conversation) {
+      return;
+    }
+
+    if (typeof record.roomName === "string" && record.roomName.trim()) {
+      conversation.name = record.roomName.trim();
+      delete conversation.nameKey;
+    }
+    if (isValidAvatarDataUrl(record.avatarDataUrl || "")) {
+      conversation.avatarDataUrl = record.avatarDataUrl;
+    }
+    if (typeof record.avatarColor === "string" && record.avatarColor.trim()) {
+      conversation.avatarColor = normalizeAvatarColor(record.avatarColor);
+    }
+    conversation.mucAvatarHash = String(record.avatarHash || conversation.mucAvatarHash || "");
+    conversation.mucAvatarMediaType = String(record.avatarMediaType || conversation.mucAvatarMediaType || "");
+    conversation.mucAvatarUpdatedAt = record.avatarUpdatedAt || conversation.mucAvatarUpdatedAt || null;
+    conversation.groupOwnerJid = bareJid(record.ownerJid || "");
+    conversation.groupAdminJids = normalizeGroupMetadataJids(record.adminJids);
+    conversation.groupMemberJids = normalizeGroupMetadataJids(record.memberJids);
+    conversation.groupApproveMembers = record.approveMembers === true;
+    conversation.groupMembersCanInvite = record.membersCanInvite !== false;
+  }
+
+  function normalizeGroupMetadataJids(values) {
+    if (!Array.isArray(values)) {
+      return [];
+    }
+
+    return [...new Set(values.map((jid) => bareJid(jid)).filter(Boolean))];
+  }
+
+  function persistGroupMetadata(conversation) {
+    if (!state.account?.accountId || !conversation || conversation.kind !== "group") {
+      return;
+    }
+
+    fetch(groupMetadataApiPath, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(groupMetadataPayload(conversation))
+    }).then((response) => {
+      if (!response.ok) {
+        appendDebug("group-metadata-error", `group metadata API returned ${response.status}`);
+      }
+    }).catch((error) => appendDebug("group-metadata-error", error.message));
+  }
+
+  function groupMetadataPayload(conversation) {
+    return {
+      accountId: state.account.accountId,
+      loginToken: accountLoginToken(),
+      roomJid: bareJid(conversation.peer),
+      roomName: conversationDisplayName(conversation),
+      avatarDataUrl: isValidAvatarDataUrl(conversation.avatarDataUrl || "") ? conversation.avatarDataUrl : "",
+      avatarColor: normalizeAvatarColor(conversation.avatarColor || ""),
+      avatarHash: conversation.mucAvatarHash || "",
+      avatarMediaType: conversation.mucAvatarMediaType || "",
+      avatarUpdatedAt: conversation.mucAvatarUpdatedAt || null,
+      ownerJid: bareJid(conversation.groupOwnerJid || ""),
+      adminJids: normalizeGroupMetadataJids(conversation.groupAdminJids || []),
+      memberJids: normalizeGroupMetadataJids(conversation.groupMemberJids || []),
+      approveMembers: conversation.groupApproveMembers === true,
+      membersCanInvite: conversation.groupMembersCanInvite !== false
+    };
   }
 
   async function fetchJson(url) {
@@ -3952,6 +4075,7 @@
     recordSessionActivity({ force: true });
     await loadMessageHistory();
     await loadConversationHistory();
+    await loadGroupMetadata();
   }
 
   async function saveDatabaseAccount(profile, action = "save") {
@@ -13477,6 +13601,7 @@
 
     const conversation = ensureConversationForPeer(peer, "group", name.trim());
     markCurrentUserAsGroupOwner(conversation);
+    persistGroupMetadata(conversation);
     selectConversation(conversation);
     joinXmppGroupConversation(conversation);
     assignCurrentUserAsGroupOwner(conversation);
@@ -13808,6 +13933,7 @@
       renderConversations();
       renderActiveConversation();
       refreshOpenTabPanel();
+      persistGroupMetadata(conversation);
     }
 
     setGroupManagementStatus(sent
@@ -13841,6 +13967,7 @@
     if (sent) {
       markCurrentUserAsGroupAdmin(conversation);
       updateGroupManagementEditControls(conversation);
+      persistGroupMetadata(conversation);
     }
     if (!sent) {
       conversation.groupApproveMembers = previousApproveMembers;
@@ -14121,6 +14248,7 @@
       rememberGroupAffiliation(conversation, jid, affiliation);
       updateGroupManagementEditControls(conversation);
       renderKnownGroupMembers(conversation);
+      persistGroupMetadata(conversation);
     }
 
     setGroupManagementStatus(sent ? successText : t("group.admin_action_failed", "Group management command could not be sent."), sent ? "good" : "danger");
@@ -14265,6 +14393,7 @@
       renderConversations();
       renderActiveConversation();
       refreshOpenTabPanel();
+      persistGroupMetadata(conversation);
     });
     reader.addEventListener("error", () => setConnectionStatus(t("avatar.read_failed", "Avatar could not be read."), "danger"));
     reader.readAsDataURL(file);
