@@ -13870,7 +13870,6 @@
 
   function openGroupManagementDialog(conversation) {
     state.groupManagementConversationId = conversation.id;
-    setGroupManagementTab("members");
     el.groupManagementSubtitle.textContent = `${conversationDisplayName(conversation)} - ${bareJid(conversation.peer)}`;
     el.groupTitleInput.value = conversationDisplayName(conversation);
     renderAvatarInto(el.groupAvatarPreview, conversation);
@@ -13880,12 +13879,16 @@
     el.groupMemberJidInput.value = "";
     el.groupAdminJidInput.value = "";
     renderKnownGroupMembers(conversation);
+    updateGroupManagementTabAccess(conversation);
+    setGroupManagementTab("members");
     setGroupManagementStatus(t("group.manage_ready", "Choose what group members and admins may do."), "info");
     el.groupManagementDialog.hidden = false;
   }
 
   function setGroupManagementTab(tab) {
-    const nextTab = ["members", "tools", "blacklist"].includes(tab) ? tab : "members";
+    const canUseAdminTabs = canCurrentUserUseGroupAdminTabs(groupManagementConversation());
+    const requestedTab = ["members", "tools", "blacklist"].includes(tab) ? tab : "members";
+    const nextTab = canUseAdminTabs || requestedTab === "members" ? requestedTab : "members";
     state.groupManagementTab = nextTab;
     for (const button of [el.groupMembersTabButton, el.groupAdminToolsTabButton, el.groupBlacklistTabButton]) {
       const selected = button.dataset.groupTab === nextTab;
@@ -13896,6 +13899,17 @@
     for (const panel of el.groupManagementDialog.querySelectorAll("[data-group-panel]")) {
       panel.hidden = panel.dataset.groupPanel !== nextTab;
     }
+  }
+
+  function updateGroupManagementTabAccess(conversation) {
+    const canUseAdminTabs = canCurrentUserUseGroupAdminTabs(conversation);
+    el.groupAdminToolsTabButton.hidden = !canUseAdminTabs;
+    el.groupBlacklistTabButton.hidden = !canUseAdminTabs;
+  }
+
+  function canCurrentUserUseGroupAdminTabs(conversation) {
+    return canManageGroupConversation(conversation)
+      && (isCurrentUserGroupAdmin(conversation) || !hasKnownGroupRoles(conversation));
   }
 
   function updateGroupManagementEditControls(conversation) {
@@ -14007,6 +14021,7 @@
 
   function renderKnownGroupMembers(conversation) {
     const members = knownGroupMembers(conversation);
+    const canUseAdminActions = canCurrentUserUseGroupAdminTabs(conversation);
     const visibleMembers = members.filter((member) => !member.isBanned);
     const bannedMembers = members.filter((member) => member.isBanned);
     el.groupKnownMembersPanel.replaceChildren();
@@ -14028,7 +14043,7 @@
     }
 
     for (const member of visibleMembers) {
-      el.groupKnownMembersPanel.appendChild(createGroupMemberRow(member, "members"));
+      el.groupKnownMembersPanel.appendChild(createGroupMemberRow(member, "members", canUseAdminActions));
     }
 
     if (!bannedMembers.length) {
@@ -14039,11 +14054,11 @@
     }
 
     for (const member of bannedMembers) {
-      el.groupBannedMembersPanel.appendChild(createGroupMemberRow(member, "blacklist"));
+      el.groupBannedMembersPanel.appendChild(createGroupMemberRow(member, "blacklist", canUseAdminActions));
     }
   }
 
-  function createGroupMemberRow(member, mode) {
+  function createGroupMemberRow(member, mode, canUseAdminActions) {
     const row = document.createElement("div");
     row.className = "group-known-member";
 
@@ -14071,7 +14086,7 @@
     const actions = document.createElement("div");
     actions.className = "group-known-member-actions";
     appendGroupMemberBadge(actions, member);
-    appendGroupMemberActions(actions, member, mode);
+    appendGroupMemberActions(actions, member, mode, canUseAdminActions);
     row.append(identity, actions);
     return row;
   }
@@ -14089,7 +14104,11 @@
     actions.appendChild(badge);
   }
 
-  function appendGroupMemberActions(actions, member, mode) {
+  function appendGroupMemberActions(actions, member, mode, canUseAdminActions) {
+    if (!canUseAdminActions) {
+      return;
+    }
+
     if (mode === "blacklist") {
       const unbanButton = document.createElement("button");
       unbanButton.type = "button";
