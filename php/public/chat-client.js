@@ -14516,7 +14516,7 @@
     const currentJid = bareJid(currentFromJid());
     const add = (jid, name = "", flags = {}) => {
       const normalized = bareJid(jid);
-      if (!normalized || normalized === bareJid(conversation?.peer || "")) {
+      if (!isKnownGroupMemberJid(normalized, conversation)) {
         return;
       }
 
@@ -14561,6 +14561,14 @@
         ? left.name.localeCompare(right.name, undefined, { sensitivity: "base" })
         : leftRank - rightRank;
     });
+  }
+
+  function isKnownGroupMemberJid(jid, conversation) {
+    const normalized = bareJid(jid);
+    return Boolean(normalized)
+      && normalized.includes("@")
+      && normalized !== bareJid(conversation?.peer || "")
+      && !isInfrastructurePeer(normalized);
   }
 
   function groupMemberRank(member) {
