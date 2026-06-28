@@ -960,6 +960,38 @@ body.account-gate .modal-shell {
   justify-content: flex-end;
 }
 
+.group-member-menu-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  padding: 0;
+  opacity: 0;
+  transition: opacity .15s ease, transform .15s ease;
+}
+
+.group-known-member:hover .group-member-menu-button,
+.group-known-member:focus-within .group-member-menu-button,
+.group-member-menu-button:focus-visible {
+  opacity: 1;
+}
+
+.group-member-menu-button:hover:not(:disabled),
+.group-member-menu-button:focus-visible {
+  transform: translateY(1px);
+}
+
+.group-member-menu-symbol {
+  display: block;
+  width: 14px;
+  height: 9px;
+  background: currentColor;
+  mask: url("assets/icons/chevron-down-icon.svg") center / contain no-repeat;
+  -webkit-mask: url("assets/icons/chevron-down-icon.svg") center / contain no-repeat;
+}
+
 .group-member-role-badge {
   display: inline-flex;
   align-items: center;
@@ -992,6 +1024,12 @@ body.account-gate .modal-shell {
   .group-management-row button,
   .group-known-member-actions {
     justify-self: start;
+  }
+}
+
+@media (hover: none) {
+  .group-member-menu-button {
+    opacity: 1;
   }
 }
 

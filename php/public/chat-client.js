@@ -14269,16 +14269,23 @@
       actions.appendChild(adminButton);
     }
 
-    const banButton = document.createElement("button");
-    banButton.type = "button";
-    banButton.className = "danger-action";
-    banButton.textContent = t("button.group_ban_member", "Ban");
-    banButton.addEventListener("click", () => {
-      setGroupAffiliationFromDialog(member.jid, "outcast", t("group.member_banned", "Member banned."), false);
-    });
     if (!member.isOwner && !member.isSelf) {
-      actions.appendChild(banButton);
+      actions.appendChild(createGroupMemberMenuButton(member));
     }
+  }
+
+  function createGroupMemberMenuButton(member) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "group-member-menu-button";
+    button.title = t("group.member_menu", "Group member menu");
+    button.setAttribute("aria-label", button.title);
+    const symbol = document.createElement("span");
+    symbol.className = "group-member-menu-symbol";
+    symbol.setAttribute("aria-hidden", "true");
+    button.appendChild(symbol);
+    button.addEventListener("click", (event) => showGroupMemberContextMenu(event, member, button));
+    return button;
   }
 
   function openGroupMemberProfile(member) {
@@ -14299,7 +14306,7 @@
     }
   }
 
-  function showGroupMemberContextMenu(event, member) {
+  function showGroupMemberContextMenu(event, member, anchor = null) {
     const jid = bareJid(member?.jid || "");
     if (!jid) {
       return;
@@ -14312,13 +14319,19 @@
     state.groupMemberContextJid = jid;
     updateGroupMemberContextMenu(member);
 
+    const anchorRect = anchor?.getBoundingClientRect();
+    const fallbackX = anchorRect ? anchorRect.left + anchorRect.width / 2 : 12;
+    const fallbackY = anchorRect ? anchorRect.bottom + 4 : 12;
+    const x = Number.isFinite(event.clientX) && event.clientX > 0 ? event.clientX : fallbackX;
+    const y = Number.isFinite(event.clientY) && event.clientY > 0 ? event.clientY : fallbackY;
+
     const menu = el.groupMemberContextMenu;
     menu.hidden = false;
     menu.style.left = "0px";
     menu.style.top = "0px";
     const rect = menu.getBoundingClientRect();
-    const left = Math.max(8, Math.min(event.clientX, window.innerWidth - rect.width - 8));
-    const top = Math.max(8, Math.min(event.clientY, window.innerHeight - rect.height - 8));
+    const left = Math.max(8, Math.min(x, window.innerWidth - rect.width - 8));
+    const top = Math.max(8, Math.min(y, window.innerHeight - rect.height - 8));
     menu.style.left = `${left}px`;
     menu.style.top = `${top}px`;
     menu.querySelector("button:not([hidden]):not(:disabled)")?.focus();
