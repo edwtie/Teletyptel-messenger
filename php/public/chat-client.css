@@ -967,6 +967,9 @@ body.account-gate .modal-shell {
   width: 34px;
   min-width: 34px;
   height: 34px;
+  border-color: transparent;
+  background: transparent;
+  color: #111827;
   padding: 0;
   opacity: 0;
   transition: opacity .15s ease, transform .15s ease;
@@ -980,6 +983,11 @@ body.account-gate .modal-shell {
 
 .group-member-menu-button:hover:not(:disabled),
 .group-member-menu-button:focus-visible {
+  border-color: transparent;
+  background: transparent;
+  color: var(--accent-strong);
+  box-shadow: none;
+  outline: none;
   transform: translateY(1px);
 }
 
@@ -7762,4 +7770,23 @@ body.viewport-phone.tc-text-visible-active.call-active .composer {
     max-width: 100vw !important;
     padding: 6px 10px !important;
   }
+}
+
+.group-member-menu-button,
+body[data-theme] .group-member-menu-button {
+  border-color: transparent;
+  background: transparent;
+  color: #111827;
+  box-shadow: none;
+}
+
+.group-member-menu-button:hover:not(:disabled),
+.group-member-menu-button:focus-visible,
+body[data-theme] .group-member-menu-button:hover:not(:disabled),
+body[data-theme] .group-member-menu-button:focus-visible {
+  border-color: transparent;
+  background: transparent;
+  color: var(--accent-strong);
+  box-shadow: none;
+  outline: none;
 }
