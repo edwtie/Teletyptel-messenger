@@ -534,7 +534,6 @@
     disconnectButton: byId("disconnectButton"),
     addConversationButton: byId("addConversationButton"),
     addGroupButton: byId("addGroupButton"),
-    inviteConversationButton: byId("inviteConversationButton"),
     developerPanel: byId("developerPanel"),
     conversationContextMenu: byId("conversationContextMenu"),
     contextProfileButton: byId("contextProfileButton"),
@@ -567,6 +566,7 @@
     groupMemberJidInput: byId("groupMemberJidInput"),
     groupAdminJidInput: byId("groupAdminJidInput"),
     groupAddMemberButton: byId("groupAddMemberButton"),
+    groupInviteButton: byId("groupInviteButton"),
     groupMakeAdminButton: byId("groupMakeAdminButton"),
     groupRemoveAdminButton: byId("groupRemoveAdminButton"),
     groupMemberListTitle: byId("groupMemberListTitle"),
@@ -928,7 +928,6 @@
     el.disconnectButton.addEventListener("click", disconnectAll);
     el.addConversationButton.addEventListener("click", addConversation);
     el.addGroupButton.addEventListener("click", addGroupConversation);
-    el.inviteConversationButton.addEventListener("click", inviteContactToActiveGroup);
     el.conversationSearchInput.addEventListener("input", renderConversations);
     el.backToContactsButton.addEventListener("click", closeActiveConversation);
     el.activeConversationAvatar.addEventListener("click", openActiveConversationAvatarProfile);
@@ -961,6 +960,7 @@
     el.groupMembersCanInviteToggle.addEventListener("change", applyGroupRoomOptionsFromDialog);
     el.groupApproveMembersToggle.addEventListener("change", applyGroupRoomOptionsFromDialog);
     el.groupAddMemberButton.addEventListener("click", addGroupMemberFromDialog);
+    el.groupInviteButton.addEventListener("click", inviteContactToManagedGroup);
     el.groupMakeAdminButton.addEventListener("click", makeGroupAdminFromDialog);
     el.groupRemoveAdminButton.addEventListener("click", removeGroupAdminFromDialog);
     el.closeContactProfileButton.addEventListener("click", closeContactProfileDialog);
@@ -13669,10 +13669,13 @@
     renderActiveConversation();
   }
 
-  function inviteContactToActiveGroup() {
-    const group = activeConversation();
+  function inviteContactToManagedGroup() {
+    inviteContactToGroup(groupManagementConversation());
+  }
+
+  function inviteContactToGroup(group) {
     if (!group || group.kind !== "group") {
-      setConnectionStatus(t("status.select_group_first", "Select a group first"), "warn");
+      setGroupManagementStatus(t("status.select_group_first", "Select a group first"), "warn");
       return;
     }
 
@@ -13717,6 +13720,9 @@
     sendXmppDirectInvite(contact.peer, group.peer);
 
     setConnectionStatus(statusText, "good");
+    if (!el.groupManagementDialog.hidden && state.groupManagementConversationId === group.id) {
+      setGroupManagementStatus(statusText, "good");
+    }
     appendDebug("invite", `${statusText} (${contactText})`);
   }
 
@@ -13964,11 +13970,13 @@
 
   function updateGroupManagementEditControls(conversation) {
     const canEdit = canEditGroupDetails(conversation);
+    const canManage = canManageGroupConversation(conversation);
     el.groupTitleInput.disabled = !canEdit;
     el.groupSaveTitleButton.disabled = !canEdit;
     el.groupDescriptionInput.disabled = !canEdit;
     el.groupSaveInfoButton.disabled = !canEdit;
     el.groupChangeAvatarButton.disabled = !canEdit;
+    el.groupInviteButton.disabled = !canManage;
     el.groupAvatarPreview.classList.toggle("avatar-clickable", canEdit);
     el.groupAvatarPreview.tabIndex = canEdit ? 0 : -1;
   }
@@ -14972,8 +14980,6 @@
   function updateComposerAvailability() {
     const hasConversation = Boolean(activeConversation());
     const blocked = isActiveConversationBlocked();
-    const selectedGroup = activeConversation()?.kind === "group";
-
     el.composerForm.classList.toggle("composer-disabled", !hasConversation || blocked);
     el.messageInput.disabled = !hasConversation || blocked;
     el.sendButton.disabled = !hasConversation || blocked;
@@ -14994,7 +15000,6 @@
     }
     syncEmojiButtonState();
     setCallButtonsDisabled(!hasConversation || Boolean(state.call) || blocked);
-    el.inviteConversationButton.disabled = !selectedGroup;
   }
 
   function setAccountReady(ready) {
