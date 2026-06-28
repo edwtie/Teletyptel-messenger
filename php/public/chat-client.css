@@ -960,6 +960,58 @@ body.account-gate .modal-shell {
   justify-content: flex-end;
 }
 
+.group-invite-contact-list {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.group-invite-contact-title {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.group-invite-contact {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  border-color: var(--line);
+  background: var(--panel);
+  text-align: left;
+}
+
+.group-invite-contact.selected {
+  border-color: var(--accent);
+  background: var(--accent-strong);
+  color: #ffffff;
+}
+
+.group-invite-contact-text {
+  display: grid;
+  min-width: 0;
+}
+
+.group-invite-contact-text strong,
+.group-invite-contact-text span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.group-invite-contact-text span,
+.group-invite-contact-empty {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.group-invite-contact.selected .group-invite-contact-text span {
+  color: rgba(255, 255, 255, .78);
+}
+
 .group-member-menu-button {
   display: inline-flex;
   align-items: center;

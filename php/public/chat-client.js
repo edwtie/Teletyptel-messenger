@@ -476,6 +476,7 @@
     sessionTimeoutInProgress: false,
     groupManagementConversationId: null,
     groupManagementTab: "members",
+    groupInviteContactId: "",
     conversations: [
       {
         id: "tester",
@@ -566,6 +567,7 @@
     groupMemberJidInput: byId("groupMemberJidInput"),
     groupAdminJidInput: byId("groupAdminJidInput"),
     groupAddMemberButton: byId("groupAddMemberButton"),
+    groupInviteContactList: byId("groupInviteContactList"),
     groupInviteButton: byId("groupInviteButton"),
     groupSendInviteLinkButton: byId("groupSendInviteLinkButton"),
     groupCopyInviteLinkButton: byId("groupCopyInviteLinkButton"),
@@ -13684,7 +13686,7 @@
       return;
     }
 
-    const contact = promptGroupInviteContact();
+    const contact = selectedGroupInviteContact();
     if (!contact) {
       return;
     }
@@ -13713,35 +13715,68 @@
     appendDebug("invite", `${statusText} (${contact.peer})`);
   }
 
-  function promptGroupInviteContact() {
-    const contacts = state.conversations.filter((conversation) =>
+  function groupInviteContacts() {
+    return state.conversations.filter((conversation) =>
       conversation.kind === "contact"
       && !isOwnContact(conversation)
       && !isBlockedConversation(conversation));
+  }
+
+  function renderGroupInviteContacts() {
+    if (!el.groupInviteContactList) {
+      return;
+    }
+
+    const contacts = groupInviteContacts();
+    el.groupInviteContactList.replaceChildren();
+    if (!contacts.length) {
+      state.groupInviteContactId = "";
+      const empty = document.createElement("div");
+      empty.className = "group-invite-contact-empty";
+      empty.textContent = t("status.no_contacts", "No contacts available");
+      el.groupInviteContactList.appendChild(empty);
+      return;
+    }
+
+    if (!contacts.some((contact) => contact.id === state.groupInviteContactId)) {
+      state.groupInviteContactId = contacts[0].id;
+    }
+
+    for (const contact of contacts) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "group-invite-contact";
+      button.classList.toggle("selected", contact.id === state.groupInviteContactId);
+      button.setAttribute("aria-pressed", contact.id === state.groupInviteContactId ? "true" : "false");
+      button.addEventListener("click", () => {
+        state.groupInviteContactId = contact.id;
+        renderGroupInviteContacts();
+      });
+
+      const avatar = createAvatarElement(contact, "avatar-list");
+      const text = document.createElement("span");
+      text.className = "group-invite-contact-text";
+      const name = document.createElement("strong");
+      name.textContent = conversationDisplayName(contact);
+      const jid = document.createElement("span");
+      jid.textContent = bareJid(contact.peer);
+      text.append(name, jid);
+      button.append(avatar, text);
+      el.groupInviteContactList.appendChild(button);
+    }
+  }
+
+  function selectedGroupInviteContact() {
+    const contacts = groupInviteContacts();
     if (!contacts.length) {
       setConnectionStatus(t("status.no_contacts", "No contacts available"), "warn");
       setGroupManagementStatus(t("status.no_contacts", "No contacts available"), "warn");
       return null;
     }
 
-    const peer = prompt(t("prompt.invite_contact", "Invite contact email"), contacts[0].peer);
-    if (!peer) {
-      return null;
-    }
-
-    const contact = ensureConversationForPeer(peer, "contact", displayNameForJid(peer));
-    if (!contact) {
-      return null;
-    }
-
-    if (isBlockedConversation(contact)) {
-      const text = t("status.contact_blocked_cannot_send", "This contact is blocked. Unblock to send messages.");
-      setConnectionStatus(text, "warn");
-      setGroupManagementStatus(text, "warn");
-      return null;
-    }
-
-    return contact;
+    const selected = contacts.find((contact) => contact.id === state.groupInviteContactId) || contacts[0];
+    state.groupInviteContactId = selected.id;
+    return selected;
   }
 
   function sendGroupInviteLinkFromDialog() {
@@ -13751,7 +13786,7 @@
       return;
     }
 
-    const contact = promptGroupInviteContact();
+    const contact = selectedGroupInviteContact();
     if (!contact) {
       return;
     }
@@ -14069,6 +14104,7 @@
     el.groupMemberJidInput.value = "";
     el.groupAdminJidInput.value = "";
     renderKnownGroupMembers(conversation);
+    renderGroupInviteContacts();
     updateGroupManagementTabAccess(conversation);
     setGroupManagementTab(options.tab || "members");
     setGroupManagementStatus(t("group.manage_ready", "Choose what group members and admins may do."), "info");
@@ -14113,6 +14149,7 @@
     el.groupInviteButton.disabled = !canManage;
     el.groupSendInviteLinkButton.disabled = !canManage;
     el.groupCopyInviteLinkButton.disabled = !canManage;
+    renderGroupInviteContacts();
     el.groupAvatarPreview.classList.toggle("avatar-clickable", canEdit);
     el.groupAvatarPreview.tabIndex = canEdit ? 0 : -1;
   }
