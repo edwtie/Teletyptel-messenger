@@ -878,6 +878,7 @@
   renderConversations();
   renderActiveConversation();
   setConnectionStatus(t("status.disconnected", "Disconnected"), "warn");
+  openGroupInviteFromUrl();
   updateComposerAvailability();
   updateServerSettingsReadonly();
   updateConnectButtonAvailability();
@@ -2156,7 +2157,7 @@
         continue;
       }
 
-      map.set(line.slice(0, equals).trim(), line.slice(equals + 1).trim());
+      map.set(line.slice(0, equals).trim(), line.slice(equals + 1).trim().replace(/\\n/g, "\n"));
     }
 
     return map;
@@ -13704,10 +13705,12 @@
       return;
     }
 
-    const inviteText = t("message.group_invite", "{0} invited you to {1} ({2}).")
+    const inviteLink = groupInviteLink(group);
+    const inviteText = t("message.group_invite", "{0} invited you to {1} ({2}).\nOpen group: {3}")
       .replace("{0}", currentSenderName())
       .replace("{1}", conversationDisplayName(group))
-      .replace("{2}", group.peer);
+      .replace("{2}", group.peer)
+      .replace("{3}", inviteLink);
     const statusText = t("message.group_invite_sent", "Invitation sent to {0}.").replace("{0}", conversationDisplayName(contact));
 
     addMessage("peer", statusText, t("sender.system", "System"), t("sender.system", "System"), null, group.id);
@@ -13717,13 +13720,46 @@
       state.relaySocket.send(JSON.stringify(envelope));
       appendDebug("relay-out", JSON.stringify(redactEnvelopeForLog(envelope)));
     }
-    sendXmppDirectInvite(contact.peer, group.peer);
+    sendXmppDirectInvite(contact.peer, group.peer, inviteLink);
 
     setConnectionStatus(statusText, "good");
     if (!el.groupManagementDialog.hidden && state.groupManagementConversationId === group.id) {
       setGroupManagementStatus(statusText, "good");
     }
     appendDebug("invite", `${statusText} (${contactText})`);
+  }
+
+  function groupInviteLink(group) {
+    const url = new URL(location.href);
+    url.hash = "";
+    url.searchParams.set("join", bareJid(group?.peer || ""));
+    url.searchParams.set("groupName", conversationDisplayName(group));
+    return url.toString();
+  }
+
+  function openGroupInviteFromUrl() {
+    const url = new URL(location.href);
+    const room = bareJid(url.searchParams.get("join") || "");
+    if (!room || !room.includes("@")) {
+      return;
+    }
+
+    const name = String(url.searchParams.get("groupName") || "").trim() || displayNameForJid(room);
+    const conversation = ensureConversationForPeer(room, "group", name);
+    if (!conversation) {
+      return;
+    }
+
+    persistGroupMetadata(conversation);
+    selectConversation(conversation);
+    joinXmppGroupConversation(conversation);
+    url.searchParams.delete("join");
+    url.searchParams.delete("groupName");
+    history.replaceState(null, "", url.toString());
+    setConnectionStatus(
+      t("message.group_invite_opened", "Group invitation opened: {0}").replace("{0}", conversationDisplayName(conversation)),
+      "good"
+    );
   }
 
   function toggleBlockContextConversation() {
@@ -14651,7 +14687,7 @@
 
     const sent = sendXmppMucAffiliation(conversation.peer, jid, affiliation);
     if (sent && inviteAfterSet) {
-      sendXmppDirectInvite(jid, conversation.peer);
+      sendXmppDirectInvite(jid, conversation.peer, groupInviteLink(conversation));
     }
     if (sent) {
       markCurrentUserAsGroupAdmin(conversation);
@@ -14735,13 +14771,14 @@
     return sendXmppStanza(xml, `<iq type="set" to="${escapeXml(room)}" muc-affiliation="${escapeXml(affiliation)}" jid="${escapeXml(jid)}"/>`);
   }
 
-  function sendXmppDirectInvite(jid, roomPeer) {
+  function sendXmppDirectInvite(jid, roomPeer, inviteLink = "") {
     const room = bareJid(roomPeer);
     if (!jid || !room) {
       return false;
     }
 
-    const reason = t("message.group_invite_reason", "You are invited to this TeleTypTel group.");
+    const reasonTemplate = t("message.group_invite_reason", "You are invited to this TeleTypTel group. {0}");
+    const reason = reasonTemplate.replace("{0}", inviteLink || "");
     const xml = `<message xmlns="jabber:client" to="${escapeXml(jid)}"><x xmlns="jabber:x:conference" jid="${escapeXml(room)}" reason="${escapeXml(reason)}"/></message>`;
     return sendXmppStanza(xml, `<message to="${escapeXml(jid)}" direct-invite="${escapeXml(room)}"/>`);
   }
