@@ -567,6 +567,8 @@
     groupAdminJidInput: byId("groupAdminJidInput"),
     groupAddMemberButton: byId("groupAddMemberButton"),
     groupInviteButton: byId("groupInviteButton"),
+    groupSendInviteLinkButton: byId("groupSendInviteLinkButton"),
+    groupCopyInviteLinkButton: byId("groupCopyInviteLinkButton"),
     groupMakeAdminButton: byId("groupMakeAdminButton"),
     groupRemoveAdminButton: byId("groupRemoveAdminButton"),
     groupMemberListTitle: byId("groupMemberListTitle"),
@@ -962,6 +964,8 @@
     el.groupApproveMembersToggle.addEventListener("change", applyGroupRoomOptionsFromDialog);
     el.groupAddMemberButton.addEventListener("click", addGroupMemberFromDialog);
     el.groupInviteButton.addEventListener("click", inviteContactToManagedGroup);
+    el.groupSendInviteLinkButton.addEventListener("click", sendGroupInviteLinkFromDialog);
+    el.groupCopyInviteLinkButton.addEventListener("click", copyGroupInviteLinkFromDialog);
     el.groupMakeAdminButton.addEventListener("click", makeGroupAdminFromDialog);
     el.groupRemoveAdminButton.addEventListener("click", removeGroupAdminFromDialog);
     el.closeContactProfileButton.addEventListener("click", closeContactProfileDialog);
@@ -13680,28 +13684,8 @@
       return;
     }
 
-    const contacts = state.conversations.filter((conversation) =>
-      conversation.kind === "contact"
-      && !isOwnContact(conversation)
-      && !isBlockedConversation(conversation));
-    if (!contacts.length) {
-      setConnectionStatus(t("status.no_contacts", "No contacts available"), "warn");
-      return;
-    }
-
-    const contactText = contacts.map((conversation) => conversation.peer).join(", ");
-    const peer = prompt(t("prompt.invite_contact", "Invite contact email"), contacts[0].peer);
-    if (!peer) {
-      return;
-    }
-
-    const contact = ensureConversationForPeer(peer, "contact", displayNameForJid(peer));
+    const contact = promptGroupInviteContact();
     if (!contact) {
-      return;
-    }
-
-    if (isBlockedConversation(contact)) {
-      setConnectionStatus(t("status.contact_blocked_cannot_send", "This contact is blocked. Unblock to send messages."), "warn");
       return;
     }
 
@@ -13726,7 +13710,121 @@
     if (!el.groupManagementDialog.hidden && state.groupManagementConversationId === group.id) {
       setGroupManagementStatus(statusText, "good");
     }
-    appendDebug("invite", `${statusText} (${contactText})`);
+    appendDebug("invite", `${statusText} (${contact.peer})`);
+  }
+
+  function promptGroupInviteContact() {
+    const contacts = state.conversations.filter((conversation) =>
+      conversation.kind === "contact"
+      && !isOwnContact(conversation)
+      && !isBlockedConversation(conversation));
+    if (!contacts.length) {
+      setConnectionStatus(t("status.no_contacts", "No contacts available"), "warn");
+      setGroupManagementStatus(t("status.no_contacts", "No contacts available"), "warn");
+      return null;
+    }
+
+    const peer = prompt(t("prompt.invite_contact", "Invite contact email"), contacts[0].peer);
+    if (!peer) {
+      return null;
+    }
+
+    const contact = ensureConversationForPeer(peer, "contact", displayNameForJid(peer));
+    if (!contact) {
+      return null;
+    }
+
+    if (isBlockedConversation(contact)) {
+      const text = t("status.contact_blocked_cannot_send", "This contact is blocked. Unblock to send messages.");
+      setConnectionStatus(text, "warn");
+      setGroupManagementStatus(text, "warn");
+      return null;
+    }
+
+    return contact;
+  }
+
+  function sendGroupInviteLinkFromDialog() {
+    const group = groupManagementConversation();
+    if (!group || group.kind !== "group") {
+      setGroupManagementStatus(t("status.select_group_first", "Select a group first"), "warn");
+      return;
+    }
+
+    const contact = promptGroupInviteContact();
+    if (!contact) {
+      return;
+    }
+
+    const inviteLink = groupInviteLink(group);
+    const text = t("message.group_invite_link", "Group link for {0}: {1}")
+      .replace("{0}", conversationDisplayName(group))
+      .replace("{1}", inviteLink);
+    const sent = sendDirectContactMessage(contact, text);
+    const statusText = sent
+      ? t("message.group_invite_link_sent", "Group link sent to {0}.").replace("{0}", conversationDisplayName(contact))
+      : t("message.group_invite_link_failed", "Group link could not be sent.");
+    setConnectionStatus(statusText, sent ? "good" : "warn");
+    setGroupManagementStatus(statusText, sent ? "good" : "warn");
+    if (sent) {
+      addMessage("peer", statusText, t("sender.system", "System"), t("sender.system", "System"), null, group.id);
+      appendDebug("invite-link", `${statusText} (${contact.peer})`);
+    }
+  }
+
+  function sendDirectContactMessage(contact, text) {
+    if (!contact?.peer || isBlockedConversation(contact)) {
+      return false;
+    }
+
+    const outgoingId = createMessageId("link");
+    if (state.mode === "xmpp" && state.xmppSocket?.readyState === WebSocket.OPEN && state.xmppSession?.authenticated) {
+      const xml = createMessageStanza(text, outgoingId, null, false, contact.peer, "", "chat");
+      const sent = sendXmppStanza(xml, `<message to="${escapeXml(contact.peer)}" invite-link="true"/>`);
+      if (sent) {
+        addMessage("self", text, "RFC 7395", null, null, contact.id, null, outgoingId, false, true, null, "sent");
+        return true;
+      }
+    }
+
+    if (state.relaySocket?.readyState === WebSocket.OPEN) {
+      const envelope = createRelayEnvelope("message", text, "", contact.peer);
+      envelope.messageId = outgoingId;
+      envelope.conversationKind = "contact";
+      state.relaySocket.send(JSON.stringify(envelope));
+      appendDebug("relay-out", JSON.stringify(redactEnvelopeForLog(envelope)));
+      addMessage("self", text, "sent", null, null, contact.id, null, outgoingId, false, true, null, "sent");
+      return true;
+    }
+
+    return false;
+  }
+
+  function copyGroupInviteLinkFromDialog() {
+    const group = groupManagementConversation();
+    if (!group || group.kind !== "group") {
+      setGroupManagementStatus(t("status.select_group_first", "Select a group first"), "warn");
+      return;
+    }
+
+    const inviteLink = groupInviteLink(group);
+    copyTextToClipboard(inviteLink)
+      .then(() => {
+        const text = t("message.group_invite_link_copied", "Group link copied to clipboard.");
+        setConnectionStatus(text, "good");
+        setGroupManagementStatus(text, "good");
+      })
+      .catch(() => {
+        prompt(t("message.group_invite_link_copy_prompt", "Copy this group link"), inviteLink);
+      });
+  }
+
+  function copyTextToClipboard(text) {
+    if (navigator.clipboard?.writeText) {
+      return navigator.clipboard.writeText(text);
+    }
+
+    return Promise.reject(new Error("clipboard_unavailable"));
   }
 
   function groupInviteLink(group) {
@@ -14013,6 +14111,8 @@
     el.groupSaveInfoButton.disabled = !canEdit;
     el.groupChangeAvatarButton.disabled = !canEdit;
     el.groupInviteButton.disabled = !canManage;
+    el.groupSendInviteLinkButton.disabled = !canManage;
+    el.groupCopyInviteLinkButton.disabled = !canManage;
     el.groupAvatarPreview.classList.toggle("avatar-clickable", canEdit);
     el.groupAvatarPreview.tabIndex = canEdit ? 0 : -1;
   }
