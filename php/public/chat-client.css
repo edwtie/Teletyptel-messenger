@@ -7772,21 +7772,21 @@ body.viewport-phone.tc-text-visible-active.call-active .composer {
   }
 }
 
-.group-member-menu-button,
-body[data-theme] .group-member-menu-button {
-  border-color: transparent;
-  background: transparent;
-  color: #111827;
-  box-shadow: none;
+button.group-member-menu-button,
+body[data-theme] button.group-member-menu-button {
+  border-color: transparent !important;
+  background: transparent !important;
+  color: #111827 !important;
+  box-shadow: none !important;
 }
 
-.group-member-menu-button:hover:not(:disabled),
-.group-member-menu-button:focus-visible,
-body[data-theme] .group-member-menu-button:hover:not(:disabled),
-body[data-theme] .group-member-menu-button:focus-visible {
-  border-color: transparent;
-  background: transparent;
-  color: var(--accent-strong);
-  box-shadow: none;
-  outline: none;
+button.group-member-menu-button:hover:not(:disabled),
+button.group-member-menu-button:focus-visible,
+body[data-theme] button.group-member-menu-button:hover:not(:disabled),
+body[data-theme] button.group-member-menu-button:focus-visible {
+  border-color: transparent !important;
+  background: transparent !important;
+  color: var(--accent-strong) !important;
+  box-shadow: none !important;
+  outline: none !important;
 }
