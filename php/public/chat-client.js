@@ -454,6 +454,7 @@
     },
     contextConversationId: null,
     contextMessage: null,
+    groupMemberContextJid: "",
     reactionMessageId: null,
     messageStateSync: new Map(),
     xmppMam: {
@@ -541,6 +542,13 @@
     contextGroupManageButton: byId("contextGroupManageButton"),
     contextMuteNotificationsButton: byId("contextMuteNotificationsButton"),
     contextBlockButton: byId("contextBlockButton"),
+    groupMemberContextMenu: byId("groupMemberContextMenu"),
+    groupMemberProfileMenuButton: byId("groupMemberProfileMenuButton"),
+    groupMemberAddMenuButton: byId("groupMemberAddMenuButton"),
+    groupMemberMakeAdminMenuButton: byId("groupMemberMakeAdminMenuButton"),
+    groupMemberRemoveAdminMenuButton: byId("groupMemberRemoveAdminMenuButton"),
+    groupMemberBanMenuButton: byId("groupMemberBanMenuButton"),
+    groupMemberUnbanMenuButton: byId("groupMemberUnbanMenuButton"),
     mucAvatarFileInput: byId("mucAvatarFileInput"),
     groupManagementDialog: byId("groupManagementDialog"),
     groupManagementSubtitle: byId("groupManagementSubtitle"),
@@ -930,6 +938,13 @@
     el.contextGroupManageButton.addEventListener("click", openContextGroupManagement);
     el.contextMuteNotificationsButton.addEventListener("click", toggleMuteContextConversationNotifications);
     el.contextBlockButton.addEventListener("click", toggleBlockContextConversation);
+    el.groupMemberContextMenu.addEventListener("click", (event) => event.stopPropagation());
+    el.groupMemberProfileMenuButton.addEventListener("click", openContextGroupMemberProfile);
+    el.groupMemberAddMenuButton.addEventListener("click", addContextGroupMember);
+    el.groupMemberMakeAdminMenuButton.addEventListener("click", makeContextGroupMemberAdmin);
+    el.groupMemberRemoveAdminMenuButton.addEventListener("click", removeContextGroupMemberAdmin);
+    el.groupMemberBanMenuButton.addEventListener("click", banContextGroupMember);
+    el.groupMemberUnbanMenuButton.addEventListener("click", unbanContextGroupMember);
     el.mucAvatarFileInput.addEventListener("change", handleMucAvatarFileSelected);
     el.conversationContextMenu.addEventListener("click", (event) => event.stopPropagation());
     el.closeGroupManagementButton.addEventListener("click", closeGroupManagementDialog);
@@ -1033,12 +1048,14 @@
     document.addEventListener("click", closeAttachmentMenuOnOutsideClick);
     document.addEventListener("click", closeSmileyPickerOnOutsideClick);
     document.addEventListener("click", closeConversationContextMenuOnOutsideClick);
+    document.addEventListener("click", closeGroupMemberContextMenuOnOutsideClick);
     document.addEventListener("click", closeMessageContextMenuOnOutsideClick);
     document.addEventListener("click", closeMessageReactionPickerOnOutsideClick);
     document.addEventListener("keydown", closeCallMenusOnEscape);
     document.addEventListener("keydown", closeAttachmentMenuOnEscape);
     document.addEventListener("keydown", closeSmileyPickerOnEscape);
     document.addEventListener("keydown", closeConversationContextMenuOnEscape);
+    document.addEventListener("keydown", closeGroupMemberContextMenuOnEscape);
     document.addEventListener("keydown", closeContactProfileDialogOnEscape);
     document.addEventListener("keydown", closeMessageContextMenuOnEscape);
     document.addEventListener("keydown", closeMessageReactionPickerOnEscape);
@@ -1049,6 +1066,7 @@
     document.addEventListener("keydown", closeVideoPreviewDialogOnEscape);
     document.addEventListener("keydown", closeMapViewerOnEscape);
     window.addEventListener("resize", closeConversationContextMenu);
+    window.addEventListener("resize", closeGroupMemberContextMenu);
     window.addEventListener("resize", closeMessageContextMenu);
     window.addEventListener("resize", closeMessageReactionPicker);
     window.addEventListener("resize", () => handleViewportChange("resize"));
@@ -13965,6 +13983,7 @@
   }
 
   function closeGroupManagementDialog() {
+    closeGroupMemberContextMenu();
     el.groupManagementDialog.hidden = true;
   }
 
@@ -14152,9 +14171,28 @@
   function createGroupMemberRow(member, mode, canUseAdminActions) {
     const row = document.createElement("div");
     row.className = "group-known-member";
+    row.addEventListener("click", (event) => {
+      if (event.target instanceof Element && event.target.closest("button")) {
+        return;
+      }
+
+      openGroupMemberProfile(member);
+    });
+    row.addEventListener("contextmenu", (event) => showGroupMemberContextMenu(event, member));
 
     const identity = document.createElement("div");
     identity.className = "group-known-member-identity";
+    identity.tabIndex = 0;
+    identity.setAttribute("role", "button");
+    identity.setAttribute("aria-label", `${member.name} - ${member.jid}`);
+    identity.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") {
+        return;
+      }
+
+      event.preventDefault();
+      openGroupMemberProfile(member);
+    });
     const name = document.createElement("strong");
     const star = document.createElement("span");
     star.className = "group-member-admin-star";
@@ -14241,6 +14279,155 @@
     if (!member.isOwner && !member.isSelf) {
       actions.appendChild(banButton);
     }
+  }
+
+  function openGroupMemberProfile(member) {
+    const jid = bareJid(member?.jid || "");
+    if (!jid) {
+      return;
+    }
+
+    closeGroupMemberContextMenu();
+    if (member.isSelf || jidMatches(jid, currentFromJid())) {
+      openAccountDialog({ mode: "profile" });
+      return;
+    }
+
+    const conversation = ensureConversationForPeer(jid, "contact", member.name || displayNameForJid(jid));
+    if (canViewContactProfile(conversation)) {
+      openContactProfileDialog(conversation);
+    }
+  }
+
+  function showGroupMemberContextMenu(event, member) {
+    const jid = bareJid(member?.jid || "");
+    if (!jid) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    closeConversationContextMenu();
+    closeMessageContextMenu();
+    state.groupMemberContextJid = jid;
+    updateGroupMemberContextMenu(member);
+
+    const menu = el.groupMemberContextMenu;
+    menu.hidden = false;
+    menu.style.left = "0px";
+    menu.style.top = "0px";
+    const rect = menu.getBoundingClientRect();
+    const left = Math.max(8, Math.min(event.clientX, window.innerWidth - rect.width - 8));
+    const top = Math.max(8, Math.min(event.clientY, window.innerHeight - rect.height - 8));
+    menu.style.left = `${left}px`;
+    menu.style.top = `${top}px`;
+    menu.querySelector("button:not([hidden]):not(:disabled)")?.focus();
+  }
+
+  function updateGroupMemberContextMenu(member = contextGroupMember()) {
+    const conversation = groupManagementConversation();
+    const canUseAdminActions = canCurrentUserUseGroupAdminTabs(conversation);
+    const canAdd = canUseAdminActions && member && !member.isMember && !member.isAdmin && !member.isOwner && !member.isBanned;
+    const canMakeAdmin = canUseAdminActions && member && !member.isAdmin && !member.isOwner && !member.isBanned;
+    const canRemoveAdmin = canUseAdminActions && member && member.isAdmin && !member.isOwner;
+    const canBan = canUseAdminActions && member && !member.isOwner && !member.isSelf && !member.isBanned;
+    const canUnban = canUseAdminActions && member && member.isBanned;
+
+    el.groupMemberProfileMenuButton.hidden = !member;
+    el.groupMemberAddMenuButton.hidden = !canAdd;
+    el.groupMemberMakeAdminMenuButton.hidden = !canMakeAdmin;
+    el.groupMemberRemoveAdminMenuButton.hidden = !canRemoveAdmin;
+    el.groupMemberBanMenuButton.hidden = !canBan;
+    el.groupMemberUnbanMenuButton.hidden = !canUnban;
+  }
+
+  function closeGroupMemberContextMenuOnOutsideClick(event) {
+    if (event.target instanceof Element && event.target.closest("#groupMemberContextMenu")) {
+      return;
+    }
+
+    closeGroupMemberContextMenu();
+  }
+
+  function closeGroupMemberContextMenuOnEscape(event) {
+    if (event.key === "Escape") {
+      closeGroupMemberContextMenu();
+    }
+  }
+
+  function closeGroupMemberContextMenu() {
+    state.groupMemberContextJid = "";
+    el.groupMemberContextMenu.hidden = true;
+  }
+
+  function contextGroupMember() {
+    const jid = bareJid(state.groupMemberContextJid);
+    const conversation = groupManagementConversation();
+    if (!jid || !conversation) {
+      return null;
+    }
+
+    return knownGroupMembers(conversation).find((member) => jidMatches(member.jid, jid)) ?? null;
+  }
+
+  function openContextGroupMemberProfile() {
+    const member = contextGroupMember();
+    if (member) {
+      openGroupMemberProfile(member);
+    }
+  }
+
+  function addContextGroupMember() {
+    const member = contextGroupMember();
+    if (!member) {
+      return;
+    }
+
+    closeGroupMemberContextMenu();
+    el.groupMemberJidInput.value = member.jid;
+    setGroupAffiliationFromDialog(member.jid, "member", t("group.member_added", "Member added."), true);
+  }
+
+  function makeContextGroupMemberAdmin() {
+    const member = contextGroupMember();
+    if (!member) {
+      return;
+    }
+
+    closeGroupMemberContextMenu();
+    el.groupAdminJidInput.value = member.jid;
+    setGroupAffiliationFromDialog(member.jid, "admin", t("group.admin_added", "Group admin assigned."), false);
+  }
+
+  function removeContextGroupMemberAdmin() {
+    const member = contextGroupMember();
+    if (!member) {
+      return;
+    }
+
+    closeGroupMemberContextMenu();
+    el.groupAdminJidInput.value = member.jid;
+    setGroupAffiliationFromDialog(member.jid, "member", t("group.admin_removed", "Group admin changed back to member."), false);
+  }
+
+  function banContextGroupMember() {
+    const member = contextGroupMember();
+    if (!member) {
+      return;
+    }
+
+    closeGroupMemberContextMenu();
+    setGroupAffiliationFromDialog(member.jid, "outcast", t("group.member_banned", "Member banned."), false);
+  }
+
+  function unbanContextGroupMember() {
+    const member = contextGroupMember();
+    if (!member) {
+      return;
+    }
+
+    closeGroupMemberContextMenu();
+    setGroupAffiliationFromDialog(member.jid, "none", t("group.member_unbanned", "Ban removed."), false);
   }
 
   function groupMemberStatusText(member) {

@@ -285,6 +285,10 @@ button:disabled {
   min-width: 180px;
 }
 
+.group-member-context-menu {
+  min-width: 210px;
+}
+
 .context-menu .danger-action:not(:disabled) {
   color: #fecaca;
 }
@@ -896,6 +900,17 @@ body.account-gate .modal-shell {
   border-radius: 8px;
   background: var(--panel);
   padding: 8px;
+  cursor: pointer;
+}
+
+.group-known-member:hover,
+.group-known-member:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--focus-ring);
+}
+
+.group-known-member-identity:focus-visible {
+  outline: none;
 }
 
 .group-known-member-identity {

@@ -384,6 +384,7 @@ group.approve_members_text=When this is on, new users must be added to the membe
 group.members=Members
 group.admins=Group admins
 group.member_list=Member list
+group.member_menu=Group member menu
 group.member_list_count_one=Member list - 1 member
 group.member_list_count_many=Member list - {0} members
 group.blacklist=Blacklist

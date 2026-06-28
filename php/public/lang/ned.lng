@@ -384,6 +384,7 @@ group.approve_members_text=Als dit aan staat, moeten nieuwe gebruikers eerst op 
 group.members=Leden
 group.admins=Groepsbeheerders
 group.member_list=Ledenlijst
+group.member_menu=Groepslid menu
 group.member_list_count_one=Ledenlijst - 1 lid
 group.member_list_count_many=Ledenlijst - {0} leden
 group.blacklist=Zwarte lijst
