@@ -390,6 +390,7 @@ group.admins_can=Beheerders kunnen
 group.approve_members=Nieuwe leden goedkeuren
 group.approve_members_text=Als dit aan staat, moeten nieuwe gebruikers eerst op de ledenlijst staan voordat zij kunnen deelnemen.
 group.members=Leden
+group.invitations=Uitnodigingen
 group.admins=Groepsbeheerders
 group.member_list=Ledenlijst
 group.member_menu=Groepslid menu
