@@ -144,7 +144,7 @@ item is implemented, tested and documented.
 - [x] Real XMPP server two-account chat smoke test.
 - [x] Location and NG112 protocol direction recorded: XEP-0080 for XMPP user
   location and PIDF-LO/RFC 6442 for future emergency gateway interop.
-- [x] ProtoXEP Jingle synchronized RTT implemented in the web client as a
+- [x] XEP-0517 Jingle synchronized RTT implemented in the web client as a
   co-session WebRTC datachannel with XEP-0301 relay fallback.
 - [x] `rtt` datachannel listens for raw UTF-8 T.140 payloads and applies
   backspace/delete plus CR/LF as live call text.
@@ -154,7 +154,7 @@ item is implemented, tested and documented.
   `text/t140` packetizer and RFC 2198 `text/red` redundant payload helper.
 - [x] ProtoXEP Jingle location/GPS core helper added so call sessions can carry
   explicit XEP-0080 location updates without relying only on PEP presence.
-- [x] ProtoXEP Jingle synchronized RTT Playwright retest passed with two fresh
+- [x] XEP-0517 Jingle synchronized RTT Playwright retest passed with two fresh
   browser profiles: video call connected, `rtt` datachannel opened,
   `jingle-rtt-out`/`jingle-rtt-in` logged, live draft displayed and final
   `jingle-rtt` message delivered.
@@ -418,7 +418,8 @@ item is implemented, tested and documented.
   on ejabberd/Prosody/Openfire, not only through the local PHP relay bridge.
 - [ ] XEP-0215 STUN/TURN credentials consumed by the browser call path.
 - [ ] XEP-0343 DataChannels reviewed for the RTT datachannel negotiation path;
-  current Total Conversation RTT datachannel remains a project ProtoXEP bridge.
+  current Total Conversation RTT datachannel remains an XEP-0517 Level 1
+  browser profile until a full XEP-0343/RFC 8864 mapping is selected.
 - [ ] XEP-0353 live call setup interop with an installed Jingle client.
 - [ ] iPhone Safari/WebView call smoke completed without black local video,
   dropped WSS connection or generic "call failed" status.

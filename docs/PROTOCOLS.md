@@ -64,19 +64,25 @@ Real-server setup guide:
 Server response flow:
 [SERVER_RESPONSE_FLOW.svg](SERVER_RESPONSE_FLOW.svg).
 
-## ProtoXEPs
+## XEP-0517 And ProtoXEPs
 
 Teletyptel tracks published XMPP RFCs and XEPs separately from project
-ProtoXEPs. A ProtoXEP is not an official XSF standard yet. It is a concrete
-proposal for behavior that Teletyptel needs but that is not clearly covered by
-the existing XMPP/Jingle specifications.
+ProtoXEPs. XEP-0517 is now the published Experimental XEP for Jingle
+Synchronized Real-Time Text. A ProtoXEP is not an official XSF standard yet; it
+is a concrete proposal for behavior that Teletyptel needs but that is not
+clearly covered by the existing XMPP/Jingle specifications.
+
+Published TeleTypTel-originated XEP:
+
+| XEP | Namespace | Purpose | Status |
+| --- | --- | --- | --- |
+| [XEP-0517: Jingle Synchronized Real-Time Text](protoxeps/jingle-rtt-sync.md) | `urn:xmpp:jingle:apps:rtt-sync:0` | Bind live text, captions, T.140 or RTT datachannel text to the same Jingle session as audio/video. | Experimental; XSF source: <https://xmpp.org/extensions/xep-0517.html>. |
 
 Current Teletyptel ProtoXEP drafts:
 
 | Draft | Namespace | Purpose | Status |
 | --- | --- | --- | --- |
-| [Total Conversation Profile](protoxeps/total-conversation-profile.md) | `urn:xmpp:total-conversation:0` | Profile that combines recent XMPP RFCs/XEPs and the two Jingle ProtoXEPs into one discoverable conversation model. | Local draft for review before XSF submission. |
-| [Jingle Synchronized Real-Time Text](protoxeps/jingle-rtt-sync.md) | `urn:xmpp:jingle:apps:rtt-sync:0` | Bind live text, captions, T.140 or RTT datachannel text to the same Jingle session as audio/video. | Submitted to XSF as PR 1541. |
+| [Total Conversation Profile](protoxeps/total-conversation-profile.md) | `urn:xmpp:total-conversation:0` | Profile that combines recent XMPP RFCs/XEPs, XEP-0517 and the Jingle location ProtoXEP into one discoverable conversation model. | Local draft for review before XSF submission. |
 | [Jingle User Location](protoxeps/jingle-geoloc.md) | `urn:xmpp:jingle:apps:geoloc:0` | Bind XEP-0080 user location updates to one active Jingle session. | Submitted to XSF as PR 1542. |
 
 Rules for using ProtoXEP behavior in Teletyptel:
@@ -85,15 +91,15 @@ Rules for using ProtoXEP behavior in Teletyptel:
 2. A ProtoXEP may only define the missing binding or session semantics.
 3. A client must advertise each ProtoXEP namespace separately through
    XEP-0030 service discovery.
-4. Support for XEP-0301 does not imply support for Jingle-synchronized RTT.
+4. Support for XEP-0301 does not imply support for XEP-0517 Jingle-synchronized RTT.
 5. Support for XEP-0080 does not imply support for Jingle-scoped location.
 6. Fallback must be visible to the user when the synchronized or call-scoped
    behavior is not available.
 
 This separation matters for XSF review: the project is not trying to replace
 existing XEPs. The Total Conversation Profile names the complete bundle, while
-the two Jingle ProtoXEPs define the missing wire pieces for synchronized text
-and call-scoped location.
+XEP-0517 and the Jingle location ProtoXEP define the missing wire pieces for
+synchronized text and call-scoped location.
 
 ## Total Conversation
 
@@ -106,12 +112,13 @@ call.
 Current software status: Teletyptel works at TC-2, meaning audio/video
 conversation is implemented through Jingle-shaped call setup and browser WebRTC
 media. TC-2 is implementation status, not yet a formal XEP-0479 compliance
-claim. TC-3 and TC-4 are represented by the current ProtoXEP drafts and test
-paths.
+claim. TC-3 and TC-4 are represented by XEP-0517, the current ProtoXEP drafts
+and test paths.
 
 Submission status: the Total Conversation Profile is good enough for internal
-review and technical discussion, but should wait for initial feedback on the
-two smaller Jingle ProtoXEPs before being converted to XSF XML and submitted.
+review and technical discussion, but should wait for initial feedback on
+XEP-0517 and the Jingle location ProtoXEP before being converted to XSF XML and
+submitted.
 The likely submission model is one discovery feature,
 `urn:xmpp:total-conversation:0`, plus a XEP-0128 data form that advertises
 `tc-0` through `tc-4`.
@@ -135,7 +142,7 @@ Total Conversation layers:
 | Call proposal | XEP-0353 | A call can be proposed, accepted, rejected, retracted or finished before IQ-based Jingle starts. |
 | Session signaling | XEP-0166 | Audio, video, synchronized text and call-scoped location are contents or session-info inside one Jingle session. |
 | Audio/video media | XEP-0167, XEP-0176, XEP-0320, WebRTC | Browser media uses WebRTC; XMPP still owns the signaling shape. |
-| Live text | XEP-0301, RFC 4103, ProtoXEP Jingle synchronized RTT | XEP-0301 is fallback/chat RTT; ProtoXEP RTT is call-bound live text. |
+| Live text | XEP-0301, RFC 4103, XEP-0517 Jingle synchronized RTT | XEP-0301 is fallback/chat RTT; XEP-0517 RTT is call-bound live text. |
 | Location | XEP-0080, ProtoXEP Jingle User Location | XEP-0080 is the payload; ProtoXEP geoloc scopes it to the call. |
 | Files | XEP-0363, XEP-0234, XEP-0065, XEP-0047/XEP-0261 | HTTP upload creates message/conversation attachments; XEP-0234 Jingle File Transfer can be session-bound to the same call. |
 | Archives and sync | XEP-0313, XEP-0280, XEP-0198 | History and multi-device behavior must not hide whether text was call-bound or fallback. |
@@ -154,8 +161,8 @@ This chapter is the product architecture. The
 [Total Conversation Profile](protoxeps/total-conversation-profile.md) is the
 protocol profile for that architecture, and it is linked to the
 [XEP-0479 compliance notes](XMPP_COMPLIANCE_SUITES.md). The published XEPs
-remain the interoperability foundation, and the two Jingle ProtoXEPs remain the
-proposed wire format for the missing parts.
+remain the interoperability foundation; XEP-0517 and the Jingle location
+ProtoXEP cover the proposed wire format for the missing parts.
 
 ## Chat
 
@@ -581,7 +588,7 @@ registration and real provider integration remain app-layer work.
 | XEP | Purpose |
 | --- | --- |
 | XEP-0301 | In-band real-time text. |
-| ProtoXEP Jingle synchronized RTT | Real-time text synchronized with an active Jingle/WebRTC audio/video session. |
+| XEP-0517 Jingle synchronized RTT | Real-time text synchronized with an active Jingle/WebRTC audio/video session. |
 
 Real-time text is different from typing notifications. XEP-0085 says that someone is typing. XEP-0301 sends live text edits while the message is being written.
 
@@ -593,15 +600,15 @@ Initial implementation status:
 - Unicode positions are handled as code points, matching the XEP wording.
 - `RttJsonEnvelope` wraps RTT XML for local WebSocket demos without replacing the XMPP payload.
 
-The web client also implements the current ProtoXEP direction for Jingle
-synchronized RTT. A Jingle call advertises an extra `text` content with
+The web client also implements XEP-0517 Jingle synchronized RTT. A Jingle call
+advertises an extra `text` content with
 `urn:xmpp:jingle:apps:rtt-sync:0`, groups audio/video/text with XEP-0338 when
 RTT is offered, then opens a reliable WebRTC datachannel named `rtt`. While that
 channel is open, live drafts and final chat text are sent in the same call
 context. If the channel is not available, the client falls back to normal
 XEP-0301 relay RTT.
 
-The current ProtoXEP direction no longer uses `lang`, `sync-group` or
+XEP-0517 no longer uses `lang`, `sync-group` or
 `sync-reference` as `rtt-sync` attributes. RTP/T.140 can already be represented
 with XEP-0167 without `rtt-sync`; the `rtt-sync` element is extra metadata for
 role, source, synchronization mode, skew and finality. Language negotiation

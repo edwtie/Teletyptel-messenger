@@ -5414,7 +5414,7 @@
       [true, "XEP-0191", t("checklist.blocking", "Block and unblock contacts, with blocked chat, RTT and calls filtered")],
       [true, "XEP-0080", t("checklist.location", "Opt-in browser location sharing with XEP-0080 and PIDF-LO export")],
       [true, "XEP-0060", t("checklist.pubsub_news", "Provider news and announcements through PubSub")],
-      [true, "ProtoXEP RTT Sync", t("checklist.jingle_rtt_sync", "Jingle co-session real-time text datachannel with XEP-0301 fallback")],
+      [true, "XEP-0517", t("checklist.jingle_rtt_sync", "Jingle co-session real-time text datachannel with XEP-0301 fallback")],
       [false, "Roster", t("checklist.roster", "Replace demo contact list with real XMPP roster-backed contacts")],
       [false, "OMEMO", t("checklist.omemo", "Finish encryption sessions, trust model and interoperability smoke")],
       [false, "Mobile", t("checklist.mobile", "Android and iOS WebView packaging smoke tests")]

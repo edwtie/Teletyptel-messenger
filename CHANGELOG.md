@@ -33,7 +33,9 @@
   XEP-0115, XEP-0124/XEP-0206, XEP-0156, XEP-0157, XEP-0198, XEP-0203,
   XEP-0215, XEP-0245, XEP-0280, XEP-0334, XEP-0352, XEP-0357, XEP-0359,
   XEP-0385, XEP-0392, XEP-0393, XEP-0424, XEP-0425, XEP-0433, XEP-0486,
-  XEP-0494 and XEP-0514.
+  XEP-0494, XEP-0514 and XEP-0517.
+- XEP-0517 Jingle Synchronized Real-Time Text is now tracked as the official
+  Experimental XEP for TeleTypTel's call-bound RTT path.
 - XEP-0486 MUC Avatars support in PHP and C# helpers, plus web UI for
   choosing and rendering group avatars in the conversation list and header.
 - XEP-0060 provider announcement/news helper with Atom entry publish, item
@@ -198,7 +200,7 @@
 - Web client audio/video call controls with a local WebRTC bridge using
   Jingle-shaped relay envelopes for offer, answer, ICE candidates and hangup.
 - Total Conversation web path: a Jingle/WebRTC audio/video call now advertises
-  ProtoXEP synchronized RTT as a `text` content, opens a reliable `rtt`
+  XEP-0517 synchronized RTT as a `text` content, opens a reliable `rtt`
   datachannel, carries live drafts/final text as `jingle-rtt` packets and
   falls back to XEP-0301 relay RTT when the call channel is unavailable.
 - Browser session profiles via `?profile=...`, so two browser windows can keep

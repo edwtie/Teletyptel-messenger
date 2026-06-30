@@ -87,15 +87,17 @@ layer on top of that core.
 | XEP-0266 | Codecs for Jingle Audio | Audio codec guidance for Jingle RTP. | Covered by WebRTC/browser negotiation for the client; SIP/NG112 PCMA/PCMU interop belongs to a future gateway layer |
 | XEP-0299 | Codecs for Jingle Video | Historical video codec guidance for Jingle RTP. | Deferred upstream; Teletyptel treats this as background because modern browser calls negotiate video through WebRTC |
 | XEP-0320 | DTLS-SRTP in Jingle | WebRTC-style media security fingerprints. | Fingerprint model started; browser DTLS is WebRTC-managed; live interop remains |
-| XEP-0343 | Signaling WebRTC DataChannels in Jingle | WebRTC data channels through Jingle. | Future/review; current RTT datachannel is project ProtoXEP signaling, not a formal XEP-0343 claim |
+| XEP-0343 | Signaling WebRTC DataChannels in Jingle | WebRTC data channels through Jingle. | Future/review; current RTT datachannel is XEP-0517 Level 1 behavior, but not a formal XEP-0343 claim |
 | XEP-0353 | Jingle Message Initiation | Message-based call proposal, ringing, proceed/reject and finish flow. | Protocol helpers done; installed-client and mobile call setup interop remain release validation |
+| XEP-0517 | Jingle Synchronized Real-Time Text | Real-time text, captions or T.140 text bound to the same Jingle session as audio/video. | Experimental XEP; web client implements Level 1 co-session RTT with XEP-0301 fallback |
 
 Project-specific call additions:
 
 - ProtoXEP `urn:xmpp:total-conversation:0` defines the Total Conversation
-  profile that combines current XMPP RFCs/XEPs with the two Jingle ProtoXEPs.
+  profile that combines current XMPP RFCs/XEPs with XEP-0517 and the Jingle
+  location ProtoXEP.
   It is a conversation profile, not a replacement for audio/video codec XEPs.
-- ProtoXEP `urn:xmpp:jingle:apps:rtt-sync:0` keeps live RTT synchronized with a
+- XEP-0517 `urn:xmpp:jingle:apps:rtt-sync:0` keeps live RTT synchronized with a
   WebRTC/Jingle call.
 - ProtoXEP `urn:xmpp:jingle:apps:geoloc:0` carries explicit XEP-0080
   location/GPS descriptions and call `session-info` updates.
