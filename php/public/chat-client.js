@@ -2023,7 +2023,7 @@
     el.dialogGoogleLoginOverlayButton.hidden = true;
 
     try {
-      const config = await fetchJson("api/auth/public-config.php");
+      const config = await fetchJson(authApiUrl("public-config.php"));
       const clientId = String(config?.google?.clientId || "").trim();
       if (!clientId) {
         wrapper?.classList.remove("sdk-rendering");
@@ -3144,7 +3144,7 @@
   function startProviderLoginFromDialog(provider) {
     const name = providerDisplayName(provider);
     updateAccountStatus(t(`account.${provider}_redirecting`, `Opening ${name} sign-in...`));
-    const target = new URL(`api/auth/${provider}/start`, location.href);
+    const target = new URL(authApiUrl(`${provider}/start`), location.href);
     location.assign(target.toString());
   }
 
@@ -3166,9 +3166,17 @@
 
     const name = providerDisplayName(provider);
     updateAccountStatus(t(`account.${provider}_link_redirecting`, `Opening ${name} linking...`));
-    const target = new URL(`api/auth/${provider}/start`, location.href);
+    const target = new URL(authApiUrl(`${provider}/start`), location.href);
     target.searchParams.set("mode", "link");
     location.assign(target.toString());
+  }
+
+  function authApiUrl(path) {
+    const cleanPath = String(path ?? "").replace(/^\/+/, "");
+    if (isLocalBrowserHost(location.hostname) && location.pathname.includes("/php/public/")) {
+      return `api/auth/${cleanPath}`;
+    }
+    return `/api/auth/${cleanPath}`;
   }
 
   async function unlinkGoogleFromDialog() {
@@ -17973,6 +17981,13 @@
       || normalized === "::1"
       || normalized === "dev.teletyptel.nl"
       || normalized === "teletyptel";
+  }
+
+  function isLocalBrowserHost(host) {
+    const normalized = String(host ?? "").trim().toLowerCase();
+    return normalized === "localhost"
+      || normalized === "127.0.0.1"
+      || normalized === "::1";
   }
 
   function isLocalXmppWebSocketUrl(url) {
