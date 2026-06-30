@@ -18023,20 +18023,32 @@
 
   function normalizeLocalXmppWebSocketUrlForCurrentHost(url) {
     const value = String(url ?? "").trim();
-    const fallback = "wss://localhost:5443/websocket/";
     if (!value || value === "ws://127.0.0.1:8787" || value === "ws://localhost:8787") {
-      return fallback;
+      return defaultXmppWebSocketUrlForCurrentHost();
     }
 
     try {
       const parsed = new URL(value);
       if (isLocalAccountDomain(parsed.hostname) && (parsed.port === "8787" || parsed.pathname === "/rtt-relay")) {
-        return fallback;
+        return defaultXmppWebSocketUrlForCurrentHost();
+      }
+      if (isLocalAccountDomain(parsed.hostname) && !isLocalAccountDomain(location.hostname)) {
+        return defaultXmppWebSocketUrlForCurrentHost();
       }
       return parsed.toString();
     } catch {
-      return fallback;
+      return defaultXmppWebSocketUrlForCurrentHost();
     }
+  }
+
+  function defaultXmppWebSocketUrlForCurrentHost() {
+    const host = String(location.hostname || "").trim();
+    if (!host || isLocalAccountDomain(host)) {
+      return "wss://localhost:5443/websocket/";
+    }
+
+    const protocol = location.protocol === "https:" ? "wss:" : "ws:";
+    return `${protocol}//${location.host}/websocket/`;
   }
 
   function normalizeXmppPort(value) {
