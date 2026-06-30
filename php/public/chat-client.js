@@ -18047,8 +18047,10 @@
       return "wss://localhost:5443/websocket/";
     }
 
-    const protocol = location.protocol === "https:" ? "wss:" : "ws:";
-    return `${protocol}//${location.host}/websocket/`;
+    const secure = location.protocol === "https:";
+    const protocol = secure ? "wss:" : "ws:";
+    const port = secure ? "5443" : "5280";
+    return `${protocol}//${host}:${port}/websocket/`;
   }
 
   function normalizeXmppPort(value) {
