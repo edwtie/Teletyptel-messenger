@@ -624,8 +624,10 @@ function ttAuthPrunePendingStates(): void
 
 function ttAuthOrigin(): string
 {
-    $https = ttAuthRequestIsHttps();
-    return ($https ? 'https' : 'http') . '://' . (string)($_SERVER['HTTP_HOST'] ?? 'localhost');
+    $host = (string)($_SERVER['HTTP_HOST'] ?? 'localhost');
+    $requestHost = ttAuthRequestHost();
+    $https = ttAuthRequestIsHttps() || ($requestHost !== '' && !ttAuthIsLocalHost($requestHost));
+    return ($https ? 'https' : 'http') . '://' . $host;
 }
 
 function ttAuthRequestIsHttps(): bool
