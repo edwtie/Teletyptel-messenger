@@ -36,6 +36,9 @@
   XEP-0494, XEP-0514 and XEP-0517.
 - XEP-0517 Jingle Synchronized Real-Time Text is now tracked as the official
   Experimental XEP for TeleTypTel's call-bound RTT path.
+- Jingle User Location ProtoXEP notes now explain why XEP-0080/PEP alone is not
+  enough for call-scoped 112/911-readiness and narrow the draft to a Jingle
+  binding for XEP-0080.
 - XEP-0486 MUC Avatars support in PHP and C# helpers, plus web UI for
   choosing and rendering group avatars in the conversation list and header.
 - XEP-0060 provider announcement/news helper with Atom entry publish, item

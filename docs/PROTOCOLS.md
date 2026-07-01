@@ -83,7 +83,7 @@ Current Teletyptel ProtoXEP drafts:
 | Draft | Namespace | Purpose | Status |
 | --- | --- | --- | --- |
 | [Total Conversation Profile](protoxeps/total-conversation-profile.md) | `urn:xmpp:total-conversation:0` | Profile that combines recent XMPP RFCs/XEPs, XEP-0517 and the Jingle location ProtoXEP into one discoverable conversation model. | Local draft for review before XSF submission. |
-| [Jingle User Location](protoxeps/jingle-geoloc.md) | `urn:xmpp:jingle:apps:geoloc:0` | Bind XEP-0080 user location updates to one active Jingle session. | Submitted to XSF as PR 1542. |
+| [Jingle User Location](protoxeps/jingle-geoloc.md) | `urn:xmpp:jingle:apps:geoloc:0` | Bind XEP-0080 user location updates to one active Jingle session. | Under revision after Council feedback; narrowed to call binding for XEP-0080. |
 
 Rules for using ProtoXEP behavior in Teletyptel:
 
