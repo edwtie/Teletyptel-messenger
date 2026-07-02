@@ -9108,7 +9108,7 @@
     if (sendJingleRttSyncPacket("edit", text, { actions, previousText })) {
       return;
     }
-    if (sendXmppRttPacket("edit", text, { actions })) {
+    if (sendXmppRttPacket("edit", text)) {
       return;
     }
     sendRttPacket("edit", text, actions);
@@ -9120,7 +9120,7 @@
       && state.xmppSession?.authenticated;
   }
 
-  function sendXmppRttPacket(eventName, text, options = {}) {
+  function sendXmppRttPacket(eventName, text) {
     if (!isXmppRttConnected() || !hasActiveConversation() || !el.rttToggle.checked || isActiveConversationBlocked()) {
       return false;
     }
@@ -9128,12 +9128,9 @@
     const conversation = activeConversation();
     joinXmppGroupConversation(conversation);
     const messageType = conversation?.kind === "group" ? "groupchat" : "chat";
-    const actions = eventName === "edit"
-      ? options.actions ?? `<t p="0">${escapeXml(text)}</t>`
-      : `<t p="0">${escapeXml(text)}</t>`;
-    const rttXml = eventName === "edit"
-      ? `<rtt xmlns="urn:xmpp:rtt:0" seq="${state.sequence++}">${actions}</rtt>`
-      : `<rtt xmlns="urn:xmpp:rtt:0" event="${escapeXml(eventName)}" seq="${state.sequence++}">${actions}</rtt>`;
+    const rttEvent = eventName === "edit" ? "reset" : eventName;
+    const actions = `<t p="0">${escapeXml(text)}</t>`;
+    const rttXml = `<rtt xmlns="urn:xmpp:rtt:0" event="${escapeXml(rttEvent)}" seq="${state.sequence++}">${actions}</rtt>`;
     const xml = createXmppRttStanza(rttXml, currentToJid(), messageType);
     const sent = sendXmppStanza(xml, `<message type="${messageType}" rtt="${escapeXml(eventName)}"/>`);
     if (sent) {
