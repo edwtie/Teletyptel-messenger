@@ -15931,6 +15931,10 @@
   }
 
   function messageContentChildren(message, meta, bodyWrap) {
+    if (message?.draft) {
+      return [bodyWrap];
+    }
+
     return [meta, bodyWrap];
   }
 
