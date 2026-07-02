@@ -8280,6 +8280,13 @@
       }
 
       conversation.presence = "online";
+      const bodyElement = message.getElementsByTagNameNS("jabber:client", "body")[0];
+      const rttElement = message.getElementsByTagNameNS("urn:xmpp:rtt:0", "rtt")[0];
+      if (rttElement && !bodyElement) {
+        handleXmppRttMessage(conversation, message, rttElement, from, type);
+        continue;
+      }
+
       const receiptElement = message.getElementsByTagNameNS("urn:xmpp:receipts", "received")[0];
       if (receiptElement) {
         const receiptId = receiptElement.getAttribute("id") || "";
@@ -8328,7 +8335,6 @@
         continue;
       }
 
-      const bodyElement = message.getElementsByTagNameNS("jabber:client", "body")[0];
       if (!bodyElement) {
         continue;
       }
@@ -8364,6 +8370,23 @@
         }
       }
     }
+  }
+
+  function handleXmppRttMessage(conversation, message, rttElement, from, type) {
+    if (isXmppOwnGroupchatEcho(from, type)) {
+      return;
+    }
+
+    conversation.remoteText = applyXmppRttElement(conversation.remoteText || "", rttElement);
+    conversation.remoteFrom = from;
+    conversation.remoteDraftUpdatedAt = new Date();
+    conversation.clientState = "active";
+    conversation.clientStateUpdatedAt = new Date();
+    setPeerPresence(conversation.peer, "online");
+    appendDebug("xmpp-rtt-in", `<rtt from="${escapeXml(from)}" seq="${escapeXml(rttElement.getAttribute("seq") || "")}"/>`);
+    recordTotalConversationTextForConversation(conversation, "peer", conversation.remoteText, conversation.remoteFrom);
+    updateRemoteDraftMessage(conversation.id);
+    updateTotalConversationTextPanel(conversation);
   }
 
   function handleXmppMamResultMessage(message) {
@@ -9047,7 +9070,7 @@
       return;
     }
 
-    if (!activeJingleRttSyncCall() && !isRelayConnected()) {
+    if (!activeJingleRttSyncCall() && !isRelayConnected() && !isXmppRttConnected()) {
       showNotConnectedStatus();
       return;
     }
@@ -9057,6 +9080,9 @@
     updateLocalRttDraftMessage();
     updateTotalConversationTextPanel();
     if (sendJingleRttSyncPacket("reset", el.messageInput.value)) {
+      return;
+    }
+    if (sendXmppRttPacket("reset", el.messageInput.value)) {
       return;
     }
     sendRttPacket("reset", el.messageInput.value);
@@ -9069,7 +9095,7 @@
     }
 
     const hasJingleRtt = Boolean(activeJingleRttSyncCall());
-    if (!hasJingleRtt && state.mode !== "relay") {
+    if (!hasJingleRtt && state.mode !== "relay" && !isXmppRttConnected()) {
       return;
     }
 
@@ -9082,7 +9108,38 @@
     if (sendJingleRttSyncPacket("edit", text, { actions, previousText })) {
       return;
     }
+    if (sendXmppRttPacket("edit", text, { actions })) {
+      return;
+    }
     sendRttPacket("edit", text, actions);
+  }
+
+  function isXmppRttConnected() {
+    return state.mode === "xmpp"
+      && state.xmppSocket?.readyState === WebSocket.OPEN
+      && state.xmppSession?.authenticated;
+  }
+
+  function sendXmppRttPacket(eventName, text, options = {}) {
+    if (!isXmppRttConnected() || !hasActiveConversation() || !el.rttToggle.checked || isActiveConversationBlocked()) {
+      return false;
+    }
+
+    const conversation = activeConversation();
+    joinXmppGroupConversation(conversation);
+    const messageType = conversation?.kind === "group" ? "groupchat" : "chat";
+    const actions = eventName === "edit"
+      ? options.actions ?? `<t p="0">${escapeXml(text)}</t>`
+      : `<t p="0">${escapeXml(text)}</t>`;
+    const rttXml = eventName === "edit"
+      ? `<rtt xmlns="urn:xmpp:rtt:0" seq="${state.sequence++}">${actions}</rtt>`
+      : `<rtt xmlns="urn:xmpp:rtt:0" event="${escapeXml(eventName)}" seq="${state.sequence++}">${actions}</rtt>`;
+    const xml = createXmppRttStanza(rttXml, currentToJid(), messageType);
+    const sent = sendXmppStanza(xml, `<message type="${messageType}" rtt="${escapeXml(eventName)}"/>`);
+    if (sent) {
+      recordTotalConversationTextForConversation(conversation, "self", text, currentFromJid());
+    }
+    return sent;
   }
 
   function sendRttPacket(eventName, text, actions = null) {
@@ -11631,6 +11688,44 @@
     }
 
     return result;
+  }
+
+  function applyXmppRttElement(previous, rttElement) {
+    if (!rttElement) {
+      return String(previous ?? "");
+    }
+
+    const eventName = String(rttElement.getAttribute("event") || "").toLowerCase();
+    let result = eventName === "reset" || eventName === "init" ? "" : String(previous ?? "");
+    for (const action of Array.from(rttElement.children || [])) {
+      if (action.namespaceURI !== "urn:xmpp:rtt:0") {
+        continue;
+      }
+
+      const position = clampRttPosition(action.getAttribute("p"), result);
+      if (action.localName === "t") {
+        const chars = Array.from(result);
+        chars.splice(position, 0, action.textContent || "");
+        result = chars.join("");
+      } else if (action.localName === "e") {
+        const count = Math.max(1, Number.parseInt(action.getAttribute("n") || "1", 10) || 1);
+        const chars = Array.from(result);
+        chars.splice(Math.max(0, position - count), count);
+        result = chars.join("");
+      }
+    }
+
+    return result;
+  }
+
+  function clampRttPosition(value, text) {
+    const chars = Array.from(String(text ?? ""));
+    const position = Number.parseInt(value || String(chars.length), 10);
+    if (!Number.isFinite(position)) {
+      return chars.length;
+    }
+
+    return Math.max(0, Math.min(chars.length, position));
   }
 
   function isIgnoredT140Control(char) {
@@ -17917,6 +18012,12 @@
     const receiptRequest = replaceId || messageType === "groupchat" ? "" : `<request xmlns="urn:xmpp:receipts"/>`;
     const markable = replaceId || messageType === "groupchat" ? "" : `<markable xmlns="urn:xmpp:chat-markers:0"/>`;
     return `<message xmlns="jabber:client" type="${messageType}" from="${escapeXml(currentXmppFromJid())}" to="${escapeXml(to)}" id="${escapeXml(id)}"><body>${escapeXml(text)}</body>${originId}${replace}${unstyled}${extraXml || ""}${receiptRequest}${markable}</message>`;
+  }
+
+  function createXmppRttStanza(rttXml, to = el.peerInput.value, type = "chat", id = createMessageId("rtt")) {
+    const messageType = isXmppGroupchatType(type) ? "groupchat" : "chat";
+    const noStoreHint = `<no-store xmlns="urn:xmpp:hints"/>`;
+    return `<message xmlns="jabber:client" type="${messageType}" from="${escapeXml(currentXmppFromJid())}" to="${escapeXml(to)}" id="${escapeXml(id)}">${rttXml}${noStoreHint}</message>`;
   }
 
   function createDeliveryReceiptStanza(to, messageId, id = createMessageId("receipt")) {
