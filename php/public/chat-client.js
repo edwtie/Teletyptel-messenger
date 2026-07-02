@@ -8970,11 +8970,15 @@
         applyMessageCorrection(edit.conversation, edit.replaceId, text, "self", outgoingId);
         clearMessageEdit();
       } else {
+        clearLocalRttDraftMessage();
         addMessage("self", text, "RFC 7395", null, null, null, null, outgoingId, false, true, null, "sent");
       }
       el.messageInput.value = "";
       syncComposerActionButtons();
       state.previousText = "";
+      state.sequence = 0;
+      clearLocalRttDraftMessage();
+      updateTotalConversationTextPanel();
       return;
     }
 
