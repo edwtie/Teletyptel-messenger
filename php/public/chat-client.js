@@ -8350,7 +8350,6 @@
       if (!isXmppGroupchatType(type)) {
         sendXmppMessageAcknowledgements(from, messageId, Boolean(message.getElementsByTagNameNS("urn:xmpp:receipts", "request")[0]));
       }
-      clearRemoteDraftForConversation(conversation, from);
       if (replaceId) {
         applyMessageCorrection(conversation, replaceId, bodyElement.textContent || "", "peer", messageId, from, stylingDisabled);
       } else {
@@ -8370,6 +8369,7 @@
           }
         }
       }
+      clearRemoteDraftForConversation(conversation, from);
     }
   }
 
@@ -9683,7 +9683,7 @@
       }
 
       applyEnvelopeIdentity(conversation, envelope);
-      clearRemoteDraftForConversation(conversation, envelopeFrom(envelope));
+      const messageFrom = envelopeFrom(envelope);
       conversation.remoteIdentity = mergeMessageIdentity(conversation.remoteIdentity, envelopeMessageIdentity(envelope));
       conversation.clientState = "active";
       conversation.clientStateUpdatedAt = new Date();
@@ -9714,6 +9714,7 @@
           true,
           envelopeMessageIdentity(envelope));
       }
+      clearRemoteDraftForConversation(conversation, messageFrom);
       return;
     }
 
