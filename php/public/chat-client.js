@@ -8350,6 +8350,7 @@
       if (!isXmppGroupchatType(type)) {
         sendXmppMessageAcknowledgements(from, messageId, Boolean(message.getElementsByTagNameNS("urn:xmpp:receipts", "request")[0]));
       }
+      clearRemoteDraftForConversation(conversation, from);
       if (replaceId) {
         applyMessageCorrection(conversation, replaceId, bodyElement.textContent || "", "peer", messageId, from, stylingDisabled);
       } else {
@@ -9679,10 +9680,8 @@
       }
 
       applyEnvelopeIdentity(conversation, envelope);
-      conversation.remoteText = "";
-      conversation.remoteFrom = envelopeFrom(envelope);
+      clearRemoteDraftForConversation(conversation, envelopeFrom(envelope));
       conversation.remoteIdentity = mergeMessageIdentity(conversation.remoteIdentity, envelopeMessageIdentity(envelope));
-      conversation.remoteDraftUpdatedAt = null;
       conversation.clientState = "active";
       conversation.clientStateUpdatedAt = new Date();
       setPeerPresence(conversation.peer, "online");
@@ -13653,6 +13652,17 @@
     updateMessageElement(existing, message);
     scrollMessageTimelineToLatest();
     updateTotalConversationTextPanel(conversation);
+  }
+
+  function clearRemoteDraftForConversation(conversation, from = "") {
+    if (!conversation) {
+      return;
+    }
+
+    conversation.remoteText = "";
+    conversation.remoteFrom = from || conversation.remoteFrom || conversation.peer;
+    conversation.remoteDraftUpdatedAt = null;
+    updateRemoteDraftMessage(conversation.id);
   }
 
   function updateLocalRttDraftMessage(conversation = activeConversation(), scroll = true) {
