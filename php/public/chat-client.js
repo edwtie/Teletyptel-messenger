@@ -8989,6 +8989,8 @@
   }
 
   function handleComposerInput() {
+    updateLocalRttDraftMessage();
+    updateTotalConversationTextPanel();
     sendRttEdit();
     syncComposerActionButtons();
   }
@@ -9091,7 +9093,6 @@
 
   function sendRttEdit() {
     if (!hasActiveConversation() || !el.rttToggle.checked) {
-      clearLocalRttDraftMessage();
       return;
     }
 
@@ -9104,8 +9105,6 @@
     const previousText = state.previousText;
     const actions = createDeltaActions(previousText, text);
     state.previousText = text;
-    updateLocalRttDraftMessage();
-    updateTotalConversationTextPanel();
     if (sendJingleRttSyncPacket("edit", text, { actions, previousText })) {
       return;
     }
@@ -13667,7 +13666,7 @@
 
   function updateLocalRttDraftMessage(conversation = activeConversation(), scroll = true) {
     const existing = el.messageTimeline.querySelector('[data-local-draft="true"]');
-    if (!conversation || conversation.id !== state.activeConversationId || !el.rttToggle.checked) {
+    if (!conversation || conversation.id !== state.activeConversationId) {
       existing?.remove();
       cleanupOrphanMessageDateSeparators();
       return;
