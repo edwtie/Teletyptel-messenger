@@ -3784,8 +3784,11 @@ body[data-theme="dark"] .message-date-separator span {
 
 .message.with-avatar .message-content {
   position: relative;
+  justify-self: start;
   display: grid;
   gap: 4px;
+  width: fit-content;
+  max-width: 100%;
   min-width: 0;
 }
 
@@ -3809,6 +3812,7 @@ body[data-theme="dark"] .message-date-separator span {
 .message.with-avatar.self .message-content {
   grid-column: 1;
   grid-row: 1;
+  justify-self: end;
 }
 
 .message.with-avatar.self .message-meta {
@@ -3854,6 +3858,7 @@ body[data-theme="dark"] .message-date-separator span {
 .message-body {
   display: flow-root;
   position: relative;
+  max-width: 100%;
   border: 1px solid #3f536d;
   border-radius: var(--radius);
   background: var(--bubble-peer);
@@ -4373,7 +4378,26 @@ body[data-theme="dark"] .link-preview-loading {
 .message-body-wrap {
   position: relative;
   display: grid;
+  justify-self: start;
+  width: fit-content;
+  max-width: 100%;
   min-width: 0;
+}
+
+.message.self .message-body-wrap {
+  justify-self: end;
+}
+
+.message-body-wrap:has(.attachment-card),
+.message-body-wrap:has(.call-message-card),
+.message-body-wrap:has(.location-card) {
+  width: min(560px, 100%);
+}
+
+.message-body:has(.attachment-card),
+.message-body:has(.call-message-card),
+.message-body:has(.location-card) {
+  width: 100%;
 }
 
 .message-body-wrap:has(.message-reactions:not([hidden])) {
