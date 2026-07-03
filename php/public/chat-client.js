@@ -8354,6 +8354,11 @@
       if (!isXmppGroupchatType(type)) {
         sendXmppMessageAcknowledgements(from, messageId, Boolean(message.getElementsByTagNameNS("urn:xmpp:receipts", "request")[0]));
       }
+      if (!replaceId && isMirroredRecentSelfMessage(conversation, bodyElement.textContent || "", from)) {
+        clearRemoteDraftForConversation(conversation, from);
+        appendDebug("xmpp-message-skip", `ignored mirrored final message from ${from}`);
+        continue;
+      }
       if (replaceId) {
         applyMessageCorrection(conversation, replaceId, bodyElement.textContent || "", "peer", messageId, from, stylingDisabled);
       } else {
@@ -9725,6 +9730,11 @@
       conversation.clientStateUpdatedAt = new Date();
       setPeerPresence(conversation.peer, "online");
       sendRelayMessageAcknowledgements(conversation, envelope);
+      if (!envelope.replaceId && isMirroredRecentSelfMessage(conversation, envelope.text ?? "", messageFrom)) {
+        clearRemoteDraftForConversation(conversation, messageFrom);
+        appendDebug("relay-message-skip", `ignored mirrored final message from ${messageFrom}`);
+        return;
+      }
       recordTotalConversationTextForConversation(conversation, "peer", envelope.text ?? "", conversation.remoteFrom, {
         final: true
       });
@@ -13298,6 +13308,26 @@
       persistHistoryMessage(conversation, message);
     }
     return message;
+  }
+
+  function isMirroredRecentSelfMessage(conversation, text, from = "") {
+    if (!conversation || conversation.kind !== "contact" || !text || !addressMatches(from, conversation.peer)) {
+      return false;
+    }
+
+    const now = Date.now();
+    const mirrorWindowMs = 10000;
+    return conversation.messages.some((message) => {
+      if (message.direction !== "self" || message.draft || message.attachment || message.location) {
+        return false;
+      }
+
+      const timestamp = message.timestamp instanceof Date ? message.timestamp : new Date(message.timestamp || 0);
+      return message.text === text
+        && Number.isFinite(timestamp.getTime())
+        && now - timestamp.getTime() >= 0
+        && now - timestamp.getTime() <= mirrorWindowMs;
+    });
   }
 
   function upsertLiveLocationMessage(direction, text, status, from, conversationId, location, senderIdentity = null) {
