@@ -9671,6 +9671,29 @@
     return resource && !generatedWebResource ? `${local}/${resource}` : local;
   }
 
+  function remoteDraftDisplayName(conversation) {
+    if (!conversation) {
+      return "Remote";
+    }
+
+    const from = conversation.remoteFrom || conversation.peer;
+    if (conversation.kind !== "group") {
+      return conversation.remoteIdentity?.displayName || displayNameForJid(from);
+    }
+
+    const occupant = resourceFromJid(from);
+    if (occupant) {
+      const known = knownGroupMembers(conversation).find((member) =>
+        member.name && (
+          member.name.toLowerCase() === occupant.toLowerCase()
+          || bareJid(member.jid).split("@")[0].toLowerCase() === occupant.toLowerCase()
+        ));
+      return known?.name || occupant;
+    }
+
+    return conversation.remoteIdentity?.displayName || displayNameForJid(from);
+  }
+
   function applyRelayEnvelope(envelope) {
     if (!envelope) {
       return;
@@ -13647,12 +13670,12 @@
         status: "typing",
         timestamp: conversation.remoteDraftUpdatedAt ?? new Date(),
         draft: true,
-        senderDisplayName: conversation.remoteIdentity?.displayName || null,
+        senderDisplayName: remoteDraftDisplayName(conversation),
         senderAvatarColor: conversation.remoteIdentity?.avatarColor || null,
         senderAvatarDataUrl: conversation.remoteIdentity?.avatarDataUrl || null
       });
       el.remoteDraft.hidden = false;
-      el.remoteDraftName.textContent = displayNameForJid(conversation.remoteFrom || conversation.peer);
+      el.remoteDraftName.textContent = remoteDraftDisplayName(conversation);
       el.remoteDraftPreviousText.textContent = lastPeerConversationText(conversation);
       el.remoteDraftText.textContent = conversation.remoteText || "";
     } else {
@@ -13694,7 +13717,7 @@
     renderAvatarInto(el.activeConversationAvatar, conversation);
     syncActiveConversationAvatarButton(conversation);
     el.remoteDraft.hidden = false;
-    el.remoteDraftName.textContent = displayNameForJid(conversation.remoteFrom || conversation.peer);
+    el.remoteDraftName.textContent = remoteDraftDisplayName(conversation);
     el.remoteDraftPreviousText.textContent = lastPeerConversationText(conversation);
     el.remoteDraftText.textContent = conversation.remoteText || "";
 
@@ -13705,7 +13728,7 @@
       status: "typing",
       timestamp: conversation.remoteDraftUpdatedAt ?? new Date(),
       draft: true,
-      senderDisplayName: conversation.remoteIdentity?.displayName || null,
+      senderDisplayName: remoteDraftDisplayName(conversation),
       senderAvatarColor: conversation.remoteIdentity?.avatarColor || null,
       senderAvatarDataUrl: conversation.remoteIdentity?.avatarDataUrl || null
     };
