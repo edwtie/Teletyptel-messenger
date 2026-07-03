@@ -485,6 +485,7 @@ account.resetting_password=Wachtwoord herstellen...
 account.reset_token_missing=De herstellink mist of is incompleet.
 account.invalid_reset_token=Deze herstellink is ongeldig of verlopen.
 account.missing_reset_data=Vul je e-mailadres en een nieuw wachtwoord in.
+account.reset_email_required=Dit lokale account heeft geen geverifieerd e-mailadres voor wachtwoordherstel.
 account.account_not_found=Dit account staat niet op de XMPP-server.
 account.disconnected_login_required=Verbinding verbroken. Meld je aan om verder te gaan.
 account.signed_out=Uitgelogd. Meld je aan om verder te gaan.

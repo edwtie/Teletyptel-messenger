@@ -4246,6 +4246,10 @@
       return t("account.missing_reset_data", "Enter your email address and a new password.");
     }
 
+    if (error === "reset_email_required") {
+      return t("account.reset_email_required", "This local account has no verified e-mail address for password recovery.");
+    }
+
     if (error === "account_not_found") {
       return t("account.account_not_found", "This account was not found on the XMPP server.");
     }

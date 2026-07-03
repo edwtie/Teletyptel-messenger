@@ -485,6 +485,7 @@ account.resetting_password=Resetting password...
 account.reset_token_missing=The password reset link is missing or incomplete.
 account.invalid_reset_token=This password reset link is invalid or expired.
 account.missing_reset_data=Enter your email address and a new password.
+account.reset_email_required=This local account has no verified e-mail address for password recovery.
 account.account_not_found=This account was not found on the XMPP server.
 account.disconnected_login_required=Connection closed. Sign in to continue.
 account.signed_out=Signed out. Sign in to continue.

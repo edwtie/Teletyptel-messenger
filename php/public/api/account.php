@@ -345,8 +345,8 @@ function createAccount(array $input): void
 
 function requestPasswordReset(array $input): void
 {
-    $jid = bareJid(cleanText($input['jid'] ?? '', 255));
-    if ($jid === '') {
+    $identifier = bareJid(cleanText($input['jid'] ?? '', 255));
+    if ($identifier === '') {
         http_response_code(400);
         echo json_encode(['ok' => false, 'error' => 'missing_jid']);
         return;
@@ -356,6 +356,27 @@ function requestPasswordReset(array $input): void
     ensureAccountProfileSchema($pdo);
     ensurePasswordResetSchema($pdo);
     ensureAccountIdentitySchema($pdo);
+
+    $jid = $identifier;
+    $recipient = '';
+    if (domainFromJid($identifier) === 'localhost') {
+        $existing = findExistingAccount($pdo, ['jid' => $identifier]);
+        if (is_array($existing)) {
+            $recipient = verifiedEmailForAccount($pdo, (string)$existing['account_id']);
+        }
+
+        if ($recipient === '') {
+            http_response_code(400);
+            echo json_encode(['ok' => false, 'error' => 'reset_email_required']);
+            return;
+        }
+    } else {
+        $emailAccount = findAccountByVerifiedEmail($pdo, $identifier);
+        if (is_array($emailAccount)) {
+            $jid = bareJid((string)$emailAccount['jid']);
+            $recipient = strtolower($identifier);
+        }
+    }
 
     if (xmppAccountExists($jid)) {
         $token = bin2hex(random_bytes(32));
@@ -374,7 +395,7 @@ function requestPasswordReset(array $input): void
         $resetLink = buildPasswordResetLink($token);
         $subject = 'TeleTypTel wachtwoord herstellen';
         $body = "Hallo,\n\nGebruik deze link om je TeleTypTel-wachtwoord te herstellen:\n{$resetLink}\n\nDeze link is 30 minuten geldig.\n\nAls je dit niet hebt aangevraagd, kun je dit bericht negeren.";
-        $sent = sendPasswordResetMail($pdo, $jid, $subject, $body, $resetLink);
+        $sent = sendPasswordResetMail($pdo, $jid, $subject, $body, $resetLink, $recipient);
         echo json_encode([
             'ok' => true,
             'mailSent' => $sent,
@@ -2039,10 +2060,10 @@ function buildPasswordResetLink(string $token): string
     return "{$scheme}://{$host}{$basePath}?reset=" . rawurlencode($token);
 }
 
-function sendPasswordResetMail(PDO $pdo, string $jid, string $subject, string $body, string $resetLink): bool
+function sendPasswordResetMail(PDO $pdo, string $jid, string $subject, string $body, string $resetLink, string $recipient = ''): bool
 {
     $mailError = '';
-    $recipient = passwordResetMailRecipient($jid);
+    $recipient = $recipient !== '' ? $recipient : passwordResetMailRecipient($jid);
     return sendTeletyptelMail($pdo, $recipient, $subject, $body, $resetLink, $mailError, $jid);
 }
 
