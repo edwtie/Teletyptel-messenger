@@ -338,6 +338,7 @@
     historySettings: loadHistorySettings(sessionProfile),
     sequence: 0,
     previousText: "",
+    outgoingXmppRttIds: new Set(),
     editingMessage: null,
     call: null,
     callVideoResize: {
@@ -8390,6 +8391,12 @@
       return;
     }
 
+    const messageId = stableXmppMessageId(message);
+    if (isOutgoingXmppRttEcho(messageId)) {
+      appendDebug("xmpp-rtt-skip", `duplicate ${messageId} from ${from}`);
+      return;
+    }
+
     const nextRemoteText = applyXmppRttElement(conversation.remoteText || "", rttElement);
     conversation.remoteText = nextRemoteText;
     conversation.remoteFrom = from;
@@ -8415,6 +8422,27 @@
     const to = message?.getAttribute("to") || "";
     return addressMatches(from, conversation.peer)
       && (!to || addressMatches(to, currentBareJid()));
+  }
+
+  function rememberOutgoingXmppRttId(id) {
+    if (!id) {
+      return;
+    }
+
+    state.outgoingXmppRttIds.add(id);
+    while (state.outgoingXmppRttIds.size > 80) {
+      const oldest = state.outgoingXmppRttIds.values().next().value;
+      state.outgoingXmppRttIds.delete(oldest);
+    }
+  }
+
+  function isOutgoingXmppRttEcho(id) {
+    if (!id || !state.outgoingXmppRttIds.has(id)) {
+      return false;
+    }
+
+    state.outgoingXmppRttIds.delete(id);
+    return true;
   }
 
   function handleXmppMamResultMessage(message) {
@@ -9162,9 +9190,11 @@
     const rttEvent = eventName === "edit" ? "reset" : eventName;
     const actions = `<t p="0">${escapeXml(text)}</t>`;
     const rttXml = `<rtt xmlns="urn:xmpp:rtt:0" event="${escapeXml(rttEvent)}" seq="${state.sequence++}">${actions}</rtt>`;
-    const xml = createXmppRttStanza(rttXml, currentToJid(), messageType);
+    const outgoingId = createMessageId("rtt");
+    const xml = createXmppRttStanza(rttXml, currentToJid(), messageType, outgoingId);
     const sent = sendXmppStanza(xml, `<message type="${messageType}" rtt="${escapeXml(eventName)}"/>`);
     if (sent) {
+      rememberOutgoingXmppRttId(outgoingId);
       recordTotalConversationTextForConversation(conversation, "self", text, currentFromJid());
     }
     return sent;
@@ -18059,7 +18089,8 @@
   function createXmppRttStanza(rttXml, to = el.peerInput.value, type = "chat", id = createMessageId("rtt")) {
     const messageType = isXmppGroupchatType(type) ? "groupchat" : "chat";
     const noStoreHint = `<no-store xmlns="urn:xmpp:hints"/>`;
-    return `<message xmlns="jabber:client" type="${messageType}" from="${escapeXml(currentXmppFromJid())}" to="${escapeXml(to)}" id="${escapeXml(id)}">${rttXml}${noStoreHint}</message>`;
+    const originId = `<origin-id xmlns="urn:xmpp:sid:0" id="${escapeXml(id)}"/>`;
+    return `<message xmlns="jabber:client" type="${messageType}" from="${escapeXml(currentXmppFromJid())}" to="${escapeXml(to)}" id="${escapeXml(id)}">${rttXml}${originId}${noStoreHint}</message>`;
   }
 
   function createDeliveryReceiptStanza(to, messageId, id = createMessageId("receipt")) {
