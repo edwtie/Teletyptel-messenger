@@ -8378,7 +8378,14 @@
       return;
     }
 
-    conversation.remoteText = applyXmppRttElement(conversation.remoteText || "", rttElement);
+    const nextRemoteText = applyXmppRttElement(conversation.remoteText || "", rttElement);
+    if (isMirroredLocalRttDraft(conversation, nextRemoteText, type)) {
+      clearRemoteDraftForConversation(conversation, from);
+      appendDebug("xmpp-rtt-skip", `ignored mirrored local RTT from ${from}`);
+      return;
+    }
+
+    conversation.remoteText = nextRemoteText;
     conversation.remoteFrom = from;
     conversation.remoteDraftUpdatedAt = new Date();
     conversation.clientState = "active";
@@ -8402,6 +8409,17 @@
     const to = message?.getAttribute("to") || "";
     return addressMatches(from, conversation.peer)
       && (!to || addressMatches(to, currentBareJid()));
+  }
+
+  function isMirroredLocalRttDraft(conversation, remoteText, type) {
+    if (!conversation || isXmppGroupchatType(type) || conversation.id !== state.activeConversationId) {
+      return false;
+    }
+
+    const localText = el.messageInput.value;
+    return Boolean(localText)
+      && localText === String(remoteText ?? "")
+      && Boolean(el.messageTimeline.querySelector('[data-local-draft="true"]'));
   }
 
   function handleXmppMamResultMessage(message) {
