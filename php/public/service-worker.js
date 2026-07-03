@@ -1,5 +1,5 @@
-const CACHE_NAME = "teletyptel-webclient-v363";
-const BUILD_VERSION = "20260702-rtt-remote-draft-replace";
+const CACHE_NAME = "teletyptel-webclient-v364";
+const BUILD_VERSION = "20260703-rtt-echo-filter";
 const ASSETS = [
   "chat.html",
   "dev.html",

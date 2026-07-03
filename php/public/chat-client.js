@@ -8374,7 +8374,7 @@
   }
 
   function handleXmppRttMessage(conversation, message, rttElement, from, type) {
-    if (isXmppOwnGroupchatEcho(from, type)) {
+    if (!shouldAcceptXmppRttMessage(conversation, message, from, type)) {
       return;
     }
 
@@ -8388,6 +8388,20 @@
     recordTotalConversationTextForConversation(conversation, "peer", conversation.remoteText, conversation.remoteFrom);
     updateRemoteDraftMessage(conversation.id);
     updateTotalConversationTextPanel(conversation);
+  }
+
+  function shouldAcceptXmppRttMessage(conversation, message, from, type) {
+    if (!conversation || !from || isOwnPeer(from) || isXmppOwnGroupchatEcho(from, type)) {
+      return false;
+    }
+
+    if (isXmppGroupchatType(type)) {
+      return addressMatches(bareJid(from), conversation.peer);
+    }
+
+    const to = message?.getAttribute("to") || "";
+    return addressMatches(from, conversation.peer)
+      && (!to || addressMatches(to, currentBareJid()));
   }
 
   function handleXmppMamResultMessage(message) {
