@@ -16059,7 +16059,8 @@
   function shouldRenderGroupSenderInBubble(message) {
     return Boolean(message)
       && activeConversation()?.kind === "group"
-      && shouldRenderInlineMessageMeta(message);
+      && !isCallMessage(message)
+      && (shouldRenderInlineMessageMeta(message) || message.draft);
   }
 
   function appendGroupSenderLabel(body, message) {
