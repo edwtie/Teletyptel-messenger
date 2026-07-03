@@ -8358,6 +8358,13 @@
       if (replaceId) {
         applyMessageCorrection(conversation, replaceId, bodyElement.textContent || "", "peer", messageId, from, stylingDisabled);
       } else {
+        const existingMessage = findConversationMessageByAnyId(conversation, messageId);
+        if (existingMessage) {
+          setMessageXmppIdentifiers(existingMessage, xmppMessageIdentifiers(message));
+          appendDebug("xmpp-message-skip", `duplicate ${messageId} from ${from}`);
+          clearRemoteDraftForConversation(conversation, from);
+          continue;
+        }
         const addedMessage = addMessage("peer", bodyElement.textContent || "", "received", from, null, conversation.id, null, messageId, stylingDisabled);
         setMessageXmppIdentifiers(addedMessage, xmppMessageIdentifiers(message));
         if (addedMessage) {
@@ -8384,12 +8391,6 @@
     }
 
     const nextRemoteText = applyXmppRttElement(conversation.remoteText || "", rttElement);
-    if (isMirroredLocalRttDraft(conversation, nextRemoteText, type)) {
-      clearRemoteDraftForConversation(conversation, from);
-      appendDebug("xmpp-rtt-skip", `ignored mirrored local RTT from ${from}`);
-      return;
-    }
-
     conversation.remoteText = nextRemoteText;
     conversation.remoteFrom = from;
     conversation.remoteDraftUpdatedAt = new Date();
@@ -8414,17 +8415,6 @@
     const to = message?.getAttribute("to") || "";
     return addressMatches(from, conversation.peer)
       && (!to || addressMatches(to, currentBareJid()));
-  }
-
-  function isMirroredLocalRttDraft(conversation, remoteText, type) {
-    if (!conversation || isXmppGroupchatType(type) || conversation.id !== state.activeConversationId) {
-      return false;
-    }
-
-    const localText = el.messageInput.value;
-    return Boolean(localText)
-      && localText === String(remoteText ?? "")
-      && Boolean(el.messageTimeline.querySelector('[data-local-draft="true"]'));
   }
 
   function handleXmppMamResultMessage(message) {
