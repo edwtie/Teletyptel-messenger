@@ -8420,8 +8420,9 @@
     }
 
     const to = message?.getAttribute("to") || "";
-    return addressMatches(from, conversation.peer)
-      && (!to || addressMatches(to, currentBareJid()));
+    return Boolean(to)
+      && addressMatches(from, conversation.peer)
+      && addressMatches(to, currentBareJid());
   }
 
   function rememberOutgoingXmppRttId(id) {
@@ -9187,11 +9188,17 @@
     const conversation = activeConversation();
     joinXmppGroupConversation(conversation);
     const messageType = conversation?.kind === "group" ? "groupchat" : "chat";
+    const toJid = currentToJid();
+    if (!isXmppGroupchatType(messageType) && (!toJid || isOwnPeer(toJid))) {
+      appendDebug("xmpp-rtt-skip", `invalid to=${toJid || "-"}`);
+      return false;
+    }
+
     const rttEvent = eventName === "edit" ? "reset" : eventName;
     const actions = `<t p="0">${escapeXml(text)}</t>`;
     const rttXml = `<rtt xmlns="urn:xmpp:rtt:0" event="${escapeXml(rttEvent)}" seq="${state.sequence++}">${actions}</rtt>`;
     const outgoingId = createMessageId("rtt");
-    const xml = createXmppRttStanza(rttXml, currentToJid(), messageType, outgoingId);
+    const xml = createXmppRttStanza(rttXml, toJid, messageType, outgoingId);
     const sent = sendXmppStanza(xml, `<message type="${messageType}" rtt="${escapeXml(eventName)}"/>`);
     if (sent) {
       rememberOutgoingXmppRttId(outgoingId);
