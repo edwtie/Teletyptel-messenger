@@ -1,5 +1,5 @@
-const CACHE_NAME = "teletyptel-webclient-v367";
-const BUILD_VERSION = "20260703-final-message-mirror-filter";
+const CACHE_NAME = "teletyptel-webclient-v368";
+const BUILD_VERSION = "20260703-jid-remote-normalize";
 const ASSETS = [
   "chat.html",
   "dev.html",
