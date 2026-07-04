@@ -6397,7 +6397,7 @@
     if (!conversation || conversation.kind === "group" || !jid || isInfrastructurePeer(jid) || !state.account?.accountId) {
       return;
     }
-    if (isValidAvatarDataUrl(conversation.avatarDataUrl) || state.publicProfileRequests.has(jid)) {
+    if (conversation.publicProfileLoadedJid === jid || state.publicProfileRequests.has(jid)) {
       return;
     }
     if (state.publicProfileCache.has(jid)) {
@@ -6431,6 +6431,11 @@
     }
     conversation.email = profile.email || conversation.email || "";
     conversation.phoneNumber = profile.phoneNumber || conversation.phoneNumber || "";
+    if (profile.displayName && shouldReplaceConversationNameWithProfile(conversation)) {
+      conversation.name = profile.displayName;
+      delete conversation.nameKey;
+    }
+
     if (isValidAvatarDataUrl(profile.avatarDataUrl)) {
       conversation.avatarDataUrl = profile.avatarDataUrl;
     }
@@ -6446,6 +6451,19 @@
         renderActiveConversation();
       }
     }
+  }
+
+  function shouldReplaceConversationNameWithProfile(conversation) {
+    if (!conversation || conversation.kind === "group") {
+      return false;
+    }
+
+    const current = String(conversation.name || "").trim();
+    if (!current || current === conversation.peer) {
+      return true;
+    }
+
+    return current === fallbackDisplayNameForJid(conversation.peer);
   }
 
   function showMessageContextMenu(event, message, anchor = null) {
@@ -9664,6 +9682,12 @@
       return conversationDisplayName(known);
     }
 
+    return fallbackDisplayNameForJid(normalized);
+  }
+
+  function fallbackDisplayNameForJid(jid) {
+    const normalized = normalizeJidInput(jid);
+    const bare = bareJid(normalized);
     const local = bare.split("@")[0] || normalized;
     const resource = normalized.includes("/") ? normalized.split("/").slice(1).join("/") : "";
     const generatedWebResource = /^web(?:-[a-z0-9]+)?$/i.test(resource);
