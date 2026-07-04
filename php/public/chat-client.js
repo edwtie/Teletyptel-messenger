@@ -2881,7 +2881,8 @@
     state.sessionTimeoutInProgress = true;
     logoutAccount({
       message: t("account.session_expired", "Session expired after inactivity. Sign in again."),
-      forceLogin: true
+      forceLogin: true,
+      reason: "session-timeout"
     })
       .finally(() => {
         state.sessionTimeoutInProgress = false;
@@ -4315,7 +4316,8 @@
       .then(() => appendDebug("account", "Server account session cleared"))
       .catch((error) => appendDebug("account-logout-error", error.message));
     disconnectAll(options.message || t("account.signed_out", "Signed out. Sign in to continue."), {
-      forceLogin: options.forceLogin === true
+      forceLogin: options.forceLogin === true,
+      reason: options.reason || "logout"
     });
   }
 
@@ -6117,8 +6119,9 @@
       stopLocationSharing();
     }
 
+    sendFinalClientStateBeforeDisconnect(options.reason || "disconnect");
+
     if (state.relaySocket) {
-      sendPresence("offline");
       stopRelayHeartbeat();
       state.relaySocket.close();
     }
@@ -6126,6 +6129,14 @@
     closeXmppWebSocket();
     updateConnectButtonAvailability();
     returnToLoginScreenAfterDisconnect(message, options);
+  }
+
+  function sendFinalClientStateBeforeDisconnect(reason = "disconnect") {
+    const previousState = state.clientLifecycle.current;
+    state.clientLifecycle.current = "inactive";
+    flushClientLifecycleState(reason, true);
+    sendPresence("offline");
+    state.clientLifecycle.current = previousState;
   }
 
   function returnToLoginScreenAfterDisconnect(message, options = {}) {

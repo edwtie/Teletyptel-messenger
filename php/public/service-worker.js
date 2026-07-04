@@ -1,5 +1,5 @@
-const CACHE_NAME = "teletyptel-webclient-v376";
-const BUILD_VERSION = "20260704-xmpp-presence-subscribe";
+const CACHE_NAME = "teletyptel-webclient-v377";
+const BUILD_VERSION = "20260704-timeout-final-presence";
 const ASSETS = [
   "chat.html",
   "dev.html",
