@@ -61,6 +61,7 @@
   const mediaSettingsStorageKey = "teletyptel.mediaSettings";
   const callVideoHeightStorageKey = "teletyptel.callVideoHeight";
   const blockedJidsStorageKeyBase = "teletyptel.blockedJids";
+  const archivedJidsStorageKeyBase = "teletyptel.archivedJids";
   const mutedNotificationJidsStorageKeyBase = "teletyptel.mutedNotificationJids";
   const doNotDisturbStorageKey = "teletyptel.doNotDisturb";
   const xmppStreamManagementStorageKeyBase = "teletyptel.xmppStreamManagement";
@@ -428,6 +429,7 @@
       cancelled: false
     },
     blockedJids: new Set(loadBlockedJids(sessionProfile)),
+    archivedJids: new Set(loadArchivedJids(sessionProfile)),
     mutedNotificationJids: new Set(loadMutedNotificationJids(sessionProfile)),
     doNotDisturb: localStorage.getItem(doNotDisturbStorageKey) === "1",
     accountReady: false,
@@ -543,6 +545,7 @@
     contextProfileButton: byId("contextProfileButton"),
     contextRoomAvatarButton: byId("contextRoomAvatarButton"),
     contextGroupManageButton: byId("contextGroupManageButton"),
+    contextArchiveButton: byId("contextArchiveButton"),
     contextMuteNotificationsButton: byId("contextMuteNotificationsButton"),
     contextBlockButton: byId("contextBlockButton"),
     groupMemberContextMenu: byId("groupMemberContextMenu"),
@@ -943,6 +946,7 @@
     el.contextProfileButton.addEventListener("click", openContextConversationProfile);
     el.contextRoomAvatarButton.addEventListener("click", chooseContextRoomAvatar);
     el.contextGroupManageButton.addEventListener("click", openContextGroupManagement);
+    el.contextArchiveButton.addEventListener("click", archiveContextConversation);
     el.contextMuteNotificationsButton.addEventListener("click", toggleMuteContextConversationNotifications);
     el.contextBlockButton.addEventListener("click", toggleBlockContextConversation);
     el.groupMemberContextMenu.addEventListener("click", (event) => event.stopPropagation());
@@ -1586,6 +1590,11 @@
     return normalized === "default" ? blockedJidsStorageKeyBase : `${blockedJidsStorageKeyBase}.${normalized}`;
   }
 
+  function archivedJidsStorageKeyFor(profile) {
+    const normalized = sanitizeSessionProfile(profile);
+    return normalized === "default" ? archivedJidsStorageKeyBase : `${archivedJidsStorageKeyBase}.${normalized}`;
+  }
+
   function mutedNotificationJidsStorageKeyFor(profile) {
     const normalized = sanitizeSessionProfile(profile);
     return normalized === "default" ? mutedNotificationJidsStorageKeyBase : `${mutedNotificationJidsStorageKeyBase}.${normalized}`;
@@ -1632,6 +1641,29 @@
     localStorage.setItem(
       blockedJidsStorageKeyFor(state.sessionProfile),
       JSON.stringify(Array.from(state.blockedJids).sort()));
+  }
+
+  function loadArchivedJids(profile) {
+    const saved = localStorage.getItem(archivedJidsStorageKeyFor(profile));
+    if (!saved) {
+      return [];
+    }
+
+    try {
+      const parsed = JSON.parse(saved);
+      return Array.isArray(parsed)
+        ? parsed.map(normalizeBlockJid).filter(Boolean)
+        : [];
+    } catch {
+      localStorage.removeItem(archivedJidsStorageKeyFor(profile));
+      return [];
+    }
+  }
+
+  function saveArchivedJids() {
+    localStorage.setItem(
+      archivedJidsStorageKeyFor(state.sessionProfile),
+      JSON.stringify(Array.from(state.archivedJids).sort()));
   }
 
   function loadMutedNotificationJids(profile) {
@@ -6249,6 +6281,9 @@
     const focusTarget = [
       el.contextProfileButton,
       el.contextRoomAvatarButton,
+      el.contextGroupManageButton,
+      el.contextArchiveButton,
+      el.contextMuteNotificationsButton,
       el.contextBlockButton
     ].find((button) => !button.hidden && !button.disabled) || menu;
     focusTarget.focus();
@@ -13455,6 +13490,10 @@
       timestamp: new Date()
     };
 
+    if (direction === "peer" && persist) {
+      unarchiveConversation(conversation);
+    }
+
     conversation.messages.push(message);
     if (conversation.id === state.activeConversationId) {
       appendMessageToTimeline(message);
@@ -13727,7 +13766,7 @@
     const query = normalizeConversationSearchText(el.conversationSearchInput.value);
     let visibleCount = 0;
     for (const conversation of state.conversations) {
-      if (isOwnContact(conversation) || isBlockedConversation(conversation)) {
+      if (isOwnContact(conversation) || isBlockedConversation(conversation) || isArchivedConversation(conversation)) {
         continue;
       }
       if (query && !conversationMatchesSearch(conversation, query)) {
@@ -14344,6 +14383,47 @@
     updateConversationContextMenu();
   }
 
+  function archiveContextConversation() {
+    const conversation = state.conversations.find((item) => item.id === state.contextConversationId) ?? activeConversation();
+    closeConversationContextMenu();
+    archiveConversation(conversation);
+  }
+
+  function archiveConversation(conversation) {
+    if (!canArchiveConversation(conversation)) {
+      setConnectionStatus(t("status.select_contact_first", "Select a contact first"), "warn");
+      return;
+    }
+
+    const wasActive = state.activeConversationId === conversation.id;
+    state.archivedJids.add(normalizeBlockJid(conversation.peer));
+    saveArchivedJids();
+    conversation.remoteText = "";
+    conversation.remoteFrom = "";
+    conversation.remoteDraftUpdatedAt = null;
+    if (wasActive) {
+      state.activeConversationId = null;
+      state.previousText = "";
+      el.messageInput.value = "";
+      el.peerInput.value = "";
+      syncComposerActionButtons();
+    }
+
+    setConnectionStatus(t("status.chat_archived", "Chat archived: {0}").replace("{0}", conversationDisplayName(conversation)), "good");
+    renderConversations();
+    renderActiveConversation();
+  }
+
+  function unarchiveConversation(conversation) {
+    const key = normalizeBlockJid(conversation?.peer || "");
+    if (!key || !state.archivedJids.has(key)) {
+      return;
+    }
+
+    state.archivedJids.delete(key);
+    saveArchivedJids();
+  }
+
   function toggleBlockConversation(conversation) {
     if (!canBlockConversation(conversation)) {
       setConnectionStatus(t("status.select_contact_first", "Select a contact first"), "warn");
@@ -14414,6 +14494,7 @@
     const canViewProfile = canViewContactProfile(conversation);
     const canBlock = canBlockConversation(conversation);
     const canMute = canMuteConversationNotifications(conversation);
+    const canArchive = canArchiveConversation(conversation);
     const blocked = isBlockedConversation(conversation);
     const muted = isNotificationMutedConversation(conversation);
     const canChangeRoomAvatar = canChangeMucAvatar(conversation);
@@ -14424,6 +14505,8 @@
     el.contextRoomAvatarButton.disabled = !canChangeRoomAvatar;
     el.contextGroupManageButton.hidden = !canManageGroup;
     el.contextGroupManageButton.disabled = !canManageGroup;
+    el.contextArchiveButton.hidden = !canArchive;
+    el.contextArchiveButton.disabled = !canArchive;
     el.contextMuteNotificationsButton.disabled = !canMute;
     el.contextMuteNotificationsButton.hidden = !canMute;
     el.contextMuteNotificationsButton.textContent = muted
@@ -14454,8 +14537,16 @@
       && !isBlockedConversation(conversation);
   }
 
+  function canArchiveConversation(conversation) {
+    return Boolean(conversation)
+      && !isOwnPeer(conversation.peer)
+      && !isInfrastructurePeer(conversation.peer)
+      && !isBlockedConversation(conversation);
+  }
+
   function canOpenConversationContextMenu(conversation) {
     return canViewContactProfile(conversation)
+      || canArchiveConversation(conversation)
       || canMuteConversationNotifications(conversation)
       || canBlockConversation(conversation)
       || canChangeMucAvatar(conversation)
@@ -15529,6 +15620,11 @@
 
   function isBlockedConversation(conversation) {
     return Boolean(conversation) && isBlockedPeer(conversation.peer);
+  }
+
+  function isArchivedConversation(conversation) {
+    const key = normalizeBlockJid(conversation?.peer || "");
+    return Boolean(key) && state.archivedJids.has(key);
   }
 
   function isBlockedEnvelope(envelope) {
