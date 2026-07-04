@@ -8141,6 +8141,7 @@
 
     state.xmppAuthRefreshAttempted = false;
     state.xmppSession.phase = "ready";
+    setAllContactPresence("offline");
     sendPresence("online");
     for (const conversation of state.conversations) {
       if (conversation.kind === "group") {
@@ -8285,7 +8286,6 @@
         continue;
       }
 
-      conversation.presence = "online";
       const bodyElement = message.getElementsByTagNameNS("jabber:client", "body")[0];
       const rttElement = message.getElementsByTagNameNS("urn:xmpp:rtt:0", "rtt")[0];
       if (rttElement && !bodyElement) {
@@ -8403,7 +8403,6 @@
     conversation.remoteDraftUpdatedAt = new Date();
     conversation.clientState = "active";
     conversation.clientStateUpdatedAt = new Date();
-    setPeerPresence(conversation.peer, "online");
     appendDebug("xmpp-rtt-in", `<rtt from="${escapeXml(from)}" seq="${escapeXml(rttElement.getAttribute("seq") || "")}"/>`);
     recordTotalConversationTextForConversation(conversation, "peer", conversation.remoteText, conversation.remoteFrom);
     updateRemoteDraftMessage(conversation.id);
