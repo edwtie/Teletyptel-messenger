@@ -3033,18 +3033,21 @@ body:not([data-chat-background="none"]) .message-body {
   overflow-wrap: anywhere;
 }
 
-.blocked-contact-list {
+.blocked-contact-list,
+.archive-contact-list {
   display: grid;
   gap: 8px;
   margin-top: 8px;
 }
 
-.blocked-contact-empty {
+.blocked-contact-empty,
+.archive-contact-empty {
   margin: 0;
   color: var(--muted);
 }
 
-.blocked-contact-row {
+.blocked-contact-row,
+.archive-contact-row {
   display: grid;
   grid-template-columns: 34px minmax(0, 1fr) auto;
   align-items: center;
@@ -3059,20 +3062,24 @@ body:not([data-chat-background="none"]) .message-body {
   filter: grayscale(1);
 }
 
-.blocked-contact-text {
+.blocked-contact-text,
+.archive-contact-text {
   display: grid;
   gap: 2px;
   min-width: 0;
 }
 
 .blocked-contact-text strong,
-.blocked-contact-text span {
+.blocked-contact-text span,
+.archive-contact-text strong,
+.archive-contact-text span {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.blocked-contact-text span {
+.blocked-contact-text span,
+.archive-contact-text span {
   color: var(--muted);
 }
 
@@ -6259,7 +6266,8 @@ body[data-theme="light"] .provider-card {
   background: #ffffff;
 }
 
-body[data-theme="light"] .blocked-contact-row {
+body[data-theme="light"] .blocked-contact-row,
+body[data-theme="light"] .archive-contact-row {
   background: #f5f8fc;
 }
 
@@ -6435,7 +6443,8 @@ body[data-theme="dark"] .provider-card {
   background: #1a2637;
 }
 
-body[data-theme="dark"] .blocked-contact-row {
+body[data-theme="dark"] .blocked-contact-row,
+body[data-theme="dark"] .archive-contact-row {
   background: #132034;
 }
 

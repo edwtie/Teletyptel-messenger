@@ -15,7 +15,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="favicon.ico" sizes="any">
   <link rel="apple-touch-icon" href="assets/brand/teletyptel-icon-192.png">
-  <link rel="stylesheet" href="chat-client.css?v=20260704-archive-chat">
+  <link rel="stylesheet" href="chat-client.css?v=20260704-archive-list">
 </head>
 <body class="account-booting">
   <a class="skip-link" href="#messageInput" data-i18n="button.skip_to_message">Skip to message</a>
@@ -37,6 +37,10 @@
         <button id="historyButton" class="icon-button top-icon-button" type="button" title="History" aria-label="History" data-i18n-title="tab.history" data-i18n-aria-label="tab.history">
           <span class="material-icon" data-icon="event" aria-hidden="true"></span>
           <span class="sr-only" data-i18n="tab.history">History</span>
+        </button>
+        <button id="archiveButton" class="icon-button top-icon-button" type="button" title="Archive" aria-label="Archive" data-i18n-title="tab.archive" data-i18n-aria-label="tab.archive">
+          <span class="material-icon" data-icon="archive" aria-hidden="true"></span>
+          <span class="sr-only" data-i18n="tab.archive">Archive</span>
         </button>
         <details id="viewMenu" class="top-menu">
           <summary class="top-icon-button" title="View" aria-label="View" data-i18n-title="menu.view" data-i18n-aria-label="menu.view">
@@ -1254,6 +1258,6 @@
 
   <script src="vendor/qrcode.js?v=20260623-history-privacy-copy"></script>
   <script src="jingle-history.js?v=20260615-jingle-history"></script>
-  <script src="chat-client.js?v=20260704-archive-chat"></script>
+  <script src="chat-client.js?v=20260704-archive-list"></script>
 </body>
 </html>

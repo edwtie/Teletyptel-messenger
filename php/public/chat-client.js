@@ -118,6 +118,10 @@
       viewBox: "0 -960 960 960",
       paths: ["M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"]
     },
+    archive: {
+      viewBox: "0 -960 960 960",
+      paths: ["M200-80q-33 0-56.5-23.5T120-160v-560q0-20 8.5-38t23.5-30l58-52q11-10 25.5-15t29.5-5h430q15 0 29.5 5t25.5 15l58 52q15 12 23.5 30t8.5 38v560q0 33-23.5 56.5T760-80H200Zm0-560v480h560v-480H200Zm32-80h496l-34-40H266l-34 40Zm248 420 160-160-56-56-64 62v-146h-80v146l-64-62-56 56 160 160ZM200-640v480-480Z"]
+    },
     ballot: {
       viewBox: "0 -960 960 960",
       paths: ["M480-560h200v-80H480v80Zm0 240h200v-80H480v80ZM360-520q33 0 56.5-23.5T440-600q0-33-23.5-56.5T360-680q-33 0-56.5 23.5T280-600q0 33 23.5 56.5T360-520Zm0 240q33 0 56.5-23.5T440-360q0-33-23.5-56.5T360-440q-33 0-56.5 23.5T280-360q0 33 23.5 56.5T360-280ZM200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm0-80h560v-560H200v560Zm0-560v560-560Z"]
@@ -532,6 +536,7 @@
     newsButton: byId("newsButton"),
     supportButton: byId("supportButton"),
     historyButton: byId("historyButton"),
+    archiveButton: byId("archiveButton"),
     profileButton: byId("profileButton"),
     accountButton: byId("accountButton"),
     doNotDisturbButton: byId("doNotDisturbButton"),
@@ -927,6 +932,7 @@
     el.newsButton.addEventListener("click", () => activateTab("news"));
     el.supportButton.addEventListener("click", () => activateSupportTab());
     el.historyButton.addEventListener("click", () => activateTab("history"));
+    el.archiveButton.addEventListener("click", () => activateTab("archive"));
     el.profileButton.addEventListener("click", () => openAccountDialog({ mode: "profile" }));
     el.accountButton.addEventListener("click", () => openAccountDialog({ mode: "settings" }));
     el.doNotDisturbButton.addEventListener("click", toggleDoNotDisturb);
@@ -4780,6 +4786,7 @@
     const newsTab = panels.find((tab) => tab.id === "news");
     const supportTab = panels.find(isSupportTab);
     const historyTab = panels.find(isHistoryTab);
+    const archiveTab = panels.find(isArchiveTab);
     el.newsButton.hidden = !newsTab;
     el.newsButton.classList.toggle("selected", state.activeTabId === "news");
     el.supportButton.hidden = !supportTab;
@@ -4793,8 +4800,10 @@
     el.supportButton.classList.toggle("selected", Boolean(supportTab) && state.activeTabId === supportTab.id);
     el.historyButton.hidden = !historyTab;
     el.historyButton.classList.toggle("selected", state.activeTabId === "history");
+    el.archiveButton.hidden = !archiveTab;
+    el.archiveButton.classList.toggle("selected", state.activeTabId === "archive");
 
-    const tabs = panels.filter((tab) => tab.id !== "news" && !isSupportTab(tab) && !isHistoryTab(tab));
+    const tabs = panels.filter((tab) => tab.id !== "news" && !isSupportTab(tab) && !isHistoryTab(tab) && !isArchiveTab(tab));
     el.appTabs.replaceChildren();
     el.appTabs.hidden = tabs.length === 0;
     for (const tab of tabs) {
@@ -4817,6 +4826,7 @@
     return [
       ...(state.provider?.announcements ? [{ id: "news", title: t("tab.news", "News"), type: "builtin" }] : []),
       { id: "history", title: t("tab.history", "History"), type: "builtin" },
+      { id: "archive", title: t("tab.archive", "Archive"), type: "builtin" },
       ...providerTabs
     ];
   }
@@ -4827,6 +4837,10 @@
 
   function isHistoryTab(tab) {
     return tab?.id === "history";
+  }
+
+  function isArchiveTab(tab) {
+    return tab?.id === "archive";
   }
 
   function activateSupportTab() {
@@ -4901,6 +4915,8 @@
       renderNewsTab(card);
     } else if (tab.id === "history") {
       renderHistoryTab(card);
+    } else if (tab.id === "archive") {
+      renderArchiveTab(card);
     } else {
       card.appendChild(createTextBlock(tab.title, t("tab.builtin_text", "Built-in Teletyptel tab.")));
     }
@@ -4959,6 +4975,47 @@
       button.addEventListener("click", () => toggleBlockConversation(conversation));
 
       row.append(createAvatarElement(conversation, "avatar-list"), text, button);
+      section.appendChild(row);
+    }
+
+    card.appendChild(section);
+  }
+
+  function renderArchiveTab(card) {
+    card.appendChild(createTextBlock(t("tab.archive", "Archive"), t("archive.text", "Archived chats are hidden from the contact list until you open them again.")));
+
+    const section = document.createElement("div");
+    section.className = "archive-contact-list";
+    const entries = archivedConversationEntries();
+    if (!entries.length) {
+      const empty = document.createElement("p");
+      empty.className = "archive-contact-empty";
+      empty.textContent = t("archive.empty", "No archived chats.");
+      section.appendChild(empty);
+      card.appendChild(section);
+      return;
+    }
+
+    for (const conversation of entries) {
+      ensurePublicProfileForConversation(conversation);
+      const row = document.createElement("div");
+      row.className = "archive-contact-row";
+      row.appendChild(createAvatarElement(conversation, "avatar-list"));
+
+      const text = document.createElement("span");
+      text.className = "archive-contact-text";
+      const title = document.createElement("strong");
+      title.textContent = conversationDisplayName(conversation);
+      const meta = document.createElement("span");
+      meta.textContent = conversation.peer;
+      text.append(title, meta);
+
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = t("button.open_chat", "Open chat");
+      button.addEventListener("click", () => openArchivedConversation(conversation));
+
+      row.append(text, button);
       section.appendChild(row);
     }
 
@@ -14412,6 +14469,7 @@
     setConnectionStatus(t("status.chat_archived", "Chat archived: {0}").replace("{0}", conversationDisplayName(conversation)), "good");
     renderConversations();
     renderActiveConversation();
+    refreshOpenTabPanel();
   }
 
   function unarchiveConversation(conversation) {
@@ -14422,6 +14480,7 @@
 
     state.archivedJids.delete(key);
     saveArchivedJids();
+    refreshOpenTabPanel();
   }
 
   function toggleBlockConversation(conversation) {
@@ -15596,6 +15655,62 @@
       .filter((jid) => !isOwnPeer(jid))
       .map((jid) => conversationsByPeer.get(jid) ?? createBlockedContactEntry(jid))
       .sort((left, right) => conversationDisplayName(left).localeCompare(conversationDisplayName(right)));
+  }
+
+  function archivedConversationEntries() {
+    const conversationsByPeer = new Map();
+    for (const conversation of state.conversations) {
+      const key = normalizeBlockJid(conversation.peer);
+      if (key && state.archivedJids.has(key)) {
+        conversationsByPeer.set(key, conversation);
+      }
+    }
+
+    return Array.from(state.archivedJids)
+      .filter((jid) => !isOwnPeer(jid))
+      .map((jid) => conversationsByPeer.get(jid) ?? createArchivedConversationEntry(jid))
+      .sort((left, right) => conversationDisplayName(left).localeCompare(conversationDisplayName(right)));
+  }
+
+  function createArchivedConversationEntry(jid) {
+    const kind = jid.includes("@conference.") ? "group" : "contact";
+    return {
+      id: `archived-${jid}`,
+      name: displayNameForJid(jid),
+      peer: jid,
+      kind,
+      avatarColor: avatarColorFor(jid),
+      presence: kind === "group" ? "group" : "offline",
+      meta: "",
+      messages: [],
+      remoteText: "",
+      remoteFrom: "",
+      remoteDraftUpdatedAt: null
+    };
+  }
+
+  function openArchivedConversation(entry) {
+    const peer = bareJid(entry?.peer || "");
+    if (!peer) {
+      return;
+    }
+
+    const conversation = ensureConversationForPeer(peer, entry.kind === "group" ? "group" : "contact", conversationDisplayName(entry));
+    if (!conversation) {
+      return;
+    }
+
+    unarchiveConversation(conversation);
+    selectConversation(conversation);
+    el.peerInput.value = conversation.peer;
+    state.previousText = "";
+    el.messageInput.value = "";
+    activateTab("chat");
+    renderConversations();
+    renderActiveConversation();
+    syncConversationMessageState(conversation, "archive-open");
+    setConnectionStatus(t("status.chat_unarchived", "Chat opened from archive: {0}").replace("{0}", conversationDisplayName(conversation)), "good");
+    el.messageInput.focus();
   }
 
   function createBlockedContactEntry(jid) {
