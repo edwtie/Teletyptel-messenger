@@ -15901,14 +15901,16 @@
     renderConversations();
   }
 
-  function setAllContactPresence(presence) {
+  function setAllContactPresence(presence, options = {}) {
     for (const conversation of state.conversations) {
       if (conversation.kind === "contact" && !isOwnContact(conversation)) {
         conversation.presence = presence;
         if (presence === "offline") {
           conversation.clientState = null;
           conversation.clientStateUpdatedAt = null;
-          conversation.lastSeenAt = new Date();
+          if (options.updateLastSeen === true) {
+            conversation.lastSeenAt = new Date();
+          }
         }
       }
     }
