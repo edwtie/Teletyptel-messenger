@@ -85,6 +85,7 @@
   const xmppDelayNamespace = "urn:xmpp:delay";
   const xmppDataFormsNamespace = "jabber:x:data";
   const xmppRsmNamespace = "http://jabber.org/protocol/rsm";
+  const xmppRosterNamespace = "jabber:iq:roster";
   const teletyptelCallInfoNamespace = "urn:teletyptel:call-info:0";
   const teletyptelJingleSignalNamespace = "urn:teletyptel:jingle-signal:0";
   const jingleHistoryNamespace = "urn:xmpp:jingle-history:0";
@@ -434,6 +435,7 @@
     contactProfileRequestId: 0,
     publicProfileCache: new Map(),
     publicProfileRequests: new Set(),
+    xmppPresenceSubscriptionRequests: new Set(),
     security: {
       twoFactorVerificationId: 0,
       twoFactorMethod: "authenticator",
@@ -8159,8 +8161,11 @@
 
     state.xmppAuthRefreshAttempted = false;
     state.xmppSession.phase = "ready";
+    state.xmppPresenceSubscriptionRequests.clear();
     setAllContactPresence("offline");
     sendPresence("online");
+    requestXmppRoster();
+    syncXmppContactPresenceSubscriptions();
     for (const conversation of state.conversations) {
       if (conversation.kind === "group") {
         conversation.mucJoined = false;
@@ -8172,6 +8177,28 @@
     setConnectionStatus(t("status.xmpp_connected", "XMPP connected"), "good");
     updateComposerAvailability();
     syncXmppMamArchive("xmpp-ready");
+  }
+
+  function syncXmppContactPresenceSubscriptions() {
+    if (state.mode !== "xmpp" || state.xmppSocket?.readyState !== WebSocket.OPEN || !state.xmppSession?.authenticated) {
+      return;
+    }
+
+    for (const conversation of state.conversations) {
+      if (conversation.kind === "contact" && !isOwnContact(conversation) && !isBlockedConversation(conversation)) {
+        sendXmppPresenceSubscription(conversation.peer);
+      }
+    }
+  }
+
+  function requestXmppRoster() {
+    if (state.mode !== "xmpp" || state.xmppSocket?.readyState !== WebSocket.OPEN || !state.xmppSession?.authenticated) {
+      return false;
+    }
+
+    const id = createMessageId("roster");
+    const xml = `<iq xmlns="jabber:client" type="get" id="${escapeXml(id)}"><query xmlns="${xmppRosterNamespace}"/></iq>`;
+    return sendXmppStanza(xml, `<iq type="get" id="${id}"><query xmlns="${xmppRosterNamespace}"/></iq>`);
   }
 
   function syncXmppMamArchive(reason = "manual") {
@@ -8258,7 +8285,7 @@
   function handleXmppIncomingFrame(xmlText) {
     const text = String(xmlText ?? "");
     handleXmppSessionFrame(text);
-    if (!text.includes("<message") && !text.includes("<presence")) {
+    if (!text.includes("<message") && !text.includes("<presence") && !text.includes("<iq")) {
       return;
     }
 
@@ -8277,6 +8304,12 @@
       .filter((element) => element.localName === "presence" && element.namespaceURI === "jabber:client");
     for (const presence of presences) {
       handleXmppPresenceElement(presence);
+    }
+
+    const iqs = Array.from(doc.documentElement?.children || [])
+      .filter((element) => element.localName === "iq" && element.namespaceURI === "jabber:client");
+    for (const iq of iqs) {
+      handleXmppIqElement(iq);
     }
 
     const messages = Array.from(doc.documentElement?.children || [])
@@ -9287,6 +9320,58 @@
       ? `<status>${escapeXml(t("presence.do_not_disturb", "Do not disturb"))}</status>`
       : "";
     return `<presence xmlns="jabber:client">${show}${status}</presence>`;
+  }
+
+  function createXmppDirectedPresenceStanza(to, options = {}) {
+    const attrs = [`to="${escapeXml(to)}"`];
+    if (options.type) {
+      attrs.push(`type="${escapeXml(options.type)}"`);
+    }
+
+    return `<presence xmlns="jabber:client" ${attrs.join(" ")}/>`;
+  }
+
+  function createXmppDirectedAvailablePresenceStanza(to, notificationState) {
+    const show = notificationState === "dnd" ? "<show>dnd</show>" : "";
+    const status = notificationState === "dnd"
+      ? `<status>${escapeXml(t("presence.do_not_disturb", "Do not disturb"))}</status>`
+      : "";
+    return `<presence xmlns="jabber:client" to="${escapeXml(to)}">${show}${status}</presence>`;
+  }
+
+  function sendXmppPresenceProbe(to) {
+    const peer = bareJid(to || "");
+    if (!peer || isOwnPeer(peer) || isInfrastructurePeer(peer)) {
+      return false;
+    }
+
+    return sendXmppStanza(
+      createXmppDirectedPresenceStanza(peer, { type: "probe" }),
+      `<presence type="probe" to="${escapeXml(peer)}"/>`);
+  }
+
+  function sendXmppPresenceSubscription(to) {
+    const peer = bareJid(to || "");
+    if (!peer || isOwnPeer(peer) || isInfrastructurePeer(peer) || state.xmppPresenceSubscriptionRequests.has(peer)) {
+      return false;
+    }
+
+    state.xmppPresenceSubscriptionRequests.add(peer);
+    sendXmppPresenceProbe(peer);
+    return sendXmppStanza(
+      createXmppDirectedPresenceStanza(peer, { type: "subscribe" }),
+      `<presence type="subscribe" to="${escapeXml(peer)}"/>`);
+  }
+
+  function sendXmppPresenceSubscribed(to) {
+    const peer = bareJid(to || "");
+    if (!peer || isOwnPeer(peer) || isInfrastructurePeer(peer)) {
+      return false;
+    }
+
+    return sendXmppStanza(
+      createXmppDirectedPresenceStanza(peer, { type: "subscribed" }),
+      `<presence type="subscribed" to="${escapeXml(peer)}"/>`);
   }
 
   function currentSenderName() {
@@ -13490,9 +13575,36 @@
       return;
     }
 
-    const presence = presenceElement.getAttribute("type") === "unavailable" ? "offline" : "online";
-    const show = presenceElement.getElementsByTagNameNS("jabber:client", "show")[0]?.textContent || "";
+    const type = presenceElement.getAttribute("type") || "";
     const peer = bareJid(from);
+    if (type === "subscribe") {
+      appendDebug("xmpp-presence", `subscribe from ${peer}`);
+      sendXmppPresenceSubscribed(peer);
+      sendXmppPresenceSubscription(peer);
+      return;
+    }
+
+    if (type === "subscribed") {
+      appendDebug("xmpp-presence", `subscribed by ${peer}`);
+      sendXmppPresenceProbe(peer);
+      return;
+    }
+
+    if (type === "probe") {
+      appendDebug("xmpp-presence", `probe from ${peer}`);
+      sendXmppStanza(
+        createXmppDirectedAvailablePresenceStanza(peer, state.doNotDisturb ? "dnd" : "available"),
+        `<presence probe-response to="${escapeXml(peer)}"/>`);
+      return;
+    }
+
+    if (type && !["unavailable", "unsubscribe", "unsubscribed"].includes(type)) {
+      appendDebug("xmpp-presence-skip", `${type} from ${peer}`);
+      return;
+    }
+
+    const presence = type === "unavailable" || type === "unsubscribe" || type === "unsubscribed" ? "offline" : "online";
+    const show = presenceElement.getElementsByTagNameNS("jabber:client", "show")[0]?.textContent || "";
     const conversation = ensureConversationForPeer(peer, "contact", displayNameForJid(peer));
     if (!conversation) {
       return;
@@ -13509,6 +13621,80 @@
     }
     renderConversations();
     renderActiveConversation();
+  }
+
+  function handleXmppIqElement(iqElement) {
+    const rosterQuery = iqElement.getElementsByTagNameNS(xmppRosterNamespace, "query")[0];
+    if (!rosterQuery) {
+      return false;
+    }
+
+    const type = iqElement.getAttribute("type") || "";
+    if (type === "set") {
+      const id = iqElement.getAttribute("id") || "";
+      if (id) {
+        sendXmppStanza(
+          `<iq xmlns="jabber:client" type="result" id="${escapeXml(id)}"/>`,
+          `<iq type="result" id="${escapeXml(id)}" roster-push-ack/>`);
+      }
+    }
+
+    const items = Array.from(rosterQuery.getElementsByTagNameNS(xmppRosterNamespace, "item"));
+    for (const item of items) {
+      applyXmppRosterItem(item);
+    }
+
+    return true;
+  }
+
+  function applyXmppRosterItem(item) {
+    const jid = bareJid(item.getAttribute("jid") || "");
+    if (!jid || isOwnPeer(jid) || isInfrastructurePeer(jid)) {
+      return;
+    }
+
+    const subscription = item.getAttribute("subscription") || "";
+    const ask = item.getAttribute("ask") || "";
+    if (subscription === "remove") {
+      const conversation = state.conversations.find((entry) => addressMatches(entry.peer, jid));
+      if (conversation && conversation.kind === "contact") {
+        conversation.presence = "offline";
+        conversation.clientState = null;
+        conversation.clientStateUpdatedAt = null;
+        conversation.lastSeenAt = new Date();
+      }
+      return;
+    }
+
+    const name = item.getAttribute("name") || displayNameForJid(jid);
+    const conversation = ensureConversationForPeer(jid, "contact", name);
+    if (!conversation) {
+      return;
+    }
+
+    if (name && shouldReplaceConversationNameWithRoster(conversation)) {
+      conversation.name = name;
+      delete conversation.nameKey;
+    }
+
+    conversation.xmppRosterSubscription = subscription;
+    conversation.xmppRosterAsk = ask;
+    if (subscription === "both" || subscription === "to") {
+      sendXmppPresenceProbe(jid);
+    } else if (!ask) {
+      sendXmppPresenceSubscription(jid);
+    }
+
+    renderConversations();
+  }
+
+  function shouldReplaceConversationNameWithRoster(conversation) {
+    if (!conversation || conversation.kind === "group") {
+      return false;
+    }
+
+    const current = String(conversation.name || "").trim();
+    return !current || current === conversation.peer || current === fallbackDisplayNameForJid(conversation.peer);
   }
 
   function activeConversation() {
@@ -15618,6 +15804,7 @@
         existing.name = name;
       }
 
+      maybeRequestXmppPresenceForConversation(existing);
       return existing;
     }
 
@@ -15638,7 +15825,22 @@
       remoteDraftUpdatedAt: null
     };
     state.conversations.push(conversation);
+    maybeRequestXmppPresenceForConversation(conversation);
     return conversation;
+  }
+
+  function maybeRequestXmppPresenceForConversation(conversation) {
+    if (state.mode !== "xmpp"
+      || state.xmppSocket?.readyState !== WebSocket.OPEN
+      || !state.xmppSession?.authenticated
+      || state.xmppSession?.phase !== "ready"
+      || conversation?.kind !== "contact"
+      || isOwnContact(conversation)
+      || isBlockedConversation(conversation)) {
+      return;
+    }
+
+    sendXmppPresenceSubscription(conversation.peer);
   }
 
   function conversationForEnvelope(envelope) {
