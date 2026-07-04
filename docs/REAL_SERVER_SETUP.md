@@ -36,6 +36,33 @@ Typical ejabberd provider ports to plan:
 5060/5061   SIP/SIPS through ejabberd_sip when enabled
 ```
 
+For the TeleTypTel web client, the normal XMPP route is ejabberd WebSocket, not
+the legacy PHP RTT relay:
+
+```text
+wss://localhost:5443/websocket/
+```
+
+In `ejabberd.yml`, the HTTPS listener should expose `/websocket` through
+`ejabberd_http_ws`. A quick local smoke is:
+
+```powershell
+& 'C:\wamp64\bin\php\php8.4.15\php.exe' php/tools/xmpp-websocket-smoke.php --url wss://localhost:5443/websocket/ --domain localhost
+```
+
+Expected result:
+
+```text
+WebSocket connected with xmpp subprotocol
+First XML frame:
+<open xmlns='urn:ietf:params:xml:ns:xmpp-framing' .../>
+```
+
+If ejabberd logs show `Accepted c2s PLAIN authentication` and `Opened c2s
+session` for a user, the browser is using ejabberd. `Replaced by new connection
+(conflict)` usually means the same account/resource reconnected; it is not a
+WebSocket listener failure.
+
 ## Local Prosody direction
 
 Recommended local domain:
@@ -69,9 +96,10 @@ muc
 TeleTypTel's installer generates `php/install-runtime/configure-linux-ejabberd-mam.sh`
 and `php/install-runtime/teletyptel-ejabberd-mam.yml`. The MAM helper detects
 both `/etc/ejabberd/ejabberd.yml` and the official Docker-style
-`/opt/ejabberd/conf/ejabberd.yml`, replaces an existing `mod_mam` block or
-inserts this module block under the top-level `modules:` section, then reloads
-ejabberd:
+`/opt/ejabberd/conf/ejabberd.yml`, replaces an existing `mod_mam` block for
+one-to-one chat, enables MAM in the existing `mod_muc` `default_room_options`
+for group chat, inserts missing module blocks under the top-level `modules:`
+section when needed, then reloads ejabberd:
 
 ```yaml
 modules:
@@ -80,6 +108,9 @@ modules:
     default: always
     assume_mam_usage: true
     request_activates_archiving: false
+  mod_muc:
+    default_room_options:
+      mam: true
 ```
 
 The helper uses `db_type: sql` automatically when the ejabberd config already
@@ -94,8 +125,9 @@ EJABBERD_MAM_DB_TYPE=sql sudo sh php/install-runtime/configure-linux-ejabberd-ma
 SQL-backed MAM requires MySQL/MariaDB to be reachable from the ejabberd process.
 If logs show `p1_mysql_conn` connection refused or timeout, fix the SQL host,
 port and container networking first; otherwise SQL-backed MAM and other SQL
-modules can fail during startup. Once SQL is healthy, normal chat history comes
-from XEP-0313 MAM instead of the TeleTypTel relay fallback.
+modules can fail during startup. Once SQL is healthy, one-to-one chat history
+and archive-enabled group chat history come from XEP-0313 MAM instead of the
+TeleTypTel relay fallback.
 
 Useful optional modules:
 

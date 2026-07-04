@@ -531,7 +531,7 @@ function historyAccountIds(PDO $pdo, string $accountId): array
             $ids,
             'SELECT account_id FROM account_profiles
              WHERE LOWER(jid) = :oauth_jid
-               AND provider_id IN ("google", "facebook", "apple", "auth0")',
+               AND provider_id IN ("google", "facebook", "apple")',
             ['oauth_jid' => $localpart . '@localhost']
         );
     }
@@ -583,7 +583,7 @@ function findHistoryRecipientAccountId(PDO $pdo, string $peer): string
         'SELECT account_id
          FROM account_profiles
          WHERE LOWER(jid) = :oauth_jid
-           AND provider_id IN ("google", "facebook", "apple", "auth0")
+           AND provider_id IN ("google", "facebook", "apple")
          LIMIT 1'
     );
     $statement->execute(['oauth_jid' => $localpart . '@localhost']);

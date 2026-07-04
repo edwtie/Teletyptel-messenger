@@ -87,6 +87,12 @@
     </section>
 
     <section>
+      <h2>Apache, MySQL en PHP</h2>
+      <div id="runtimeStatus" class="server-grid"></div>
+      <p id="runtimeHint" class="status"></p>
+    </section>
+
+    <section>
       <h2>ejabberd en SIP-server</h2>
       <p class="small">SIP hoort bij de server/gatewaylaag. Dit paneel controleert de bekende ejabberd-configuratie en of de SIP-poorten bereikbaar lijken.</p>
       <div id="sipStatus" class="server-grid"></div>
@@ -132,6 +138,8 @@
     const messagePanel = document.getElementById("messagePanel");
     const cards = document.getElementById("cards");
     const serverStatus = document.getElementById("serverStatus");
+    const runtimeStatus = document.getElementById("runtimeStatus");
+    const runtimeHint = document.getElementById("runtimeHint");
     const sipStatus = document.getElementById("sipStatus");
     const sipHint = document.getElementById("sipHint");
     const accountsTable = document.getElementById("accountsTable");
@@ -184,6 +192,7 @@
       }).catch(() => {});
       setAdminIdentity(null);
       renderCards({});
+      renderRuntime({});
       renderSip({});
       renderAccounts([]);
       renderLogs([]);
@@ -197,6 +206,7 @@
         setAdminIdentity(data.admin || null);
         renderCards(data.stats || {});
         renderServer(data.server || {});
+        renderRuntime(data.server?.runtime || {});
         renderSip(data.server?.ejabberd || {});
         renderAccounts(data.accounts || []);
         renderLogs(data.logs || []);
@@ -233,6 +243,28 @@
         server.adminTokenConfigured ? "token actief" : "alleen lokaal"
       ];
       serverStatus.textContent = parts.join(" · ");
+    }
+
+    function renderRuntime(runtime) {
+      const apache = runtime.apache || {};
+      const mysql = runtime.mysql || {};
+      const php = runtime.php || {};
+      const items = [
+        ["Apache", apache.active ? "actief" : "niet actief", Boolean(apache.active), apache.version || "-", apache.detail || "Webserver niet herkend"],
+        ["MySQL", mysql.active ? "actief" : "niet actief", Boolean(mysql.active), mysql.version || "-", mysql.detail || "Database niet bereikbaar"],
+        ["PHP", php.active ? "actief" : "niet actief", Boolean(php.active), php.version || "-", php.detail || "PHP runtime onbekend"],
+      ];
+      runtimeStatus.innerHTML = items.map(([label, value, ok, version, detail]) => `<div class="card">
+        <span>${escapeHtml(label)}</span>
+        <strong><span class="badge ${ok ? "ok" : "warn"}">${escapeHtml(value)}</span></strong>
+        <div>Versie ${escapeHtml(version)}</div>
+        <div class="small">${escapeHtml(detail)}</div>
+      </div>`).join("");
+
+      const missing = items.filter(([, , ok]) => !ok).map(([label]) => label);
+      runtimeHint.textContent = missing.length
+        ? `Controleer nog: ${missing.join(", ")}.`
+        : "Basisstack actief: Apache, MySQL en PHP draaien.";
     }
 
     function renderSip(sip) {

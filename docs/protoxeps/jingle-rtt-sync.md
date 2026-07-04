@@ -1,20 +1,22 @@
 # Jingle Synchronized Real-Time Text
 
-Readable Markdown copy of the ProtoXEP XML draft.
+Readable Markdown copy of XEP-0517.
 
-The XSF XML file remains the source of truth for submission. This file is for
-review, discussion and product planning inside Teletyptel.
+The XSF XEP remains the source of truth. This file is for review, discussion
+and product planning inside TeleTypTel.
 
 ## Metadata
 
 | Field | Value |
 | --- | --- |
 | Short name | `jingle-rtt-sync` |
-| Status | ProtoXEP |
+| XEP | XEP-0517 |
+| Status | Experimental |
 | Type | Standards Track |
 | Namespace | `urn:xmpp:jingle:apps:rtt-sync:0` |
 | Author | Edward Tie, `info@tiedragon.com` |
-| Revision | 0.0.3, 2026-06-15 |
+| Revision | 0.1.0, 2026-06-30 |
+| Source | <https://xmpp.org/extensions/xep-0517.html> |
 
 ## Abstract
 

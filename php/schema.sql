@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS account_profiles (
   preferred_language VARCHAR(16) NOT NULL DEFAULT 'nl',
   live_rtt_enabled TINYINT(1) NOT NULL DEFAULT 1,
   show_smileys TINYINT(1) NOT NULL DEFAULT 1,
+  session_timeout_enabled TINYINT(1) NOT NULL DEFAULT 1,
   subscription_plan VARCHAR(32) NOT NULL DEFAULT 'free',
   account_status VARCHAR(32) NOT NULL DEFAULT 'active',
   subscription_expires_at DATE NULL,
@@ -134,7 +135,7 @@ CREATE TABLE IF NOT EXISTS account_verification_codes (
   user_agent VARCHAR(255) NOT NULL DEFAULT '',
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY uq_account_verification_code_hash (code_hash),
-  KEY idx_account_verification_identifier (identifier(190), purpose, created_at),
+  KEY idx_account_verification_identifier (identifier(150), purpose, created_at),
   KEY idx_account_verification_account (account_id, created_at)
 );
 

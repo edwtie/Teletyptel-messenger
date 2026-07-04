@@ -162,7 +162,7 @@ function readAdminData(PDO $pdo): void
         'ok' => true,
         'generatedAt' => gmdate('c'),
         'admin' => $admin !== null ? adminUserToClient($admin) : null,
-        'server' => serverSummary(),
+        'server' => serverSummary($pdo),
         'stats' => statsSummary($pdo),
         'accounts' => accountRows($pdo),
         'logs' => logRows($pdo),
@@ -286,7 +286,7 @@ function logRows(PDO $pdo): array
     return array_slice($logs, 0, 80);
 }
 
-function serverSummary(): array
+function serverSummary(PDO $pdo): array
 {
     $config = loadAdminConfig();
     return [
@@ -299,8 +299,102 @@ function serverSummary(): array
         'adminTokenConfigured' => adminToken() !== '',
         'adminSession' => isset($_SESSION['teletyptel_admin_id']),
         'localRequest' => isLocalRequest(),
+        'runtime' => runtimeSummary($pdo, $config),
         'ejabberd' => ejabberdSipSummary($config),
     ];
+}
+
+function runtimeSummary(PDO $pdo, array $config): array
+{
+    $mysqlConfig = is_array($config['mysql'] ?? null) ? $config['mysql'] : [];
+    $mysqlHost = cleanAdminText($mysqlConfig['host'] ?? '127.0.0.1', 255);
+    $mysqlPort = normalizePort($mysqlConfig['port'] ?? 3306, 3306);
+    $serverSoftware = cleanAdminText($_SERVER['SERVER_SOFTWARE'] ?? '', 255);
+    $phpSapi = cleanAdminText(PHP_SAPI, 80);
+    $apachePorts = servicePorts([80, 443, 8080]);
+    $mysqlPortOpen = tcpPortOpen($mysqlHost, $mysqlPort);
+
+    return [
+        'apache' => [
+            'label' => 'Apache',
+            'active' => stripos($serverSoftware, 'apache') !== false || $phpSapi === 'apache2handler' || anyPortOpen($apachePorts),
+            'version' => apacheVersion($serverSoftware),
+            'detail' => $serverSoftware !== '' ? $serverSoftware : 'Webserver via ' . $phpSapi,
+            'ports' => $apachePorts,
+        ],
+        'mysql' => [
+            'label' => 'MySQL',
+            'active' => databaseResponds($pdo),
+            'version' => databaseVersion($pdo),
+            'detail' => $mysqlHost . ':' . $mysqlPort . ($mysqlPortOpen ? ' bereikbaar' : ' verbonden via PDO'),
+            'host' => $mysqlHost,
+            'port' => $mysqlPort,
+            'portOpen' => $mysqlPortOpen,
+        ],
+        'php' => [
+            'label' => 'PHP',
+            'active' => true,
+            'version' => PHP_VERSION,
+            'detail' => 'PHP ' . PHP_VERSION . ' via ' . $phpSapi,
+            'sapi' => $phpSapi,
+            'extensions' => [
+                'pdo_mysql' => extension_loaded('pdo_mysql'),
+                'openssl' => extension_loaded('openssl'),
+            ],
+        ],
+    ];
+}
+
+function apacheVersion(string $serverSoftware): string
+{
+    if (preg_match('/Apache\/([^\s]+)/i', $serverSoftware, $matches) === 1) {
+        return cleanAdminText($matches[1], 80);
+    }
+    return '';
+}
+
+function servicePorts(array $ports): array
+{
+    $result = [];
+    foreach ($ports as $port) {
+        $normalized = normalizePort($port, 0);
+        if ($normalized > 0) {
+            $result[] = [
+                'port' => $normalized,
+                'open' => tcpPortOpen('127.0.0.1', $normalized),
+            ];
+        }
+    }
+    return $result;
+}
+
+function anyPortOpen(array $ports): bool
+{
+    foreach ($ports as $port) {
+        if (!empty($port['open'])) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function databaseVersion(PDO $pdo): string
+{
+    try {
+        $version = $pdo->query('SELECT VERSION()')->fetchColumn();
+        return cleanAdminText(is_scalar($version) ? (string)$version : '', 120);
+    } catch (Throwable) {
+        return '';
+    }
+}
+
+function databaseResponds(PDO $pdo): bool
+{
+    try {
+        return (string)$pdo->query('SELECT 1')->fetchColumn() === '1';
+    } catch (Throwable) {
+        return false;
+    }
 }
 
 function ejabberdSipSummary(array $config): array

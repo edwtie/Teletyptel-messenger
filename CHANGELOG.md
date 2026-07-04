@@ -4,6 +4,11 @@
 
 ### Added
 
+- Web group management dialog for XMPP MUC rooms: member approval/members-only
+  room options, member invites and assigning or removing group admins via MUC
+  affiliations.
+- Settings now include an inactivity sign-out toggle, so 24-hour reachable
+  users can keep TeleTypTel open without automatic timeout.
 - Public TeleTypTel branding pass for the web package, Windows demo language
   files, language package manifests, project metadata, XSF entry drafts and
   architecture diagrams. Internal `Tiedragon.XmppMessenger` namespaces and
@@ -28,7 +33,12 @@
   XEP-0115, XEP-0124/XEP-0206, XEP-0156, XEP-0157, XEP-0198, XEP-0203,
   XEP-0215, XEP-0245, XEP-0280, XEP-0334, XEP-0352, XEP-0357, XEP-0359,
   XEP-0385, XEP-0392, XEP-0393, XEP-0424, XEP-0425, XEP-0433, XEP-0486,
-  XEP-0494 and XEP-0514.
+  XEP-0494, XEP-0514 and XEP-0517.
+- XEP-0517 Jingle Synchronized Real-Time Text is now tracked as the official
+  Experimental XEP for TeleTypTel's call-bound RTT path.
+- Jingle User Location ProtoXEP notes now explain why XEP-0080/PEP alone is not
+  enough for call-scoped 112/911-readiness and narrow the draft to a Jingle
+  binding for XEP-0080.
 - XEP-0486 MUC Avatars support in PHP and C# helpers, plus web UI for
   choosing and rendering group avatars in the conversation list and header.
 - XEP-0060 provider announcement/news helper with Atom entry publish, item
@@ -111,9 +121,10 @@
   message builder, renderer, local-only payload support and MAM-friendly call
   event messages for completed, missed, declined and failed calls.
 - The installer now generates an ejabberd MAM helper that enables `mod_mam`
-  with always-on XEP-0313 archiving, detects `/etc` and `/opt` ejabberd config
-  paths, replaces existing `mod_mam` blocks and only auto-selects SQL storage
-  when the ejabberd config already uses SQL.
+  with always-on XEP-0313 one-to-one archiving, enables `mod_muc`
+  `default_room_options.mam` for group chat archives, detects `/etc` and
+  `/opt` ejabberd config paths, replaces existing `mod_mam` blocks and only
+  auto-selects SQL storage when the ejabberd config already uses SQL.
 - Interactive location sharing UI with map preview, share duration up to eight
   hours, Google Maps/OpenStreetMap provider setting, browser geolocation
   permission handling and single live location card updates instead of duplicate
@@ -192,7 +203,7 @@
 - Web client audio/video call controls with a local WebRTC bridge using
   Jingle-shaped relay envelopes for offer, answer, ICE candidates and hangup.
 - Total Conversation web path: a Jingle/WebRTC audio/video call now advertises
-  ProtoXEP synchronized RTT as a `text` content, opens a reliable `rtt`
+  XEP-0517 synchronized RTT as a `text` content, opens a reliable `rtt`
   datachannel, carries live drafts/final text as `jingle-rtt` packets and
   falls back to XEP-0301 relay RTT when the call channel is unavailable.
 - Browser session profiles via `?profile=...`, so two browser windows can keep
@@ -261,10 +272,18 @@
 - Web admin panel `admin.php` shows server status, account usage, recent logs
   and early subscription/account-status controls guarded by an installer-created
   admin account, with admin token support kept as an emergency fallback.
-- Auth0 can now be configured as an OpenID Connect login provider alongside
-  Google, Facebook and Apple.
-- The web installer now collects Google, Facebook, Apple and Auth0 provider
+- The web installer now collects Google, Facebook and Apple provider
   IDs/secrets and writes the matching OAuth callback configuration.
+- The web client now exposes Facebook sign-in plus account linking/unlinking in
+  the account security dialog, matching the existing Google social-login flow.
+- Social login buttons now use provider-style Google and Facebook logo buttons
+  instead of plain letter badges.
+- The Google sign-in button is now rendered through Google Identity Services
+  when a public Google client ID is configured, with the existing server-side
+  OAuth redirect kept as the click target.
+- Auth0 has been removed from the web login UI, installer and supported social
+  provider documentation; TeleTypTel now focuses social login on Google,
+  Facebook and Apple.
 - The web admin panel now shows ejabberd/XMPP and SIP gateway readiness,
   including SIP/SIPS port checks for future ejabberd_sip/mod_sip work.
 - The web installer now disables itself after a successful installation by
@@ -282,7 +301,8 @@
 - Mobile voice-message preview now removes the redundant custom play/pause
   button and keeps the audio controls plus actions on one row.
 - Message URLs now render as links without smiley replacement inside the URL,
-  and link-preview fetching uses a browser-like request header for sites such as YouTube.
+  and link-preview fetching uses a browser-like request header for sites such
+  as YouTube.
 - Link-preview cards now use a lighter WhatsApp-style surface in the default
   chat theme instead of the previous dark block.
 - Attachment cards now expose downloading through a small dedicated icon button
@@ -299,9 +319,43 @@
 - Product copy now presents TeleTypTel as an open messenger and Total
   Conversation platform instead of the older "Tiedragon XMPP Messenger" working
   name.
+- Account login, saved sessions and logout handling are simplified so a stored
+  account can reconnect without a visible login-screen flash, explicit sign-out
+  clears the local and server account session, and inactive sessions expire
+  after a fixed idle timeout.
+- Public homepage and teaser material are kept out of the software repository;
+  `php/public/index.php` is ignored so website copy can live outside GitHub.
+- The account/settings dialog is reorganized into a clearer fixed-size menu
+  layout with separate profile/security and app/server settings areas, plain
+  text-style navigation, read-only server fields while connected and clearer
+  status text for saved database accounts.
+- Account security now includes interactive current/new/repeat password
+  validation, stricter password rule feedback, two-factor login/setup flow
+  text and Google account connect/disconnect status in the profile/security
+  area.
+- Browser notifications now cover incoming chat messages, message reactions and
+  incoming calls, while respecting global Do Not Disturb and per-conversation
+  notification mute settings.
+- Global Do Not Disturb is now visible in presence/status, suppresses browser
+  notifications and rejects incoming Jingle calls as busy, while per-contact
+  notification mute stays private and does not block calls.
 - Production server direction is documented as ejabberd plus coturn and
   production modules for roster, MUC, MAM, PubSub/PEP, HTTP upload, TURN/STUN
   discovery and optional SIP-gateway work.
+- Web setup documentation now treats ejabberd XMPP WebSocket
+  (`wss://localhost:5443/websocket/`) as the normal browser route in README,
+  Getting Started, User Guide and Real Server Setup.
+- Installer copy and system checks now show ejabberd `/websocket` on port 5443
+  as the normal route and describe the PHP RTT relay as an optional legacy
+  RTT/RFC7395 smoke-test path.
+- Installer validation no longer requires a relay WebSocket URL, so
+  `relay_websocket` can stay empty when TeleTypTel uses ejabberd directly.
+- Real Server Setup now documents the `xmpp-websocket-smoke.php` check and how
+  to recognize successful ejabberd WebSocket sessions in the ejabberd log.
+- Web client smoke with two real accounts now covers RTT, presence and normal
+  chat.
+- Phone Safari/WebView audio/video call smoke with two real accounts now passes,
+  including camera permission, local preview and reconnect behavior.
 - XSF/software-directory notes now describe only the current evaluation scope
   and avoid claiming Android/iOS or formal XEP-0479 compliance before release
   validation.
@@ -324,8 +378,9 @@
 - XEP-0313 one-to-one and MUC archive smoke have public-server evidence; repeat
   against the production TeleTypTel/ejabberd server before making a hosted
   service claim.
-- Live social-login smoke still needs final real Google/Facebook/Apple
-  provider configuration and redirect URLs for the production domain.
+- Google and Facebook social-login smoke have passed on dev provider apps;
+  Apple live smoke and production-domain redirect URLs still need final release
+  validation.
 - Account security flows are implemented for development/evaluation, but still
   need production hardening, rate limiting, mail-delivery monitoring and abuse
   policy before public signup.
@@ -337,10 +392,25 @@
   operations, public signup policy, moderation, backups and monitoring before a
   production launch.
 - Browser chat, profile, history, attachment, location and Total Conversation
-  flows run through the TeleTypTel PHP web/API layer and local relay today.
-  Standards-based XMPP pieces are available in the PHP/C# libraries, LocalServer
-  and real-server smoke tools, but the browser UI is not yet a full federated
-  direct-XMPP client for arbitrary providers.
+  flows run through the TeleTypTel PHP web/API layer and ejabberd WebSocket for
+  the current local path. Standards-based XMPP pieces are available in the
+  PHP/C# libraries, LocalServer and real-server smoke tools, but the browser UI
+  is not yet a full federated direct-XMPP client for arbitrary providers.
+- Browser notifications depend on browser permission, active service worker
+  state and foreground/background rules. They are useful for beta testing, but
+  production mobile push still needs Web Push/APNs/FCM work.
+- Do Not Disturb and per-conversation notification mute are client-side
+  behavior today. Global DND is advertised through presence and rejects incoming
+  browser Jingle calls, but provider-wide policy enforcement still belongs on
+  the server side.
+- The simplified login/session flow is intended for beta evaluation. Public
+  service deployment still needs production rate limiting, session policy,
+  audit logging and abuse monitoring.
+- The settings/profile split is clearer, but final mobile layouts, accessibility
+  review and full keyboard/screen-reader QA remain release work.
+- Jingle calling works in the local browser path, but interoperability against
+  existing XMPP/Jingle clients and TURN-only network conditions still needs
+  hosted ejabberd/coturn smoke testing.
 - OMEMO/Double Ratchet work is intentionally audit-gated: wire helpers,
   envelopes, local key models and experimental PHP/C# ratchet code exist, but
   production end-to-end encryption must wait for independent review, stable test
@@ -358,6 +428,14 @@
 
 ### Fixed
 
+- Inactivity timeout now forces the login dialog after signing out the local
+  session instead of only disconnecting silently.
+- Refreshing the web client no longer briefly shows the login screen for a
+  stored account session, reducing the grey/login flash during normal reloads.
+- Signing out now really clears the remembered browser account session, password
+  state and server session before returning to the login gate.
+- The reconnect/login availability path no longer references the missing
+  `hasStoredAccountSession` helper during disconnect/login failure handling.
 - Google OAuth sessions can load chat history again: the history schema now fits
   older MySQL index limits, Total Conversation history is part of the install
   schema, and the Google provider manifest no longer 404s.

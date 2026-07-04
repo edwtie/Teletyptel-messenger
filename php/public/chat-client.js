@@ -61,12 +61,16 @@
   const mediaSettingsStorageKey = "teletyptel.mediaSettings";
   const callVideoHeightStorageKey = "teletyptel.callVideoHeight";
   const blockedJidsStorageKeyBase = "teletyptel.blockedJids";
+  const archivedJidsStorageKeyBase = "teletyptel.archivedJids";
+  const mutedNotificationJidsStorageKeyBase = "teletyptel.mutedNotificationJids";
+  const doNotDisturbStorageKey = "teletyptel.doNotDisturb";
   const xmppStreamManagementStorageKeyBase = "teletyptel.xmppStreamManagement";
   const locationSettingsStorageKeyBase = "teletyptel.locationSettings";
   const chatBackgroundStorageKeyBase = "teletyptel.chatBackground";
   const historySettingsStorageKeyBase = "teletyptel.historySettings";
   const accountApiPath = "api/account.php";
   const historyApiPath = "api/history.php";
+  const groupMetadataApiPath = "api/group-metadata.php";
   const linkPreviewApiPath = "api/link-preview.php";
   const rtcConfigApiPath = "api/rtc-config.php";
   const uploadApiPath = "api/upload.php";
@@ -82,7 +86,9 @@
   const xmppDelayNamespace = "urn:xmpp:delay";
   const xmppDataFormsNamespace = "jabber:x:data";
   const xmppRsmNamespace = "http://jabber.org/protocol/rsm";
+  const xmppRosterNamespace = "jabber:iq:roster";
   const teletyptelCallInfoNamespace = "urn:teletyptel:call-info:0";
+  const teletyptelJingleSignalNamespace = "urn:teletyptel:jingle-signal:0";
   const jingleHistoryNamespace = "urn:xmpp:jingle-history:0";
   const jingleRttSyncNamespace = "urn:xmpp:jingle:apps:rtt-sync:0";
   const jingleGroupingNamespace = "urn:xmpp:jingle:apps:grouping:0";
@@ -92,6 +98,9 @@
   const t140Delete = "\u007f";
   const locationStaleAfterMs = 5 * 60 * 1000;
   const websocketHeartbeatMs = 25 * 1000;
+  const sessionInactivityTimeoutMs = 30 * 60 * 1000;
+  const sessionActivityThrottleMs = 15 * 1000;
+  const sessionActivityEvents = ["pointerdown", "keydown", "input", "scroll", "touchstart"];
   const locationDurationOptions = [
     [15 * 60 * 1000, "location.duration_15m"],
     [30 * 60 * 1000, "location.duration_30m"],
@@ -109,6 +118,10 @@
       viewBox: "0 -960 960 960",
       paths: ["M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"]
     },
+    archive: {
+      viewBox: "0 -960 960 960",
+      paths: ["M200-80q-33 0-56.5-23.5T120-160v-560q0-20 8.5-38t23.5-30l58-52q11-10 25.5-15t29.5-5h430q15 0 29.5 5t25.5 15l58 52q15 12 23.5 30t8.5 38v560q0 33-23.5 56.5T760-80H200Zm0-560v480h560v-480H200Zm32-80h496l-34-40H266l-34 40Zm248 420 160-160-56-56-64 62v-146h-80v146l-64-62-56 56 160 160ZM200-640v480-480Z"]
+    },
     ballot: {
       viewBox: "0 -960 960 960",
       paths: ["M480-560h200v-80H480v80Zm0 240h200v-80H480v80ZM360-520q33 0 56.5-23.5T440-600q0-33-23.5-56.5T360-680q-33 0-56.5 23.5T280-600q0 33 23.5 56.5T360-520Zm0 240q33 0 56.5-23.5T440-360q0-33-23.5-56.5T360-440q-33 0-56.5 23.5T280-360q0 33 23.5 56.5T360-280ZM200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm0-80h560v-560H200v560Zm0-560v560-560Z"]
@@ -120,6 +133,18 @@
     callEnd: {
       viewBox: "0 -960 960 960",
       paths: ["M480-520q112 0 213 38.5T872-372q15 15 20.5 34.5T892-298l-35 92q-8 22-27 34t-43 8l-146-22q-18-3-30-16t-12-31v-84q-29-12-59-18t-60-6q-31 0-60.5 6T361-317v84q0 18-12 31t-30 16l-146 22q-24 4-43-8t-27-34l-35-92q-7-20-1-40t21-34q78-71 179-109.5T480-520Z"]
+    },
+    logout: {
+      viewBox: "0 -960 960 960",
+      paths: ["M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h280v80H200v560h280v80H200Zm440-160-55-58 102-102H360v-80h327L585-622l55-58 200 200-200 200Z"]
+    },
+    notificationsOff: {
+      viewBox: "0 -960 960 960",
+      paths: ["M160-200v-80h80v-280q0-83 50-147.5T420-792v-28q0-25 17.5-42.5T480-880q25 0 42.5 17.5T540-820v28q30 8 56 24t46 39l-58 58q-19-22-46-35.5T480-720q-66 0-113 47t-47 113v280h326L160-766l56-56 608 608-56 56-84-82H160Zm320 120q-33 0-56.5-23.5T400-160h160q0 33-23.5 56.5T480-80Zm240-342-80-80v-58q0-28-10-53t-28-46l57-57q29 32 45 72t16 84v138Z"]
+    },
+    search: {
+      viewBox: "0 -960 960 960",
+      paths: ["M784-120 532-372q-30 24-69 38t-83 14q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l252 252-56 56ZM380-400q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Z"]
     },
     videocam: {
       viewBox: "0 -960 960 960",
@@ -159,6 +184,10 @@
     highQuality: {
       viewBox: "0 -960 960 960",
       paths: ["M160-200q-33 0-56.5-23.5T80-280v-400q0-33 23.5-56.5T160-760h640q33 0 56.5 23.5T880-680v400q0 33-23.5 56.5T800-200H160Zm0-80h640v-400H160v400Zm80-80h80v-120h120v120h80v-320h-80v120H320v-120h-80v320Zm360 0h100q50 0 85-35t35-85v-80q0-50-35-85t-85-35H600v320Zm80-80v-160h20q17 0 28.5 11.5T740-560v80q0 17-11.5 28.5T700-440h-20ZM160-280v-400 400Z"]
+    },
+    qualityTune: {
+      viewBox: "0 -960 960 960",
+      paths: ["M440-120v-240h80v80h320v80H520v80h-80Zm-320-80v-80h240v80H120Zm160-160v-80H120v-80h160v-80h80v240h-80Zm160-80v-80h400v80H440Zm160-160v-240h80v80h160v80H680v80h-80Zm-480-80v-80h400v80H120Z"]
     },
     locationOff: {
       viewBox: "0 -960 960 960",
@@ -270,13 +299,16 @@
   const oauthLoginToken = locationSearchParams.get("loginToken") || "";
 
   const state = {
-    mode: "relay",
+    mode: "xmpp",
     theme: loadTheme(),
     relaySocket: null,
     xmppSocket: null,
     xmppSession: null,
     intentionalDisconnect: false,
+    xmppAuthRefreshAttempted: false,
     account: null,
+    pendingLoginTwoFactor: null,
+    accountSettingsPanel: "profile",
     passwordResetToken: locationSearchParams.get("reset") || "",
     developerMode,
     provider: null,
@@ -312,6 +344,7 @@
     historySettings: loadHistorySettings(sessionProfile),
     sequence: 0,
     previousText: "",
+    outgoingXmppRttIds: new Set(),
     editingMessage: null,
     call: null,
     callVideoResize: {
@@ -330,7 +363,9 @@
       startX: 0,
       startY: 0,
       startOffsetX: 0,
-      startOffsetY: 0
+      startOffsetY: 0,
+      target: "account",
+      conversationId: null
     },
     avatarCrop: {
       image: null,
@@ -367,6 +402,8 @@
     mediaSettings: loadMediaSettings(),
     mediaDevices: [],
     mediaPreviewStream: null,
+    incomingCallNotification: null,
+    incomingCallNotificationSid: "",
     voiceRecorder: {
       recorder: null,
       stream: null,
@@ -386,6 +423,7 @@
     videoRecorder: {
       recorder: null,
       stream: null,
+      previewStream: null,
       chunks: [],
       blob: null,
       objectUrl: "",
@@ -395,9 +433,15 @@
       cancelled: false
     },
     blockedJids: new Set(loadBlockedJids(sessionProfile)),
+    archivedJids: new Set(loadArchivedJids(sessionProfile)),
+    mutedNotificationJids: new Set(loadMutedNotificationJids(sessionProfile)),
+    doNotDisturb: localStorage.getItem(doNotDisturbStorageKey) === "1",
     accountReady: false,
     pendingMucAvatarConversationId: null,
     contactProfileRequestId: 0,
+    publicProfileCache: new Map(),
+    publicProfileRequests: new Set(),
+    xmppPresenceSubscriptionRequests: new Set(),
     security: {
       twoFactorVerificationId: 0,
       twoFactorMethod: "authenticator",
@@ -419,35 +463,30 @@
     },
     contextConversationId: null,
     contextMessage: null,
+    groupMemberContextJid: "",
     reactionMessageId: null,
     messageStateSync: new Map(),
     xmppMam: {
       pending: false,
       lastStartedAt: 0,
       loaded: false,
+      resultCount: 0,
+      fallbackHistoryReloaded: false,
       timerId: null
     },
     smileyPickerMode: "composer",
-    accountGateRequired: !hasInitialAccountProfile,
+    accountBooting: true,
+    accountGateRequired: false,
     accountDialogMode: !hasInitialAccountProfile ? "signin" : "settings",
+    suppressAutoLoginDialog: hasInitialAccountProfile,
+    sessionIdleTimerId: null,
+    sessionLastActivityAt: Date.now(),
+    sessionLastActivityRecordedAt: 0,
+    sessionTimeoutInProgress: false,
+    groupManagementConversationId: null,
+    groupManagementTab: "members",
+    groupInviteContactId: "",
     conversations: [
-      {
-        id: "relay",
-        name: "Relay room",
-        nameKey: "conversation.relay_room",
-        peer: "relay@localhost",
-        kind: "contact",
-        avatarColor: "#0f766e",
-        presence: "offline",
-        meta: "Offline",
-        clientState: null,
-        clientStateUpdatedAt: null,
-        lastSeenAt: null,
-        messages: [],
-        remoteText: "",
-        remoteFrom: "",
-        remoteDraftUpdatedAt: null
-      },
       {
         id: "tester",
         name: "Tester",
@@ -461,6 +500,7 @@
         clientStateUpdatedAt: null,
         lastSeenAt: null,
         messages: [],
+        unreadCount: 0,
         remoteText: "",
         remoteFrom: "",
         remoteDraftUpdatedAt: null
@@ -478,6 +518,7 @@
         clientStateUpdatedAt: null,
         lastSeenAt: null,
         messages: [],
+        unreadCount: 0,
         remoteText: "",
         remoteFrom: "",
         remoteDraftUpdatedAt: null
@@ -495,19 +536,61 @@
     newsButton: byId("newsButton"),
     supportButton: byId("supportButton"),
     historyButton: byId("historyButton"),
+    archiveButton: byId("archiveButton"),
     profileButton: byId("profileButton"),
     accountButton: byId("accountButton"),
+    doNotDisturbButton: byId("doNotDisturbButton"),
+    logoutButton: byId("logoutButton"),
     connectButton: byId("connectButton"),
     disconnectButton: byId("disconnectButton"),
     addConversationButton: byId("addConversationButton"),
     addGroupButton: byId("addGroupButton"),
-    inviteConversationButton: byId("inviteConversationButton"),
     developerPanel: byId("developerPanel"),
     conversationContextMenu: byId("conversationContextMenu"),
     contextProfileButton: byId("contextProfileButton"),
     contextRoomAvatarButton: byId("contextRoomAvatarButton"),
+    contextGroupManageButton: byId("contextGroupManageButton"),
+    contextArchiveButton: byId("contextArchiveButton"),
+    contextMuteNotificationsButton: byId("contextMuteNotificationsButton"),
     contextBlockButton: byId("contextBlockButton"),
+    groupMemberContextMenu: byId("groupMemberContextMenu"),
+    groupMemberProfileMenuButton: byId("groupMemberProfileMenuButton"),
+    groupMemberAddMenuButton: byId("groupMemberAddMenuButton"),
+    groupMemberMakeAdminMenuButton: byId("groupMemberMakeAdminMenuButton"),
+    groupMemberRemoveAdminMenuButton: byId("groupMemberRemoveAdminMenuButton"),
+    groupMemberBanMenuButton: byId("groupMemberBanMenuButton"),
+    groupMemberUnbanMenuButton: byId("groupMemberUnbanMenuButton"),
     mucAvatarFileInput: byId("mucAvatarFileInput"),
+    groupManagementDialog: byId("groupManagementDialog"),
+    groupManagementSubtitle: byId("groupManagementSubtitle"),
+    groupMembersTabButton: byId("groupMembersTabButton"),
+    groupAdminToolsTabButton: byId("groupAdminToolsTabButton"),
+    groupBlacklistTabButton: byId("groupBlacklistTabButton"),
+    groupAvatarPreview: byId("groupAvatarPreview"),
+    groupTitleInput: byId("groupTitleInput"),
+    groupDescriptionInput: byId("groupDescriptionInput"),
+    groupInfoText: byId("groupInfoText"),
+    groupSaveTitleButton: byId("groupSaveTitleButton"),
+    groupSaveInfoButton: byId("groupSaveInfoButton"),
+    groupChangeAvatarButton: byId("groupChangeAvatarButton"),
+    groupMembersCanInviteToggle: byId("groupMembersCanInviteToggle"),
+    groupApproveMembersToggle: byId("groupApproveMembersToggle"),
+    groupMemberJidInput: byId("groupMemberJidInput"),
+    groupAdminJidInput: byId("groupAdminJidInput"),
+    groupAddMemberButton: byId("groupAddMemberButton"),
+    groupInviteContactList: byId("groupInviteContactList"),
+    groupInviteButton: byId("groupInviteButton"),
+    groupSendInviteLinkButton: byId("groupSendInviteLinkButton"),
+    groupCopyInviteLinkButton: byId("groupCopyInviteLinkButton"),
+    groupMakeAdminButton: byId("groupMakeAdminButton"),
+    groupRemoveAdminButton: byId("groupRemoveAdminButton"),
+    groupMemberListTitle: byId("groupMemberListTitle"),
+    groupKnownMembersPanel: byId("groupKnownMembersPanel"),
+    groupBannedMembersPanel: byId("groupBannedMembersPanel"),
+    groupKnownMembersList: byId("groupKnownMembersList"),
+    groupManagementStatus: byId("groupManagementStatus"),
+    closeGroupManagementButton: byId("closeGroupManagementButton"),
+    groupManagementOkButton: byId("groupManagementOkButton"),
     contactProfileDialog: byId("contactProfileDialog"),
     contactProfileTitle: byId("contactProfileTitle"),
     contactProfileSubtitle: byId("contactProfileSubtitle"),
@@ -526,6 +609,7 @@
     messageContextDownloadButton: byId("messageContextDownloadButton"),
     messageContextForwardButton: byId("messageContextForwardButton"),
     conversationItems: byId("conversationItems"),
+    conversationSearchInput: byId("conversationSearchInput"),
     backToContactsButton: byId("backToContactsButton"),
     activeConversationAvatar: byId("activeConversationAvatar"),
     activeConversationName: byId("activeConversationName"),
@@ -555,6 +639,7 @@
     muteMicrophoneButton: byId("muteMicrophoneButton"),
     muteRemoteAudioButton: byId("muteRemoteAudioButton"),
     toggleTotalConversationTextButton: byId("toggleTotalConversationTextButton"),
+    hangupCallPanelButton: byId("hangupCallPanelButton"),
     remoteVolumeInput: byId("remoteVolumeInput"),
     remoteVolumeValue: byId("remoteVolumeValue"),
     totalConversationTextPanel: byId("totalConversationTextPanel"),
@@ -567,11 +652,20 @@
     xmppModeButton: byId("xmppModeButton"),
     dropOverlay: byId("dropOverlay"),
     messageTimeline: byId("messageTimeline"),
+    scrollToLatestButton: byId("scrollToLatestButton"),
     tabPanel: byId("tabPanel"),
     tabPanelTitle: byId("tabPanelTitle"),
     tabPanelMeta: byId("tabPanelMeta"),
     tabPanelBody: byId("tabPanelBody"),
     closeTabPanelButton: byId("closeTabPanelButton"),
+    historyPage: byId("historyPage"),
+    historyPageTitle: byId("historyPageTitle"),
+    historyPageMeta: byId("historyPageMeta"),
+    historyPageBody: byId("historyPageBody"),
+    closeHistoryPageButton: byId("closeHistoryPageButton"),
+    historyPrivacyDialog: byId("historyPrivacyDialog"),
+    closeHistoryPrivacyDialogButton: byId("closeHistoryPrivacyDialogButton"),
+    historyPrivacyOkButton: byId("historyPrivacyOkButton"),
     remoteDraft: byId("remoteDraft"),
     remoteDraftName: byId("remoteDraftName"),
     remoteDraftPreviousText: byId("remoteDraftPreviousText"),
@@ -605,6 +699,12 @@
     videoPreviewDialogTitle: byId("videoPreviewDialogTitle"),
     videoPreviewDialogVideo: byId("videoPreviewDialogVideo"),
     videoRecorderQualityInput: byId("videoRecorderQualityInput"),
+    videoRecorderQualityButton: byId("videoRecorderQualityButton"),
+    videoRecorderQualityLabel: byId("videoRecorderQualityLabel"),
+    videoRecorderQualityMenu: byId("videoRecorderQualityMenu"),
+    videoRecorderCameraButton: byId("videoRecorderCameraButton"),
+    videoRecorderCameraLabel: byId("videoRecorderCameraLabel"),
+    videoRecorderCameraMenu: byId("videoRecorderCameraMenu"),
     closeVideoPreviewDialogButton: byId("closeVideoPreviewDialogButton"),
     startVideoRecordingButton: byId("startVideoRecordingButton"),
     dialogCancelVideoMessageButton: byId("dialogCancelVideoMessageButton"),
@@ -617,6 +717,7 @@
     fileInput: byId("fileInput"),
     rttToggle: byId("rttToggle"),
     smileyToggle: byId("smileyToggle"),
+    sessionTimeoutToggle: byId("sessionTimeoutToggle"),
     composerInputRow: byId("composerInputRow"),
     messageInput: byId("messageInput"),
     sendButton: byId("sendButton"),
@@ -663,10 +764,14 @@
     dialogAdvancedDetails: byId("dialogAdvancedDetails"),
     dialogSessionProfileInput: byId("dialogSessionProfileInput"),
     dialogDisplayNameInput: byId("dialogDisplayNameInput"),
+    dialogProfileEmailInput: byId("dialogProfileEmailInput"),
     dialogJidInput: byId("dialogJidInput"),
     dialogPasswordInput: byId("dialogPasswordInput"),
     dialogForgotPasswordButton: byId("dialogForgotPasswordButton"),
     dialogRememberPasswordToggle: byId("dialogRememberPasswordToggle"),
+    loginTwoFactorSection: byId("loginTwoFactorSection"),
+    loginTwoFactorCodeInput: byId("loginTwoFactorCodeInput"),
+    verifyLoginTwoFactorButton: byId("verifyLoginTwoFactorButton"),
     dialogXmppDomainInput: byId("dialogXmppDomainInput"),
     dialogXmppHostInput: byId("dialogXmppHostInput"),
     dialogXmppPortInput: byId("dialogXmppPortInput"),
@@ -675,10 +780,23 @@
     dialogXmppUrlInput: byId("dialogXmppUrlInput"),
     dialogProviderInput: byId("dialogProviderInput"),
     dialogLanguageInput: byId("dialogLanguageInput"),
+    settingsLanguageInput: byId("settingsLanguageInput"),
     dialogPeerInput: byId("dialogPeerInput"),
     dialogPhoneInput: byId("dialogPhoneInput"),
     dialogBirthDateInput: byId("dialogBirthDateInput"),
     accountSecuritySection: byId("accountSecuritySection"),
+    dialogCurrentPasswordInput: byId("dialogCurrentPasswordInput"),
+    dialogNewPasswordInput: byId("dialogNewPasswordInput"),
+    dialogRepeatPasswordInput: byId("dialogRepeatPasswordInput"),
+    passwordRulesPanel: byId("passwordRulesPanel"),
+    dialogRememberNewPasswordToggle: byId("dialogRememberNewPasswordToggle"),
+    changePasswordButton: byId("changePasswordButton"),
+    googleLinkStatus: byId("googleLinkStatus"),
+    linkGoogleButton: byId("linkGoogleButton"),
+    unlinkGoogleButton: byId("unlinkGoogleButton"),
+    facebookLinkStatus: byId("facebookLinkStatus"),
+    linkFacebookButton: byId("linkFacebookButton"),
+    unlinkFacebookButton: byId("unlinkFacebookButton"),
     twoFactorStatus: byId("twoFactorStatus"),
     twoFactorQrPanel: byId("twoFactorQrPanel"),
     twoFactorQrCode: byId("twoFactorQrCode"),
@@ -704,13 +822,17 @@
     dialogAccessibilityPanel: byId("dialogAccessibilityPanel"),
     dialogServerSettingsLockNote: byId("dialogServerSettingsLockNote"),
     dialogAccountStatus: byId("dialogAccountStatus"),
+    accountSettingsMenu: byId("accountSettingsMenu"),
     dialogCreateAccountButton: byId("dialogCreateAccountButton"),
     dialogGoogleLoginButton: byId("dialogGoogleLoginButton"),
-    dialogAuth0LoginButton: byId("dialogAuth0LoginButton"),
+    dialogGoogleLoginFallbackButton: byId("dialogGoogleLoginFallbackButton"),
+    dialogGoogleLoginOverlayButton: byId("dialogGoogleLoginOverlayButton"),
+    dialogFacebookLoginButton: byId("dialogFacebookLoginButton"),
     dialogSaveAccountButton: byId("dialogSaveAccountButton"),
     dialogConnectButton: byId("dialogConnectButton"),
     dialogResetPasswordButton: byId("dialogResetPasswordButton"),
     dialogServerSettingsButton: byId("dialogServerSettingsButton"),
+    settingsLogoutButton: byId("settingsLogoutButton"),
     locationShareDialog: byId("locationShareDialog"),
     locationShareStatus: byId("locationShareStatus"),
     locationShareMap: byId("locationShareMap"),
@@ -754,9 +876,11 @@
     debugLog: byId("debugLog")
   };
 
+  document.body.classList.toggle("account-booting", state.accountBooting);
   document.body.classList.toggle("account-gate", state.accountGateRequired);
   document.body.classList.toggle("developer-mode", state.developerMode);
   applyDeviceDetection();
+  configureInlineVideoPlayback();
   updateDeveloperPanelVisibility();
   bindEvents();
   el.sessionProfileInput.value = state.sessionProfile;
@@ -769,15 +893,18 @@
   renderConversations();
   renderActiveConversation();
   setConnectionStatus(t("status.disconnected", "Disconnected"), "warn");
+  openGroupInviteFromUrl();
   updateComposerAvailability();
   updateServerSettingsReadonly();
   updateConnectButtonAvailability();
+  syncDoNotDisturbButton();
   resetServiceWorkerCachesIfRequested();
   loadPlatformConfig();
   applyMediaSettingsToControls();
   refreshMediaDevices(false);
   registerServiceWorker();
   setupMobileLifecycle();
+  setupSessionInactivityTimeout();
 
   async function resetServiceWorkerCachesIfRequested() {
     if (!resetServiceWorker || !("serviceWorker" in navigator)) {
@@ -805,19 +932,57 @@
     el.newsButton.addEventListener("click", () => activateTab("news"));
     el.supportButton.addEventListener("click", () => activateSupportTab());
     el.historyButton.addEventListener("click", () => activateTab("history"));
+    el.archiveButton.addEventListener("click", () => activateTab("archive"));
     el.profileButton.addEventListener("click", () => openAccountDialog({ mode: "profile" }));
     el.accountButton.addEventListener("click", () => openAccountDialog({ mode: "settings" }));
-    el.connectButton.addEventListener("click", connectRelay);
+    el.doNotDisturbButton.addEventListener("click", toggleDoNotDisturb);
+    el.logoutButton.addEventListener("click", logoutAccount);
+    el.settingsLogoutButton.addEventListener("click", logoutAccount);
+    el.connectButton.addEventListener("click", () => {
+      requestCallNotificationPermissionFromGesture();
+      connectXmppWebSocket();
+    });
     el.disconnectButton.addEventListener("click", disconnectAll);
     el.addConversationButton.addEventListener("click", addConversation);
     el.addGroupButton.addEventListener("click", addGroupConversation);
-    el.inviteConversationButton.addEventListener("click", inviteContactToActiveGroup);
+    el.conversationSearchInput.addEventListener("input", renderConversations);
     el.backToContactsButton.addEventListener("click", closeActiveConversation);
+    el.activeConversationAvatar.addEventListener("click", openActiveConversationAvatarProfile);
+    el.activeConversationAvatar.addEventListener("keydown", handleActiveConversationAvatarKeydown);
     el.contextProfileButton.addEventListener("click", openContextConversationProfile);
     el.contextRoomAvatarButton.addEventListener("click", chooseContextRoomAvatar);
+    el.contextGroupManageButton.addEventListener("click", openContextGroupManagement);
+    el.contextArchiveButton.addEventListener("click", archiveContextConversation);
+    el.contextMuteNotificationsButton.addEventListener("click", toggleMuteContextConversationNotifications);
     el.contextBlockButton.addEventListener("click", toggleBlockContextConversation);
+    el.groupMemberContextMenu.addEventListener("click", (event) => event.stopPropagation());
+    el.groupMemberProfileMenuButton.addEventListener("click", openContextGroupMemberProfile);
+    el.groupMemberAddMenuButton.addEventListener("click", addContextGroupMember);
+    el.groupMemberMakeAdminMenuButton.addEventListener("click", makeContextGroupMemberAdmin);
+    el.groupMemberRemoveAdminMenuButton.addEventListener("click", removeContextGroupMemberAdmin);
+    el.groupMemberBanMenuButton.addEventListener("click", banContextGroupMember);
+    el.groupMemberUnbanMenuButton.addEventListener("click", unbanContextGroupMember);
     el.mucAvatarFileInput.addEventListener("change", handleMucAvatarFileSelected);
     el.conversationContextMenu.addEventListener("click", (event) => event.stopPropagation());
+    el.closeGroupManagementButton.addEventListener("click", closeGroupManagementDialog);
+    el.groupManagementOkButton.addEventListener("click", closeGroupManagementDialog);
+    el.groupManagementDialog.addEventListener("click", closeGroupManagementDialogOnBackdrop);
+    el.groupMembersTabButton.addEventListener("click", () => setGroupManagementTab("members"));
+    el.groupAdminToolsTabButton.addEventListener("click", () => setGroupManagementTab("tools"));
+    el.groupBlacklistTabButton.addEventListener("click", () => setGroupManagementTab("blacklist"));
+    el.groupAvatarPreview.addEventListener("click", chooseGroupAvatarFromDialog);
+    el.groupAvatarPreview.addEventListener("keydown", handleGroupAvatarPreviewKeydown);
+    el.groupSaveTitleButton.addEventListener("click", saveGroupTitleFromDialog);
+    el.groupSaveInfoButton.addEventListener("click", saveGroupInfoFromDialog);
+    el.groupChangeAvatarButton.addEventListener("click", chooseGroupAvatarFromDialog);
+    el.groupMembersCanInviteToggle.addEventListener("change", applyGroupRoomOptionsFromDialog);
+    el.groupApproveMembersToggle.addEventListener("change", applyGroupRoomOptionsFromDialog);
+    el.groupAddMemberButton.addEventListener("click", addGroupMemberFromDialog);
+    el.groupInviteButton.addEventListener("click", inviteContactToManagedGroup);
+    el.groupSendInviteLinkButton.addEventListener("click", sendGroupInviteLinkFromDialog);
+    el.groupCopyInviteLinkButton.addEventListener("click", copyGroupInviteLinkFromDialog);
+    el.groupMakeAdminButton.addEventListener("click", makeGroupAdminFromDialog);
+    el.groupRemoveAdminButton.addEventListener("click", removeGroupAdminFromDialog);
     el.closeContactProfileButton.addEventListener("click", closeContactProfileDialog);
     el.contactProfileOkButton.addEventListener("click", closeContactProfileDialog);
     el.contactProfileDialog.addEventListener("click", closeContactProfileDialogOnBackdrop);
@@ -826,9 +991,18 @@
     el.messageContextDeleteButton.addEventListener("click", deleteContextMessage);
     el.messageContextDownloadButton.addEventListener("click", downloadContextMessageAttachment);
     el.messageContextForwardButton.addEventListener("click", forwardContextMessage);
-    el.startAudioCallOption.addEventListener("click", () => startCallFromMenu("audio"));
-    el.startVideoCallOption.addEventListener("click", () => startCallFromMenu("video"));
-    el.startTotalCallOption.addEventListener("click", () => startCallFromMenu("total"));
+    el.startAudioCallOption.addEventListener("click", () => {
+      requestCallNotificationPermissionFromGesture();
+      startCallFromMenu("audio");
+    });
+    el.startVideoCallOption.addEventListener("click", () => {
+      requestCallNotificationPermissionFromGesture();
+      startCallFromMenu("video");
+    });
+    el.startTotalCallOption.addEventListener("click", () => {
+      requestCallNotificationPermissionFromGesture();
+      startCallFromMenu("total");
+    });
     el.answerCallButton.addEventListener("click", answerIncomingCall);
     el.rejectCallButton.addEventListener("click", rejectIncomingCall);
     el.incomingAnswerButton.addEventListener("click", answerIncomingCall);
@@ -836,6 +1010,7 @@
     el.dialogAnswerButton.addEventListener("click", answerIncomingCall);
     el.dialogRejectButton.addEventListener("click", rejectIncomingCall);
     el.hangupCallButton.addEventListener("click", hangupCall);
+    el.hangupCallPanelButton.addEventListener("click", hangupCall);
     el.toggleCameraButton.addEventListener("click", toggleCameraVideo);
     el.muteMicrophoneButton.addEventListener("click", toggleMicrophoneMute);
     el.muteRemoteAudioButton.addEventListener("click", toggleRemoteAudioMute);
@@ -846,9 +1021,13 @@
     el.callVideoFacingInput.addEventListener("change", () => handleMediaSettingsChange("video", "call"));
     el.callMicrophoneInput.addEventListener("change", () => handleMediaSettingsChange("audio", "call"));
     el.remoteVolumeInput.addEventListener("input", saveRemoteVolumeFromControl);
-    el.relayModeButton.addEventListener("click", () => setMode("relay"));
+    el.relayModeButton.addEventListener("click", () => setMode("xmpp"));
     el.xmppModeButton.addEventListener("click", () => setMode("xmpp"));
     el.closeTabPanelButton.addEventListener("click", () => activateTab("chat"));
+    el.closeHistoryPageButton.addEventListener("click", () => activateTab("chat"));
+    el.closeHistoryPrivacyDialogButton.addEventListener("click", closeHistoryPrivacyDialog);
+    el.historyPrivacyOkButton.addEventListener("click", closeHistoryPrivacyDialog);
+    el.historyPrivacyDialog.addEventListener("click", closeHistoryPrivacyDialogOnBackdrop);
     el.resetRttButton.addEventListener("click", sendRttReset);
     el.enableRttButton.addEventListener("click", enableLiveRttFromToolbar);
     el.attachmentMenuButton.addEventListener("click", toggleAttachmentMenu);
@@ -889,12 +1068,14 @@
     document.addEventListener("click", closeAttachmentMenuOnOutsideClick);
     document.addEventListener("click", closeSmileyPickerOnOutsideClick);
     document.addEventListener("click", closeConversationContextMenuOnOutsideClick);
+    document.addEventListener("click", closeGroupMemberContextMenuOnOutsideClick);
     document.addEventListener("click", closeMessageContextMenuOnOutsideClick);
     document.addEventListener("click", closeMessageReactionPickerOnOutsideClick);
     document.addEventListener("keydown", closeCallMenusOnEscape);
     document.addEventListener("keydown", closeAttachmentMenuOnEscape);
     document.addEventListener("keydown", closeSmileyPickerOnEscape);
     document.addEventListener("keydown", closeConversationContextMenuOnEscape);
+    document.addEventListener("keydown", closeGroupMemberContextMenuOnEscape);
     document.addEventListener("keydown", closeContactProfileDialogOnEscape);
     document.addEventListener("keydown", closeMessageContextMenuOnEscape);
     document.addEventListener("keydown", closeMessageReactionPickerOnEscape);
@@ -905,6 +1086,7 @@
     document.addEventListener("keydown", closeVideoPreviewDialogOnEscape);
     document.addEventListener("keydown", closeMapViewerOnEscape);
     window.addEventListener("resize", closeConversationContextMenu);
+    window.addEventListener("resize", closeGroupMemberContextMenu);
     window.addEventListener("resize", closeMessageContextMenu);
     window.addEventListener("resize", closeMessageReactionPicker);
     window.addEventListener("resize", () => handleViewportChange("resize"));
@@ -913,6 +1095,8 @@
     window.addEventListener("scroll", closeConversationContextMenu, true);
     window.addEventListener("scroll", closeMessageContextMenu, true);
     window.addEventListener("scroll", closeMessageReactionPicker, true);
+    el.messageTimeline.addEventListener("scroll", updateScrollToLatestButton, { passive: true });
+    el.scrollToLatestButton.addEventListener("click", scrollMessageTimelineToLatest);
     document.addEventListener("visibilitychange", handleVisibilityLifecycleChange);
     window.addEventListener("focus", () => setClientLifecycleState("active", "focus"));
     window.addEventListener("blur", handleWindowLifecycleBlur);
@@ -922,6 +1106,9 @@
     document.addEventListener("pause", () => setClientLifecycleState("inactive", "app-pause", { force: true }));
     document.addEventListener("resume", () => setClientLifecycleState("active", "app-resume"));
     window.addEventListener("teletyptel:lifecycle", handleNativeLifecycleEvent);
+    for (const eventName of sessionActivityEvents) {
+      document.addEventListener(eventName, recordSessionActivity, { passive: true, capture: true });
+    }
     el.composerForm.addEventListener("submit", sendComposerMessage);
     el.messageInput.addEventListener("input", handleComposerInput);
     el.messageInput.addEventListener("keydown", handleComposerKeydown);
@@ -937,13 +1124,29 @@
     el.accountDialog.addEventListener("click", closeAccountDialogOnBackdrop);
     el.closeAccountDialogButton.addEventListener("click", closeAccountDialog);
     el.cancelAccountDialogButton.addEventListener("click", closeAccountDialog);
+    el.accountSettingsMenu.querySelectorAll("[data-account-panel]").forEach((button) => {
+      button.addEventListener("click", () => setAccountSettingsPanel(button.dataset.accountPanel || "profile"));
+    });
     el.dialogCreateAccountButton.addEventListener("click", createAccountFromDialog);
-    el.dialogGoogleLoginButton.addEventListener("click", startGoogleLoginFromDialog);
-    el.dialogAuth0LoginButton.addEventListener("click", startAuth0LoginFromDialog);
+    el.dialogGoogleLoginFallbackButton.addEventListener("click", startGoogleLoginFromDialog);
+    el.dialogGoogleLoginOverlayButton.addEventListener("click", startGoogleLoginFromDialog);
+    el.dialogFacebookLoginButton.addEventListener("click", startFacebookLoginFromDialog);
     el.dialogSaveAccountButton.addEventListener("click", () => saveAccountDialogProfile(false));
     el.dialogConnectButton.addEventListener("click", () => saveAccountDialogProfile(true));
     el.dialogForgotPasswordButton.addEventListener("click", requestPasswordResetFromDialog);
     el.dialogResetPasswordButton.addEventListener("click", resetPasswordFromDialog);
+    el.verifyLoginTwoFactorButton.addEventListener("click", verifyLoginTwoFactorFromDialog);
+    el.loginTwoFactorCodeInput.addEventListener("input", () => {
+      el.verifyLoginTwoFactorButton.disabled = el.loginTwoFactorCodeInput.value.replace(/\D+/g, "").length !== 6;
+    });
+    el.changePasswordButton.addEventListener("click", changePasswordFromSecuritySection);
+    el.dialogCurrentPasswordInput.addEventListener("input", updatePasswordRulesPanel);
+    el.dialogNewPasswordInput.addEventListener("input", updatePasswordRulesPanel);
+    el.dialogRepeatPasswordInput.addEventListener("input", updatePasswordRulesPanel);
+    el.linkGoogleButton.addEventListener("click", startGoogleLinkFromDialog);
+    el.unlinkGoogleButton.addEventListener("click", unlinkGoogleFromDialog);
+    el.linkFacebookButton.addEventListener("click", startFacebookLinkFromDialog);
+    el.unlinkFacebookButton.addEventListener("click", unlinkFacebookFromDialog);
     el.requestTwoFactorButton.addEventListener("click", requestTwoFactorSetupFromDialog);
     el.confirmTwoFactorButton.addEventListener("click", confirmTwoFactorSetupFromDialog);
     el.dialogServerSettingsButton.addEventListener("click", openDialogServerSettings);
@@ -982,6 +1185,12 @@
     el.microphoneInput.addEventListener("change", () => handleMediaSettingsChange("audio"));
     el.videoQualityInput.addEventListener("change", () => handleMediaSettingsChange("video"));
     el.videoRecorderQualityInput.addEventListener("change", () => handleMediaSettingsChange("video", "recorder"));
+    el.videoRecorderQualityButton?.addEventListener("click", toggleVideoRecorderQualityMenu);
+    el.videoRecorderQualityMenu?.addEventListener("click", handleVideoRecorderQualityMenuClick);
+    el.videoRecorderCameraButton?.addEventListener("click", toggleVideoRecorderCameraMenu);
+    el.videoRecorderCameraMenu?.addEventListener("click", handleVideoRecorderCameraMenuClick);
+    document.addEventListener("click", closeVideoRecorderQualityMenuOnOutsideClick);
+    document.addEventListener("keydown", closeVideoRecorderQualityMenuOnEscape);
     el.videoMessageFacingInput.addEventListener("change", () => handleMediaSettingsChange("video"));
     el.refreshMediaButton.addEventListener("click", () => refreshMediaDevices(true));
     el.previewMediaButton.addEventListener("click", previewMedia);
@@ -996,6 +1205,9 @@
     el.peerInput.addEventListener("change", updateRelayConversationMeta);
     el.displayNameInput.addEventListener("change", handleAccountIdentityChanged);
     el.jidInput.addEventListener("change", handleAccountIdentityChanged);
+    el.dialogProfileEmailInput.addEventListener("change", () => {
+      el.dialogJidInput.value = el.dialogProfileEmailInput.value.trim();
+    });
     el.avatarColorInput.addEventListener("input", () => handleAvatarColorChanged("main"));
     el.chooseAvatarButton.addEventListener("click", () => el.avatarFileInput.click());
     el.avatarFileInput.addEventListener("change", () => handleAvatarFileSelected(el.avatarFileInput));
@@ -1025,9 +1237,23 @@
       }
       renderActiveConversation();
     });
+    el.sessionTimeoutToggle.addEventListener("change", () => {
+      if (state.account) {
+        state.account.sessionTimeoutEnabled = el.sessionTimeoutToggle.checked;
+      }
+      if (el.sessionTimeoutToggle.checked) {
+        recordSessionActivity({ force: true });
+        return;
+      }
+
+      window.clearTimeout(state.sessionIdleTimerId);
+      state.sessionIdleTimerId = null;
+    });
     el.passwordInput.addEventListener("input", updateAccountPasswordStatus);
     el.rememberPasswordToggle.addEventListener("change", updateAccountPasswordStatus);
-    el.languageInput.addEventListener("change", () => loadLanguage(el.languageInput.value));
+    el.languageInput.addEventListener("change", () => handleLanguageInputChanged(el.languageInput.value));
+    el.dialogLanguageInput.addEventListener("change", () => handleLanguageInputChanged(el.dialogLanguageInput.value));
+    el.settingsLanguageInput.addEventListener("change", () => handleLanguageInputChanged(el.settingsLanguageInput.value));
     el.xmppOpenButton.addEventListener("click", connectXmppWebSocket);
     el.xmppCloseButton.addEventListener("click", closeXmppWebSocket);
     el.clearLogButton.addEventListener("click", () => {
@@ -1171,8 +1397,22 @@
     appendDebug("device", `${device.platform}/${device.deviceClass}: ${device.userAgent}`);
   }
 
+  function configureInlineVideoPlayback() {
+    [
+      el.remoteVideo,
+      el.localVideo,
+      el.videoPreviewVideo,
+      el.videoPreviewDialogVideo
+    ].forEach((video) => {
+      if (video) {
+        video.playsInline = true;
+      }
+    });
+  }
+
   function applyViewportDetection() {
     const metrics = currentViewportMetrics();
+    document.documentElement.style.setProperty("--visual-viewport-height", `${metrics.height}px`);
     const viewportClass = metrics.width <= 640
       ? "phone"
       : metrics.width <= 1024
@@ -1264,6 +1504,7 @@
       createClientStateXml(clientState),
       "relay@localhost");
     envelope.clientState = clientState;
+    envelope.notificationState = state.doNotDisturb ? "dnd" : "available";
     envelope.reason = reason;
     envelope.sentAt = new Date().toISOString();
     state.relaySocket.send(JSON.stringify(envelope));
@@ -1355,6 +1596,16 @@
     return normalized === "default" ? blockedJidsStorageKeyBase : `${blockedJidsStorageKeyBase}.${normalized}`;
   }
 
+  function archivedJidsStorageKeyFor(profile) {
+    const normalized = sanitizeSessionProfile(profile);
+    return normalized === "default" ? archivedJidsStorageKeyBase : `${archivedJidsStorageKeyBase}.${normalized}`;
+  }
+
+  function mutedNotificationJidsStorageKeyFor(profile) {
+    const normalized = sanitizeSessionProfile(profile);
+    return normalized === "default" ? mutedNotificationJidsStorageKeyBase : `${mutedNotificationJidsStorageKeyBase}.${normalized}`;
+  }
+
   function xmppStreamManagementStorageKeyFor(profile) {
     const normalized = sanitizeSessionProfile(profile);
     return normalized === "default" ? xmppStreamManagementStorageKeyBase : `${xmppStreamManagementStorageKeyBase}.${normalized}`;
@@ -1396,6 +1647,52 @@
     localStorage.setItem(
       blockedJidsStorageKeyFor(state.sessionProfile),
       JSON.stringify(Array.from(state.blockedJids).sort()));
+  }
+
+  function loadArchivedJids(profile) {
+    const saved = localStorage.getItem(archivedJidsStorageKeyFor(profile));
+    if (!saved) {
+      return [];
+    }
+
+    try {
+      const parsed = JSON.parse(saved);
+      return Array.isArray(parsed)
+        ? parsed.map(normalizeBlockJid).filter(Boolean)
+        : [];
+    } catch {
+      localStorage.removeItem(archivedJidsStorageKeyFor(profile));
+      return [];
+    }
+  }
+
+  function saveArchivedJids() {
+    localStorage.setItem(
+      archivedJidsStorageKeyFor(state.sessionProfile),
+      JSON.stringify(Array.from(state.archivedJids).sort()));
+  }
+
+  function loadMutedNotificationJids(profile) {
+    const saved = localStorage.getItem(mutedNotificationJidsStorageKeyFor(profile));
+    if (!saved) {
+      return [];
+    }
+
+    try {
+      const parsed = JSON.parse(saved);
+      return Array.isArray(parsed)
+        ? parsed.map(normalizeBlockJid).filter(Boolean)
+        : [];
+    } catch {
+      localStorage.removeItem(mutedNotificationJidsStorageKeyFor(profile));
+      return [];
+    }
+  }
+
+  function saveMutedNotificationJids() {
+    localStorage.setItem(
+      mutedNotificationJidsStorageKeyFor(state.sessionProfile),
+      JSON.stringify(Array.from(state.mutedNotificationJids).sort()));
   }
 
   function loadLocationSettings(profile) {
@@ -1574,6 +1871,37 @@
     el.viewMenu.removeAttribute("open");
   }
 
+  function toggleDoNotDisturb() {
+    state.doNotDisturb = !state.doNotDisturb;
+    localStorage.setItem(doNotDisturbStorageKey, state.doNotDisturb ? "1" : "0");
+    if (state.doNotDisturb) {
+      closeIncomingCallBrowserNotification();
+    }
+    syncDoNotDisturbButton();
+    sendPresence("online");
+    flushClientLifecycleState("do-not-disturb", true);
+    setConnectionStatus(state.doNotDisturb
+      ? t("status.do_not_disturb_on", "Do not disturb is on. Browser notifications are muted.")
+      : t("status.do_not_disturb_off", "Do not disturb is off. Browser notifications are enabled."), state.doNotDisturb ? "warn" : "good");
+  }
+
+  function syncDoNotDisturbButton() {
+    if (!el.doNotDisturbButton) {
+      return;
+    }
+
+    const label = state.doNotDisturb
+      ? t("button.do_not_disturb_on", "Do not disturb on")
+      : t("button.do_not_disturb", "Do not disturb");
+    el.doNotDisturbButton.classList.toggle("selected", state.doNotDisturb);
+    el.doNotDisturbButton.title = label;
+    el.doNotDisturbButton.setAttribute("aria-label", label);
+    const srText = el.doNotDisturbButton.querySelector(".sr-only");
+    if (srText) {
+      srText.textContent = label;
+    }
+  }
+
   function loadChatBackground(profile) {
     return normalizeChatBackground(localStorage.getItem(chatBackgroundStorageKeyFor(profile)));
   }
@@ -1611,22 +1939,21 @@
         ? t("aria.theme_white", "Switch to white mode")
         : t("aria.theme_black", "Switch to black mode"));
     el.themeButton.title = el.themeButton.getAttribute("aria-label");
-    document.querySelector('meta[name="theme-color"]')?.setAttribute(
-      "content",
-      state.theme === "dark" ? "#111827" : "#eef2f7");
   }
 
   function setMode(mode) {
     state.mode = mode;
     el.relayModeButton.classList.toggle("selected", mode === "relay");
     el.xmppModeButton.classList.toggle("selected", mode === "xmpp");
+    el.relayModeButton.setAttribute("aria-selected", mode === "relay" ? "true" : "false");
+    el.xmppModeButton.setAttribute("aria-selected", mode === "xmpp" ? "true" : "false");
     setDefaultComposerState();
     updateComposerAvailability();
   }
 
   function applyNetworkDefaultsForCurrentHost() {
-    el.relayUrlInput.value = normalizeLocalWebSocketUrlForCurrentHost(el.relayUrlInput.value, 8787);
-    el.xmppUrlInput.value = normalizeLocalWebSocketUrlForCurrentHost(el.xmppUrlInput.value, 8787);
+    el.relayUrlInput.value = "";
+    el.xmppUrlInput.value = normalizeLocalXmppWebSocketUrlForCurrentHost(el.xmppUrlInput.value);
   }
 
   async function loadPlatformConfig() {
@@ -1634,6 +1961,8 @@
     let databaseLoaded = false;
     try {
       savedAccount = loadSavedAccountProfile();
+      const hasSavedAccountSession = Boolean(savedAccount?.accountId || savedAccount?.jid);
+      state.suppressAutoLoginDialog = hasSavedAccountSession;
       const account = mergeAccountProfiles(
         applySessionAccountDefaults(await fetchJson("config/account-profile.json"), savedAccount),
         savedAccount);
@@ -1654,6 +1983,7 @@
       }
       await loadMessageHistory();
       await loadConversationHistory();
+      await loadGroupMetadata();
       await loadLanguage(state.account.preferredLanguage ?? "eng");
       await loadRtcConfig();
       const provider = await fetchJson(`config/providers/${encodeURIComponent(state.account.providerId)}.json`);
@@ -1661,9 +1991,12 @@
       await loadGoogleMapsConfig();
       renderProvider();
       renderTabs();
-      showAccountStartIfRequired(!databaseLoaded);
-      setAccountReady(databaseLoaded);
-      autoConnectIfReady();
+      setAccountBooting(false);
+      showAccountStartIfRequired(!databaseLoaded && !state.pendingLoginTwoFactor && !hasSavedAccountSession);
+      setAccountReady(databaseLoaded || hasSavedAccountSession);
+      if (databaseLoaded || state.account?.password) {
+        autoConnectIfReady();
+      }
       openPasswordResetDialogIfRequested();
       appendDebug("config", `Loaded provider ${provider.providerId}`);
     } catch (error) {
@@ -1673,9 +2006,14 @@
       await loadRtcConfig();
       await loadGoogleMapsConfig();
       renderTabs();
-      showAccountStartIfRequired(!databaseLoaded);
-      setAccountReady(databaseLoaded);
-      autoConnectIfReady();
+      setAccountBooting(false);
+      const hasSavedAccountSession = Boolean(savedAccount?.accountId || savedAccount?.jid || hasStoredAccountSession());
+      state.suppressAutoLoginDialog = hasSavedAccountSession;
+      showAccountStartIfRequired(!databaseLoaded && !state.pendingLoginTwoFactor && !hasSavedAccountSession);
+      setAccountReady(databaseLoaded || hasSavedAccountSession);
+      if (databaseLoaded || state.account?.password) {
+        autoConnectIfReady();
+      }
       openPasswordResetDialogIfRequested();
     }
   }
@@ -1701,10 +2039,132 @@
     }
   }
 
+  async function renderGoogleSdkLoginButton() {
+    if (!el.dialogGoogleLoginButton || !el.dialogGoogleLoginFallbackButton || !el.dialogGoogleLoginOverlayButton) {
+      return;
+    }
+    const wrapper = el.dialogGoogleLoginButton.closest(".google-sdk-login-wrap");
+    const row = el.dialogGoogleLoginButton.closest(".social-login-row");
+    if (row?.hidden) {
+      return;
+    }
+    if (wrapper?.classList.contains("sdk-ready") && el.dialogGoogleLoginButton.querySelector("iframe")) {
+      return;
+    }
+
+    const rect = el.dialogGoogleLoginButton.getBoundingClientRect();
+    if (rect.width < 36) {
+      return;
+    }
+
+    wrapper?.classList.remove("sdk-ready");
+    wrapper?.classList.add("sdk-rendering");
+    el.dialogGoogleLoginButton.replaceChildren();
+    el.dialogGoogleLoginFallbackButton.hidden = false;
+    el.dialogGoogleLoginOverlayButton.hidden = true;
+
+    try {
+      const config = await fetchJson(authApiUrl("public-config.php"));
+      const clientId = String(config?.google?.clientId || "").trim();
+      if (!clientId) {
+        wrapper?.classList.remove("sdk-rendering");
+        appendDebug("google-sdk", "Google client ID unavailable; using fallback button.");
+        return;
+      }
+
+      const locale = languageCodeForGoogleButton();
+      el.dialogGoogleLoginButton.dataset.locale = locale;
+      await loadExternalScript(`https://accounts.google.com/gsi/client?hl=${encodeURIComponent(locale)}`, `teletyptel-google-identity-${locale}`);
+      if (!globalThis.google?.accounts?.id?.initialize || !globalThis.google?.accounts?.id?.renderButton) {
+        throw new Error("Google Identity Services unavailable.");
+      }
+
+      globalThis.google.accounts.id.initialize({
+        client_id: clientId,
+        callback: () => startGoogleLoginFromDialog()
+      });
+      globalThis.google.accounts.id.renderButton(el.dialogGoogleLoginButton, {
+        type: "icon",
+        theme: "outline",
+        size: "large",
+        text: "sign_in_with",
+        shape: "circle",
+        logo_alignment: "left",
+        width: 44,
+        locale
+      });
+      window.setTimeout(() => activateGoogleSdkLoginButton(), 500);
+    } catch (error) {
+      resetGoogleSdkLoginButton();
+      appendDebug("google-sdk-error", error.message || String(error));
+    }
+  }
+
+  function activateGoogleSdkLoginButton() {
+    if (!el.dialogGoogleLoginButton || !el.dialogGoogleLoginOverlayButton) {
+      return;
+    }
+    const wrapper = el.dialogGoogleLoginButton.closest(".google-sdk-login-wrap");
+    const iframe = el.dialogGoogleLoginButton.querySelector("iframe");
+    const frameRect = iframe?.getBoundingClientRect();
+    if (iframe && frameRect && frameRect.width >= 36 && frameRect.height >= 32) {
+      wrapper?.classList.remove("sdk-rendering");
+      wrapper?.classList.add("sdk-ready");
+      el.dialogGoogleLoginOverlayButton.hidden = false;
+      appendDebug("google-sdk", "Google Identity Services button rendered.");
+      return;
+    }
+    resetGoogleSdkLoginButton();
+    appendDebug("google-sdk", "Google Identity Services button unavailable; using fallback button.");
+  }
+
+  function resetGoogleSdkLoginButton() {
+    const wrapper = el.dialogGoogleLoginButton?.closest(".google-sdk-login-wrap");
+    wrapper?.classList.remove("sdk-rendering", "sdk-ready");
+    el.dialogGoogleLoginButton?.replaceChildren();
+    if (el.dialogGoogleLoginFallbackButton) {
+      el.dialogGoogleLoginFallbackButton.hidden = false;
+    }
+    if (el.dialogGoogleLoginOverlayButton) {
+      el.dialogGoogleLoginOverlayButton.hidden = true;
+    }
+  }
+
+  function loadExternalScript(src, marker) {
+    const existing = document.querySelector(`script[data-${marker}]`);
+    if (existing) {
+      return existing.dataset.loaded === "true"
+        ? Promise.resolve()
+        : new Promise((resolve, reject) => {
+          existing.addEventListener("load", resolve, { once: true });
+          existing.addEventListener("error", reject, { once: true });
+        });
+    }
+
+    return new Promise((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = src;
+      script.async = true;
+      script.defer = true;
+      script.setAttribute(`data-${marker}`, "true");
+      script.addEventListener("load", () => {
+        script.dataset.loaded = "true";
+        resolve();
+      }, { once: true });
+      script.addEventListener("error", () => reject(new Error(`Failed to load ${src}`)), { once: true });
+      document.head.appendChild(script);
+    });
+  }
+
+  function languageCodeForGoogleButton() {
+    const lang = String(state.account?.preferredLanguage || el.languageInput?.value || document.documentElement.lang || "").toLowerCase();
+    return lang.startsWith("ned") || lang.startsWith("nl") ? "nl" : "en";
+  }
+
   async function loadLanguage(code) {
     const normalized = normalizeLanguageCode(code);
     state.languageCode = normalized;
-    el.languageInput.value = normalized;
+    syncLanguageInputs(normalized);
 
     try {
       const text = await fetchText(`${languageBasePath}${encodeURIComponent(normalized)}.lng`);
@@ -1744,7 +2204,7 @@
         continue;
       }
 
-      map.set(line.slice(0, equals).trim(), line.slice(equals + 1).trim());
+      map.set(line.slice(0, equals).trim(), line.slice(equals + 1).trim().replace(/\\n/g, "\n"));
     }
 
     return map;
@@ -1895,6 +2355,11 @@
       }
 
       const payload = await response.json();
+      if (payload.ok && payload.twoFactorRequired) {
+        showLoginTwoFactorChallenge(payload, { oauth: Boolean(loginToken), connectAfterSave: true });
+        return false;
+      }
+
       if (payload.ok && payload.account) {
         state.account = {
           ...state.account,
@@ -1949,6 +2414,24 @@
     }
   }
 
+  function syncLanguageInputs(code) {
+    const normalized = normalizeLanguageCode(code);
+    [el.languageInput, el.dialogLanguageInput, el.settingsLanguageInput].forEach((input) => {
+      if (input) {
+        input.value = normalized;
+      }
+    });
+  }
+
+  function handleLanguageInputChanged(code) {
+    const normalized = normalizeLanguageCode(code);
+    syncLanguageInputs(normalized);
+    if (state.account) {
+      state.account.preferredLanguage = normalized;
+    }
+    loadLanguage(normalized).catch((error) => appendDebug("lng-error", error.message || String(error)));
+  }
+
   async function loadRtcConfig() {
     try {
       const config = await fetchJson(rtcConfigApiPath);
@@ -1967,6 +2450,17 @@
   }
 
   function historyQueryParams(params = {}) {
+    const query = new URLSearchParams({
+      ...params
+    });
+    const loginToken = accountLoginToken();
+    if (loginToken) {
+      query.set("loginToken", loginToken);
+    }
+    return query;
+  }
+
+  function groupMetadataQueryParams(params = {}) {
     const query = new URLSearchParams({
       ...params
     });
@@ -2158,6 +2652,120 @@
     }).catch((error) => appendDebug("history-error", error.message));
   }
 
+  async function loadGroupMetadata() {
+    if (!state.account?.accountId) {
+      return false;
+    }
+
+    try {
+      const query = groupMetadataQueryParams({ accountId: state.account.accountId });
+      const response = await fetch(`${groupMetadataApiPath}?${query.toString()}`, { cache: "no-store" });
+      if (response.status === 404) {
+        return false;
+      }
+
+      if (!response.ok) {
+        appendDebug("group-metadata-error", `group metadata API returned ${response.status}`);
+        return false;
+      }
+
+      const payload = await response.json();
+      if (!payload.ok || !Array.isArray(payload.groups)) {
+        return false;
+      }
+
+      for (const group of payload.groups) {
+        applyGroupMetadataRecord(group);
+      }
+      renderConversations();
+      renderActiveConversation();
+      refreshOpenTabPanel();
+      appendDebug("group-metadata", `Loaded ${payload.groups.length} groups`);
+      return true;
+    } catch (error) {
+      appendDebug("group-metadata-error", error.message);
+      return false;
+    }
+  }
+
+  function applyGroupMetadataRecord(record) {
+    const roomJid = bareJid(record?.roomJid || "");
+    if (!roomJid) {
+      return;
+    }
+
+    const conversation = ensureConversationForPeer(roomJid, "group", record.roomName || displayNameForJid(roomJid));
+    if (!conversation) {
+      return;
+    }
+
+    if (typeof record.roomName === "string" && record.roomName.trim()) {
+      conversation.name = record.roomName.trim();
+      delete conversation.nameKey;
+    }
+    conversation.groupDescription = String(record.roomDescription || "");
+    if (isValidAvatarImageSource(record.avatarDataUrl || "")) {
+      conversation.avatarDataUrl = record.avatarDataUrl;
+    }
+    if (typeof record.avatarColor === "string" && record.avatarColor.trim()) {
+      conversation.avatarColor = normalizeAvatarColor(record.avatarColor);
+    }
+    conversation.mucAvatarHash = String(record.avatarHash || conversation.mucAvatarHash || "");
+    conversation.mucAvatarMediaType = String(record.avatarMediaType || conversation.mucAvatarMediaType || "");
+    conversation.mucAvatarUpdatedAt = record.avatarUpdatedAt || conversation.mucAvatarUpdatedAt || null;
+    conversation.groupOwnerJid = bareJid(record.ownerJid || "");
+    conversation.groupAdminJids = normalizeGroupMetadataJids(record.adminJids);
+    conversation.groupMemberJids = normalizeGroupMetadataJids(record.memberJids);
+    conversation.groupBannedJids = normalizeGroupMetadataJids(record.bannedJids);
+    conversation.groupApproveMembers = record.approveMembers === true;
+    conversation.groupMembersCanInvite = record.membersCanInvite !== false;
+  }
+
+  function normalizeGroupMetadataJids(values) {
+    if (!Array.isArray(values)) {
+      return [];
+    }
+
+    return [...new Set(values.map((jid) => bareJid(jid)).filter(Boolean))];
+  }
+
+  function persistGroupMetadata(conversation) {
+    if (!state.account?.accountId || !conversation || conversation.kind !== "group") {
+      return;
+    }
+
+    fetch(groupMetadataApiPath, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(groupMetadataPayload(conversation))
+    }).then((response) => {
+      if (!response.ok) {
+        appendDebug("group-metadata-error", `group metadata API returned ${response.status}`);
+      }
+    }).catch((error) => appendDebug("group-metadata-error", error.message));
+  }
+
+  function groupMetadataPayload(conversation) {
+    return {
+      accountId: state.account.accountId,
+      loginToken: accountLoginToken(),
+      roomJid: bareJid(conversation.peer),
+      roomName: conversationDisplayName(conversation),
+      roomDescription: String(conversation.groupDescription || ""),
+      avatarDataUrl: isValidAvatarImageSource(conversation.avatarDataUrl || "") ? conversation.avatarDataUrl : "",
+      avatarColor: normalizeAvatarColor(conversation.avatarColor || ""),
+      avatarHash: conversation.mucAvatarHash || "",
+      avatarMediaType: conversation.mucAvatarMediaType || "",
+      avatarUpdatedAt: conversation.mucAvatarUpdatedAt || null,
+      ownerJid: bareJid(conversation.groupOwnerJid || ""),
+      adminJids: normalizeGroupMetadataJids(conversation.groupAdminJids || []),
+      memberJids: normalizeGroupMetadataJids(conversation.groupMemberJids || []),
+      bannedJids: normalizeGroupMetadataJids(conversation.groupBannedJids || []),
+      approveMembers: conversation.groupApproveMembers === true,
+      membersCanInvite: conversation.groupMembersCanInvite !== false
+    };
+  }
+
   async function fetchJson(url) {
     const response = await fetch(url, { cache: "no-store" });
     if (!response.ok) {
@@ -2174,6 +2782,7 @@
       ...state.account,
       avatarDataUrl: account.avatarDataUrl ?? state.account?.avatarDataUrl ?? "",
       avatarColor: account.avatarColor || state.account?.avatarColor || avatarColorFor(account.displayName ?? account.jid ?? state.sessionProfile),
+      sessionTimeoutEnabled: account.sessionTimeoutEnabled !== false,
       twoFactorEnabled: account.twoFactorEnabled === true || state.account?.twoFactorEnabled === true,
       twoFactorMethod: account.twoFactorMethod || state.account?.twoFactorMethod || ""
     };
@@ -2182,20 +2791,23 @@
     el.rememberPasswordToggle.checked = account.rememberPassword === true;
     el.rttToggle.checked = account.liveRttEnabled !== false;
     el.smileyToggle.checked = account.showSmileys !== false;
+    el.sessionTimeoutToggle.checked = account.sessionTimeoutEnabled !== false;
     syncRttToolbarState();
-    el.peerInput.value = account.peer ?? el.peerInput.value;
+    el.peerInput.value = account.peer && !addressMatches(account.peer, "relay@localhost")
+      ? account.peer
+      : "tester@localhost";
     el.phoneInput.value = account.phoneNumber ?? "";
     if (state.account) {
       state.account.birthDate = normalizeBirthDate(account.birthDate ?? state.account.birthDate ?? "");
     }
-    el.languageInput.value = normalizeLanguageCode(account.preferredLanguage ?? "eng");
+    syncLanguageInputs(account.preferredLanguage ?? "eng");
     el.providerInput.value = account.providerId ?? "";
-    el.relayUrlInput.value = normalizeLocalWebSocketUrlForCurrentHost(account.relayWebSocket ?? el.relayUrlInput.value, 8787);
-    el.xmppUrlInput.value = normalizeLocalWebSocketUrlForCurrentHost(account.xmppWebSocket ?? el.xmppUrlInput.value, 8787);
+    el.relayUrlInput.value = "";
+    el.xmppUrlInput.value = normalizeLocalXmppWebSocketUrlForCurrentHost(account.xmppWebSocket ?? el.xmppUrlInput.value);
     state.account.xmppHost = account.xmppHost ?? state.account.xmppHost ?? domainFromJid(account.jid ?? "");
     state.account.xmppPort = account.xmppPort ?? state.account.xmppPort ?? 5222;
     state.account.xmppDomain = account.xmppDomain ?? state.account.xmppDomain ?? domainFromJid(account.jid ?? "");
-    state.account.xmppTlsMode = account.xmppTlsMode ?? state.account.xmppTlsMode ?? "starttls";
+    state.account.xmppTlsMode = "websocket";
     updateAccountStatus(account.savedInDatabase === true ? t("account.database_loaded", "Server account loaded") : t("account.default_profile", "Default account profile"));
     updateAccountAvatarPreview();
     updateRelayConversationMeta();
@@ -2203,11 +2815,139 @@
     syncAccountDialogFromControls();
   }
 
-  function showAccountStartIfRequired(required) {
-    setAccountGateRequired(required);
-    if (required) {
-      openAccountDialog({ required: true });
+  function refreshDatabaseAccountAfterXmppAuthFailure() {
+    if (state.xmppAuthRefreshAttempted
+      || !state.account?.accountId
+      || state.account?.savedInDatabase !== true) {
+      return false;
     }
+
+    state.xmppAuthRefreshAttempted = true;
+    const accountId = state.account.accountId;
+    const loginToken = accountLoginToken(state.account);
+    appendDebug("xmpp-auth", "Refreshing server account after auth failure");
+    state.intentionalDisconnect = true;
+    closeXmppWebSocket();
+    loadDatabaseAccount(accountId, loginToken)
+      .then((loaded) => {
+        if (!loaded || !state.account?.password) {
+          returnToLoginScreenAfterDisconnect(t("account.invalid_credentials", "The server rejected this email or password."));
+          return;
+        }
+
+        setAccountReady(true);
+        state.intentionalDisconnect = false;
+        connectXmppWebSocket();
+      })
+      .catch((error) => {
+        appendDebug("xmpp-auth-refresh-error", error.message);
+        returnToLoginScreenAfterDisconnect(t("account.invalid_credentials", "The server rejected this email or password."));
+      });
+    return true;
+  }
+
+  function showAccountStartIfRequired(required) {
+    if (required) {
+      requestLoginRequired(t("account.start_required", "Sign in or create an account before Teletyptel opens."));
+      return;
+    }
+
+    setAccountGateRequired(false);
+  }
+
+  function shouldSuppressAutomaticLoginDialog(options = {}) {
+    if (options.forceLogin === true || state.pendingLoginTwoFactor) {
+      return false;
+    }
+
+    return state.suppressAutoLoginDialog === true
+      && (hasStoredAccountSession() || Boolean(state.account?.accountId || state.account?.jid));
+  }
+
+  function setupSessionInactivityTimeout() {
+    recordSessionActivity({ force: true });
+  }
+
+  function isSessionInactivityTimeoutEnabled() {
+    return state.account?.sessionTimeoutEnabled !== false
+      && el.sessionTimeoutToggle?.checked !== false;
+  }
+
+  function recordSessionActivity(options = {}) {
+    if (state.sessionTimeoutInProgress) {
+      return;
+    }
+
+    const now = Date.now();
+    if (options.force !== true && now - state.sessionLastActivityRecordedAt < sessionActivityThrottleMs) {
+      return;
+    }
+
+    state.sessionLastActivityAt = now;
+    state.sessionLastActivityRecordedAt = now;
+    scheduleSessionInactivityTimeout();
+  }
+
+  function scheduleSessionInactivityTimeout() {
+    window.clearTimeout(state.sessionIdleTimerId);
+    state.sessionIdleTimerId = null;
+    if (!isSessionInactivityTimeoutEnabled() || !hasAccountSessionForInactivityTimeout()) {
+      return;
+    }
+
+    const elapsed = Date.now() - state.sessionLastActivityAt;
+    const delay = Math.max(1000, sessionInactivityTimeoutMs - elapsed);
+    state.sessionIdleTimerId = window.setTimeout(handleSessionInactivityTimeout, delay);
+  }
+
+  function hasAccountSessionForInactivityTimeout() {
+    return !state.accountGateRequired
+      && Boolean(state.account?.accountId || state.account?.jid || hasStoredAccountSession());
+  }
+
+  function handleSessionInactivityTimeout() {
+    if (!hasAccountSessionForInactivityTimeout()) {
+      return;
+    }
+
+    const elapsed = Date.now() - state.sessionLastActivityAt;
+    if (elapsed < sessionInactivityTimeoutMs) {
+      scheduleSessionInactivityTimeout();
+      return;
+    }
+
+    state.sessionTimeoutInProgress = true;
+    logoutAccount({
+      message: t("account.session_expired", "Session expired after inactivity. Sign in again."),
+      forceLogin: true,
+      reason: "session-timeout"
+    })
+      .finally(() => {
+        state.sessionTimeoutInProgress = false;
+      });
+  }
+
+  function requestLoginRequired(message = "", options = {}) {
+    const text = message || t("account.disconnected_login_required", "Connection closed. Sign in to continue.");
+    const forceLogin = options.forceLogin === true;
+    if (!forceLogin && (options.openLogin === false || shouldSuppressAutomaticLoginDialog(options))) {
+      setAccountGateRequired(false);
+      if (!el.accountDialog.hidden && effectiveAccountDialogMode() === "signin") {
+        closeAccountDialog();
+      }
+      updateAccountStatus(text);
+      updateConnectButtonAvailability();
+      return false;
+    }
+
+    openAccountDialog({ required: true, forceLogin: true });
+    el.dialogAccountStatus.textContent = text;
+    return true;
+  }
+
+  function setAccountBooting(booting) {
+    state.accountBooting = booting === true;
+    document.body.classList.toggle("account-booting", state.accountBooting);
   }
 
   function setAccountGateRequired(required) {
@@ -2237,6 +2977,11 @@
       : (options.required === true
         ? "signin"
         : (options.mode === "profile" ? "profile" : "settings"));
+    if (state.accountDialogMode === "profile") {
+      ensureAccountSettingsPanel("profile");
+    } else if (state.accountDialogMode === "settings") {
+      ensureAccountSettingsPanel(state.accountSettingsPanel === "profile" ? "preferences" : state.accountSettingsPanel);
+    }
     if (options.required === true) {
       setAccountGateRequired(true);
     } else {
@@ -2254,11 +2999,11 @@
         : accountDialogStatusText("account.settings_ready", "Edit app, media and server settings."));
     el.accountDialog.hidden = false;
     document.body.classList.add("modal-open");
+    if (mode === "signin") {
+      window.setTimeout(() => renderGoogleSdkLoginButton(), 0);
+    }
     window.setTimeout(() => {
-      const focusTarget = mode === "profile"
-        ? el.dialogDisplayNameInput
-        : (mode === "settings" ? (el.dialogCameraInput || el.dialogChatBackgroundInput) : (mode === "reset" ? el.dialogPasswordInput : el.dialogJidInput));
-      focusTarget.focus();
+      accountDialogFocusTarget(mode).focus();
     }, 0);
   }
 
@@ -2281,13 +3026,19 @@
     el.accountDialog.classList.toggle("profile-dialog", profileMode);
     el.accountDialog.classList.toggle("settings-dialog", settingsMode);
     el.accountDialog.classList.toggle("server-settings-visible", settingsMode);
+    const loginTwoFactorMode = Boolean(state.pendingLoginTwoFactor);
+    el.accountDialog.classList.toggle("account-menu-dialog", !startMode && !resetMode && !loginTwoFactorMode);
     el.accountDialogTitle.textContent = resetMode
       ? t("account.reset_title", "Reset password")
+      : loginTwoFactorMode
+      ? t("account.login_two_factor_title", "Two-factor check")
       : startMode
       ? t("account.start_title", "Sign in")
       : (profileMode ? t("account.profile_title", "Profile") : t("account.settings_title", "Settings"));
     el.accountDialogSubtitle.textContent = resetMode
       ? t("account.reset_subtitle", "Use the reset link from your e-mail and choose a new password.")
+      : loginTwoFactorMode
+      ? t("account.login_two_factor_subtitle", "Use the code from your authenticator app.")
       : startMode
       ? t("account.start_subtitle", "Use your XMPP account. New users can create an account.")
       : (profileMode
@@ -2298,6 +3049,7 @@
       : startMode
       ? t("section.sign_in", "Sign in")
       : t("section.real_account", "Real account");
+    ensureAccountSettingsPanel(profileMode ? state.accountSettingsPanel : (settingsMode ? state.accountSettingsPanel : "profile"));
     el.dialogAdvancedDetails.open = settingsMode;
     el.accountSecuritySection.hidden = startMode || resetMode;
     el.dialogSaveAccountButton.hidden = startMode || resetMode;
@@ -2306,23 +3058,38 @@
     el.dialogForgotPasswordButton.hidden = resetMode;
     el.dialogGoogleLoginButton.closest(".social-login-row").hidden = resetMode || !startMode;
     el.dialogCreateAccountButton.hidden = resetMode;
+    el.loginTwoFactorSection.hidden = !loginTwoFactorMode;
+    el.verifyLoginTwoFactorButton.disabled = !loginTwoFactorMode || el.loginTwoFactorCodeInput.value.replace(/\D+/g, "").length !== 6;
     el.dialogRememberPasswordToggle.closest("label").hidden = resetMode;
     el.dialogPasswordInput.autocomplete = resetMode ? "new-password" : "current-password";
     el.dialogConnectButton.textContent = startMode
       ? t("button.sign_in", "Sign in")
       : t("button.save_connect", "Save and connect");
+    el.dialogSaveAccountButton.textContent = profileMode
+      ? t("button.save_profile", "Save profile")
+      : t("button.save_settings", "Save settings");
     if (!resetMode) {
-      el.dialogCreateAccountButton.hidden = false;
+      el.dialogCreateAccountButton.hidden = loginTwoFactorMode;
       el.dialogCreateAccountButton.textContent = startMode
         ? t("button.sign_up", "New account")
         : t("button.create_account", "Create account");
     }
-    el.dialogServerSettingsButton.hidden = profileMode || resetMode;
+    if (loginTwoFactorMode) {
+      el.dialogSaveAccountButton.hidden = true;
+      el.dialogConnectButton.hidden = true;
+      el.dialogForgotPasswordButton.hidden = true;
+      el.dialogGoogleLoginButton.closest(".social-login-row").hidden = true;
+    } else if (startMode && !el.accountDialog.hidden) {
+      window.setTimeout(() => renderGoogleSdkLoginButton(), 0);
+    }
+    el.dialogServerSettingsButton.hidden = profileMode || settingsMode || resetMode;
+    renderAccountSettingsMenu();
     updateServerSettingsReadonly();
   }
 
   function openDialogServerSettings() {
     state.accountDialogMode = "settings";
+    setAccountSettingsPanel("server", { focus: false });
     updateAccountDialogMode();
     el.accountDialog.classList.add("server-settings-visible");
     el.dialogAdvancedDetails.open = true;
@@ -2334,10 +3101,161 @@
     }, 120);
   }
 
+  function accountDialogPanelsForMode(mode = effectiveAccountDialogMode()) {
+    if (mode === "profile") {
+      return ["profile", "security"];
+    }
+
+    if (mode === "settings") {
+      return ["preferences", "app-security", "media", "server", "accessibility"];
+    }
+
+    return [];
+  }
+
+  function ensureAccountSettingsPanel(preferred = state.accountSettingsPanel) {
+    const panels = accountDialogPanelsForMode();
+    if (!panels.length) {
+      state.accountSettingsPanel = preferred || "profile";
+      return;
+    }
+
+    state.accountSettingsPanel = panels.includes(preferred) ? preferred : panels[0];
+  }
+
+  function setAccountSettingsPanel(panel, options = {}) {
+    state.accountSettingsPanel = panel;
+    ensureAccountSettingsPanel(panel);
+    renderAccountSettingsMenu();
+    if (options.focus !== false) {
+      window.setTimeout(() => accountDialogFocusTarget(effectiveAccountDialogMode()).focus({ preventScroll: true }), 0);
+    }
+  }
+
+  function renderAccountSettingsMenu() {
+    if (!el.accountSettingsMenu) {
+      return;
+    }
+
+    const mode = effectiveAccountDialogMode();
+    const panels = accountDialogPanelsForMode(mode);
+    const menuVisible = panels.length > 0 && !state.pendingLoginTwoFactor;
+    el.accountSettingsMenu.hidden = !menuVisible;
+    el.accountSettingsMenu.querySelectorAll("[data-account-panel]").forEach((button) => {
+      const panel = button.dataset.accountPanel || "";
+      button.hidden = !panels.includes(panel);
+      button.classList.toggle("selected", panel === state.accountSettingsPanel);
+      button.setAttribute("aria-current", panel === state.accountSettingsPanel ? "page" : "false");
+    });
+
+    el.accountDialog.querySelectorAll("[data-settings-panel]").forEach((panelEl) => {
+      panelEl.classList.toggle("active-settings-panel", panelEl.dataset.settingsPanel === state.accountSettingsPanel);
+    });
+    el.dialogAdvancedDetails.open = mode === "settings";
+  }
+
+  function accountDialogFocusTarget(mode) {
+    if (mode === "reset") {
+      return el.dialogPasswordInput;
+    }
+
+    if (mode === "signin") {
+      return el.dialogJidInput;
+    }
+
+    const byPanel = {
+      profile: el.dialogDisplayNameInput,
+      security: el.dialogCurrentPasswordInput,
+      preferences: el.rttToggle,
+      "app-security": el.settingsLogoutButton,
+      media: el.dialogCameraInput || el.dialogMicrophoneInput,
+      server: serverSettingsControls().find((control) => !control.disabled) || el.dialogXmppDomainInput,
+      accessibility: el.dialogAccessibilityPanel
+    };
+    return byPanel[state.accountSettingsPanel] || el.dialogDisplayNameInput || el.dialogJidInput;
+  }
+
   function startGoogleLoginFromDialog() {
-    updateAccountStatus(t("account.google_redirecting", "Opening Google sign-in..."));
-    const target = new URL("api/auth/google/start", location.href);
+    startProviderLoginFromDialog("google");
+  }
+
+  function startFacebookLoginFromDialog() {
+    startProviderLoginFromDialog("facebook");
+  }
+
+  function startProviderLoginFromDialog(provider) {
+    const name = providerDisplayName(provider);
+    updateAccountStatus(t(`account.${provider}_redirecting`, `Opening ${name} sign-in...`));
+    const target = new URL(authApiUrl(`${provider}/start`), location.href);
     location.assign(target.toString());
+  }
+
+  function startGoogleLinkFromDialog() {
+    startProviderLinkFromDialog("google");
+  }
+
+  function startFacebookLinkFromDialog() {
+    startProviderLinkFromDialog("facebook");
+  }
+
+  function startProviderLinkFromDialog(provider) {
+    if (!state.account?.accountId || state.account?.savedInDatabase !== true) {
+      const name = providerDisplayName(provider);
+      el.dialogAccountStatus.textContent = t(`account.save_before_${provider}_link`, `Save and sign in before linking ${name}.`);
+      el.dialogAccountStatus.scrollIntoView({ block: "nearest" });
+      return;
+    }
+
+    const name = providerDisplayName(provider);
+    updateAccountStatus(t(`account.${provider}_link_redirecting`, `Opening ${name} linking...`));
+    const target = new URL(authApiUrl(`${provider}/start`), location.href);
+    target.searchParams.set("mode", "link");
+    location.assign(target.toString());
+  }
+
+  function authApiUrl(path) {
+    const cleanPath = String(path ?? "").replace(/^\/+/, "");
+    if (isLocalBrowserHost(location.hostname) && location.pathname.includes("/php/public/")) {
+      return `api/auth/${cleanPath}`;
+    }
+    return `/api/auth/${cleanPath}`;
+  }
+
+  async function unlinkGoogleFromDialog() {
+    await unlinkProviderFromDialog("google");
+  }
+
+  async function unlinkFacebookFromDialog() {
+    await unlinkProviderFromDialog("facebook");
+  }
+
+  async function unlinkProviderFromDialog(provider) {
+    if (!state.account?.accountId || state.account?.savedInDatabase !== true) {
+      return;
+    }
+
+    const name = providerDisplayName(provider);
+    setAccountDialogBusy(true, t(`account.${provider}_unlinking`, `Unlinking ${name}...`));
+    try {
+      const payload = await postAccountAction({
+        action: "unlink_identity",
+        accountId: state.account.accountId,
+        provider
+      });
+      state.account = { ...state.account, ...payload.account, savedInDatabase: true };
+      updateLinkedIdentityStatus();
+      const message = t(`account.${provider}_unlinked`, `${name} has been unlinked.`);
+      updateAccountStatus(message);
+      el.dialogAccountStatus.textContent = message;
+    } catch (error) {
+      showAccountDialogError(error);
+    } finally {
+      setAccountDialogBusy(false);
+    }
+  }
+
+  function providerDisplayName(provider) {
+    return provider === "facebook" ? "Facebook" : provider === "google" ? "Google" : provider;
   }
 
   async function loadConversationHistory() {
@@ -2383,12 +3301,6 @@
       media: Array.isArray(item.media) ? item.media : [],
       note: String(item.note || "")
     };
-  }
-
-  function startAuth0LoginFromDialog() {
-    updateAccountStatus(t("account.auth0_redirecting", "Opening Auth0 sign-in..."));
-    const target = new URL("api/auth/auth0/start", location.href);
-    location.assign(target.toString());
   }
 
   function serverSettingsControls() {
@@ -2461,16 +3373,23 @@
     el.dialogJidInput.value = state.accountGateRequired && !hasStoredAccount
       ? ""
       : stripGeneratedResourceSuffix(el.jidInput.value.trim());
+    el.dialogProfileEmailInput.value = el.dialogJidInput.value;
     el.dialogPasswordInput.value = el.passwordInput.value;
     el.dialogRememberPasswordToggle.checked = el.rememberPasswordToggle.checked || state.accountGateRequired;
+    el.dialogCurrentPasswordInput.value = "";
+    el.dialogNewPasswordInput.value = "";
+    el.dialogRepeatPasswordInput.value = "";
+    el.dialogRememberNewPasswordToggle.checked = el.dialogRememberPasswordToggle.checked;
+    updatePasswordRulesPanel();
+    updateLinkedIdentityStatus();
     el.dialogXmppDomainInput.value = state.account?.xmppDomain || domainFromJid(el.dialogJidInput.value);
     el.dialogXmppHostInput.value = state.account?.xmppHost || el.dialogXmppDomainInput.value || "localhost";
     el.dialogXmppPortInput.value = String(state.account?.xmppPort || 5222);
-    el.dialogXmppTlsModeInput.value = normalizeTlsMode(state.account?.xmppTlsMode || "starttls");
+    el.dialogXmppTlsModeInput.value = "websocket";
     el.dialogRelayUrlInput.value = el.relayUrlInput.value;
     el.dialogXmppUrlInput.value = el.xmppUrlInput.value;
     el.dialogProviderInput.value = el.providerInput.value;
-    el.dialogLanguageInput.value = el.languageInput.value;
+    syncLanguageInputs(el.languageInput.value);
     el.dialogPeerInput.value = el.peerInput.value;
     el.dialogPhoneInput.value = el.phoneInput.value;
     el.dialogBirthDateInput.value = normalizeBirthDate(state.account?.birthDate ?? "");
@@ -2478,6 +3397,65 @@
     el.dialogMapProviderInput.value = normalizeMapProvider(state.location.settings.mapProvider);
     updateTwoFactorStatus();
     renderMediaDeviceSelects();
+  }
+
+  function showLoginTwoFactorChallenge(payload, options = {}) {
+    state.pendingLoginTwoFactor = {
+      accountId: String(payload.accountId || ""),
+      method: payload.method || "authenticator",
+      profile: options.profile || currentAccountProfile(),
+      connectAfterSave: options.connectAfterSave !== false,
+      oauth: options.oauth === true
+    };
+    state.accountDialogMode = "signin";
+    setAccountGateRequired(true);
+    el.loginTwoFactorCodeInput.value = "";
+    syncAccountDialogFromControls();
+    updateAccountDialogMode();
+    el.dialogAccountStatus.textContent = t("account.login_two_factor_prompt", "Enter the 6-digit authenticator code to finish signing in.");
+    el.accountDialog.hidden = false;
+    document.body.classList.add("modal-open");
+    window.setTimeout(() => el.loginTwoFactorCodeInput.focus(), 0);
+  }
+
+  async function verifyLoginTwoFactorFromDialog() {
+    const pending = state.pendingLoginTwoFactor;
+    const code = el.loginTwoFactorCodeInput.value.replace(/\D+/g, "");
+    if (!pending || code.length !== 6) {
+      el.loginTwoFactorCodeInput.focus();
+      el.dialogAccountStatus.textContent = t("account.two_factor_code_required", "Enter the 6-digit code first.");
+      return;
+    }
+
+    setAccountDialogBusy(true, t("account.login_two_factor_verifying", "Checking 2FA code..."));
+    try {
+      const payload = await postAccountAction({
+        action: "verify_login_two_factor",
+        accountId: pending.accountId,
+        code
+      });
+      if (!payload.account) {
+        throw new Error(t("account.login_two_factor_failed", "2FA login failed."));
+      }
+
+      await applyDatabaseAccount(payload.account, pending.profile || currentAccountProfile());
+      state.pendingLoginTwoFactor = null;
+      setAccountGateRequired(false);
+      setAccountReady(true);
+      recordSessionActivity({ force: true });
+      closeAccountDialog();
+      if (pending.oauth) {
+        cleanOauthUrl();
+      }
+      if (pending.connectAfterSave) {
+        autoConnectIfReady();
+      }
+    } catch (error) {
+      showAccountDialogError(error);
+    } finally {
+      setAccountDialogBusy(false);
+      updateAccountDialogMode();
+    }
   }
 
   function updateTwoFactorStatus(message = "") {
@@ -2501,6 +3479,31 @@
     el.twoFactorSecretText.textContent = hasQr ? state.security.twoFactorManualSecret : "";
   }
 
+  function updateLinkedIdentityStatus() {
+    updateProviderLinkStatus("google", el.googleLinkStatus, el.linkGoogleButton, el.unlinkGoogleButton);
+    updateProviderLinkStatus("facebook", el.facebookLinkStatus, el.linkFacebookButton, el.unlinkFacebookButton);
+  }
+
+  function updateProviderLinkStatus(provider, statusElement, linkButton, unlinkButton) {
+    if (!statusElement || !linkButton || !unlinkButton) {
+      return;
+    }
+
+    const name = providerDisplayName(provider);
+    const identity = state.account?.linkedIdentities?.[provider] || null;
+    const linked = identity?.linked === true;
+    const email = String(identity?.email || "").trim();
+    statusElement.textContent = linked
+      ? (email
+        ? t(`account.${provider}_linked_email`, `${name} linked: {email}`).replace("{email}", email)
+        : t(`account.${provider}_linked`, `${name} is linked.`))
+      : t(`account.${provider}_not_linked`, `${name} is not linked.`);
+    linkButton.hidden = linked;
+    unlinkButton.hidden = !linked;
+    linkButton.disabled = state.account?.savedInDatabase !== true;
+    unlinkButton.disabled = state.account?.savedInDatabase !== true;
+  }
+
   function renderTwoFactorQrCode(uri) {
     state.security.twoFactorOtpauthUri = uri || "";
     el.twoFactorQrCode.textContent = "";
@@ -2515,14 +3518,24 @@
       return;
     }
 
-    const qr = qrcode(0, "M");
-    qr.addData(uri);
-    qr.make();
-    el.twoFactorQrCode.innerHTML = qr.createSvgTag(4, 0);
+    try {
+      const qr = qrcode(0, "M");
+      qr.addData(uri);
+      qr.make();
+      el.twoFactorQrCode.innerHTML = qr.createSvgTag(4, 0);
+    } catch (error) {
+      appendDebug("two-factor-qr-error", error.message || String(error));
+      el.twoFactorQrCode.textContent = t("account.two_factor_qr_unavailable", "QR generator unavailable.");
+    }
     updateTwoFactorStatus();
   }
 
   function applyAccountDialogToControls(options = {}) {
+    const profileEmail = stripGeneratedResourceSuffix(el.dialogProfileEmailInput.value.trim());
+    if (profileEmail) {
+      el.dialogJidInput.value = profileEmail;
+    }
+
     const jid = normalizeJidInput(stripGeneratedResourceSuffix(el.dialogJidInput.value.trim()));
     const displayName = el.dialogDisplayNameInput.value.trim();
 
@@ -2537,7 +3550,7 @@
     const xmppPort = normalizeXmppPort(el.dialogXmppPortInput.value);
     let xmppDomain = el.dialogXmppDomainInput.value.trim() || domainFromJid(jid);
     let xmppHost = el.dialogXmppHostInput.value.trim() || xmppDomain;
-    const xmppWebSocket = normalizeLocalWebSocketUrlForCurrentHost(el.dialogXmppUrlInput.value.trim() || el.xmppUrlInput.value, 8787);
+    const xmppWebSocket = normalizeLocalXmppWebSocketUrlForCurrentHost(el.dialogXmppUrlInput.value.trim() || el.xmppUrlInput.value);
     if (isLocalAccountDomain(xmppHost) || isLocalXmppWebSocketUrl(xmppWebSocket)) {
       xmppDomain = "localhost";
       xmppHost = "localhost";
@@ -2549,12 +3562,13 @@
     el.displayNameInput.value = displayName || jid.split("@")[0] || "Teletyptel";
     el.jidInput.value = jid;
     el.dialogJidInput.value = jid;
+    el.dialogProfileEmailInput.value = jid;
     el.passwordInput.value = el.dialogPasswordInput.value;
     el.rememberPasswordToggle.checked = el.dialogRememberPasswordToggle.checked;
-    el.relayUrlInput.value = normalizeLocalWebSocketUrlForCurrentHost(el.dialogRelayUrlInput.value.trim() || el.relayUrlInput.value, 8787);
+    el.relayUrlInput.value = "";
     el.xmppUrlInput.value = xmppWebSocket;
     el.providerInput.value = el.dialogProviderInput.value.trim() || "example-provider";
-    el.languageInput.value = normalizeLanguageCode(el.dialogLanguageInput.value);
+    syncLanguageInputs(el.dialogLanguageInput.value);
     el.peerInput.value = el.dialogPeerInput.value.trim() || el.peerInput.value;
     el.phoneInput.value = el.dialogPhoneInput.value.trim();
     const birthDate = normalizeBirthDate(el.dialogBirthDateInput.value);
@@ -2574,6 +3588,7 @@
       jid,
       liveRttEnabled: el.rttToggle.checked,
       showSmileys: el.smileyToggle.checked,
+      sessionTimeoutEnabled: el.sessionTimeoutToggle.checked,
       birthDate,
       xmppDomain,
       xmppHost,
@@ -2693,6 +3708,103 @@
     }
   }
 
+  async function changePasswordFromSecuritySection() {
+    const currentPassword = el.dialogCurrentPasswordInput.value;
+    const password = el.dialogNewPasswordInput.value;
+    const repeatedPassword = el.dialogRepeatPasswordInput.value;
+    const validation = passwordValidationState(currentPassword, password, repeatedPassword);
+    if (!currentPassword) {
+      showAccountDialogError(accountDialogError("dialogCurrentPasswordInput", t("account.current_password_required", "Enter your current password first.")));
+      return;
+    }
+
+    if (!password) {
+      showAccountDialogError(accountDialogError("dialogNewPasswordInput", t("account.password_required", "Enter a password for a real server account.")));
+      return;
+    }
+
+    if (password !== repeatedPassword) {
+      showAccountDialogError(accountDialogError("dialogRepeatPasswordInput", t("account.password_repeat_mismatch", "The repeated password does not match.")));
+      return;
+    }
+
+    if (!validation.valid) {
+      showAccountDialogError(accountDialogError("dialogNewPasswordInput", t("account.password_rules_incomplete", "The new password does not meet all security rules.")));
+      updatePasswordRulesPanel();
+      return;
+    }
+
+    setAccountDialogBusy(true, t("account.changing_password", "Changing password..."));
+    try {
+      el.dialogPasswordInput.value = password;
+      el.passwordInput.value = password;
+      el.dialogRememberPasswordToggle.checked = el.dialogRememberNewPasswordToggle.checked;
+      el.rememberPasswordToggle.checked = el.dialogRememberNewPasswordToggle.checked;
+      if (state.account) {
+        state.account.password = password;
+        state.account.rememberPassword = el.dialogRememberNewPasswordToggle.checked;
+      }
+
+      applyAccountDialogToControls({ requirePassword: true });
+      const profile = currentAccountProfile();
+      const account = await saveDatabaseAccount({ ...profile, currentPassword }, "save");
+      state.account = { ...state.account, ...profile, ...account, password, savedInDatabase: true };
+      storeServerAccountSession(state.account, profile.rememberPassword);
+      updateAccountAvatarPreview();
+      updateRelayConversationMeta();
+      reconcileContactsForCurrentAccount();
+      updateAccountStatus(t("account.password_changed", "Password changed"));
+      setAccountReady(true);
+      el.dialogCurrentPasswordInput.value = "";
+      el.dialogNewPasswordInput.value = "";
+      el.dialogRepeatPasswordInput.value = "";
+      updatePasswordRulesPanel();
+      el.dialogAccountStatus.textContent = accountDialogStatusText("account.password_changed", "Password changed");
+      syncAccountDialogFromControls();
+    } catch (error) {
+      showAccountDialogError(error);
+    } finally {
+      setAccountDialogBusy(false);
+    }
+  }
+
+  function passwordValidationState(currentPassword = el.dialogCurrentPasswordInput.value, password = el.dialogNewPasswordInput.value, repeatedPassword = el.dialogRepeatPasswordInput.value) {
+    const rules = [
+      { id: "length", ok: password.length >= 10, text: t("password.rule_length", "At least 10 characters") },
+      { id: "lower", ok: /[a-z]/.test(password), text: t("password.rule_lower", "At least one lowercase letter") },
+      { id: "upper", ok: /[A-Z]/.test(password), text: t("password.rule_upper", "At least one uppercase letter") },
+      { id: "number", ok: /\d/.test(password), text: t("password.rule_number", "At least one number") },
+      { id: "symbol", ok: /[^A-Za-z0-9]/.test(password), text: t("password.rule_symbol", "At least one special character") },
+      { id: "repeat", ok: password !== "" && password === repeatedPassword, text: t("password.rule_repeat", "Repeated password matches") },
+      { id: "different", ok: currentPassword !== "" && password !== "" && currentPassword !== password, text: t("password.rule_different", "Different from current password") }
+    ];
+    return {
+      rules,
+      valid: rules.every((rule) => rule.ok)
+    };
+  }
+
+  function updatePasswordRulesPanel() {
+    if (!el.passwordRulesPanel || !el.changePasswordButton) {
+      return;
+    }
+
+    const validation = passwordValidationState();
+    el.passwordRulesPanel.replaceChildren(...validation.rules.map((rule) => {
+      const item = document.createElement("div");
+      item.className = `password-rule ${rule.ok ? "valid" : "invalid"}`;
+      const marker = document.createElement("span");
+      marker.className = "password-rule-marker";
+      marker.textContent = rule.ok ? "✓" : "";
+      marker.setAttribute("aria-hidden", "true");
+      const label = document.createElement("span");
+      label.textContent = rule.text;
+      item.append(marker, label);
+      return item;
+    }));
+    el.changePasswordButton.disabled = !validation.valid;
+  }
+
   async function requestTwoFactorSetupFromDialog() {
     if (!state.account?.accountId || state.account?.savedInDatabase !== true) {
       el.dialogAccountStatus.textContent = t("account.save_before_2fa", "Save and sign in before enabling 2FA.");
@@ -2778,6 +3890,10 @@
       const wasGateRequired = state.accountGateRequired;
       applyAccountDialogToControls({ requirePassword: wasGateRequired });
       const result = await saveAccountProfile(wasGateRequired ? "login" : "save");
+      if (result?.twoFactorRequired) {
+        showLoginTwoFactorChallenge(result, { profile: result.profile, connectAfterSave: connectAfterSave || wasGateRequired });
+        return;
+      }
       await loadLanguage(el.languageInput.value);
       el.dialogAccountStatus.textContent = accountDialogStatusText("account.database_saved", "Server account saved");
       syncAccountDialogFromControls();
@@ -2801,8 +3917,15 @@
     el.dialogCreateAccountButton.disabled = busy;
     el.dialogSaveAccountButton.disabled = busy;
     el.dialogConnectButton.disabled = busy;
+    el.verifyLoginTwoFactorButton.disabled = busy || !state.pendingLoginTwoFactor || el.loginTwoFactorCodeInput.value.replace(/\D+/g, "").length !== 6;
+    el.changePasswordButton.disabled = busy || !passwordValidationState().valid;
+    el.linkGoogleButton.disabled = busy || state.account?.savedInDatabase !== true;
+    el.unlinkGoogleButton.disabled = busy || state.account?.savedInDatabase !== true;
+    el.linkFacebookButton.disabled = busy || state.account?.savedInDatabase !== true;
+    el.unlinkFacebookButton.disabled = busy || state.account?.savedInDatabase !== true;
     el.requestTwoFactorButton.disabled = busy || state.account?.twoFactorEnabled === true;
-    el.confirmTwoFactorButton.disabled = busy || state.account?.twoFactorEnabled === true || state.security.twoFactorVerificationId <= 0;
+    const hasAuthenticatorQr = state.account?.twoFactorEnabled !== true && state.security.twoFactorOtpauthUri !== "";
+    el.confirmTwoFactorButton.disabled = busy || state.account?.twoFactorEnabled === true || (!hasAuthenticatorQr && state.security.twoFactorVerificationId <= 0);
     if (text) {
       el.dialogAccountStatus.textContent = text;
       el.dialogAccountStatus.scrollIntoView({ block: "nearest" });
@@ -2882,6 +4005,7 @@
       presence: "offline",
       meta: "Offline",
       messages: [],
+      unreadCount: 0,
       remoteText: "",
       remoteFrom: "",
       remoteDraftUpdatedAt: null
@@ -2936,7 +4060,9 @@
       accountId: `local-${state.sessionProfile}`,
       displayName: sessionProfileToDisplayName(state.sessionProfile),
       jid: `${localPart}@localhost/web`,
-      peer: defaultAccount.peer ?? "relay@localhost"
+      peer: defaultAccount.peer && !addressMatches(defaultAccount.peer, "relay@localhost")
+        ? defaultAccount.peer
+        : "tester@localhost"
     };
   }
 
@@ -2999,18 +4125,19 @@
       rememberPassword: el.rememberPasswordToggle.checked,
       liveRttEnabled: el.rttToggle.checked,
       showSmileys: el.smileyToggle.checked,
+      sessionTimeoutEnabled: el.sessionTimeoutToggle.checked,
       password: el.passwordInput.value,
       phoneNumber: el.phoneInput.value.trim(),
       birthDate: normalizeBirthDate(state.account?.birthDate ?? el.dialogBirthDateInput?.value ?? ""),
       providerId: el.providerInput.value.trim() || state.account?.providerId || "example-provider",
       accessibilityProfileId: state.account?.accessibilityProfileId ?? "default-live-text",
       preferredLanguage: el.languageInput.value,
-      relayWebSocket: normalizeLocalWebSocketUrlForCurrentHost(el.relayUrlInput.value.trim(), 8787),
-      xmppWebSocket: normalizeLocalWebSocketUrlForCurrentHost(el.xmppUrlInput.value.trim(), 8787),
+      relayWebSocket: "",
+      xmppWebSocket: normalizeLocalXmppWebSocketUrlForCurrentHost(el.xmppUrlInput.value.trim()),
       xmppHost: state.account?.xmppHost || domainFromJid(el.jidInput.value.trim()),
       xmppPort: state.account?.xmppPort || 5222,
       xmppDomain: state.account?.xmppDomain || domainFromJid(el.jidInput.value.trim()),
-      xmppTlsMode: normalizeTlsMode(state.account?.xmppTlsMode || "starttls"),
+      xmppTlsMode: "websocket",
       peer: el.peerInput.value.trim()
     };
   }
@@ -3023,6 +4150,15 @@
   async function saveAccountProfile(action = "save") {
     const profile = currentAccountProfile();
     const account = await saveDatabaseAccount(profile, action);
+    if (account?.twoFactorRequired) {
+      return { ...account, profile };
+    }
+
+    await applyDatabaseAccount(account, profile);
+    return { profile: state.account, databaseSaved: true };
+  }
+
+  async function applyDatabaseAccount(account, profile = currentAccountProfile()) {
     state.account = { ...state.account, ...profile, ...account, savedInDatabase: true };
     storeServerAccountSession(state.account, profile.rememberPassword);
     el.jidInput.value = createUniqueJid(state.account.jid);
@@ -3032,9 +4168,10 @@
     updateAccountStatus(t("account.database_saved", "Server account saved"));
     appendDebug("account", `Server saved ${el.jidInput.value}`);
     setAccountReady(true);
+    recordSessionActivity({ force: true });
     await loadMessageHistory();
     await loadConversationHistory();
-    return { profile: state.account, databaseSaved: true };
+    await loadGroupMetadata();
   }
 
   async function saveDatabaseAccount(profile, action = "save") {
@@ -3049,6 +4186,11 @@
     const payload = await response.json();
     if (!response.ok || !payload.ok) {
       throw new Error(accountApiErrorText(payload.error || `account API returned ${response.status}`, payload));
+    }
+
+    if (payload.twoFactorRequired) {
+      appendDebug("account-db", `2FA required for ${payload.accountId || profile.jid}`);
+      return payload;
     }
 
     appendDebug("account-db", `Saved ${payload.account.jid}`);
@@ -3094,6 +4236,10 @@
       return t("account.invalid_credentials", "The server rejected this email or password.");
     }
 
+    if (error === "invalid_current_password") {
+      return t("account.invalid_current_password", "The current password is not correct.");
+    }
+
     if (error === "not_authenticated") {
       return t("account.not_authenticated", "Sign in again before loading this server account.");
     }
@@ -3126,6 +4272,10 @@
       return t("account.two_factor_setup_missing", "Create a new QR code before entering the 2FA code.");
     }
 
+    if (error === "unsupported_identity_provider") {
+      return t("account.unsupported_identity_provider", "This account link is not supported.");
+    }
+
     if (error === "password_required") {
       return t("account.password_required", "Enter a password for a real server account.");
     }
@@ -3136,6 +4286,10 @@
 
     if (error === "missing_reset_data") {
       return t("account.missing_reset_data", "Enter your email address and a new password.");
+    }
+
+    if (error === "reset_email_required") {
+      return t("account.reset_email_required", "This local account has no verified e-mail address for password recovery.");
     }
 
     if (error === "account_not_found") {
@@ -3169,6 +4323,61 @@
     updateAccountStatus(t("account.reset_reload", "Account reset; reload to restore defaults"));
     appendDebug("account", "Server account session cleared");
     location.reload();
+  }
+
+  function clearAccountSessionForCurrentProfile() {
+    localStorage.removeItem(accountStorageKeyFor(state.sessionProfile));
+    sessionStorage.removeItem(accountStorageKeyFor(state.sessionProfile));
+    sessionStorage.removeItem(clientInstanceStorageKeyFor(state.sessionProfile));
+    clearStoredXmppStreamManagement();
+    cleanOauthUrl();
+  }
+
+  async function logoutAccount(options = {}) {
+    state.suppressAutoLoginDialog = false;
+    window.clearTimeout(state.sessionIdleTimerId);
+    state.sessionIdleTimerId = null;
+    clearAccountSessionForCurrentProfile();
+    if (state.account) {
+      state.account.password = "";
+      state.account.loginToken = "";
+      state.account.rememberPassword = false;
+      state.account.savedInSession = false;
+    }
+    el.passwordInput.value = "";
+    el.dialogPasswordInput.value = "";
+    el.rememberPasswordToggle.checked = false;
+    el.dialogRememberPasswordToggle.checked = false;
+    appendDebug("account", "Signed out and cleared local account session");
+    setAccountReady(false);
+    sendLogoutAccountSession()
+      .then(() => appendDebug("account", "Server account session cleared"))
+      .catch((error) => appendDebug("account-logout-error", error.message));
+    disconnectAll(options.message || t("account.signed_out", "Signed out. Sign in to continue."), {
+      forceLogin: options.forceLogin === true,
+      reason: options.reason || "logout"
+    });
+  }
+
+  function sendLogoutAccountSession() {
+    const body = JSON.stringify({ action: "logout" });
+    if (navigator.sendBeacon) {
+      const sent = navigator.sendBeacon(accountApiPath, new Blob([body], { type: "application/json" }));
+      if (sent) {
+        return Promise.resolve();
+      }
+    }
+
+    return fetch(accountApiPath, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body,
+      keepalive: true
+    }).then((response) => {
+      if (!response.ok) {
+        throw new Error(`logout API returned ${response.status}`);
+      }
+    });
   }
 
   function handleAccountIdentityChanged() {
@@ -3232,16 +4441,18 @@
         return;
       }
 
-      openAvatarCropDialog(dataUrl);
+      openAvatarCropDialog(dataUrl, { target: "account" });
     });
     reader.addEventListener("error", () => updateAccountStatus(t("avatar.read_failed", "Avatar could not be read.")));
     reader.readAsDataURL(file);
   }
 
-  function openAvatarCropDialog(dataUrl) {
+  function openAvatarCropDialog(dataUrl, options = {}) {
     const image = new Image();
     image.addEventListener("load", () => {
       state.avatarCrop.image = image;
+      state.avatarCrop.target = options.target || "account";
+      state.avatarCrop.conversationId = options.conversationId || null;
       resetAvatarCrop();
       el.avatarCropDialog.hidden = false;
       document.body.classList.add("modal-open");
@@ -3392,7 +4603,7 @@
     el.avatarCropCanvas.classList.remove("dragging");
   }
 
-  function applyAvatarCrop() {
+  async function applyAvatarCrop() {
     const image = state.avatarCrop.image;
     if (!image) {
       return;
@@ -3414,6 +4625,14 @@
     const sourceSize = Math.min(image.naturalWidth - sourceX, image.naturalHeight - sourceY, cropSize / state.avatarCrop.scale);
     context.drawImage(image, sourceX, sourceY, sourceSize, sourceSize, 0, 0, outputSize, outputSize);
     const dataUrl = canvas.toDataURL("image/jpeg", .9);
+    if (state.avatarCrop.target === "group") {
+      const conversation = state.conversations.find((item) => item.id === state.avatarCrop.conversationId) ?? null;
+      if (await setGroupAvatarFromCroppedCanvas(conversation, canvas)) {
+        closeAvatarCropDialog();
+      }
+      return;
+    }
+
     setAccountAvatarDataUrl(dataUrl);
     closeAvatarCropDialog();
   }
@@ -3436,6 +4655,8 @@
   function closeAvatarCropDialog() {
     el.avatarCropDialog.hidden = true;
     state.avatarCrop.image = null;
+    state.avatarCrop.target = "account";
+    state.avatarCrop.conversationId = null;
     endAvatarCropDrag();
     if (el.accountDialog.hidden) {
       document.body.classList.remove("modal-open");
@@ -3535,9 +4756,14 @@
       return t("account.database_loaded", "Server account loaded");
     }
 
-    return (localStorage.getItem(accountStorageKeyFor(state.sessionProfile)) || sessionStorage.getItem(accountStorageKeyFor(state.sessionProfile)))
+    return hasStoredAccountSession()
       ? t("account.server_session", "Server account session")
       : t("account.default_profile", "Default account profile");
+  }
+
+  function hasStoredAccountSession() {
+    const key = accountStorageKeyFor(state.sessionProfile);
+    return Boolean(localStorage.getItem(key) || sessionStorage.getItem(key));
   }
 
   function renderProvider() {
@@ -3560,6 +4786,7 @@
     const newsTab = panels.find((tab) => tab.id === "news");
     const supportTab = panels.find(isSupportTab);
     const historyTab = panels.find(isHistoryTab);
+    const archiveTab = panels.find(isArchiveTab);
     el.newsButton.hidden = !newsTab;
     el.newsButton.classList.toggle("selected", state.activeTabId === "news");
     el.supportButton.hidden = !supportTab;
@@ -3573,8 +4800,10 @@
     el.supportButton.classList.toggle("selected", Boolean(supportTab) && state.activeTabId === supportTab.id);
     el.historyButton.hidden = !historyTab;
     el.historyButton.classList.toggle("selected", state.activeTabId === "history");
+    el.archiveButton.hidden = !archiveTab;
+    el.archiveButton.classList.toggle("selected", state.activeTabId === "archive");
 
-    const tabs = panels.filter((tab) => tab.id !== "news" && !isSupportTab(tab) && !isHistoryTab(tab));
+    const tabs = panels.filter((tab) => tab.id !== "news" && !isSupportTab(tab) && !isHistoryTab(tab) && !isArchiveTab(tab));
     el.appTabs.replaceChildren();
     el.appTabs.hidden = tabs.length === 0;
     for (const tab of tabs) {
@@ -3597,6 +4826,7 @@
     return [
       ...(state.provider?.announcements ? [{ id: "news", title: t("tab.news", "News"), type: "builtin" }] : []),
       { id: "history", title: t("tab.history", "History"), type: "builtin" },
+      { id: "archive", title: t("tab.archive", "Archive"), type: "builtin" },
       ...providerTabs
     ];
   }
@@ -3609,6 +4839,10 @@
     return tab?.id === "history";
   }
 
+  function isArchiveTab(tab) {
+    return tab?.id === "archive";
+  }
+
   function activateSupportTab() {
     const supportTab = allTabs().find(isSupportTab);
     activateTab(supportTab?.id ?? "chat");
@@ -3619,6 +4853,8 @@
     renderTabs();
 
     if (tabId === "chat") {
+      document.body.classList.remove("history-page-active");
+      el.historyPage.hidden = true;
       el.messageTimeline.hidden = false;
       el.tabPanel.hidden = true;
       el.composerForm.hidden = false;
@@ -3631,10 +4867,25 @@
       return;
     }
 
+    document.body.classList.toggle("history-page-active", isHistoryTab(tab));
     el.messageTimeline.hidden = true;
-    el.tabPanel.hidden = false;
     el.composerForm.hidden = true;
+    el.historyPage.hidden = !isHistoryTab(tab);
+    el.tabPanel.hidden = isHistoryTab(tab);
+    if (isHistoryTab(tab)) {
+      renderHistoryPage(tab);
+      return;
+    }
     renderTabPanel(tab);
+  }
+
+  function renderHistoryPage(tab) {
+    el.historyPageTitle.textContent = t("history.title", "Total Conversation geschiedenis");
+    el.historyPageMeta.textContent = t("history.text", "Oproepen, gemiste oproepen en Total Conversation worden los van de gewone chat bewaard.");
+    el.historyPageBody.replaceChildren();
+    const card = createProviderCard();
+    renderHistoryTab(card, { includeIntro: false, includeSaveToggle: false });
+    el.historyPageBody.appendChild(card);
   }
 
   function renderTabPanel(tab) {
@@ -3664,6 +4915,8 @@
       renderNewsTab(card);
     } else if (tab.id === "history") {
       renderHistoryTab(card);
+    } else if (tab.id === "archive") {
+      renderArchiveTab(card);
     } else {
       card.appendChild(createTextBlock(tab.title, t("tab.builtin_text", "Built-in Teletyptel tab.")));
     }
@@ -3722,6 +4975,47 @@
       button.addEventListener("click", () => toggleBlockConversation(conversation));
 
       row.append(createAvatarElement(conversation, "avatar-list"), text, button);
+      section.appendChild(row);
+    }
+
+    card.appendChild(section);
+  }
+
+  function renderArchiveTab(card) {
+    card.appendChild(createTextBlock(t("tab.archive", "Archive"), t("archive.text", "Archived chats are hidden from the contact list until you open them again.")));
+
+    const section = document.createElement("div");
+    section.className = "archive-contact-list";
+    const entries = archivedConversationEntries();
+    if (!entries.length) {
+      const empty = document.createElement("p");
+      empty.className = "archive-contact-empty";
+      empty.textContent = t("archive.empty", "No archived chats.");
+      section.appendChild(empty);
+      card.appendChild(section);
+      return;
+    }
+
+    for (const conversation of entries) {
+      ensurePublicProfileForConversation(conversation);
+      const row = document.createElement("div");
+      row.className = "archive-contact-row";
+      row.appendChild(createAvatarElement(conversation, "avatar-list"));
+
+      const text = document.createElement("span");
+      text.className = "archive-contact-text";
+      const title = document.createElement("strong");
+      title.textContent = conversationDisplayName(conversation);
+      const meta = document.createElement("span");
+      meta.textContent = conversation.peer;
+      text.append(title, meta);
+
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = t("button.open_chat", "Open chat");
+      button.addEventListener("click", () => openArchivedConversation(conversation));
+
+      row.append(text, button);
       section.appendChild(row);
     }
 
@@ -3807,12 +5101,14 @@
     return label;
   }
 
-  function renderHistoryTab(card) {
+  function renderHistoryTab(card, options = {}) {
     card.classList.add("history-card");
-    card.appendChild(createTextBlock(
-      t("history.title", "Total Conversation geschiedenis"),
-      t("history.text", "Oproepen, gemiste oproepen en Total Conversation worden los van de gewone chat bewaard.")));
-    card.appendChild(createHistorySettingsPanel());
+    if (options.includeIntro !== false) {
+      card.appendChild(createTextBlock(
+        t("history.title", "Total Conversation geschiedenis"),
+        t("history.text", "Oproepen, gemiste oproepen en Total Conversation worden los van de gewone chat bewaard.")));
+    }
+    card.appendChild(createHistorySettingsPanel({ includeSaveToggle: options.includeSaveToggle !== false }));
 
     const layout = document.createElement("div");
     layout.className = "history-layout";
@@ -3826,21 +5122,24 @@
     card.appendChild(layout);
   }
 
-  function createHistorySettingsPanel() {
+  function createHistorySettingsPanel(options = {}) {
     const panel = document.createElement("section");
     panel.className = "history-settings";
-    const tcLabel = createHistoryToggle(
-      t("history.save_tc", "Total Conversation bewaren"),
-      state.historySettings.saveTotalConversation,
-      (checked) => {
-        state.historySettings.saveTotalConversation = checked;
-        saveHistorySettings();
-        refreshOpenTabPanel();
-      });
+    if (options.includeSaveToggle !== false) {
+      const tcLabel = createHistoryToggle(
+        t("history.save_tc", "Total Conversation bewaren"),
+        state.historySettings.saveTotalConversation,
+        (checked) => {
+          state.historySettings.saveTotalConversation = checked;
+          saveHistorySettings();
+          refreshOpenTabPanel();
+        });
+      panel.appendChild(tcLabel);
+    }
     const retention = document.createElement("label");
     retention.className = "history-retention";
     const retentionText = document.createElement("span");
-    retentionText.textContent = t("history.retention", "Bewaartermijn");
+    retentionText.textContent = t("history.retention", "Bewaartermijn max.");
     const select = document.createElement("select");
     for (const [value, label] of historyRetentionOptions()) {
       const option = document.createElement("option");
@@ -3855,8 +5154,40 @@
       refreshOpenTabPanel();
     });
     retention.append(retentionText, select);
-    panel.append(tcLabel, retention);
+    panel.appendChild(retention);
+    panel.appendChild(createHistoryPrivacyHelp());
     return panel;
+  }
+
+  function createHistoryPrivacyHelp() {
+    const wrapper = document.createElement("div");
+    wrapper.className = "history-privacy-help";
+
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "history-help-button";
+    button.textContent = "?";
+    button.setAttribute("aria-label", t("history.privacy_help_label", "AVG uitleg"));
+    button.addEventListener("click", openHistoryPrivacyDialog);
+
+    wrapper.appendChild(button);
+    return wrapper;
+  }
+
+  function openHistoryPrivacyDialog() {
+    el.historyPrivacyDialog.hidden = false;
+    document.body.classList.add("modal-open");
+  }
+
+  function closeHistoryPrivacyDialog() {
+    el.historyPrivacyDialog.hidden = true;
+    document.body.classList.remove("modal-open");
+  }
+
+  function closeHistoryPrivacyDialogOnBackdrop(event) {
+    if (event.target === el.historyPrivacyDialog) {
+      closeHistoryPrivacyDialog();
+    }
   }
 
   function createHistoryToggle(labelText, checked, onChange) {
@@ -3918,10 +5249,7 @@
       const meta = document.createElement("span");
       meta.className = "history-item-meta";
       meta.textContent = entry.meta;
-      const preview = document.createElement("span");
-      preview.className = "history-item-preview";
-      preview.textContent = entry.preview;
-      button.append(title, meta, preview);
+      button.append(title, meta);
       container.appendChild(button);
     }
   }
@@ -4184,7 +5512,7 @@
       [true, "XEP-0191", t("checklist.blocking", "Block and unblock contacts, with blocked chat, RTT and calls filtered")],
       [true, "XEP-0080", t("checklist.location", "Opt-in browser location sharing with XEP-0080 and PIDF-LO export")],
       [true, "XEP-0060", t("checklist.pubsub_news", "Provider news and announcements through PubSub")],
-      [true, "ProtoXEP RTT Sync", t("checklist.jingle_rtt_sync", "Jingle co-session real-time text datachannel with XEP-0301 fallback")],
+      [true, "XEP-0517", t("checklist.jingle_rtt_sync", "Jingle co-session real-time text datachannel with XEP-0301 fallback")],
       [false, "Roster", t("checklist.roster", "Replace demo contact list with real XMPP roster-backed contacts")],
       [false, "OMEMO", t("checklist.omemo", "Finish encryption sessions, trust model and interoperability smoke")],
       [false, "Mobile", t("checklist.mobile", "Android and iOS WebView packaging smoke tests")]
@@ -4737,11 +6065,7 @@
         return;
       }
 
-      if (kind === "xmpp") {
-        connectXmppWebSocket();
-      } else {
-        connectRelay();
-      }
+      connectXmppWebSocket();
     }, 1000);
     return true;
   }
@@ -4799,7 +6123,7 @@
 
   function connectRelay() {
     if (!state.accountReady || state.accountGateRequired) {
-      openAccountDialog({ required: true });
+      requestLoginRequired(t("account.start_required", "Sign in or create an account before Teletyptel opens."), { forceLogin: true });
       return;
     }
 
@@ -4870,7 +6194,11 @@
     });
   }
 
-  function disconnectAll() {
+  function disconnectAll(message = null, options = {}) {
+    if (message instanceof Event) {
+      message = null;
+    }
+
     state.intentionalDisconnect = true;
     clearTimeout(state.clientLifecycle.transientReconnectTimer);
     state.clientLifecycle.transientReconnectTimer = null;
@@ -4880,18 +6208,27 @@
       stopLocationSharing();
     }
 
+    sendFinalClientStateBeforeDisconnect(options.reason || "disconnect");
+
     if (state.relaySocket) {
-      sendPresence("offline");
       stopRelayHeartbeat();
       state.relaySocket.close();
     }
 
     closeXmppWebSocket();
     updateConnectButtonAvailability();
-    returnToLoginScreenAfterDisconnect();
+    returnToLoginScreenAfterDisconnect(message, options);
   }
 
-  function returnToLoginScreenAfterDisconnect(message) {
+  function sendFinalClientStateBeforeDisconnect(reason = "disconnect") {
+    const previousState = state.clientLifecycle.current;
+    state.clientLifecycle.current = "inactive";
+    flushClientLifecycleState(reason, true);
+    sendPresence("offline");
+    state.clientLifecycle.current = previousState;
+  }
+
+  function returnToLoginScreenAfterDisconnect(message, options = {}) {
     state.intentionalDisconnect = true;
     clearTimeout(state.clientLifecycle.transientReconnectTimer);
     state.clientLifecycle.transientReconnectTimer = null;
@@ -4924,9 +6261,7 @@
     renderConversations();
     renderActiveConversation();
     setConnectionStatus(t("status.disconnected", "Disconnected"), "warn");
-    setAccountGateRequired(true);
-    openAccountDialog({ required: true });
-    el.dialogAccountStatus.textContent = message || t("account.disconnected_login_required", "Connection closed. Sign in to continue.");
+    requestLoginRequired(message, options);
     updateConnectButtonAvailability();
   }
 
@@ -5003,6 +6338,9 @@
     const focusTarget = [
       el.contextProfileButton,
       el.contextRoomAvatarButton,
+      el.contextGroupManageButton,
+      el.contextArchiveButton,
+      el.contextMuteNotificationsButton,
       el.contextBlockButton
     ].find((button) => !button.hidden && !button.disabled) || menu;
     focusTarget.focus();
@@ -5035,6 +6373,30 @@
 
     closeConversationContextMenu();
     openContactProfileDialog(conversation);
+  }
+
+  function openActiveConversationAvatarProfile() {
+    const conversation = activeConversation();
+    if (canManageGroupConversation(conversation)) {
+      openGroupManagementDialog(conversation, { tab: canEditGroupDetails(conversation) ? "tools" : "members" });
+      return;
+    }
+
+    if (canViewContactProfile(conversation)) {
+      openContactProfileDialog(conversation);
+      return;
+    }
+
+    openAccountDialog({ mode: "profile" });
+  }
+
+  function handleActiveConversationAvatarKeydown(event) {
+    if (event.key !== "Enter" && event.key !== " ") {
+      return;
+    }
+
+    event.preventDefault();
+    openActiveConversationAvatarProfile();
   }
 
   function openContactProfileDialog(conversation) {
@@ -5135,13 +6497,50 @@
     return payload.ok && payload.profile ? payload.profile : null;
   }
 
-  function applyPublicProfileToConversation(conversation, profile) {
+  function ensurePublicProfileForConversation(conversation) {
+    const jid = bareJid(conversation?.peer || "");
+    if (!conversation || conversation.kind === "group" || !jid || isInfrastructurePeer(jid) || !state.account?.accountId) {
+      return;
+    }
+    if (conversation.publicProfileLoadedJid === jid || state.publicProfileRequests.has(jid)) {
+      return;
+    }
+    if (state.publicProfileCache.has(jid)) {
+      const cached = state.publicProfileCache.get(jid);
+      if (cached && conversation.publicProfileLoadedJid !== jid) {
+        applyPublicProfileToConversation(conversation, cached, { render: false });
+      }
+      return;
+    }
+
+    state.publicProfileRequests.add(jid);
+    loadPublicContactProfile(conversation)
+      .then((profile) => {
+        state.publicProfileCache.set(jid, profile || null);
+        if (profile) {
+          applyPublicProfileToConversation(conversation, profile);
+        }
+      })
+      .catch((error) => appendDebug("profile-avatar-error", error.message || String(error)))
+      .finally(() => state.publicProfileRequests.delete(jid));
+  }
+
+  function applyPublicProfileToConversation(conversation, profile, options = {}) {
     if (!conversation || !profile) {
       return;
     }
 
+    const profileJid = bareJid(profile.jid || conversation.peer || "");
+    if (profileJid) {
+      state.publicProfileCache.set(profileJid, profile);
+    }
     conversation.email = profile.email || conversation.email || "";
     conversation.phoneNumber = profile.phoneNumber || conversation.phoneNumber || "";
+    if (profile.displayName && shouldReplaceConversationNameWithProfile(conversation)) {
+      conversation.name = profile.displayName;
+      delete conversation.nameKey;
+    }
+
     if (isValidAvatarDataUrl(profile.avatarDataUrl)) {
       conversation.avatarDataUrl = profile.avatarDataUrl;
     }
@@ -5149,8 +6548,27 @@
     if (profile.avatarColor) {
       conversation.avatarColor = profile.avatarColor;
     }
+    conversation.publicProfileLoadedJid = profileJid || bareJid(conversation.peer || "");
 
-    renderConversations();
+    if (options.render !== false) {
+      renderConversations();
+      if (conversation.id === state.activeConversationId) {
+        renderActiveConversation();
+      }
+    }
+  }
+
+  function shouldReplaceConversationNameWithProfile(conversation) {
+    if (!conversation || conversation.kind === "group") {
+      return false;
+    }
+
+    const current = String(conversation.name || "").trim();
+    if (!current || current === conversation.peer) {
+      return true;
+    }
+
+    return current === fallbackDisplayNameForJid(conversation.peer);
   }
 
   function showMessageContextMenu(event, message, anchor = null) {
@@ -5253,7 +6671,7 @@
     }
 
     if (target.conversation.id !== state.activeConversationId) {
-      selectConversation(target.conversation.id);
+      selectConversation(target.conversation);
     }
     startMessageEdit(target.message.id);
   }
@@ -5956,17 +7374,15 @@
       openVideoRecorderDialog({ reset: false });
     }
     try {
-      let stream;
-      try {
-        stream = await navigator.mediaDevices.getUserMedia(createVideoMessageConstraints());
-      } catch {
-        stream = await navigator.mediaDevices.getUserMedia(createVideoMessageConstraints(true));
-      }
+      const stream = state.videoRecorder.previewStream || await requestVideoMessageStream();
+      state.videoRecorder.stream = stream;
 
       const mimeType = preferredVideoRecordingMimeType();
       const options = mimeType ? { mimeType } : undefined;
       const recorder = new MediaRecorder(stream, options);
-      state.videoRecorder.stream = stream;
+      if (state.videoRecorder.previewStream === stream) {
+        state.videoRecorder.previewStream = null;
+      }
       state.videoRecorder.recorder = recorder;
       state.videoRecorder.mimeType = recorder.mimeType || mimeType || "video/webm";
       state.videoRecorder.chunks = [];
@@ -6003,10 +7419,58 @@
       updateVideoRecordingTimer();
     } catch (error) {
       stopVideoStream();
+      stopVideoPreviewStream();
       updateVideoRecordingUi(false);
       updateVideoDialogActionButtons("setup");
       setConnectionStatus(`${t("video.record_failed", "Could not start video recording")}: ${error.message}`, "danger");
       appendDebug("video-record-error", error.message || String(error));
+    }
+  }
+
+  async function requestVideoMessageStream() {
+    try {
+      return await navigator.mediaDevices.getUserMedia(createVideoMessageConstraints());
+    } catch {
+      return await navigator.mediaDevices.getUserMedia(createVideoMessageConstraints(true));
+    }
+  }
+
+  async function startVideoDialogPreview() {
+    if (state.videoRecorder.blob || state.videoRecorder.objectUrl || state.videoRecorder.recorder?.state === "recording") {
+      return;
+    }
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setConnectionStatus(mediaAccessUnavailableMessage(), "danger");
+      return;
+    }
+
+    stopVideoPreviewStream();
+    try {
+      markMediaCaptureTransition("video-dialog-preview", 12000);
+      const stream = await requestVideoMessageStream();
+      if (el.videoPreviewDialog.hidden
+        || state.videoRecorder.blob
+        || state.videoRecorder.recorder?.state === "recording") {
+        stopStream(stream);
+        return;
+      }
+
+      state.videoRecorder.previewStream = stream;
+      el.videoPreviewDialogVideo.pause();
+      el.videoPreviewDialogVideo.removeAttribute("src");
+      el.videoPreviewDialogVideo.srcObject = stream;
+      el.videoPreviewDialogVideo.muted = true;
+      el.videoPreviewDialogVideo.defaultMuted = true;
+      el.videoPreviewDialogVideo.controls = false;
+      el.videoPreviewDialogVideo.autoplay = true;
+      el.videoPreviewDialogVideo.playsInline = true;
+      await el.videoPreviewDialogVideo.play?.();
+      await refreshMediaDevices(false);
+    } catch (error) {
+      stopVideoPreviewStream();
+      setConnectionStatus(`${t("media.preview_failed", "Preview failed")}: ${error.message}`, "danger");
+      appendDebug("video-dialog-preview-error", error.message || String(error));
     }
   }
 
@@ -6124,7 +7588,6 @@
 
     clearRecordedVideoMessage();
     openVideoRecorderDialog({ reset: false });
-    await startVideoRecording();
   }
 
   function cancelVideoMessage() {
@@ -6141,6 +7604,7 @@
   function clearRecordedVideoMessage() {
     clearVideoTimer();
     stopVideoStream();
+    stopVideoPreviewStream();
     if (state.videoRecorder.objectUrl) {
       URL.revokeObjectURL(state.videoRecorder.objectUrl);
     }
@@ -6181,6 +7645,16 @@
     el.videoMessageButton.classList.toggle("recording", recording);
     el.videoMessageButton.setAttribute("aria-pressed", recording ? "true" : "false");
     el.videoRecorderQualityInput.disabled = recording;
+    if (el.videoRecorderQualityButton) {
+      el.videoRecorderQualityButton.disabled = recording;
+    }
+    if (el.videoRecorderCameraButton) {
+      el.videoRecorderCameraButton.disabled = recording;
+    }
+    if (recording) {
+      closeVideoRecorderQualityMenu();
+      closeVideoRecorderCameraMenu();
+    }
     const icon = el.videoMessageButton.querySelector("[data-icon]");
     if (icon) {
       icon.dataset.icon = recording ? "videocamOff" : "videocam";
@@ -6325,6 +7799,13 @@
       stopStream(state.videoRecorder.stream);
     }
     state.videoRecorder.stream = null;
+  }
+
+  function stopVideoPreviewStream() {
+    if (state.videoRecorder.previewStream) {
+      stopStream(state.videoRecorder.previewStream);
+    }
+    state.videoRecorder.previewStream = null;
   }
 
   function preferredVoiceRecordingMimeType() {
@@ -6501,7 +7982,7 @@
     }
 
     state.intentionalDisconnect = false;
-    const url = normalizeXmppWebSocketUrl(normalizeLocalWebSocketUrlForCurrentHost(el.xmppUrlInput.value.trim(), 8787));
+    const url = normalizeXmppWebSocketUrl(normalizeLocalXmppWebSocketUrlForCurrentHost(el.xmppUrlInput.value.trim()));
     el.xmppUrlInput.value = url;
     const socket = new WebSocket(url, "xmpp");
     state.xmppSocket = socket;
@@ -6715,7 +8196,7 @@
     const password = state.account?.password || el.passwordInput.value || "";
     if (!password) {
       setConnectionStatus(t("account.password_required", "Enter a password for a real server account."), "danger");
-      returnToLoginScreenAfterDisconnect(t("account.password_required", "Enter a password for a real server account."));
+      returnToLoginScreenAfterDisconnect(t("account.password_required", "Enter a password for a real server account."), { openLogin: false });
       closeXmppWebSocket();
       return;
     }
@@ -6781,14 +8262,46 @@
       return;
     }
 
+    state.xmppAuthRefreshAttempted = false;
     state.xmppSession.phase = "ready";
-    const presence = '<presence xmlns="jabber:client"/>';
-    sendXmppStanza(presence);
+    state.xmppPresenceSubscriptionRequests.clear();
+    setAllContactPresence("offline");
+    sendPresence("online");
+    requestXmppRoster();
+    syncXmppContactPresenceSubscriptions();
+    for (const conversation of state.conversations) {
+      if (conversation.kind === "group") {
+        conversation.mucJoined = false;
+      }
+    }
+    joinActiveXmppGroupConversation();
     startXmppHeartbeat();
     flushClientLifecycleState("xmpp-ready", true);
     setConnectionStatus(t("status.xmpp_connected", "XMPP connected"), "good");
     updateComposerAvailability();
     syncXmppMamArchive("xmpp-ready");
+  }
+
+  function syncXmppContactPresenceSubscriptions() {
+    if (state.mode !== "xmpp" || state.xmppSocket?.readyState !== WebSocket.OPEN || !state.xmppSession?.authenticated) {
+      return;
+    }
+
+    for (const conversation of state.conversations) {
+      if (conversation.kind === "contact" && !isOwnContact(conversation) && !isBlockedConversation(conversation)) {
+        sendXmppPresenceSubscription(conversation.peer);
+      }
+    }
+  }
+
+  function requestXmppRoster() {
+    if (state.mode !== "xmpp" || state.xmppSocket?.readyState !== WebSocket.OPEN || !state.xmppSession?.authenticated) {
+      return false;
+    }
+
+    const id = createMessageId("roster");
+    const xml = `<iq xmlns="jabber:client" type="get" id="${escapeXml(id)}"><query xmlns="${xmppRosterNamespace}"/></iq>`;
+    return sendXmppStanza(xml, `<iq type="get" id="${id}"><query xmlns="${xmppRosterNamespace}"/></iq>`);
   }
 
   function syncXmppMamArchive(reason = "manual") {
@@ -6806,6 +8319,7 @@
 
     state.xmppMam.pending = true;
     state.xmppMam.lastStartedAt = now;
+    state.xmppMam.resultCount = 0;
     const id = createMessageId("mam");
     const queryId = createMessageId("mamq");
     const xml = createXmppMamQueryStanza(id, queryId, { max: 200 });
@@ -6817,6 +8331,7 @@
       }
       state.xmppMam.pending = false;
       appendDebug("xmpp-mam", "query timeout or unsupported");
+      reloadLocalHistoryAfterEmptyMam("timeout");
     }, 8000);
     return sendXmppStanza(xml, `<iq type="set" id="${id}"><query xmlns="${xmppMamNamespace}" queryid="${queryId}">...</query></iq>`);
   }
@@ -6849,6 +8364,12 @@
     return btoa(binary);
   }
 
+  function utf8FromBase64(value) {
+    const binary = atob(String(value || ""));
+    const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+    return new TextDecoder().decode(bytes);
+  }
+
   function closeXmppWebSocket() {
     if (!state.xmppSocket) {
       return;
@@ -6867,7 +8388,7 @@
   function handleXmppIncomingFrame(xmlText) {
     const text = String(xmlText ?? "");
     handleXmppSessionFrame(text);
-    if (!text.includes("<message")) {
+    if (!text.includes("<message") && !text.includes("<presence") && !text.includes("<iq")) {
       return;
     }
 
@@ -6882,6 +8403,18 @@
       return;
     }
 
+    const presences = Array.from(doc.documentElement?.children || [])
+      .filter((element) => element.localName === "presence" && element.namespaceURI === "jabber:client");
+    for (const presence of presences) {
+      handleXmppPresenceElement(presence);
+    }
+
+    const iqs = Array.from(doc.documentElement?.children || [])
+      .filter((element) => element.localName === "iq" && element.namespaceURI === "jabber:client");
+    for (const iq of iqs) {
+      handleXmppIqElement(iq);
+    }
+
     const messages = Array.from(doc.documentElement?.children || [])
       .filter((element) => element.localName === "message" && element.namespaceURI === "jabber:client");
     for (const message of messages) {
@@ -6889,17 +8422,31 @@
         continue;
       }
 
+      const type = message.getAttribute("type") || "chat";
       const from = message.getAttribute("from") || "";
-      if (!from || isOwnPeer(from)) {
+      const fromPeer = isXmppGroupchatType(type) ? from : bareJid(from);
+      if (!fromPeer || (!isXmppGroupchatType(type) && isOwnPeer(fromPeer))) {
         continue;
       }
 
-      const conversation = ensureConversationForPeer(from, "contact", displayNameForJid(from));
+      if (handleXmppJingleSignalMessage(message, from)) {
+        continue;
+      }
+
+      const conversationPeer = isXmppGroupchatType(type) ? bareJid(from) : fromPeer;
+      const conversationKind = isXmppGroupchatType(type) ? "group" : "contact";
+      const conversation = ensureConversationForPeer(conversationPeer, conversationKind, displayNameForJid(conversationPeer));
       if (!conversation) {
         continue;
       }
 
-      conversation.presence = "online";
+      const bodyElement = message.getElementsByTagNameNS("jabber:client", "body")[0];
+      const rttElement = message.getElementsByTagNameNS("urn:xmpp:rtt:0", "rtt")[0];
+      if (rttElement && !bodyElement) {
+        handleXmppRttMessage(conversation, message, rttElement, from, type);
+        continue;
+      }
+
       const receiptElement = message.getElementsByTagNameNS("urn:xmpp:receipts", "received")[0];
       if (receiptElement) {
         const receiptId = receiptElement.getAttribute("id") || "";
@@ -6948,7 +8495,6 @@
         continue;
       }
 
-      const bodyElement = message.getElementsByTagNameNS("jabber:client", "body")[0];
       if (!bodyElement) {
         continue;
       }
@@ -6957,10 +8503,23 @@
       const replaceId = replaceElement?.getAttribute("id") || "";
       const messageId = stableXmppMessageId(message);
       const stylingDisabled = Boolean(message.getElementsByTagNameNS("urn:xmpp:styling:0", "unstyled")[0]);
-      sendXmppMessageAcknowledgements(from, messageId, Boolean(message.getElementsByTagNameNS("urn:xmpp:receipts", "request")[0]));
+      if (isXmppOwnGroupchatEcho(from, type)) {
+        continue;
+      }
+
+      if (!isXmppGroupchatType(type)) {
+        sendXmppMessageAcknowledgements(from, messageId, Boolean(message.getElementsByTagNameNS("urn:xmpp:receipts", "request")[0]));
+      }
       if (replaceId) {
         applyMessageCorrection(conversation, replaceId, bodyElement.textContent || "", "peer", messageId, from, stylingDisabled);
       } else {
+        const existingMessage = findConversationMessageByAnyId(conversation, messageId);
+        if (existingMessage) {
+          setMessageXmppIdentifiers(existingMessage, xmppMessageIdentifiers(message));
+          appendDebug("xmpp-message-skip", `duplicate ${messageId} from ${from}`);
+          clearRemoteDraftForConversation(conversation, from);
+          continue;
+        }
         const addedMessage = addMessage("peer", bodyElement.textContent || "", "received", from, null, conversation.id, null, messageId, stylingDisabled);
         setMessageXmppIdentifiers(addedMessage, xmppMessageIdentifiers(message));
         if (addedMessage) {
@@ -6977,7 +8536,67 @@
           }
         }
       }
+      clearRemoteDraftForConversation(conversation, from);
     }
+  }
+
+  function handleXmppRttMessage(conversation, message, rttElement, from, type) {
+    if (!shouldAcceptXmppRttMessage(conversation, message, from, type)) {
+      return;
+    }
+
+    const messageId = stableXmppMessageId(message);
+    if (isOutgoingXmppRttEcho(messageId)) {
+      appendDebug("xmpp-rtt-skip", `duplicate ${messageId} from ${from}`);
+      return;
+    }
+
+    const nextRemoteText = applyXmppRttElement(conversation.remoteText || "", rttElement);
+    conversation.remoteText = nextRemoteText;
+    conversation.remoteFrom = from;
+    conversation.remoteDraftUpdatedAt = new Date();
+    conversation.clientState = "active";
+    conversation.clientStateUpdatedAt = new Date();
+    appendDebug("xmpp-rtt-in", `<rtt from="${escapeXml(from)}" seq="${escapeXml(rttElement.getAttribute("seq") || "")}"/>`);
+    recordTotalConversationTextForConversation(conversation, "peer", conversation.remoteText, conversation.remoteFrom);
+    updateRemoteDraftMessage(conversation.id);
+    updateTotalConversationTextPanel(conversation);
+  }
+
+  function shouldAcceptXmppRttMessage(conversation, message, from, type) {
+    if (!conversation || !from || isOwnPeer(from) || isXmppOwnGroupchatEcho(from, type)) {
+      return false;
+    }
+
+    if (isXmppGroupchatType(type)) {
+      return addressMatches(bareJid(from), conversation.peer);
+    }
+
+    const to = message?.getAttribute("to") || "";
+    return Boolean(to)
+      && addressMatches(from, conversation.peer)
+      && addressMatches(to, currentBareJid());
+  }
+
+  function rememberOutgoingXmppRttId(id) {
+    if (!id) {
+      return;
+    }
+
+    state.outgoingXmppRttIds.add(id);
+    while (state.outgoingXmppRttIds.size > 80) {
+      const oldest = state.outgoingXmppRttIds.values().next().value;
+      state.outgoingXmppRttIds.delete(oldest);
+    }
+  }
+
+  function isOutgoingXmppRttEcho(id) {
+    if (!id || !state.outgoingXmppRttIds.has(id)) {
+      return false;
+    }
+
+    state.outgoingXmppRttIds.delete(id);
+    return true;
   }
 
   function handleXmppMamResultMessage(message) {
@@ -6993,16 +8612,55 @@
       return true;
     }
 
-    restoreXmppMamArchivedMessage(archivedMessage, result, forwarded);
+    if (restoreXmppMamArchivedMessage(archivedMessage, result, forwarded)) {
+      state.xmppMam.resultCount += 1;
+    }
     return true;
+  }
+
+  function handleXmppJingleSignalMessage(message, from) {
+    const signal = message.getElementsByTagNameNS(teletyptelJingleSignalNamespace, "signal")[0];
+    if (!signal) {
+      return false;
+    }
+
+    const envelope = decodeXmppJingleSignal(signal);
+    if (!envelope) {
+      appendDebug("jingle-xmpp-error", "Invalid XMPP Jingle signal payload");
+      return true;
+    }
+
+    if (envelope.clientId && envelope.clientId === state.clientInstance.id) {
+      appendDebug("jingle-xmpp-skip", "Ignored own XMPP Jingle signal echo");
+      return true;
+    }
+
+    envelope.type = "jingle";
+    envelope.from = envelope.from || from;
+    envelope.to = envelope.to || currentFromJid();
+    if (isXmppGroupchatType(message.getAttribute("type"))) {
+      envelope.conversationKind = "group";
+      envelope.roomJid = envelope.roomJid || bareJid(from);
+    }
+    appendDebug("jingle-xmpp-in", `${envelope.action || "jingle"} sid=${envelope.sid || "-"} from=${bareJid(from)}`);
+    handleJingleEnvelope(envelope);
+    return true;
+  }
+
+  function decodeXmppJingleSignal(signal) {
+    try {
+      return JSON.parse(utf8FromBase64(signal.textContent || ""));
+    } catch {
+      return null;
+    }
   }
 
   function restoreXmppMamArchivedMessage(message, result, forwarded) {
     const type = message.getAttribute("type") || "chat";
     const from = message.getAttribute("from") || "";
     const to = message.getAttribute("to") || "";
-    const direction = isOwnPeer(from) ? "self" : "peer";
-    const peer = type === "groupchat"
+    const direction = isOwnPeer(from) || isXmppOwnGroupchatEcho(from, type) ? "self" : "peer";
+    const peer = isXmppGroupchatType(type)
       ? bareJid(from)
       : direction === "self"
         ? bareJid(to)
@@ -7060,6 +8718,7 @@
     if (timestamp) {
       added.timestamp = timestamp;
     }
+    persistHistoryMessage(conversation, added);
     appendDebug("xmpp-mam", `${conversation.peer} ${direction} ${messageId || result.getAttribute("id") || "-"}`);
     renderConversations();
     if (conversation.id === state.activeConversationId) {
@@ -7311,6 +8970,10 @@
     if (failure) {
       setConnectionStatus(t("status.xmpp_auth_failed", "XMPP authentication failed"), "danger");
       appendDebug("xmpp-auth", failure.textContent || "failed");
+      if (refreshDatabaseAccountAfterXmppAuthFailure()) {
+        return;
+      }
+
       returnToLoginScreenAfterDisconnect(t("account.invalid_credentials", "The server rejected this email or password."));
       closeXmppWebSocket();
       return;
@@ -7336,8 +8999,25 @@
     window.clearTimeout(state.xmppMam.timerId);
     state.xmppMam.timerId = null;
     appendDebug("xmpp-mam", `fin complete=${fin.getAttribute("complete") || "false"}`);
+    if (state.xmppMam.resultCount === 0) {
+      reloadLocalHistoryAfterEmptyMam("empty");
+    }
     syncAllConversationMessageState("mam-load");
     return true;
+  }
+
+  function reloadLocalHistoryAfterEmptyMam(reason) {
+    if (state.xmppMam.fallbackHistoryReloaded) {
+      return;
+    }
+
+    state.xmppMam.fallbackHistoryReloaded = true;
+    appendDebug("xmpp-mam", `no archive messages (${reason}); reloading local history fallback`);
+    loadMessageHistory().then((loaded) => {
+      if (loaded) {
+        appendDebug("history", "Local history fallback restored after empty MAM.");
+      }
+    }).catch((error) => appendDebug("history-error", error.message || String(error)));
   }
 
   function handleXmppFeatures(features) {
@@ -7490,17 +9170,24 @@
     const edit = activeEditTarget();
     const outgoingId = createMessageId(edit ? "edit" : "msg");
     if (state.mode === "xmpp" && state.xmppSocket?.readyState === WebSocket.OPEN && state.xmppSession?.authenticated) {
-      const xml = createMessageStanza(text, outgoingId, edit?.replaceId ?? null);
+      const conversation = activeConversation();
+      joinXmppGroupConversation(conversation);
+      const messageType = conversation?.kind === "group" ? "groupchat" : "chat";
+      const xml = createMessageStanza(text, outgoingId, edit?.replaceId ?? null, false, currentToJid(), "", messageType);
       sendXmppStanza(xml);
       if (edit) {
         applyMessageCorrection(edit.conversation, edit.replaceId, text, "self", outgoingId);
         clearMessageEdit();
       } else {
+        clearLocalRttDraftMessage();
         addMessage("self", text, "RFC 7395", null, null, null, null, outgoingId, false, true, null, "sent");
       }
       el.messageInput.value = "";
       syncComposerActionButtons();
       state.previousText = "";
+      state.sequence = 0;
+      clearLocalRttDraftMessage();
+      updateTotalConversationTextPanel();
       return;
     }
 
@@ -7515,6 +9202,8 @@
   }
 
   function handleComposerInput() {
+    updateLocalRttDraftMessage();
+    updateTotalConversationTextPanel();
     sendRttEdit();
     syncComposerActionButtons();
   }
@@ -7597,7 +9286,7 @@
       return;
     }
 
-    if (!activeJingleRttSyncCall() && !isRelayConnected()) {
+    if (!activeJingleRttSyncCall() && !isRelayConnected() && !isXmppRttConnected()) {
       showNotConnectedStatus();
       return;
     }
@@ -7609,17 +9298,19 @@
     if (sendJingleRttSyncPacket("reset", el.messageInput.value)) {
       return;
     }
+    if (sendXmppRttPacket("reset", el.messageInput.value)) {
+      return;
+    }
     sendRttPacket("reset", el.messageInput.value);
   }
 
   function sendRttEdit() {
     if (!hasActiveConversation() || !el.rttToggle.checked) {
-      clearLocalRttDraftMessage();
       return;
     }
 
     const hasJingleRtt = Boolean(activeJingleRttSyncCall());
-    if (!hasJingleRtt && state.mode !== "relay") {
+    if (!hasJingleRtt && state.mode !== "relay" && !isXmppRttConnected()) {
       return;
     }
 
@@ -7627,12 +9318,46 @@
     const previousText = state.previousText;
     const actions = createDeltaActions(previousText, text);
     state.previousText = text;
-    updateLocalRttDraftMessage();
-    updateTotalConversationTextPanel();
     if (sendJingleRttSyncPacket("edit", text, { actions, previousText })) {
       return;
     }
+    if (sendXmppRttPacket("edit", text)) {
+      return;
+    }
     sendRttPacket("edit", text, actions);
+  }
+
+  function isXmppRttConnected() {
+    return state.mode === "xmpp"
+      && state.xmppSocket?.readyState === WebSocket.OPEN
+      && state.xmppSession?.authenticated;
+  }
+
+  function sendXmppRttPacket(eventName, text) {
+    if (!isXmppRttConnected() || !hasActiveConversation() || !el.rttToggle.checked || isActiveConversationBlocked()) {
+      return false;
+    }
+
+    const conversation = activeConversation();
+    joinXmppGroupConversation(conversation);
+    const messageType = conversation?.kind === "group" ? "groupchat" : "chat";
+    const toJid = currentToJid();
+    if (!isXmppGroupchatType(messageType) && (!toJid || isOwnPeer(toJid))) {
+      appendDebug("xmpp-rtt-skip", `invalid to=${toJid || "-"}`);
+      return false;
+    }
+
+    const rttEvent = eventName === "edit" ? "reset" : eventName;
+    const actions = `<t p="0">${escapeXml(text)}</t>`;
+    const rttXml = `<rtt xmlns="urn:xmpp:rtt:0" event="${escapeXml(rttEvent)}" seq="${state.sequence++}">${actions}</rtt>`;
+    const outgoingId = createMessageId("rtt");
+    const xml = createXmppRttStanza(rttXml, toJid, messageType, outgoingId);
+    const sent = sendXmppStanza(xml, `<message type="${messageType}" rtt="${escapeXml(eventName)}"/>`);
+    if (sent) {
+      rememberOutgoingXmppRttId(outgoingId);
+      recordTotalConversationTextForConversation(conversation, "self", text, currentFromJid());
+    }
+    return sent;
   }
 
   function sendRttPacket(eventName, text, actions = null) {
@@ -7671,16 +9396,85 @@
   }
 
   function sendPresence(presence, options = {}) {
-    if (!isRelayConnected()) {
-      return;
+    const normalizedPresence = presence === "offline" ? "offline" : "online";
+    const notificationState = normalizedPresence === "online" && state.doNotDisturb ? "dnd" : "available";
+    if (isRelayConnected()) {
+      const envelope = createRelayEnvelope("presence", "", "", "relay@localhost");
+      envelope.presence = normalizedPresence;
+      envelope.notificationState = notificationState;
+      envelope.probe = options.probe === true;
+      envelope.responseTo = options.responseTo || null;
+      state.relaySocket.send(JSON.stringify(envelope));
+      appendDebug("presence-out", `${envelope.presence}/${notificationState} ${envelope.probe ? "probe" : "announce"}`);
     }
 
-    const envelope = createRelayEnvelope("presence", "", "", "relay@localhost");
-    envelope.presence = presence === "offline" ? "offline" : "online";
-    envelope.probe = options.probe === true;
-    envelope.responseTo = options.responseTo || null;
-    state.relaySocket.send(JSON.stringify(envelope));
-    appendDebug("presence-out", `${envelope.presence} ${envelope.probe ? "probe" : "announce"}`);
+    if (state.xmppSocket?.readyState === WebSocket.OPEN && state.xmppSession?.authenticated) {
+      sendXmppStanza(createXmppPresenceStanza(normalizedPresence, notificationState), `<presence ${normalizedPresence}/${notificationState}/>`);
+    }
+  }
+
+  function createXmppPresenceStanza(presence, notificationState) {
+    if (presence === "offline") {
+      return '<presence xmlns="jabber:client" type="unavailable"/>';
+    }
+
+    const show = notificationState === "dnd" ? "<show>dnd</show>" : "";
+    const status = notificationState === "dnd"
+      ? `<status>${escapeXml(t("presence.do_not_disturb", "Do not disturb"))}</status>`
+      : "";
+    return `<presence xmlns="jabber:client">${show}${status}</presence>`;
+  }
+
+  function createXmppDirectedPresenceStanza(to, options = {}) {
+    const attrs = [`to="${escapeXml(to)}"`];
+    if (options.type) {
+      attrs.push(`type="${escapeXml(options.type)}"`);
+    }
+
+    return `<presence xmlns="jabber:client" ${attrs.join(" ")}/>`;
+  }
+
+  function createXmppDirectedAvailablePresenceStanza(to, notificationState) {
+    const show = notificationState === "dnd" ? "<show>dnd</show>" : "";
+    const status = notificationState === "dnd"
+      ? `<status>${escapeXml(t("presence.do_not_disturb", "Do not disturb"))}</status>`
+      : "";
+    return `<presence xmlns="jabber:client" to="${escapeXml(to)}">${show}${status}</presence>`;
+  }
+
+  function sendXmppPresenceProbe(to) {
+    const peer = bareJid(to || "");
+    if (!peer || isOwnPeer(peer) || isInfrastructurePeer(peer)) {
+      return false;
+    }
+
+    return sendXmppStanza(
+      createXmppDirectedPresenceStanza(peer, { type: "probe" }),
+      `<presence type="probe" to="${escapeXml(peer)}"/>`);
+  }
+
+  function sendXmppPresenceSubscription(to) {
+    const peer = bareJid(to || "");
+    if (!peer || isOwnPeer(peer) || isInfrastructurePeer(peer) || state.xmppPresenceSubscriptionRequests.has(peer)) {
+      return false;
+    }
+
+    state.xmppPresenceSubscriptionRequests.add(peer);
+    sendXmppPresenceProbe(peer);
+    return sendXmppStanza(
+      createXmppDirectedPresenceStanza(peer, { type: "subscribe" }),
+      `<presence type="subscribe" to="${escapeXml(peer)}"/>`);
+  }
+
+  function sendXmppPresenceSubscribed(to) {
+    const peer = bareJid(to || "");
+    if (!peer || isOwnPeer(peer) || isInfrastructurePeer(peer)) {
+      return false;
+    }
+
+    return sendXmppStanza(
+      createXmppDirectedPresenceStanza(peer, { type: "subscribed" }),
+      `<presence type="subscribed" to="${escapeXml(peer)}"/>`);
   }
 
   function currentSenderName() {
@@ -7732,14 +9526,18 @@
     }
 
     container.replaceChildren();
-    const { dataUrl, color, initials } = avatarVisual(source);
+    const { imageSrc, color, initials } = avatarVisual(source);
     container.style.setProperty("--avatar-bg", color);
     container.title = source?.displayName || source?.name || source?.peer || initials;
-    if (dataUrl) {
+    if (imageSrc) {
       const image = document.createElement("img");
-      image.src = dataUrl;
+      image.src = imageSrc;
       image.alt = "";
       image.decoding = "async";
+      image.addEventListener("error", () => {
+        container.replaceChildren();
+        container.textContent = initials;
+      }, { once: true });
       container.appendChild(image);
       return;
     }
@@ -7758,10 +9556,10 @@
   function avatarVisual(source) {
     const name = source?.displayName || (source ? conversationDisplayName(source) : "") || source?.name || source?.peer || "TX";
     const avatarDataUrl = source?.avatarDataUrl || source?.roomAvatarDataUrl || "";
-    const dataUrl = isValidAvatarDataUrl(avatarDataUrl) ? avatarDataUrl : "";
+    const imageSrc = isValidAvatarImageSource(avatarDataUrl) ? avatarDataUrl : "";
     const color = normalizeAvatarColor(source?.avatarColor || avatarColorFor(`${name}:${source?.peer ?? ""}`));
     return {
-      dataUrl,
+      imageSrc,
       color,
       initials: avatarInitials(name)
     };
@@ -7931,6 +9729,14 @@
     return text.length <= avatarMaxBytes * 2 && /^data:image\/(?:png|jpeg|jpg|gif|webp|svg\+xml);base64,/i.test(text);
   }
 
+  function isValidAvatarFileUrl(value) {
+    return /^api\/file\.php\?id=[a-f0-9]{32}$/i.test(String(value || "").trim());
+  }
+
+  function isValidAvatarImageSource(value) {
+    return isValidAvatarDataUrl(value) || isValidAvatarFileUrl(value);
+  }
+
   function isAvatarSourceDataUrl(value) {
     const text = String(value || "");
     return text.length <= avatarSourceMaxBytes * 2 && /^data:image\/(?:png|jpeg|jpg|gif|webp|svg\+xml);base64,/i.test(text);
@@ -7977,7 +9783,60 @@
       return conversation.peer;
     }
 
-    return el.peerInput.value.trim() || "relay@localhost";
+    return el.peerInput.value.trim() || "tester@localhost";
+  }
+
+  function xmppMucNickname() {
+    const from = bareJid(currentFromJid());
+    return sanitizeXmppResource(currentSenderName())
+      || sanitizeXmppResource(from.split("@")[0])
+      || `web-${state.clientInstance.resourceSuffix}`;
+  }
+
+  function sanitizeXmppResource(value) {
+    return String(value || "")
+      .trim()
+      .replace(/[<>&"']/g, "")
+      .replace(/\s+/g, "-")
+      .slice(0, 48);
+  }
+
+  function resourceFromJid(jid) {
+    const value = String(jid || "");
+    return value.includes("/") ? value.split("/").slice(1).join("/") : "";
+  }
+
+  function isXmppGroupchatType(type) {
+    return String(type || "").toLowerCase() === "groupchat";
+  }
+
+  function isXmppOwnGroupchatEcho(from, type) {
+    return isXmppGroupchatType(type) && resourceFromJid(from).toLowerCase() === xmppMucNickname().toLowerCase();
+  }
+
+  function joinActiveXmppGroupConversation() {
+    joinXmppGroupConversation(activeConversation());
+  }
+
+  function joinXmppGroupConversation(conversation) {
+    if (conversation?.kind !== "group"
+      || state.mode !== "xmpp"
+      || state.xmppSocket?.readyState !== WebSocket.OPEN
+      || !state.xmppSession?.authenticated
+      || conversation.mucJoined) {
+      return false;
+    }
+
+    const room = bareJid(conversation.peer);
+    if (!room) {
+      return false;
+    }
+
+    const occupant = `${room}/${xmppMucNickname()}`;
+    const xml = `<presence xmlns="jabber:client" to="${escapeXml(occupant)}"><x xmlns="http://jabber.org/protocol/muc"><history maxchars="0"/></x></presence>`;
+    const sent = sendXmppStanza(xml, `<presence to="${escapeXml(room)}/..." muc="join"/>`);
+    conversation.mucJoined = sent || conversation.mucJoined;
+    return sent;
   }
 
   function envelopeFrom(envelope) {
@@ -8011,10 +9870,39 @@
       return conversationDisplayName(known);
     }
 
+    return fallbackDisplayNameForJid(normalized);
+  }
+
+  function fallbackDisplayNameForJid(jid) {
+    const normalized = normalizeJidInput(jid);
+    const bare = bareJid(normalized);
     const local = bare.split("@")[0] || normalized;
     const resource = normalized.includes("/") ? normalized.split("/").slice(1).join("/") : "";
     const generatedWebResource = /^web(?:-[a-z0-9]+)?$/i.test(resource);
     return resource && !generatedWebResource ? `${local}/${resource}` : local;
+  }
+
+  function remoteDraftDisplayName(conversation) {
+    if (!conversation) {
+      return "Remote";
+    }
+
+    const from = conversation.remoteFrom || conversation.peer;
+    if (conversation.kind !== "group") {
+      return conversation.remoteIdentity?.displayName || displayNameForJid(from);
+    }
+
+    const occupant = resourceFromJid(from);
+    if (occupant) {
+      const known = knownGroupMembers(conversation).find((member) =>
+        member.name && (
+          member.name.toLowerCase() === occupant.toLowerCase()
+          || bareJid(member.jid).split("@")[0].toLowerCase() === occupant.toLowerCase()
+        ));
+      return known?.name || occupant;
+    }
+
+    return conversation.remoteIdentity?.displayName || displayNameForJid(from);
   }
 
   function applyRelayEnvelope(envelope) {
@@ -8093,10 +9981,8 @@
       }
 
       applyEnvelopeIdentity(conversation, envelope);
-      conversation.remoteText = "";
-      conversation.remoteFrom = envelopeFrom(envelope);
+      const messageFrom = envelopeFrom(envelope);
       conversation.remoteIdentity = mergeMessageIdentity(conversation.remoteIdentity, envelopeMessageIdentity(envelope));
-      conversation.remoteDraftUpdatedAt = null;
       conversation.clientState = "active";
       conversation.clientStateUpdatedAt = new Date();
       setPeerPresence(conversation.peer, "online");
@@ -8126,6 +10012,7 @@
           true,
           envelopeMessageIdentity(envelope));
       }
+      clearRemoteDraftForConversation(conversation, messageFrom);
       return;
     }
 
@@ -8161,10 +10048,15 @@
     applyEnvelopeIdentity(conversation, envelope);
 
     conversation.presence = presence;
+    conversation.clientState = envelope.notificationState === "dnd" ? "dnd" : conversation.clientState;
+    conversation.clientStateUpdatedAt = envelope.notificationState === "dnd" ? new Date() : conversation.clientStateUpdatedAt;
     if (presence === "offline") {
       conversation.clientState = null;
       conversation.clientStateUpdatedAt = null;
       conversation.lastSeenAt = new Date();
+    } else if (envelope.notificationState !== "dnd" && conversation.clientState === "dnd") {
+      conversation.clientState = "active";
+      conversation.clientStateUpdatedAt = new Date();
     }
     renderConversations();
     renderActiveConversation();
@@ -8180,7 +10072,9 @@
       return;
     }
 
-    const clientState = envelope.clientState === "inactive" ? "inactive" : "active";
+    const clientState = envelope.notificationState === "dnd"
+      ? "dnd"
+      : (envelope.clientState === "inactive" ? "inactive" : "active");
     const conversation = ensureConversationForPeer(from, "contact", envelope.displayName || displayNameForJid(from));
     if (!conversation) {
       return;
@@ -8502,7 +10396,7 @@
     const visibleDevices = devices.filter((device) => shouldShowMediaDeviceOption(device, devices));
     select.replaceChildren(new Option(defaultLabel, ""));
     visibleDevices.forEach((device, index) => {
-      select.appendChild(new Option(device.label || `${fallbackLabel} ${index + 1}`, device.deviceId));
+      select.appendChild(new Option(cleanMediaDeviceLabel(device.label) || `${fallbackLabel} ${index + 1}`, device.deviceId));
     });
 
     select.value = visibleDevices.some((device) => device.deviceId === selectedValue)
@@ -8525,6 +10419,8 @@
         select.value = videoQuality;
       }
     }
+    updateVideoRecorderQualityPicker();
+    updateVideoRecorderCameraPicker();
     const facingMode = normalizeVideoFacingMode(state.mediaSettings.videoMessageFacingMode);
     for (const select of [el.videoMessageFacingInput, el.dialogVideoMessageFacingInput, el.callVideoFacingInput]) {
       if (select) {
@@ -8532,6 +10428,246 @@
       }
     }
     syncCallVideoFacingToggle();
+  }
+
+  function updateVideoRecorderQualityPicker() {
+    const select = el.videoRecorderQualityInput;
+    const button = el.videoRecorderQualityButton;
+    const label = el.videoRecorderQualityLabel;
+    const menu = el.videoRecorderQualityMenu;
+    if (!select || !button || !label || !menu) {
+      return;
+    }
+
+    if (!select.value && select.options.length) {
+      select.value = "default";
+    }
+
+    const selectedOption = select.selectedOptions?.[0] || select.options[select.selectedIndex] || select.options[0];
+    label.replaceChildren(createVideoQualityLabel(selectedOption));
+    button.setAttribute("aria-label", `${t("label.video_quality", "Video quality")}: ${videoQualityOptionText(selectedOption)}`);
+    menu.replaceChildren(...Array.from(select.options).map((option) => {
+      const item = document.createElement("button");
+      item.type = "button";
+      item.className = "video-quality-option";
+      item.dataset.value = option.value;
+      item.setAttribute("role", "option");
+      item.setAttribute("aria-selected", option.value === select.value ? "true" : "false");
+      item.appendChild(createVideoQualityLabel(option));
+      return item;
+    }));
+  }
+
+  function createVideoQualityLabel(option) {
+    const wrapper = document.createElement("span");
+    wrapper.className = "video-quality-label";
+    const text = document.createElement("span");
+    text.textContent = option?.textContent || "Auto";
+    wrapper.appendChild(text);
+    const badgeValue = option?.dataset?.badge || "";
+    if (badgeValue) {
+      const badge = document.createElement("span");
+      badge.className = "video-quality-badge";
+      badge.textContent = badgeValue;
+      wrapper.appendChild(badge);
+    }
+    return wrapper;
+  }
+
+  function videoQualityOptionText(option) {
+    const text = option?.textContent || "Auto";
+    const badge = option?.dataset?.badge || "";
+    return badge ? `${text} ${badge}` : text;
+  }
+
+  function toggleVideoRecorderQualityMenu(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!el.videoRecorderQualityMenu || !el.videoRecorderQualityButton) {
+      return;
+    }
+
+    const open = el.videoRecorderQualityMenu.hidden;
+    updateVideoRecorderQualityPicker();
+    closeVideoRecorderCameraMenu();
+    if (open) {
+      positionVideoRecorderMenu(el.videoRecorderQualityMenu, el.videoRecorderQualityButton);
+    }
+    el.videoRecorderQualityMenu.hidden = !open;
+    el.videoRecorderQualityButton.setAttribute("aria-expanded", open ? "true" : "false");
+  }
+
+  function closeVideoRecorderQualityMenu() {
+    if (!el.videoRecorderQualityMenu || el.videoRecorderQualityMenu.hidden) {
+      return;
+    }
+
+    el.videoRecorderQualityMenu.hidden = true;
+    el.videoRecorderQualityButton?.setAttribute("aria-expanded", "false");
+  }
+
+  function closeVideoRecorderQualityMenuOnOutsideClick(event) {
+    if (event.target?.closest?.(".video-recorder-quality, .video-quality-menu, .video-recorder-camera, .video-camera-menu")) {
+      return;
+    }
+    closeVideoRecorderQualityMenu();
+    closeVideoRecorderCameraMenu();
+  }
+
+  function closeVideoRecorderQualityMenuOnEscape(event) {
+    if (event.key === "Escape") {
+      closeVideoRecorderQualityMenu();
+      closeVideoRecorderCameraMenu();
+    }
+  }
+
+  function handleVideoRecorderQualityMenuClick(event) {
+    const option = event.target?.closest?.(".video-quality-option");
+    if (!option || !el.videoRecorderQualityInput) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    el.videoRecorderQualityInput.value = option.dataset.value || "default";
+    el.videoRecorderQualityInput.dispatchEvent(new Event("change", { bubbles: true }));
+    updateVideoRecorderQualityPicker();
+    closeVideoRecorderQualityMenu();
+    el.videoRecorderQualityButton?.focus();
+  }
+
+  function updateVideoRecorderCameraPicker() {
+    const button = el.videoRecorderCameraButton;
+    const label = el.videoRecorderCameraLabel;
+    const menu = el.videoRecorderCameraMenu;
+    if (!button || !label || !menu) {
+      return;
+    }
+
+    const options = videoRecorderCameraOptions();
+    const selected = options.find((option) => option.selected) || options[0];
+    label.textContent = selected?.label || t("media.camera", "Camera");
+    button.setAttribute("aria-label", `${t("label.camera", "Camera")}: ${label.textContent}`);
+    menu.replaceChildren(...options.map((option) => {
+      const item = document.createElement("button");
+      item.type = "button";
+      item.className = "video-camera-option";
+      item.dataset.value = option.value;
+      item.dataset.mode = option.mode;
+      item.setAttribute("role", "option");
+      item.setAttribute("aria-selected", option === selected ? "true" : "false");
+      item.textContent = option.label;
+      return item;
+    }));
+  }
+
+  function videoRecorderCameraOptions() {
+    if (usesFacingCameraPicker()) {
+      const mode = normalizeVideoFacingMode(state.mediaSettings.videoMessageFacingMode);
+      return [
+        { mode: "facing", value: "user", label: t("camera.front", "Front camera"), selected: mode === "user" },
+        { mode: "facing", value: "environment", label: t("camera.back", "Back camera"), selected: mode === "environment" }
+      ];
+    }
+
+    const cameras = state.mediaDevices
+      .filter((device) => device.kind === "videoinput")
+      .filter((device) => shouldShowMediaDeviceOption(device, state.mediaDevices.filter((item) => item.kind === "videoinput")));
+    const selectedDeviceId = normalizeSelectedMediaDeviceId(state.mediaSettings.cameraDeviceId, "videoinput");
+    return [
+      {
+        mode: "device",
+        value: "",
+        label: t("media.default_camera", "Default camera"),
+        selected: !selectedDeviceId
+      },
+      ...cameras.map((device, index) => ({
+        mode: "device",
+        value: device.deviceId,
+        label: cleanMediaDeviceLabel(device.label) || `${t("media.camera", "Camera")} ${index + 1}`,
+        selected: selectedDeviceId === device.deviceId
+      }))
+    ];
+  }
+
+  function cleanMediaDeviceLabel(label) {
+    return String(label || "")
+      .replace(/\s*\([0-9a-f]{4}:[0-9a-f]{4}\)\s*$/i, "")
+      .replace(/\s*\[[0-9a-f]{4}:[0-9a-f]{4}\]\s*$/i, "")
+      .trim();
+  }
+
+  function usesFacingCameraPicker() {
+    return document.body.dataset.platform === "ios"
+      || document.body.dataset.platform === "android"
+      || (isPhoneViewport() && state.mediaDevices.filter((device) => device.kind === "videoinput").length <= 2);
+  }
+
+  function toggleVideoRecorderCameraMenu(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!el.videoRecorderCameraMenu || !el.videoRecorderCameraButton) {
+      return;
+    }
+
+    const open = el.videoRecorderCameraMenu.hidden;
+    updateVideoRecorderCameraPicker();
+    closeVideoRecorderQualityMenu();
+    if (open) {
+      positionVideoRecorderMenu(el.videoRecorderCameraMenu, el.videoRecorderCameraButton);
+    }
+    el.videoRecorderCameraMenu.hidden = !open;
+    el.videoRecorderCameraButton.setAttribute("aria-expanded", open ? "true" : "false");
+  }
+
+  function positionVideoRecorderMenu(menu, button) {
+    const card = el.videoPreviewDialog?.querySelector(".video-preview-dialog-card");
+    if (!menu || !button || !card) {
+      return;
+    }
+
+    menu.hidden = false;
+    const cardRect = card.getBoundingClientRect();
+    const buttonRect = button.getBoundingClientRect();
+    const menuRect = menu.getBoundingClientRect();
+    const gap = 8;
+    const minLeft = 10;
+    const maxLeft = Math.max(minLeft, cardRect.width - menuRect.width - minLeft);
+    const preferredLeft = buttonRect.left - cardRect.left;
+    const left = Math.max(minLeft, Math.min(maxLeft, preferredLeft));
+    const bottom = Math.max(48, cardRect.bottom - buttonRect.top + gap);
+    menu.style.left = `${Math.round(left)}px`;
+    menu.style.bottom = `${Math.round(bottom)}px`;
+  }
+
+  function closeVideoRecorderCameraMenu() {
+    if (!el.videoRecorderCameraMenu || el.videoRecorderCameraMenu.hidden) {
+      return;
+    }
+
+    el.videoRecorderCameraMenu.hidden = true;
+    el.videoRecorderCameraButton?.setAttribute("aria-expanded", "false");
+  }
+
+  function handleVideoRecorderCameraMenuClick(event) {
+    const option = event.target?.closest?.(".video-camera-option");
+    if (!option) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    if (option.dataset.mode === "facing") {
+      if (el.videoMessageFacingInput) {
+        el.videoMessageFacingInput.value = option.dataset.value || "user";
+      }
+    } else if (el.cameraInput) {
+      el.cameraInput.value = option.dataset.value || "";
+    }
+    handleMediaSettingsChange("video", "recorder");
+    updateVideoRecorderCameraPicker();
+    closeVideoRecorderCameraMenu();
+    el.videoRecorderCameraButton?.focus();
   }
 
   async function toggleCallVideoFacingMode() {
@@ -8630,6 +10766,15 @@
 
   async function handleMediaSettingsChange(kind, source = "main") {
     saveMediaSettingsFromControls(false, source);
+    if ((source === "dialog" || source === "recorder")
+      && state.videoRecorder.previewStream
+      && !state.videoRecorder.blob
+      && state.videoRecorder.recorder?.state !== "recording") {
+      startVideoDialogPreview();
+      setMediaStatus(t("media.saved", "Media settings saved. They are used for the next call or preview."));
+      return;
+    }
+
     const call = state.call;
     if (!call?.localStream || !call.pc) {
       setMediaStatus(t("media.saved", "Media settings saved. They are used for the next call or preview."));
@@ -8801,14 +10946,14 @@
     setCallStatus(t("call.starting", "Starting call..."));
 
     try {
-      await ensureRelayConnectedForJingle(5000);
+      await ensureXmppCallSignalingReady();
       await openLocalMedia(call);
       createPeerConnection(call);
       const offer = await call.pc.createOffer();
       appendSdpDebug("offer-created", offer.sdp);
       await call.pc.setLocalDescription(offer);
       appendSdpDebug("offer-local", call.pc.localDescription?.sdp);
-      await ensureRelayConnectedForJingle();
+      await ensureXmppCallSignalingReady();
       sendJingleEnvelope("session-initiate", {
         sid: call.sid,
         mediaKind: call.mediaKind,
@@ -8842,7 +10987,7 @@
       appendSdpDebug("answer-created", answer.sdp);
       await call.pc.setLocalDescription(answer);
       appendSdpDebug("answer-local", call.pc.localDescription?.sdp);
-      await ensureRelayConnectedForJingle();
+      await ensureXmppCallSignalingReady();
       sendJingleEnvelope("session-accept", {
         sid: call.sid,
         mediaKind: call.mediaKind,
@@ -8851,6 +10996,7 @@
         rttSync: call.rttSync
       });
       call.incomingOffer = null;
+      closeIncomingCallBrowserNotification();
       setCallStatus(jingleRttSyncStatusText(call));
       updateCallUi();
     } catch (error) {
@@ -8875,6 +11021,7 @@
       reason: "decline",
       reasonText: t("call.rejected", "Call rejected")
     });
+    closeIncomingCallBrowserNotification();
     cleanupCall(false, "rejected");
     setCallStatus(t("call.rejected", "Call rejected"));
   }
@@ -8986,25 +11133,41 @@
       return;
     }
 
+    const callerPeer = envelopeFrom(envelope);
+    if (state.doNotDisturb) {
+      sendJingleEnvelope("session-terminate", {
+        sid: envelope.sid,
+        to: callerPeer,
+        reason: "busy",
+        reasonText: t("call.do_not_disturb", "Do not disturb")
+      });
+      setCallStatus(t("call.do_not_disturb_rejected", "Call rejected because Do not disturb is on."));
+      appendDebug("jingle-dnd", `Rejected incoming call from ${callerPeer || "unknown"}`);
+      return;
+    }
+
+    const roomPeer = groupRoomFromJingleEnvelope(envelope);
     const call = createCallState(
       String(envelope.sid || "td-" + createShortId()),
-      envelopeFrom(envelope),
+      callerPeer,
       "receiver",
       envelope.mediaKind === "video" ? "video" : "audio",
       Boolean(envelope.rttSync));
+    call.roomJid = roomPeer;
     call.rttSync = call.rttEnabled
       ? normalizeJingleRttSyncDescriptor(envelope.rttSync, call.sid, "offered")
       : null;
     call.incomingOffer = envelope.sdp;
     state.call = call;
     updateCallUi();
+    const conversationPeer = roomPeer || call.peer;
     const conversation = ensureConversationForPeer(
-      call.peer,
-      envelope.conversationKind === "group" || call.peer.includes("@conference.") ? "group" : "contact",
-      displayNameForJid(call.peer));
+      conversationPeer,
+      roomPeer ? "group" : "contact",
+      displayNameForJid(conversationPeer));
     if (conversation) {
       applyEnvelopeIdentity(conversation, envelope);
-      state.activeConversationId = conversation.id;
+      selectConversation(conversation);
       el.peerInput.value = conversation.peer;
     }
 
@@ -9027,6 +11190,9 @@
     }
 
     try {
+      if (call.roomJid && envelopeFrom(envelope)) {
+        call.peer = envelopeFrom(envelope);
+      }
       if (envelope.rttSync || call.rttEnabled) {
         call.rttEnabled = true;
         call.callMode = callModeName(call.mediaKind, true);
@@ -9086,6 +11252,7 @@
     return {
       sid,
       peer,
+      roomJid: "",
       role,
       mediaKind,
       callMode: callModeName(mediaKind, rttEnabled),
@@ -9138,6 +11305,160 @@
     return call?.mediaKind === "video"
       ? t("call.video_incoming", "Incoming audio + video call")
       : t("call.audio_incoming", "Incoming audio call");
+  }
+
+  function incomingCallText(call) {
+    return `${t("call.incoming", "Incoming call from")} ${displayNameForJid(call.peer)}`;
+  }
+
+  function selectConversationForPeer(peer) {
+    const conversation = state.conversations.find((item) => addressMatches(item.peer, peer))
+      || ensureConversationForPeer(peer, peer.includes("@conference.") ? "group" : "contact", displayNameForJid(peer));
+    if (conversation) {
+      selectConversation(conversation);
+    }
+  }
+
+  function requestCallNotificationPermissionFromGesture() {
+    if (!("Notification" in window) || Notification.permission !== "default") {
+      return;
+    }
+
+    Notification.requestPermission()
+      .then((permission) => appendDebug("notification", `permission ${permission}`))
+      .catch((error) => appendDebug("notification-error", error.message || String(error)));
+  }
+
+  function showIncomingCallBrowserNotification(call) {
+    if (!call?.incomingOffer || !("Notification" in window) || Notification.permission !== "granted") {
+      return;
+    }
+
+    if (state.doNotDisturb) {
+      return;
+    }
+
+    if (isBlockedPeer(call.peer) || isNotificationMutedPeer(call.peer)) {
+      return;
+    }
+
+    if (state.incomingCallNotificationSid === call.sid && state.incomingCallNotification) {
+      return;
+    }
+
+    closeIncomingCallBrowserNotification();
+    let notification = null;
+    try {
+      notification = new Notification(incomingCallTitle(call), {
+        body: incomingCallText(call),
+        tag: `teletyptel-call-${call.sid}`,
+        renotify: true,
+        requireInteraction: true,
+        icon: "assets/brand/teletyptel-icon-192.png",
+        badge: "assets/brand/teletyptel-icon-192.png"
+      });
+    } catch (error) {
+      appendDebug("notification-error", error.message || String(error));
+      return;
+    }
+    notification.onclick = () => {
+      window.focus();
+      selectConversationForPeer(call.roomJid || call.peer);
+      updateCallUi();
+    };
+    notification.onclose = () => {
+      if (state.incomingCallNotification === notification) {
+        state.incomingCallNotification = null;
+        state.incomingCallNotificationSid = "";
+      }
+    };
+    state.incomingCallNotification = notification;
+    state.incomingCallNotificationSid = call.sid;
+  }
+
+  function showBrowserNotification(title, body, options = {}) {
+    if (!("Notification" in window) || Notification.permission !== "granted") {
+      return;
+    }
+
+    if (state.doNotDisturb) {
+      return;
+    }
+
+    if (options.notificationPeer && (isBlockedPeer(options.notificationPeer) || isNotificationMutedPeer(options.notificationPeer))) {
+      return;
+    }
+
+    try {
+      const notification = new Notification(title, {
+        body,
+        tag: options.tag || "",
+        renotify: options.renotify === true,
+        icon: "assets/brand/teletyptel-icon-192.png",
+        badge: "assets/brand/teletyptel-icon-192.png"
+      });
+      notification.onclick = () => {
+        window.focus();
+        if (options.conversationId) {
+          const conversation = state.conversations.find((item) => item.id === options.conversationId);
+          if (conversation) {
+            selectConversation(conversation);
+          }
+        }
+        notification.close();
+      };
+    } catch (error) {
+      appendDebug("notification-error", error.message || String(error));
+    }
+  }
+
+  function shouldNotifyForConversation(conversation) {
+    return Boolean(conversation)
+      && conversation.id !== state.activeConversationId;
+  }
+
+  function showMessageBrowserNotification(conversation, message) {
+    if (!shouldNotifyForConversation(conversation) || !message || isCallMessage(message)) {
+      return;
+    }
+
+    const sender = message.senderDisplayName || displayNameForJid(message.from || conversation.peer);
+    const title = conversation.kind === "group"
+      ? `${conversationDisplayName(conversation)} - ${sender}`
+      : sender;
+    const body = visibleMessageText(message)
+      || (message.attachment ? t("upload.shared_file", "Shared file") : t("message.new_message", "New message"));
+    showBrowserNotification(title, body, {
+      tag: `teletyptel-message-${conversation.id}`,
+      renotify: true,
+      conversationId: conversation.id,
+      notificationPeer: message.from || conversation.peer
+    });
+  }
+
+  function showReactionBrowserNotification(conversation, message, actor, reactions) {
+    if (!shouldNotifyForConversation(conversation) || !message || !Array.isArray(reactions) || !reactions.length) {
+      return;
+    }
+
+    const sender = displayNameForJid(actor || conversation.peer);
+    const body = t("reaction.notification_body", "{sender} reageerde met {reaction}")
+      .replace("{sender}", sender)
+      .replace("{reaction}", reactions.join(" "));
+    showBrowserNotification(conversationDisplayName(conversation), body, {
+      tag: `teletyptel-reaction-${conversation.id}-${message.id}`,
+      renotify: true,
+      conversationId: conversation.id,
+      notificationPeer: actor || conversation.peer
+    });
+  }
+
+  function closeIncomingCallBrowserNotification() {
+    if (state.incomingCallNotification) {
+      state.incomingCallNotification.close();
+    }
+    state.incomingCallNotification = null;
+    state.incomingCallNotificationSid = "";
   }
 
   function createJingleRttSyncDescriptor(sid, stateName = "offered") {
@@ -9667,6 +11988,44 @@
     return result;
   }
 
+  function applyXmppRttElement(previous, rttElement) {
+    if (!rttElement) {
+      return String(previous ?? "");
+    }
+
+    const eventName = String(rttElement.getAttribute("event") || "").toLowerCase();
+    let result = eventName === "reset" || eventName === "init" ? "" : String(previous ?? "");
+    for (const action of Array.from(rttElement.children || [])) {
+      if (action.namespaceURI !== "urn:xmpp:rtt:0") {
+        continue;
+      }
+
+      const position = clampRttPosition(action.getAttribute("p"), result);
+      if (action.localName === "t") {
+        const chars = Array.from(result);
+        chars.splice(position, 0, action.textContent || "");
+        result = chars.join("");
+      } else if (action.localName === "e") {
+        const count = Math.max(1, Number.parseInt(action.getAttribute("n") || "1", 10) || 1);
+        const chars = Array.from(result);
+        chars.splice(Math.max(0, position - count), count);
+        result = chars.join("");
+      }
+    }
+
+    return result;
+  }
+
+  function clampRttPosition(value, text) {
+    const chars = Array.from(String(text ?? ""));
+    const position = Number.parseInt(value || String(chars.length), 10);
+    if (!Number.isFinite(position)) {
+      return chars.length;
+    }
+
+    return Math.max(0, Math.min(chars.length, position));
+  }
+
   function isIgnoredT140Control(char) {
     if (char === "\t") {
       return false;
@@ -9903,7 +12262,7 @@
     }
 
     if (quality === "uhd") {
-      return { width: { ideal: 3840 }, height: { ideal: 2160 }, aspectRatio: { ideal: 16 / 9 } };
+      return { width: { ideal: 2560 }, height: { ideal: 1440 }, aspectRatio: { ideal: 16 / 9 } };
     }
 
     return { width: { ideal: 1920 }, height: { ideal: 1080 }, aspectRatio: { ideal: 16 / 9 } };
@@ -10338,10 +12697,12 @@
   function cleanupCall(notifyRemote, historyStatus = "ended") {
     const call = state.call;
     if (!call) {
+      closeIncomingCallBrowserNotification();
       updateCallUi();
       return;
     }
 
+    closeIncomingCallBrowserNotification();
     persistConversationHistoryCall(call, historyStatus);
     stopTotalConversationRecorder(call);
     const updatedNotification = updateCallNotificationMessage(call, historyStatus);
@@ -10377,16 +12738,14 @@
   }
 
   function sendJingleEnvelope(action, payload = {}) {
-    if (!isRelayConnected()) {
-      appendDebug("jingle-error", "Relay is not connected");
-      return;
-    }
-
+    const active = activeConversation();
+    const roomJid = state.call?.roomJid || (active?.kind === "group" ? active.peer : "");
     const envelope = {
       ...createRelayEnvelope("jingle", "", ""),
       action,
       sid: payload.sid || state.call?.sid || "td-" + createShortId(),
       to: payload.to || state.call?.peer || currentToJid(),
+      roomJid: payload.roomJid || roomJid || null,
       mediaKind: payload.mediaKind || state.call?.mediaKind || "audio",
       info: payload.info || null,
       reason: payload.reason || null,
@@ -10399,8 +12758,46 @@
         : (action === "session-initiate" || action === "session-accept" ? state.call?.rttSync || null : null)
     };
     envelope.xml = createJingleDebugXml(action, envelope);
-    state.relaySocket.send(JSON.stringify(envelope));
-    appendDebug("jingle-out", envelope.xml);
+    if (sendXmppJingleEnvelope(envelope)) {
+      appendDebug("jingle-out", envelope.xml);
+      return;
+    }
+
+    if (isRelayConnected()) {
+      state.relaySocket.send(JSON.stringify(envelope));
+      appendDebug("jingle-out", envelope.xml);
+      return;
+    }
+
+    appendDebug("jingle-error", "No call signaling transport is connected");
+  }
+
+  function sendXmppJingleEnvelope(envelope) {
+    if (state.mode !== "xmpp"
+      || state.xmppSocket?.readyState !== WebSocket.OPEN
+      || !state.xmppSession?.authenticated) {
+      return false;
+    }
+
+    const id = createMessageId("jingle");
+    const to = envelope.to || state.call?.peer || currentToJid();
+    const groupSignal = Boolean(envelope.roomJid && addressMatches(to, envelope.roomJid));
+    if (groupSignal) {
+      const conversation = state.conversations.find((item) => addressMatches(item.peer, envelope.roomJid || to));
+      joinXmppGroupConversation(conversation);
+    }
+    const payload = base64Utf8(JSON.stringify(redactTransientJingleEnvelope(envelope)));
+    const signal = `<signal xmlns="${teletyptelJingleSignalNamespace}" encoding="json-base64">${payload}</signal>`;
+    const messageType = groupSignal ? "groupchat" : "chat";
+    const xml = `<message xmlns="jabber:client" type="${messageType}" from="${escapeXml(currentXmppFromJid())}" to="${escapeXml(to)}" id="${escapeXml(id)}">${signal}<no-store xmlns="urn:xmpp:hints"/></message>`;
+    return sendXmppStanza(xml, `<message type="${messageType}" jingle-signal="${escapeXml(envelope.action || "")}" sid="${escapeXml(envelope.sid || "")}">...</message>`);
+  }
+
+  function redactTransientJingleEnvelope(envelope) {
+    return {
+      ...envelope,
+      xml: envelope.xml || ""
+    };
   }
 
   function createJingleDebugXml(action, envelope) {
@@ -10518,15 +12915,17 @@
     el.incomingCallBanner.hidden = !incoming;
     el.incomingCallDialog.hidden = !incoming;
     if (incoming) {
-      const caller = displayNameForJid(call.peer);
       const title = incomingCallTitle(call);
-      const text = `${t("call.incoming", "Incoming call from")} ${caller}`;
+      const text = incomingCallText(call);
       el.incomingCallTitle.textContent = title;
       el.incomingCallDialogTitle.textContent = title;
       el.incomingCallText.textContent = text;
       el.incomingCallDialogText.textContent = text;
+      showIncomingCallBrowserNotification(call);
       el.incomingCallBanner.scrollIntoView({ block: "nearest" });
       el.dialogAnswerButton.focus();
+    } else {
+      closeIncomingCallBrowserNotification();
     }
 
     el.answerCallButton.hidden = !incoming;
@@ -10535,6 +12934,8 @@
     setCallModeButtonsHidden(Boolean(call));
     el.hangupCallButton.hidden = !call || incoming;
     el.hangupCallButton.disabled = !call;
+    el.hangupCallPanelButton.hidden = !call || incoming;
+    el.hangupCallPanelButton.disabled = !call;
     const hasLocalVideo = hasVideoTrack(call?.localStream);
     const hasRemoteVideo = hasVideoTrack(call?.remoteStream);
     const conversation = activeConversation();
@@ -10830,26 +13231,13 @@
     return new Promise((resolve) => window.setTimeout(resolve, ms));
   }
 
-  async function ensureRelayConnectedForJingle(timeoutMs = 3500) {
-    if (isRelayConnected()) {
-      return;
+  async function ensureXmppCallSignalingReady() {
+    if (state.xmppSocket?.readyState !== WebSocket.OPEN || !state.xmppSession?.authenticated) {
+      connectXmppWebSocket();
+      throw new Error(t("call.xmpp_connect_first", "Connect XMPP first, then start the call again."));
     }
 
-    if (state.accountReady && !state.accountGateRequired && !state.intentionalDisconnect) {
-      connectRelay();
-    }
-
-    const startedAt = Date.now();
-    while (Date.now() - startedAt < timeoutMs) {
-      await wait(100);
-      if (isRelayConnected()) {
-        return;
-      }
-    }
-
-    const relayUrl = normalizeLocalWebSocketUrlForCurrentHost(el.relayUrlInput?.value || "", 8787);
-    appendDebug("jingle-error", `Relay did not connect for call: ${relayUrl}`);
-    throw new Error(`${t("status.not_connected", "Not connected.")} ${relayUrl}`);
+    return true;
   }
 
   function hasActiveMessageTransport() {
@@ -10873,7 +13261,26 @@
       return true;
     }
 
+    const room = groupRoomFromJingleEnvelope(envelope);
+    if (room && addressMatches(envelope.to, room)) {
+      return true;
+    }
+
     return jidMatches(envelope.to, currentFromJid());
+  }
+
+  function groupRoomFromJingleEnvelope(envelope) {
+    const room = bareJid(envelope?.roomJid || "");
+    if (room) {
+      return room;
+    }
+
+    const to = bareJid(envelope?.to || "");
+    if (envelope?.conversationKind === "group" || to.includes("@conference.")) {
+      return to;
+    }
+
+    return "";
   }
 
   function jidMatches(left, right) {
@@ -11140,9 +13547,16 @@
       timestamp: new Date()
     };
 
+    if (direction === "peer" && persist) {
+      unarchiveConversation(conversation);
+    }
+
     conversation.messages.push(message);
     if (conversation.id === state.activeConversationId) {
       appendMessageToTimeline(message);
+    } else if (direction === "peer" && persist) {
+      conversation.unreadCount = Math.min((Number(conversation.unreadCount) || 0) + 1, 99);
+      showMessageBrowserNotification(conversation, message);
     }
 
     renderConversations();
@@ -11212,12 +13626,29 @@
 
     if (existingDraft) {
       updateMessageElement(existingDraft, message);
-      el.messageTimeline.scrollTop = el.messageTimeline.scrollHeight;
+      scrollMessageTimelineToLatest();
       return;
     }
 
     appendMessageElementToTimeline(message);
-    el.messageTimeline.scrollTop = el.messageTimeline.scrollHeight;
+    scrollMessageTimelineToLatest();
+  }
+
+  function isMessageTimelineNearBottom(threshold = 120) {
+    const distance = el.messageTimeline.scrollHeight - el.messageTimeline.clientHeight - el.messageTimeline.scrollTop;
+    return distance <= threshold;
+  }
+
+  function updateScrollToLatestButton() {
+    if (!el.scrollToLatestButton || el.messageTimeline.hidden) {
+      return;
+    }
+    el.scrollToLatestButton.hidden = !activeConversation() || isMessageTimelineNearBottom();
+  }
+
+  function scrollMessageTimelineToLatest() {
+    el.messageTimeline.scrollTo({ top: el.messageTimeline.scrollHeight, behavior: "smooth" });
+    window.setTimeout(updateScrollToLatestButton, 120);
   }
 
   function addConversation() {
@@ -11236,7 +13667,7 @@
       return;
     }
 
-    state.activeConversationId = conversation.id;
+    selectConversation(conversation);
     el.peerInput.value = conversation.peer;
     if (state.activeTabId !== "chat") {
       activateTab("chat");
@@ -11245,16 +13676,160 @@
     renderActiveConversation();
   }
 
+  function handleXmppPresenceElement(presenceElement) {
+    const from = presenceElement.getAttribute("from") || "";
+    if (!from || isOwnPeer(from)) {
+      return;
+    }
+
+    const type = presenceElement.getAttribute("type") || "";
+    const peer = bareJid(from);
+    if (type === "subscribe") {
+      appendDebug("xmpp-presence", `subscribe from ${peer}`);
+      sendXmppPresenceSubscribed(peer);
+      sendXmppPresenceSubscription(peer);
+      return;
+    }
+
+    if (type === "subscribed") {
+      appendDebug("xmpp-presence", `subscribed by ${peer}`);
+      sendXmppPresenceProbe(peer);
+      return;
+    }
+
+    if (type === "probe") {
+      appendDebug("xmpp-presence", `probe from ${peer}`);
+      sendXmppStanza(
+        createXmppDirectedAvailablePresenceStanza(peer, state.doNotDisturb ? "dnd" : "available"),
+        `<presence probe-response to="${escapeXml(peer)}"/>`);
+      return;
+    }
+
+    if (type && !["unavailable", "unsubscribe", "unsubscribed"].includes(type)) {
+      appendDebug("xmpp-presence-skip", `${type} from ${peer}`);
+      return;
+    }
+
+    const presence = type === "unavailable" || type === "unsubscribe" || type === "unsubscribed" ? "offline" : "online";
+    const show = presenceElement.getElementsByTagNameNS("jabber:client", "show")[0]?.textContent || "";
+    const conversation = ensureConversationForPeer(peer, "contact", displayNameForJid(peer));
+    if (!conversation) {
+      return;
+    }
+
+    conversation.presence = presence;
+    if (presence === "offline") {
+      conversation.clientState = null;
+      conversation.clientStateUpdatedAt = null;
+      conversation.lastSeenAt = new Date();
+    } else {
+      conversation.clientState = show === "dnd" ? "dnd" : "active";
+      conversation.clientStateUpdatedAt = new Date();
+    }
+    renderConversations();
+    renderActiveConversation();
+  }
+
+  function handleXmppIqElement(iqElement) {
+    const rosterQuery = iqElement.getElementsByTagNameNS(xmppRosterNamespace, "query")[0];
+    if (!rosterQuery) {
+      return false;
+    }
+
+    const type = iqElement.getAttribute("type") || "";
+    if (type === "set") {
+      const id = iqElement.getAttribute("id") || "";
+      if (id) {
+        sendXmppStanza(
+          `<iq xmlns="jabber:client" type="result" id="${escapeXml(id)}"/>`,
+          `<iq type="result" id="${escapeXml(id)}" roster-push-ack/>`);
+      }
+    }
+
+    const items = Array.from(rosterQuery.getElementsByTagNameNS(xmppRosterNamespace, "item"));
+    for (const item of items) {
+      applyXmppRosterItem(item);
+    }
+
+    return true;
+  }
+
+  function applyXmppRosterItem(item) {
+    const jid = bareJid(item.getAttribute("jid") || "");
+    if (!jid || isOwnPeer(jid) || isInfrastructurePeer(jid)) {
+      return;
+    }
+
+    const subscription = item.getAttribute("subscription") || "";
+    const ask = item.getAttribute("ask") || "";
+    if (subscription === "remove") {
+      const conversation = state.conversations.find((entry) => addressMatches(entry.peer, jid));
+      if (conversation && conversation.kind === "contact") {
+        conversation.presence = "offline";
+        conversation.clientState = null;
+        conversation.clientStateUpdatedAt = null;
+        conversation.lastSeenAt = new Date();
+      }
+      return;
+    }
+
+    const name = item.getAttribute("name") || displayNameForJid(jid);
+    const conversation = ensureConversationForPeer(jid, "contact", name);
+    if (!conversation) {
+      return;
+    }
+
+    if (name && shouldReplaceConversationNameWithRoster(conversation)) {
+      conversation.name = name;
+      delete conversation.nameKey;
+    }
+
+    conversation.xmppRosterSubscription = subscription;
+    conversation.xmppRosterAsk = ask;
+    if (subscription === "both" || subscription === "to") {
+      sendXmppPresenceProbe(jid);
+    } else if (!ask) {
+      sendXmppPresenceSubscription(jid);
+    }
+
+    renderConversations();
+  }
+
+  function shouldReplaceConversationNameWithRoster(conversation) {
+    if (!conversation || conversation.kind === "group") {
+      return false;
+    }
+
+    const current = String(conversation.name || "").trim();
+    return !current || current === conversation.peer || current === fallbackDisplayNameForJid(conversation.peer);
+  }
+
   function activeConversation() {
     return state.conversations.find((conversation) => conversation.id === state.activeConversationId) ?? null;
   }
 
+  function selectConversation(conversation) {
+    if (!conversation) {
+      return;
+    }
+
+    state.activeConversationId = conversation.id;
+    conversation.unreadCount = 0;
+    joinXmppGroupConversation(conversation);
+  }
+
   function renderConversations() {
     el.conversationItems.replaceChildren();
+    const query = normalizeConversationSearchText(el.conversationSearchInput.value);
+    let visibleCount = 0;
     for (const conversation of state.conversations) {
-      if (isOwnContact(conversation) || isBlockedConversation(conversation)) {
+      if (isOwnContact(conversation) || isBlockedConversation(conversation) || isArchivedConversation(conversation)) {
         continue;
       }
+      if (query && !conversationMatchesSearch(conversation, query)) {
+        continue;
+      }
+      ensurePublicProfileForConversation(conversation);
 
       const button = document.createElement("button");
       button.type = "button";
@@ -11268,11 +13843,22 @@
       name.textContent = conversationDisplayName(conversation);
       meta.textContent = conversationListPreviewText(conversation);
       text.append(name, meta);
+      const time = document.createElement("span");
+      time.className = "conversation-time";
+      time.textContent = conversationListTimeText(conversation);
+      if (!time.textContent) {
+        time.hidden = true;
+      }
       const presence = document.createElement("span");
       presence.className = `presence-dot presence-${conversationPresence(conversation)}`;
-      button.append(avatar, text, presence);
+      const unread = createConversationUnreadBadge(conversation);
+      const rowMeta = document.createElement("span");
+      rowMeta.className = "conversation-row-meta";
+      rowMeta.append(time, unread, presence);
+      button.append(avatar, text, rowMeta);
       button.addEventListener("click", () => {
-        state.activeConversationId = conversation.id;
+        selectConversation(conversation);
+        ensurePublicProfileForConversation(conversation);
         el.peerInput.value = conversation.peer;
         state.previousText = "";
         el.messageInput.value = "";
@@ -11292,9 +13878,49 @@
         }
       });
       el.conversationItems.appendChild(button);
+      visibleCount += 1;
+    }
+
+    if (!visibleCount && query) {
+      const empty = document.createElement("p");
+      empty.className = "conversation-empty";
+      empty.textContent = t("contacts.search_empty", "No contacts found.");
+      el.conversationItems.appendChild(empty);
     }
 
     updateComposerAvailability();
+  }
+
+  function normalizeConversationSearchText(value) {
+    return String(value || "").trim().toLocaleLowerCase();
+  }
+
+  function conversationMatchesSearch(conversation, query) {
+    const haystack = [
+      conversationDisplayName(conversation),
+      conversation.peer,
+      conversation.kind,
+      conversationListPreviewText(conversation)
+    ]
+      .map(normalizeConversationSearchText)
+      .join(" ");
+    return haystack.includes(query);
+  }
+
+  function createConversationUnreadBadge(conversation) {
+    const badge = document.createElement("span");
+    badge.className = "conversation-unread-badge";
+    const count = Number(conversation?.unreadCount) || 0;
+    if (count <= 0) {
+      badge.hidden = true;
+      badge.setAttribute("aria-hidden", "true");
+      return badge;
+    }
+
+    const label = count > 99 ? "99+" : String(count);
+    badge.textContent = label;
+    badge.setAttribute("aria-label", t("conversation.unread_count", "{0} unread messages").replace("{0}", label));
+    return badge;
   }
 
   function closeActiveConversation() {
@@ -11307,6 +13933,20 @@
     renderActiveConversation();
   }
 
+  function syncActiveConversationAvatarButton(conversation) {
+    const label = canManageGroupConversation(conversation)
+      ? t("button.group_manage", "Group management...")
+      : (canViewContactProfile(conversation)
+        ? t("button.view_profile", "View profile")
+        : t("button.profile", "Profile"));
+    el.activeConversationAvatar.classList.add("avatar-clickable");
+    el.activeConversationAvatar.removeAttribute("aria-hidden");
+    el.activeConversationAvatar.setAttribute("role", "button");
+    el.activeConversationAvatar.tabIndex = 0;
+    el.activeConversationAvatar.title = label;
+    el.activeConversationAvatar.setAttribute("aria-label", label);
+  }
+
   function renderActiveConversation() {
     const conversation = activeConversation();
     document.body.classList.toggle("conversation-open", Boolean(conversation));
@@ -11315,6 +13955,7 @@
         displayName: "TX",
         avatarColor: "#2563eb"
       });
+      syncActiveConversationAvatarButton(null);
       el.activeConversationName.textContent = t("conversation.none_title", "Select a contact");
       el.activeConversationMeta.textContent = t("conversation.none_meta", "Click a contact to open the chat room.");
       el.messageTimeline.replaceChildren(createNoConversationElement());
@@ -11323,12 +13964,14 @@
       el.remoteDraftText.textContent = "";
       el.messageInput.value = "";
       updateComposerAvailability();
+      updateScrollToLatestButton();
       return;
     }
 
     el.activeConversationName.textContent = conversationDisplayName(conversation);
     el.activeConversationMeta.textContent = conversationMeta(conversation);
     renderAvatarInto(el.activeConversationAvatar, conversation);
+    syncActiveConversationAvatarButton(conversation);
     el.messageTimeline.replaceChildren();
 
     for (const message of conversation.messages) {
@@ -11343,12 +13986,12 @@
         status: "typing",
         timestamp: conversation.remoteDraftUpdatedAt ?? new Date(),
         draft: true,
-        senderDisplayName: conversation.remoteIdentity?.displayName || null,
+        senderDisplayName: remoteDraftDisplayName(conversation),
         senderAvatarColor: conversation.remoteIdentity?.avatarColor || null,
         senderAvatarDataUrl: conversation.remoteIdentity?.avatarDataUrl || null
       });
       el.remoteDraft.hidden = false;
-      el.remoteDraftName.textContent = displayNameForJid(conversation.remoteFrom || conversation.peer);
+      el.remoteDraftName.textContent = remoteDraftDisplayName(conversation);
       el.remoteDraftPreviousText.textContent = lastPeerConversationText(conversation);
       el.remoteDraftText.textContent = conversation.remoteText || "";
     } else {
@@ -11359,7 +14002,7 @@
 
     updateLocalRttDraftMessage(conversation, false);
     updateComposerAvailability();
-    el.messageTimeline.scrollTop = el.messageTimeline.scrollHeight;
+    scrollMessageTimelineToLatest();
     updateTotalConversationTextPanel(conversation);
   }
 
@@ -11388,8 +14031,9 @@
     el.activeConversationName.textContent = conversationDisplayName(conversation);
     el.activeConversationMeta.textContent = conversationMeta(conversation);
     renderAvatarInto(el.activeConversationAvatar, conversation);
+    syncActiveConversationAvatarButton(conversation);
     el.remoteDraft.hidden = false;
-    el.remoteDraftName.textContent = displayNameForJid(conversation.remoteFrom || conversation.peer);
+    el.remoteDraftName.textContent = remoteDraftDisplayName(conversation);
     el.remoteDraftPreviousText.textContent = lastPeerConversationText(conversation);
     el.remoteDraftText.textContent = conversation.remoteText || "";
 
@@ -11400,26 +14044,37 @@
       status: "typing",
       timestamp: conversation.remoteDraftUpdatedAt ?? new Date(),
       draft: true,
-      senderDisplayName: conversation.remoteIdentity?.displayName || null,
+      senderDisplayName: remoteDraftDisplayName(conversation),
       senderAvatarColor: conversation.remoteIdentity?.avatarColor || null,
       senderAvatarDataUrl: conversation.remoteIdentity?.avatarDataUrl || null
     };
 
     if (!existing) {
       appendMessageElementToTimeline(message);
-      el.messageTimeline.scrollTop = el.messageTimeline.scrollHeight;
+      scrollMessageTimelineToLatest();
       updateTotalConversationTextPanel(conversation);
       return;
     }
 
     updateMessageElement(existing, message);
-    el.messageTimeline.scrollTop = el.messageTimeline.scrollHeight;
+    scrollMessageTimelineToLatest();
     updateTotalConversationTextPanel(conversation);
+  }
+
+  function clearRemoteDraftForConversation(conversation, from = "") {
+    if (!conversation) {
+      return;
+    }
+
+    conversation.remoteText = "";
+    conversation.remoteFrom = from || conversation.remoteFrom || conversation.peer;
+    conversation.remoteDraftUpdatedAt = null;
+    updateRemoteDraftMessage(conversation.id);
   }
 
   function updateLocalRttDraftMessage(conversation = activeConversation(), scroll = true) {
     const existing = el.messageTimeline.querySelector('[data-local-draft="true"]');
-    if (!conversation || conversation.id !== state.activeConversationId || !el.rttToggle.checked) {
+    if (!conversation || conversation.id !== state.activeConversationId) {
       existing?.remove();
       cleanupOrphanMessageDateSeparators();
       return;
@@ -11452,7 +14107,7 @@
     }
 
     if (scroll) {
-      el.messageTimeline.scrollTop = el.messageTimeline.scrollHeight;
+      scrollMessageTimelineToLatest();
     }
   }
 
@@ -11528,48 +14183,37 @@
     }
 
     const conversation = ensureConversationForPeer(peer, "group", name.trim());
-    state.activeConversationId = conversation.id;
+    markCurrentUserAsGroupOwner(conversation);
+    persistGroupMetadata(conversation);
+    selectConversation(conversation);
+    joinXmppGroupConversation(conversation);
+    assignCurrentUserAsGroupOwner(conversation);
     el.peerInput.value = conversation.peer;
     renderConversations();
     renderActiveConversation();
   }
 
-  function inviteContactToActiveGroup() {
-    const group = activeConversation();
+  function inviteContactToManagedGroup() {
+    inviteContactToGroup(groupManagementConversation());
+  }
+
+  function inviteContactToGroup(group) {
     if (!group || group.kind !== "group") {
-      setConnectionStatus(t("status.select_group_first", "Select a group first"), "warn");
+      setGroupManagementStatus(t("status.select_group_first", "Select a group first"), "warn");
       return;
     }
 
-    const contacts = state.conversations.filter((conversation) =>
-      conversation.kind === "contact"
-      && !isOwnContact(conversation)
-      && !isBlockedConversation(conversation));
-    if (!contacts.length) {
-      setConnectionStatus(t("status.no_contacts", "No contacts available"), "warn");
-      return;
-    }
-
-    const contactText = contacts.map((conversation) => conversation.peer).join(", ");
-    const peer = prompt(t("prompt.invite_contact", "Invite contact email"), contacts[0].peer);
-    if (!peer) {
-      return;
-    }
-
-    const contact = ensureConversationForPeer(peer, "contact", displayNameForJid(peer));
+    const contact = selectedGroupInviteContact();
     if (!contact) {
       return;
     }
 
-    if (isBlockedConversation(contact)) {
-      setConnectionStatus(t("status.contact_blocked_cannot_send", "This contact is blocked. Unblock to send messages."), "warn");
-      return;
-    }
-
-    const inviteText = t("message.group_invite", "{0} invited you to {1} ({2}).")
+    const inviteLink = groupInviteLink(group);
+    const inviteText = t("message.group_invite", "{0} invited you to {1} ({2}).\nOpen group: {3}")
       .replace("{0}", currentSenderName())
       .replace("{1}", conversationDisplayName(group))
-      .replace("{2}", group.peer);
+      .replace("{2}", group.peer)
+      .replace("{3}", inviteLink);
     const statusText = t("message.group_invite_sent", "Invitation sent to {0}.").replace("{0}", conversationDisplayName(contact));
 
     addMessage("peer", statusText, t("sender.system", "System"), t("sender.system", "System"), null, group.id);
@@ -11579,15 +14223,264 @@
       state.relaySocket.send(JSON.stringify(envelope));
       appendDebug("relay-out", JSON.stringify(redactEnvelopeForLog(envelope)));
     }
+    sendXmppDirectInvite(contact.peer, group.peer, inviteLink);
 
     setConnectionStatus(statusText, "good");
-    appendDebug("invite", `${statusText} (${contactText})`);
+    if (!el.groupManagementDialog.hidden && state.groupManagementConversationId === group.id) {
+      setGroupManagementStatus(statusText, "good");
+    }
+    appendDebug("invite", `${statusText} (${contact.peer})`);
+  }
+
+  function groupInviteContacts() {
+    return state.conversations.filter((conversation) =>
+      conversation.kind === "contact"
+      && !isOwnContact(conversation)
+      && !isBlockedConversation(conversation));
+  }
+
+  function renderGroupInviteContacts() {
+    if (!el.groupInviteContactList) {
+      return;
+    }
+
+    const contacts = groupInviteContacts();
+    el.groupInviteContactList.replaceChildren();
+    if (!contacts.length) {
+      state.groupInviteContactId = "";
+      const empty = document.createElement("div");
+      empty.className = "group-invite-contact-empty";
+      empty.textContent = t("status.no_contacts", "No contacts available");
+      el.groupInviteContactList.appendChild(empty);
+      return;
+    }
+
+    if (!contacts.some((contact) => contact.id === state.groupInviteContactId)) {
+      state.groupInviteContactId = contacts[0].id;
+    }
+
+    for (const contact of contacts) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "group-invite-contact";
+      button.classList.toggle("selected", contact.id === state.groupInviteContactId);
+      button.setAttribute("aria-pressed", contact.id === state.groupInviteContactId ? "true" : "false");
+      button.addEventListener("click", () => {
+        state.groupInviteContactId = contact.id;
+        renderGroupInviteContacts();
+      });
+
+      const avatar = createAvatarElement(contact, "avatar-list");
+      const text = document.createElement("span");
+      text.className = "group-invite-contact-text";
+      const name = document.createElement("strong");
+      name.textContent = conversationDisplayName(contact);
+      const jid = document.createElement("span");
+      jid.textContent = bareJid(contact.peer);
+      text.append(name, jid);
+      button.append(avatar, text);
+      el.groupInviteContactList.appendChild(button);
+    }
+  }
+
+  function selectedGroupInviteContact() {
+    const contacts = groupInviteContacts();
+    if (!contacts.length) {
+      setConnectionStatus(t("status.no_contacts", "No contacts available"), "warn");
+      setGroupManagementStatus(t("status.no_contacts", "No contacts available"), "warn");
+      return null;
+    }
+
+    const selected = contacts.find((contact) => contact.id === state.groupInviteContactId) || contacts[0];
+    state.groupInviteContactId = selected.id;
+    return selected;
+  }
+
+  function sendGroupInviteLinkFromDialog() {
+    const group = groupManagementConversation();
+    if (!group || group.kind !== "group") {
+      setGroupManagementStatus(t("status.select_group_first", "Select a group first"), "warn");
+      return;
+    }
+
+    const contact = selectedGroupInviteContact();
+    if (!contact) {
+      return;
+    }
+
+    const inviteLink = groupInviteLink(group);
+    const text = t("message.group_invite_link", "Group link for {0}: {1}")
+      .replace("{0}", conversationDisplayName(group))
+      .replace("{1}", inviteLink);
+    const sent = sendDirectContactMessage(contact, text);
+    const statusText = sent
+      ? t("message.group_invite_link_sent", "Group link sent to {0}.").replace("{0}", conversationDisplayName(contact))
+      : t("message.group_invite_link_failed", "Group link could not be sent.");
+    setConnectionStatus(statusText, sent ? "good" : "warn");
+    setGroupManagementStatus(statusText, sent ? "good" : "warn");
+    if (sent) {
+      addMessage("peer", statusText, t("sender.system", "System"), t("sender.system", "System"), null, group.id);
+      appendDebug("invite-link", `${statusText} (${contact.peer})`);
+    }
+  }
+
+  function sendDirectContactMessage(contact, text) {
+    if (!contact?.peer || isBlockedConversation(contact)) {
+      return false;
+    }
+
+    const outgoingId = createMessageId("link");
+    if (state.mode === "xmpp" && state.xmppSocket?.readyState === WebSocket.OPEN && state.xmppSession?.authenticated) {
+      const xml = createMessageStanza(text, outgoingId, null, false, contact.peer, "", "chat");
+      const sent = sendXmppStanza(xml, `<message to="${escapeXml(contact.peer)}" invite-link="true"/>`);
+      if (sent) {
+        addMessage("self", text, "RFC 7395", null, null, contact.id, null, outgoingId, false, true, null, "sent");
+        return true;
+      }
+    }
+
+    if (state.relaySocket?.readyState === WebSocket.OPEN) {
+      const envelope = createRelayEnvelope("message", text, "", contact.peer);
+      envelope.messageId = outgoingId;
+      envelope.conversationKind = "contact";
+      state.relaySocket.send(JSON.stringify(envelope));
+      appendDebug("relay-out", JSON.stringify(redactEnvelopeForLog(envelope)));
+      addMessage("self", text, "sent", null, null, contact.id, null, outgoingId, false, true, null, "sent");
+      return true;
+    }
+
+    return false;
+  }
+
+  function copyGroupInviteLinkFromDialog() {
+    const group = groupManagementConversation();
+    if (!group || group.kind !== "group") {
+      setGroupManagementStatus(t("status.select_group_first", "Select a group first"), "warn");
+      return;
+    }
+
+    const inviteLink = groupInviteLink(group);
+    copyTextToClipboard(inviteLink)
+      .then(() => {
+        const text = t("message.group_invite_link_copied", "Group link copied to clipboard.");
+        setConnectionStatus(text, "good");
+        setGroupManagementStatus(text, "good");
+      })
+      .catch(() => {
+        prompt(t("message.group_invite_link_copy_prompt", "Copy this group link"), inviteLink);
+      });
+  }
+
+  function copyTextToClipboard(text) {
+    if (navigator.clipboard?.writeText) {
+      return navigator.clipboard.writeText(text);
+    }
+
+    return Promise.reject(new Error("clipboard_unavailable"));
+  }
+
+  function groupInviteLink(group) {
+    const url = new URL(location.href);
+    url.hash = "";
+    url.searchParams.set("join", bareJid(group?.peer || ""));
+    url.searchParams.set("groupName", conversationDisplayName(group));
+    return url.toString();
+  }
+
+  function openGroupInviteFromUrl() {
+    const url = new URL(location.href);
+    const room = bareJid(url.searchParams.get("join") || "");
+    if (!room || !room.includes("@")) {
+      return;
+    }
+
+    const name = String(url.searchParams.get("groupName") || "").trim() || displayNameForJid(room);
+    const conversation = ensureConversationForPeer(room, "group", name);
+    if (!conversation) {
+      return;
+    }
+
+    persistGroupMetadata(conversation);
+    selectConversation(conversation);
+    joinXmppGroupConversation(conversation);
+    url.searchParams.delete("join");
+    url.searchParams.delete("groupName");
+    history.replaceState(null, "", url.toString());
+    setConnectionStatus(
+      t("message.group_invite_opened", "Group invitation opened: {0}").replace("{0}", conversationDisplayName(conversation)),
+      "good"
+    );
   }
 
   function toggleBlockContextConversation() {
     const conversation = state.conversations.find((item) => item.id === state.contextConversationId) ?? activeConversation();
     closeConversationContextMenu();
     toggleBlockConversation(conversation);
+  }
+
+  function toggleMuteContextConversationNotifications() {
+    const conversation = state.conversations.find((item) => item.id === state.contextConversationId) ?? activeConversation();
+    closeConversationContextMenu();
+    toggleMuteConversationNotifications(conversation);
+  }
+
+  function toggleMuteConversationNotifications(conversation) {
+    if (!canMuteConversationNotifications(conversation)) {
+      setConnectionStatus(t("status.select_contact_first", "Select a contact first"), "warn");
+      return;
+    }
+
+    const shouldMute = !isNotificationMutedConversation(conversation);
+    setNotificationMutedPeer(conversation.peer, shouldMute);
+    const statusText = shouldMute
+      ? t("status.notifications_muted", "Notifications muted for {0}")
+      : t("status.notifications_unmuted", "Notifications enabled for {0}");
+    setConnectionStatus(statusText.replace("{0}", conversationDisplayName(conversation)), shouldMute ? "warn" : "good");
+    renderConversations();
+    updateConversationContextMenu();
+  }
+
+  function archiveContextConversation() {
+    const conversation = state.conversations.find((item) => item.id === state.contextConversationId) ?? activeConversation();
+    closeConversationContextMenu();
+    archiveConversation(conversation);
+  }
+
+  function archiveConversation(conversation) {
+    if (!canArchiveConversation(conversation)) {
+      setConnectionStatus(t("status.select_contact_first", "Select a contact first"), "warn");
+      return;
+    }
+
+    const wasActive = state.activeConversationId === conversation.id;
+    state.archivedJids.add(normalizeBlockJid(conversation.peer));
+    saveArchivedJids();
+    conversation.remoteText = "";
+    conversation.remoteFrom = "";
+    conversation.remoteDraftUpdatedAt = null;
+    if (wasActive) {
+      state.activeConversationId = null;
+      state.previousText = "";
+      el.messageInput.value = "";
+      el.peerInput.value = "";
+      syncComposerActionButtons();
+    }
+
+    setConnectionStatus(t("status.chat_archived", "Chat archived: {0}").replace("{0}", conversationDisplayName(conversation)), "good");
+    renderConversations();
+    renderActiveConversation();
+    refreshOpenTabPanel();
+  }
+
+  function unarchiveConversation(conversation) {
+    const key = normalizeBlockJid(conversation?.peer || "");
+    if (!key || !state.archivedJids.has(key)) {
+      return;
+    }
+
+    state.archivedJids.delete(key);
+    saveArchivedJids();
+    refreshOpenTabPanel();
   }
 
   function toggleBlockConversation(conversation) {
@@ -11640,16 +14533,45 @@
     saveBlockedJids();
   }
 
+  function setNotificationMutedPeer(peer, muted) {
+    const key = normalizeBlockJid(peer);
+    if (!key) {
+      return;
+    }
+
+    if (muted) {
+      state.mutedNotificationJids.add(key);
+    } else {
+      state.mutedNotificationJids.delete(key);
+    }
+
+    saveMutedNotificationJids();
+  }
+
   function updateConversationContextMenu() {
     const conversation = state.conversations.find((item) => item.id === state.contextConversationId) ?? null;
     const canViewProfile = canViewContactProfile(conversation);
     const canBlock = canBlockConversation(conversation);
+    const canMute = canMuteConversationNotifications(conversation);
+    const canArchive = canArchiveConversation(conversation);
     const blocked = isBlockedConversation(conversation);
+    const muted = isNotificationMutedConversation(conversation);
     const canChangeRoomAvatar = canChangeMucAvatar(conversation);
+    const canManageGroup = canManageGroupConversation(conversation);
     el.contextProfileButton.hidden = !canViewProfile;
     el.contextProfileButton.disabled = !canViewProfile;
     el.contextRoomAvatarButton.hidden = !canChangeRoomAvatar;
     el.contextRoomAvatarButton.disabled = !canChangeRoomAvatar;
+    el.contextGroupManageButton.hidden = !canManageGroup;
+    el.contextGroupManageButton.disabled = !canManageGroup;
+    el.contextArchiveButton.hidden = !canArchive;
+    el.contextArchiveButton.disabled = !canArchive;
+    el.contextMuteNotificationsButton.disabled = !canMute;
+    el.contextMuteNotificationsButton.hidden = !canMute;
+    el.contextMuteNotificationsButton.textContent = muted
+      ? t("button.unmute_notifications", "Enable notifications")
+      : t("button.mute_notifications", "Mute notifications");
+    el.contextMuteNotificationsButton.classList.toggle("selected", muted);
     el.contextBlockButton.disabled = !canBlock;
     el.contextBlockButton.hidden = !canBlock;
     el.contextBlockButton.textContent = blocked
@@ -11666,8 +14588,28 @@
       && !isInfrastructurePeer(conversation.peer);
   }
 
+  function canMuteConversationNotifications(conversation) {
+    return Boolean(conversation)
+      && conversation.kind === "contact"
+      && !isOwnPeer(conversation.peer)
+      && !isInfrastructurePeer(conversation.peer)
+      && !isBlockedConversation(conversation);
+  }
+
+  function canArchiveConversation(conversation) {
+    return Boolean(conversation)
+      && !isOwnPeer(conversation.peer)
+      && !isInfrastructurePeer(conversation.peer)
+      && !isBlockedConversation(conversation);
+  }
+
   function canOpenConversationContextMenu(conversation) {
-    return canViewContactProfile(conversation) || canBlockConversation(conversation) || canChangeMucAvatar(conversation);
+    return canViewContactProfile(conversation)
+      || canArchiveConversation(conversation)
+      || canMuteConversationNotifications(conversation)
+      || canBlockConversation(conversation)
+      || canChangeMucAvatar(conversation)
+      || canManageGroupConversation(conversation);
   }
 
   function canViewContactProfile(conversation) {
@@ -11678,9 +14620,883 @@
   }
 
   function canChangeMucAvatar(conversation) {
+    return canEditGroupDetails(conversation);
+  }
+
+  function canManageGroupConversation(conversation) {
     return Boolean(conversation)
       && conversation.kind === "group"
       && !isBlockedConversation(conversation);
+  }
+
+  function canEditGroupDetails(conversation) {
+    return canManageGroupConversation(conversation)
+      && (isCurrentUserGroupAdmin(conversation) || !hasKnownGroupRoles(conversation));
+  }
+
+  function hasKnownGroupRoles(conversation) {
+    return Boolean(bareJid(conversation?.groupOwnerJid || ""))
+      || Boolean((conversation?.groupAdminJids || []).some((jid) => bareJid(jid)))
+      || Boolean((conversation?.groupMemberJids || []).some((jid) => bareJid(jid)));
+  }
+
+  function isCurrentUserGroupAdmin(conversation) {
+    const jid = bareJid(currentFromJid());
+    if (!conversation || !jid) {
+      return false;
+    }
+
+    if (jidMatches(conversation.groupOwnerJid || "", jid)) {
+      return true;
+    }
+
+    return (conversation.groupAdminJids || []).some((adminJid) => jidMatches(adminJid, jid));
+  }
+
+  function openContextGroupManagement() {
+    const conversation = state.conversations.find((item) => item.id === state.contextConversationId) ?? null;
+    if (!canManageGroupConversation(conversation)) {
+      return;
+    }
+
+    closeConversationContextMenu();
+    openGroupManagementDialog(conversation);
+  }
+
+  function openGroupManagementDialog(conversation, options = {}) {
+    state.groupManagementConversationId = conversation.id;
+    el.groupManagementSubtitle.textContent = `${conversationDisplayName(conversation)} - ${bareJid(conversation.peer)}`;
+    el.groupTitleInput.value = conversationDisplayName(conversation);
+    syncGroupDescriptionControls(conversation);
+    renderAvatarInto(el.groupAvatarPreview, conversation);
+    updateGroupManagementEditControls(conversation);
+    el.groupMembersCanInviteToggle.checked = conversation.groupMembersCanInvite !== false;
+    el.groupApproveMembersToggle.checked = conversation.groupApproveMembers === true;
+    el.groupMemberJidInput.value = "";
+    el.groupAdminJidInput.value = "";
+    renderKnownGroupMembers(conversation);
+    renderGroupInviteContacts();
+    updateGroupManagementTabAccess(conversation);
+    setGroupManagementTab(options.tab || "members");
+    setGroupManagementStatus(t("group.manage_ready", "Choose what group members and admins may do."), "info");
+    el.groupManagementDialog.hidden = false;
+  }
+
+  function setGroupManagementTab(tab) {
+    const canUseAdminTabs = canCurrentUserUseGroupAdminTabs(groupManagementConversation());
+    const requestedTab = ["members", "tools", "blacklist"].includes(tab) ? tab : "members";
+    const nextTab = canUseAdminTabs || requestedTab === "members" ? requestedTab : "members";
+    state.groupManagementTab = nextTab;
+    for (const button of [el.groupMembersTabButton, el.groupAdminToolsTabButton, el.groupBlacklistTabButton]) {
+      const selected = button.dataset.groupTab === nextTab;
+      button.classList.toggle("selected", selected);
+      button.setAttribute("aria-selected", selected ? "true" : "false");
+    }
+
+    for (const panel of el.groupManagementDialog.querySelectorAll("[data-group-panel]")) {
+      panel.hidden = panel.dataset.groupPanel !== nextTab;
+    }
+  }
+
+  function updateGroupManagementTabAccess(conversation) {
+    const canUseAdminTabs = canCurrentUserUseGroupAdminTabs(conversation);
+    el.groupAdminToolsTabButton.hidden = !canUseAdminTabs;
+    el.groupBlacklistTabButton.hidden = !canUseAdminTabs;
+  }
+
+  function canCurrentUserUseGroupAdminTabs(conversation) {
+    return canManageGroupConversation(conversation)
+      && (isCurrentUserGroupAdmin(conversation) || !hasKnownGroupRoles(conversation));
+  }
+
+  function updateGroupManagementEditControls(conversation) {
+    const canEdit = canEditGroupDetails(conversation);
+    const canManage = canManageGroupConversation(conversation);
+    el.groupTitleInput.disabled = !canEdit;
+    el.groupSaveTitleButton.disabled = !canEdit;
+    el.groupDescriptionInput.disabled = !canEdit;
+    el.groupSaveInfoButton.disabled = !canEdit;
+    el.groupChangeAvatarButton.disabled = !canEdit;
+    el.groupInviteButton.disabled = !canManage;
+    el.groupSendInviteLinkButton.disabled = !canManage;
+    el.groupCopyInviteLinkButton.disabled = !canManage;
+    renderGroupInviteContacts();
+    el.groupAvatarPreview.classList.toggle("avatar-clickable", canEdit);
+    el.groupAvatarPreview.tabIndex = canEdit ? 0 : -1;
+  }
+
+  function handleGroupAvatarPreviewKeydown(event) {
+    if (event.key !== "Enter" && event.key !== " ") {
+      return;
+    }
+
+    event.preventDefault();
+    chooseGroupAvatarFromDialog();
+  }
+
+  function closeGroupManagementDialog() {
+    closeGroupMemberContextMenu();
+    el.groupManagementDialog.hidden = true;
+  }
+
+  function closeGroupManagementDialogOnBackdrop(event) {
+    if (event.target === el.groupManagementDialog) {
+      closeGroupManagementDialog();
+    }
+  }
+
+  function groupManagementConversation() {
+    const id = state.groupManagementConversationId || state.contextConversationId || state.activeConversationId;
+    return state.conversations.find((conversation) => conversation.id === id && conversation.kind === "group") ?? null;
+  }
+
+  function setGroupManagementStatus(text, level = "info") {
+    el.groupManagementStatus.textContent = text;
+    el.groupManagementStatus.dataset.level = level;
+  }
+
+  function syncGroupDescriptionControls(conversation) {
+    const description = String(conversation?.groupDescription || "");
+    el.groupDescriptionInput.value = description;
+    el.groupInfoText.textContent = description || t("group.info_empty", "No group information yet.");
+  }
+
+  function saveGroupTitleFromDialog() {
+    const conversation = groupManagementConversation();
+    if (!canManageGroupConversation(conversation)) {
+      setGroupManagementStatus(t("status.select_group_first", "Select a group first"), "warn");
+      return;
+    }
+
+    if (!canEditGroupDetails(conversation)) {
+      setGroupManagementStatus(t("group.admin_required", "Only group admins can change this."), "warn");
+      return;
+    }
+
+    const title = String(el.groupTitleInput.value || "").trim();
+    if (!title) {
+      setGroupManagementStatus(t("group.enter_title", "Enter a group title."), "warn");
+      return;
+    }
+
+    if (!ensureXmppGroupManagementReady(conversation)) {
+      return;
+    }
+
+    const sent = sendXmppRoomConfig(conversation.peer, {
+      "muc#roomconfig_roomname": title
+    });
+    if (sent) {
+      markCurrentUserAsGroupAdmin(conversation);
+      conversation.name = title;
+      delete conversation.nameKey;
+      el.groupManagementSubtitle.textContent = `${conversationDisplayName(conversation)} - ${bareJid(conversation.peer)}`;
+      renderConversations();
+      renderActiveConversation();
+      refreshOpenTabPanel();
+      persistGroupMetadata(conversation);
+    }
+
+    setGroupManagementStatus(sent
+      ? t("group.title_saved", "Group title saved.")
+      : t("group.title_failed", "Group title could not be sent."), sent ? "good" : "danger");
+  }
+
+  function saveGroupInfoFromDialog() {
+    const conversation = groupManagementConversation();
+    if (!canManageGroupConversation(conversation)) {
+      setGroupManagementStatus(t("status.select_group_first", "Select a group first"), "warn");
+      return;
+    }
+
+    if (!canEditGroupDetails(conversation)) {
+      setGroupManagementStatus(t("group.admin_required", "Only group admins can change this."), "warn");
+      return;
+    }
+
+    const description = String(el.groupDescriptionInput.value || "").trim();
+    if (!ensureXmppGroupManagementReady(conversation)) {
+      return;
+    }
+
+    const sent = sendXmppRoomConfig(conversation.peer, {
+      "muc#roomconfig_roomdesc": description
+    });
+    if (sent) {
+      markCurrentUserAsGroupAdmin(conversation);
+      conversation.groupDescription = description;
+      syncGroupDescriptionControls(conversation);
+      persistGroupMetadata(conversation);
+    }
+
+    setGroupManagementStatus(sent
+      ? t("group.info_saved", "Group information saved.")
+      : t("group.info_failed", "Group information could not be sent."), sent ? "good" : "danger");
+  }
+
+  function applyGroupRoomOptionsFromDialog() {
+    const conversation = groupManagementConversation();
+    if (!canManageGroupConversation(conversation)) {
+      setGroupManagementStatus(t("status.select_group_first", "Select a group first"), "warn");
+      return;
+    }
+
+    const approveMembers = el.groupApproveMembersToggle.checked;
+    const membersCanInvite = el.groupMembersCanInviteToggle.checked;
+    const previousApproveMembers = conversation.groupApproveMembers === true;
+    const previousMembersCanInvite = conversation.groupMembersCanInvite !== false;
+    if (!ensureXmppGroupManagementReady(conversation)) {
+      el.groupApproveMembersToggle.checked = previousApproveMembers;
+      el.groupMembersCanInviteToggle.checked = previousMembersCanInvite;
+      return;
+    }
+
+    conversation.groupApproveMembers = approveMembers;
+    conversation.groupMembersCanInvite = membersCanInvite;
+    const sent = sendXmppRoomConfig(conversation.peer, {
+      "muc#roomconfig_membersonly": approveMembers ? "1" : "0",
+      "muc#roomconfig_allowinvites": membersCanInvite ? "1" : "0"
+    });
+    if (sent) {
+      markCurrentUserAsGroupAdmin(conversation);
+      updateGroupManagementEditControls(conversation);
+      persistGroupMetadata(conversation);
+    }
+    if (!sent) {
+      conversation.groupApproveMembers = previousApproveMembers;
+      conversation.groupMembersCanInvite = previousMembersCanInvite;
+      el.groupApproveMembersToggle.checked = previousApproveMembers;
+      el.groupMembersCanInviteToggle.checked = previousMembersCanInvite;
+    }
+    setGroupManagementStatus(sent
+      ? t("group.room_options_sent", "Group settings sent to ejabberd.")
+      : t("group.room_options_failed", "Group settings could not be sent."), sent ? "good" : "danger");
+  }
+
+  function renderKnownGroupMembers(conversation) {
+    const members = knownGroupMembers(conversation);
+    const canUseAdminActions = canCurrentUserUseGroupAdminTabs(conversation);
+    const visibleMembers = members.filter((member) => !member.isBanned);
+    const bannedMembers = members.filter((member) => member.isBanned);
+    el.groupMemberListTitle.textContent = groupMemberListTitle(visibleMembers.length);
+    el.groupKnownMembersPanel.replaceChildren();
+    el.groupBannedMembersPanel.replaceChildren();
+    el.groupKnownMembersList.replaceChildren();
+
+    for (const member of members) {
+      const option = document.createElement("option");
+      option.value = member.jid;
+      option.label = member.name;
+      el.groupKnownMembersList.appendChild(option);
+    }
+
+    if (!visibleMembers.length) {
+      const empty = document.createElement("div");
+      empty.className = "group-known-members-empty";
+      empty.textContent = t("group.known_members_empty", "No known members yet. Members will appear here after they write in the group.");
+      el.groupKnownMembersPanel.appendChild(empty);
+    }
+
+    for (const member of visibleMembers) {
+      el.groupKnownMembersPanel.appendChild(createGroupMemberRow(member, "members", canUseAdminActions));
+    }
+
+    if (!bannedMembers.length) {
+      const empty = document.createElement("div");
+      empty.className = "group-known-members-empty";
+      empty.textContent = t("group.blacklist_empty", "No banned members.");
+      el.groupBannedMembersPanel.appendChild(empty);
+    }
+
+    for (const member of bannedMembers) {
+      el.groupBannedMembersPanel.appendChild(createGroupMemberRow(member, "blacklist", canUseAdminActions));
+    }
+  }
+
+  function groupMemberListTitle(count) {
+    const template = count === 1
+      ? t("group.member_list_count_one", "Member list - 1 member")
+      : t("group.member_list_count_many", "Member list - {0} members");
+    return template.replace("{0}", String(count));
+  }
+
+  function createGroupMemberRow(member, mode, canUseAdminActions) {
+    const row = document.createElement("div");
+    row.className = "group-known-member";
+    row.addEventListener("click", (event) => {
+      if (event.target instanceof Element && event.target.closest("button")) {
+        return;
+      }
+
+      openGroupMemberProfile(member);
+    });
+    row.addEventListener("contextmenu", (event) => showGroupMemberContextMenu(event, member));
+
+    const identity = document.createElement("div");
+    identity.className = "group-known-member-identity";
+    identity.tabIndex = 0;
+    identity.setAttribute("role", "button");
+    identity.setAttribute("aria-label", `${member.name} - ${member.jid}`);
+    identity.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") {
+        return;
+      }
+
+      event.preventDefault();
+      openGroupMemberProfile(member);
+    });
+    const name = document.createElement("strong");
+    const star = document.createElement("span");
+    star.className = "group-member-admin-star";
+    star.textContent = "★";
+    star.title = member.isOwner
+      ? t("group.status_owner", "Owner")
+      : t("group.status_admin", "Admin");
+    star.setAttribute("aria-label", star.title);
+    star.hidden = !member.isAdmin && !member.isOwner;
+    const nameText = document.createElement("span");
+    nameText.textContent = member.name;
+    name.append(star, nameText);
+    const jid = document.createElement("span");
+    jid.textContent = member.jid;
+    const status = document.createElement("span");
+    status.className = "group-known-member-status";
+    status.textContent = groupMemberStatusText(member);
+    identity.append(name, jid, status);
+
+    const actions = document.createElement("div");
+    actions.className = "group-known-member-actions";
+    appendGroupMemberBadge(actions, member);
+    appendGroupMemberActions(actions, member, mode, canUseAdminActions);
+    row.append(identity, actions);
+    return row;
+  }
+
+  function appendGroupMemberBadge(actions, member) {
+    if (!member.isBanned) {
+      return;
+    }
+
+    const badge = document.createElement("span");
+    badge.className = "group-member-role-badge group-member-role-badge-danger";
+    badge.textContent = groupMemberStatusText(member);
+    actions.appendChild(badge);
+  }
+
+  function appendGroupMemberActions(actions, member, mode, canUseAdminActions) {
+    if (!canUseAdminActions) {
+      return;
+    }
+
+    if (mode === "blacklist") {
+      const unbanButton = document.createElement("button");
+      unbanButton.type = "button";
+      unbanButton.textContent = t("button.group_unban_member", "Unban");
+      unbanButton.addEventListener("click", () => {
+        setGroupAffiliationFromDialog(member.jid, "none", t("group.member_unbanned", "Ban removed."), false);
+      });
+      actions.appendChild(unbanButton);
+      return;
+    }
+
+    const addButton = document.createElement("button");
+    addButton.type = "button";
+    addButton.textContent = t("button.group_add_member", "Add member");
+    addButton.addEventListener("click", () => {
+      el.groupMemberJidInput.value = member.jid;
+      setGroupAffiliationFromDialog(member.jid, "member", t("group.member_added", "Member added."), true);
+    });
+    if (!member.isMember && !member.isAdmin && !member.isOwner && !member.isBanned) {
+      actions.appendChild(addButton);
+    }
+
+    const adminButton = document.createElement("button");
+    adminButton.type = "button";
+    adminButton.textContent = t("button.group_make_admin", "Make admin");
+    adminButton.addEventListener("click", () => {
+      el.groupAdminJidInput.value = member.jid;
+      setGroupAffiliationFromDialog(member.jid, "admin", t("group.admin_added", "Group admin assigned."), false);
+    });
+    if (!member.isAdmin && !member.isOwner && !member.isBanned) {
+      actions.appendChild(adminButton);
+    }
+
+    if (!member.isOwner && !member.isSelf) {
+      actions.appendChild(createGroupMemberMenuButton(member));
+    }
+  }
+
+  function createGroupMemberMenuButton(member) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "group-member-menu-button";
+    button.title = t("group.member_menu", "Group member menu");
+    button.setAttribute("aria-label", button.title);
+    const symbol = document.createElement("span");
+    symbol.className = "group-member-menu-symbol";
+    symbol.setAttribute("aria-hidden", "true");
+    button.appendChild(symbol);
+    button.addEventListener("click", (event) => showGroupMemberContextMenu(event, member, button));
+    return button;
+  }
+
+  function openGroupMemberProfile(member) {
+    const jid = bareJid(member?.jid || "");
+    if (!jid) {
+      return;
+    }
+
+    closeGroupMemberContextMenu();
+    if (member.isSelf || jidMatches(jid, currentFromJid())) {
+      openAccountDialog({ mode: "profile" });
+      return;
+    }
+
+    const conversation = ensureConversationForPeer(jid, "contact", member.name || displayNameForJid(jid));
+    if (canViewContactProfile(conversation)) {
+      openContactProfileDialog(conversation);
+    }
+  }
+
+  function showGroupMemberContextMenu(event, member, anchor = null) {
+    const jid = bareJid(member?.jid || "");
+    if (!jid) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    closeConversationContextMenu();
+    closeMessageContextMenu();
+    state.groupMemberContextJid = jid;
+    updateGroupMemberContextMenu(member);
+
+    const anchorRect = anchor?.getBoundingClientRect();
+    const fallbackX = anchorRect ? anchorRect.left + anchorRect.width / 2 : 12;
+    const fallbackY = anchorRect ? anchorRect.bottom + 4 : 12;
+    const x = Number.isFinite(event.clientX) && event.clientX > 0 ? event.clientX : fallbackX;
+    const y = Number.isFinite(event.clientY) && event.clientY > 0 ? event.clientY : fallbackY;
+
+    const menu = el.groupMemberContextMenu;
+    menu.hidden = false;
+    menu.style.left = "0px";
+    menu.style.top = "0px";
+    const rect = menu.getBoundingClientRect();
+    const left = Math.max(8, Math.min(x, window.innerWidth - rect.width - 8));
+    const top = Math.max(8, Math.min(y, window.innerHeight - rect.height - 8));
+    menu.style.left = `${left}px`;
+    menu.style.top = `${top}px`;
+    menu.querySelector("button:not([hidden]):not(:disabled)")?.focus();
+  }
+
+  function updateGroupMemberContextMenu(member = contextGroupMember()) {
+    const conversation = groupManagementConversation();
+    const canUseAdminActions = canCurrentUserUseGroupAdminTabs(conversation);
+    const canAdd = canUseAdminActions && member && !member.isMember && !member.isAdmin && !member.isOwner && !member.isBanned;
+    const canMakeAdmin = canUseAdminActions && member && !member.isAdmin && !member.isOwner && !member.isBanned;
+    const canRemoveAdmin = canUseAdminActions && member && member.isAdmin && !member.isOwner;
+    const canBan = canUseAdminActions && member && !member.isOwner && !member.isSelf && !member.isBanned;
+    const canUnban = canUseAdminActions && member && member.isBanned;
+
+    el.groupMemberProfileMenuButton.hidden = !member;
+    el.groupMemberAddMenuButton.hidden = !canAdd;
+    el.groupMemberMakeAdminMenuButton.hidden = !canMakeAdmin;
+    el.groupMemberRemoveAdminMenuButton.hidden = !canRemoveAdmin;
+    el.groupMemberBanMenuButton.hidden = !canBan;
+    el.groupMemberUnbanMenuButton.hidden = !canUnban;
+  }
+
+  function closeGroupMemberContextMenuOnOutsideClick(event) {
+    if (event.target instanceof Element && event.target.closest("#groupMemberContextMenu")) {
+      return;
+    }
+
+    closeGroupMemberContextMenu();
+  }
+
+  function closeGroupMemberContextMenuOnEscape(event) {
+    if (event.key === "Escape") {
+      closeGroupMemberContextMenu();
+    }
+  }
+
+  function closeGroupMemberContextMenu() {
+    state.groupMemberContextJid = "";
+    el.groupMemberContextMenu.hidden = true;
+  }
+
+  function contextGroupMember() {
+    const jid = bareJid(state.groupMemberContextJid);
+    const conversation = groupManagementConversation();
+    if (!jid || !conversation) {
+      return null;
+    }
+
+    return knownGroupMembers(conversation).find((member) => jidMatches(member.jid, jid)) ?? null;
+  }
+
+  function openContextGroupMemberProfile() {
+    const member = contextGroupMember();
+    if (member) {
+      openGroupMemberProfile(member);
+    }
+  }
+
+  function addContextGroupMember() {
+    const member = contextGroupMember();
+    if (!member) {
+      return;
+    }
+
+    closeGroupMemberContextMenu();
+    el.groupMemberJidInput.value = member.jid;
+    setGroupAffiliationFromDialog(member.jid, "member", t("group.member_added", "Member added."), true);
+  }
+
+  function makeContextGroupMemberAdmin() {
+    const member = contextGroupMember();
+    if (!member) {
+      return;
+    }
+
+    closeGroupMemberContextMenu();
+    el.groupAdminJidInput.value = member.jid;
+    setGroupAffiliationFromDialog(member.jid, "admin", t("group.admin_added", "Group admin assigned."), false);
+  }
+
+  function removeContextGroupMemberAdmin() {
+    const member = contextGroupMember();
+    if (!member) {
+      return;
+    }
+
+    closeGroupMemberContextMenu();
+    el.groupAdminJidInput.value = member.jid;
+    setGroupAffiliationFromDialog(member.jid, "member", t("group.admin_removed", "Group admin changed back to member."), false);
+  }
+
+  function banContextGroupMember() {
+    const member = contextGroupMember();
+    if (!member) {
+      return;
+    }
+
+    closeGroupMemberContextMenu();
+    setGroupAffiliationFromDialog(member.jid, "outcast", t("group.member_banned", "Member banned."), false);
+  }
+
+  function unbanContextGroupMember() {
+    const member = contextGroupMember();
+    if (!member) {
+      return;
+    }
+
+    closeGroupMemberContextMenu();
+    setGroupAffiliationFromDialog(member.jid, "none", t("group.member_unbanned", "Ban removed."), false);
+  }
+
+  function groupMemberStatusText(member) {
+    if (member.isBanned) {
+      return t("group.status_banned", "Banned");
+    }
+
+    if (member.isOwner) {
+      return t("group.status_owner", "Owner");
+    }
+
+    if (member.isAdmin) {
+      return t("group.status_admin", "Admin");
+    }
+
+    if (member.isMember) {
+      return t("group.status_member", "Member");
+    }
+
+    return t("group.status_seen", "Written in group");
+  }
+
+  function knownGroupMembers(conversation) {
+    const members = new Map();
+    const memberJids = new Set((conversation?.groupMemberJids || []).map((jid) => bareJid(jid)).filter(Boolean));
+    const adminJids = new Set((conversation?.groupAdminJids || []).map((jid) => bareJid(jid)).filter(Boolean));
+    const bannedJids = new Set((conversation?.groupBannedJids || []).map((jid) => bareJid(jid)).filter(Boolean));
+    const ownerJid = bareJid(conversation?.groupOwnerJid || "");
+    const currentJid = bareJid(currentFromJid());
+    const add = (jid, name = "", flags = {}) => {
+      const normalized = bareJid(jid);
+      if (!isKnownGroupMemberJid(normalized, conversation)) {
+        return;
+      }
+
+      const previous = members.get(normalized);
+      members.set(normalized, {
+        jid: normalized,
+        name: name || previous?.name || displayNameForJid(normalized),
+        isMember: previous?.isMember || flags.isMember || memberJids.has(normalized),
+        isAdmin: previous?.isAdmin || flags.isAdmin || adminJids.has(normalized),
+        isOwner: previous?.isOwner || flags.isOwner || normalized === ownerJid,
+        isBanned: previous?.isBanned || flags.isBanned || bannedJids.has(normalized),
+        isSelf: previous?.isSelf || normalized === currentJid
+      });
+    };
+
+    for (const contact of state.conversations) {
+      if (contact.kind === "contact" && !isBlockedConversation(contact)) {
+        add(contact.peer, conversationDisplayName(contact));
+      }
+    }
+
+    add(currentFromJid(), currentSenderName(), { isOwner: jidMatches(currentFromJid(), conversation?.groupOwnerJid || "") });
+    add(conversation?.groupOwnerJid, currentSenderName(), { isOwner: true });
+    for (const jid of conversation?.groupMemberJids || []) {
+      add(jid, jidMatches(jid, currentFromJid()) ? currentSenderName() : "", { isMember: true });
+    }
+    for (const jid of conversation?.groupAdminJids || []) {
+      add(jid, jidMatches(jid, currentFromJid()) ? currentSenderName() : "", { isAdmin: true });
+    }
+    for (const jid of conversation?.groupBannedJids || []) {
+      add(jid, "", { isBanned: true });
+    }
+
+    for (const message of conversation?.messages || []) {
+      add(message.from, message.senderDisplayName || "");
+    }
+
+    return [...members.values()].sort((left, right) => {
+      const leftRank = groupMemberRank(left);
+      const rightRank = groupMemberRank(right);
+      return leftRank === rightRank
+        ? left.name.localeCompare(right.name, undefined, { sensitivity: "base" })
+        : leftRank - rightRank;
+    });
+  }
+
+  function isKnownGroupMemberJid(jid, conversation) {
+    const normalized = bareJid(jid);
+    return Boolean(normalized)
+      && normalized.includes("@")
+      && normalized !== bareJid(conversation?.peer || "")
+      && !isInfrastructurePeer(normalized);
+  }
+
+  function groupMemberRank(member) {
+    if (member.isOwner) {
+      return 0;
+    }
+
+    if (member.isAdmin) {
+      return 1;
+    }
+
+    if (member.isMember) {
+      return 2;
+    }
+
+    if (member.isBanned) {
+      return 3;
+    }
+
+    return 4;
+  }
+
+  function addGroupMemberFromDialog() {
+    const jid = normalizedGroupDialogJid(el.groupMemberJidInput.value);
+    if (!jid) {
+      setGroupManagementStatus(t("group.enter_member_jid", "Enter a member JID."), "warn");
+      return;
+    }
+
+    setGroupAffiliationFromDialog(jid, "member", t("group.member_added", "Member added."), true);
+  }
+
+  function makeGroupAdminFromDialog() {
+    const jid = normalizedGroupDialogJid(el.groupAdminJidInput.value);
+    if (!jid) {
+      setGroupManagementStatus(t("group.enter_admin_jid", "Enter an admin JID."), "warn");
+      return;
+    }
+
+    setGroupAffiliationFromDialog(jid, "admin", t("group.admin_added", "Group admin assigned."), false);
+  }
+
+  function removeGroupAdminFromDialog() {
+    const jid = normalizedGroupDialogJid(el.groupAdminJidInput.value);
+    if (!jid) {
+      setGroupManagementStatus(t("group.enter_admin_jid", "Enter an admin JID."), "warn");
+      return;
+    }
+
+    setGroupAffiliationFromDialog(jid, "member", t("group.admin_removed", "Group admin changed back to member."), false);
+  }
+
+  function normalizedGroupDialogJid(value) {
+    const jid = bareJid(String(value || "").trim());
+    return jid && jid.includes("@") ? jid : "";
+  }
+
+  function markCurrentUserAsGroupOwner(conversation) {
+    const jid = bareJid(currentFromJid());
+    if (!conversation || !jid) {
+      return;
+    }
+
+    conversation.groupOwnerJid = jid;
+    conversation.groupMemberJids = Array.from(new Set([...(conversation.groupMemberJids || []), jid]));
+    conversation.groupAdminJids = Array.from(new Set([...(conversation.groupAdminJids || []), jid]));
+    conversation.groupBannedJids = (conversation.groupBannedJids || []).filter((item) => !jidMatches(item, jid));
+  }
+
+  function markCurrentUserAsGroupAdmin(conversation) {
+    const jid = bareJid(currentFromJid());
+    if (!conversation || !jid) {
+      return;
+    }
+
+    conversation.groupMemberJids = Array.from(new Set([...(conversation.groupMemberJids || []), jid]));
+    conversation.groupAdminJids = Array.from(new Set([...(conversation.groupAdminJids || []), jid]));
+    conversation.groupBannedJids = (conversation.groupBannedJids || []).filter((item) => !jidMatches(item, jid));
+  }
+
+  function assignCurrentUserAsGroupOwner(conversation) {
+    const jid = bareJid(currentFromJid());
+    if (!conversation || !jid) {
+      return false;
+    }
+
+    if (!ensureXmppGroupManagementReady(conversation, { quiet: true })) {
+      return false;
+    }
+
+    return sendXmppMucAffiliation(conversation.peer, jid, "owner");
+  }
+
+  function ensureXmppGroupManagementReady(conversation, options = {}) {
+    const ready = state.mode === "xmpp"
+      && state.xmppSocket?.readyState === WebSocket.OPEN
+      && state.xmppSession?.authenticated;
+    if (!ready) {
+      const text = t("group.xmpp_required", "Connect XMPP before changing group management.");
+      if (!options.quiet) {
+        setGroupManagementStatus(text, "danger");
+        setConnectionStatus(text, "danger");
+      }
+      return false;
+    }
+
+    if (conversation?.kind === "group" && !conversation.mucJoined) {
+      joinXmppGroupConversation(conversation);
+    }
+
+    return true;
+  }
+
+  function setGroupAffiliationFromDialog(jid, affiliation, successText, inviteAfterSet) {
+    const conversation = groupManagementConversation();
+    if (!canManageGroupConversation(conversation)) {
+      setGroupManagementStatus(t("status.select_group_first", "Select a group first"), "warn");
+      return;
+    }
+
+    if (!ensureXmppGroupManagementReady(conversation)) {
+      return;
+    }
+
+    const sent = sendXmppMucAffiliation(conversation.peer, jid, affiliation);
+    if (sent && inviteAfterSet) {
+      sendXmppDirectInvite(jid, conversation.peer, groupInviteLink(conversation));
+    }
+    if (sent) {
+      markCurrentUserAsGroupAdmin(conversation);
+      rememberGroupAffiliation(conversation, jid, affiliation);
+      updateGroupManagementEditControls(conversation);
+      renderKnownGroupMembers(conversation);
+      persistGroupMetadata(conversation);
+    }
+
+    setGroupManagementStatus(sent ? successText : t("group.admin_action_failed", "Group management command could not be sent."), sent ? "good" : "danger");
+  }
+
+  function rememberGroupAffiliation(conversation, jid, affiliation) {
+    const normalized = bareJid(jid);
+    if (!conversation || !normalized) {
+      return;
+    }
+
+    const members = new Set((conversation.groupMemberJids || []).map((item) => bareJid(item)).filter(Boolean));
+    const admins = new Set((conversation.groupAdminJids || []).map((item) => bareJid(item)).filter(Boolean));
+    const banned = new Set((conversation.groupBannedJids || []).map((item) => bareJid(item)).filter(Boolean));
+    if (affiliation === "owner") {
+      conversation.groupOwnerJid = normalized;
+      members.add(normalized);
+      admins.add(normalized);
+      banned.delete(normalized);
+    } else if (affiliation === "admin") {
+      members.add(normalized);
+      admins.add(normalized);
+      banned.delete(normalized);
+    } else if (affiliation === "member") {
+      members.add(normalized);
+      admins.delete(normalized);
+      banned.delete(normalized);
+      if (jidMatches(conversation.groupOwnerJid || "", normalized)) {
+        conversation.groupOwnerJid = "";
+      }
+    } else if (affiliation === "outcast") {
+      members.delete(normalized);
+      admins.delete(normalized);
+      banned.add(normalized);
+      if (jidMatches(conversation.groupOwnerJid || "", normalized)) {
+        conversation.groupOwnerJid = "";
+      }
+    } else if (affiliation === "none") {
+      members.delete(normalized);
+      admins.delete(normalized);
+      banned.delete(normalized);
+      if (jidMatches(conversation.groupOwnerJid || "", normalized)) {
+        conversation.groupOwnerJid = "";
+      }
+    }
+
+    conversation.groupMemberJids = [...members];
+    conversation.groupAdminJids = [...admins];
+    conversation.groupBannedJids = [...banned];
+  }
+
+  function sendXmppRoomConfig(roomPeer, fields) {
+    const room = bareJid(roomPeer);
+    if (!room) {
+      return false;
+    }
+
+    const fieldXml = Object.entries(fields)
+      .map(([name, value]) => `<field var="${escapeXml(name)}"><value>${escapeXml(value)}</value></field>`)
+      .join("");
+    const id = createShortId();
+    const xml = `<iq xmlns="jabber:client" type="set" to="${escapeXml(room)}" id="${escapeXml(id)}"><query xmlns="http://jabber.org/protocol/muc#owner"><x xmlns="jabber:x:data" type="submit"><field var="FORM_TYPE" type="hidden"><value>http://jabber.org/protocol/muc#roomconfig</value></field>${fieldXml}</x></query></iq>`;
+    return sendXmppStanza(xml, `<iq type="set" to="${escapeXml(room)}" muc-roomconfig="partial"/>`);
+  }
+
+  function sendXmppMucAffiliation(roomPeer, jid, affiliation) {
+    const room = bareJid(roomPeer);
+    if (!room || !jid || !affiliation) {
+      return false;
+    }
+
+    const id = createShortId();
+    const xml = `<iq xmlns="jabber:client" type="set" to="${escapeXml(room)}" id="${escapeXml(id)}"><query xmlns="http://jabber.org/protocol/muc#admin"><item jid="${escapeXml(jid)}" affiliation="${escapeXml(affiliation)}"/></query></iq>`;
+    return sendXmppStanza(xml, `<iq type="set" to="${escapeXml(room)}" muc-affiliation="${escapeXml(affiliation)}" jid="${escapeXml(jid)}"/>`);
+  }
+
+  function sendXmppDirectInvite(jid, roomPeer, inviteLink = "") {
+    const room = bareJid(roomPeer);
+    if (!jid || !room) {
+      return false;
+    }
+
+    const reasonTemplate = t("message.group_invite_reason", "You are invited to this TeleTypTel group. {0}");
+    const reason = reasonTemplate.replace("{0}", inviteLink || "");
+    const xml = `<message xmlns="jabber:client" to="${escapeXml(jid)}"><x xmlns="jabber:x:conference" jid="${escapeXml(room)}" reason="${escapeXml(reason)}"/></message>`;
+    return sendXmppStanza(xml, `<message to="${escapeXml(jid)}" direct-invite="${escapeXml(room)}"/>`);
   }
 
   function chooseContextRoomAvatar() {
@@ -11691,6 +15507,23 @@
 
     state.pendingMucAvatarConversationId = conversation.id;
     closeConversationContextMenu();
+    el.mucAvatarFileInput.value = "";
+    el.mucAvatarFileInput.click();
+  }
+
+  function chooseGroupAvatarFromDialog() {
+    const conversation = groupManagementConversation();
+    if (!canManageGroupConversation(conversation)) {
+      setGroupManagementStatus(t("status.select_group_first", "Select a group first"), "warn");
+      return;
+    }
+
+    if (!canChangeMucAvatar(conversation)) {
+      setGroupManagementStatus(t("group.admin_required", "Only group admins can change this."), "warn");
+      return;
+    }
+
+    state.pendingMucAvatarConversationId = conversation.id;
     el.mucAvatarFileInput.value = "";
     el.mucAvatarFileInput.click();
   }
@@ -11709,31 +15542,78 @@
       return;
     }
 
-    if (file.size > avatarMaxBytes) {
-      setConnectionStatus(t("avatar.file_too_large", "Avatar file is too large. Choose an image up to 256 KB."), "warn");
+    if (file.size > avatarSourceMaxBytes) {
+      setConnectionStatus(t("avatar.source_too_large", "Avatar photo is too large. Choose an image up to 5 MB."), "warn");
       return;
     }
 
     const reader = new FileReader();
     reader.addEventListener("load", () => {
       const dataUrl = String(reader.result ?? "");
-      if (!isValidAvatarDataUrl(dataUrl)) {
+      if (!isAvatarSourceDataUrl(dataUrl)) {
         setConnectionStatus(t("avatar.read_failed", "Avatar could not be read."), "danger");
         return;
       }
 
-      conversation.avatarDataUrl = dataUrl;
-      conversation.mucAvatarHash = hexBytes(sha1Bytes(dataUrlPayloadBytes(dataUrl)));
-      conversation.mucAvatarMediaType = file.type || dataUrlMediaType(dataUrl) || "image/png";
+      openAvatarCropDialog(dataUrl, { target: "group", conversationId: conversation.id });
+    });
+    reader.addEventListener("error", () => setConnectionStatus(t("avatar.read_failed", "Avatar could not be read."), "danger"));
+    reader.readAsDataURL(file);
+  }
+
+  async function setGroupAvatarFromCroppedCanvas(conversation, canvas) {
+    if (!conversation || !canChangeMucAvatar(conversation)) {
+      setConnectionStatus(t("group.admin_required", "Only group admins can change this."), "warn");
+      return false;
+    }
+
+    setConnectionStatus(t("button.uploading", "Uploading..."), "warn");
+    try {
+      const blob = await canvasToAvatarBlob(canvas);
+      const file = new File([blob], "group-avatar.jpg", { type: "image/jpeg" });
+      const [payload, bytes] = await Promise.all([
+        uploadFileDirect(file),
+        blob.arrayBuffer()
+      ]);
+      const avatarUrl = String(payload?.file?.url || "");
+      if (!isValidAvatarFileUrl(avatarUrl)) {
+        throw new Error("uploaded avatar URL is invalid");
+      }
+
+      conversation.avatarDataUrl = avatarUrl;
+      conversation.mucAvatarHash = hexBytes(sha1Bytes([...new Uint8Array(bytes)]));
+      conversation.mucAvatarMediaType = "image/jpeg";
       conversation.mucAvatarUpdatedAt = new Date().toISOString();
+      markCurrentUserAsGroupAdmin(conversation);
       setConnectionStatus(t("status.group_avatar_changed", "Group avatar changed."), "good");
+      if (!el.groupManagementDialog.hidden && state.groupManagementConversationId === conversation.id) {
+        renderAvatarInto(el.groupAvatarPreview, conversation);
+        setGroupManagementStatus(t("status.group_avatar_changed", "Group avatar changed."), "good");
+      }
       appendDebug("muc-avatar", `${conversation.peer} ${conversation.mucAvatarHash}`);
       renderConversations();
       renderActiveConversation();
       refreshOpenTabPanel();
+      persistGroupMetadata(conversation);
+      return true;
+    } catch (error) {
+      appendDebug("muc-avatar-error", error.message);
+      setConnectionStatus(t("upload.failed", "Upload failed"), "danger");
+      return false;
+    }
+  }
+
+  function canvasToAvatarBlob(canvas) {
+    return new Promise((resolve, reject) => {
+      canvas.toBlob((blob) => {
+        if (blob) {
+          resolve(blob);
+          return;
+        }
+
+        reject(new Error("avatar crop failed"));
+      }, "image/jpeg", .9);
     });
-    reader.addEventListener("error", () => setConnectionStatus(t("avatar.read_failed", "Avatar could not be read."), "danger"));
-    reader.readAsDataURL(file);
   }
 
   function refreshOpenTabPanel() {
@@ -11741,12 +15621,23 @@
       renderSettingsPanels();
     }
 
-    if (state.activeTabId === "chat" || el.tabPanel.hidden) {
+    if (state.activeTabId === "chat") {
       return;
     }
 
     const tab = allTabs().find((item) => item.id === state.activeTabId);
-    if (tab) {
+    if (!tab) {
+      return;
+    }
+
+    if (isHistoryTab(tab)) {
+      if (!el.historyPage.hidden) {
+        renderHistoryPage(tab);
+      }
+      return;
+    }
+
+    if (!el.tabPanel.hidden) {
       renderTabPanel(tab);
     }
   }
@@ -11764,6 +15655,62 @@
       .filter((jid) => !isOwnPeer(jid))
       .map((jid) => conversationsByPeer.get(jid) ?? createBlockedContactEntry(jid))
       .sort((left, right) => conversationDisplayName(left).localeCompare(conversationDisplayName(right)));
+  }
+
+  function archivedConversationEntries() {
+    const conversationsByPeer = new Map();
+    for (const conversation of state.conversations) {
+      const key = normalizeBlockJid(conversation.peer);
+      if (key && state.archivedJids.has(key)) {
+        conversationsByPeer.set(key, conversation);
+      }
+    }
+
+    return Array.from(state.archivedJids)
+      .filter((jid) => !isOwnPeer(jid))
+      .map((jid) => conversationsByPeer.get(jid) ?? createArchivedConversationEntry(jid))
+      .sort((left, right) => conversationDisplayName(left).localeCompare(conversationDisplayName(right)));
+  }
+
+  function createArchivedConversationEntry(jid) {
+    const kind = jid.includes("@conference.") ? "group" : "contact";
+    return {
+      id: `archived-${jid}`,
+      name: displayNameForJid(jid),
+      peer: jid,
+      kind,
+      avatarColor: avatarColorFor(jid),
+      presence: kind === "group" ? "group" : "offline",
+      meta: "",
+      messages: [],
+      remoteText: "",
+      remoteFrom: "",
+      remoteDraftUpdatedAt: null
+    };
+  }
+
+  function openArchivedConversation(entry) {
+    const peer = bareJid(entry?.peer || "");
+    if (!peer) {
+      return;
+    }
+
+    const conversation = ensureConversationForPeer(peer, entry.kind === "group" ? "group" : "contact", conversationDisplayName(entry));
+    if (!conversation) {
+      return;
+    }
+
+    unarchiveConversation(conversation);
+    selectConversation(conversation);
+    el.peerInput.value = conversation.peer;
+    state.previousText = "";
+    el.messageInput.value = "";
+    activateTab("chat");
+    renderConversations();
+    renderActiveConversation();
+    syncConversationMessageState(conversation, "archive-open");
+    setConnectionStatus(t("status.chat_unarchived", "Chat opened from archive: {0}").replace("{0}", conversationDisplayName(conversation)), "good");
+    el.messageInput.focus();
   }
 
   function createBlockedContactEntry(jid) {
@@ -11790,6 +15737,11 @@
     return Boolean(conversation) && isBlockedPeer(conversation.peer);
   }
 
+  function isArchivedConversation(conversation) {
+    const key = normalizeBlockJid(conversation?.peer || "");
+    return Boolean(key) && state.archivedJids.has(key);
+  }
+
   function isBlockedEnvelope(envelope) {
     const from = envelopeFrom(envelope);
     return Boolean(from) && isBlockedPeer(from);
@@ -11798,6 +15750,15 @@
   function isBlockedPeer(peer) {
     const key = normalizeBlockJid(peer);
     return Boolean(key) && state.blockedJids.has(key);
+  }
+
+  function isNotificationMutedConversation(conversation) {
+    return Boolean(conversation) && isNotificationMutedPeer(conversation.peer);
+  }
+
+  function isNotificationMutedPeer(peer) {
+    const key = normalizeBlockJid(peer);
+    return Boolean(key) && state.mutedNotificationJids.has(key);
   }
 
   function normalizeBlockJid(peer) {
@@ -11833,8 +15794,6 @@
   function updateComposerAvailability() {
     const hasConversation = Boolean(activeConversation());
     const blocked = isActiveConversationBlocked();
-    const selectedGroup = activeConversation()?.kind === "group";
-
     el.composerForm.classList.toggle("composer-disabled", !hasConversation || blocked);
     el.messageInput.disabled = !hasConversation || blocked;
     el.sendButton.disabled = !hasConversation || blocked;
@@ -11855,11 +15814,16 @@
     }
     syncEmojiButtonState();
     setCallButtonsDisabled(!hasConversation || Boolean(state.call) || blocked);
-    el.inviteConversationButton.disabled = !selectedGroup;
   }
 
   function setAccountReady(ready) {
     state.accountReady = ready === true;
+    if (state.accountReady) {
+      scheduleSessionInactivityTimeout();
+    } else {
+      window.clearTimeout(state.sessionIdleTimerId);
+      state.sessionIdleTimerId = null;
+    }
     updateConnectButtonAvailability();
     updateComposerAvailability();
   }
@@ -11881,12 +15845,7 @@
         return;
       }
 
-      const preferXmpp = state.mode === "xmpp" || normalizeTlsMode(state.account?.xmppTlsMode) === "websocket";
-      if (preferXmpp) {
-        connectXmppWebSocket();
-      } else {
-        connectRelay();
-      }
+      connectXmppWebSocket();
     }, 0);
   }
 
@@ -11901,8 +15860,9 @@
     const xmppOpen = state.xmppSocket?.readyState === WebSocket.OPEN;
     const connected = relayOpen || xmppOpen;
     el.connectButton.disabled = !state.accountReady || state.accountGateRequired || relayBusy;
-    el.disconnectButton.hidden = !connected;
+    el.disconnectButton.hidden = !state.developerMode || !connected;
     el.disconnectButton.disabled = !connected;
+    el.logoutButton.disabled = state.accountGateRequired && !hasStoredAccountSession();
     updateServerSettingsReadonly();
   }
 
@@ -11919,10 +15879,16 @@
       return t("presence.group", "Group");
     }
 
-    return conversation.presence === "online"
-      ? conversation.clientState === "inactive"
+    if (conversation.presence === "online") {
+      return conversation.clientState === "dnd"
+        ? t("presence.do_not_disturb", "Do not disturb")
+        : conversation.clientState === "inactive"
         ? t("presence.online_inactive", "Online - inactive")
-        : t("presence.online", "Online")
+        : t("presence.online", "Online");
+    }
+
+    return conversation.lastSeenAt
+      ? t("presence.last_seen", "last seen: {0}").replace("{0}", formatLastSeen(conversation.lastSeenAt))
       : t("presence.offline", "Offline");
   }
 
@@ -11941,12 +15907,46 @@
     return prefix ? `${prefix}: ${body}` : body;
   }
 
-  function conversationListFallbackMeta(conversation) {
-    if (conversation.presence === "offline" && conversation.lastSeenAt) {
-      return t("presence.last_seen", "laatst gezien: {0}")
-        .replace("{0}", formatLastSeen(conversation.lastSeenAt));
+  function conversationListTimeText(conversation) {
+    const message = lastConversationPreviewMessage(conversation);
+    const timestamp = message?.timestamp || conversation.lastSeenAt || null;
+    if (!timestamp) {
+      return "";
     }
 
+    return conversationListDateLabel(timestamp);
+  }
+
+  function conversationListDateLabel(value) {
+    const date = normalizeMessageDate(value);
+    const today = new Date();
+    if (date.toDateString() === today.toDateString()) {
+      return formatTime(date);
+    }
+
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    if (date.toDateString() === yesterday.toDateString()) {
+      return t("history.yesterday", "Yesterday");
+    }
+
+    const dayBeforeYesterday = new Date(today);
+    dayBeforeYesterday.setDate(today.getDate() - 2);
+    if (date.toDateString() === dayBeforeYesterday.toDateString()) {
+      return t("history.day_before_yesterday", "The day before yesterday");
+    }
+
+    const weekAgo = new Date(today);
+    weekAgo.setHours(0, 0, 0, 0);
+    weekAgo.setDate(weekAgo.getDate() - 6);
+    if (date >= weekAgo) {
+      return date.toLocaleDateString(undefined, { weekday: "long" });
+    }
+
+    return date.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+  }
+
+  function conversationListFallbackMeta(conversation) {
     return conversationMeta(conversation);
   }
 
@@ -12026,6 +16026,7 @@
         existing.name = name;
       }
 
+      maybeRequestXmppPresenceForConversation(existing);
       return existing;
     }
 
@@ -12046,7 +16047,22 @@
       remoteDraftUpdatedAt: null
     };
     state.conversations.push(conversation);
+    maybeRequestXmppPresenceForConversation(conversation);
     return conversation;
+  }
+
+  function maybeRequestXmppPresenceForConversation(conversation) {
+    if (state.mode !== "xmpp"
+      || state.xmppSocket?.readyState !== WebSocket.OPEN
+      || !state.xmppSession?.authenticated
+      || state.xmppSession?.phase !== "ready"
+      || conversation?.kind !== "contact"
+      || isOwnContact(conversation)
+      || isBlockedConversation(conversation)) {
+      return;
+    }
+
+    sendXmppPresenceSubscription(conversation.peer);
   }
 
   function conversationForEnvelope(envelope) {
@@ -12096,13 +16112,16 @@
     renderConversations();
   }
 
-  function setAllContactPresence(presence) {
+  function setAllContactPresence(presence, options = {}) {
     for (const conversation of state.conversations) {
       if (conversation.kind === "contact" && !isOwnContact(conversation)) {
         conversation.presence = presence;
         if (presence === "offline") {
           conversation.clientState = null;
           conversation.clientStateUpdatedAt = null;
+          if (options.updateLastSeen === true) {
+            conversation.lastSeenAt = new Date();
+          }
         }
       }
     }
@@ -12124,7 +16143,7 @@
   }
 
   function currentBareJid() {
-    return bareJid(currentFromJid()).toLowerCase();
+    return bareJid(state.xmppSession?.boundJid || currentFromJid()).toLowerCase();
   }
 
   function addressMatches(left, right) {
@@ -12453,6 +16472,10 @@
   }
 
   function messageContentChildren(message, meta, bodyWrap) {
+    if (message?.draft) {
+      return [bodyWrap];
+    }
+
     return [meta, bodyWrap];
   }
 
@@ -12485,7 +16508,8 @@
   function shouldRenderGroupSenderInBubble(message) {
     return Boolean(message)
       && activeConversation()?.kind === "group"
-      && shouldRenderInlineMessageMeta(message);
+      && !isCallMessage(message)
+      && (shouldRenderInlineMessageMeta(message) || message.draft);
   }
 
   function appendGroupSenderLabel(body, message) {
@@ -12781,6 +16805,9 @@
       delete normalized[actorId];
     }
     match.message.reactions = normalized;
+    if (actorId !== reactionActorId() && persist) {
+      showReactionBrowserNotification(match.conversation, match.message, actor, list);
+    }
 
     if (match.conversation.id === state.activeConversationId) {
       renderActiveConversation();
@@ -13067,6 +17094,9 @@
     document.body.classList.add("modal-open");
     updateVideoDialogActionButtons(state.videoRecorder.blob ? "preview" : "setup");
     el.startVideoRecordingButton.focus();
+    if (!state.videoRecorder.blob) {
+      startVideoDialogPreview();
+    }
   }
 
   async function toggleDialogVideoRecording() {
@@ -13112,6 +17142,9 @@
     }
 
     el.videoPreviewDialogVideo.pause();
+    closeVideoRecorderQualityMenu();
+    stopVideoPreviewStream();
+    el.videoPreviewDialogVideo.srcObject = null;
     el.videoPreviewDialog.hidden = true;
     document.body.classList.remove("modal-open");
     updatePreviewPlaybackButton("video");
@@ -14521,15 +18554,23 @@
     return xml;
   }
 
-  function createMessageStanza(text, id = createMessageId("msg"), replaceId = null, stylingDisabled = false, to = el.peerInput.value, extraXml = "") {
+  function createMessageStanza(text, id = createMessageId("msg"), replaceId = null, stylingDisabled = false, to = el.peerInput.value, extraXml = "", type = "chat") {
     const replace = replaceId
       ? `<replace xmlns="urn:xmpp:message-correct:0" id="${escapeXml(replaceId)}"/>`
       : "";
     const unstyled = stylingDisabled ? `<unstyled xmlns="urn:xmpp:styling:0"/>` : "";
     const originId = `<origin-id xmlns="urn:xmpp:sid:0" id="${escapeXml(id)}"/>`;
-    const receiptRequest = replaceId ? "" : `<request xmlns="urn:xmpp:receipts"/>`;
-    const markable = replaceId ? "" : `<markable xmlns="urn:xmpp:chat-markers:0"/>`;
-    return `<message xmlns="jabber:client" type="chat" from="${escapeXml(currentXmppFromJid())}" to="${escapeXml(to)}" id="${escapeXml(id)}"><body>${escapeXml(text)}</body>${originId}${replace}${unstyled}${extraXml || ""}${receiptRequest}${markable}</message>`;
+    const messageType = isXmppGroupchatType(type) ? "groupchat" : "chat";
+    const receiptRequest = replaceId || messageType === "groupchat" ? "" : `<request xmlns="urn:xmpp:receipts"/>`;
+    const markable = replaceId || messageType === "groupchat" ? "" : `<markable xmlns="urn:xmpp:chat-markers:0"/>`;
+    return `<message xmlns="jabber:client" type="${messageType}" from="${escapeXml(currentXmppFromJid())}" to="${escapeXml(to)}" id="${escapeXml(id)}"><body>${escapeXml(text)}</body>${originId}${replace}${unstyled}${extraXml || ""}${receiptRequest}${markable}</message>`;
+  }
+
+  function createXmppRttStanza(rttXml, to = el.peerInput.value, type = "chat", id = createMessageId("rtt")) {
+    const messageType = isXmppGroupchatType(type) ? "groupchat" : "chat";
+    const noStoreHint = `<no-store xmlns="urn:xmpp:hints"/>`;
+    const originId = `<origin-id xmlns="urn:xmpp:sid:0" id="${escapeXml(id)}"/>`;
+    return `<message xmlns="jabber:client" type="${messageType}" from="${escapeXml(currentXmppFromJid())}" to="${escapeXml(to)}" id="${escapeXml(id)}">${rttXml}${originId}${noStoreHint}</message>`;
   }
 
   function createDeliveryReceiptStanza(to, messageId, id = createMessageId("receipt")) {
@@ -14596,6 +18637,13 @@
       || normalized === "teletyptel";
   }
 
+  function isLocalBrowserHost(host) {
+    const normalized = String(host ?? "").trim().toLowerCase();
+    return normalized === "localhost"
+      || normalized === "127.0.0.1"
+      || normalized === "::1";
+  }
+
   function isLocalXmppWebSocketUrl(url) {
     try {
       const parsed = new URL(String(url ?? "").trim());
@@ -14640,6 +18688,38 @@
     } catch {
       return fallback;
     }
+  }
+
+  function normalizeLocalXmppWebSocketUrlForCurrentHost(url) {
+    const value = String(url ?? "").trim();
+    if (!value || value === "ws://127.0.0.1:8787" || value === "ws://localhost:8787") {
+      return defaultXmppWebSocketUrlForCurrentHost();
+    }
+
+    try {
+      const parsed = new URL(value);
+      if (isLocalAccountDomain(parsed.hostname) && (parsed.port === "8787" || parsed.pathname === "/rtt-relay")) {
+        return defaultXmppWebSocketUrlForCurrentHost();
+      }
+      if (isLocalAccountDomain(parsed.hostname) && !isLocalAccountDomain(location.hostname)) {
+        return defaultXmppWebSocketUrlForCurrentHost();
+      }
+      return parsed.toString();
+    } catch {
+      return defaultXmppWebSocketUrlForCurrentHost();
+    }
+  }
+
+  function defaultXmppWebSocketUrlForCurrentHost() {
+    const host = String(location.hostname || "").trim();
+    if (!host || isLocalAccountDomain(host)) {
+      return "wss://localhost:5443/websocket/";
+    }
+
+    const secure = location.protocol === "https:";
+    const protocol = secure ? "wss:" : "ws:";
+    const port = secure ? "5443" : "5280";
+    return `${protocol}//${host}:${port}/websocket/`;
   }
 
   function normalizeXmppPort(value) {
