@@ -8,9 +8,13 @@ final class XmppWebSocketTransport
     /** @var resource|null */
     private $stream = null;
     private string $buffer = '';
+    private string $url;
+    private int $timeoutSeconds;
 
-    public function __construct(private readonly string $url, private readonly int $timeoutSeconds = 15)
+    public function __construct(string $url, int $timeoutSeconds = 15)
     {
+        $this->url = $url;
+        $this->timeoutSeconds = $timeoutSeconds;
     }
 
     public function connect(): void

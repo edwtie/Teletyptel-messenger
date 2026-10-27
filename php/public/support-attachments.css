@@ -1,0 +1,10 @@
+.support-attachments { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.support-attachments [hidden] { display: none !important; }
+.support-file-selection { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 8px; border: 1px solid #b4cde6; border-radius: 10px; background: #f4f8fc; color: #183550; }
+.support-file-selection > span { flex: 1 1 100%; overflow-wrap: anywhere; font-size: 13px; }
+.support-file { display: block; color: #165eaa; overflow-wrap: anywhere; font-size: 13px; margin-block: 8px; }
+.support-file img { display: block; width: min(220px, 100%); height: auto; max-height: 180px; object-fit: contain; border-radius: 10px; margin-bottom: 6px; }
+.support-send > .support-attachments { display: contents; }
+.support-file-extras { margin: 4px 12px; }
+.support-file-extras:not(:has(> :not([hidden]))) { display: none; }
+.support-file-error { flex-basis: 100%; font-size: 13px; color: #8a231a; }

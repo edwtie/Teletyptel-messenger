@@ -185,8 +185,8 @@ before it claims A/V Calling compliance.
 
 The [Total Conversation Profile](protoxeps/total-conversation-profile.md) is the
 integrated Teletyptel profile that sits on top of XEP-0479. It combines the
-normal Core/Web/IM/Mobile/A/V suites with XEP-0301 real-time text and the two
-Jingle ProtoXEPs.
+normal Core/Web/IM/Mobile/A/V suites with XEP-0301 real-time text, XEP-0517 and
+the Jingle location ProtoXEP.
 
 Current implementation level:
 
@@ -195,7 +195,7 @@ Current implementation level:
 | TC-0 | Core conversation | Done as XMPP core foundation. |
 | TC-1 | Live text conversation | Done with XEP-0301 and message fallback. |
 | TC-2 | Audio/video conversation | Working now through Jingle-shaped call setup and browser WebRTC media. |
-| TC-3 | Synchronized Total Conversation | Prototype through Jingle synchronized RTT and `rtt` datachannel tests. |
+| TC-3 | Synchronized Total Conversation | Prototype through XEP-0517 Jingle synchronized RTT and `rtt` datachannel tests. |
 | TC-4 | Assistive context | Draft/prototype through XEP-0080 and Jingle user location. |
 
 TC-2 is a product/protocol implementation milestone. It is not the same as a
@@ -203,7 +203,8 @@ formal XEP-0479 A/V Calling Client claim, which still needs release packaging,
 hosted deployment and installed-client interop evidence.
 
 Submission timing: the Total Conversation Profile should stay as an internal
-review draft until the two Jingle ProtoXEPs have received initial XSF feedback.
+review draft until XEP-0517 and the Jingle location ProtoXEP have received
+initial XSF feedback.
 After that, convert the profile to XSF XML and submit it as the umbrella profile
-that combines XEP-0479, XEP-0301, Jingle synchronized RTT and Jingle user
-location.
+that combines XEP-0479, XEP-0301, XEP-0517 Jingle synchronized RTT and Jingle
+user location.

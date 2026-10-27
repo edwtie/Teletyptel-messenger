@@ -85,10 +85,11 @@ Run the protocol tests:
 dotnet run --project tests/Tiedragon.XmppMessenger.Tests/Tiedragon.XmppMessenger.Tests.csproj
 ```
 
-Start the local PHP relay:
+For the current web client, use ejabberd's XMPP WebSocket endpoint as the
+normal route:
 
-```bash
-php php/rtt-websocket-server.php
+```text
+wss://localhost:5443/websocket/
 ```
 
 Serve `php/public` through a local web server such as Apache/WAMP and open:
@@ -99,6 +100,10 @@ http://localhost/chat.html
 
 Do not open `chat.html` directly from the filesystem, because the account and
 profile APIs require a local web server.
+
+The old PHP RTT relay (`php/rtt-websocket-server.php`) is still included for
+local RTT/RFC7395 smoke tests, but it is no longer the normal webclient route
+when ejabberd is available.
 
 ## Documentation
 

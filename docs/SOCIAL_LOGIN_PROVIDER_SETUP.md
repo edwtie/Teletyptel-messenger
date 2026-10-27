@@ -1,8 +1,8 @@
 # Social Login Provider Setup
 
 TeleTypTel gebruikt social login als aanmeldlaag bovenop het eigen accountmodel.
-De XMPP-identiteit blijft apart: een Google-, Facebook-, Apple- of
-Auth0-account wordt gekoppeld aan een TeleTypTel `account_id`, en dat account
+De XMPP-identiteit blijft apart: een Google-, Facebook- of Apple-account
+wordt gekoppeld aan een TeleTypTel `account_id`, en dat account
 krijgt daarna een XMPP JID op de gekozen server.
 
 Dit voorkomt dat `famtie@freedom.nl` per ongeluk als XMPP-server `freedom.nl`
@@ -12,7 +12,7 @@ wordt behandeld wanneer de echte XMPP-server `localhost` of `teletyptel.nl` is.
 
 ```text
 login identity  -> account_id -> xmpp identity
-Google/Facebook/Apple/Auth0/telefoon/e-mail -> tt_... -> localpart@xmpp-domain
+Google/Facebook/Apple/telefoon/e-mail -> tt_... -> localpart@xmpp-domain
 ```
 
 Voor productie:
@@ -52,15 +52,11 @@ APPLE_CLIENT_ID=
 APPLE_CLIENT_SECRET=
 TELETYPTEL_OAUTH_APPLE_REDIRECT_URI=
 
-TELETYPTEL_OAUTH_AUTH0_DOMAIN=
-TELETYPTEL_OAUTH_AUTH0_CLIENT_ID=
-TELETYPTEL_OAUTH_AUTH0_CLIENT_SECRET=
-TELETYPTEL_OAUTH_AUTH0_REDIRECT_URI=
 ```
 
 De PHP-backend leest dezelfde waarden ook uit `php/config.php` onder `oauth`.
 De webinstaller `php/public/install.php` kan deze IDs en secrets tijdens
-installatie invullen voor Google, Facebook, Apple en Auth0. Laat
+installatie invullen voor Google, Facebook en Apple. Laat
 `php/config.example.php` leeg of met placeholders; echte secrets horen niet in
 Git.
 
@@ -86,8 +82,6 @@ Geimplementeerde backendroutes:
 /api/auth/facebook/callback
 /api/auth/apple/start
 /api/auth/apple/callback
-/api/auth/auth0/start
-/api/auth/auth0/callback
 ```
 
 Als providerconfiguratie ontbreekt, geven deze routes bewust
@@ -195,41 +189,6 @@ email = echte e-mail of private relay e-mail
 
 Apple geeft de naam vaak alleen bij de eerste toestemming. Sla die dus meteen
 op als profielvoorstel.
-
-## Auth0
-
-1. Maak een Auth0 Application met type Regular Web Application.
-2. Noteer je tenant domain, bijvoorbeeld:
-
-```text
-your-tenant.eu.auth0.com
-```
-
-3. Configureer Allowed Callback URLs:
-
-```text
-https://teletyptel.nl/api/auth/auth0/callback
-```
-
-Voor lokale tests eventueel:
-
-```text
-http://localhost/api/auth/auth0/callback
-```
-
-4. Gebruik minimale scopes:
-
-```text
-openid email profile
-```
-
-Gebruik in TeleTypTel:
-
-```text
-provider = auth0
-identifier = sub uit Auth0 /userinfo of ID token
-email = email claim
-```
 
 ## XMPP-Kant
 

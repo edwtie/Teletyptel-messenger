@@ -8,10 +8,13 @@
     "test": "tests"
   },
   "scripts": {
+    "test:support": "C:\\wamp64\\bin\\php\\php8.4.15\\php.exe php/tests/support-chat-smoke.php && C:\\wamp64\\bin\\php\\php8.4.15\\php.exe php/tests/support-call-smoke.php && C:\\wamp64\\bin\\php\\php8.4.15\\php.exe php/tests/support-translation-smoke.php && C:\\wamp64\\bin\\php\\php8.4.15\\php.exe php/tests/support-attachments-smoke.php && node tests/support-chat-ui.test.js && node tests/support-call-ui.test.js && node tests/support-translation-ui.test.js && node tests/support-language-ui.test.js",
+    "test:interpreter": "C:\\wamp64\\bin\\php\\php8.4.15\\php.exe php/tests/interpreter-smoke.php && node tests/interpreter-ui.test.js && node tests/interpreter-inline.test.js",
+    "test:translation": "node tests/translation-ui.test.js && node tests/xmpp-translation-ui.test.js && node tests/live-rtt-integration.test.js",
     "ios:sync": "cap sync ios",
     "ios:open": "cap open ios",
     "mobile:sync": "cap sync",
-    "test": "node tests/jingle-history.test.js"
+    "test": "node tests/jingle-history.test.js && node tests/admin-ui.test.js && node tests/intake-ui.test.js && C:\\wamp64\\bin\\php\\php8.4.15\\php.exe php/tests/admin-account-actions-smoke.php"
   },
   "repository": {
     "type": "git",

@@ -122,6 +122,14 @@ final class XmppStreamBuffer
     {
         $xml = substr($this->buffer, 0, $length);
         $this->buffer = substr($this->buffer, $length);
+        $tagEnd = strpos($xml, '>');
+        $opening = substr($xml, 0, $tagEnd === false ? strlen($xml) : $tagEnd);
+        if (preg_match('/^<stream:[A-Za-z]+(?=[\s>\/])/', $xml) && !preg_match('/\sxmlns:stream\s*=/', $opening)) {
+            $xml = preg_replace('/^(<stream:[A-Za-z]+)/', '$1 xmlns:stream="http://etherx.jabber.org/streams"', $xml, 1);
+        }
+        if (preg_match('/^<(iq|message|presence)(?=[\s>\/])/', $xml) && !preg_match('/\sxmlns\s*=/', $opening)) {
+            $xml = preg_replace('/^(<(?:iq|message|presence))/', '$1 xmlns="jabber:client"', $xml, 1);
+        }
         return $xml;
     }
 

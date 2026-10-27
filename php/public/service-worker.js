@@ -1,11 +1,16 @@
-const CACHE_NAME = "teletyptel-webclient-v252";
-const BUILD_VERSION = "20260615-xmpp-mam-sync";
+const CACHE_NAME = "teletyptel-webclient-v415";
+const BUILD_VERSION = "20261027-inline-interpreter";
 const ASSETS = [
   "chat.html",
   "dev.html",
-  `chat-client.css?v=${BUILD_VERSION}`,
+  "chat-client.css?v=20261027-inline-interpreter",
+  "chat-xmpp-translation.js?v=20261027-inline-interpreter",
+  "chat-translation.js?v=20261027-inline-interpreter",
+  "mobile-navigation.js?v=20260929-rtt-first",
+  "chat-interpreter.js?v=20261027-inline-interpreter",
   `chat-client.js?v=${BUILD_VERSION}`,
   `vendor/qrcode.js?v=${BUILD_VERSION}`,
+  "favicon.ico",
   "manifest.webmanifest",
   "assets/brand/teletyptel-logo-header.png",
   "assets/brand/teletyptel-logo-header@2x.png",
@@ -46,10 +51,11 @@ self.addEventListener("fetch", (event) => {
 });
 
 async function networkFirst(request) {
+  if (isPrivateRoute(request)) return fetch(request);
   const cache = await caches.open(CACHE_NAME);
   try {
     const response = await fetch(request);
-    if (response.ok && shouldCache(request)) {
+    if (response.ok && shouldCache(request) && !/no-store|private/i.test(response.headers.get("Cache-Control") || "")) {
       await cache.put(request, response.clone());
     }
 
@@ -72,6 +78,7 @@ async function networkFirst(request) {
 }
 
 function shouldCache(request) {
+  if (isPrivateRoute(request)) return false;
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) {
     return false;
@@ -82,4 +89,9 @@ function shouldCache(request) {
     || (request.destination === "image" && (url.pathname.includes("/smileys/") || url.pathname.includes("/assets/")))
     || url.pathname.includes("/lang/")
     || url.pathname.includes("/config/");
+}
+
+function isPrivateRoute(request) {
+  const pathname = new URL(request.url).pathname;
+  return /\/(?:aanmelden|admin|tolk)(?:\/|\.php|$)/i.test(pathname) || /\/api\//i.test(pathname);
 }

@@ -3,8 +3,9 @@
 Readable Markdown draft for a Teletyptel ProtoXEP.
 
 This draft describes an umbrella protocol profile. It does not replace the
-existing XMPP RFCs, published XEPs or the two Jingle ProtoXEPs. It defines how
-they fit together when a client claims to support Total Conversation.
+existing XMPP RFCs, published XEPs, XEP-0517 or the Jingle location ProtoXEP.
+It defines how they fit together when a client claims to support Total
+Conversation.
 
 ## Metadata
 
@@ -93,7 +94,7 @@ For this profile:
   interoperability or a clearly declared WebRTC datachannel/T.140 profile for
   browser deployments.
 
-This is the reason the Jingle synchronized real-time text ProtoXEP remains
+This is the reason XEP-0517 Jingle Synchronized Real-Time Text remains
 necessary even when audio and video codec negotiation already works.
 
 ## Normative Building Blocks
@@ -191,7 +192,7 @@ defines the integrated conversation behavior that uses those suites together.
 | TC-0 Core conversation | Core Client | Normal authenticated XMPP chat identity, stream, TLS, disco and presence foundation. |
 | TC-1 Live text conversation | Core Client plus IM Client messaging path | XEP-0301 live text is available with normal message fallback. |
 | TC-2 Audio/video conversation | A/V Calling Client baseline | A real Jingle call can be proposed, accepted and represented as audio/video in the conversation. |
-| TC-3 Synchronized Total Conversation | A/V Calling Client plus Jingle synchronized RTT ProtoXEP | Live text/captions are negotiated inside the same Jingle session instead of only in chat. |
+| TC-3 Synchronized Total Conversation | A/V Calling Client plus XEP-0517 Jingle synchronized RTT | Live text/captions are negotiated inside the same Jingle session instead of only in chat. |
 | TC-4 Assistive context | Advanced IM/Mobile/A/V features where applicable | Location, files, captions, device state, service contact and assistive context are explicit and discoverable. |
 
 Advanced Client requirements remain separate claims. For example, a client can
@@ -263,7 +264,7 @@ still making TC-0 through TC-4 machine-readable.
 
 The `tc#level` value must be one of `tc-0`, `tc-1`, `tc-2`, `tc-3` or `tc-4`.
 A client must not advertise `tc-3` unless it also advertises and can negotiate
-the Jingle synchronized RTT ProtoXEP. A client must not advertise `tc-4` unless
+XEP-0517 Jingle synchronized RTT. A client must not advertise `tc-4` unless
 it can also represent assistive context such as call-scoped location, fallback
 state and consent state.
 
@@ -287,7 +288,7 @@ Teletyptel implementation status:
 | TC-0 | Implemented in the XMPP core and local/public smoke paths. |
 | TC-1 | Implemented with XEP-0301 RTT, normal body fallback and browser/relay demos. |
 | TC-2 | Working in current software through Jingle-shaped call setup and browser WebRTC audio/video. This is implementation evidence, not a formal XEP-0479 A/V compliance claim yet. |
-| TC-3 | Prototype path exists through the Jingle synchronized RTT ProtoXEP and browser `rtt` datachannel tests. |
+| TC-3 | Prototype path exists through XEP-0517 Jingle synchronized RTT and browser `rtt` datachannel tests. |
 | TC-4 | Draft/prototype direction through XEP-0080 and Jingle user location; production consent, mobile and interop evidence remain required. |
 
 ## Binding Model
@@ -326,7 +327,7 @@ Example content set:
 Jingle sid: call-123
   content audio     -> XEP-0167 RTP audio
   content video     -> XEP-0167 RTP video
-  content text      -> ProtoXEP Jingle synchronized RTT
+  content text      -> XEP-0517 Jingle synchronized RTT
   content location  -> ProtoXEP Jingle user location
   content file      -> XEP-0234 Jingle file transfer
 ```
@@ -504,11 +505,11 @@ This Markdown draft is close to ProtoXEP submission shape, but it should not be
 submitted as XML before these steps are done:
 
 1. Decide whether XSF prefers this as a separate profile XEP or as explanatory
-   text after the two Jingle ProtoXEPs.
+   text after XEP-0517 and the Jingle location ProtoXEP.
 2. Keep the TC-level advertisement model small: one base disco feature plus one
    XEP-0128 form is easier to review than many feature strings.
-3. Convert this Markdown into XSF XEP XML only after the two smaller Jingle
-   ProtoXEPs receive initial Council/standards feedback.
+3. Convert this Markdown into XSF XEP XML only after XEP-0517 and the Jingle
+   location ProtoXEP receive initial Council/standards feedback.
 4. Keep Teletyptel's current claim at TC-2 until TC-3/TC-4 can be demonstrated
    with accepted protocol text and interop evidence.
 
@@ -520,5 +521,5 @@ submitted as XML before these steps are done:
    emergency-readiness extension?
 3. How should archives represent call-bound text without requiring servers to
    store media streams?
-4. Should this profile be submitted as a separate XSF ProtoXEP after the two
-   Jingle ProtoXEPs have been reviewed?
+4. Should this profile be submitted as a separate XSF ProtoXEP after XEP-0517
+   and the Jingle location ProtoXEP have been reviewed?

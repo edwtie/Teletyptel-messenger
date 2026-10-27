@@ -14,7 +14,7 @@ review, discussion and product planning inside Teletyptel.
 | Type | Standards Track |
 | Namespace | `urn:xmpp:jingle:apps:geoloc:0` |
 | Author | Edward Tie, `info@tiedragon.com` |
-| Revision | 0.0.1, 2026-05-31 |
+| Revision | 0.0.2, 2026-07-01 |
 
 ## Abstract
 
@@ -32,6 +32,9 @@ Location payload.
 | XEP-0167 | Jingle RTP sessions |
 | XEP-0176 | Jingle ICE-UDP transport |
 | XEP-0353 | Jingle Message Initiation context |
+| RFC 4119 | PIDF-LO background for location payloads in emergency ecosystems |
+| RFC 6442 | SIP location conveyance background for call-signaling location |
+| RFC 6881 | Emergency calling background for location conveyed with SIP calls |
 
 ## Introduction
 
@@ -39,6 +42,14 @@ XEP-0080 defines a payload for user location in XMPP. Jingle defines session
 negotiation, commonly used for audio and video calls. When location is shared
 during a call using only an out-of-session PEP event, the user experience can
 look call-scoped while the protocol state is not bound to that Jingle session.
+
+XEP-0080 is therefore necessary but not sufficient for this use case. It
+answers "what is the user's location?", but it does not by itself answer "which
+active call is this location for?". PEP and PubSub publication are useful for
+account-level or contact-visible location sharing, but they do not explicitly
+bind a location update to a Jingle `sid`, a content name, active call
+participants, a call-specific consent action, or call end/stop-sharing
+semantics.
 
 This specification defines a Jingle application extension for carrying XEP-0080
 location information inside the same Jingle session as audio, video or other
@@ -50,6 +61,41 @@ The motivating use cases include accessibility assistance, captioned or
 interpreted calls, emergency-readiness experiments and Total Conversation
 systems where text, audio, video and location may need to be shown as one
 deliberate conversational context.
+
+SIP emergency calling has a similar layering distinction. PIDF-LO describes a
+location object, while SIP location conveyance defines how location is conveyed
+in SIP session signaling. This proposal follows the same architectural idea for
+XMPP/Jingle: reuse the existing location payload, but define how it is scoped to
+an active call. It does not define emergency routing, PSAP behavior or national
+112/911 compliance.
+
+## Why XEP-0080/PEP Alone Is Not Enough
+
+XEP-0080 over PEP/PubSub remains the right tool for general user-location
+publication. It is not enough for call-scoped location because a receiving
+client or gateway cannot safely infer call intent from the latest published
+location item.
+
+For an active accessibility, relay or emergency-readiness call, the protocol
+needs to distinguish:
+
+1. a general presence/profile location from a location deliberately shared into
+   one call;
+2. a fresh call location from a stale PEP item;
+3. a location meant for one Jingle `sid` from another simultaneous call or
+   device session;
+4. a one-time call location from live location sharing;
+5. a stopped or expired call location from a still-live location;
+6. a location shared with call participants from a broader contact-visible
+   publication.
+
+Without a Jingle binding, a future relay, accessibility assistant or emergency
+gateway has to guess whether an XEP-0080 item belongs to the active call. That
+guessing is unsafe for 112/911-readiness, especially when a user may be deaf,
+speech-impaired, using RTT, using video signing, or depending on a relay service.
+
+This specification narrows the problem to call binding. It does not create a
+new coordinate format, a new presence format or a replacement for PEP.
 
 ## Requirements
 
@@ -259,6 +305,19 @@ This specification complements XEP-0080 and does not replace it.
 | User wants location to belong to a specific Jingle call | Use this Jingle location extension. |
 | Peer does not support this specification | A client may offer normal XEP-0080 sharing, but must not present it as call-scoped unless the UI makes the difference clear. |
 
+When a client falls back to normal XEP-0080 sharing, it must not assume that the
+latest published location item is the location for the active call. The user
+interface should show that the location is general location sharing, not
+call-bound location.
+
+This distinction is important for gateway designs. A gateway that bridges an
+XMPP/Jingle Total Conversation call to SIP or NG112-style infrastructure needs
+to know which location belongs to the call it is bridging. A general PEP item
+can be absent, stale, intended for another audience, or replaced by another
+device. A Jingle-scoped location update gives the gateway a session identifier,
+sender, content name, timestamp and stop/expiry semantics that are tied to the
+call state.
+
 ## Business Rules
 
 A client implementing this specification must not send location automatically
@@ -342,6 +401,17 @@ urn:xmpp:jingle:apps:geoloc:0
 One alternative is to use only XEP-0080 PEP publication. That is appropriate for
 normal user location publication, but it does not bind the update to a
 particular Jingle session and can fail on servers without PEP support.
+
+Another alternative is to put XEP-0080 geoloc payloads in ordinary chat
+messages. That can be useful for one-off location sharing, but it still lacks a
+standard call binding unless every message carries a Jingle `sid` reference and
+clients agree on stop/expiry behavior. This specification keeps the binding in
+the Jingle session where the call already lives.
+
+Another alternative is to use only a gateway-local convention. That may work in
+one deployment, but it does not help two independent XMPP clients or services
+understand that a location belongs to the same call. A small Jingle binding is
+intended to make that meaning explicit and interoperable.
 
 Another alternative is to define new latitude and longitude attributes inside
 Jingle. That would duplicate XEP-0080, lose fields such as accuracy and

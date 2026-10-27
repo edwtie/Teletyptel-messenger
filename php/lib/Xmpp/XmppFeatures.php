@@ -59,7 +59,7 @@ final class XmppFeatures
             'XEP-0486 MUC Avatars' => XmppXml::VCARD_TEMP_NS,
             'XEP-0494 Client Access Management' => XmppXml::CLIENT_ACCESS_MANAGEMENT_NS,
             'XEP-0514 Custom Emoji' => XmppXml::EMOJI_MARKUP_NS,
-            'ProtoXEP Jingle RTT Sync' => XmppXml::JINGLE_RTT_SYNC_NS,
+            'XEP-0517 Jingle Synchronized Real-Time Text' => XmppXml::JINGLE_RTT_SYNC_NS,
             'ProtoXEP Jingle User Location' => XmppXml::JINGLE_GEOLOC_NS,
         ];
     }

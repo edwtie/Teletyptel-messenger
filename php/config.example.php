@@ -2,6 +2,13 @@
 declare(strict_types=1);
 
 return [
+    'translation' => [
+        'enabled' => false,
+        'provider' => 'google',
+        'apiKey' => '',
+        'dailyCharacters' => 50000,
+        'globalDailyCharacters' => 500000,
+    ],
     'mysql' => [
         'host' => '127.0.0.1',
         'port' => 3306,
@@ -36,6 +43,17 @@ return [
         // Emergency fallback for admin.php. Prefer the admin account created by install.php.
         // Environment variable TELETYPTEL_ADMIN_TOKEN wins.
         'token' => '',
+    ],
+    'intake' => [
+        'enabled' => false,
+        'privacy_url' => '',
+        'privacy_version' => '',
+        'retention_days' => 0,
+        'medical_processing_approved' => false,
+        'medical_basis' => '',
+        'bsn_processing_approved' => false,
+        'bsn_legal_basis' => '',
+        'scanner_path' => '',
     ],
     'sip' => [
         // SIP is a server/gateway layer through ejabberd_sip/mod_sip or an external gateway.
@@ -86,13 +104,6 @@ return [
             'authorization_endpoint' => 'https://appleid.apple.com/auth/authorize',
             'token_endpoint' => 'https://appleid.apple.com/auth/token',
             'scopes' => ['name', 'email'],
-        ],
-        'auth0' => [
-            'auth0_domain' => 'your-tenant.eu.auth0.com',
-            'client_id' => '',
-            'client_secret' => '',
-            'redirect_uri' => 'http://localhost/api/auth/auth0/callback',
-            'scopes' => ['openid', 'email', 'profile'],
         ],
     ],
 ];

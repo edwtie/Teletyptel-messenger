@@ -8,9 +8,15 @@ const TT_AUTH_HANDOFF_TTL_SECONDS = 2592000;
 
 function ttAuthHandle(string $provider, string $step): void
 {
+    session_set_cookie_params([
+        'httponly' => true,
+        'secure' => !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
+        'samesite' => 'Lax',
+    ]);
     session_start();
     header('Cache-Control: no-store');
     try {
+        AccountAccess::guardSession(Database::connect(), $_SESSION);
         if ($step === 'start') {
             ttAuthStart($provider);
             return;
@@ -20,6 +26,8 @@ function ttAuthHandle(string $provider, string $step): void
             return;
         }
         ttAuthJson(['ok' => false, 'error' => 'unknown_auth_step'], 404);
+    } catch (AccountAccessDenied $error) {
+        ttAuthJson(['ok' => false, 'error' => 'account_access_denied', 'message' => $error->getMessage()], 403);
     } catch (Throwable $error) {
         ttAuthJson(['ok' => false, 'error' => 'oauth_server_error', 'message' => $error->getMessage()], 500);
     }
@@ -36,12 +44,17 @@ function ttAuthStart(string $provider): void
     $state = ttAuthBase64Url(random_bytes(24));
     $verifier = ttAuthBase64Url(random_bytes(48));
     $redirectUri = ttAuthRedirectUri($provider, $config);
+    $linkAccountId = '';
+    if (strtolower((string)($_GET['mode'] ?? '')) === 'link') {
+        $linkAccountId = ttAuthClean((string)($_SESSION['teletyptel_account_id'] ?? ''), 96);
+    }
     $_SESSION[TT_AUTH_SESSION_KEY][$provider][$state] = [
         'code_verifier' => $verifier,
         'redirect_uri' => $redirectUri,
         'created_at' => time(),
+        'link_account_id' => $linkAccountId,
     ];
-    ttAuthStorePendingState($provider, $state, $verifier, $redirectUri);
+    ttAuthStorePendingState($provider, $state, $verifier, $redirectUri, $linkAccountId);
 
     $query = [
         'response_type' => 'code',
@@ -99,11 +112,30 @@ function ttAuthCallback(string $provider): void
 
     $pdo = Database::connect();
     ttAuthEnsureAccountSchema($pdo);
-    $account = ttAuthPersistProviderAccount($pdo, $provider, $profile, $config);
+    $account = ttAuthPersistProviderAccount($pdo, $provider, $profile, $config, ttAuthClean((string)($session['link_account_id'] ?? ''), 96));
+    AccountAccess::bind($pdo, (string)$account['account_id'], $_SESSION);
     $_SESSION['teletyptel_account_id'] = $account['account_id'];
+    unset($_SESSION['teletyptel_authenticated_at'], $_SESSION['teletyptel_intake_authenticated_id'], $_SESSION['teletyptel_intake_csrf']);
+    $security = null;
+    if ((int)$pdo->query("SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'account_security_settings'")->fetchColumn() > 0) {
+        $statement = $pdo->prepare('SELECT two_factor_enabled, two_factor_method FROM account_security_settings WHERE account_id = ?');
+        $statement->execute([$account['account_id']]);
+        $security = $statement->fetch(PDO::FETCH_ASSOC);
+    }
+    session_regenerate_id(true);
+    if (!empty($security['two_factor_enabled'])) {
+        unset($_SESSION['teletyptel_account_id'], $_SESSION['teletyptel_2fa_pending_password']);
+        $_SESSION['teletyptel_2fa_pending_account_id'] = $account['account_id'];
+    } else {
+        unset($_SESSION['teletyptel_2fa_pending_account_id'], $_SESSION['teletyptel_2fa_pending_password']);
+        $_SESSION['teletyptel_authenticated_at'] = time();
+        $_SESSION['teletyptel_intake_authenticated_id'] = $account['account_id'];
+    }
 
     if (($request['format'] ?? '') === 'json') {
-        ttAuthJson(['ok' => true, 'account' => $account]);
+        ttAuthJson(!empty($security['two_factor_enabled'])
+            ? ['ok' => true, 'twoFactorRequired' => true, 'accountId' => $account['account_id'], 'method' => $security['two_factor_method']]
+            : ['ok' => true, 'account' => $account]);
         return;
     }
 
@@ -144,13 +176,6 @@ function ttAuthProviderConfig(string $provider): array
             'userinfo_endpoint' => '',
             'scopes' => ['name', 'email'],
         ],
-        'auth0' => [
-            'auth0_domain' => '',
-            'authorization_endpoint' => '',
-            'token_endpoint' => '',
-            'userinfo_endpoint' => '',
-            'scopes' => ['openid', 'email', 'profile'],
-        ],
     ];
     if (!isset($defaults[$provider])) {
         return ['configured' => false];
@@ -159,15 +184,6 @@ function ttAuthProviderConfig(string $provider): array
     $merged = array_merge($defaults[$provider], $providerConfig);
     $envPrefix = 'TELETYPTEL_OAUTH_' . strtoupper($provider) . '_';
     $plainPrefix = strtoupper($provider) . '_';
-    if ($provider === 'auth0') {
-        $domain = ttAuthNormalizeAuth0Domain(ttAuthEnv($envPrefix . 'DOMAIN', ttAuthEnv($plainPrefix . 'DOMAIN', (string)($merged['auth0_domain'] ?? $merged['domain'] ?? ''))));
-        if ($domain !== '') {
-            $merged['auth0_domain'] = $domain;
-            $merged['authorization_endpoint'] = (string)($merged['authorization_endpoint'] ?: 'https://' . $domain . '/authorize');
-            $merged['token_endpoint'] = (string)($merged['token_endpoint'] ?: 'https://' . $domain . '/oauth/token');
-            $merged['userinfo_endpoint'] = (string)($merged['userinfo_endpoint'] ?: 'https://' . $domain . '/userinfo');
-        }
-    }
     $clientIdKey = $provider === 'facebook' ? 'app_id' : 'client_id';
     $secretKey = $provider === 'facebook' ? 'app_secret' : 'client_secret';
     $clientId = ttAuthEnv($envPrefix . 'CLIENT_ID', ttAuthEnv($envPrefix . 'APP_ID', ttAuthEnv($plainPrefix . 'CLIENT_ID', ttAuthEnv($plainPrefix . 'APP_ID', (string)($merged[$clientIdKey] ?? $merged['client_id'] ?? '')))));
@@ -179,18 +195,10 @@ function ttAuthProviderConfig(string $provider): array
     $merged['xmpp_domain'] = (string)($oauth['xmpp_domain'] ?? $config['default_xmpp_domain'] ?? 'localhost');
     $merged['xmpp_host'] = (string)($oauth['xmpp_host'] ?? $config['default_xmpp_host'] ?? $merged['xmpp_domain']);
     $merged['xmpp_websocket'] = (string)($oauth['xmpp_websocket'] ?? $config['default_xmpp_websocket'] ?? 'wss://localhost:5443/websocket/');
+    $merged['xmpp_tls_mode'] = (string)($oauth['xmpp_tls_mode'] ?? $config['default_xmpp_tls_mode'] ?? 'websocket');
     $merged['configured'] = $clientId !== ''
-        && ($provider !== 'apple' || $clientSecret !== '')
-        && ($provider !== 'auth0' || (string)($merged['auth0_domain'] ?? '') !== '');
+        && ($provider !== 'apple' || $clientSecret !== '');
     return $merged;
-}
-
-function ttAuthNormalizeAuth0Domain(string $domain): string
-{
-    $domain = strtolower(trim($domain));
-    $domain = preg_replace('#^https?://#', '', $domain) ?? $domain;
-    $domain = rtrim($domain, '/');
-    return preg_match('/^[a-z0-9.-]+$/', $domain) === 1 ? $domain : '';
 }
 
 function ttAuthExchangeCode(string $provider, array $config, string $code, string $verifier, string $redirectUri): array
@@ -247,23 +255,28 @@ function ttAuthProfile(string $subject, string $email, bool $emailVerified, stri
     ];
 }
 
-function ttAuthPersistProviderAccount(PDO $pdo, string $provider, array $profile, array $config): array
+function ttAuthPersistProviderAccount(PDO $pdo, string $provider, array $profile, array $config, string $linkAccountId = ''): array
 {
     $email = $profile['email'];
     $displayName = $profile['display_name'] !== '' ? $profile['display_name'] : ($email !== '' ? $email : ucfirst($provider) . ' gebruiker');
     $domain = ttAuthClean((string)$config['xmpp_domain'], 255);
     $xmppDomain = $domain !== '' ? $domain : 'localhost';
-    $linkedAccount = ttAuthExistingLinkedAccount($pdo, $provider, $profile['subject'])
+    $linkedAccount = ($linkAccountId !== '' ? ttAuthAccountForLinkTarget($pdo, $linkAccountId) : null)
+        ?? ttAuthExistingLinkedAccount($pdo, $provider, $profile['subject'])
         ?? ttAuthAccountForVerifiedEmail($pdo, $email, $profile['email_verified']);
     $accountId = is_array($linkedAccount)
         ? (string)$linkedAccount['account_id']
         : 'oauth-' . $provider . '-' . substr(hash('sha256', $profile['subject']), 0, 24);
+    AccountAccess::assertAllowed($pdo, $accountId);
     $jid = is_array($linkedAccount) && (string)($linkedAccount['jid'] ?? '') !== ''
         ? (string)$linkedAccount['jid']
         : ttAuthChooseAvailableLocalJid($pdo, ttAuthLocalpart($email !== '' ? $email : $accountId), $xmppDomain, $accountId);
+    AccountAccess::assertJidAllowed($pdo, $jid);
     $host = ttAuthClean((string)$config['xmpp_host'], 255);
     $websocket = ttAuthClean((string)$config['xmpp_websocket'], 255);
-    $passwordHash = password_hash(bin2hex(random_bytes(32)), PASSWORD_DEFAULT);
+    $tlsMode = ttAuthClean((string)($config['xmpp_tls_mode'] ?? 'websocket'), 32);
+    $xmppPassword = ttAuthBase64Url(random_bytes(32));
+    $passwordHash = password_hash($xmppPassword, PASSWORD_DEFAULT);
 
     $pdo->beginTransaction();
     try {
@@ -283,39 +296,48 @@ function ttAuthPersistProviderAccount(PDO $pdo, string $provider, array $profile
         $pdo->prepare(
             'INSERT INTO account_credentials (account_id, password_hash, password_updated_at)
              VALUES (:account_id, :password_hash, NOW())
-             ON DUPLICATE KEY UPDATE account_id = account_id'
+             ON DUPLICATE KEY UPDATE password_hash = VALUES(password_hash), password_updated_at = NOW()'
         )->execute(['account_id' => $accountId, 'password_hash' => $passwordHash]);
         $pdo->prepare(
             'INSERT INTO account_xmpp (account_id, xmpp_jid, xmpp_domain, xmpp_host, xmpp_port, xmpp_tls_mode, xmpp_websocket, peer)
-             VALUES (:account_id, :jid, :domain, :host, 5222, "websocket", :websocket, "relay@localhost")
-             ON DUPLICATE KEY UPDATE xmpp_jid = VALUES(xmpp_jid), xmpp_domain = VALUES(xmpp_domain), xmpp_host = VALUES(xmpp_host), xmpp_websocket = VALUES(xmpp_websocket)'
-        )->execute(['account_id' => $accountId, 'jid' => $jid, 'domain' => $xmppDomain, 'host' => $host, 'websocket' => $websocket]);
+             VALUES (:account_id, :jid, :domain, :host, 5222, :tls_mode, :websocket, "tester@localhost")
+             ON DUPLICATE KEY UPDATE xmpp_jid = VALUES(xmpp_jid), xmpp_domain = VALUES(xmpp_domain), xmpp_host = VALUES(xmpp_host), xmpp_tls_mode = VALUES(xmpp_tls_mode), xmpp_websocket = VALUES(xmpp_websocket)'
+        )->execute(['account_id' => $accountId, 'jid' => $jid, 'domain' => $xmppDomain, 'host' => $host, 'tls_mode' => $tlsMode, 'websocket' => $websocket]);
         $pdo->prepare(
             'INSERT INTO account_profiles (
                 account_id, display_name, jid, peer, relay_websocket, xmpp_host,
-                xmpp_domain, xmpp_websocket, provider_id, preferred_language, password_hash
+                xmpp_domain, xmpp_tls_mode, xmpp_websocket, provider_id, preferred_language,
+                password_secret, password_hash, remember_password
              )
              VALUES (
-                :account_id, :display_name, :jid, "relay@localhost", "ws://127.0.0.1:8787",
-                :host, :domain, :websocket, :provider_id, "nl", :password_hash
+                :account_id, :display_name, :jid, "tester@localhost", "",
+                :host, :domain, :tls_mode, :websocket, :provider_id, "nl",
+                :password_secret, :password_hash, 1
              )
              ON DUPLICATE KEY UPDATE
                 display_name = VALUES(display_name),
                 jid = VALUES(jid),
                 xmpp_host = VALUES(xmpp_host),
                 xmpp_domain = VALUES(xmpp_domain),
+                xmpp_tls_mode = VALUES(xmpp_tls_mode),
                 xmpp_websocket = VALUES(xmpp_websocket),
-                provider_id = VALUES(provider_id)'
+                provider_id = VALUES(provider_id),
+                password_secret = VALUES(password_secret),
+                password_hash = VALUES(password_hash),
+                remember_password = VALUES(remember_password)'
         )->execute([
             'account_id' => $accountId,
             'display_name' => $displayName,
             'jid' => $jid,
             'host' => $host,
             'domain' => $xmppDomain,
+            'tls_mode' => $tlsMode,
             'websocket' => $websocket,
             'provider_id' => $provider,
+            'password_secret' => $xmppPassword,
             'password_hash' => $passwordHash,
         ]);
+        ttAuthUpsertXmppSqlAccount($jid, $xmppPassword);
         $pdo->commit();
     } catch (Throwable $error) {
         $pdo->rollBack();
@@ -323,6 +345,26 @@ function ttAuthPersistProviderAccount(PDO $pdo, string $provider, array $profile
     }
 
     return ['account_id' => $accountId, 'displayName' => $displayName, 'jid' => $jid, 'xmppHost' => $host, 'xmppDomain' => $xmppDomain, 'xmppWebSocket' => $websocket, 'identityProvider' => $provider, 'email' => $email, 'linkedExistingAccount' => is_array($linkedAccount)];
+}
+
+function ttAuthUpsertXmppSqlAccount(string $jid, string $password): void
+{
+    $parts = explode('@', strtolower(trim($jid)), 2);
+    $username = $parts[0] ?? '';
+    if ($username === '' || !preg_match('/^[a-z0-9._-]+$/', $username)) {
+        throw new RuntimeException('OAuth XMPP username is invalid.');
+    }
+
+    $pdo = Database::connectXmpp();
+    $statement = $pdo->prepare(
+        'INSERT INTO users (username, type, password, serverkey, salt, iterationcount)
+         VALUES (:username, 1, :password, "", "", 0)
+         ON DUPLICATE KEY UPDATE type = 1, password = VALUES(password), serverkey = "", salt = "", iterationcount = 0'
+    );
+    $statement->execute([
+        'username' => $username,
+        'password' => $password,
+    ]);
 }
 
 function ttAuthExistingLinkedAccount(PDO $pdo, string $provider, string $subject): ?array
@@ -355,6 +397,24 @@ function ttAuthAccountForVerifiedEmail(PDO $pdo, string $email, bool $emailVerif
          LIMIT 1'
     );
     $statement->execute(['email' => $normalizedEmail]);
+    $row = $statement->fetch();
+    return is_array($row) ? $row : null;
+}
+
+function ttAuthAccountForLinkTarget(PDO $pdo, string $accountId): ?array
+{
+    $accountId = ttAuthClean($accountId, 96);
+    if ($accountId === '') {
+        return null;
+    }
+
+    $statement = $pdo->prepare(
+        'SELECT account_id, jid
+         FROM account_profiles
+         WHERE account_id = :account_id
+         LIMIT 1'
+    );
+    $statement->execute(['account_id' => $accountId]);
     $row = $statement->fetch();
     return is_array($row) ? $row : null;
 }
@@ -405,8 +465,8 @@ function ttAuthEnsureAccountSchema(PDO $pdo): void
     $pdo->exec('CREATE TABLE IF NOT EXISTS accounts (account_id VARCHAR(96) NOT NULL PRIMARY KEY, display_name VARCHAR(120) NOT NULL DEFAULT "", phone_number VARCHAR(64) NOT NULL DEFAULT "", birth_date VARCHAR(10) NOT NULL DEFAULT "", provider_id VARCHAR(96) NOT NULL DEFAULT "example-provider", accessibility_profile_id VARCHAR(96) NOT NULL DEFAULT "default-live-text", preferred_language VARCHAR(16) NOT NULL DEFAULT "nl", avatar_data_url MEDIUMTEXT NULL, avatar_color VARCHAR(32) NOT NULL DEFAULT "#2563eb", status VARCHAR(32) NOT NULL DEFAULT "active", created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
     $pdo->exec('CREATE TABLE IF NOT EXISTS account_identities (id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY, account_id VARCHAR(96) NOT NULL, provider VARCHAR(32) NOT NULL, provider_subject VARCHAR(255) NOT NULL, email VARCHAR(255) NOT NULL DEFAULT "", email_verified TINYINT(1) NOT NULL DEFAULT 0, display_name VARCHAR(120) NOT NULL DEFAULT "", linked_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, last_used_at DATETIME NULL, UNIQUE KEY uq_account_identities_provider_subject (provider, provider_subject), KEY ix_account_identities_account_id (account_id), KEY ix_account_identities_email (email)) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
     $pdo->exec('CREATE TABLE IF NOT EXISTS account_credentials (account_id VARCHAR(96) NOT NULL PRIMARY KEY, password_hash VARCHAR(255) NOT NULL DEFAULT "", password_updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
-    $pdo->exec('CREATE TABLE IF NOT EXISTS account_xmpp (account_id VARCHAR(96) NOT NULL PRIMARY KEY, xmpp_jid VARCHAR(255) NOT NULL, xmpp_domain VARCHAR(255) NOT NULL DEFAULT "localhost", xmpp_host VARCHAR(255) NOT NULL DEFAULT "localhost", xmpp_port INT NOT NULL DEFAULT 5222, xmpp_tls_mode VARCHAR(32) NOT NULL DEFAULT "websocket", xmpp_websocket VARCHAR(255) NOT NULL DEFAULT "wss://localhost:5443/websocket/", peer VARCHAR(255) NOT NULL DEFAULT "relay@localhost", updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, UNIQUE KEY uq_account_xmpp_jid (xmpp_jid)) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
-    $pdo->exec('CREATE TABLE IF NOT EXISTS account_profiles (account_id VARCHAR(96) NOT NULL PRIMARY KEY, jid VARCHAR(255) NOT NULL, display_name VARCHAR(120) NOT NULL DEFAULT "", password_secret TEXT NULL, remember_password TINYINT(1) NOT NULL DEFAULT 0, phone_number VARCHAR(64) NOT NULL DEFAULT "", provider_id VARCHAR(96) NOT NULL DEFAULT "local", accessibility_profile_id VARCHAR(96) NOT NULL DEFAULT "", preferred_language VARCHAR(16) NOT NULL DEFAULT "nl", relay_websocket VARCHAR(255) NOT NULL DEFAULT "ws://127.0.0.1:8787", xmpp_websocket VARCHAR(255) NOT NULL DEFAULT "wss://localhost:5443/websocket/", peer VARCHAR(255) NOT NULL DEFAULT "relay@localhost", created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, avatar_data_url MEDIUMTEXT NULL, avatar_color VARCHAR(32) NOT NULL DEFAULT "#2563eb", password_hash VARCHAR(255) NOT NULL DEFAULT "", xmpp_host VARCHAR(255) NOT NULL DEFAULT "localhost", xmpp_port INT NOT NULL DEFAULT 5222, xmpp_domain VARCHAR(255) NOT NULL DEFAULT "localhost", xmpp_tls_mode VARCHAR(32) NOT NULL DEFAULT "websocket", live_rtt_enabled TINYINT(1) NOT NULL DEFAULT 1, show_smileys TINYINT(1) NOT NULL DEFAULT 1, birth_date VARCHAR(10) NOT NULL DEFAULT "", UNIQUE KEY uq_account_profiles_jid (jid)) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
+    $pdo->exec('CREATE TABLE IF NOT EXISTS account_xmpp (account_id VARCHAR(96) NOT NULL PRIMARY KEY, xmpp_jid VARCHAR(255) NOT NULL, xmpp_domain VARCHAR(255) NOT NULL DEFAULT "localhost", xmpp_host VARCHAR(255) NOT NULL DEFAULT "localhost", xmpp_port INT NOT NULL DEFAULT 5222, xmpp_tls_mode VARCHAR(32) NOT NULL DEFAULT "websocket", xmpp_websocket VARCHAR(255) NOT NULL DEFAULT "wss://localhost:5443/websocket/", peer VARCHAR(255) NOT NULL DEFAULT "tester@localhost", updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, UNIQUE KEY uq_account_xmpp_jid (xmpp_jid)) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
+    $pdo->exec('CREATE TABLE IF NOT EXISTS account_profiles (account_id VARCHAR(96) NOT NULL PRIMARY KEY, jid VARCHAR(255) NOT NULL, display_name VARCHAR(120) NOT NULL DEFAULT "", password_secret TEXT NULL, remember_password TINYINT(1) NOT NULL DEFAULT 0, phone_number VARCHAR(64) NOT NULL DEFAULT "", provider_id VARCHAR(96) NOT NULL DEFAULT "local", accessibility_profile_id VARCHAR(96) NOT NULL DEFAULT "", preferred_language VARCHAR(16) NOT NULL DEFAULT "nl", relay_websocket VARCHAR(255) NOT NULL DEFAULT "", xmpp_websocket VARCHAR(255) NOT NULL DEFAULT "wss://localhost:5443/websocket/", peer VARCHAR(255) NOT NULL DEFAULT "tester@localhost", created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, avatar_data_url MEDIUMTEXT NULL, avatar_color VARCHAR(32) NOT NULL DEFAULT "#2563eb", password_hash VARCHAR(255) NOT NULL DEFAULT "", xmpp_host VARCHAR(255) NOT NULL DEFAULT "localhost", xmpp_port INT NOT NULL DEFAULT 5222, xmpp_domain VARCHAR(255) NOT NULL DEFAULT "localhost", xmpp_tls_mode VARCHAR(32) NOT NULL DEFAULT "websocket", live_rtt_enabled TINYINT(1) NOT NULL DEFAULT 1, show_smileys TINYINT(1) NOT NULL DEFAULT 1, session_timeout_enabled TINYINT(1) NOT NULL DEFAULT 1, birth_date VARCHAR(10) NOT NULL DEFAULT "", UNIQUE KEY uq_account_profiles_jid (jid)) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
     ttAuthMigrateAccountSchema($pdo);
 }
 
@@ -437,7 +497,8 @@ function ttAuthMigrateAccountSchema(PDO $pdo): void
     ttAuthEnsureTableColumn($pdo, 'account_credentials', 'password_updated_at', 'password_updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP');
     ttAuthEnsureTableColumn($pdo, 'account_xmpp', 'xmpp_port', 'xmpp_port INT NOT NULL DEFAULT 5222');
     ttAuthEnsureTableColumn($pdo, 'account_xmpp', 'xmpp_tls_mode', 'xmpp_tls_mode VARCHAR(32) NOT NULL DEFAULT "websocket"');
-    ttAuthEnsureTableColumn($pdo, 'account_xmpp', 'peer', 'peer VARCHAR(255) NOT NULL DEFAULT "relay@localhost"');
+    ttAuthEnsureTableColumn($pdo, 'account_xmpp', 'peer', 'peer VARCHAR(255) NOT NULL DEFAULT "tester@localhost"');
+    ttAuthEnsureTableColumn($pdo, 'account_profiles', 'session_timeout_enabled', 'session_timeout_enabled TINYINT(1) NOT NULL DEFAULT 1');
 }
 
 function ttAuthEnsureTableColumn(PDO $pdo, string $table, string $column, string $definition): void
@@ -501,7 +562,7 @@ function ttAuthRedirectUri(string $provider, array $config): string
     return $configured;
 }
 
-function ttAuthStorePendingState(string $provider, string $state, string $verifier, string $redirectUri): void
+function ttAuthStorePendingState(string $provider, string $state, string $verifier, string $redirectUri, string $linkAccountId = ''): void
 {
     ttAuthPrunePendingStates();
     $payload = [
@@ -510,16 +571,20 @@ function ttAuthStorePendingState(string $provider, string $state, string $verifi
         'code_verifier' => $verifier,
         'redirect_uri' => $redirectUri,
         'created_at' => time(),
+        'link_account_id' => $linkAccountId,
     ];
     file_put_contents(ttAuthPendingStatePath($provider, $state), json_encode($payload, JSON_UNESCAPED_SLASHES), LOCK_EX);
 }
 
 function ttAuthCreateLoginToken(string $accountId): string
 {
+    $pdo = Database::connect();
+    AccountAccess::assertAllowed($pdo, $accountId);
     $token = ttAuthBase64Url(random_bytes(32));
     $payload = [
         'account_id' => $accountId,
         'token_hash' => hash('sha256', $token),
+        'access_version' => (int)AccountAccess::state($pdo, $accountId)['version'],
         'created_at' => time(),
     ];
     $directory = ttAuthHandoffDirectory();
@@ -553,6 +618,7 @@ function ttAuthLoadPendingState(string $provider, string $state): ?array
         'code_verifier' => (string)($payload['code_verifier'] ?? ''),
         'redirect_uri' => (string)($payload['redirect_uri'] ?? ''),
         'created_at' => (int)($payload['created_at'] ?? 0),
+        'link_account_id' => (string)($payload['link_account_id'] ?? ''),
     ];
 }
 
@@ -590,8 +656,10 @@ function ttAuthPrunePendingStates(): void
 
 function ttAuthOrigin(): string
 {
-    $https = ttAuthRequestIsHttps();
-    return ($https ? 'https' : 'http') . '://' . (string)($_SERVER['HTTP_HOST'] ?? 'localhost');
+    $host = (string)($_SERVER['HTTP_HOST'] ?? 'localhost');
+    $requestHost = ttAuthRequestHost();
+    $https = ttAuthRequestIsHttps() || ($requestHost !== '' && !ttAuthIsLocalHost($requestHost));
+    return ($https ? 'https' : 'http') . '://' . $host;
 }
 
 function ttAuthRequestIsHttps(): bool

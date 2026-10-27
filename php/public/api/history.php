@@ -10,6 +10,7 @@ header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 
 try {
+    AccountAccess::guardSession(Database::connect(), $_SESSION);
     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         readHistory();
         return;
@@ -22,6 +23,9 @@ try {
 
     http_response_code(405);
     echo json_encode(['ok' => false, 'error' => 'method_not_allowed']);
+} catch (AccountAccessDenied $error) {
+    http_response_code(403);
+    echo json_encode(['ok' => false, 'error' => 'account_access_denied', 'message' => $error->getMessage()]);
 } catch (Throwable $error) {
     http_response_code(500);
     echo json_encode(['ok' => false, 'error' => 'server_error', 'message' => $error->getMessage()]);
@@ -450,6 +454,7 @@ function isCurrentHistorySession(string $accountId): bool
 
 function canReadHistorySession(PDO $pdo, string $accountId, string $loginToken = ''): bool
 {
+    if (!AccountAccess::allowed($pdo, $accountId)) return false;
     if (isCurrentHistorySession($accountId) || consumeHistoryOAuthLoginToken($accountId, $loginToken)) {
         return true;
     }
@@ -491,6 +496,9 @@ function consumeHistoryOAuthLoginToken(string $accountId, string $token): bool
 
         if (($payload['account_id'] ?? '') === $accountId
             && hash_equals((string)($payload['token_hash'] ?? ''), hash('sha256', $token))) {
+            $pdo = Database::connect();
+            if (!AccountAccess::versionAllowed($pdo, $accountId, (int)($payload['access_version'] ?? 1))) return false;
+            AccountAccess::bind($pdo, $accountId, $_SESSION);
             $_SESSION['teletyptel_account_id'] = $accountId;
             return true;
         }
@@ -531,7 +539,7 @@ function historyAccountIds(PDO $pdo, string $accountId): array
             $ids,
             'SELECT account_id FROM account_profiles
              WHERE LOWER(jid) = :oauth_jid
-               AND provider_id IN ("google", "facebook", "apple", "auth0")',
+               AND provider_id IN ("google", "facebook", "apple")',
             ['oauth_jid' => $localpart . '@localhost']
         );
     }
@@ -583,7 +591,7 @@ function findHistoryRecipientAccountId(PDO $pdo, string $peer): string
         'SELECT account_id
          FROM account_profiles
          WHERE LOWER(jid) = :oauth_jid
-           AND provider_id IN ("google", "facebook", "apple", "auth0")
+           AND provider_id IN ("google", "facebook", "apple")
          LIMIT 1'
     );
     $statement->execute(['oauth_jid' => $localpart . '@localhost']);

@@ -12,7 +12,8 @@ final class XmppConnectionSettings
         public readonly bool $requireTls = true,
         public readonly bool $directTls = false,
         public readonly ?string $tlsServerName = null,
-        public readonly string $preferredLanguage = 'en'
+        public readonly string $preferredLanguage = 'en',
+        public readonly ?string $caFile = null
     ) {
         if ($this->host === '') {
             throw new \InvalidArgumentException('XMPP host is required.');

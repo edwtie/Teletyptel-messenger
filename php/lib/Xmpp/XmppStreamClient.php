@@ -11,6 +11,7 @@ final class XmppStreamClient
     private bool $tlsActive = false;
     /** @var array<int,string> */
     private array $pendingElements = [];
+    private array $pendingNodes = [];
 
     public function __construct(private readonly XmppConnectionSettings $settings, private readonly int $timeoutSeconds = 15)
     {
@@ -531,6 +532,7 @@ final class XmppStreamClient
         $remote = $transport . '://' . $this->settings->host . ':' . $this->settings->port;
         $context = stream_context_create([
             'ssl' => [
+                ...($this->settings->caFile ? ['cafile' => $this->settings->caFile] : []),
                 'peer_name' => $this->settings->tlsName(),
                 'verify_peer' => true,
                 'verify_peer_name' => true,
@@ -556,6 +558,7 @@ final class XmppStreamClient
     private function openAndReadFeatures(): array
     {
         $this->buffer->reset();
+        $this->pendingNodes = [];
         $this->write(XmppStream::open($this->settings->account->domain, $this->settings->preferredLanguage, $this->settings->account));
         $this->readUntilOpen();
         $featuresXml = $this->readElementNamed('features');
@@ -747,6 +750,7 @@ final class XmppStreamClient
      */
     private function readNodes(): array
     {
+        if ($this->pendingNodes !== []) return [array_shift($this->pendingNodes)];
         if (!is_resource($this->stream)) {
             throw new \RuntimeException('No active stream.');
         }
@@ -754,7 +758,8 @@ final class XmppStreamClient
         while (true) {
             $nodes = $this->buffer->readAvailable();
             if ($nodes !== []) {
-                return $nodes;
+                $this->pendingNodes = $nodes;
+                return [array_shift($this->pendingNodes)];
             }
 
             $chunk = fread($this->stream, 8192);

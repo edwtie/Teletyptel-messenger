@@ -1,6 +1,9 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/AdminSettings.php';
+require_once __DIR__ . '/AccountAccess.php';
+
 final class Database
 {
     public static function connect(): PDO
@@ -40,13 +43,7 @@ final class Database
 
     private static function loadConfig(): array
     {
-        $path = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'config.php';
-        if (!is_file($path)) {
-            return [];
-        }
-
-        $config = require $path;
-        return is_array($config) ? $config : [];
+        return (new AdminSettings())->configuration();
     }
 
     private static function env(string $key, string $fallback): string
