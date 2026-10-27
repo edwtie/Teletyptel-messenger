@@ -608,6 +608,7 @@
     messageContextDeleteButton: byId("messageContextDeleteButton"),
     messageContextDownloadButton: byId("messageContextDownloadButton"),
     messageContextForwardButton: byId("messageContextForwardButton"),
+    messageContextTranslateButton: byId("messageContextTranslateButton"),
     conversationItems: byId("conversationItems"),
     conversationSearchInput: byId("conversationSearchInput"),
     backToContactsButton: byId("backToContactsButton"),
@@ -876,7 +877,39 @@
     debugLog: byId("debugLog")
   };
 
+  let xmppRttStates = new WeakMap();
+  const xmppTranslation = window.TeleTypTelXmppTranslation.create({
+    send: (xml) => sendXmppStanza(xml, '<iq translation="private"/>'),
+    connected: () => isXmppRttConnected()
+  });
+  const messageTranslation = window.TeleTypTelTranslation.create({ translate: t, xmpp: xmppTranslation,
+    refreshMessage: (message) => message ? updateMessageElementById(message) : renderActiveConversation(),
+    refreshLive: refreshLiveTranslation,
+    openSettings: (reason) => {
+      if (["sign_in", "session_expired"].includes(reason)) {
+        openAccountDialog({ required: true, forceLogin: true });
+        return;
+      }
+      openAccountDialog({ mode: "settings" });
+      setAccountSettingsPanel("privacy", { focus: false });
+      const control = byId(reason === "manual_consent_required" ? "translationManualConsent" : "translationOwnLiveConsent");
+      control.scrollIntoView({ block: "center" });
+      control.focus({ preventScroll: true });
+    } });
+
   document.body.classList.toggle("account-booting", state.accountBooting);
+  let interpreter = null;
+  window.addEventListener("DOMContentLoaded", () => {
+    interpreter = window.TeleTypTelInterpreter.create({
+      selectedPeer: () => activeConversation()?.kind === "contact" && !isActiveConversationBlocked() ? activeConversation().peer : "",
+      getCall: () => state.call,
+      startCall: () => startCall("total"),
+      selfJid: currentBareJid,
+      conversationPeer: () => activeConversation()?.peer || "",
+      mediaChanged: updateCallUi,
+      translate: t
+    });
+  });
   document.body.classList.toggle("account-gate", state.accountGateRequired);
   document.body.classList.toggle("developer-mode", state.developerMode);
   applyDeviceDetection();
@@ -991,6 +1024,7 @@
     el.messageContextDeleteButton.addEventListener("click", deleteContextMessage);
     el.messageContextDownloadButton.addEventListener("click", downloadContextMessageAttachment);
     el.messageContextForwardButton.addEventListener("click", forwardContextMessage);
+    el.messageContextTranslateButton.addEventListener("click", translateContextMessage);
     el.startAudioCallOption.addEventListener("click", () => {
       requestCallNotificationPermissionFromGesture();
       startCallFromMenu("audio");
@@ -2305,6 +2339,7 @@
       node.setAttribute("title", t(node.dataset.i18nTitle, node.getAttribute("title") ?? ""));
     }
 
+    messageTranslation.refreshLabels();
     renderMaterialIcons();
     applyTheme(state.theme);
     setMode(state.mode);
@@ -3107,7 +3142,7 @@
     }
 
     if (mode === "settings") {
-      return ["preferences", "app-security", "media", "server", "accessibility"];
+      return ["preferences", "privacy", "app-security", "media", "server", "accessibility"];
     }
 
     return [];
@@ -3167,6 +3202,7 @@
       profile: el.dialogDisplayNameInput,
       security: el.dialogCurrentPasswordInput,
       preferences: el.rttToggle,
+      privacy: byId("translationManualConsent"),
       "app-security": el.settingsLogoutButton,
       media: el.dialogCameraInput || el.dialogMicrophoneInput,
       server: serverSettingsControls().find((control) => !control.disabled) || el.dialogXmppDomainInput,
@@ -3883,19 +3919,26 @@
   }
 
   async function saveAccountDialogProfile(connectAfterSave) {
+    let savingTranslation = false;
     setAccountDialogBusy(true, connectAfterSave
       ? t("account.saving_connecting", "Saving account and connecting...")
       : t("account.saving", "Saving account settings..."));
     try {
       const wasGateRequired = state.accountGateRequired;
+      if (!wasGateRequired) messageTranslation.validatePreferences();
       applyAccountDialogToControls({ requirePassword: wasGateRequired });
       const result = await saveAccountProfile(wasGateRequired ? "login" : "save");
       if (result?.twoFactorRequired) {
         showLoginTwoFactorChallenge(result, { profile: result.profile, connectAfterSave: connectAfterSave || wasGateRequired });
         return;
       }
+      if (!wasGateRequired) {
+        savingTranslation = true;
+        await messageTranslation.savePreferences();
+        savingTranslation = false;
+      }
       await loadLanguage(el.languageInput.value);
-      el.dialogAccountStatus.textContent = accountDialogStatusText("account.database_saved", "Server account saved");
+      el.dialogAccountStatus.textContent = accountDialogStatusText("account.settings_saved", "Settings saved");
       syncAccountDialogFromControls();
       setAccountGateRequired(false);
       setAccountReady(true);
@@ -3907,6 +3950,12 @@
         autoConnectIfReady();
       }
     } catch (error) {
+      if (error.fieldId?.startsWith("translation")) {
+        setAccountSettingsPanel("privacy", { focus: false });
+      }
+      if (savingTranslation) {
+        error.message = t("translation.partial_save", "Account settings saved, but translation preferences were not saved. Try Save settings again.") + " " + error.message;
+      }
       showAccountDialogError(error);
     } finally {
       setAccountDialogBusy(false);
@@ -6195,6 +6244,7 @@
   }
 
   function disconnectAll(message = null, options = {}) {
+    messageTranslation.clearLive();
     if (message instanceof Event) {
       message = null;
     }
@@ -6588,12 +6638,16 @@
     const canDelete = !message.retracted;
     const canDownload = Boolean(message.attachment?.url);
     const canForward = canForwardMessage(message);
+    const translationAction = messageTranslation.menuAction(message);
+    el.messageContextTranslateButton.hidden = !translationAction.visible;
+    el.messageContextTranslateButton.disabled = translationAction.disabled;
+    el.messageContextTranslateButton.textContent = translationAction.label;
     el.messageContextEditButton.hidden = !canEdit;
     el.messageContextDeleteButton.hidden = !canDelete;
     el.messageContextDownloadButton.hidden = !canDownload;
     el.messageContextForwardButton.hidden = !canForward;
 
-    if (!canEdit && !canDelete && !canDownload && !canForward) {
+    if (!canEdit && !canDelete && !canDownload && !canForward && !translationAction.visible) {
       closeMessageContextMenu();
       return;
     }
@@ -6633,6 +6687,12 @@
   function closeMessageContextMenu() {
     state.contextMessage = null;
     el.messageContextMenu.hidden = true;
+  }
+
+  function translateContextMessage() {
+    const target = contextMessageTarget();
+    closeMessageContextMenu();
+    if (target) void messageTranslation.activate(target.message);
   }
 
   function contextMessageTarget() {
@@ -8371,6 +8431,14 @@
   }
 
   function closeXmppWebSocket() {
+    xmppTranslation.disconnect();
+    xmppRttStates = new WeakMap();
+    for (const conversation of state.conversations) {
+      conversation.remoteText = "";
+      conversation.remoteFrom = "";
+      conversation.remoteDraftUpdatedAt = null;
+    }
+    messageTranslation.clearLive();
     if (!state.xmppSocket) {
       return;
     }
@@ -8540,6 +8608,18 @@
     }
   }
 
+  function remoteXmppDrafts(conversation) {
+    return Array.from(xmppRttStates.get(conversation)?.values() || []).filter((draft) => draft.text);
+  }
+
+  function syncRemoteXmppDraft(conversation) {
+    const drafts = remoteXmppDrafts(conversation);
+    const latest = drafts[drafts.length - 1];
+    conversation.remoteText = latest?.text || "";
+    conversation.remoteFrom = latest?.sender || "";
+    conversation.remoteDraftUpdatedAt = latest?.updatedAt || null;
+  }
+
   function handleXmppRttMessage(conversation, message, rttElement, from, type) {
     if (!shouldAcceptXmppRttMessage(conversation, message, from, type)) {
       return;
@@ -8551,7 +8631,33 @@
       return;
     }
 
-    const nextRemoteText = applyXmppRttElement(conversation.remoteText || "", rttElement);
+    const eventName = rttElement.getAttribute("event") || "edit";
+    if (!["new", "reset", "edit", "init", "cancel"].includes(eventName)) return;
+    if (eventName === "init") return;
+    if (!xmppRttStates.has(conversation)) xmppRttStates.set(conversation, new Map());
+    const drafts = xmppRttStates.get(conversation);
+    const senderKey = conversation.kind === "group" ? from : bareJid(from);
+    if (eventName === "cancel") {
+      drafts.delete(senderKey);
+      syncRemoteXmppDraft(conversation);
+      updateRemoteDraftMessage(conversation.id);
+      return;
+    }
+    const previous = drafts.get(senderKey);
+    const sequenceText = rttElement.getAttribute("seq") || "";
+    const sequence = /^\d+$/.test(sequenceText) ? Number(sequenceText) : NaN;
+    if (!Number.isInteger(sequence) || sequence < 0 || sequence > 2147483647
+        || (eventName === "edit" && (!previous?.synced || sequence !== (previous.sequence + 1) % 2147483648))) {
+      if (previous) previous.synced = false;
+      return;
+    }
+    if (!previous && drafts.size >= 50) return;
+    const nextRemoteText = applyXmppRttElement(previous?.text || "", rttElement);
+    if (Array.from(nextRemoteText).length > 20000) {
+      if (previous) previous.synced = false;
+      return;
+    }
+    drafts.set(senderKey, { sender: from, text: nextRemoteText, sequence, synced: true, updatedAt: new Date() });
     conversation.remoteText = nextRemoteText;
     conversation.remoteFrom = from;
     conversation.remoteDraftUpdatedAt = new Date();
@@ -9175,6 +9281,7 @@
       const messageType = conversation?.kind === "group" ? "groupchat" : "chat";
       const xml = createMessageStanza(text, outgoingId, edit?.replaceId ?? null, false, currentToJid(), "", messageType);
       sendXmppStanza(xml);
+      interpreter?.final(text);
       if (edit) {
         applyMessageCorrection(edit.conversation, edit.replaceId, text, "self", outgoingId);
         clearMessageEdit();
@@ -9235,6 +9342,7 @@
       messageId: outgoingId,
       replaceId: edit?.replaceId ?? null
     })) {
+      interpreter?.final(text);
       if (edit) {
         applyMessageCorrection(edit.conversation, edit.replaceId, text, "self", outgoingId);
         clearMessageEdit();
@@ -9266,6 +9374,7 @@
     recordTotalConversationTextForConversation(activeConversation(), "self", text, currentFromJid(), {
       final: true
     });
+    interpreter?.final(text);
     if (edit) {
       applyMessageCorrection(edit.conversation, edit.replaceId, text, "self", outgoingId);
       clearMessageEdit();
@@ -10818,6 +10927,7 @@
     const muted = Boolean(state.mediaSettings.remoteSoundMuted) || volume === 0;
     el.remoteVideo.volume = volume;
     el.remoteVideo.muted = muted;
+    interpreter?.volume(volume, muted);
     el.remoteVolumeInput.value = String(percent);
     el.remoteVolumeValue.textContent = `${percent}%`;
     setIconButtonAction(
@@ -11994,7 +12104,9 @@
     }
 
     const eventName = String(rttElement.getAttribute("event") || "").toLowerCase();
-    let result = eventName === "reset" || eventName === "init" ? "" : String(previous ?? "");
+    if (eventName === "cancel") return "";
+    if (!["", "edit", "new", "reset"].includes(eventName)) return String(previous ?? "");
+    let result = ["reset", "new"].includes(eventName) ? "" : String(previous ?? "");
     for (const action of Array.from(rttElement.children || [])) {
       if (action.namespaceURI !== "urn:xmpp:rtt:0") {
         continue;
@@ -12006,7 +12118,8 @@
         chars.splice(position, 0, action.textContent || "");
         result = chars.join("");
       } else if (action.localName === "e") {
-        const count = Math.max(1, Number.parseInt(action.getAttribute("n") || "1", 10) || 1);
+        const parsedCount = Number.parseInt(action.getAttribute("n") ?? "1", 10);
+        const count = Number.isFinite(parsedCount) ? Math.max(0, Math.min(position, parsedCount)) : Math.min(position, 1);
         const chars = Array.from(result);
         chars.splice(Math.max(0, position - count), count);
         result = chars.join("");
@@ -12696,6 +12809,7 @@
 
   function cleanupCall(notifyRemote, historyStatus = "ended") {
     const call = state.call;
+    if (call) interpreter?.endCall(call.sid);
     if (!call) {
       closeIncomingCallBrowserNotification();
       updateCallUi();
@@ -12703,6 +12817,7 @@
     }
 
     closeIncomingCallBrowserNotification();
+    messageTranslation.clearLive();
     persistConversationHistoryCall(call, historyStatus);
     stopTotalConversationRecorder(call);
     const updatedNotification = updateCallNotificationMessage(call, historyStatus);
@@ -12953,7 +13068,7 @@
       && !call.incomingOffer
     );
     const showLocalPreview = hasLocalVideo;
-    const showCallPanel = hasRemoteVideo || hasLocalVideo || totalConversationVisible;
+    const showCallPanel = hasRemoteVideo || hasLocalVideo || totalConversationVisible || interpreter?.hasMedia();
     el.callPanel.hidden = !showCallPanel;
     el.localVideo.hidden = !showLocalPreview;
     el.remoteVideo.hidden = !hasRemoteVideo;
@@ -13186,7 +13301,7 @@
   }
 
   function setCallModeButtonsHidden(hidden) {
-    el.startAudioCallOption.closest(".call-mode-buttons").hidden = hidden;
+    el.startTotalCallOption.closest(".call-mode-buttons").hidden = hidden;
   }
 
   function updateMicrophoneMuteUi() {
@@ -13562,6 +13677,7 @@
     renderConversations();
     if (persist) {
       persistHistoryMessage(conversation, message);
+      if (!isCallMessage(message)) messageTranslation.incoming(message);
     }
     return message;
   }
@@ -13684,6 +13800,11 @@
 
     const type = presenceElement.getAttribute("type") || "";
     const peer = bareJid(from);
+    const room = state.conversations.find((conversation) => conversation.kind === "group" && addressMatches(conversation.peer, peer));
+    if (room && resourceFromJid(from)) {
+      if (type === "unavailable") clearRemoteDraftForConversation(room, from);
+      return;
+    }
     if (type === "subscribe") {
       appendDebug("xmpp-presence", `subscribe from ${peer}`);
       sendXmppPresenceSubscribed(peer);
@@ -13731,6 +13852,7 @@
   }
 
   function handleXmppIqElement(iqElement) {
+    if (xmppTranslation.handleIq(iqElement)) return true;
     const rosterQuery = iqElement.getElementsByTagNameNS(xmppRosterNamespace, "query")[0];
     if (!rosterQuery) {
       return false;
@@ -13949,6 +14071,7 @@
 
   function renderActiveConversation() {
     const conversation = activeConversation();
+    syncLiveTranslation(conversation);
     document.body.classList.toggle("conversation-open", Boolean(conversation));
     if (!conversation) {
       renderAvatarInto(el.activeConversationAvatar, {
@@ -13978,7 +14101,14 @@
       appendMessageElementToTimeline(message);
     }
 
-    if (conversation.remoteText) {
+    const remoteDrafts = conversation.kind === "group" ? remoteXmppDrafts(conversation) : [];
+    if (remoteDrafts.length) {
+      for (const draft of remoteDrafts) appendMessageElementToTimeline({
+        direction: "peer", from: draft.sender, text: draft.text, status: "typing",
+        timestamp: draft.updatedAt, draft: true, senderDisplayName: draft.sender.split("/").slice(1).join("/")
+      });
+      el.remoteDraft.hidden = true;
+    } else if (conversation.remoteText) {
       appendMessageElementToTimeline({
         direction: "peer",
         from: conversation.remoteFrom,
@@ -14017,6 +14147,26 @@
       return;
     }
 
+    if (conversation.kind === "group" && xmppRttStates.has(conversation)) {
+      syncRemoteXmppDraft(conversation);
+      syncLiveTranslation(conversation);
+      const existingDrafts = new Map(Array.from(el.messageTimeline.querySelectorAll('[data-remote-draft="true"]'))
+        .map((element) => [element.dataset.draftSender, element]));
+      for (const draft of remoteXmppDrafts(conversation)) {
+        const message = { direction: "peer", from: draft.sender, text: draft.text, status: "typing",
+          timestamp: draft.updatedAt, draft: true, senderDisplayName: draft.sender.split("/").slice(1).join("/") };
+        const existing = existingDrafts.get(draft.sender);
+        if (existing) updateMessageElement(existing, message);
+        else appendMessageElementToTimeline(message);
+        existingDrafts.delete(draft.sender);
+      }
+      for (const element of existingDrafts.values()) element.remove();
+      el.remoteDraft.hidden = true;
+      cleanupOrphanMessageDateSeparators();
+      refreshLiveTranslation();
+      return;
+    }
+    syncLiveTranslation(conversation);
     const existing = el.messageTimeline.querySelector('[data-remote-draft="true"]');
     if (!conversation.remoteText) {
       existing?.remove();
@@ -14066,6 +14216,14 @@
       return;
     }
 
+    const drafts = xmppRttStates.get(conversation);
+    if (drafts) {
+      if (from) drafts.delete(conversation.kind === "group" ? from : bareJid(from));
+      else drafts.clear();
+      syncRemoteXmppDraft(conversation);
+      updateRemoteDraftMessage(conversation.id);
+      return;
+    }
     conversation.remoteText = "";
     conversation.remoteFrom = from || conversation.remoteFrom || conversation.peer;
     conversation.remoteDraftUpdatedAt = null;
@@ -14073,6 +14231,7 @@
   }
 
   function updateLocalRttDraftMessage(conversation = activeConversation(), scroll = true) {
+    syncOwnLiveTranslation(conversation);
     const existing = el.messageTimeline.querySelector('[data-local-draft="true"]');
     if (!conversation || conversation.id !== state.activeConversationId) {
       existing?.remove();
@@ -14112,11 +14271,51 @@
   }
 
   function clearLocalRttDraftMessage() {
+    messageTranslation.setLiveDraft("", "", "", "self");
     el.messageTimeline.querySelector('[data-local-draft="true"]')?.remove();
     cleanupOrphanMessageDateSeparators();
   }
 
+  function syncLiveTranslation(conversation) {
+    const allowed = conversation && !isBlockedConversation(conversation) && !isArchivedConversation(conversation);
+    const drafts = allowed ? (conversation.kind === "group" ? remoteXmppDrafts(conversation)
+      : [{ sender: conversation.remoteFrom || "", text: conversation.remoteText || "" }]) : [];
+    messageTranslation.setPeerDrafts(allowed ? conversation.id : "", drafts);
+    syncOwnLiveTranslation(conversation);
+  }
+
+  function syncOwnLiveTranslation(conversation) {
+    const allowed = conversation && conversation.id === state.activeConversationId
+      && !isBlockedConversation(conversation) && !isArchivedConversation(conversation);
+    messageTranslation.setLiveDraft(allowed ? conversation.id : "", allowed ? el.messageInput.value : "",
+      allowed ? currentFromJid() : "", "self");
+  }
+
+  function refreshLiveTranslation() {
+    const followLatest = isMessageTimelineNearBottom();
+    let hasDraft = false;
+    for (const [direction, attribute] of [["peer", "remote"], ["self", "local"]]) {
+      for (const draftBody of el.messageTimeline.querySelectorAll(`[data-${attribute}-draft="true"] .message-body`)) {
+        draftBody.querySelector(".live-rtt-translation")?.remove();
+        draftBody.querySelector(".translation-notice")?.remove();
+        messageTranslation.renderLive(draftBody, direction, draftBody.closest('[data-draft-sender]')?.dataset.draftSender || "");
+        if (direction === "self") messageTranslation.renderOwnStatus(draftBody);
+        hasDraft = true;
+      }
+    }
+    for (const [id, direction] of [["remoteDraftTranslation", "peer"], ["totalConversationRemoteTranslation", "peer"], ["totalConversationLocalTranslation", "self"]]) {
+      const container = byId(id);
+      container.replaceChildren();
+      messageTranslation.renderLive(container, direction, activeConversation()?.remoteFrom || "");
+      if (direction === "self" && activeConversation() && el.messageInput.value.trim()) messageTranslation.renderOwnStatus(container);
+      container.closest(".tc-text-line")?.classList.toggle("has-live-translation", container.childElementCount > 0);
+    }
+    if (hasDraft && followLatest) el.messageTimeline.scrollTop = el.messageTimeline.scrollHeight;
+    updateScrollToLatestButton();
+  }
+
   function updateTotalConversationTextPanel(conversation = activeConversation()) {
+    refreshLiveTranslation();
     const call = state.call;
     const visible = Boolean(
       call?.rttEnabled
@@ -14454,6 +14653,7 @@
 
     const wasActive = state.activeConversationId === conversation.id;
     state.archivedJids.add(normalizeBlockJid(conversation.peer));
+    xmppRttStates.delete(conversation);
     saveArchivedJids();
     conversation.remoteText = "";
     conversation.remoteFrom = "";
@@ -14494,6 +14694,7 @@
     const wasActive = state.activeConversationId === conversation.id;
     setBlockedPeer(peer, shouldBlock);
     if (shouldBlock) {
+      xmppRttStates.delete(conversation);
       conversation.remoteText = "";
       conversation.remoteFrom = "";
       conversation.remoteDraftUpdatedAt = null;
@@ -15818,6 +16019,7 @@
 
   function setAccountReady(ready) {
     state.accountReady = ready === true;
+    void messageTranslation.setAccount(state.accountReady ? state.account?.accountId || "" : "");
     if (state.accountReady) {
       scheduleSessionInactivityTimeout();
     } else {
@@ -16348,8 +16550,10 @@
   function applyMessageDraftDataset(item, message) {
     if (message.draft && !message.localDraft) {
       item.dataset.remoteDraft = "true";
+      item.dataset.draftSender = message.from || "";
     } else {
       delete item.dataset.remoteDraft;
+      delete item.dataset.draftSender;
     }
 
     if (message.localDraft) {
@@ -16383,6 +16587,7 @@
     if (!message.retracted && message.location) {
       body.appendChild(createLocationElement(message.location, message));
     }
+    if (!isCallMessage(message)) messageTranslation.render(message, body);
     appendLinkPreviewIfNeeded(body, message);
     if (shouldRenderInlineMessageMeta(message)) {
       appendInlineMessageMeta(body, message);

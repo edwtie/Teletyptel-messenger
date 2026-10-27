@@ -10,6 +10,7 @@ header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 
 try {
+    AccountAccess::guardSession(Database::connect(), $_SESSION);
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
         http_response_code(405);
         echo json_encode(['ok' => false, 'error' => 'method_not_allowed']);
@@ -57,6 +58,9 @@ try {
 
     $originalName = sanitizeFileName((string)($file['name'] ?? 'upload.bin'));
     echo json_encode(['ok' => true, 'file' => persistUploadedFile((string)$file['tmp_name'], $originalName, (string)($file['type'] ?? ''), $size)], JSON_UNESCAPED_SLASHES);
+} catch (AccountAccessDenied $error) {
+    http_response_code(403);
+    echo json_encode(['ok' => false, 'error' => 'account_access_denied', 'message' => $error->getMessage()]);
 } catch (Throwable $error) {
     http_response_code(500);
     echo json_encode(['ok' => false, 'error' => 'server_error', 'message' => $error->getMessage()]);

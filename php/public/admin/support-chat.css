@@ -1,0 +1,15 @@
+.support-inbox-layout { display: grid; grid-template-columns: minmax(240px, .8fr) minmax(0, 1.2fr); gap: 20px; }
+.support-inbox-layout section { min-width: 0; }
+.support-staff-note { font-size: 13px; }
+#supportStaffReply label { display: block; }
+#supportStaffText { display: block; box-sizing: border-box; width: 100%; min-height: 100px; padding: 12px; margin: 8px 0 12px; border: 1px solid #9bb8d5; border-radius: 8px; background: #fff; color: #183550; font: inherit; resize: vertical; }
+#supportStaffText:focus-visible { outline: 3px solid #165eaa; outline-offset: 2px; }
+#supportStaffQueue article { padding: 14px 0; border-bottom: 1px solid #c6d6e6; overflow-wrap: anywhere; }
+#supportStaffQueue h3 { font-size: 17px; margin: 0 0 6px; }
+#supportStaffQueue p { font-size: 13px; margin: 5px 0 10px; }
+.support-staff-messages { max-height: 460px; overflow-y: auto; }
+.support-staff-messages article { border: 1px solid #c6d6e6; border-radius: 10px; padding: 12px; margin: 10px 0; overflow-wrap: anywhere; }
+.support-staff-messages article.staff { background: #e6f4ee; }
+.support-staff-messages p { white-space: pre-wrap; margin: 5px 0; }
+.support-staff-messages time { font-size: 12px; color: #53677a; }
+@media (max-width: 760px) { .support-inbox-layout { grid-template-columns: minmax(0, 1fr); } }

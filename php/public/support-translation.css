@@ -1,0 +1,16 @@
+.support-translation-settings { padding: 8px 12px; background: #f4f8fc; color: #183550; font: 13px/1.5 "Segoe UI", system-ui, sans-serif; }
+.support-translation-settings summary { cursor: pointer; min-height: 28px; }
+.support-translation-settings form { display: grid; gap: 10px; padding-block: 10px; }
+.support-translation-settings label { display: grid; gap: 4px; }
+.support-translation-settings select { width: 100%; min-height: 40px; font: inherit; background: #fff; color: #183550; border: 1px solid #9bb8d5; border-radius: 8px; padding: 6px; }
+.support-translation-settings .support-translation-check { display: flex; align-items: flex-start; gap: 8px; }
+.support-translation-check input { flex-shrink: 0; width: 18px; height: 18px; }
+.support-translation-settings p { margin: 4px 0; font-size: 12px; }
+.support-translation-settings [hidden], .support-translation-result:empty { display: none !important; }
+.support-translation-result { border-top: 1px solid #b4cde6; padding-top: 5px; margin-top: 5px; overflow-wrap: anywhere; white-space: normal; }
+.support-translation-result > div { white-space: pre-wrap; }
+.support-translation-result summary { cursor: pointer; font-size: 11px; text-decoration: underline; }
+.support-translation-result small { display: block; font-size: 11px; }
+.support-widget .support-translate-action, .support-staff-messages .support-translate-action { min-height: 32px; border: 0; padding: 3px 0; background: transparent; color: #165eaa; text-decoration: underline; font-size: 12px; }
+.support-call-drafts > .support-translation-result { background: #fff; padding: 8px; border: 1px dashed #9bb8d5; border-radius: 8px; }
+.support-call-actions .support-translation-settings { padding: 0; background: transparent; }

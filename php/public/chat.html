@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>TeleTypTel Messenger</title>
   <script>
     if (location.protocol === "file:") {
@@ -15,7 +15,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="favicon.ico" sizes="any">
   <link rel="apple-touch-icon" href="assets/brand/teletyptel-icon-192.png">
-  <link rel="stylesheet" href="chat-client.css?v=20260704-archive-list">
+  <link rel="stylesheet" href="chat-client.css?v=20261027-inline-interpreter">
 </head>
 <body class="account-booting">
   <a class="skip-link" href="#messageInput" data-i18n="button.skip_to_message">Skip to message</a>
@@ -28,8 +28,14 @@
           <span id="connectionSummary" role="status" aria-live="polite" data-i18n="status.disconnected">Disconnected</span>
         </div>
       </div>
-      <div class="top-actions" role="toolbar" aria-label="Connection actions">
-        <button id="newsButton" type="button" data-i18n="tab.news" hidden>News</button>
+      <button id="mobileActionsToggle" class="mobile-actions-toggle" type="button" aria-controls="mobileActionsPanel" aria-expanded="false" aria-label="Menu" title="Menu">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+      <div id="mobileActionsPanel" class="top-actions" role="toolbar" aria-label="Connection actions">
+        <button id="newsButton" class="icon-button top-icon-button" type="button" title="News" aria-label="News" data-i18n-title="tab.news" data-i18n-aria-label="tab.news" hidden>
+          <span class="material-icon" data-icon="description" aria-hidden="true"></span>
+          <span class="sr-only" data-i18n="tab.news">News</span>
+        </button>
         <button id="supportButton" class="icon-button top-icon-button" type="button" hidden title="Support" aria-label="Support">
           <span class="material-icon" data-icon="supportTech" aria-hidden="true"></span>
           <span class="sr-only">Support</span>
@@ -113,7 +119,10 @@
 
         <div class="chat-header">
           <div class="chat-title">
-            <button id="backToContactsButton" class="back-to-contacts" type="button" data-i18n="button.back_to_contacts">Contacts</button>
+            <button id="backToContactsButton" class="back-to-contacts" type="button" title="Contacts" aria-label="Contacts" data-i18n-title="button.back_to_contacts" data-i18n-aria-label="button.back_to_contacts">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 5-7 7 7 7M5 12h15"/></svg>
+              <span class="sr-only" data-i18n="button.back_to_contacts">Contacts</span>
+            </button>
             <div id="activeConversationAvatar" class="avatar avatar-header" aria-hidden="true">R</div>
             <div>
             <h2 id="activeConversationName">Tester</h2>
@@ -131,11 +140,14 @@
                   <span class="material-icon" data-icon="videocam" aria-hidden="true"></span>
                   <span class="sr-only" data-i18n="button.call_audio_video">Audio + video</span>
                 </button>
-                <button id="startTotalCallOption" class="icon-button call-mode-button total-conversation-button" type="button" title="Total conversation" aria-label="Total conversation" data-i18n-title="button.call_total_conversation" data-i18n-aria-label="button.call_total_conversation">
+                <button id="startTotalCallOption" class="icon-button call-mode-button total-conversation-button" type="button" title="RTT: total conversation with audio and video" aria-label="RTT: total conversation with audio and video" data-i18n-title="button.call_rtt_total" data-i18n-aria-label="button.call_rtt_total">
                   <span class="material-icon" data-icon="rtt" aria-hidden="true"></span>
                   <span class="sr-only" data-i18n="button.call_total_conversation">Total conversation</span>
                 </button>
               </div>
+              <button id="interpreterButton" class="icon-button call-mode-button interpreter-button" type="button" title="Gebarentolk oproepen" aria-label="Gebarentolk oproepen" data-i18n-title="interpreter.button" data-i18n-aria-label="interpreter.button">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="9" cy="7" r="3"/><path d="M3 21v-4a6 6 0 0 1 12 0v4M17 4a3 3 0 0 1 0 6M18 13a5 5 0 0 1 3 4v4"/></svg><span id="interpreterBadge" class="interpreter-badge" hidden></span>
+              </button>
               <button id="resetRttButton" class="icon-button call-mode-button rtt-toolbar-button" type="button" title="Reset RTT" aria-label="Reset RTT" data-i18n-title="button.reset_rtt" data-i18n-aria-label="button.reset_rtt">
                 <span class="material-icon" data-icon="restartAlt" aria-hidden="true"></span>
                 <span class="sr-only" data-i18n="button.reset_rtt">Reset RTT</span>
@@ -158,10 +170,17 @@
               </button>
               <span id="callStatus" class="call-status" role="status" aria-live="polite" data-i18n="call.idle">No call</span>
             </div>
+            <button id="chatMoreToggle" class="icon-button chat-more-toggle" type="button" aria-controls="chatMorePanel" aria-expanded="false" title="Conversation options" aria-label="Conversation options" data-i18n-title="menu.conversation_options" data-i18n-aria-label="menu.conversation_options">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
+            </button>
             <div class="mode-switch developer-only" role="tablist" aria-label="Transport mode">
               <button id="relayModeButton" type="button" hidden role="tab" aria-selected="false" data-i18n="mode.relay">Relay</button>
               <button id="xmppModeButton" type="button" class="selected" role="tab" aria-selected="true">XMPP</button>
             </div>
+          </div>
+          <div id="chatMorePanel" class="chat-more-panel" aria-labelledby="chatMoreToggle" hidden>
+            <a href="tolk/" target="_blank" rel="noopener" data-i18n="interpreter.workspace">Tolkwerkplek</a>
+            <span id="mobileCallStatus" class="chat-more-status"></span>
           </div>
         </div>
 
@@ -200,6 +219,13 @@
         </div>
 
         <section id="callPanel" class="call-panel" hidden aria-label="Call media">
+          <div id="interpreterTile" class="interpreter-tile" hidden>
+            <video id="interpreterVideo" autoplay playsinline></video>
+            <div class="interpreter-caption"><strong id="interpreterName"></strong><button id="interpreterRemove" type="button" title="Tolk verwijderen" aria-label="Tolk verwijderen" data-i18n-title="interpreter.remove" data-i18n-aria-label="interpreter.remove">×</button><button id="interpreterPlay" type="button" hidden data-i18n="interpreter.play">Beeld / geluid starten</button></div>
+            <video id="interpreterCameraPreview" autoplay playsinline muted hidden></video>
+            <button id="interpreterCameraToggle" class="interpreter-camera-toggle" type="button" aria-pressed="true" hidden data-i18n="interpreter.camera">Camera voor tolk aan/uit</button>
+            <div class="interpreter-rtt" aria-live="polite"><p id="interpreterPreviousText"></p><p id="interpreterText"></p></div>
+          </div>
           <video id="remoteVideo" autoplay></video>
           <video id="localVideo" autoplay muted></video>
           <div id="callResizeHandle" class="call-resize-handle" role="separator" aria-orientation="horizontal" aria-label="Resize call video" title="Resize call video"></div>
@@ -258,6 +284,7 @@
               <div class="tc-text-lines">
                 <p id="totalConversationRemotePreviousText"></p>
                 <p id="totalConversationRemoteText"></p>
+                <div id="totalConversationRemoteTranslation"></div>
               </div>
             </div>
             <div class="tc-text-line tc-text-local">
@@ -265,6 +292,7 @@
               <div class="tc-text-lines tc-local-lines">
                 <p id="totalConversationLocalPreviousText"></p>
                 <p id="totalConversationLocalText"></p>
+                <div id="totalConversationLocalTranslation"></div>
               </div>
             </div>
           </div>
@@ -291,6 +319,7 @@
           <div class="remote-draft-lines">
             <p id="remoteDraftPreviousText"></p>
             <p id="remoteDraftText"></p>
+            <div id="remoteDraftTranslation"></div>
           </div>
         </div>
 
@@ -568,9 +597,12 @@
             <button type="button" data-account-panel="security" data-i18n="section.security">Security</button>
             <button type="button" data-account-panel="app-security" data-i18n="section.security">Security</button>
             <button type="button" data-account-panel="preferences" data-i18n="section.preferences">Preferences</button>
+            <button type="button" data-account-panel="privacy" data-i18n="translation.privacy_tab">Privacy</button>
             <button type="button" data-account-panel="media" data-i18n="section.media">Media</button>
             <button type="button" data-account-panel="server" data-i18n="section.server_settings">Server settings</button>
             <button type="button" data-account-panel="accessibility" data-i18n="tab.accessibility">Accessibility</button>
+            <a href="admin/#gebruikers" target="_blank" rel="noopener" data-i18n="button.admin_tools">User administration</a>
+            <a href="aanmelden/" target="_blank" rel="noopener">Abonnement aanvragen / mijn aanmelding</a>
           </nav>
 
           <section class="modal-section account-auth-section">
@@ -759,7 +791,7 @@
             </label>
             <label>
               <span data-i18n="label.language">Language</span>
-              <select id="settingsLanguageInput">
+              <select id="settingsLanguageInput" aria-describedby="translationLanguageHint">
                 <option value="ned">Nederlands</option>
                 <option value="eng">English</option>
               </select>
@@ -771,6 +803,33 @@
                 <option value="google" data-i18n="map.google_maps">Google Maps</option>
               </select>
             </label>
+          </div>
+        </section>
+
+        <section class="modal-section account-settings-section" data-settings-panel="privacy">
+          <h3 data-i18n="translation.privacy_title">Privacy and cookies</h3>
+          <div class="translation-settings">
+          <h3 data-i18n="translation.heading">Message translation</h3>
+          <p id="translationLanguageHint" data-i18n="translation.separate">The interface language changes buttons and menus. Translation language only changes message translations.</p>
+          <div class="account-dialog-grid">
+            <label><span data-i18n="translation.target">Translate messages into</span><select id="translationTarget" disabled><option value="nl">Nederlands</option><option value="en">English</option></select></label>
+            <label><span data-i18n="translation.mode">Translation mode</span><select id="translationMode" disabled>
+              <option value="off" data-i18n="translation.off">Off</option>
+              <option value="manual" data-i18n="translation.manual" selected>Manual — per message</option>
+              <option value="automatic" data-i18n="translation.automatic">Automatic — new incoming messages</option>
+            </select></label>
+          </div>
+          <p data-i18n="translation.privacy">Translation sends text to Google Cloud Translation. The original stays visible. Translations can contain errors. Live RTT requires separate permission below. Attachments and location cards are not translated.</p>
+          <label class="toggle modal-toggle"><input id="translationManualConsent" type="checkbox" disabled aria-describedby="translationCookieHint"><span data-i18n="translation.manual_consent">I allow messages I select using Translate to be sent to Google Cloud Translation, and this choice to be remembered in a preference cookie.</span></label>
+          <p id="translationCookieHint" data-i18n="translation.cookie_hint">Off by default. This first-party cookie remembers manual translation permission for this account in this browser for 180 days. It contains no chat text and is not used for tracking. Uncheck to revoke permission and delete the cookie. Automatic and live RTT permissions remain separate.</p>
+          <label id="translationConsentLabel" class="toggle modal-toggle" hidden><input id="translationConsent" type="checkbox"><span data-i18n="translation.consent">I allow new incoming text messages to be sent to Google automatically for translation.</span></label>
+          <label class="toggle modal-toggle"><input id="translationLiveConsent" type="checkbox" disabled aria-describedby="translationLiveHint"><span data-i18n="translation.live_consent">Translate live RTT too: I allow incoming draft text in the open conversation to be sent to Google, including text that may later be changed or deleted.</span></label>
+          <label class="toggle modal-toggle"><input id="translationOwnLiveConsent" type="checkbox" disabled><span data-i18n="translation.own_live_consent">Also show a translation while I type: I allow my unsent draft text to be sent to Google.</span></label>
+          <p data-i18n="translation.own_live_hint">Your preview uses the selected translation language. It is not sent to the other person; sending a message still sends your original text. Deleted drafts may already have reached Google.</p>
+          <p id="translationLiveHint" data-i18n="translation.live_hint">Off by default. Works with Manual or Automatic mode. The original appears immediately; provisional translations follow after a short pause, or about every 4 seconds while typing continues. Provider delay and usage limits apply. Deleted text may already have reached Google. Only enable with the other person's agreement.</p>
+          <p data-i18n="translation.save_hint">Use Save settings at the bottom to save these choices too.</p>
+          <div class="button-row"><button id="translationReload" type="button" data-i18n="translation.reload">Reload</button></div>
+          <p id="translationSettingsStatus" role="status" aria-live="polite" data-i18n="translation.loading">Loading translation preferences…</p>
           </div>
         </section>
 
@@ -1254,10 +1313,21 @@
     <button id="messageContextDeleteButton" class="danger-action" type="button" role="menuitem" data-i18n="button.delete_message">Delete</button>
     <button id="messageContextDownloadButton" type="button" role="menuitem" data-i18n="button.download">Download</button>
     <button id="messageContextForwardButton" type="button" role="menuitem" data-i18n="button.forward_message">Forward</button>
+    <button id="messageContextTranslateButton" type="button" role="menuitem" hidden>Translate</button>
   </div>
 
+  <aside id="interpreterBanner" class="interpreter-banner" aria-label="Gebarentolk" hidden>
+    <p id="interpreterStatus" role="status" aria-live="polite"></p>
+    <button id="interpreterAllow" type="button" hidden data-i18n="interpreter.allow">Tolk toelaten</button>
+    <button id="interpreterCancel" type="button" hidden data-i18n="button.cancel">Annuleren</button>
+    <button type="button" id="interpreterDismiss" aria-label="Melding sluiten" data-i18n="button.close">Sluiten</button>
+  </aside>
   <script src="vendor/qrcode.js?v=20260623-history-privacy-copy"></script>
   <script src="jingle-history.js?v=20260615-jingle-history"></script>
-  <script src="chat-client.js?v=20260704-archive-list"></script>
+  <script src="chat-xmpp-translation.js?v=20261027-inline-interpreter"></script>
+  <script src="chat-translation.js?v=20261027-inline-interpreter"></script>
+  <script src="chat-client.js?v=20261027-inline-interpreter"></script>
+  <script src="chat-interpreter.js?v=20261027-inline-interpreter"></script>
+  <script src="mobile-navigation.js?v=20260929-rtt-first"></script>
 </body>
 </html>

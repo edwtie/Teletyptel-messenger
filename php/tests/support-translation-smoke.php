@@ -1,0 +1,73 @@
+<?php
+declare(strict_types=1);
+require_once dirname(__DIR__) . '/lib/SupportTranslationService.php';
+$pdo = new PDO('sqlite::memory:', null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+$pdo->exec('CREATE TABLE admin_users (admin_id TEXT PRIMARY KEY, display_name TEXT, role TEXT, enabled INTEGER, session_version INTEGER)');
+$pdo->exec("INSERT INTO admin_users VALUES ('agent', 'Agent', 'staff', 1, 1), ('other', 'Other', 'staff', 1, 1)");
+$calls = new SupportCallService($pdo); $calls->ensureSchema();
+$chat = new SupportChatService($pdo);
+$visitor = ['role' => 'visitor', 'id' => 'visitor-one']; $staff = ['role' => 'staff', 'id' => 'agent', 'version' => 1];
+$admin = $pdo->query("SELECT * FROM admin_users WHERE admin_id = 'agent'")->fetch(PDO::FETCH_ASSOC);
+$thread = $chat->visitorAction($visitor['id'], '127.0.0.1', ['action' => 'start', 'name' => 'Sam', 'acknowledged' => true])['threadId'];
+$chat->staffAction($admin, ['action' => 'claim', 'threadId' => $thread]);
+$chat->visitorAction($visitor['id'], '127.0.0.1', ['action' => 'send', 'threadId' => $thread, 'text' => 'Hello', 'clientId' => 'fixture-translation-message']);
+$providerCalls = []; $checks = 0;
+$config = ['enabled' => true, 'apiKey' => 'fixture-only', 'dailyCharacters' => 50000];
+$provider = new TranslationService($pdo, $config, function (array $request) use (&$providerCalls): array {
+    $providerCalls[] = $request;
+    return ['data' => ['translations' => [['translatedText' => 'Hallo &amp; welkom', 'detectedSourceLanguage' => 'en']]]];
+});
+$service = new SupportTranslationService($pdo, $provider); $service->ensureSchema();
+function expectSupportTranslation(bool $value, string $message): void { global $checks; if (!$value) throw new RuntimeException($message); $checks++; }
+function denySupportTranslation(callable $operation, int $status): void {
+    try { $operation(); } catch (SupportChatFailure | TranslationFailure $failure) { expectSupportTranslation($failure->status === $status, $failure->getMessage()); return; }
+    throw new RuntimeException('Expected refusal');
+}
+$preferences = ['targetLanguage' => 'nl', 'mode' => 'automatic', 'consent' => true, 'liveConsent' => false];
+$request = ['sequence' => 1, 'targetLanguage' => 'nl', 'automatic' => true];
+expectSupportTranslation($service->view($visitor, $thread)['preferences']['mode'] === 'off', 'Translation is opt-in');
+denySupportTranslation(fn() => $service->translate($visitor, $thread, $request), 403);
+denySupportTranslation(fn() => $service->save($visitor, $thread, array_replace($preferences, ['consent' => false])), 403);
+denySupportTranslation(fn() => $service->save($visitor, $thread, array_replace($preferences, ['targetLanguage' => 'xx'])), 400);
+denySupportTranslation(fn() => $service->view(['role' => 'visitor', 'id' => 'stranger'], $thread), 404);
+denySupportTranslation(fn() => $service->view(['role' => 'staff', 'id' => 'other', 'version' => 1], $thread), 403);
+$service->save($visitor, $thread, $preferences);
+denySupportTranslation(fn() => $service->translate($visitor, $thread, $request), 403);
+expectSupportTranslation(count($providerCalls) === 0, 'No provider call without both consents');
+$service->save($staff, $thread, $preferences);
+$result = $service->translate($staff, $thread, $request + ['text' => 'Forged text']);
+expectSupportTranslation($providerCalls[0]['q'] === 'Hello', 'Message text loaded from authorized transcript, not client');
+expectSupportTranslation($result['text'] === 'Hallo & welkom', 'Existing provider decoding reused');
+expectSupportTranslation(!str_contains(json_encode($result), 'fixture-only'), 'No key leaked');
+denySupportTranslation(fn() => $service->translate($staff, $thread, array_replace($request, ['sequence' => 99])), 404);
+denySupportTranslation(fn() => $service->translate($staff, $thread, array_replace($request, ['targetLanguage' => 'en'])), 409);
+denySupportTranslation(fn() => $service->save($staff, $thread, array_replace($preferences, ['mode' => 'manual'])), 400);
+$service->save($staff, $thread, array_replace($preferences, ['mode' => 'off']));
+denySupportTranslation(fn() => $service->translate($staff, $thread, $request), 403);
+$call = $calls->action($visitor, ['action' => 'start', 'threadId' => $thread, 'mode' => 'rtt', 'consent' => true, 'clientId' => 'fixture-visitor-client'])['callId'];
+$calls->action($staff, ['action' => 'join', 'callId' => $call, 'consent' => true, 'clientId' => 'fixture-staff-client']);
+$live = ['live' => true, 'callId' => $call, 'clientId' => 'fixture-visitor-client', 'sourceRole' => 'visitor', 'text' => 'Typing live', 'targetLanguage' => 'nl', 'automatic' => true];
+denySupportTranslation(fn() => $service->translate($visitor, $thread, $live), 403);
+$service->save($visitor, $thread, array_replace($preferences, ['liveConsent' => true]));
+denySupportTranslation(fn() => $service->translate($visitor, $thread, $live), 403);
+$service->save($staff, $thread, array_replace($preferences, ['liveConsent' => true]));
+denySupportTranslation(fn() => $service->translate($visitor, $thread, array_replace($live, ['clientId' => 'fixture-other-window'])), 403);
+denySupportTranslation(fn() => $service->translate($visitor, $thread, array_replace($live, ['sourceRole' => 'interpreter'])), 400);
+$service->translate($visitor, $thread, $live);
+expectSupportTranslation(end($providerCalls)['q'] === 'Typing live', 'Live translation only after explicit consent and joined RTT');
+expectSupportTranslation((int)$pdo->query('SELECT COUNT(*) FROM support_chat_messages')->fetchColumn() === 1, 'Draft and translations not persisted in transcript');
+expectSupportTranslation((int)$pdo->query('SELECT COUNT(*) FROM translation_preferences')->fetchColumn() === 0, 'No fake Messenger preferences or accounts');
+$service->save($staff, $thread, array_replace($preferences, ['mode' => 'off', 'liveConsent' => true]));
+expectSupportTranslation(!$service->view($staff, $thread)['preferences']['liveConsent'], 'Off revokes live consent');
+denySupportTranslation(fn() => $service->translate($visitor, $thread, $live), 403);
+denySupportTranslation(fn() => $service->translate($visitor, $thread, $request), 403);
+$service->save($staff, $thread, $preferences);
+$limited = new SupportTranslationService($pdo, new TranslationService($pdo, array_replace($config, ['globalDailyCharacters' => 1])));
+denySupportTranslation(fn() => $limited->translate($visitor, $thread, $request), 429);
+$broken = new SupportTranslationService($pdo, new TranslationService($pdo, $config, static function () { throw new RuntimeException('fixture-only'); }));
+denySupportTranslation(fn() => $broken->translate($visitor, $thread, $request), 502);
+$pdo->exec("UPDATE admin_users SET enabled = 0 WHERE admin_id = 'agent'");
+denySupportTranslation(fn() => $service->translate($staff, $thread, $request), 401);
+$pdo->exec('DELETE FROM support_chat_threads'); $service->ensureSchema();
+expectSupportTranslation((int)$pdo->query('SELECT COUNT(*) FROM support_translation_preferences')->fetchColumn() === 0, 'Consent cleaned up with deleted chat');
+echo "Support translation passed: $checks checks; isolated SQLite, no external provider calls.\n";

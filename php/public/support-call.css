@@ -1,0 +1,56 @@
+.support-call { border-block: 1px solid #c5d8ea; padding: 12px; background: #f4f8fc; color: #183550; }
+.support-call [hidden] { display: none !important; }
+.support-call-actions, .support-call-media { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.support-call-actions { position: relative; }
+.support-call-help { margin-left: auto; }
+.support-icon-control, .support-widget .support-icon-control, .support-call .support-icon-control { display: inline-flex; align-items: center; justify-content: center; width: 44px; min-width: 44px; height: 44px; min-height: 44px; padding: 0; box-sizing: border-box; border: 1px solid #b4cde6; border-radius: 12px; background: #fff; color: #173b64; cursor: pointer; list-style: none; }
+.support-icon-control::-webkit-details-marker { display: none; }
+.support-icon-control svg { flex: none; pointer-events: none; }
+.support-icon-control:focus-visible { outline: 3px solid #c35f14; outline-offset: 3px; }
+.support-icon-control[aria-pressed="false"] { color: #8a231a; background: #fff0ed; }
+.support-call-help > div, .support-call-actions .support-translation-body { position: absolute; z-index: 5; top: calc(100% + 6px); left: 0; right: 0; max-height: min(400px, 55dvh); overflow: auto; padding: 12px; border: 1px solid #b4cde6; border-radius: 12px; background: #fff; box-shadow: 0 8px 24px #173b6426; }
+.support-call[data-rtt="connected"] .support-call-help > summary { border-color: #2b8860; }
+.support-call-videos:empty, .support-call-drafts:empty { display: none; }
+.support-call button { font: inherit; font-size: 13px; min-height: 40px; border: 1px solid #9bb8d5; border-radius: 8px; padding: 7px 10px; background: #fff; color: #173b64; cursor: pointer; }
+.support-call button:disabled { opacity: .5; cursor: not-allowed; }
+.support-call button:focus-visible { outline: 3px solid #c35f14; outline-offset: 2px; }
+.support-call button[data-action="tc"], .support-call button[data-action="join"] { background: #165eaa; color: #fff; }
+.support-call button[data-action="end"] { color: #8a231a; border-color: #bf625b; margin-top: 8px; }
+.support-call .support-call-state, .support-call .support-call-notice, .support-call .support-call-incoming p, .support-call .support-call-permission p { font-size: 12px; line-height: 1.5; margin: 8px 0; }
+.support-call .support-call-notice { color: #53677a; }
+.support-call-incoming, .support-call-permission { border-left: 3px solid #165eaa; padding: 8px; margin: 8px 0; background: #e3effb; }
+.support-call-videos { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 6px; margin-block: 8px; }
+.support-call.has-media .support-call-videos { height: clamp(180px, 30vh, 300px); grid-template-rows: minmax(0, 1fr); }
+.support-call.has-interpreter .support-call-videos, .support-call.operator.has-media .support-call-videos { grid-template-rows: repeat(2, minmax(0, 1fr)); }
+.support-call-tile { min-width: 0; min-height: 0; display: flex; flex-direction: column; background: #07111f; color: white; border-radius: 8px; overflow: hidden; grid-column: 1; grid-row: 1; }
+.support-call-tile.self { grid-column: 2; }
+.support-call.has-interpreter .support-call-tile:not(.interpreter):not(.self) { grid-column: 2; grid-row: 2; }
+.support-call.operator .support-call-tile.visitor { grid-column: 1; grid-row: 1 / span 2; }
+.support-call.operator .support-call-tile.staff { grid-column: 2; grid-row: 2; }
+.support-call-tile video { display: block; width: 100%; height: 100%; min-height: 0; flex: 1 1 0; object-fit: contain; background: #07111f; }
+.support-call-tile > span { display: block; padding: 4px 8px; font-size: 12px; overflow-wrap: anywhere; }
+.support-call-tile.interpreter { grid-column: 1; grid-row: 1 / span 2; border: 2px solid #3b82f6; }
+.support-live { min-height: 0; max-height: 240px; overflow-y: auto; overscroll-behavior: contain; padding-inline: 16px; }
+.support-call-drafts:not(:has(.support-call-draft:not([hidden]))), .support-call-drafts [hidden] { display: none !important; }
+.support-call-draft { box-sizing: border-box; width: fit-content; max-width: 94%; margin: 6px 0; padding: 10px 12px; background: #f0f4f7; color: #183550; border: 1px dashed #9bb8d5; border-radius: 14px 14px 14px 3px; overflow-wrap: anywhere; }
+.support-call-draft.own { margin-left: auto; background: #e6f4ee; border-color: #69ad90; border-radius: 14px 14px 3px 14px; }
+.support-call-draft .support-translation-result { font-size: 15px; }
+.support-call-drafts strong { display: block; font-size: 11px; }
+.support-call-drafts span { display: block; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 15px; max-height: 140px; overflow-y: auto; }
+.support-call .support-call-error { font-size: 13px; background: #fff0ed; color: #8a231a; padding: 8px; margin: 8px 0; }
+.support-popup:has(.support-call.has-media) { width: min(580px, calc(100vw - 32px)); }
+.support-popup .support-call { flex-shrink: 0; }
+.support-call.has-media .support-call-drafts { display: grid; gap: 4px; }
+.support-call.has-media .support-call-draft { margin: 2px 0; padding: 6px; }
+.support-call.has-media .support-call-drafts span { max-height: 45px; }
+.support-call.has-media .support-call-media { margin-top: 8px; }
+.support-call.has-media [data-action="end"] { margin-top: 0; }
+.support-popup:has(.support-call.has-media) { inset: auto max(12px, env(safe-area-inset-right)) 12px auto; height: calc(100dvh - 24px); max-height: calc(100dvh - 24px); overflow: hidden; }
+.support-popup:has(.support-call.has-media) .support-heading, .support-popup:has(.support-call.has-media) .support-status { flex-shrink: 0; padding-block: 8px; }
+.support-popup:has(.support-call.has-media) .support-conversation { flex: 1; min-height: 0; overflow: hidden; }
+.support-popup:has(.support-call.has-media) .support-call { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 8px; }
+.support-popup:has(.support-call.has-media) .support-messages { min-height: 0; max-height: 50px; padding: 4px 12px; flex-shrink: 2; }
+.support-popup:has(.support-call.has-media) .support-send, .support-popup:has(.support-call.has-media) .support-footer { flex-shrink: 0; padding-block: 6px; }
+.support-popup .support-call.has-media .support-call-videos { height: clamp(150px, 25dvh, 220px); }
+.support-popup:has(.support-call.has-media) .support-live { flex-shrink: 1; max-height: 140px; }
+.support-widget:has(.support-call.has-media) .support-launcher { display: none; }

@@ -7,11 +7,17 @@ const TELETYPTEL_OAUTH_HANDOFF_TTL_SECONDS = 2592000;
 const TELETYPTEL_2FA_PENDING_ACCOUNT_SESSION_KEY = 'teletyptel_2fa_pending_account_id';
 const TELETYPTEL_2FA_PENDING_PASSWORD_SESSION_KEY = 'teletyptel_2fa_pending_password';
 
+session_set_cookie_params([
+    'httponly' => true,
+    'secure' => !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
+    'samesite' => 'Lax',
+]);
 session_start();
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 
 try {
+    AccountAccess::guardSession(Database::connect(), $_SESSION);
     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         readAccount();
         return;
@@ -24,6 +30,9 @@ try {
 
     http_response_code(405);
     echo json_encode(['ok' => false, 'error' => 'method_not_allowed']);
+} catch (AccountAccessDenied $error) {
+    http_response_code(403);
+    echo json_encode(['ok' => false, 'error' => 'account_access_denied', 'message' => $error->getMessage()]);
 } catch (Throwable $error) {
     http_response_code(500);
     echo json_encode(['ok' => false, 'error' => 'server_error', 'message' => $error->getMessage()]);
@@ -143,6 +152,9 @@ function logoutAccountSession(): void
 {
     unset(
         $_SESSION['teletyptel_account_id'],
+        $_SESSION['teletyptel_authenticated_at'],
+        $_SESSION['teletyptel_intake_authenticated_id'],
+        $_SESSION['teletyptel_intake_csrf'],
         $_SESSION[TELETYPTEL_2FA_PENDING_ACCOUNT_SESSION_KEY],
         $_SESSION[TELETYPTEL_2FA_PENDING_PASSWORD_SESSION_KEY]
     );
@@ -194,10 +206,12 @@ function consumeOAuthLoginToken(string $accountId, string $token): bool
             && hash_equals((string)($payload['token_hash'] ?? ''), hash('sha256', $token))) {
             $pdo = Database::connect();
             ensureAccountProfileSchema($pdo);
+            if (!AccountAccess::versionAllowed($pdo, $accountId, (int)($payload['access_version'] ?? 1))) return false;
             if (accountRequiresTwoFactor($pdo, $accountId)) {
                 beginTwoFactorLoginSession($accountId);
             } else {
                 $_SESSION['teletyptel_account_id'] = $accountId;
+                markIntakeAuthentication($accountId, (int)($payload['created_at'] ?? 0));
                 clearTwoFactorLoginSession();
             }
             return true;
@@ -258,6 +272,7 @@ function loginAccount(array $input): void
     }
 
     $_SESSION['teletyptel_account_id'] = $row['account_id'];
+    markIntakeAuthentication((string)$row['account_id']);
     clearTwoFactorLoginSession();
     $account = rowToAccount($row);
     $account['password'] = $password;
@@ -292,7 +307,11 @@ function saveAccount(array $input): void
 
     persistAccount($pdo, $account);
 
+    AccountAccess::bind($pdo, (string)$account['account_id'], $_SESSION);
     $_SESSION['teletyptel_account_id'] = $account['account_id'];
+    if (!$existing) {
+        markIntakeAuthentication((string)$account['account_id']);
+    }
     unset($account['password_secret']);
     echo json_encode(['ok' => true, 'account' => accountToClient($account)], JSON_UNESCAPED_SLASHES);
 }
@@ -478,6 +497,7 @@ function resetPassword(array $input): void
     }
 
     if (is_array($existing)) {
+        AccountAccess::bind($pdo, (string)$existing['account_id'], $_SESSION);
         $_SESSION['teletyptel_account_id'] = $existing['account_id'];
         $existing['password_hash'] = $passwordHash;
         echo json_encode(['ok' => true, 'account' => rowToAccount($existing)], JSON_UNESCAPED_SLASHES);
@@ -888,6 +908,7 @@ function verifyLoginTwoFactor(array $input): void
 
     $row = ensureProviderXmppPassword($pdo, $row);
     $_SESSION['teletyptel_account_id'] = $accountId;
+    markIntakeAuthentication($accountId);
     $password = cleanText($_SESSION[TELETYPTEL_2FA_PENDING_PASSWORD_SESSION_KEY] ?? '', 1024);
     clearTwoFactorLoginSession();
     $account = rowToAccount($row);
@@ -895,6 +916,15 @@ function verifyLoginTwoFactor(array $input): void
         $account['password'] = $password;
     }
     echo json_encode(['ok' => true, 'account' => $account], JSON_UNESCAPED_SLASHES);
+}
+
+function markIntakeAuthentication(string $accountId, ?int $authenticatedAt = null): void
+{
+    AccountAccess::bind(Database::connect(), $accountId, $_SESSION);
+    session_regenerate_id(true);
+    $_SESSION['teletyptel_authenticated_at'] = $authenticatedAt ?? time();
+    $_SESSION['teletyptel_intake_authenticated_id'] = $accountId;
+    unset($_SESSION['teletyptel_intake_csrf']);
 }
 
 function unlinkIdentity(array $input): void
@@ -936,6 +966,8 @@ function unlinkIdentity(array $input): void
 
 function persistAccount(PDO $pdo, array $account): void
 {
+    AccountAccess::assertAllowed($pdo, (string)$account['account_id']);
+    AccountAccess::assertJidAllowed($pdo, (string)$account['jid']);
     ensureAccountIdentitySchema($pdo);
     $statement = $pdo->prepare(
         'INSERT INTO account_profiles (
@@ -1125,6 +1157,7 @@ function rowToAccount(array $row): array
 
 function ensureProviderXmppPassword(PDO $pdo, array $row): array
 {
+    AccountAccess::assertAllowed($pdo, (string)$row['account_id']);
     $provider = strtolower((string)($row['provider_id'] ?? ''));
     if (!in_array($provider, ['google', 'facebook', 'apple'], true)) {
         return $row;
@@ -1363,7 +1396,9 @@ function accountRequiresTwoFactor(PDO $pdo, string $accountId): bool
 
 function beginTwoFactorLoginSession(string $accountId, string $password = ''): void
 {
-    unset($_SESSION['teletyptel_account_id']);
+    AccountAccess::bind(Database::connect(), $accountId, $_SESSION);
+    unset($_SESSION['teletyptel_account_id'], $_SESSION['teletyptel_authenticated_at'],
+        $_SESSION['teletyptel_intake_authenticated_id'], $_SESSION['teletyptel_intake_csrf']);
     $_SESSION[TELETYPTEL_2FA_PENDING_ACCOUNT_SESSION_KEY] = $accountId;
     if ($password !== '') {
         $_SESSION[TELETYPTEL_2FA_PENDING_PASSWORD_SESSION_KEY] = $password;
@@ -1874,6 +1909,7 @@ function displayNameFromJid(string $jid): string
 
 function verifyAccountPassword(PDO $pdo, array $row, string $password): bool
 {
+    AccountAccess::assertAllowed($pdo, (string)$row['account_id']);
     $hash = (string)($row['password_hash'] ?? '');
     if ($hash !== '' && password_verify($password, $hash)) {
         return true;
@@ -1892,6 +1928,7 @@ function verifyAccountPassword(PDO $pdo, array $row, string $password): bool
 
 function verifyXmppAccountPassword(string $jid, string $password): bool
 {
+    AccountAccess::assertJidAllowed(Database::connect(), $jid);
     $bare = strtolower(bareJid($jid));
     $parts = explode('@', $bare, 2);
     if (count($parts) !== 2 || $parts[0] === '' || $parts[1] === '') {
@@ -2011,6 +2048,7 @@ function createXmppSqlAccount(string $username, string $password): bool
 
 function updateXmppSqlPassword(string $jid, string $password): bool
 {
+    AccountAccess::assertJidAllowed(Database::connect(), $jid);
     $parts = explode('@', bareJid($jid), 2);
     if (count($parts) !== 2 || $parts[0] === '') {
         return false;

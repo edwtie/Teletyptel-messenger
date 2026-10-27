@@ -8,9 +8,15 @@ const TT_AUTH_HANDOFF_TTL_SECONDS = 2592000;
 
 function ttAuthHandle(string $provider, string $step): void
 {
+    session_set_cookie_params([
+        'httponly' => true,
+        'secure' => !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
+        'samesite' => 'Lax',
+    ]);
     session_start();
     header('Cache-Control: no-store');
     try {
+        AccountAccess::guardSession(Database::connect(), $_SESSION);
         if ($step === 'start') {
             ttAuthStart($provider);
             return;
@@ -20,6 +26,8 @@ function ttAuthHandle(string $provider, string $step): void
             return;
         }
         ttAuthJson(['ok' => false, 'error' => 'unknown_auth_step'], 404);
+    } catch (AccountAccessDenied $error) {
+        ttAuthJson(['ok' => false, 'error' => 'account_access_denied', 'message' => $error->getMessage()], 403);
     } catch (Throwable $error) {
         ttAuthJson(['ok' => false, 'error' => 'oauth_server_error', 'message' => $error->getMessage()], 500);
     }
@@ -105,10 +113,29 @@ function ttAuthCallback(string $provider): void
     $pdo = Database::connect();
     ttAuthEnsureAccountSchema($pdo);
     $account = ttAuthPersistProviderAccount($pdo, $provider, $profile, $config, ttAuthClean((string)($session['link_account_id'] ?? ''), 96));
+    AccountAccess::bind($pdo, (string)$account['account_id'], $_SESSION);
     $_SESSION['teletyptel_account_id'] = $account['account_id'];
+    unset($_SESSION['teletyptel_authenticated_at'], $_SESSION['teletyptel_intake_authenticated_id'], $_SESSION['teletyptel_intake_csrf']);
+    $security = null;
+    if ((int)$pdo->query("SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'account_security_settings'")->fetchColumn() > 0) {
+        $statement = $pdo->prepare('SELECT two_factor_enabled, two_factor_method FROM account_security_settings WHERE account_id = ?');
+        $statement->execute([$account['account_id']]);
+        $security = $statement->fetch(PDO::FETCH_ASSOC);
+    }
+    session_regenerate_id(true);
+    if (!empty($security['two_factor_enabled'])) {
+        unset($_SESSION['teletyptel_account_id'], $_SESSION['teletyptel_2fa_pending_password']);
+        $_SESSION['teletyptel_2fa_pending_account_id'] = $account['account_id'];
+    } else {
+        unset($_SESSION['teletyptel_2fa_pending_account_id'], $_SESSION['teletyptel_2fa_pending_password']);
+        $_SESSION['teletyptel_authenticated_at'] = time();
+        $_SESSION['teletyptel_intake_authenticated_id'] = $account['account_id'];
+    }
 
     if (($request['format'] ?? '') === 'json') {
-        ttAuthJson(['ok' => true, 'account' => $account]);
+        ttAuthJson(!empty($security['two_factor_enabled'])
+            ? ['ok' => true, 'twoFactorRequired' => true, 'accountId' => $account['account_id'], 'method' => $security['two_factor_method']]
+            : ['ok' => true, 'account' => $account]);
         return;
     }
 
@@ -240,9 +267,11 @@ function ttAuthPersistProviderAccount(PDO $pdo, string $provider, array $profile
     $accountId = is_array($linkedAccount)
         ? (string)$linkedAccount['account_id']
         : 'oauth-' . $provider . '-' . substr(hash('sha256', $profile['subject']), 0, 24);
+    AccountAccess::assertAllowed($pdo, $accountId);
     $jid = is_array($linkedAccount) && (string)($linkedAccount['jid'] ?? '') !== ''
         ? (string)$linkedAccount['jid']
         : ttAuthChooseAvailableLocalJid($pdo, ttAuthLocalpart($email !== '' ? $email : $accountId), $xmppDomain, $accountId);
+    AccountAccess::assertJidAllowed($pdo, $jid);
     $host = ttAuthClean((string)$config['xmpp_host'], 255);
     $websocket = ttAuthClean((string)$config['xmpp_websocket'], 255);
     $tlsMode = ttAuthClean((string)($config['xmpp_tls_mode'] ?? 'websocket'), 32);
@@ -549,10 +578,13 @@ function ttAuthStorePendingState(string $provider, string $state, string $verifi
 
 function ttAuthCreateLoginToken(string $accountId): string
 {
+    $pdo = Database::connect();
+    AccountAccess::assertAllowed($pdo, $accountId);
     $token = ttAuthBase64Url(random_bytes(32));
     $payload = [
         'account_id' => $accountId,
         'token_hash' => hash('sha256', $token),
+        'access_version' => (int)AccountAccess::state($pdo, $accountId)['version'],
         'created_at' => time(),
     ];
     $directory = ttAuthHandoffDirectory();

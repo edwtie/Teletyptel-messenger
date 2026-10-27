@@ -150,6 +150,15 @@ CREATE TABLE IF NOT EXISTS account_security_settings (
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS account_access_controls (
+  account_id VARCHAR(96) NOT NULL PRIMARY KEY,
+  web_blocked TINYINT(1) NOT NULL DEFAULT 0,
+  trashed_at DATETIME NULL,
+  version INT NOT NULL DEFAULT 1,
+  updated_at DATETIME NOT NULL,
+  CONSTRAINT fk_account_access_profile FOREIGN KEY (account_id) REFERENCES account_profiles(account_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS admin_users (
   admin_id VARCHAR(96) NOT NULL PRIMARY KEY,
   email VARCHAR(255) NOT NULL,
@@ -157,10 +166,124 @@ CREATE TABLE IF NOT EXISTS admin_users (
   password_hash VARCHAR(255) NOT NULL,
   role VARCHAR(32) NOT NULL DEFAULT 'owner',
   enabled TINYINT(1) NOT NULL DEFAULT 1,
+  can_review_intake TINYINT NOT NULL DEFAULT 0,
+  session_version INT NOT NULL DEFAULT 1,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   last_login_at DATETIME NULL,
   UNIQUE KEY uq_admin_users_email (email(190))
 );
+
+CREATE TABLE IF NOT EXISTS admin_audit_log (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  actor_id VARCHAR(96) NOT NULL,
+  action VARCHAR(40) NOT NULL,
+  target_account_id VARCHAR(96) NOT NULL DEFAULT '',
+  created_at DATETIME NOT NULL,
+  KEY idx_admin_audit_target (target_account_id, created_at)
+);
+
+CREATE TABLE IF NOT EXISTS subscription_plans (
+  plan_id VARCHAR(32) NOT NULL PRIMARY KEY,
+  name VARCHAR(120) NOT NULL,
+  description TEXT NOT NULL,
+  price_cents INT UNSIGNED NULL,
+  billing_period VARCHAR(16) NOT NULL DEFAULT 'month',
+  enabled TINYINT(1) NOT NULL DEFAULT 1,
+  version INT UNSIGNED NOT NULL DEFAULT 1,
+  created_at DATETIME NOT NULL,
+  updated_at DATETIME NOT NULL
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS subscription_history (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  account_id VARCHAR(96) NOT NULL,
+  from_plan VARCHAR(32) NOT NULL,
+  to_plan VARCHAR(32) NOT NULL,
+  from_plan_name VARCHAR(120) NOT NULL,
+  to_plan_name VARCHAR(120) NOT NULL,
+  from_expires_at DATE NULL,
+  to_expires_at DATE NULL,
+  actor_id VARCHAR(96) NOT NULL,
+  note TEXT NOT NULL,
+  created_at DATETIME NOT NULL,
+  KEY idx_subscription_history_account (account_id, id)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS subscription_schedules (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  account_id VARCHAR(96) NOT NULL,
+  expected_plan VARCHAR(32) NOT NULL,
+  expected_expires_at DATE NULL,
+  to_plan VARCHAR(32) NOT NULL,
+  to_expires_at DATE NULL,
+  effective_on DATE NOT NULL,
+  status VARCHAR(16) NOT NULL DEFAULT 'pending',
+  actor_id VARCHAR(96) NOT NULL,
+  note TEXT NOT NULL,
+  error_code VARCHAR(64) NOT NULL DEFAULT '',
+  created_at DATETIME NOT NULL,
+  completed_at DATETIME NULL,
+  KEY idx_schedule_due (status, effective_on),
+  KEY idx_schedule_account (account_id, status)
+) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS billing_invoices (
+  id VARCHAR(32) NOT NULL PRIMARY KEY,
+  request_key VARCHAR(64) NOT NULL UNIQUE,
+  account_id VARCHAR(96) NOT NULL,
+  recipient_type VARCHAR(16) NOT NULL DEFAULT 'customer',
+  status VARCHAR(16) NOT NULL DEFAULT 'draft',
+  invoice_number VARCHAR(64) NULL UNIQUE,
+  customer_name VARCHAR(120) NOT NULL,
+  customer_address TEXT NOT NULL,
+  customer_email VARCHAR(255) NOT NULL,
+  description TEXT NOT NULL,
+  service_on DATE NOT NULL,
+  due_on DATE NOT NULL,
+  quantity INT NOT NULL,
+  unit_cents BIGINT NOT NULL,
+  vat_basis_points INT NOT NULL,
+  subtotal_cents BIGINT NOT NULL,
+  vat_cents BIGINT NOT NULL,
+  total_cents BIGINT NOT NULL,
+  currency VARCHAR(3) NOT NULL DEFAULT 'EUR',
+  supplier_json TEXT NULL,
+  issued_on DATE NULL,
+  paid_on DATE NULL,
+  payment_reference VARCHAR(128) NOT NULL DEFAULT '',
+  version INT NOT NULL DEFAULT 1,
+  actor_id VARCHAR(96) NOT NULL,
+  created_at DATETIME NOT NULL,
+  KEY idx_invoice_account (account_id, created_at)
+) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS billing_sequences (
+  sequence_year INT NOT NULL PRIMARY KEY,
+  last_number BIGINT NOT NULL
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS billing_recurring (
+  id VARCHAR(32) NOT NULL PRIMARY KEY,
+  account_id VARCHAR(96) NOT NULL UNIQUE,
+  recipient_type VARCHAR(16) NOT NULL DEFAULT 'customer',
+  plan_id VARCHAR(32) NOT NULL,
+  plan_version INT NOT NULL,
+  unit_cents BIGINT NOT NULL,
+  billing_period VARCHAR(16) NOT NULL,
+  anchor_day INT NOT NULL,
+  customer_name VARCHAR(120) NOT NULL,
+  customer_address TEXT NOT NULL,
+  customer_email VARCHAR(255) NOT NULL,
+  vat_basis_points INT NOT NULL,
+  next_on DATE NOT NULL,
+  enabled TINYINT NOT NULL,
+  auto_issue TINYINT NOT NULL DEFAULT 0,
+  version INT NOT NULL DEFAULT 1,
+  last_error VARCHAR(128) NOT NULL DEFAULT '',
+  actor_id VARCHAR(96) NOT NULL,
+  updated_at DATETIME NOT NULL,
+  KEY idx_recurring_due (enabled, next_on)
+) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS message_history (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -190,6 +313,60 @@ CREATE TABLE IF NOT EXISTS message_history (
     ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS intake_plan_rules (
+  plan_id VARCHAR(32) NOT NULL PRIMARY KEY,
+  published TINYINT NOT NULL DEFAULT 0,
+  requires_documents TINYINT NOT NULL DEFAULT 0,
+  requires_bsn TINYINT NOT NULL DEFAULT 0,
+  version INT NOT NULL DEFAULT 1
+) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS intake_applications (
+  id CHAR(32) NOT NULL PRIMARY KEY,
+  account_id VARCHAR(96) NOT NULL,
+  plan_id VARCHAR(32) NOT NULL,
+  plan_version INT NOT NULL,
+  rule_version INT NOT NULL,
+  plan_name VARCHAR(120) NOT NULL,
+  price_cents INT NULL,
+  billing_period VARCHAR(16) NOT NULL,
+  requires_documents TINYINT NOT NULL,
+  requires_bsn TINYINT NOT NULL,
+  status VARCHAR(24) NOT NULL DEFAULT 'draft',
+  payload MEDIUMTEXT NULL,
+  consent_version VARCHAR(64) NOT NULL DEFAULT '',
+  feedback_code VARCHAR(32) NOT NULL DEFAULT '',
+  version INT NOT NULL DEFAULT 1,
+  created_at DATETIME NOT NULL,
+  updated_at DATETIME NOT NULL,
+  expires_at DATETIME NOT NULL,
+  submitted_at DATETIME NULL,
+  reviewed_at DATETIME NULL,
+  KEY idx_intake_account (account_id, created_at),
+  KEY idx_intake_status (status, created_at),
+  KEY idx_intake_expiry (expires_at)
+) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS intake_documents (
+  id CHAR(32) NOT NULL PRIMARY KEY,
+  application_id CHAR(32) NOT NULL,
+  kind VARCHAR(20) NOT NULL,
+  extension VARCHAR(5) NOT NULL,
+  file_size INT NOT NULL,
+  encrypted_content MEDIUMBLOB NOT NULL,
+  created_at DATETIME NOT NULL,
+  UNIQUE KEY uq_intake_document_kind (application_id, kind)
+) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS intake_audit (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  actor_id VARCHAR(128) NOT NULL,
+  action VARCHAR(40) NOT NULL,
+  application_id VARCHAR(32) NOT NULL DEFAULT '',
+  created_at DATETIME NOT NULL,
+  KEY idx_intake_audit_application (application_id, created_at)
+) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS conversation_history (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
   account_id VARCHAR(96) NOT NULL,
@@ -214,3 +391,21 @@ CREATE TABLE IF NOT EXISTS conversation_history (
     FOREIGN KEY (account_id) REFERENCES account_profiles(account_id)
     ON DELETE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS translation_preferences (
+  account_id VARCHAR(96) NOT NULL PRIMARY KEY,
+  target_language VARCHAR(16) NOT NULL DEFAULT 'nl',
+  translation_mode VARCHAR(16) NOT NULL DEFAULT 'manual',
+  automatic_consent INTEGER NOT NULL DEFAULT 0,
+  live_rtt_consent INTEGER NOT NULL DEFAULT 0,
+  own_live_rtt_consent INTEGER NOT NULL DEFAULT 0
+) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS translation_usage (
+  scope_key VARCHAR(128) NOT NULL,
+  window_start BIGINT NOT NULL,
+  window_end BIGINT NOT NULL,
+  requests INTEGER NOT NULL DEFAULT 0,
+  characters INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (scope_key, window_start)
+) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
