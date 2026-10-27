@@ -29,7 +29,8 @@ window.TeleTypTelSupportTranslation = {
       lives.clear();
     };
     const resultNode = (parent) => { const result = document.createElement("div"); result.className = "support-translation-result"; parent.append(result); return result; };
-    const show = (result, text, provisional = false, own = false) => {
+    const show = (result, text, provisional = false, own = false, sameLanguage = false) => {
+      if (sameLanguage) { results.delete(result); result.replaceChildren(); return; }
       const open = result.querySelector("details")?.open || false;
       results.set(result, { text, provisional, own });
       const detail = document.createElement("details"), summary = document.createElement("summary"), warning = document.createElement("small"), content = document.createElement("div");
@@ -50,7 +51,9 @@ window.TeleTypTelSupportTranslation = {
           nextRequest = Date.now() + 2200;
           try {
             const response = await request({ action: "translate", threadId: thread, targetLanguage: settings.preferences.targetLanguage, ...job.body });
-            if (job.generation === generation && ready() && job.valid()) job.complete(response.translation.text);
+            const source = String(response.translation.sourceLanguage || "").toLowerCase();
+            const sameLanguage = response.translation.translationNeeded === false || (source !== "" && source === String(response.translation.targetLanguage || settings.preferences.targetLanguage).toLowerCase());
+            if (job.generation === generation && ready() && job.valid()) job.complete(response.translation.text, sameLanguage);
           } catch (failure) {
             if (job.generation === generation && job.valid()) job.failed(failure);
           }
@@ -62,8 +65,8 @@ window.TeleTypTelSupportTranslation = {
       entry.attempted = true;
       entry.pending = true; entry.button.disabled = true;
       entry.result.textContent = label("Vertalen…", "Translating…");
-      queue.push({ generation, body: { sequence: Number(entry.message.sequence), automatic }, valid: () => entry.result.isConnected,
-        complete(text) { entry.pending = false; entry.done = true; entry.button.hidden = true; show(entry.result, text); },
+      queue.push({ generation, body: { sequence: Number(entry.message.sequence), messageRevision: Number(entry.message.revision || 0), automatic }, valid: () => entry.result.isConnected,
+        complete(text, sameLanguage) { entry.pending = false; entry.done = true; entry.button.hidden = true; show(entry.result, text, false, false, sameLanguage); },
         failed(failure) { entry.pending = false; entry.button.disabled = false; entry.failure = failure; entry.result.textContent = language.failure(failure, true); } });
       void pump();
     };
@@ -71,7 +74,7 @@ window.TeleTypTelSupportTranslation = {
       for (const entry of entries.values()) {
         entry.button.hidden = true;
         entry.button.disabled = entry.pending;
-        if (ready() && settings.preferences.mode === "automatic" && entry.automatic && !entry.attempted && entry.message.kind !== (staff ? "staff" : "visitor")) translate(entry, true);
+        if (ready() && settings.preferences.mode === "automatic" && entry.automatic && !entry.attempted) translate(entry, true);
       }
     };
     const sync = (identifier, data) => {
@@ -139,7 +142,12 @@ window.TeleTypTelSupportTranslation = {
     container.hidden = true;
     return {
       sync,
+      detach(sequence) {
+        const entry = entries.get(Number(sequence));
+        if (entry) { results.delete(entry.result); entry.result.remove(); entry.button.remove(); entries.delete(Number(sequence)); }
+      },
       attach(parent, message, automatic = true) {
+        if (message.deleted) return;
         if (message.attachment && !message.text) return;
         const button = document.createElement("button"); button.type = "button"; button.className = "support-translate-action"; icons.set(button, "translate", label("Vertalen", "Translate")); parent.append(button);
         const entry = { message, button, result: resultNode(parent), pending: false, done: false, automatic };
@@ -157,9 +165,9 @@ window.TeleTypTelSupportTranslation = {
         live.timer = setTimeout(() => {
           if (ticket !== generation || lives.get(key) !== live) return;
           queue = queue.filter((job) => job.liveKey !== key);
-          queue.push({ generation, liveKey: key, body: { live: true, automatic: true, text: event.text, callId: event.callId, clientId: event.clientId, sourceRole: event.sourceRole },
+          queue.push({ generation, liveKey: key, body: { live: true, ownDraft: event.own === true, automatic: true, text: event.text, callId: event.callId, clientId: event.clientId, sourceRole: event.sourceRole },
             valid: () => lives.get(key) === live && live.version === version && live.result.isConnected,
-            complete(text) { show(live.result, text, true, event.own); },
+            complete(text, sameLanguage) { show(live.result, text, true, event.own, sameLanguage); },
             failed(failure) { live.failure = failure; live.result.textContent = language.failure(failure, true); } });
           void pump();
         }, 1300);

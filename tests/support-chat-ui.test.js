@@ -25,6 +25,13 @@ async function check(engine, device, label) {
     const visitor = await browser.newContext({ ...devices[device], locale: "nl-NL", serviceWorkers: "block" });
     const staff = await browser.newContext({ viewport: { width: 1280, height: 900 }, serviceWorkers: "block" });
     const stranger = await browser.newContext({ serviceWorkers: "block" });
+    for (const context of [visitor, staff, stranger]) await context.addInitScript(() => {
+      window.supportTestPeers = [];
+      const OriginalPeer = window.RTCPeerConnection;
+      if (OriginalPeer) window.RTCPeerConnection = class extends OriginalPeer {
+        constructor(config) { super(config); window.supportTestPeers.push(this); }
+      };
+    });
     const page = await visitor.newPage(), desk = await staff.newPage(), other = await stranger.newPage();
     const failures = [];
     for (const current of [page, desk, other]) current.on("pageerror", (error) => failures.push(error.message));
@@ -47,9 +54,15 @@ async function check(engine, device, label) {
     assert.equal((await visitor.request.post(origin + "/api/support-chat.php", { data: { action: "start", name: "Forged", acknowledged: true } })).status(), 403, "CSRF required");
     assert.equal((await visitor.request.get(origin + "/api/support-chat.php", { headers: { "Sec-Fetch-Site": "cross-site" } })).status(), 403, "Cross-site request rejected");
     await page.locator("#supportName").fill("Sam <img src=x onerror=alert(1)>");
+    await page.locator("#supportMinimize").click();
+    assert.equal(await page.locator("#supportDialog").isVisible(), false, "Minus hides the signup form without resetting it");
+    assert.equal(await page.evaluate(() => document.activeElement.id), "supportLauncher", "Minimize restores keyboard focus");
+    await launcher.click();
+    assert.equal(await page.locator("#supportName").inputValue(), "Sam <img src=x onerror=alert(1)>", "Minimize preserves the name before signup");
     await page.locator('#supportStart button[type="submit"]').click();
     assert.equal(await page.locator("#supportStart").isVisible(), true, "Required acknowledgement cannot be skipped");
-    await page.locator("#supportAcknowledged").check();
+    await page.locator("#supportAcknowledged").press("Space");
+    assert.equal(await page.locator("#supportAcknowledged").isChecked(), true, "Start terms can be accepted with the keyboard");
     await page.locator('#supportStart button[type="submit"]').click();
     await page.locator("#supportSend").waitFor();
     assert.equal(await page.locator("#supportMessageSend").isVisible(), false, "Empty composer shows microphone instead of send");
@@ -94,6 +107,41 @@ async function check(engine, device, label) {
     await page.locator("#supportMessages").getByText("Hallo Sam, waarmee kan ik je helpen?", { exact: true }).waitFor();
     await page.locator("#supportStatus").filter({ hasText: "Staff1 (test) helpt je" }).waitFor();
     assert.equal(await desk.locator("#supportAdminLink").isVisible(), false, "Staff receives no admin navigation");
+    const ownMessage = page.locator('#supportMessages article[data-sequence="1"]');
+    await page.locator("#supportText").fill("Keep this new draft");
+    await ownMessage.dispatchEvent("contextmenu", { clientX: 300, clientY: 200 });
+    assert.deepEqual(await page.locator('.support-message-menu [role="menuitem"]').allTextContents(), ["Bewerken", "Verwijderen", "Kopiëren"], "Support has no forwarding or manual translation");
+    await page.getByRole("menuitem", { name: "Bewerken", exact: true }).click();
+    await page.locator(".support-message-editor textarea").fill("Mijn aangepaste vraag");
+    await page.locator('.support-message-editor [data-action="save"]').click();
+    await ownMessage.getByText("Mijn aangepaste vraag", { exact: true }).waitFor();
+    await desk.locator("#supportStaffMessages").getByText("Mijn aangepaste vraag", { exact: true }).waitFor();
+    assert.equal(await page.locator("#supportText").inputValue(), "Keep this new draft", "Editing preserves new RTT draft");
+    assert.equal(await ownMessage.locator(".support-message-edited").textContent(), "Bewerkt");
+    await page.locator('#supportMessages article[data-sequence="2"] .support-message-more').click();
+    assert.deepEqual(await page.locator('.support-message-menu [role="menuitem"]').allTextContents(), ["Kopiëren"], "Cannot edit received message");
+    await page.keyboard.press("Escape");
+    await desk.locator('#supportStaffMessages article[data-sequence="2"] .support-message-more').click();
+    await desk.getByRole("menuitem", { name: "Bewerken", exact: true }).click();
+    await desk.locator(".support-message-editor textarea").fill("Aangepast antwoord");
+    await desk.locator('.support-message-editor [data-action="save"]').click();
+    await page.locator("#supportMessages").getByText("Aangepast antwoord", { exact: true }).waitFor();
+    await ownMessage.focus(); await page.keyboard.press("Shift+F10");
+    await page.keyboard.press("Escape");
+    await ownMessage.dispatchEvent("pointerdown", { pointerType: "touch", clientX: 200, clientY: 200 });
+    await page.getByRole("menuitem", { name: "Verwijderen", exact: true }).waitFor();
+    await ownMessage.dispatchEvent("pointerup", { pointerType: "touch" });
+    await page.getByRole("menuitem", { name: "Verwijderen", exact: true }).click();
+    await page.locator('.support-message-editor [data-action="cancel"]').click();
+    assert.equal(await ownMessage.getByText("Mijn aangepaste vraag", { exact: true }).count(), 1, "Delete cancellation preserves text");
+    await ownMessage.locator(".support-message-more").click();
+    const menuBounds = await page.locator(".support-message-menu").boundingBox();
+    assert.ok(menuBounds.x >= 0 && menuBounds.x + menuBounds.width <= page.viewportSize().width, "Menu stays within mobile viewport");
+    await page.getByRole("menuitem", { name: "Verwijderen", exact: true }).click();
+    await page.locator('.support-message-editor [data-action="save"]').click();
+    await ownMessage.getByText("Bericht verwijderd", { exact: true }).waitFor();
+    await desk.locator('#supportStaffMessages article[data-sequence="1"]').getByText("Bericht verwijderd", { exact: true }).waitFor();
+    assert.equal(await ownMessage.locator(".support-message-more").count(), 0, "Deleted message has no actions");
     const pdf = Buffer.from("%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\n%%EOF");
     await page.locator("#supportText").fill("Dit concept blijft staan");
     await page.locator('#supportAttachments input[type="file"]').setInputFiles({ name: "rapport.pdf", mimeType: "application/pdf", buffer: pdf });
@@ -105,6 +153,9 @@ async function check(engine, device, label) {
     const fileUrl = await page.locator("#supportMessages .support-file").filter({ hasText: "rapport.pdf" }).getAttribute("href");
     const download = await visitor.request.get(fileUrl);
     assert.equal(download.status(), 200); assert.deepEqual(await download.body(), pdf);
+    await page.locator('#supportMessages article:has(.support-file) .support-message-more').click();
+    assert.deepEqual(await page.locator('.support-message-menu [role="menuitem"]').allTextContents(), ["Verwijderen", "Downloaden"], "Own attachment offers delete/download, not edit or forwarding");
+    await page.keyboard.press("Escape");
     assert.ok(download.headers()["content-disposition"].startsWith("attachment;"), "PDF downloads rather than executing in the website");
     assert.equal(download.headers()["x-content-type-options"], "nosniff");
     assert.equal((await stranger.request.get(fileUrl)).status(), 404, "Other visitor cannot download attachment");
@@ -136,14 +187,59 @@ async function check(engine, device, label) {
     await page.unroute("**/api/support-chat.php");
     await page.locator('#supportSend button[type="submit"]').click();
     await page.waitForFunction(() => document.getElementById("supportText").value === "");
+    await desk.setViewportSize({ width: 390, height: 844 });
+    assert.equal(await desk.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, "Staff inbox fits mobile");
+    await other.goto(origin + "/admin/support-chat.php");
+    await other.locator("#supportStaffEmail").fill("staff2@example.test");
+    await other.locator("#supportStaffPassword").fill("fixture-password-only");
+    await other.locator('#supportStaffLogin button[type="submit"]').click();
+    await other.locator("#supportStaffWorkspace").waitFor();
+    assert.equal((await stranger.request.get(origin + "/admin/support-chat-api.php?thread=" + threadId)).status(), 403, "Another staff member cannot read assigned transcript");
+    assert.equal((await stranger.request.get(staffFileUrl)).status(), 403, "Another staff member cannot download attachments");
+    assert.equal(await page.locator("#supportStaffTransfer").count(), 0, "Visitor has no transfer control");
+    await other.locator("#supportStaffAvailable").check();
+    await desk.locator("#supportStaffRefresh").click();
+    await desk.locator("#supportStaffTransfer summary").click();
+    await desk.locator("#supportStaffRecipient").selectOption("staff2");
+    desk.once("dialog", (dialog) => dialog.accept());
+    await desk.locator("#supportStaffTransferSend").click();
+    await desk.locator("#supportStaffStatus").getByText("Gesprek doorgestuurd naar Staff2 (test).", { exact: true }).waitFor();
+    assert.equal(await desk.locator("#supportStaffMessages").innerText(), "", "Transfer clears former staff transcript");
+    assert.equal((await staff.request.get(staffFileUrl)).status(), 403, "Transfer revokes former staff attachment access");
+    await other.getByRole("button", { name: "Openen", exact: true }).click();
+    await other.locator("#supportStaffMessages").getByText("Aangepast antwoord", { exact: true }).waitFor();
+    await other.locator("#supportStaffMessages .support-file").filter({ hasText: "rapport.pdf" }).waitFor();
+    assert.equal((await stranger.request.get(staffFileUrl)).status(), 200, "New assignee can download original attachment");
+    await page.locator("#supportStatus").filter({ hasText: "Staff2 (test) helpt je" }).waitFor();
+    if (await page.evaluate(() => typeof RTCPeerConnection === "function")) {
+      await page.waitForFunction(() => document.getElementById("supportCall").dataset.rtt === "connected").catch(async (error) => {
+        for (const current of [page, other]) console.error(await current.evaluate(() => ({
+          state: document.querySelector('.support-call-state')?.textContent,
+          error: document.querySelector('.support-call-error')?.textContent,
+          peers: window.supportTestPeers.map((peer) => ({ connection: peer.connectionState, ice: peer.iceConnectionState, signaling: peer.signalingState }))
+        })));
+        throw error;
+      });
+      await page.locator("#supportText").fill("RTT voor nieuwe medewerker");
+      await other.locator("#supportStaffLive").getByText("RTT voor nieuwe medewerker", { exact: true }).waitFor();
+      assert.equal(await desk.locator("#supportStaffLive").getByText("RTT voor nieuwe medewerker", { exact: true }).count(), 0, "Old colleague does not receive new live text");
+      await page.locator("#supportText").fill("");
+    }
+    await other.locator("#supportStaffTransfer summary").click();
+    await other.locator("#supportStaffRecipient").selectOption("staff1");
+    other.once("dialog", (dialog) => dialog.accept());
+    await other.locator("#supportStaffTransferSend").click();
+    await other.locator("#supportStaffStatus").getByText("Gesprek doorgestuurd naar Staff1 (test).", { exact: true }).waitFor();
+    await desk.getByRole("button", { name: "Openen", exact: true }).click();
+    await desk.locator("#supportStaffReply").waitFor();
     const retried = await (await visitor.request.get(origin + "/api/support-chat.php")).json();
     assert.equal(retried.messages.filter((message) => message.text === "Antwoord na verbindingsfout").length, 1, "Lost response retry does not duplicate message");
     await page.locator("#supportLauncher").click();
     assert.equal(await page.locator("#supportDialog").isVisible(), false);
     await page.goto(origin + "/demo.html");
     await page.locator("#supportLauncher").click();
-    await page.locator("#supportMessages").getByText("Hallo Sam, waarmee kan ik je helpen?", { exact: true }).waitFor();
-    for (const width of [390, 320]) {
+    await page.locator("#supportMessages").getByText("Aangepast antwoord", { exact: true }).waitFor();
+    for (const width of [768, 600, 390, 320]) {
       await page.setViewportSize({ width, height: 740 });
       const composer = await page.locator("#supportSend").boundingBox();
       const input = await page.locator("#supportText").boundingBox();
@@ -157,13 +253,13 @@ async function check(engine, device, label) {
       const bounds = await page.locator("#supportDialog").boundingBox();
       assert.ok(bounds.x >= 0 && bounds.x + bounds.width <= width && bounds.y >= 0 && bounds.y + bounds.height <= 740, "Popup fits narrow mobile viewport");
       const header = page.locator(".support-heading");
-      const controls = header.locator("#supportTranslation summary, [data-action='interpreter'], .support-call-help summary, #supportMinimize");
-      assert.equal(await controls.count(), 4, "Language, interpreter, help and close share the header");
-      const closeBounds = await page.locator("#supportMinimize").boundingBox();
+      const controls = header.locator("#supportTranslation summary, [data-action='interpreter'], .support-call-help summary, #supportMinimize, #supportClose");
+      assert.equal(await controls.count(), 5, "Language, interpreter, help, minimize and close share the header");
+      const closeBounds = await page.locator("#supportClose").boundingBox();
       const headerBounds = await header.boundingBox();
       for (const control of await controls.all()) {
         const iconBounds = await control.boundingBox();
-        assert.ok(Math.abs(iconBounds.y - closeBounds.y) <= 1, "All four icons sit on one row beside close");
+        assert.ok(Math.abs(iconBounds.y - closeBounds.y) <= 1, "All five icons sit on one row beside close");
         assert.ok(iconBounds.width >= 44 && iconBounds.height >= 44, "Icons keep accessible touch targets");
         assert.ok(iconBounds.x >= headerBounds.x && iconBounds.x + iconBounds.width <= headerBounds.x + headerBounds.width, "Header icons never overflow");
         assert.ok(await control.getAttribute("aria-label"), "Icon has an accessible name");
@@ -188,16 +284,25 @@ async function check(engine, device, label) {
       await page.locator("#supportTranslation summary").click();
       assert.equal(await page.locator("#supportCall .support-call-actions").count(), 0, "No duplicate toolbar below the header");
       await page.screenshot({ path: path.join(os.tmpdir(), "teletyptel-support-header-" + label + "-" + width + ".png") });
+      await page.locator("#supportText").fill("Concept bewaren bij verbergen");
+      await page.locator('#supportAttachments input[type="file"]').setInputFiles({ name: "concept.pdf", mimeType: "application/pdf", buffer: pdf });
+      const minimize = page.getByRole("button", { name: "Chat verbergen", exact: true });
+      assert.equal(await minimize.innerText(), "", "Minimize shows only a symbol");
+      await minimize.focus(); await page.keyboard.press("Enter");
+      assert.equal(await page.locator("#supportDialog").isVisible(), false, "Minus hides the popup without a close confirmation");
+      assert.equal(await launcher.getAttribute("aria-expanded"), "false");
+      assert.equal(await page.evaluate(() => document.activeElement.id), "supportLauncher");
+      const minimized = await (await visitor.request.get(origin + "/api/support-chat.php")).json();
+      assert.equal(minimized.thread.id, threadId);
+      assert.equal(minimized.thread.status, "active", "Minimize never ends the server conversation");
+      await launcher.click();
+      assert.equal(await launcher.getAttribute("aria-expanded"), "true");
+      assert.equal(await page.locator("#supportEndConfirm").isVisible(), false);
+      assert.equal(await page.locator("#supportText").inputValue(), "Concept bewaren bij verbergen");
+      assert.ok((await page.locator("#supportFileExtras").innerText()).includes("concept.pdf"), "Minimize preserves selected attachments");
+      await page.locator('#supportFileExtras [data-file="cancel"]').click();
+      await page.locator("#supportText").fill("");
     }
-    await desk.setViewportSize({ width: 390, height: 844 });
-    assert.equal(await desk.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, "Staff inbox fits mobile");
-    await other.goto(origin + "/admin/support-chat.php");
-    await other.locator("#supportStaffEmail").fill("staff2@example.test");
-    await other.locator("#supportStaffPassword").fill("fixture-password-only");
-    await other.locator('#supportStaffLogin button[type="submit"]').click();
-    await other.locator("#supportStaffWorkspace").waitFor();
-    assert.equal((await stranger.request.get(origin + "/admin/support-chat-api.php?thread=" + threadId)).status(), 403, "Another staff member cannot read assigned transcript");
-    assert.equal((await stranger.request.get(staffFileUrl)).status(), 403, "Another staff member cannot download attachments");
     await staff.request.get(origin + "/fixture/block");
     await desk.locator("#supportStaffLogin").waitFor();
     assert.equal((await staff.request.get(staffFileUrl)).status(), 401, "Blocked staff loses attachment access");
@@ -206,14 +311,14 @@ async function check(engine, device, label) {
     await other.locator("#supportStaffReply").waitFor();
     assert.equal(await page.locator("#supportEnd").count(), 0, "No second end-chat button below the composer");
     await page.locator("#supportText").fill("Niet verstuurd concept");
-    await page.locator("#supportMinimize").click();
+    await page.locator("#supportClose").click();
     await page.locator("#supportEndConfirm").waitFor();
-    assert.equal(await page.locator("#supportMinimize").getAttribute("aria-label"), "Alles afsluiten");
+    assert.equal(await page.locator("#supportClose").getAttribute("aria-label"), "Alles afsluiten");
     await page.screenshot({ path: path.join(os.tmpdir(), "teletyptel-close-all-" + label + ".png") });
     assert.equal((await (await visitor.request.get(origin + "/api/support-chat.php")).json()).thread.status, "active", "X first asks for confirmation");
     await page.locator("#supportEndNo").click();
     assert.equal(await page.locator("#supportText").inputValue(), "Niet verstuurd concept", "Cancel keeps the draft and conversation");
-    await page.locator("#supportMinimize").click();
+    await page.locator("#supportClose").click();
     await page.route("**/api/support-chat.php", async (route) => {
       if (route.request().method() === "POST" && route.request().postDataJSON()?.action === "close") await route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ ok: false }) });
       else await route.continue();

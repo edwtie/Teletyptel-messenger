@@ -2,6 +2,61 @@
 
 ## Unreleased
 
+- Preserve short Dutch acknowledgements (including “Ja” and “Nee”) when translating
+  support messages or live RTT into Dutch. Skip provider auto-detection for these
+  exact replies and hide the redundant result; other text/targets retain translation.
+
+- Fixed support initialization crashing on LAN HTTP when `crypto.randomUUID` is
+  unavailable. The support launcher now opens a clear HTTPS/trusted-certificate
+  notice; insecure pages do not collect or request chat data. Server HTTPS checks remain.
+
+- Hide redundant support translations when the detected source and target language
+  match, including live RTT and staff views. Originals stay visible.
+
+- Shortened the English customer-service heading and launcher label to “Support”
+  in the shared widget; other languages stay unchanged.
+
+### Staff-only support handoff — 2026-10-27
+
+- Assigned staff can transfer an active customer-service conversation to another
+  online, available colleague, including existing messages and attachments.
+  Visitors have no forwarding control or API permission.
+- Recheck recipient availability/session, revoke former staff access, record the
+  handoff and deduplicate retries. Old calls end; media consent is not inherited.
+- Added authorization, retention, media-reset and visitor/staff UI regressions.
+
+### Support message menu — 2026-10-27
+
+- Added right-click, keyboard, touch-hold and ellipsis menus to visitor and staff
+  messages: edit/delete own messages, copy text and download attachments. No
+  message forwarding for visitors; staff handoff is a separate conversation
+  action. Translation remains automatic.
+- Edits preserve the new composer draft, display an edited label and synchronize
+  to the other participant. Confirmed deletion erases the body/attachment and
+  leaves a tombstone. Server authorization, revision checks and idempotent retries
+  prevent changing other authors' messages or overwriting a newer revision.
+- Invalidated old translation output after edits/deletes, including provider
+  responses arriving after a mutation. Added isolated backend and mobile UI tests.
+
+### Support own-message translation fix — 2026-10-27
+
+- Fixed automatic translation silently skipping the visitor's and staff's own
+  sent messages. Own drafts can now show a translation while waiting, without
+  requiring a joined RTT call; received RTT keeps its call-membership checks.
+- Kept visitor consent, ownership/staff authorization, quotas, draft size limits
+  and post-provider revocation/closed-chat checks. No transcript storage of drafts.
+- Added waiting-room own-draft/sent-message regression tests with a fixture
+  provider. Existing translation targets and consent are not changed globally.
+
+### Customer-service minimize button — 2026-10-27
+
+- Added a separate minus icon beside close to hide the visitor popup without
+  ending the chat or discarding unsent text/files. Reopening uses the launcher.
+- Kept the existing privacy behavior: hiding stops RTT/camera/microphone;
+  closing with × still requires confirmation before ending an active chat.
+- Kept five localized, touch-friendly header controls on one row on phones
+  and small tablets, with the title above them.
+
 ### Customer-service translation — 2026-10-27
 
 - Removed the extra staff confirmation from support translation. Visitor chat

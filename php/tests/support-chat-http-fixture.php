@@ -36,7 +36,7 @@ if ($path === '/api/interpreter.php') {
 }
 if (in_array($path, ['/api/support-chat.php', '/admin/support-chat-api.php'], true)) {
     $translator = new TranslationService($pdo, ['enabled' => true, 'apiKey' => 'fixture-only'], static function (array $input): array {
-        return ['data' => ['translations' => [['translatedText' => '[' . $input['target'] . '] ' . $input['q'], 'detectedSourceLanguage' => 'en']]]];
+        return ['data' => ['translations' => [['translatedText' => '[' . $input['target'] . '] ' . $input['q'], 'detectedSourceLanguage' => '']]]];
     });
     SupportChatHttp::serve($pdo, $path === '/admin/support-chat-api.php', $translator); exit;
 }
@@ -68,7 +68,7 @@ if ($path === '/') $path = '/index.php';
 if ($path === '/tolk/') $path = '/tolk/index.php';
 $file = realpath($root . $path);
 if (!$file || !str_starts_with($file, $root . DIRECTORY_SEPARATOR) || !is_file($file)
-    || !preg_match('~^/(index\.php|demo\.html|site\.css|support-(chat|call|translation|language|attachments)\.(js|css)|admin/support-chat\.(php|css|js)|tolk/|aanmelden/intake(-ui\.js|\.css)|assets/|favicon\.ico|manifest\.webmanifest)~', $path)) { http_response_code(404); exit; }
+    || !preg_match('~^/(index\.php|demo\.html|site\.css|support-(chat|call|translation|language|attachments|message-menu)\.(js|css)|admin/support-chat\.(php|css|js)|tolk/|aanmelden/intake(-ui\.js|\.css)|assets/|favicon\.ico|manifest\.webmanifest)~', $path)) { http_response_code(404); exit; }
 $extension = pathinfo($file, PATHINFO_EXTENSION);
 if ($extension === 'php') {
     if (!in_array($path, ['/index.php', '/admin/support-chat.php', '/tolk/index.php', '/tolk/support.php'], true)) { http_response_code(404); exit; }

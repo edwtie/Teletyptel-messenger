@@ -35,7 +35,10 @@ final class SupportChatService
             'support_chat_messages' => '(thread_id VARCHAR(48) NOT NULL, sequence INTEGER NOT NULL, author_kind VARCHAR(12) NOT NULL,
                 author_id VARCHAR(96) NOT NULL, author_name VARCHAR(120) NOT NULL, body TEXT NOT NULL, created INTEGER NOT NULL,
                 client_id VARCHAR(64) NOT NULL, PRIMARY KEY (thread_id, sequence), UNIQUE (thread_id, author_id, client_id))',
+            'support_chat_message_state' => '(thread_id VARCHAR(48) NOT NULL, sequence INTEGER NOT NULL, revision INTEGER NOT NULL,
+                edited_at INTEGER NULL, deleted_at INTEGER NULL, mutation_id VARCHAR(64) NOT NULL, action VARCHAR(16) NOT NULL, PRIMARY KEY (thread_id, sequence))',
             'support_chat_presence' => '(staff_id VARCHAR(96) NOT NULL PRIMARY KEY, session_version INTEGER NOT NULL, seen INTEGER NOT NULL, available INTEGER NOT NULL DEFAULT 0)',
+            'support_chat_transfers' => '(thread_id VARCHAR(48) NOT NULL, sender_id VARCHAR(96) NOT NULL, client_id VARCHAR(64) NOT NULL, recipient_id VARCHAR(96) NOT NULL, recipient_version INTEGER NOT NULL, created INTEGER NOT NULL, PRIMARY KEY (thread_id, sender_id, client_id))',
             'support_chat_limits' => '(bucket_key VARCHAR(128) NOT NULL PRIMARY KEY, hits INTEGER NOT NULL, expires INTEGER NOT NULL)',
             'support_chat_audit' => '(audit_id VARCHAR(48) NOT NULL PRIMARY KEY, thread_id VARCHAR(48) NOT NULL,
                 actor_id VARCHAR(96) NOT NULL, action VARCHAR(16) NOT NULL, created INTEGER NOT NULL)'
@@ -65,7 +68,7 @@ final class SupportChatService
                 WHERE status = 'active' AND NOT EXISTS (SELECT 1 FROM admin_users admin WHERE admin.admin_id = support_chat_threads.staff_id
                 AND admin.enabled = 1 AND admin.role IN ('owner', 'admin', 'staff') AND admin.session_version = support_chat_threads.staff_version)")->execute();
             $expired = "SELECT thread_id FROM support_chat_threads WHERE closed_at IS NOT NULL AND closed_at < ?";
-            foreach (['support_chat_attachments', 'support_chat_messages', 'support_chat_audit'] as $table) {
+            foreach (['support_chat_attachments', 'support_chat_message_state', 'support_chat_messages', 'support_chat_transfers', 'support_chat_audit'] as $table) {
                 $this->pdo->prepare('DELETE FROM ' . $table . ' WHERE thread_id IN (' . $expired . ')')->execute([$now - 30 * 86400]);
             }
             $statement = $this->pdo->prepare('DELETE FROM support_chat_threads WHERE closed_at IS NOT NULL AND closed_at < ?');
@@ -87,7 +90,7 @@ final class SupportChatService
         $thread = $threadId !== '' ? $this->thread($threadId) : null;
         if ($thread && !hash_equals($thread['visitor_id'], $visitor)) throw new SupportChatFailure('Gesprek niet gevonden.', 404);
         return ['thread' => $thread ? $this->publicThread($thread) : null,
-            'messages' => $thread ? $this->messages($threadId) : [], 'available' => $this->available()];
+            'messages' => $thread ? $this->messages($threadId, 'visitor', $visitor, $thread['status'] !== 'closed') : [], 'available' => $this->available()];
     }
 
     public function visitorAction(string $visitor, string $address, array $input, ?array $attachment = null): array
@@ -112,6 +115,8 @@ final class SupportChatService
             if (!hash_equals($thread['visitor_id'], $visitor)) throw new SupportChatFailure('Gesprek niet gevonden.', 404);
             if ($action === 'send') {
                 $this->send($thread, 'visitor', $visitor, $thread['visitor_name'], $input, $attachment);
+            } elseif (in_array($action, ['edit', 'delete'], true)) {
+                $this->mutateMessage($thread, 'visitor', $visitor, $input);
             } elseif ($action === 'close') {
                 $this->close($thread, $visitor);
             } else throw new SupportChatFailure('Onbekende chatactie.');
@@ -149,8 +154,9 @@ final class SupportChatService
         $presence = $this->pdo->prepare('SELECT available FROM support_chat_presence WHERE staff_id = ? AND session_version = ? AND seen >= ?');
         $presence->execute([$admin['admin_id'], $admin['session_version'], time() - 45]);
         return ['threads' => $threads, 'page' => $page, 'total' => $total, 'available' => (bool)$presence->fetchColumn(),
+            'transferTargets' => $thread && $thread['status'] === 'active' && $thread['staff_id'] === $admin['admin_id'] ? $this->transferTargets($admin['admin_id']) : [],
             'thread' => $thread ? $this->publicThread($thread) + ['mine' => $thread['staff_id'] === $admin['admin_id']] : null,
-            'messages' => $thread ? $this->messages($threadId) : []];
+            'messages' => $thread ? $this->messages($threadId, 'staff', $admin['admin_id'], $thread['status'] === 'active' && $thread['staff_id'] === $admin['admin_id']) : []];
     }
 
     public function staffAction(array $admin, array $input, ?array $attachment = null): array
@@ -165,6 +171,7 @@ final class SupportChatService
                 return [];
             }
             $thread = $this->thread($this->identifier($input['threadId'] ?? null));
+            if ($action === 'transfer') return $this->transfer($admin, $thread, $input);
             if ($action === 'claim') {
                 if ($thread['status'] !== 'waiting') throw new SupportChatFailure('Dit gesprek is al opgepakt of afgesloten.', 409);
                 $this->pdo->prepare("UPDATE support_chat_threads SET status = 'active', staff_id = ?, staff_version = ?, updated = ? WHERE thread_id = ?")
@@ -176,6 +183,9 @@ final class SupportChatService
                     if ($thread['staff_id'] !== $admin['admin_id']) throw new SupportChatFailure('Alleen de toegewezen medewerker kan antwoorden.', 403);
                     $name = $this->text($admin['display_name'] ?: 'Medewerker', 120, false);
                     $this->send($thread, 'staff', $admin['admin_id'], $name, $input, $attachment);
+                } elseif (in_array($action, ['edit', 'delete'], true)) {
+                    if ($thread['staff_id'] !== $admin['admin_id'] || (int)$thread['staff_version'] !== (int)$admin['session_version']) throw new SupportChatFailure('Alleen de toegewezen medewerker mag eigen berichten wijzigen.', 403);
+                    $this->mutateMessage($thread, 'staff', $admin['admin_id'], $input);
                 } elseif ($action === 'release') {
                     if ($thread['status'] !== 'active') throw new SupportChatFailure('Dit gesprek is niet in behandeling.', 409);
                     $this->pdo->prepare("UPDATE support_chat_threads SET status = 'waiting', staff_id = NULL, staff_version = NULL, updated = ? WHERE thread_id = ?")
@@ -234,6 +244,65 @@ final class SupportChatService
         $this->pdo->prepare('UPDATE support_chat_threads SET updated = ? WHERE thread_id = ?')->execute([time(), $thread['thread_id']]);
     }
 
+    private function transferTargets(string $sender): array
+    {
+        $statement = $this->pdo->prepare("SELECT admin.admin_id AS id, admin.display_name AS name, admin.session_version AS version FROM admin_users admin JOIN support_chat_presence presence ON presence.staff_id = admin.admin_id AND presence.session_version = admin.session_version WHERE admin.enabled = 1 AND admin.role IN ('owner', 'admin', 'staff') AND admin.admin_id <> ? AND presence.available = 1 AND presence.seen >= ? ORDER BY admin.display_name, admin.admin_id");
+        $statement->execute([$sender, time() - 45]);
+        $targets = $statement->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($targets as &$target) { $target['version'] = (int)$target['version']; $target['name'] = $target['name'] ?: 'Medewerker'; }
+        return $targets;
+    }
+
+    private function transfer(array $admin, array $thread, array $input): array
+    {
+        $recipient = $input['recipientId'] ?? null; $version = $input['recipientVersion'] ?? null;
+        if (!is_string($recipient) || $recipient === '' || strlen($recipient) > 96 || !is_int($version) || $version < 1) throw new SupportChatFailure('Kies een beschikbare medewerker.');
+        $client = $this->identifier($input['clientId'] ?? null);
+        $statement = $this->pdo->prepare('SELECT recipient_id, recipient_version FROM support_chat_transfers WHERE thread_id = ? AND sender_id = ? AND client_id = ?');
+        $statement->execute([$thread['thread_id'], $admin['admin_id'], $client]);
+        if ($previous = $statement->fetch(PDO::FETCH_ASSOC)) {
+            if ($previous['recipient_id'] !== $recipient || (int)$previous['recipient_version'] !== $version || $thread['staff_id'] !== $recipient || (int)$thread['staff_version'] !== $version || $thread['status'] !== 'active') throw new SupportChatFailure('Het gesprek is intussen gewijzigd. Ververs de inbox.', 409);
+            return ['threadId' => $thread['thread_id'], 'transferred' => true];
+        }
+        if ($thread['staff_id'] !== $admin['admin_id'] || (int)$thread['staff_version'] !== (int)$admin['session_version']) throw new SupportChatFailure('Alleen de toegewezen medewerker kan dit gesprek doorsturen.', 403);
+        if ($thread['status'] !== 'active') throw new SupportChatFailure('Dit gesprek is niet meer in behandeling.', 409);
+        $targets = $this->transferTargets($admin['admin_id']);
+        if (!array_filter($targets, static fn(array $target): bool => $target['id'] === $recipient && $target['version'] === $version)) throw new SupportChatFailure('Deze medewerker is niet meer beschikbaar. Ververs de inbox.', 409);
+        $this->rate('transfer-' . hash('sha256', $admin['admin_id']), 20, 60);
+        $now = time();
+        $this->pdo->prepare('UPDATE support_chat_threads SET staff_id = ?, staff_version = ?, updated = ? WHERE thread_id = ?')->execute([$recipient, $version, $now, $thread['thread_id']]);
+        $this->pdo->prepare('INSERT INTO support_chat_transfers VALUES (?, ?, ?, ?, ?, ?)')->execute([$thread['thread_id'], $admin['admin_id'], $client, $recipient, $version, $now]);
+        $this->audit($thread['thread_id'], $admin['admin_id'], 'transfer');
+        $this->audit($thread['thread_id'], $recipient, 'assigned');
+        return ['threadId' => $thread['thread_id'], 'transferred' => true];
+    }
+
+    private function mutateMessage(array $thread, string $kind, string $author, array $input): void
+    {
+        $sequence = $input['sequence'] ?? null; $revision = $input['revision'] ?? null;
+        if (!is_int($sequence) || $sequence < 1 || !is_int($revision) || $revision < 0) throw new SupportChatFailure('Ongeldig bericht / Invalid message.');
+        $client = $this->identifier($input['clientId'] ?? null);
+        $statement = $this->pdo->prepare('SELECT message.*, COALESCE(state.revision, 0) AS revision, state.edited_at, state.deleted_at, state.mutation_id, state.action FROM support_chat_messages message LEFT JOIN support_chat_message_state state ON state.thread_id = message.thread_id AND state.sequence = message.sequence WHERE message.thread_id = ? AND message.sequence = ?');
+        $statement->execute([$thread['thread_id'], $sequence]); $message = $statement->fetch(PDO::FETCH_ASSOC);
+        if (!$message) throw new SupportChatFailure('Bericht niet gevonden / Message not found.', 404);
+        if ($message['author_kind'] !== $kind || $message['author_id'] !== $author) throw new SupportChatFailure('Je kunt alleen eigen berichten wijzigen / You can only change your own messages.', 403);
+        $action = $input['action'];
+        $text = $action === 'edit' ? $this->text($input['text'] ?? null, 2000, true) : '';
+        if ($message['mutation_id'] === $client && $message['action'] === $action && $message['body'] === $text) return;
+        if ($thread['status'] === 'closed' || $message['deleted_at'] !== null || (int)$message['revision'] !== $revision) throw new SupportChatFailure('Bericht of gesprek gewijzigd. Ververs en probeer opnieuw / Message or chat changed. Refresh and try again.', 409);
+        $statement = $this->pdo->prepare('SELECT attachment_id FROM support_chat_attachments WHERE thread_id = ? AND sequence = ?');
+        $statement->execute([$thread['thread_id'], $sequence]);
+        if ($action === 'edit' && $statement->fetchColumn() !== false) throw new SupportChatFailure('Een bijlage kan niet worden bewerkt / An attachment cannot be edited.');
+        $this->rate('mutate-' . $kind . '-' . hash('sha256', $author), 30, 60);
+        $now = time();
+        $this->pdo->prepare('UPDATE support_chat_messages SET body = ? WHERE thread_id = ? AND sequence = ?')->execute([$text, $thread['thread_id'], $sequence]);
+        if ($action === 'delete') $this->pdo->prepare('DELETE FROM support_chat_attachments WHERE thread_id = ? AND sequence = ?')->execute([$thread['thread_id'], $sequence]);
+        $this->pdo->prepare('DELETE FROM support_chat_message_state WHERE thread_id = ? AND sequence = ?')->execute([$thread['thread_id'], $sequence]);
+        $this->pdo->prepare('INSERT INTO support_chat_message_state VALUES (?, ?, ?, ?, ?, ?, ?)')->execute([$thread['thread_id'], $sequence, $revision + 1, $action === 'edit' ? $now : $message['edited_at'], $action === 'delete' ? $now : null, $client, $action]);
+        $this->pdo->prepare('UPDATE support_chat_threads SET updated = ? WHERE thread_id = ?')->execute([$now, $thread['thread_id']]);
+        $this->audit($thread['thread_id'], $author, $action);
+    }
+
     private function close(array $thread, string $actor): void
     {
         if ($thread['status'] === 'closed') return;
@@ -262,18 +331,28 @@ final class SupportChatService
             if ($member = $statement->fetch(PDO::FETCH_ASSOC)) { $name = $member['display_name'] ?: 'Medewerker'; $online = (int)$member['seen'] >= time() - 45; }
         }
         return ['id' => $thread['thread_id'], 'name' => $thread['visitor_name'], 'status' => $thread['status'],
+            'staffAssignment' => $thread['status'] === 'active' && $thread['staff_id'] ? hash('sha256', $thread['thread_id'] . ':' . $thread['staff_id'] . ':' . $thread['staff_version']) : '',
             'staffName' => $name, 'staffOnline' => $online, 'created' => (int)$thread['created'], 'updated' => (int)$thread['updated']];
     }
 
-    private function messages(string $identifier): array
+    private function messages(string $identifier, string $kind, string $author, bool $permitted): array
     {
-        $statement = $this->pdo->prepare('SELECT sequence, author_kind AS kind, author_name AS name, body AS text, created FROM support_chat_messages WHERE thread_id = ? ORDER BY sequence LIMIT 500');
+        $statement = $this->pdo->prepare('SELECT message.sequence, message.author_kind AS kind, message.author_id, message.author_name AS name, message.body AS text, message.created, COALESCE(state.revision, 0) AS revision, state.edited_at AS editedAt, state.deleted_at FROM support_chat_messages message LEFT JOIN support_chat_message_state state ON state.thread_id = message.thread_id AND state.sequence = message.sequence WHERE message.thread_id = ? ORDER BY message.sequence LIMIT 500');
         $statement->execute([$identifier]);
         $messages = $statement->fetchAll(PDO::FETCH_ASSOC);
         $statement = $this->pdo->prepare('SELECT attachment_id AS id, sequence, name, mime, size FROM support_chat_attachments WHERE thread_id = ?');
         $statement->execute([$identifier]);
         $attachments = array_column($statement->fetchAll(PDO::FETCH_ASSOC), null, 'sequence');
-        foreach ($messages as &$message) if (isset($attachments[$message['sequence']])) $message['attachment'] = $attachments[$message['sequence']];
+        foreach ($messages as &$message) {
+            $message['revision'] = (int)$message['revision'];
+            $message['deleted'] = $message['deleted_at'] !== null;
+            $own = $message['kind'] === $kind && $message['author_id'] === $author;
+            if (!$message['deleted'] && isset($attachments[$message['sequence']])) $message['attachment'] = $attachments[$message['sequence']];
+            $message['canDelete'] = $permitted && $own && !$message['deleted'];
+            $message['canEdit'] = $message['canDelete'] && !isset($message['attachment']) && $message['text'] !== '';
+            if ($message['deleted']) $message['text'] = '';
+            unset($message['author_id'], $message['deleted_at']);
+        }
         return $messages;
     }
 

@@ -14,7 +14,7 @@ for (const [phrase, values] of Object.entries(catalog.messages)) {
   assert.equal(values.length, 3, phrase);
   for (const value of values) assert.ok(typeof value === "string" && value.trim(), phrase);
 }
-for (const file of ["support-chat.js", "support-call.js", "support-translation.js", "support-language.js", "support-attachments.js"]) {
+for (const file of ["support-chat.js", "support-call.js", "support-translation.js", "support-language.js", "support-attachments.js", "support-message-menu.js"]) {
   const source = fs.readFileSync(path.resolve(__dirname, "../php/public", file), "utf8");
   for (const match of source.matchAll(/\b(?:wording|label|text|control|word)\(\s*((?:(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')\s*,?\s*)+)\)/g)) {
     const argumentsList = [...match[1].matchAll(/"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'/g)];
@@ -26,7 +26,7 @@ for (const file of ["support-chat.js", "support-call.js", "support-translation.j
 }
 assert.equal(catalog.create("de-AT").language, "de");
 assert.equal(catalog.create("xx").language, "en");
-const titles = { nl: "Klantenservice", en: "Customer service", de: "Kundenservice", fr: "Service client", es: "Atención al cliente" };
+const titles = { nl: "Klantenservice", en: "Support", de: "Kundenservice", fr: "Service client", es: "Atención al cliente" };
 const startNames = { nl: "Start chat", en: "Start chat", de: "Chat starten", fr: "Démarrer le chat", es: "Iniciar chat" };
 
 async function check(engine, device, name) {

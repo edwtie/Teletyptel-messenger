@@ -12,4 +12,10 @@
 .support-staff-messages article.staff { background: #e6f4ee; }
 .support-staff-messages p { white-space: pre-wrap; margin: 5px 0; }
 .support-staff-messages time { font-size: 12px; color: #53677a; }
+#supportStaffTransfer { margin-top: 16px; padding: 12px; border: 1px solid #c6d6e6; border-radius: 10px; }
+#supportStaffTransfer summary { cursor: pointer; min-height: 44px; display: list-item; align-content: center; font-weight: 600; }
+#supportStaffTransferForm { display: grid; gap: 10px; margin-top: 10px; }
+#supportStaffTransferForm p { margin: 0; font-size: 13px; }
+#supportStaffRecipient { width: 100%; min-width: 0; box-sizing: border-box; min-height: 44px; }
+#supportStaffTransferError { color: #a52b27; }
 @media (max-width: 760px) { .support-inbox-layout { grid-template-columns: minmax(0, 1fr); } }

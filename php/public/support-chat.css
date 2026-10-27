@@ -16,17 +16,15 @@
 .support-widget .support-heading:has(.support-call-actions:not([hidden])) h2 { font-size: 17px; margin: 0; }
 .support-widget .support-heading h2 { font-size: 20px; margin: 0 0 3px; color: #fff; }
 .support-heading span { font-size: 13px; }
-.support-widget #supportMinimize, .support-widget .support-heading .support-call-actions > button, .support-widget .support-heading summary.support-icon-control { background: transparent; border-color: #ffffff66; color: #fff; padding: 0; }
+.support-widget #supportMinimize, .support-widget #supportClose, .support-widget .support-heading .support-call-actions > button, .support-widget .support-heading summary.support-icon-control { background: transparent; border-color: #ffffff66; color: #fff; padding: 0; }
 .support-popup:has(.support-header-tools details[open]) { min-height: min(560px, calc(100dvh - 110px)); }
 .support-widget .support-heading .support-call-help > div, .support-widget .support-heading .support-translation-body { left: 8px; right: 8px; max-height: min(400px, var(--support-panel-height, 45dvh)); box-sizing: border-box; color: #183550; }
 .support-heading .support-call-state, .support-heading .support-call-notice { font-size: 12px; line-height: 1.5; margin: 8px 0; }
 .support-heading .support-call-notice { color: #53677a; }
 .support-widget .support-heading .support-call-actions[data-rtt="connected"] .support-call-help > summary { border-color: #6bd6a6; }
 .support-popup .support-call:not(.has-media) { padding-block: 0; border: 0; }
-@media (max-width: 360px) {
-  .support-heading:has(.support-call-actions:not([hidden])) { flex-wrap: wrap; }
-  .support-heading:has(.support-call-actions:not([hidden])) .support-heading-title { flex-basis: 100%; }
-}
+.support-heading { flex-wrap: wrap; }
+.support-heading:has(.support-call-actions:not([hidden])) .support-heading-title { flex-basis: 100%; }
 .support-widget .support-status { padding: 12px 16px; margin: 0; background: #edf4fa; color: #365470; font-size: 13px; }
 .support-form { display: grid; gap: 12px; padding: 16px; }
 .support-widget input:not([type="checkbox"]), .support-widget textarea, .support-widget select { width: 100%; min-width: 0; box-sizing: border-box; border: 1px solid #9bb8d5; border-radius: 8px; padding: 10px; color: #183550; background: #fff; font-size: 16px; }

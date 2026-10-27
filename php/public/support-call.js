@@ -8,6 +8,7 @@ window.TeleTypTelSupportIcons = {
     help: '<path d="M8 7a4 4 0 1 1 6 3.5c-1.5 1-2 1.5-2 4M12 19h.01"/>',
     send: '<path d="m3 3 18 9-18 9 4-9-4-9Zm4 9h14"/>',
     close: '<path d="m6 6 12 12M6 18 18 6"/>',
+    minimize: '<path d="M5 12h14"/>',
     check: '<path d="m5 12 4 4L19 6"/>',
     plus: '<path d="M12 4v16M4 12h16"/>',
     camera: '<rect x="3" y="6" width="12" height="12" rx="2"/><path d="m15 10 6-4v12l-6-4"/>',
@@ -21,7 +22,7 @@ window.TeleTypTelSupportIcons = {
   }
 };
 window.TeleTypTelSupportCall = {
-  mount({ container, toolbarHost = null, draftHost = null, composerCamera = null, composerMicrophone = null, endpoint, rtcEndpoint, input, interpreter = false, onLive = () => {}, english = false, language = window.TeleTypTelSupportLanguage.create(english ? "en" : "nl") }) {
+  mount({ container, toolbarHost = null, draftHost = null, composerCamera = null, composerMicrophone = null, endpoint, rtcEndpoint, input, interpreter = false, actorRole = "visitor", onLive = () => {}, english = false, language = window.TeleTypTelSupportLanguage.create(english ? "en" : "nl") }) {
     container.classList.add("support-call");
     container.innerHTML = `<div class="support-call-actions"><button type="button" data-action="interpreter">Gebarentolk oproepen</button><details class="support-call-help"><summary></summary><div><p class="support-call-state" role="status"></p>
       <p class="support-call-notice">RTT staat standaard aan zodra de medewerker aansluit: tekst wordt tijdens het typen gedeeld, ook vóór versturen. Camera en microfoon starten alleen als je zelf een tolk oproept of een video-uitnodiging accepteert. Vertaling werkt automatisch na toestemming. Deel geen gevoelige gegevens.</p></div></details></div>
@@ -45,10 +46,11 @@ window.TeleTypTelSupportCall = {
     icon("allow", "check", wording("Tolk toelaten", "Allow interpreter"));
     icon("end", "end", wording("Beeld en geluid beëindigen", "End video and audio"));
     const peers = new Map(), seen = new Set();
-    const clientId = crypto.randomUUID();
+    const clientId = typeof crypto.randomUUID === "function" ? crypto.randomUUID() : Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) => byte.toString(16).padStart(2, "0")).join("");
     let thread = "", fixedCall = "", call = null, role = interpreter ? "interpreter" : "", csrf = "", stream = null;
     let joined = false, enabled = false, busy = false, polling = false, generation = 0, sequence = 0, timer = null, config = null;
     let automaticAttempted = false, automaticJoined = "", anotherWindow = false;
+    let staffAssignment = "";
     let stateText = "", errorText = "";
     let ownDraft = null;
     const syncComposer = () => {
@@ -163,11 +165,11 @@ window.TeleTypTelSupportCall = {
       ownDraft.label.textContent = wording("Jij", "You") + wording(" · live tekst", " · live text");
       ownDraft.content.textContent = text; ownDraft.bubble.hidden = !text;
       ownDraft.content.scrollTop = ownDraft.content.scrollHeight;
+      if (!interpreter) onLive({ sourceRole: actorRole, text, own: true, target: ownDraft.bubble });
     };
     const broadcast = (text, final = false) => {
       if (!joined || typeof text !== "string" || text.length > 2000) return;
       showOwnDraft(final ? "" : text);
-      onLive({ sourceRole: role, text: final ? "" : text, own: true, target: ownDraft?.bubble, callId: call?.id, clientId });
       const payload = JSON.stringify({ type: final ? "final" : "rtt", text, sequence: ++sequence });
       for (const peer of peers.values()) if (peer.channel?.readyState === "open" && peer.channel.bufferedAmount < 65536) peer.channel.send(payload);
     };
@@ -361,8 +363,8 @@ window.TeleTypTelSupportCall = {
     };
     language.onChange(localize); localize();
     return {
-      setThread(identifier, permitted) {
-        if (thread !== identifier || (enabled && !permitted)) { stop(); thread = identifier; automaticAttempted = false; automaticJoined = ""; anotherWindow = false; }
+      setThread(identifier, permitted, assignment = "") {
+        if (thread !== identifier || staffAssignment !== assignment || (enabled && !permitted)) { stop(); thread = identifier; staffAssignment = assignment; automaticAttempted = false; automaticJoined = ""; anotherWindow = false; }
         enabled = Boolean(identifier && permitted); container.hidden = !identifier;
         if (draftHost) draftHost.hidden = !identifier;
         if (toolbarHost) actions.hidden = !identifier || interpreter;

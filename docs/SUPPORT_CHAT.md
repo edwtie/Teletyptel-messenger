@@ -10,6 +10,11 @@ medewerker de chat heeft opgepakt, zijn ook RTT, TC en een gebarentolk beschikba
 
 ## Vertaling voor anderstalige bezoekers
 
+- Korte Nederlandse bevestigingen zoals `ja`, `nee`, `oké` en `bedankt` blijven
+  onveranderd wanneer de doeltaal Nederlands is. Deze exacte antwoorden worden
+  niet aan Google aangeboden voor taaldetectie; er verschijnt geen vertaalblok.
+  Dit geldt ook voor live RTT. Andere teksten en doeltalen blijven vertalen.
+
 - Op het startscherm staan **naam en taal** bij elkaar. Nederlands, Engels, Duits,
   Frans en Spaans wisselen direct alle eigen popupteksten: labels, uitleg,
   toestemmingsinformatie, meldingen en toegankelijke icoonnamen. De browsertaal
@@ -42,8 +47,11 @@ medewerker de chat heeft opgepakt, zijn ook RTT, TC en een gebarentolk beschikba
   en RTT blijven werken. Dit stopt bericht- en live vertaling voor beide kanten.
   Een nieuw toegewezen medewerker kan direct vertalen zolang de bezoeker dit toestaat;
   staff kan ingetrokken of ontbrekende bezoekerstoestemming niet overschrijven.
-- Automatisch vertaalt ontvangen berichten (bij openen maximaal de tien nieuwste
-  berichten als kandidaten). Eigen concepttekst krijgt een live vertaalvoorbeeld.
+- Automatisch vertaalt ontvangen én eigen verzonden berichten (bij openen maximaal
+  de tien nieuwste berichten als kandidaten). Eigen concepttekst krijgt een live
+  vertaalvoorbeeld, ook in de wachtrij zonder medewerker of actieve RTT-oproep.
+  Kies onder de wereldbol **Vertalen naar → Engels** voor een Engels voorbeeld;
+  de taal van het venster kan gewoon Nederlands blijven.
   Origineel en vertaling blijven apart. **Vertaling**
   bevat een uitklapbare waarschuwing dat machinevertalingen fouten kunnen bevatten.
 - De bezoekerstoestemming en de staffmelding benoemen expliciet live RTT.
@@ -58,6 +66,11 @@ medewerker de chat heeft opgepakt, zijn ook RTT, TC en een gebarentolk beschikba
   Leegmaken, verzenden of stoppen verwijdert de voorlopige weergave. Alleen
   verzonden berichten komen in de geschiedenis; een lokale typeweergave geeft
   geen extra Google-toestemming en start geen camera of microfoon.
+- Eigen conceptvertaling vereist eigendom van de chat (of stafftoewijzing), een
+  open gesprek en bestaande bezoekerstoestemming voor live vertaling. De bronrol
+  moet de eigen rol zijn. Ontvangen RTT blijft de actieve oproep en deelnemende
+  clients controleren. Intrekking en afsluiten tijdens een verzoek blokkeren
+  ook een laat eigen conceptresultaat. Er worden geen concepten opgeslagen.
 - Zonder toestemming, bij een fout of bereikt limiet blijft de originele chat
   beschikbaar. Verzoeken worden begrensd; verouderde taal- en conceptresultaten
   worden niet getoond. Er is geen onbeperkte kosteloze vertaaldienst voor gasten.
@@ -78,8 +91,13 @@ medewerker de chat heeft opgepakt, zijn ook RTT, TC en een gebarentolk beschikba
   vertaling. Niet-verzonden tekst en gekozen bestanden worden gewist. Annuleren
   behoudt het gesprek. Bij een fout blijft het venster open voor opnieuw proberen;
   lokale media blijven gestopt. De dubbele afsluitknop onderaan is verwijderd.
-  Opnieuw openen na afsluiten toont een leeg aanmeldformulier. De chatlauncher
-  kan het venster nog tijdelijk verbergen; dat sluit het tekstgesprek niet af.
+  Opnieuw openen na afsluiten toont een leeg aanmeldformulier.
+- **− = Chat verbergen**: aparte knop naast ×, ook op telefoons en kleine tablets.
+  De chat en niet-verzonden tekst/bijlagen blijven bewaard zolang de pagina open
+  blijft. De chatlauncher opent hetzelfde gesprek opnieuw. Tijdens verbergen
+  stoppen RTT, camera en microfoon; media starten niet automatisch opnieuw.
+  De launcher kan het venster ook verbergen. De vijf headericonen blijven op één
+  rij, met de titel erboven zodat alle aanraakvlakken minstens 44 px blijven.
 
 - De bezoekerspopup heeft één afgeronde balk: **+**, emoji, tekst, camera en
   microfoon. Tijdens typen vervangt versturen het microfoontje. Het tekstvak
@@ -239,6 +257,45 @@ Deel geen accountgegevens op basis van alleen die naam.
   Houd de worker ingepland voor opruiming zonder websiteverkeer; dit is geen
   gegarandeerde verwijdering op exact de seconde. Back-ups vallen buiten deze
   opruiming en moeten een eigen bewaarbeleid hebben.
+
+## Berichtmenu
+
+Rechtsklik op een bericht of gebruik de knop ⋯. Op mobiel werkt ook lang
+indrukken; met het toetsenbord werkt Shift+F10 op het bericht.
+Het menu bevat **Bewerken**, **Verwijderen**, **Kopiëren** en bij bestanden
+**Downloaden**, afhankelijk van het bericht en je rechten. Bezoekers kunnen niet
+doorsturen. Staff kan het hele gesprek overdragen via **Doorsturen naar medewerker**
+onder het gesprek (geen losse berichten naar Messenger). Vertaling blijft automatisch.
+
+Alleen de auteur kan eigen berichten wijzigen in een niet-afgesloten gesprek;
+staff moet bovendien nog de toegewezen medewerker zijn. Beheerders kunnen niet
+namens een andere auteur wijzigen. Bijlagen zijn niet bewerkbaar.
+Een apart bewerkvenster bewaart het nieuwe concept in de normale invoerbalk;
+wijzigingen in dat venster worden niet als live RTT gedeeld vóór opslaan.
+De andere deelnemer ziet wijzigingen bij de volgende verversing (normaal 3 seconden).
+
+Verwijderen vraagt bevestiging en wist de berichtinhoud en eventuele bijlage uit
+de actieve opslag. In beide schermen blijft **Bericht verwijderd** staan. Dit is
+geen herstelbare prullenbak; reeds gedownloade kopieën en back-ups worden niet
+teruggehaald. Bewerkte berichten krijgen **Bewerkt**. Oude vertaalresultaten
+worden verwijderd en gewijzigde tekst wordt opnieuw vertaald. Revisiecontroles
+voorkomen dat een oud bewerkvenster nieuwe wijzigingen overschrijft.
+
+## Overdragen aan een collega
+
+Alleen de toegewezen medewerker kan een actief gesprek doorsturen naar een andere
+ingeschakelde collega die online is en **Beschikbaar** heeft aangevinkt. Ook
+beheerders kunnen dit alleen voor een aan hen toegewezen gesprek. Kies de collega
+en bevestig **Gesprek doorsturen**. De ontvanger opent het gesprek in de eigen inbox;
+berichten en bijlagen blijven bij hetzelfde gesprek. De bezoeker ziet de nieuwe naam.
+De vorige gewone staffmedewerker verliest direct servertoegang tot het gesprek.
+Bestaande algemene inzagerechten van beheerders blijven gelden.
+
+Niet-verstuurde tekst wordt niet doorgestuurd. Lopende RTT/TC-verbindingen eindigen
+bij de overdracht; RTT kan met de nieuwe medewerker opnieuw verbinden. Camera,
+microfoon en een tolk worden niet stilzwijgend doorverbonden. Oude toestemming voor
+een videogesprek geldt niet als deelname aan een nieuwe oproep. Overdracht wordt
+vastgelegd zonder berichtinhoud; de registratie verdwijnt bij de transcriptopruiming.
 
 ## Controle
 

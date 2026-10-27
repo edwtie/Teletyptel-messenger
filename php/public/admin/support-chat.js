@@ -4,17 +4,23 @@
   const auth = ui.client("api.php"), api = ui.client("support-chat-api.php");
   const attachments = window.TeleTypTelSupportAttachments.mount({ container: get("supportStaffAttachments"), request: (body) => api.request(body), endpoint: "support-chat-api.php", language: window.TeleTypTelSupportLanguage.create("nl"), onSent: () => loadInbox(), onError: (error) => fail(error) });
   const translations = window.TeleTypTelSupportTranslation.mount({ container: get("supportStaffTranslation"), request: (body) => api.request(body), staff: true });
-  const supportCall = window.TeleTypTelSupportCall.mount({ container: get("supportStaffCall"), draftHost: get("supportStaffLive"), input: get("supportStaffText"), endpoint: "support-call-api.php", rtcEndpoint: "../api/rtc-config.php", onLive: translations.live });
+  const messageMenu = window.TeleTypTelSupportMessageMenu.mount({ language: window.TeleTypTelSupportLanguage.create("nl"), request: (body) => api.request(body), refresh: () => loadInbox() });
+  const messageEntries = new Map();
+  const supportCall = window.TeleTypTelSupportCall.mount({ container: get("supportStaffCall"), draftHost: get("supportStaffLive"), input: get("supportStaffText"), endpoint: "support-call-api.php", rtcEndpoint: "../api/rtc-config.php", actorRole: "staff", onLive: translations.live });
   get("supportStaffCall").querySelector(".support-call-actions").prepend(get("supportStaffTranslation"));
-  let admin = null, selected = "", page = 1, rendered = "", lastSequence = 0, pending = null, queueSignature = "";
+  let admin = null, selected = "", page = 1, rendered = "", pending = null, queueSignature = "";
   let busy = false, polling = false, available = false, lastPresence = 0, generation = 0;
+  let transferSignature = "", transferPending = null, transferTargets = [];
   const stateNames = { waiting: "Wacht op een medewerker", active: "In behandeling", closed: "Afgesloten" };
   const status = (text) => { get("supportStaffStatus").textContent = text; };
   const clearThread = () => {
+    get("supportStaffTransfer").hidden = true; get("supportStaffTransfer").open = false;
+    get("supportStaffTransferError").hidden = true; transferSignature = ""; transferPending = null; transferTargets = [];
+    messageMenu.sync("", false); messageEntries.clear();
     attachments.setThread("", false);
     translations.clear();
     supportCall.setThread("", false);
-    selected = rendered = ""; lastSequence = 0; pending = null;
+    selected = rendered = ""; pending = null;
     get("supportStaffMessages").replaceChildren(); get("supportStaffText").value = "";
     get("supportThreadTitle").textContent = "Kies een gesprek"; get("supportThreadStatus").textContent = "";
     get("supportStaffReply").hidden = get("supportThreadActions").hidden = true;
@@ -58,8 +64,21 @@
     get("supportPrevious").disabled = data.page <= 1; get("supportNext").disabled = data.page * 30 >= data.total;
     if (!data.thread) return;
     const thread = data.thread;
+    get("supportStaffTransfer").hidden = !thread.mine || thread.status !== "active";
+    const nextTargets = JSON.stringify(data.transferTargets || []);
+    if (transferSignature !== nextTargets) {
+      transferSignature = nextTargets; transferTargets = data.transferTargets || [];
+      const select = get("supportStaffRecipient"), previous = select.value;
+      const placeholder = document.createElement("option"); placeholder.value = ""; placeholder.textContent = transferTargets.length ? "Kies een medewerker" : "Geen andere medewerker beschikbaar";
+      select.replaceChildren(placeholder, ...transferTargets.map((target) => {
+        const option = document.createElement("option"); option.value = target.id; option.textContent = target.name; return option;
+      }));
+      if (transferTargets.some((target) => target.id === previous)) select.value = previous;
+      select.disabled = !transferTargets.length; get("supportStaffTransferSend").disabled = !transferTargets.length;
+    }
     attachments.setThread(thread.id, thread.mine && thread.status === "active");
     translations.sync(thread.id, data.translationSettings);
+    messageMenu.sync(thread.id, thread.mine && thread.status === "active");
     supportCall.setThread(thread.id, thread.mine && thread.status === "active");
     get("supportThreadTitle").textContent = thread.name;
     get("supportThreadStatus").textContent = stateNames[thread.status] + " · Naam door bezoeker opgegeven, identiteit niet gecontroleerd.";
@@ -67,17 +86,22 @@
     get("supportThreadActions").hidden = thread.status === "closed";
     get("supportStaffRelease").hidden = thread.status !== "active";
     const log = get("supportStaffMessages"), nearBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 80;
-    if (rendered !== thread.id) { log.replaceChildren(); lastSequence = 0; rendered = thread.id; }
+    if (rendered !== thread.id) { log.replaceChildren(); messageEntries.clear(); rendered = thread.id; }
     let changed = false;
     for (const message of data.messages) {
-      if (Number(message.sequence) <= lastSequence) continue;
+      const previous = messageEntries.get(Number(message.sequence)), signature = JSON.stringify(message);
+      if (previous?.signature === signature) continue;
+      if (previous) translations.detach(message.sequence);
       const entry = ui.node("article", undefined, message.kind);
       entry.append(ui.node("strong", message.name + (message.kind === "staff" ? " · medewerker" : " · bezoeker")), ui.node("p", message.text));
       const stamp = ui.node("time", new Date(message.created * 1000).toLocaleString("nl-NL"));
-      stamp.dateTime = new Date(message.created * 1000).toISOString(); entry.append(stamp); log.append(entry);
-      attachments.render(entry, message, thread.id);
+      stamp.dateTime = new Date(message.created * 1000).toISOString(); entry.append(stamp);
+      if (previous) previous.entry.replaceWith(entry); else log.append(entry);
+      messageEntries.set(Number(message.sequence), { entry, signature });
+      if (!message.deleted) attachments.render(entry, message, thread.id);
       translations.attach(entry, message, Number(message.sequence) > Number(data.messages.at(-1)?.sequence || 0) - 10);
-      lastSequence = Number(message.sequence); changed = true;
+      messageMenu.attach(entry, message, thread.id);
+      changed = true;
     }
     if (changed && nearBottom) log.scrollTop = log.scrollHeight;
   };
@@ -126,6 +150,26 @@
   for (const [id, action, question] of [["supportStaffRelease", "release", "Dit gesprek terugzetten in de wachtrij?"], ["supportStaffClose", "close", "Dit gesprek afsluiten?"]]) {
     get(id).addEventListener("click", () => { if (window.confirm(question)) void run(async () => { await api.request({ action, threadId: selected }); clearThread(); await loadInbox(); }); });
   }
+  get("supportStaffTransferForm").addEventListener("submit", (event) => {
+    event.preventDefault();
+    if (busy) return;
+    const recipient = transferTargets.find((target) => target.id === get("supportStaffRecipient").value);
+    if (!selected || !recipient) return;
+    if (!window.confirm("Het hele gesprek doorsturen naar " + recipient.name + "? Je niet-verstuurde tekst wordt gewist en een lopende oproep stopt.")) return;
+    void run(async () => {
+      get("supportStaffTransferError").hidden = true; get("supportStaffTransferSend").disabled = true;
+      if (!transferPending || transferPending.threadId !== selected || transferPending.recipientId !== recipient.id || transferPending.recipientVersion !== recipient.version) {
+        transferPending = { action: "transfer", threadId: selected, recipientId: recipient.id, recipientVersion: recipient.version, clientId: crypto.randomUUID() };
+      }
+      try {
+        await api.request(transferPending); clearThread(); await loadInbox(); status("Gesprek doorgestuurd naar " + recipient.name + ".");
+      } catch (error) {
+        if ([401, 403, 404].includes(error.status)) { fail(error); return; }
+        get("supportStaffTransferError").textContent = error.message || "Doorsturen niet bevestigd. Ververs de inbox of probeer opnieuw.";
+        get("supportStaffTransferError").hidden = false;
+      } finally { get("supportStaffTransferSend").disabled = !transferTargets.length; }
+    });
+  });
   setInterval(async () => {
     if (!admin || busy || polling || document.hidden) return;
     const ticket = generation;

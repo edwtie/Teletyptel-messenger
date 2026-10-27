@@ -1,0 +1,21 @@
+.support-menu-message { position: relative; padding-right: 48px !important; }
+.support-menu-message:focus-visible { outline: 3px solid #165eaa; outline-offset: 2px; }
+.support-menu-message .support-message-more { position: absolute; top: 0; right: 0; display: grid; place-items: center; width: 44px; height: 44px; min-height: 44px; padding: 0; border: 0; border-radius: 10px; background: transparent; color: #173b64; font-size: 24px; cursor: pointer; }
+.support-message-edited { display: block; font-size: 11px; color: #53677a; text-align: right; }
+.support-message-menu { position: fixed; z-index: 10000; width: 200px; max-width: calc(100vw - 16px); max-height: calc(100dvh - 16px); overflow: auto; padding: 5px; border: 1px solid #b4cde6; border-radius: 12px; background: #fff; box-shadow: 0 5px 22px #173b6433; font: 15px/1.5 "Segoe UI", system-ui, sans-serif; }
+.support-message-menu[hidden], .support-message-editor [hidden] { display: none !important; }
+.support-message-menu button { display: block; width: 100%; min-height: 44px; border: 0; border-radius: 7px; padding: 9px 12px; background: #edf4ff; color: #183550; text-align: left; cursor: pointer; font: inherit; }
+.support-message-menu button + button { margin-top: 4px; }
+.support-message-menu button:hover { background: #dceaff; }
+.support-message-menu button.danger { color: #a52b27; }
+.support-message-editor { position: fixed; width: min(440px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto; box-sizing: border-box; border: 1px solid #b4cde6; border-radius: 16px; padding: 20px; color: #183550; background: white; font: 15px/1.5 "Segoe UI", system-ui, sans-serif; }
+.support-message-editor::backdrop { background: #173b6470; }
+.support-message-editor h2 { margin: 0; font-size: 20px; }
+.support-message-editor label { display: grid; gap: 6px; }
+.support-message-editor textarea { box-sizing: border-box; width: 100%; padding: 10px; resize: vertical; max-height: 40dvh; border: 1px solid #9bb8d5; border-radius: 8px; font: 16px/1.5 "Segoe UI", system-ui, sans-serif; color: #183550; background: white; }
+.support-message-editor-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.support-message-editor button { min-height: 44px; border: 1px solid #b4cde6; border-radius: 9px; padding: 9px 14px; background: white; color: #173b64; cursor: pointer; font: inherit; }
+.support-message-editor button[type="submit"] { background: #165eaa; color: white; }
+.support-message-editor button:disabled { opacity: .6; cursor: wait; }
+.support-message-error { color: #a52b27; }
+.support-message-menu button:focus-visible, .support-message-editor button:focus-visible, .support-message-editor textarea:focus-visible, .support-message-more:focus-visible { outline: 3px solid #c35f14; outline-offset: 2px; }

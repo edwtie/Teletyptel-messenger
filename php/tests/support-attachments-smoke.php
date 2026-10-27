@@ -44,7 +44,14 @@ try {
     denyFile(fn() => SupportAttachment::validate('macro.docx', file_get_contents($temporary)), 400);
 } finally { unlink($temporary); }
 $pdo->exec("UPDATE support_chat_attachments SET size = 20971520");
+$mutation = ['action' => 'edit', 'threadId' => $thread, 'sequence' => (int)$message['sequence'], 'revision' => 0, 'text' => 'Not a file editor', 'clientId' => 'file-edit-request'];
+denyFile(fn() => $chat->visitorAction('visitor', '127.0.0.1', $mutation), 400);
 denyFile(fn() => $chat->visitorAction('visitor', '127.0.0.1', array_replace($input, ['clientId' => 'new-file-request']), $image), 413);
+$chat->visitorAction('visitor', '127.0.0.1', array_replace($mutation, ['action' => 'delete', 'clientId' => 'file-delete-request']));
+denyFile(fn() => $chat->attachment('visitor', null, $thread, $file['id']), 404);
+denyFile(fn() => $chat->attachment('', $staff, $thread, $file['id']), 404);
+checkFile((int)$pdo->query('SELECT COUNT(*) FROM support_chat_attachments')->fetchColumn() === 0, 'Deleting attachment erases stored content');
+checkFile(!isset($chat->visitorView('visitor', $thread)['messages'][0]['attachment']), 'Deleted attachment no longer exposed');
 $chat->visitorAction('visitor', '127.0.0.1', ['action' => 'close', 'threadId' => $thread]);
 denyFile(fn() => $chat->visitorAction('visitor', '127.0.0.1', array_replace($input, ['clientId' => 'closed-file-request']), $image), 409);
 $pdo->exec("UPDATE admin_users SET enabled = 0 WHERE admin_id = 'agent'");

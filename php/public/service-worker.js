@@ -1,4 +1,4 @@
-const CACHE_NAME = "teletyptel-webclient-v417";
+const CACHE_NAME = "teletyptel-webclient-v430";
 const BUILD_VERSION = "20261027-inline-interpreter";
 const ASSETS = [
   "chat.html",
