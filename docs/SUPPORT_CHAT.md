@@ -27,17 +27,26 @@ medewerker de chat heeft opgepakt, zijn ook RTT, TC en een gebarentolk beschikba
   handmatige vertaalmodus of vertaalactie per bericht. De bestaande twaalf
   berichtvertaaltalen blijven beschikbaar. Alleen de venstertaal wijzigen
   verleent geen nieuwe toestemming en verandert geen opgeslagen vertaaltaal.
-- Bezoeker en toegewezen medewerker geven ieder toestemming voor Google Cloud
-  Translation. Dezelfde serverconfiguratie, API-sleutel en gebruikslimieten als
-  Messenger worden gebruikt. Geen sleutel of fictief Messenger-account bij de bezoeker.
+- De bezoeker accepteert de vertaalvoorwaarden één keer bij de start. De toegewezen
+  medewerker hoeft geen extra toestemming te geven: bericht- en live RTT-vertaling
+  werken automatisch. De staffwerkplek meldt vóór het oppakken dat ook concepttekst
+  naar Google gaat. Dezelfde serverconfiguratie, API-sleutel en gebruikslimieten als
+  Messenger worden gebruikt; Messenger-voorkeuren veranderen niet.
+- Voor staff staat de vertaalweergave standaard aan, met Nederlands als doeltaal.
+  Onder **Taal** kan staff de eigen doeltaal wijzigen of **Automatisch vertalen op
+  mijn scherm** uitzetten. Dit stopt niet de vertaling bij de bezoeker. Bestaande
+  opgeslagen staffvoorkeuren (ook uit) blijven behouden. Er wordt geen fictieve
+  persoonlijke toestemmingsregistratie voor staff gemaakt.
 - Toestemming geldt per gesprek, niet voor alle websitebezoekers. Vink de
   toestemming onder de wereldbol uit en sla op om haar in te trekken; tekstchat
-  en RTT blijven werken. Een nieuwe medewerker moet zelf opnieuw instemmen.
+  en RTT blijven werken. Dit stopt bericht- en live vertaling voor beide kanten.
+  Een nieuw toegewezen medewerker kan direct vertalen zolang de bezoeker dit toestaat;
+  staff kan ingetrokken of ontbrekende bezoekerstoestemming niet overschrijven.
 - Automatisch vertaalt ontvangen berichten (bij openen maximaal de tien nieuwste
   berichten als kandidaten). Eigen concepttekst krijgt een live vertaalvoorbeeld.
   Origineel en vertaling blijven apart. **Vertaling**
   bevat een uitklapbare waarschuwing dat machinevertalingen fouten kunnen bevatten.
-- De gecombineerde toestemming benoemt bij beide deelnemers expliciet live RTT.
+- De bezoekerstoestemming en de staffmelding benoemen expliciet live RTT.
   Eigen en ontvangen concepttekst gaat dan na een korte typpauze naar Google,
   vóór versturen. De voorlopige vertaling wordt bij wijzigingen of stoppen gewist.
   Onvertaalde RTT blijft direct werken. Geen automatische vertaling van tolktekst,
@@ -55,9 +64,11 @@ medewerker de chat heeft opgepakt, zijn ook RTT, TC en een gebarentolk beschikba
 - Vertalingen/concepten worden niet aan het opgeslagen transcript toegevoegd.
   Google ontvangt de te vertalen tekst; dit is geen uitsluitend lokale verwerking.
   Toestemmingen worden met de verwijderde chat opgeruimd. Historische antwoorden
-  van een andere medewerker worden niet met diens opvolgers toestemming vertaald.
+  van een andere medewerker blijven uitgesloten van vertaling; de bestaande
+  afscherming wordt niet verruimd naar eerdere medewerkers.
 - De aparte service- en browsertests gebruiken een fictieve vertaalaanbieder:
-  twee talen, beide toestemmingen, ingetrokken toestemming, live RTT, eigen
+  twee talen, starten zonder staffbevestiging, ingetrokken bezoekerstoestemming,
+  onafhankelijke staffweergave, live RTT, eigen
   voorbeeld, CSRF en afscherming van andere chats. Geen klantteksten naar Google.
 
 ## Compacte invoerbalk
@@ -191,7 +202,7 @@ Deel geen accountgegevens op basis van alleen die naam.
 - Threads zijn gekoppeld aan een willekeurige, serverzijdige bezoekersidentiteit.
   Een thread-ID is geen toegangstoken. Naam en tekst worden als tekst weergegeven,
   niet als HTML. Uploads zijn afgeschermd per gesprek; automatische vertaling
-  vereist de hierboven beschreven toestemming van beide deelnemers.
+  vereist de hierboven beschreven bezoekerstoestemming en een bevoegde deelnemer.
 - Opgeslagen berichten gebruiken PHP/HTTPS met polling elke drie seconden. De
   server bewaart die transcripties in de database; die tekstchat is niet end-to-end
   versleuteld. Deel geen BSN, medische gegevens of wachtwoorden.

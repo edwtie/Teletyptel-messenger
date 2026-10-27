@@ -8,6 +8,20 @@ testing. It is intended for testers and developers, not for production use.
 
 ## Opening The Client
 
+### Calling A Phone Number (Preparation)
+
+Use the keypad symbol in the top toolbar (**Call a number** / **Nummer bellen**).
+On mobile it is in the top menu. Enter an international number with its country
+code, using the keyboard or keypad. Closing the panel clears the number; it is
+not sent or saved. The existing Messenger contact/call controls are unchanged.
+
+The call button is deliberately disabled: a SIP provider and an RTT-capable
+gateway have not been integrated yet. No number calls or emergency calls are
+available here. RTT is the intended default for the future number route, not a
+claim that RTT is already connected or supported by every telephone destination.
+
+### Website And Messenger
+
 The local website starts at `/index.php`, with navigation to Messenger, subscription
 applications, tester contact and frequently asked questions. Its Messenger preview
 uses screenshots of the actual interface with fictitious test data. The screenshot

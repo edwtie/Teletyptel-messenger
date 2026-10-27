@@ -1,7 +1,9 @@
-const CACHE_NAME = "teletyptel-webclient-v415";
+const CACHE_NAME = "teletyptel-webclient-v417";
 const BUILD_VERSION = "20261027-inline-interpreter";
 const ASSETS = [
   "chat.html",
+  "chat-dialer.css?v=20261027-number-dialer",
+  "chat-dialer.js?v=20261027-number-dialer",
   "dev.html",
   "chat-client.css?v=20261027-inline-interpreter",
   "chat-xmpp-translation.js?v=20261027-inline-interpreter",

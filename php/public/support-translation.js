@@ -6,13 +6,14 @@ window.TeleTypTelSupportTranslation = {
     container.innerHTML = `<details><summary></summary><div class="support-translation-body"><form>
       <label ${staff ? 'hidden' : ''}><span data-label="window"></span><select name="interfaceLanguage"></select></label>
       <label><span data-label="target"></span> <select name="language"></select></label>
-      <label class="support-translation-check"><input name="consent" type="checkbox"><span data-label="consent"></span></label>
+      <label class="support-translation-check"><input name="${staff ? 'enabled' : 'consent'}" type="checkbox"><span data-label="consent"></span></label>
       <p data-label="explanation"></p>
       <button type="submit">${label("Opslaan", "Save")}</button></form><p class="support-translation-status" role="status"></p></div></details>`;
     const icons = window.TeleTypTelSupportIcons;
     icons.set(container.querySelector("summary"), "language", label("Taal", "Language"));
     icons.set(container.querySelector('button[type="submit"]'), "check", label("Opslaan", "Save"));
     const form = container.querySelector("form"), field = (name) => form.elements.namedItem(name);
+    const enabled = field(staff ? "enabled" : "consent");
     language.options(field("interfaceLanguage"));
     field("interfaceLanguage").addEventListener("change", () => language.set(field("interfaceLanguage").value));
     const status = container.querySelector(".support-translation-status");
@@ -20,7 +21,7 @@ window.TeleTypTelSupportTranslation = {
     let thread = "", settings = null, signature = "", generation = 0, working = false, queue = [], nextRequest = 0, visible = true;
     let statusFailure = null, targetDirty = false;
     field("language").addEventListener("change", () => { targetDirty = true; });
-    const ready = () => visible && settings?.available && settings.preferences.consent && settings.preferences.mode !== "off" && settings.peerConsent;
+    const ready = () => visible && settings?.available && settings.canTranslate;
     const invalidate = () => {
       generation++; queue = []; results.clear();
       for (const entry of entries.values()) { entry.result.replaceChildren(); entry.pending = false; entry.done = false; entry.attempted = false; entry.failure = null; }
@@ -84,7 +85,7 @@ window.TeleTypTelSupportTranslation = {
         if (JSON.stringify(previous) !== JSON.stringify(data.preferences) || !field("language").options.length) {
           field("language").replaceChildren(...Object.entries(data.languages).map(([value, name]) => { const option = document.createElement("option"); option.value = value; option.textContent = name; return option; }));
           field("language").value = data.preferences.targetLanguage || language.language; targetDirty = false;
-          field("consent").checked = data.preferences.consent && data.preferences.liveConsent && data.preferences.mode === "automatic";
+          enabled.checked = data.preferences.mode === "automatic" && (staff || (data.preferences.consent && data.preferences.liveConsent));
         }
         renderStatus();
       }
@@ -95,8 +96,10 @@ window.TeleTypTelSupportTranslation = {
       invalidate(); const identifier = thread, ticket = generation;
       const save = form.querySelector('button[type="submit"]'); save.disabled = true;
       try {
-        const consent = field("consent").checked;
-        const response = await request({ action: "translation_settings", threadId: identifier, targetLanguage: field("language").value, mode: consent ? "automatic" : "off", consent, liveConsent: consent });
+        const active = enabled.checked;
+        const body = { action: "translation_settings", threadId: identifier, targetLanguage: field("language").value, mode: active ? "automatic" : "off" };
+        if (!staff) Object.assign(body, { consent: active, liveConsent: active });
+        const response = await request(body);
         if (thread === identifier && ticket === generation) { signature = ""; sync(identifier, response.translationSettings); container.querySelector("details").open = false; }
       } catch (failure) { if (thread === identifier && ticket === generation) { statusFailure = failure; status.textContent = language.failure(failure, true); } }
       finally { save.disabled = false; }
@@ -105,7 +108,7 @@ window.TeleTypTelSupportTranslation = {
       status.textContent = statusFailure ? language.failure(statusFailure, true)
         : !settings ? "" : !settings.available ? label("Vertaling niet beschikbaar. De originele chat blijft werken.", "Translation unavailable. The original chat still works.")
         : settings.preferences.mode === "off" ? label("Vertaling staat uit.", "Translation is off.")
-        : !settings.peerConsent ? label("Wachten op toestemming van de andere deelnemer.", "Waiting for the other participant's consent.")
+        : !settings.canTranslate ? label("Vertaling staat uit voor dit gesprek.", "Translation is off for this chat.")
         : label("Vertaling ingeschakeld. Het origineel blijft staan.", "Translation enabled. Originals are preserved.");
     };
     const localize = () => {
@@ -115,8 +118,13 @@ window.TeleTypTelSupportTranslation = {
       icons.set(form.querySelector('button[type="submit"]'), "check", label("Opslaan", "Save"));
       text("window", "Taal van dit venster", "Window language"); text("target", "Vertalen naar", "Translate into");
       field("interfaceLanguage").setAttribute("aria-label", label("Taal van dit venster", "Window language")); field("language").setAttribute("aria-label", label("Vertalen naar", "Translate into"));
-      text("consent", "Ik sta automatische vertaling van berichten en live RTT via Google Cloud Translation toe, ook vóór versturen.", "I allow automatic translation of messages and live RTT through Google Cloud Translation, including before sending.");
-      text("explanation", "Beide deelnemers moeten instemmen. Vertalingen kunnen fouten bevatten. Geen audiovertaling. Vink uit en sla op om toestemming in te trekken; tekstchat en RTT blijven werken.", "Both participants must agree. Translations may contain errors. No audio translation. Uncheck and save to withdraw consent; text chat and RTT keep working.");
+      if (staff) {
+        text("consent", "Automatisch vertalen op mijn scherm", "Translate automatically on my screen");
+        text("explanation", "Bij toestemming van de bezoeker vertaalt Google berichten en live RTT, ook vóór versturen. Geen extra bevestiging nodig. Uitvinken stopt alleen jouw vertaalweergave. Vertalingen kunnen fouten bevatten.", "When the visitor permits it, Google translates messages and live RTT, including before sending. No extra confirmation needed. Unchecking stops only your translation view. Translations may contain errors.");
+      } else {
+        text("consent", "Ik sta automatische vertaling van berichten en live RTT via Google Cloud Translation toe, ook vóór versturen.", "I allow automatic translation of messages and live RTT through Google Cloud Translation, including before sending.");
+        text("explanation", "Geen extra bevestiging van de medewerker nodig. Vertalingen kunnen fouten bevatten. Geen audiovertaling. Vink uit en sla op om vertaling voor dit gesprek te stoppen; tekstchat en RTT blijven werken.", "No extra confirmation from the agent is needed. Translations may contain errors. No audio translation. Uncheck and save to stop translation for this chat; text chat and RTT keep working.");
+      }
       if (settings && !settings.preferences.targetLanguage && !targetDirty) field("language").value = language.language;
       for (const entry of entries.values()) {
         icons.set(entry.button, "translate", label("Vertalen", "Translate"));
@@ -143,7 +151,7 @@ window.TeleTypTelSupportTranslation = {
         const key = event.sourceRole;
         let live = lives.get(key);
         if (live) { clearTimeout(live.timer); live.version++; live.failure = null; results.delete(live.result); live.result.replaceChildren(); }
-        if (!event.text || !ready() || !settings.preferences.liveConsent || !settings.peerLiveConsent || settings.preferences.mode !== "automatic") { live?.result.remove(); lives.delete(key); return; }
+        if (!event.text || !ready() || !settings.canTranslateLive) { live?.result.remove(); lives.delete(key); return; }
         if (!live) { live = { result: resultNode(event.target), version: 0, timer: null }; lives.set(key, live); }
         const version = live.version, ticket = generation;
         live.timer = setTimeout(() => {

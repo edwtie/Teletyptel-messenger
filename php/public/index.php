@@ -32,7 +32,7 @@ function siteIcon(string $name): string
   <link rel="stylesheet" href="support-chat.css?v=20261027-close-all">
   <link rel="stylesheet" href="support-call.css?v=20261027-close-all">
   <link rel="stylesheet" href="support-translation.css?v=20261027-close-all">
-  <script src="support-language.js?v=20261027-close-all" defer></script><script src="support-translation.js?v=20261027-close-all" defer></script>
+  <script src="support-language.js?v=20261027-support-auto" defer></script><script src="support-translation.js?v=20261027-support-auto" defer></script>
   <script src="support-call.js?v=20261027-close-all" defer></script>
   <link rel="stylesheet" href="support-attachments.css?v=20261027-close-all"><script src="support-attachments.js?v=20261027-close-all" defer></script><script src="support-chat.js?v=20261027-close-all" defer></script>
 </head>

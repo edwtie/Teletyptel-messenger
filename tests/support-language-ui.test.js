@@ -87,6 +87,11 @@ async function check(engine, device, name) {
     assert.equal(history.translationSettings.preferences.mode, "automatic");
     assert.equal(history.translationSettings.preferences.liveConsent, true, "Start terms include live Google translation");
     assert.equal(history.translationSettings.preferences.targetLanguage, "de", "Start language is stored as translation target");
+    const disabled = await visitorContext.request.post(origin + "/api/support-chat.php", {
+      headers: { "X-CSRF-Token": history.csrfToken },
+      data: { action: "translation_settings", threadId: history.thread.id, targetLanguage: "de", mode: "off", consent: false, liveConsent: false }
+    });
+    assert.equal(disabled.status(), 200, "Isolate UI localization from separately tested automatic translation");
     await visitor.locator("#supportTranslation > details > summary").click();
     await visitor.locator('#supportSend button[type="submit"]').click();
     await visitor.locator("#supportMessages p").getByText("Do not translate or erase this draft", { exact: true }).waitFor();

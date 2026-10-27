@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+### Customer-service translation — 2026-10-27
+
+- Removed the extra staff confirmation from support translation. Visitor chat
+  terms enable automatic message and live RTT translation; assigned staff sees
+  a Google-processing notice and defaults to a Dutch translation view.
+- Staff can change or disable only their own display. Visitor withdrawal stops
+  translation for both sides. Access checks, quotas and stale-result protection
+  remain enforced; Messenger translation settings are unchanged.
+
+### Number dialer preparation — 2026-10-27
+
+- Added a localized number keypad inside Messenger, with mobile layout, keyboard
+  access and international-number format checks. RTT is the intended default.
+- Number calls remain disabled until an RTT-capable SIP provider/gateway is
+  integrated. This does not place calls, request media, send or save numbers,
+  or change existing Messenger calls. Closing clears the entered number.
+
 ### Product update — 2026-10-27
 
 - Added a separate web admin portal with user and staff management, compact

@@ -2,6 +2,16 @@
 # Format: key=value
 
 app.title=TeleTypTel Messenger
+dialer.title=Nummer bellen
+dialer.mode=RTT standaard, wanneer ondersteund
+dialer.number=Telefoonnummer
+dialer.hint=Gebruik de landcode, bijvoorbeeld +31.
+dialer.invalid=Gebruik + en cijfers, met een landcode (maximaal 15 cijfers). Geen extensies of SIP-adressen.
+dialer.keypad=Toetsenblok
+dialer.delete=Cijfer wissen
+dialer.unavailable=Nog niet aangesloten. De SIP/RTT-provider koppelen we later.
+dialer.call=Bellen met RTT
+dialer.no_calls=Nog geen gesprekken of noodoproepen mogelijk. Nummers worden niet verzonden of bewaard.
 status.disconnected=Niet verbonden
 status.connecting_relay=Relay verbinden
 status.relay_connected=Relay verbonden

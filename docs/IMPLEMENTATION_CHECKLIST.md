@@ -46,12 +46,20 @@ Detailed behavior and constraints are in [Admin](ADMIN_TOOL.md),
   explicitly accepted video and interpreter participation.
 - [x] Protected support photo/PDF/DOC/DOCX attachments with type and size checks.
 - [x] Five local support interface languages and consent-based automatic translation.
+- [x] Customer-service translation starts from visitor terms without extra staff
+  confirmation; staff display settings are independent, and visitor withdrawal
+  disables translation for both sides without changing Messenger preferences.
 - [x] Compact mobile support composer and icon header with accessible names.
 - [x] Close-all confirmation ends the server chat and local media, supports cancel
   and retry, and clears drafts after successful closure.
 - [x] Responsive homepage/demo and automated website/support regression checks.
 - [ ] Configure and validate a real external interpreter provider such as Tolkcontact.
 - [ ] Implement and validate SIP/provider gateway interoperability.
+- [x] Prepare a localized Messenger number keypad with format checks and mobile
+  browser tests; calling remains disabled and numbers are neither sent nor saved.
+- [ ] Connect number dialing to an RTT-capable SIP gateway, with negotiated RTT
+  status and explicit handling of unsupported destinations; no silent audio-only
+  fallback. Provider selection is deferred.
 - [ ] Integrate payment collection and insurer claim submission if required.
 - [ ] Complete operational privacy, retention, backup and sensitive-data setup
   before enabling those features in a production deployment.

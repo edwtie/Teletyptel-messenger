@@ -51,22 +51,21 @@ final class SupportTranslationService
     private function preferences(string $thread, array $actor): array
     {
         $row = $this->row('SELECT * FROM support_translation_preferences WHERE thread_id = ? AND actor_key = ?', [$thread, $this->key($actor)]) ?? [];
-        return ['targetLanguage' => $row['target_language'] ?? '', 'mode' => $row['mode'] ?? 'off',
-            'consent' => (bool)($row['consent'] ?? false), 'liveConsent' => (bool)($row['live_consent'] ?? false)];
-    }
-
-    private function peer(array $actor, array $thread): array
-    {
-        return $actor['role'] === 'staff' ? ['role' => 'visitor', 'id' => $thread['visitor_id']]
-            : ['role' => 'staff', 'id' => $thread['staff_id'] ?? '', 'version' => (int)($thread['staff_version'] ?? 0)];
+        $staff = $actor['role'] === 'staff';
+        return ['targetLanguage' => $row['target_language'] ?? ($staff ? 'nl' : ''), 'mode' => $row['mode'] ?? ($staff ? 'automatic' : 'off'),
+            'consent' => !$staff && (bool)($row['consent'] ?? false), 'liveConsent' => !$staff && (bool)($row['live_consent'] ?? false)];
     }
 
     public function view(array $actor, string $identifier): array
     {
         $thread = $this->thread($actor, $identifier);
-        $peer = $this->preferences($identifier, $this->peer($actor, $thread));
+        $visitor = $this->preferences($identifier, ['role' => 'visitor', 'id' => $thread['visitor_id']]);
+        $preferences = $this->preferences($identifier, $actor);
+        $visitorConsent = $visitor['consent'] && $visitor['mode'] === 'automatic';
+        $allowed = $visitorConsent && $preferences['mode'] === 'automatic';
         return ['available' => $this->translator->available(), 'languages' => TranslationService::LANGUAGES,
-            'preferences' => $this->preferences($identifier, $actor), 'peerConsent' => $peer['consent'], 'peerLiveConsent' => $peer['liveConsent']];
+            'preferences' => $preferences, 'visitorConsent' => $visitorConsent,
+            'canTranslate' => $allowed, 'canTranslateLive' => $allowed && $visitor['liveConsent']];
     }
 
     public function save(array $actor, string $identifier, array $input): array
@@ -74,8 +73,8 @@ final class SupportTranslationService
         $this->thread($actor, $identifier);
         $target = $input['targetLanguage'] ?? null; $mode = $input['mode'] ?? null;
         if (!is_string($target) || !isset(TranslationService::LANGUAGES[$target]) || !in_array($mode, ['off', 'automatic'], true)) throw new SupportChatFailure('Kies een taal en vertaalmodus / Choose a language and mode.');
-        $consent = ($input['consent'] ?? false) === true;
-        if ($mode !== 'off' && !$consent) throw new SupportChatFailure('Toestemming voor Google vereist / Google consent required.', 403);
+        $consent = $actor['role'] === 'visitor' && ($input['consent'] ?? false) === true;
+        if ($actor['role'] === 'visitor' && $mode !== 'off' && !$consent) throw new SupportChatFailure('Toestemming voor Google vereist / Google consent required.', 403);
         $consent = $consent && $mode !== 'off';
         $sql = 'INSERT INTO support_translation_preferences (thread_id, actor_key, target_language, mode, consent, live_consent) VALUES (?, ?, ?, ?, ?, ?) ';
         $sql .= $this->pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql'
@@ -85,22 +84,27 @@ final class SupportTranslationService
         return $this->view($actor, $identifier);
     }
 
+    private function checkLiveCall(array $actor, string $identifier, array $input): void
+    {
+        $callId = $input['callId'] ?? ''; $client = $input['clientId'] ?? '';
+        if (!is_string($callId) || !is_string($client) || !in_array($input['sourceRole'] ?? '', ['visitor', 'staff'], true)) throw new SupportChatFailure('Ongeldige live aanvraag / Invalid live request.');
+        if (!$this->row('SELECT call_id FROM support_calls WHERE call_id = ? AND thread_id = ?', [$callId, $identifier])) throw new SupportChatFailure('Oproep niet gevonden / Call not found.', 404);
+        $call = (new SupportCallService($this->pdo))->view($actor, $identifier, $callId, $client);
+        $members = array_column($call['members'], null, 'role');
+        if (($call['call']['status'] ?? '') !== 'active' || empty($members[$actor['role']]['owned']) || empty($members['visitor']['joined']) || empty($members['staff']['joined'])) throw new SupportChatFailure('Neem eerst deel aan RTT / Join RTT first.', 403);
+    }
+
     public function translate(array $actor, string $identifier, array $input): array
     {
         $thread = $this->thread($actor, $identifier);
-        $preferences = $this->preferences($identifier, $actor);
-        if (!$preferences['consent'] || $preferences['mode'] === 'off') throw new SupportChatFailure('Vertaling staat uit / Translation is off.', 403);
+        $settings = $this->view($actor, $identifier);
+        $preferences = $settings['preferences'];
+        if (!$settings['canTranslate']) throw new SupportChatFailure('Vertaling staat uit / Translation is off.', 403);
         if (($input['targetLanguage'] ?? '') !== $preferences['targetLanguage']) throw new SupportChatFailure('Taal gewijzigd / Language changed.', 409);
         if (($input['automatic'] ?? false) && $preferences['mode'] !== 'automatic') throw new SupportChatFailure('Automatische vertaling staat uit / Automatic translation is off.', 403);
-        $peer = $this->preferences($identifier, $this->peer($actor, $thread));
         if (($input['live'] ?? false) === true) {
-            if (!$preferences['liveConsent'] || !$peer['liveConsent'] || !$peer['consent'] || $thread['status'] !== 'active') throw new SupportChatFailure('Beide deelnemers moeten live vertaling toestaan / Both participants must allow live translation.', 403);
-            $callId = $input['callId'] ?? ''; $client = $input['clientId'] ?? '';
-            if (!is_string($callId) || !is_string($client) || !in_array($input['sourceRole'] ?? '', ['visitor', 'staff'], true)) throw new SupportChatFailure('Ongeldige live aanvraag / Invalid live request.');
-            if (!$this->row('SELECT call_id FROM support_calls WHERE call_id = ? AND thread_id = ?', [$callId, $identifier])) throw new SupportChatFailure('Oproep niet gevonden / Call not found.', 404);
-            $call = (new SupportCallService($this->pdo))->view($actor, $identifier, $callId, $client);
-            $members = array_column($call['members'], null, 'role');
-            if (($call['call']['status'] ?? '') !== 'active' || empty($members[$actor['role']]['owned']) || empty($members['visitor']['joined']) || empty($members['staff']['joined'])) throw new SupportChatFailure('Neem eerst deel aan RTT / Join RTT first.', 403);
+            if (!$settings['canTranslateLive'] || $thread['status'] !== 'active') throw new SupportChatFailure('Live vertaling staat uit / Live translation is off.', 403);
+            $this->checkLiveCall($actor, $identifier, $input);
             $text = $input['text'] ?? null;
             if (!is_string($text) || strlen($text) > 8000 || preg_match_all('/./us', $text) > 2000) throw new SupportChatFailure('Live tekst te lang / Live text too long.');
         } else {
@@ -108,13 +112,16 @@ final class SupportTranslationService
             $message = $this->row('SELECT body, author_kind, author_id FROM support_chat_messages WHERE thread_id = ? AND sequence = ?', [$identifier, $input['sequence']]);
             if (!$message) throw new SupportChatFailure('Bericht niet gevonden / Message not found.', 404);
             if ($message['body'] === '') throw new SupportChatFailure('Bestanden worden niet vertaald / Files are not translated.');
-            if (!$peer['consent']) throw new SupportChatFailure('De andere deelnemer moet vertaling toestaan / The other participant must allow translation.', 403);
-            if ($message['author_kind'] === 'staff' && $message['author_id'] !== $thread['staff_id']) throw new SupportChatFailure('Geen toestemming van de vorige medewerker / Previous agent has not consented.', 403);
+            if ($message['author_kind'] === 'staff' && $message['author_id'] !== $thread['staff_id']) throw new SupportChatFailure('Vertaling van eerdere medewerkers niet beschikbaar / Translation of previous agents is unavailable.', 403);
             $text = $message['body'];
         }
         $result = $this->translator->translateAuthorizedText('support:' . $this->key($actor), $text, $preferences['targetLanguage']);
         $current = $this->view($actor, $identifier);
-        if ($current['preferences'] !== $preferences || !$current['peerConsent'] || (($input['live'] ?? false) && !$current['peerLiveConsent'])) throw new SupportChatFailure('Toestemming gewijzigd / Consent changed.', 409);
+        $currentThread = $this->thread($actor, $identifier);
+        if ($current['preferences'] !== $preferences || !$current['canTranslate']
+            || $currentThread['staff_id'] !== $thread['staff_id'] || $currentThread['staff_version'] !== $thread['staff_version']
+            || (($input['live'] ?? false) && (!$current['canTranslateLive'] || $currentThread['status'] !== 'active'))) throw new SupportChatFailure('Vertaalinstellingen of gesprek gewijzigd / Translation settings or chat changed.', 409);
+        if (($input['live'] ?? false) === true) $this->checkLiveCall($actor, $identifier, $input);
         return $result;
     }
 }

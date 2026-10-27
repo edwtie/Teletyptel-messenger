@@ -1,0 +1,88 @@
+.phone-dialer {
+  width: min(380px, calc(100vw - 24px));
+  max-height: calc(100dvh - 24px);
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 20px 70px #0006;
+  overflow: auto;
+}
+
+.phone-dialer::backdrop {
+  background: #08132599;
+}
+
+.phone-dialer-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.phone-dialer-heading h2 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.phone-dialer-heading button {
+  flex: 0 0 44px;
+  height: 44px;
+}
+
+.phone-dialer-mode {
+  font-weight: 600;
+  margin: 12px 0;
+}
+
+.phone-dialer input {
+  width: 100%;
+  margin-top: 6px;
+  min-height: 48px;
+  font-size: 1.35rem;
+  letter-spacing: .04em;
+}
+
+.phone-dialer-hint,
+.phone-dialer-error {
+  margin: 8px 0 12px;
+  font-size: .85rem;
+  line-height: 1.45;
+}
+
+.phone-dialer-hint {
+  color: var(--muted);
+}
+
+.phone-dialer-error {
+  border-left: 3px solid var(--danger);
+  padding-left: 10px;
+}
+
+.phone-dialer-keys {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.phone-dialer-keys button {
+  min-height: 46px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  font-size: 1.35rem;
+}
+
+.phone-dialer-availability {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: .9rem;
+  line-height: 1.5;
+}
+
+#phoneDialerCall {
+  width: 100%;
+  min-height: 44px;
+}

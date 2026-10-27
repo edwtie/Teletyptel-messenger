@@ -2,6 +2,16 @@
 # Format: key=value
 
 app.title=TeleTypTel Messenger
+dialer.title=Call a number
+dialer.mode=RTT as standard when supported
+dialer.number=Phone number
+dialer.hint=Include the country code, for example +31.
+dialer.invalid=Use + and digits, with a country code (at most 15 digits). No extensions or SIP addresses.
+dialer.keypad=Keypad
+dialer.delete=Delete digit
+dialer.unavailable=Not connected yet. The SIP/RTT provider will be added later.
+dialer.call=Call with RTT
+dialer.no_calls=No calls or emergency calls yet. Numbers are not sent or saved.
 status.disconnected=Disconnected
 status.connecting_relay=Connecting relay
 status.relay_connected=Relay connected
