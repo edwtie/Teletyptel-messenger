@@ -23,6 +23,9 @@ people:
 - Total Conversation with text, voice and video together;
 - contacts and groups;
 - file, photo and location sharing;
+- consent-based message translation and live-text translation previews;
+- requesting an approved sign-language interpreter during a conversation;
+- a website customer-service popup with a separate staff inbox;
 - light and dark mode;
 - Dutch and English interface text;
 - a browser-first design that can grow into Windows, Android and iOS apps.
@@ -71,6 +74,28 @@ TeleTypTel is growing toward:
 The long-term vision is a decentralized messenger that can be operated by
 providers and organizations instead of depending on one closed messaging company.
 
+## Current feature overview
+
+The October 2026 development branch includes:
+
+| Area | Available in the codebase |
+| --- | --- |
+| Messenger | Chat, groups, live RTT, audio/video, attachments and compact mobile controls. |
+| Translation | Google-backed message and live-draft translation with consent; optional private XMPP translation requests, including personal MUC results. |
+| Interpreters | Own-interpreter applications, admin approval and three-person participation in an existing call. |
+| Customer service | Visitor popup, staff inbox, automatic RTT, optional video/interpreter, photo/document uploads and five interface languages. |
+| Administration | Separate admin portal, user/staff management, bulk actions, recoverable trash and audit views. |
+| Plans and billing | Plan requirements, scheduled transitions, invoices and worker-driven recurring billing. |
+| Applications | Own-application portal and authorized review; sensitive data collection requires explicit server setup. |
+| Website | Public homepage, demo and responsive iPhone/Android browser layouts. |
+
+RTT means real-time text; Total Conversation combines text, audio and video.
+These are development features, not a production-readiness or standards-compliance
+claim. Tolkcontact, SIP/provider gateways, payment/insurance-claim integrations
+and native-app release validation remain separate work. See the
+[implementation checklist](docs/IMPLEMENTATION_CHECKLIST.md) for completed and
+open items.
+
 ## Local development
 
 Build the .NET solution:
@@ -108,6 +133,11 @@ when ejabberd is available.
 ## Documentation
 
 - User guide: [docs/USER_GUIDE.md](docs/USER_GUIDE.md)
+- Admin and billing: [docs/ADMIN_TOOL.md](docs/ADMIN_TOOL.md)
+- Applications and review: [docs/INTAKE.md](docs/INTAKE.md)
+- Own interpreters: [docs/INTERPRETERS.md](docs/INTERPRETERS.md)
+- Customer-service chat: [docs/SUPPORT_CHAT.md](docs/SUPPORT_CHAT.md)
+- Implementation checklist: [docs/IMPLEMENTATION_CHECKLIST.md](docs/IMPLEMENTATION_CHECKLIST.md)
 - Getting started: [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md)
 - Windows setup: [docs/WINDOWS_SETUP.md](docs/WINDOWS_SETUP.md)
 - Linux setup: [docs/LINUX_SETUP.md](docs/LINUX_SETUP.md)

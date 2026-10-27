@@ -34,6 +34,19 @@ layer on top of that core.
 | XEP-0424 | Message Retraction | Retract a previously sent message and show tombstones/fallback safely. | Done; core serializer/parser, incoming stanza detection and web retraction display |
 | XEP-0514 | Custom Emoji | Attach custom emoji markup to message spans and link those emoji to hashed media. | Done for core helper/parser and incoming stanza exposure; UI picker and live-server interop remain release validation |
 
+## Translation Service
+
+| XEP | Name | Purpose | Status |
+| --- | --- | --- | --- |
+| XEP-0171 | Language Translation | Private translation requests to a configured service. | Implemented subset: discovery, language pairs and one target language per IQ; worker and client tests included. No dictionaries, pivot translation or multiple target languages per request. |
+
+The translation worker uses a dedicated authenticated XMPP account and Google as
+the translation engine. It does not join MUC rooms. Each participant requests
+their own translation; originals and group messages remain unchanged. Live RTT
+translation is a consent-gated preview, not a replacement for the RTT protocol.
+See [Admin tool](ADMIN_TOOL.md#xmpp-vertaaldienst-en-muc) and the
+[User guide](USER_GUIDE.md) for configuration and implementation evidence.
+
 ## Sync And History
 
 | XEP | Name | Purpose | Status |

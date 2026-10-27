@@ -18,11 +18,45 @@ item is implemented, tested and documented.
   user-facing docs and public evaluation path are complete.
 - [x] XEP-0479 compliance notes separate repository evidence from formal
   compliance claims.
-- [x] Public homepage/teaser material is kept outside the software repository;
-  `php/public/index.php` is ignored so website copy is not published with the
-  app source.
+- [x] Public homepage and demo sources are included in the software repository;
+  local configuration, secrets, database files and customer uploads stay ignored.
 - [ ] Public hosted Teletyptel service is live with production account,
   abuse/rate-limit, moderation and backup policies.
+
+## October 2026 Product Update
+
+Status describes repository implementation, not production certification.
+Detailed behavior and constraints are in [Admin](ADMIN_TOOL.md),
+[Intake](INTAKE.md), [Interpreters](INTERPRETERS.md),
+[Support chat](SUPPORT_CHAT.md) and the [User guide](USER_GUIDE.md).
+
+- [x] Separate admin portal, role-scoped access, user/staff lists and audit views.
+- [x] Compact user management with page-scoped selection, blocking and recoverable
+  trash; web-session revocation does not replace ejabberd account administration.
+- [x] Plan configuration combines prices, availability and application requirements.
+- [x] Scheduled subscription transitions and worker-driven recurring invoices.
+- [x] Own-application portal, insurer selection and authorized dossier review;
+  sensitive-data collection remains gated by server configuration.
+- [x] Consent-based message translation, received RTT previews and optional own
+  draft previews, preserving original text and excluding drafts from history.
+- [x] XMPP translation worker with discovery, language pairs and one target language
+  per private request; personal MUC results without a room-joining translation bot.
+- [x] Own-interpreter approval, availability and three-person in-call participation.
+- [x] Customer-service popup and separate staff inbox with automatic RTT,
+  explicitly accepted video and interpreter participation.
+- [x] Protected support photo/PDF/DOC/DOCX attachments with type and size checks.
+- [x] Five local support interface languages and consent-based automatic translation.
+- [x] Compact mobile support composer and icon header with accessible names.
+- [x] Close-all confirmation ends the server chat and local media, supports cancel
+  and retry, and clears drafts after successful closure.
+- [x] Responsive homepage/demo and automated website/support regression checks.
+- [ ] Configure and validate a real external interpreter provider such as Tolkcontact.
+- [ ] Implement and validate SIP/provider gateway interoperability.
+- [ ] Integrate payment collection and insurer claim submission if required.
+- [ ] Complete operational privacy, retention, backup and sensitive-data setup
+  before enabling those features in a production deployment.
+- [ ] Validate production TURN, real iPhone/Android devices and external networks;
+  browser emulation alone does not establish native-app readiness.
 
 ## Alpha 2 - Web, Accounts And Localization
 

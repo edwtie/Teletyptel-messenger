@@ -190,7 +190,8 @@ Deel geen accountgegevens op basis van alleen die naam.
   de bestaande service worker cachet geen `/api/`- of `/admin/`-routes.
 - Threads zijn gekoppeld aan een willekeurige, serverzijdige bezoekersidentiteit.
   Een thread-ID is geen toegangstoken. Naam en tekst worden als tekst weergegeven,
-  niet als HTML. Er zijn geen uploads of automatische vertaling in deze popup.
+  niet als HTML. Uploads zijn afgeschermd per gesprek; automatische vertaling
+  vereist de hierboven beschreven toestemming van beide deelnemers.
 - Opgeslagen berichten gebruiken PHP/HTTPS met polling elke drie seconden. De
   server bewaart die transcripties in de database; die tekstchat is niet end-to-end
   versleuteld. Deel geen BSN, medische gegevens of wachtwoorden.

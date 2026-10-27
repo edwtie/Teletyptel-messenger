@@ -2,6 +2,39 @@
 
 ## Unreleased
 
+### Product update — 2026-10-27
+
+- Added a separate web admin portal with user and staff management, compact
+  lists, bulk actions, recoverable account trash, audit views and role checks.
+- Added subscription configuration, scheduled plan changes, customer/insurer
+  invoices and recurring billing through the admin worker. Payment-provider
+  and insurance-claim integrations are not included.
+- Added an application portal with plan-specific requirements, an insurer
+  selector and permission-controlled review. BSN and medical uploads remain
+  gated by explicit server configuration and the documented prerequisites.
+- Added consent-based Google message translation, incoming live RTT translation
+  and an optional own-draft preview. Originals remain unchanged. Messenger uses
+  a compact translation label and a message-menu action instead of repeated icons.
+- Added an XMPP translation worker with private XEP-0171 requests, discovery,
+  language pairs and one target language per request. MUC translations stay
+  personal; the service does not join rooms or publish translated group messages.
+- Added own-interpreter registration, approval, availability and three-person
+  in-call participation. Tolkcontact remains disabled pending provider details;
+  this is not a new SIP gateway or federated XMPP conference implementation.
+- Added the public homepage and interactive demo to the repository, responsive
+  iPhone/Android layouts, compact symbol-based navigation and demo screenshots.
+- Added a customer-service popup and separate staff inbox, with automatic live
+  RTT, opt-in Total Conversation, interpreter requests and protected photo/document
+  attachments. Visitor interface languages are Dutch, English, German, French
+  and Spanish; automatic Google translation requires participant consent.
+- Simplified the support composer and header. The close button now confirms
+  ending the server chat, stops RTT/camera/microphone/live translation and clears
+  unsent drafts. Cancellation preserves the conversation; errors allow retry.
+- Added PHP and browser regression coverage for admin, intake, translation,
+  interpreters and customer service. Website and support checks passed locally;
+  mobile emulation is not evidence of native-app or real-device interoperability.
+- Kept local configuration, secrets, databases and customer uploads outside Git.
+
 ### Added
 
 - Web group management dialog for XMPP MUC rooms: member approval/members-only
