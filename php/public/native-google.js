@@ -5,12 +5,13 @@
   async function signIn(endpoint) {
     if (busy) throw Object.assign(new Error("Google sign-in is already open."), { code: "BUSY" });
     const capacitor = root.Capacitor;
-    if (capacitor?.getPlatform?.() !== "ios" || !capacitor.isPluginAvailable?.("TeleTypTelGoogle")) {
+    const plugin = capacitor?.Plugins?.TeleTypTelGoogle;
+    if (capacitor?.getPlatform?.() !== "ios" || !capacitor.isPluginAvailable?.("TeleTypTelGoogle")
+        || typeof plugin?.signIn !== "function") {
       throw Object.assign(new Error("Update TeleTypTel in TestFlight to use Google sign-in."), { code: "UPDATE_REQUIRED" });
     }
     const url = new URL(endpoint, root.location.href);
     if (url.origin !== root.location.origin || url.protocol !== "https:") throw new Error("Secure same-origin sign-in is required.");
-    const plugin = capacitor.registerPlugin("TeleTypTelGoogle");
     async function post(body) {
       const response = await root.fetch(url.toString(), {
         method: "POST", credentials: "same-origin", cache: "no-store", redirect: "error",

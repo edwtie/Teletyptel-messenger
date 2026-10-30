@@ -20,9 +20,12 @@ De Google-SDK opent de systeemauthenticatie en verwerkt de callback via het omge
 
 Een oude TestFlight-build toont een updateverzoek. Installeer de nieuwe build, open Google-aanmelding, test annuleren en opnieuw aanmelden, en test een account met 2FA. De cloudtest kan alleen compilatie en opstarten controleren; echte Google-aanmelding en de lokale WAMP-verbinding moeten op de iPhone worden bevestigd.
 
+De remote webclient gebruikt `window.Capacitor.Plugins.TeleTypTelGoogle.signIn`, zoals de native iOS-bridge die bij het laden injecteert. `registerPlugin` is een API uit de gebundelde Capacitor-webmodule en is niet aanwezig in deze losse webclient. De regressietest gebruikt daarom bewust een bridge zonder die functie.
+
 Lokale regressietests:
 
 - `node --test tests/native-google.test.js`
+- `node --test tests/native-google-bridge-ui.test.js` (Playwright/Chromium en de geïnstalleerde iOS-harnessafhankelijkheden; echte JavaScriptbridge, fictieve native Google-respons).
 - `php php/tests/native-google-signin-test.php`
 - `php php/tests/oauth-session-test.php`
 - Na voorbereiden van het geïsoleerde project: `node --test scripts/ios-testflight/prepare.test.js`.

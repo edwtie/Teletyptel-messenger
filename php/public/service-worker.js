@@ -1,5 +1,5 @@
-const CACHE_NAME = "teletyptel-webclient-v436";
-const BUILD_VERSION = "20261030-ios-google";
+const CACHE_NAME = "teletyptel-webclient-v437";
+const BUILD_VERSION = "20261030-ios-google-bridge";
 const ASSETS = [
   "chat.html",
   "chat-dialer.css?v=20261027-number-dialer",
@@ -11,7 +11,7 @@ const ASSETS = [
   "mobile-navigation.js?v=20260929-rtt-first",
   "chat-interpreter.js?v=20261027-inline-interpreter",
   `chat-client.js?v=${BUILD_VERSION}`,
-  "native-google.js?v=20261030-ios-google",
+  "native-google.js?v=20261030-ios-google-bridge",
   `vendor/qrcode.js?v=${BUILD_VERSION}`,
   "favicon.ico",
   "manifest.webmanifest",

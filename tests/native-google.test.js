@@ -10,13 +10,10 @@ function fixture({ available = true, signIn, response } = {}) {
   const calls = [];
   const context = { URL, location: new URL("https://server.test/chat.html"),
     Capacitor: { getPlatform: () => "ios", isPluginAvailable: () => available,
-      registerPlugin: name => {
-        assert.equal(name, "TeleTypTelGoogle");
-        return { signIn: async config => {
-          calls.push(config);
-          return signIn ? signIn() : { serverAuthCode: "fictitious-single-use-code" };
-        } };
-      } },
+      Plugins: { TeleTypTelGoogle: { signIn: async config => {
+        calls.push(config);
+        return signIn ? signIn() : { serverAuthCode: "fictitious-single-use-code" };
+      } } } },
     fetch: async (url, options) => {
       requests.push({ url, options, body: JSON.parse(options.body) });
       const payload = requests.length === 1
@@ -26,11 +23,12 @@ function fixture({ available = true, signIn, response } = {}) {
     }
   };
   vm.runInNewContext(source, context);
-  return { api: context.TeleTypTelNativeGoogle, requests, calls };
+  return { api: context.TeleTypTelNativeGoogle, requests, calls, context };
 }
 
-test("Native code goes only to a same-origin HTTPS POST, never a URL or storage", async () => {
-  const { api, requests, calls } = fixture();
+test("Injected iOS plugin works without the bundled registerPlugin API and uses HTTPS POST", async () => {
+  const { api, requests, calls, context } = fixture();
+  assert.equal(context.Capacitor.registerPlugin, undefined);
   assert.equal((await api.signIn("/api/auth/google/native.php")).accountId, "fixture-account");
   assert.equal(calls[0].serverClientId, "public-server-id");
   assert.equal(requests.length, 2);
@@ -45,6 +43,13 @@ test("Native code goes only to a same-origin HTTPS POST, never a URL or storage"
     assert.equal(options.headers["X-TeleTypTel-Native"], "google");
   }
   assert.doesNotMatch(source, /localStorage|sessionStorage|console\./);
+});
+
+test("Missing injected signIn method fails clearly before sending any request", async () => {
+  const { api, context, requests } = fixture();
+  delete context.Capacitor.Plugins.TeleTypTelGoogle.signIn;
+  await assert.rejects(api.signIn("/native"), error => error.code === "UPDATE_REQUIRED");
+  assert.equal(requests.length, 0);
 });
 
 test("Old app builds fail clearly instead of navigating to the invalid LAN OAuth redirect", async () => {
