@@ -35,8 +35,8 @@ final class TeleTypTelGooglePlugin: CAPPlugin, CAPBridgedPlugin {
             GIDSignIn.sharedInstance.signIn(withPresenting: presenter) { result, error in
                 self.signingIn = false
                 defer { GIDSignIn.sharedInstance.signOut() }
-                if let error = error as NSError? {
-                    let cancelled = error.code == GIDSignInErrorCode.canceled.rawValue
+                if let error = error {
+                    let cancelled = (error as? GIDSignInError)?.code == .canceled
                     call.reject(cancelled ? "Google sign-in cancelled." : "Google sign-in failed. Please try again.", cancelled ? "CANCELLED" : "GOOGLE_FAILED")
                     return
                 }

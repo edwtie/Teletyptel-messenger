@@ -83,6 +83,8 @@ test("Google native sign-in uses the supplied iOS client and a separate server c
   assert.match(native, /current.scheme == "https"/);
   assert.match(native, /current.host == expected.host && current.port == expected.port/);
   assert.match(native, /call.getString\("serverClientId"\) == serverClientID/);
+  assert.match(native, /error as\? GIDSignInError/);
+  assert.doesNotMatch(native, /GIDSignInErrorCode/);
   assert.doesNotMatch(native, /client_secret|clientSecret|accessToken|idToken/);
 });
 

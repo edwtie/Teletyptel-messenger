@@ -22,7 +22,7 @@ function logged(command, args, filename, options = {}) {
   const descriptor = fs.openSync(logfile, "w", 0o600);
   try { return run(command, args, { ...options, stdio: ["ignore", descriptor, descriptor] }); }
   catch (error) {
-    let detail = fs.readFileSync(logfile, "utf8").split(/\r?\n/).filter(line => /error:|error\]|Error Domain|ERROR|BUILD FAILED|EXPORT FAILED/i.test(line)).slice(-12).join("\n");
+    let detail = fs.readFileSync(logfile, "utf8").split(/\r?\n/).filter(line => /\berror:|\berror\]|Error Domain|^\s*ERROR\b|BUILD FAILED|EXPORT FAILED/i.test(line)).slice(-12).join("\n");
     for (const value of Object.values(secrets)) if (value) detail = detail.split(value).join("[redacted]");
     console.error(detail.slice(-5000));
     throw error;
