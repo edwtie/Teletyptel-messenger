@@ -1,0 +1,17 @@
+{
+  "name": "teletyptel-ios-simulator-tests",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "prepare:fixture": "node prepare.js",
+    "test": "node --test prepare.test.js",
+    "preview": "node preview.js",
+    "simulate": "node run.js"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.4.3",
+    "@capacitor/core": "8.4.3",
+    "@capacitor/ios": "8.4.3",
+    "playwright": "1.60.0"
+  }
+}

@@ -1,0 +1,53 @@
+name: iOS Simulator smoke tests
+
+on:
+  push:
+    branches: [codex/teletyptel-beta-polish]
+    paths:
+      - .github/workflows/ios-simulator.yml
+      - scripts/ios-simulator/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-simulator-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  simulator:
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+      - name: Select installed Xcode 26
+        shell: bash
+        run: |
+          XCODE_PATH=$(find /Applications -maxdepth 1 -name 'Xcode_26*.app' -type d | sort -r | head -n 1)
+          test -n "$XCODE_PATH"
+          echo "DEVELOPER_DIR=$XCODE_PATH/Contents/Developer" >> "$GITHUB_ENV"
+      - name: Install isolated test dependencies
+        working-directory: scripts/ios-simulator
+        run: npm ci --ignore-scripts
+      - name: Prepare allowlisted committed assets and validate isolation
+        working-directory: scripts/ios-simulator
+        run: |
+          npm run prepare:fixture
+          npm test
+      - name: Build and test two actual iPhone simulators
+        working-directory: scripts/ios-simulator
+        run: npm run simulate
+      - name: Save screenshots, results and simulator-only app
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: teletyptel-ios-simulator-${{ github.run_id }}
+          path: artifacts/ios-simulator/results/
+          if-no-files-found: warn
+          retention-days: 7
