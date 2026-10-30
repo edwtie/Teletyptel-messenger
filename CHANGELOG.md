@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### Bundled iOS Messenger — 2026-10-31
+
+- Package the actual Messenger interface, languages and static assets inside the
+  iOS app instead of loading the page from WAMP. Exclude server configuration,
+  PHP, user data and demo assets; retain WAMP for APIs and secure XMPP transport.
+- Add a scoped native HTTPS/session bridge for Google/email login, JSON and
+  multipart requests, cancellable translations, media and the iOS file-share sheet.
+  Restrict plugin messages to the bundled main document and retain system TLS checks.
+- Preserve mobile login without automatic keyboard focus; show local startup and
+  connection-failure UI. Add bundle/runtime/offline-WebKit regression coverage.
+- This changes the prepared iOS build only: native compilation and a new internal
+  TestFlight upload/device validation are still required. Android is unchanged.
+
 - Preserve short Dutch acknowledgements (including “Ja” and “Nee”) when translating
   support messages or live RTT into Dutch. Skip provider auto-detection for these
   exact replies and hide the redundant result; other text/targets retain translation.

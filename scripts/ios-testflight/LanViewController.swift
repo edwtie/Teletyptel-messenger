@@ -1,8 +1,24 @@
 final class LanViewController: CAPBridgeViewController {
+    private let mediaHandler = MessengerMediaHandler()
+
+    override func webViewConfiguration(for instanceConfiguration: InstanceConfiguration) -> WKWebViewConfiguration {
+        let configuration = super.webViewConfiguration(for: instanceConfiguration)
+        configuration.setURLSchemeHandler(mediaHandler, forURLScheme: "teletyptel-media")
+        return configuration
+    }
+
     override func capacitorDidLoad() {
         super.capacitorDidLoad()
+        if let controller = bridge?.webView?.configuration.userContentController {
+            let delegate = bridge?.webView?.navigationDelegate as? WKScriptMessageHandler
+            controller.removeScriptMessageHandler(forName: "bridge")
+            if let delegate = delegate {
+                controller.add(MessengerScriptHandler(delegate: delegate), name: "bridge")
+            }
+        }
         bridge?.registerPluginInstance(LanSystemTrustPlugin())
         bridge?.registerPluginInstance(TeleTypTelGooglePlugin())
+        bridge?.registerPluginInstance(TeleTypTelServerPlugin())
     }
 }
 

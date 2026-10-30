@@ -4,6 +4,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { settings } = require("./settings");
 const { project, webAssets } = require("./prepare");
+const { assetFiles } = require("./bundle-frontend");
 const { validateProfile } = require("./build");
 const google = require("./google-signin");
 
@@ -41,12 +42,16 @@ test("Server URL and build number reject unsafe values", () => {
   assert.equal(config.capacitor.ios.webContentsDebuggingEnabled, false);
 });
 
-test("Only minimal offline assets are packaged", () => {
-  assert.deepEqual(fs.readdirSync(path.join(project, "www")).sort(), [...webAssets, "chat.html", "connection.js"].sort());
+test("Only allowlisted Messenger assets and the native adapter are packaged", () => {
+  const walk = (directory, prefix = "") => fs.readdirSync(directory, { withFileTypes: true }).flatMap(entry =>
+    entry.isDirectory() ? walk(path.join(directory, entry.name), prefix + entry.name + "/") : [prefix + entry.name]);
+  const files = walk(path.join(project, "www"));
+  assert.deepEqual(files.sort(), [...new Set([...webAssets, ...assetFiles(), "connection.js", "native-server.js", "native-startup.css"])].sort());
+  assert.ok(files.every(file => !/postnl|demo|config\/|\.php|uploads\/|admin\//i.test(file)));
   const config = JSON.parse(fs.readFileSync(path.join(project, "capacitor.config.json"), "utf8"));
   assert.equal(config.webDir, "www");
   assert.equal(config.appId, "com.tiedragon.teletyptel");
-  assert.equal(new URL(config.server.url).protocol, "https:");
+  assert.equal(config.server.url, undefined);
   assert.equal(config.server.appStartPath, "/chat.html");
   assert.equal(config.server.allowNavigation, undefined);
 });
@@ -61,11 +66,15 @@ test("Native TLS uses system validation only for the configured host", () => {
   assert.doesNotMatch(plist, /NSAllowsArbitraryLoads|NSExceptionAllowsInsecureHTTPLoads/);
 });
 
-test("Capacitor's local startup file exists even when using a remote server", () => {
+test("The bundled startup file contains the real Messenger, not a server redirect", () => {
   const config = JSON.parse(fs.readFileSync(path.join(project, "capacitor.config.json"), "utf8"));
   const startFile = path.join(project, "www", config.server.appStartPath.replace(/^\/+/, ""));
   assert.ok(fs.existsSync(startFile), "Missing bundled startup file: Capacitor exits before loading the remote URL");
-  assert.equal(fs.readFileSync(startFile, "utf8"), fs.readFileSync(path.join(project, "www/index.html"), "utf8"));
+  const html = fs.readFileSync(startFile, "utf8");
+  assert.match(html, /id="messageInput"/);
+  assert.match(html, /src="native-server.js"/);
+  assert.match(html, /id="accountDialogTitle" tabindex="-1"/);
+  assert.ok(html.indexOf('src="native-server.js"') < html.indexOf('src="chat-client.js'));
 });
 
 test("Google native sign-in uses the supplied iOS client and a separate server client", () => {
@@ -80,8 +89,8 @@ test("Google native sign-in uses the supplied iOS client and a separate server c
   assert.match(native, /GIDSignIn.sharedInstance.handle\(url\)/);
   assert.match(native, /registerPluginInstance\(TeleTypTelGooglePlugin\(\)\)/);
   assert.match(native, /serverAuthCode/);
-  assert.match(native, /current.scheme == "https"/);
-  assert.match(native, /current.host == expected.host && current.port == expected.port/);
+  assert.match(native, /isBundledMessenger\(bridge\?\.webView\?\.url\)/);
+  assert.match(native, /url.scheme == "capacitor" && url.host == "localhost"/);
   assert.match(native, /call.getString\("serverClientId"\) == serverClientID/);
   assert.match(native, /error as\? GIDSignInError/);
   assert.doesNotMatch(native, /GIDSignInErrorCode/);

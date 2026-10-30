@@ -26,11 +26,22 @@ window.TeleTypTelTranslation = {
     let paused = false;
     const manualConsentKey = () => "teletyptel_translation_google_v1_" + encodeURIComponent(accountId);
     const hasManualConsent = () => {
+      if (window.TeleTypTelApp) {
+        try { return Boolean(accountId) && Number(localStorage.getItem(manualConsentKey())) > Date.now(); }
+        catch { return false; }
+      }
       try { return Boolean(accountId) && document.cookie.split("; ").includes(manualConsentKey() + "=allowed"); }
       catch { return false; }
     };
     const rememberManualConsent = (allowed) => {
       if (!accountId) return false;
+      if (window.TeleTypTelApp) {
+        try {
+          if (allowed) localStorage.setItem(manualConsentKey(), String(Date.now() + 15552000000));
+          else localStorage.removeItem(manualConsentKey());
+        } catch {}
+        return hasManualConsent() === allowed;
+      }
       try {
         document.cookie = manualConsentKey() + "=" + (allowed ? "allowed" : "")
           + "; Path=/; SameSite=Strict; Max-Age=" + (allowed ? 15552000 : 0)

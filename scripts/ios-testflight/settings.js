@@ -12,7 +12,7 @@ function settings(serverUrl, buildNumber = "1.0") {
     bundleId, teamId, buildNumber, serverUrl: server.href,
     capacitor: {
       appId: bundleId, appName: "TeleTypTel Test", webDir: "www", loggingBehavior: "none",
-      server: { url: server.origin, appStartPath: server.pathname, hostname: "localhost", iosScheme: "capacitor", cleartext: false, errorPath: "offline.html" },
+      server: { appStartPath: server.pathname, hostname: "localhost", iosScheme: "capacitor", cleartext: false, errorPath: "offline.html" },
       ios: { contentInset: "automatic", webContentsDebuggingEnabled: false },
       plugins: { CapacitorHttp: { enabled: false } }
     }

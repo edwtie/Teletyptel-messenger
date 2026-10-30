@@ -11,8 +11,10 @@ async function launchSmoke({ run, logged, config, reports }) {
   const app = path.join(derived, "Build/Products/Release-iphonesimulator/App.app");
   const configurationFile = path.join(app, "capacitor.config.json");
   const configuration = JSON.parse(fs.readFileSync(configurationFile, "utf8"));
-  configuration.server.url = "https://127.0.0.1:1";
-  fs.writeFileSync(configurationFile, JSON.stringify(configuration));
+  if (configuration.server.url) throw new Error("Simulator must launch the bundled interface, not a remote page");
+  run("/usr/libexec/PlistBuddy", ["-c", "Set :TeleTypTelServerOrigin https://127.0.0.1:1", path.join(app, "Info.plist")]);
+  run("/usr/libexec/PlistBuddy", ["-c", "Set :TeleTypTelServerHost 127.0.0.1", path.join(app, "Info.plist")]);
+  fs.writeFileSync(path.join(app, "public/connection.js"), 'window.teletyptelServer = "https://127.0.0.1:1/chat.html";\n');
   const startupFile = path.join(app, "public", configuration.server.appStartPath.replace(/^\/+/, ""));
   const startupContent = fs.readFileSync(startupFile);
   const runtimes = JSON.parse(run("xcrun", ["simctl", "list", "runtimes", "--json"])).runtimes

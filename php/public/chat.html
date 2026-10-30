@@ -15,7 +15,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="favicon.ico" sizes="any">
   <link rel="apple-touch-icon" href="assets/brand/teletyptel-icon-192.png">
-  <link rel="stylesheet" href="chat-client.css?v=20261030-mobile-signin">
+  <link rel="stylesheet" href="chat-client.css?v=20261031-call-viewport-anchor">
   <link rel="stylesheet" href="chat-dialer.css?v=20261027-number-dialer">
 </head>
 <body class="account-booting">
@@ -588,7 +588,7 @@
     <div class="modal-card account-dialog-card">
       <div class="modal-header">
         <div>
-          <h2 id="accountDialogTitle" data-i18n="account.dialog_title">Account and password</h2>
+          <h2 id="accountDialogTitle" tabindex="-1" data-i18n="account.dialog_title">Account and password</h2>
           <span id="accountDialogSubtitle" data-i18n="account.dialog_subtitle">Use your e-mail, password and server settings.</span>
         </div>
         <button id="closeAccountDialogButton" class="icon-button" type="button" aria-label="Close" data-i18n-aria-label="button.close">x</button>
@@ -1364,9 +1364,9 @@
   <script src="vendor/qrcode.js?v=20260623-history-privacy-copy"></script>
   <script src="jingle-history.js?v=20260615-jingle-history"></script>
   <script src="chat-xmpp-translation.js?v=20261027-inline-interpreter"></script>
-  <script src="chat-translation.js?v=20261027-inline-interpreter"></script>
-  <script src="native-google.js?v=20261030-ios-google-bridge"></script>
-  <script src="chat-client.js?v=20261030-ios-google-bridge"></script>
+  <script src="chat-translation.js?v=20261031-bundled-interface"></script>
+  <script src="native-google.js?v=20261031-bundled-interface"></script>
+  <script src="chat-client.js?v=20261031-bundled-interface"></script>
   <script src="chat-interpreter.js?v=20261027-inline-interpreter"></script>
   <script src="mobile-navigation.js?v=20260929-rtt-first"></script>
 </body>

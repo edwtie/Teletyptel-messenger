@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "prepare:app": "node prepare.js",
-    "test": "node --test prepare.test.js",
+    "test": "node --test prepare.test.js ../../tests/ios-bundled-runtime.test.js ../../tests/native-google.test.js",
     "build:check": "node build.js --unsigned",
     "upload:internal": "node build.js --upload-internal"
   },

@@ -3,9 +3,12 @@ const path = require("node:path");
 const { execFileSync } = require("node:child_process");
 const { settings } = require("./settings");
 const google = require("./google-signin");
+const { bundleFrontend } = require("./bundle-frontend");
 
 const root = path.resolve(__dirname, "../..");
-const output = path.join(root, "artifacts/ios-testflight");
+const stagingName = process.env.IOS_STAGING_NAME || "ios-testflight";
+if (!/^ios-[a-z0-9-]+$/.test(stagingName)) throw new Error("Invalid isolated iOS staging name");
+const output = path.join(root, "artifacts", stagingName);
 const project = path.join(output, "project");
 const webAssets = ["index.html", "offline.html", "shell.js", "shell.css"];
 
@@ -23,8 +26,7 @@ function prepare() {
       && !/(?:public\/|capacitor\.config|xcuserdata|Package\.resolved)/.test(file));
   for (const file of files) write(file, execFileSync("git", ["show", "HEAD:" + file], { cwd: root, maxBuffer: 20 * 1024 * 1024 }));
   for (const file of webAssets) write("www/" + file, fs.readFileSync(path.join(__dirname, "www", file)));
-  write("www/chat.html", fs.readFileSync(path.join(__dirname, "www/index.html")));
-  write("www/connection.js", "window.teletyptelServer = " + JSON.stringify(config.serverUrl) + ";\n");
+  const frontendAssets = bundleFrontend(write, config.serverUrl);
   const delegate = "ios/App/App/AppDelegate.swift";
   const originalDelegate = fs.readFileSync(path.join(project, delegate), "utf8");
   const urlHandler = "return ApplicationDelegateProxy.shared.application(app, open: url, options: options)";
@@ -32,7 +34,8 @@ function prepare() {
   write(delegate, "import WebKit\nimport GoogleSignIn\n" + originalDelegate.replace(urlHandler,
     "if GIDSignIn.sharedInstance.handle(url) { return true }\n        " + urlHandler) + "\n"
     + fs.readFileSync(path.join(__dirname, "LanViewController.swift"), "utf8") + "\n"
-    + fs.readFileSync(path.join(__dirname, "GoogleSignInPlugin.swift"), "utf8"));
+    + fs.readFileSync(path.join(__dirname, "GoogleSignInPlugin.swift"), "utf8") + "\n"
+    + fs.readFileSync(path.join(__dirname, "ServerBridge.swift"), "utf8"));
   const storyboard = "ios/App/App/Base.lproj/Main.storyboard";
   const originalStoryboard = fs.readFileSync(path.join(project, storyboard), "utf8");
   const marker = 'customClass="CAPBridgeViewController" customModule="Capacitor"';
@@ -54,8 +57,8 @@ function prepare() {
     dependencies: { "@capacitor/core": "8.4.3", "@capacitor/ios": "8.4.3" } }, null, 2));
   fs.symlinkSync(path.join(__dirname, "node_modules"), path.join(project, "node_modules"), process.platform === "win32" ? "junction" : "dir");
   fs.writeFileSync(path.join(output, "settings.json"), JSON.stringify(config, null, 2));
-  fs.writeFileSync(path.join(output, "source.json"), JSON.stringify({ revision: execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim(), nativeFiles: files, webAssets }, null, 2));
-  console.log("Prepared real-server iOS shell; no PHP, user data, simulator fixtures or signing assets bundled.");
+  fs.writeFileSync(path.join(output, "source.json"), JSON.stringify({ revision: execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim(), nativeFiles: files, webAssets, frontendAssets }, null, 2));
+  console.log("Prepared bundled Messenger with a scoped HTTPS server bridge; no PHP, user data, demos or signing assets bundled.");
 }
 
 if (require.main === module) prepare();

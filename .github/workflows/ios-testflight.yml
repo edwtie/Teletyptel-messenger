@@ -7,6 +7,24 @@ on:
       - .github/workflows/ios-testflight.yml
       - scripts/ios-testflight/**
       - ios/App/**
+      - php/public/chat.html
+      - php/public/chat-client.*
+      - php/public/chat-dialer.*
+      - php/public/chat-translation.js
+      - php/public/chat-xmpp-translation.js
+      - php/public/chat-interpreter.js
+      - php/public/native-google.js
+      - php/public/mobile-navigation.js
+      - php/public/jingle-history.js
+      - php/public/lang/**
+      - php/public/smileys/**
+      - php/public/assets/brand/**
+      - php/public/assets/backgrounds/**
+      - php/public/assets/icons/**
+      - php/public/vendor/qrcode.js
+      - php/public/favicon.ico
+      - tests/ios-bundled-runtime.test.js
+      - tests/native-google.test.js
   workflow_dispatch:
 
 permissions:

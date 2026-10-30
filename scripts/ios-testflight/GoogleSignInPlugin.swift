@@ -8,16 +8,13 @@ final class TeleTypTelGooglePlugin: CAPPlugin, CAPBridgedPlugin {
     private var signingIn = false
 
     private var trustedPage: Bool {
-        guard let configured = Bundle.main.object(forInfoDictionaryKey: "TeleTypTelServerOrigin") as? String,
-              let expected = URL(string: configured),
-              let current = bridge?.webView?.url else { return false }
-        return current.scheme == "https" && current.host == expected.host && current.port == expected.port
+        return isBundledMessenger(bridge?.webView?.url)
     }
 
     @objc func signIn(_ call: CAPPluginCall) {
         DispatchQueue.main.async {
             guard self.trustedPage, let presenter = self.bridge?.viewController else {
-                call.reject("Google sign-in is only available on the configured secure server.", "UNTRUSTED_ORIGIN")
+                call.reject("Google sign-in is only available in the bundled Messenger.", "UNTRUSTED_ORIGIN")
                 return
             }
             guard !self.signingIn else {

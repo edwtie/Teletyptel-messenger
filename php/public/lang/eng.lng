@@ -774,3 +774,7 @@ checklist.jingle_rtt_sync=Jingle real-time text data channel alongside audio/vid
 checklist.omemo=Finish encryption sessions, trust model and interoperability smoke
 checklist.mobile=Android and iOS WebView packaging smoke tests
 button.admin_tools=User administration
+account.native_provider_unavailable=Use Google or email to sign in to this app. Other providers are available on the website.
+account.native_link_unavailable=Link sign-in providers through the website.
+download.failed=Download failed.
+account.native_server_unavailable=The server is unavailable. Check Wi-Fi, WAMP and certificate trust, then try signing in again.

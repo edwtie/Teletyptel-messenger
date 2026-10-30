@@ -11,7 +11,10 @@
       throw Object.assign(new Error("Update TeleTypTel in TestFlight to use Google sign-in."), { code: "UPDATE_REQUIRED" });
     }
     const url = new URL(endpoint, root.location.href);
-    if (url.origin !== root.location.origin || url.protocol !== "https:") throw new Error("Secure same-origin sign-in is required.");
+    const bundled = root.TeleTypTelApp && root.location.protocol === "capacitor:" && root.location.hostname === "localhost"
+      && url.protocol === "capacitor:" && url.hostname === "localhost" && !url.port
+      && !url.username && !url.password && !url.search && !url.hash && url.pathname === "/api/auth/google/native.php";
+    if (!bundled && (url.origin !== root.location.origin || url.protocol !== "https:")) throw new Error("Secure same-origin sign-in is required.");
     async function post(body) {
       const response = await root.fetch(url.toString(), {
         method: "POST", credentials: "same-origin", cache: "no-store", redirect: "error",

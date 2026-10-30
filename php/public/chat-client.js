@@ -878,6 +878,10 @@
   };
 
   let xmppRttStates = new WeakMap();
+  let messageTimelineFollower = null;
+  let callViewportTimer = null;
+  const displayedMessageAcknowledgements = new WeakMap();
+  let displayedMessageFrame = null;
   const xmppTranslation = window.TeleTypTelXmppTranslation.create({
     send: (xml) => sendXmppStanza(xml, '<iq translation="private"/>'),
     connected: () => isXmppRttConnected()
@@ -1126,10 +1130,19 @@
     window.addEventListener("resize", () => handleViewportChange("resize"));
     window.addEventListener("orientationchange", () => handleViewportChange("orientationchange"));
     window.visualViewport?.addEventListener("resize", () => handleViewportChange("visual-viewport-resize"));
+    window.visualViewport?.addEventListener("scroll", () => {
+      applyViewportDetection();
+      updatePhoneLandscapeCallMode();
+      messageTimelineFollower?.layoutChanged();
+    });
     window.addEventListener("scroll", closeConversationContextMenu, true);
     window.addEventListener("scroll", closeMessageContextMenu, true);
     window.addEventListener("scroll", closeMessageReactionPicker, true);
-    el.messageTimeline.addEventListener("scroll", updateScrollToLatestButton, { passive: true });
+    messageTimelineFollower = createMessageTimelineFollower(el.messageTimeline, updateScrollToLatestButton);
+    el.messageTimeline.addEventListener("scroll", scheduleVisibleMessageAcknowledgements, { passive: true });
+    window.addEventListener("resize", scheduleVisibleMessageAcknowledgements);
+    window.visualViewport?.addEventListener("resize", scheduleVisibleMessageAcknowledgements);
+    document.addEventListener("focusin", scheduleVisibleMessageAcknowledgements);
     el.scrollToLatestButton.addEventListener("click", scrollMessageTimelineToLatest);
     document.addEventListener("visibilitychange", handleVisibilityLifecycleChange);
     window.addEventListener("focus", () => setClientLifecycleState("active", "focus"));
@@ -1145,6 +1158,7 @@
     }
     el.composerForm.addEventListener("submit", sendComposerMessage);
     el.messageInput.addEventListener("input", handleComposerInput);
+    el.messageInput.addEventListener("focus", scrollMessageTimelineToLatest);
     el.messageInput.addEventListener("keydown", handleComposerKeydown);
     el.switchSessionButton.addEventListener("click", switchBrowserSession);
     el.openSecondSessionButton.addEventListener("click", openSecondBrowserSession);
@@ -1371,6 +1385,7 @@
     if (changed || options.force === true) {
       flushClientLifecycleState(reason, options.force === true);
     }
+    if (normalized === "active") scheduleVisibleMessageAcknowledgements();
   }
 
   function markMediaCaptureTransition(reason = "media-capture", durationMs = 8000) {
@@ -1381,21 +1396,30 @@
   }
 
   function handleCallViewportChange(reason) {
-    if (!state.call) {
+    window.clearTimeout(callViewportTimer);
+    callViewportTimer = null;
+    const call = state.call;
+    if (!call) {
       return;
     }
 
     markMediaCaptureTransition(`call-${reason}`, 15000);
-    window.setTimeout(() => {
+    callViewportTimer = window.setTimeout(() => {
+      callViewportTimer = null;
+      if (state.call !== call) return;
+      applyViewportDetection();
       updatePhoneLandscapeCallMode();
-      updateCallUi();
-      startVideoPlayback(el.localVideo);
-      startVideoPlayback(el.remoteVideo);
+      applyCallVideoHeight();
     }, 350);
   }
 
   function handleViewportChange(reason) {
+    const timeline = el.messageTimeline;
+    const followLatest = timeline && timeline.getClientRects().length > 0
+      && timeline.scrollHeight - timeline.clientHeight - timeline.scrollTop <= 48;
     applyViewportDetection();
+    if (messageTimelineFollower) messageTimelineFollower.layoutChanged();
+    else if (followLatest) timeline.scrollTop = timeline.scrollHeight;
     updatePhoneLandscapeCallMode();
     if (state.call) {
       handleCallViewportChange(reason);
@@ -1406,7 +1430,11 @@
     const metrics = currentViewportMetrics();
     const landscape = metrics.landscape;
     const phoneSized = isPhoneViewport();
-    const keyboardVisible = landscape && phoneSized && metrics.visualHeight > 0 && metrics.visualHeight <= 430;
+    const keyboardVisible = phoneSized
+      && document.activeElement?.matches('textarea, input, [contenteditable="true"]')
+      && Number(window.visualViewport?.scale || 1) <= 1.05
+      && Math.abs(metrics.visualWidth - metrics.width) <= 2
+      && metrics.layoutHeight - metrics.visualHeight > 80;
     document.body.classList.toggle(
       "tc-phone-landscape-active",
       Boolean(state.call && visible && landscape && phoneSized));
@@ -1447,20 +1475,19 @@
   function applyViewportDetection() {
     const metrics = currentViewportMetrics();
     document.documentElement.style.setProperty("--visual-viewport-height", `${metrics.height}px`);
-    const viewportClass = metrics.width <= 640
+    document.documentElement.style.setProperty("--visual-viewport-top", `${metrics.offsetTop}px`);
+    const viewportClass = document.body.dataset.deviceClass === "phone" || metrics.width <= 640
       ? "phone"
       : metrics.width <= 1024
         ? "tablet"
         : "desktop";
     document.body.dataset.viewportClass = viewportClass;
     document.body.dataset.viewportOrientation = metrics.landscape ? "landscape" : "portrait";
-    for (const className of Array.from(document.body.classList)) {
-      if (className.startsWith("viewport-")) {
-        document.body.classList.remove(className);
-      }
+    for (const name of ["phone", "tablet", "desktop"]) {
+      document.body.classList.toggle(`viewport-${name}`, name === viewportClass);
     }
-    document.body.classList.add(`viewport-${viewportClass}`);
-    document.body.classList.add(metrics.landscape ? "viewport-landscape" : "viewport-portrait");
+    document.body.classList.toggle("viewport-landscape", metrics.landscape);
+    document.body.classList.toggle("viewport-portrait", !metrics.landscape);
   }
 
   function currentViewportMetrics() {
@@ -1469,14 +1496,17 @@
     const visualHeight = Number(visualViewport?.height || 0);
     const layoutWidth = Number(window.innerWidth || document.documentElement.clientWidth || visualWidth || 0);
     const layoutHeight = Number(window.innerHeight || document.documentElement.clientHeight || visualHeight || 0);
-    const width = Math.round(visualWidth || layoutWidth || 0);
-    const height = Math.round(visualHeight || layoutHeight || 0);
+    const zoomed = Number(visualViewport?.scale || 1) > 1.05;
+    const width = Math.round(layoutWidth || visualWidth || 0);
+    const height = Math.round((zoomed ? layoutHeight : visualHeight) || layoutHeight || 0);
     return {
       width,
       height,
+      layoutHeight,
+      offsetTop: zoomed ? 0 : Math.min(Math.max(0, layoutHeight - height), Math.max(0, Number(visualViewport?.offsetTop || 0))),
       visualWidth: Math.round(visualWidth || width),
       visualHeight: Math.round(visualHeight || height),
-      landscape: width > height
+      landscape: layoutWidth > layoutHeight
     };
   }
 
@@ -2037,8 +2067,11 @@
       el.providerSummary.textContent = t("provider.unavailable", "Provider manifest unavailable.");
       appendDebug("config-error", error.message);
       await loadLanguage(state.account?.preferredLanguage ?? "eng");
-      await loadRtcConfig();
-      await loadGoogleMapsConfig();
+      const nativeServerUnavailable = window.TeleTypTelApp && error.code === "SERVER_UNAVAILABLE";
+      if (!nativeServerUnavailable) {
+        await loadRtcConfig();
+        await loadGoogleMapsConfig();
+      }
       renderTabs();
       setAccountBooting(false);
       const hasSavedAccountSession = Boolean(savedAccount?.accountId || savedAccount?.jid || hasStoredAccountSession());
@@ -2049,6 +2082,12 @@
         autoConnectIfReady();
       }
       openPasswordResetDialogIfRequested();
+      if (nativeServerUnavailable) {
+        const notice = t("account.native_server_unavailable", "The server is unavailable. Check Wi-Fi, WAMP and certificate trust, then try signing in again.");
+        updateAccountStatus(notice);
+        el.dialogAccountStatus.textContent = notice;
+        setConnectionStatus(notice, "danger");
+      }
     }
   }
 
@@ -3046,7 +3085,7 @@
       window.setTimeout(() => renderGoogleSdkLoginButton(), 0);
     }
     window.setTimeout(() => {
-      accountDialogFocusTarget(mode).focus();
+      focusAccountDialogField(accountDialogFocusTarget(effectiveAccountDialogMode()));
     }, 0);
   }
 
@@ -3197,6 +3236,17 @@
     el.dialogAdvancedDetails.open = mode === "settings";
   }
 
+  function focusAccountDialogField(field) {
+    if (el.accountDialog.hidden) return;
+    const touchDevice = ["phone", "tablet"].includes(document.body.dataset.deviceClass)
+      || window.matchMedia?.("(pointer: coarse)")?.matches === true;
+    const authenticationMode = ["signin", "reset"].includes(effectiveAccountDialogMode())
+      || Boolean(state.pendingLoginTwoFactor);
+    const suppressKeyboard = touchDevice && authenticationMode;
+    const target = suppressKeyboard ? el.accountDialogTitle : field;
+    target?.focus({ preventScroll: suppressKeyboard });
+  }
+
   function accountDialogFocusTarget(mode) {
     if (mode === "reset") {
       return el.dialogPasswordInput;
@@ -3230,6 +3280,10 @@
   function startProviderLoginFromDialog(provider) {
     if (provider === "google" && window.Capacitor?.getPlatform?.() === "ios") {
       void startNativeGoogleLoginFromDialog();
+      return;
+    }
+    if (window.TeleTypTelApp) {
+      el.dialogAccountStatus.textContent = t("account.native_provider_unavailable", "Use Google or email to sign in to this app. Other providers are available on the website.");
       return;
     }
     const name = providerDisplayName(provider);
@@ -3280,6 +3334,10 @@
   }
 
   function startProviderLinkFromDialog(provider) {
+    if (window.TeleTypTelApp) {
+      el.dialogAccountStatus.textContent = t("account.native_link_unavailable", "Link sign-in providers through the website.");
+      return;
+    }
     if (provider === "google" && window.Capacitor?.getPlatform?.() === "ios") {
       el.dialogAccountStatus.textContent = t("account.google_link_browser", "Link Google using the desktop website. Google sign-in is available in the iPhone app.");
       return;
@@ -3500,14 +3558,14 @@
     el.dialogAccountStatus.textContent = t("account.login_two_factor_prompt", "Enter the 6-digit authenticator code to finish signing in.");
     el.accountDialog.hidden = false;
     document.body.classList.add("modal-open");
-    window.setTimeout(() => el.loginTwoFactorCodeInput.focus(), 0);
+    window.setTimeout(() => focusAccountDialogField(el.loginTwoFactorCodeInput), 0);
   }
 
   async function verifyLoginTwoFactorFromDialog() {
     const pending = state.pendingLoginTwoFactor;
     const code = el.loginTwoFactorCodeInput.value.replace(/\D+/g, "");
     if (!pending || code.length !== 6) {
-      el.loginTwoFactorCodeInput.focus();
+      focusAccountDialogField(el.loginTwoFactorCodeInput);
       el.dialogAccountStatus.textContent = t("account.two_factor_code_required", "Enter the 6-digit code first.");
       return;
     }
@@ -4040,7 +4098,7 @@
     el.dialogAccountStatus.textContent = error.message;
     el.dialogAccountStatus.scrollIntoView({ block: "nearest" });
     const field = error.fieldId ? byId(error.fieldId) : el.dialogJidInput;
-    field.focus();
+    focusAccountDialogField(field);
   }
 
   function accountDialogStatusText(key, fallback) {
@@ -4956,6 +5014,7 @@
       el.messageTimeline.hidden = false;
       el.tabPanel.hidden = true;
       el.composerForm.hidden = false;
+      scheduleVisibleMessageAcknowledgements();
       return;
     }
 
@@ -6900,7 +6959,7 @@
       text = `${t("upload.shared_file", "Shared file")}: ${attachment.name || attachment.url}`;
     }
     if (attachment?.url) {
-      const url = new URL(attachment.url, location.href).href;
+      const url = new URL(attachment.url, networkPageUrl()).href;
       if (!text.includes(url)) {
         text = `${text}\n${url}`.trim();
       }
@@ -8625,7 +8684,7 @@
       }
 
       if (!isXmppGroupchatType(type)) {
-        sendXmppMessageAcknowledgements(from, messageId, Boolean(message.getElementsByTagNameNS("urn:xmpp:receipts", "request")[0]));
+        sendXmppMessageAcknowledgements(from, message.getAttribute("id") || "", Boolean(message.getElementsByTagNameNS("urn:xmpp:receipts", "request")[0]));
       }
       if (replaceId) {
         applyMessageCorrection(conversation, replaceId, bodyElement.textContent || "", "peer", messageId, from, stylingDisabled);
@@ -8633,6 +8692,8 @@
         const existingMessage = findConversationMessageByAnyId(conversation, messageId);
         if (existingMessage) {
           setMessageXmppIdentifiers(existingMessage, xmppMessageIdentifiers(message));
+          existingMessage.xmppMarkable = Boolean(message.getElementsByTagNameNS("urn:xmpp:chat-markers:0", "markable")[0]);
+          scheduleVisibleMessageAcknowledgements();
           appendDebug("xmpp-message-skip", `duplicate ${messageId} from ${from}`);
           clearRemoteDraftForConversation(conversation, from);
           continue;
@@ -8640,6 +8701,7 @@
         const addedMessage = addMessage("peer", bodyElement.textContent || "", "received", from, null, conversation.id, null, messageId, stylingDisabled);
         setMessageXmppIdentifiers(addedMessage, xmppMessageIdentifiers(message));
         if (addedMessage) {
+          addedMessage.xmppMarkable = Boolean(message.getElementsByTagNameNS("urn:xmpp:chat-markers:0", "markable")[0]);
           addedMessage.callInfo = parseXmppCallInfo(message);
           addedMessage.jingleHistory = parseXmppJingleHistory(message);
           if (!addedMessage.callInfo && addedMessage.jingleHistory) {
@@ -9062,8 +9124,6 @@
       appendDebug("xmpp-receipt-out", `received ${messageId} to ${to}`);
       sendXmppStanza(createDeliveryReceiptStanza(to, messageId), "<message receipt=\"received\"/>");
     }
-    appendDebug("xmpp-marker-out", `displayed ${messageId} to ${to}`);
-    sendXmppStanza(createDisplayedMarkerStanza(to, messageId), "<message marker=\"displayed\"/>");
   }
 
   function applyMessageDeliveryMarker(conversation, messageId, status) {
@@ -10301,7 +10361,6 @@
     }
 
     sendRelayMessageAcknowledgement(conversation, targetId, "delivered");
-    sendRelayMessageAcknowledgement(conversation, targetId, "displayed");
   }
 
   function sendRelayMessageAcknowledgement(conversation, targetId, ack) {
@@ -10323,6 +10382,7 @@
     if (!conversation || isOwnContact(conversation) || isBlockedConversation(conversation)) {
       return;
     }
+    scheduleVisibleMessageAcknowledgements();
 
     const now = Date.now();
     const syncKey = `${conversation.id}:${state.mode}`;
@@ -10337,10 +10397,6 @@
         continue;
       }
 
-      if (message.direction === "peer") {
-        sent += sendStoredMessageReadState(conversation, targetId);
-      }
-
       if (sendStoredOwnReaction(conversation, message, targetId)) {
         sent += 1;
       }
@@ -10352,20 +10408,48 @@
     }
   }
 
-  function sendStoredMessageReadState(conversation, targetId) {
-    if (state.mode === "xmpp" && state.xmppSocket?.readyState === WebSocket.OPEN && state.xmppSession?.authenticated) {
-      sendXmppStanza(createDeliveryReceiptStanza(conversation.peer, targetId), "<message receipt=\"sync\"/>");
-      sendXmppStanza(createDisplayedMarkerStanza(conversation.peer, targetId), "<message marker=\"sync\"/>");
-      return 2;
-    }
+  function scheduleVisibleMessageAcknowledgements() {
+    if (displayedMessageFrame !== null) return;
+    displayedMessageFrame = window.requestAnimationFrame(() => {
+      displayedMessageFrame = null;
+      acknowledgeVisibleMessages();
+    });
+  }
 
-    if (state.relaySocket?.readyState === WebSocket.OPEN) {
-      sendRelayMessageAcknowledgement(conversation, targetId, "delivered");
-      sendRelayMessageAcknowledgement(conversation, targetId, "displayed");
-      return 2;
+  function acknowledgeVisibleMessages() {
+    const conversation = activeConversation();
+    if (!conversation || conversation.kind === "group" || isOwnContact(conversation) || isBlockedConversation(conversation)
+        || state.activeTabId !== "chat" || document.visibilityState !== "visible" || !document.hasFocus()
+        || state.clientLifecycle.current === "inactive" || document.querySelector("dialog[open]")) return;
+    const timeline = el.messageTimeline;
+    if (timeline.hidden || !timeline.getClientRects().length) return;
+    const bounds = timeline.getBoundingClientRect();
+    const viewport = window.visualViewport;
+    const top = Math.max(bounds.top, viewport?.offsetTop || 0);
+    const bottom = Math.min(bounds.bottom, (viewport?.offsetTop || 0) + (viewport?.height || window.innerHeight));
+    const left = Math.max(bounds.left, viewport?.offsetLeft || 0);
+    const right = Math.min(bounds.right, (viewport?.offsetLeft || 0) + (viewport?.width || window.innerWidth));
+    const messages = new Map(conversation.messages.map((message) => [message.id, message]));
+    const socket = state.mode === "xmpp" ? state.xmppSocket : state.relaySocket;
+    if (socket?.readyState !== WebSocket.OPEN || (state.mode === "xmpp" && !state.xmppSession?.authenticated)) return;
+    for (const item of timeline.querySelectorAll("[data-message-id]")) {
+      const message = messages.get(item.dataset.messageId);
+      if (!message || message.direction !== "peer" || message.draft || message.retracted
+          || (state.mode === "xmpp" && message.xmppMarkable === false)) continue;
+      const targetId = state.mode === "xmpp" ? message.xmppMessageId || bestMessageTargetId(message) : bestMessageTargetId(message);
+      if (!targetId || !item.getClientRects().length) continue;
+      const previous = displayedMessageAcknowledgements.get(message);
+      if (previous?.socket === socket && previous.targetId === targetId) continue;
+      const rect = item.getBoundingClientRect();
+      if (rect.bottom <= top || rect.top >= bottom || rect.right <= left || rect.left >= right
+          || rect.width <= 0 || rect.height <= 0 || top >= bottom || left >= right) continue;
+      if (state.mode === "xmpp") {
+        sendXmppStanza(createDisplayedMarkerStanza(conversation.peer, targetId), "<message marker=\"displayed\"/>");
+      } else {
+        sendRelayMessageAcknowledgement(conversation, targetId, "displayed");
+      }
+      displayedMessageAcknowledgements.set(message, { socket, targetId });
     }
-
-    return 0;
   }
 
   function sendStoredOwnReaction(conversation, message, targetId) {
@@ -13811,9 +13895,66 @@
     el.scrollToLatestButton.hidden = !activeConversation() || isMessageTimelineNearBottom();
   }
 
+  function createMessageTimelineFollower(timeline, onUpdate) {
+    const nearBottom = () => timeline.scrollHeight - timeline.clientHeight - timeline.scrollTop <= 2;
+    let following = nearBottom();
+    let height = timeline.clientHeight;
+    let contentHeight = timeline.scrollHeight;
+    let frame = null;
+    const rememberLayout = () => {
+      height = timeline.clientHeight;
+      contentHeight = timeline.scrollHeight;
+    };
+    const pinToLatest = () => {
+      timeline.scrollTo({ top: timeline.scrollHeight, behavior: "instant" });
+      rememberLayout();
+      onUpdate();
+    };
+    const settleLayout = () => {
+      if (frame !== null) return;
+      frame = window.requestAnimationFrame(() => {
+        frame = null;
+        if (following) pinToLatest();
+      });
+    };
+    const layoutChanged = () => {
+      if (following) {
+        pinToLatest();
+        settleLayout();
+      } else {
+        rememberLayout();
+        onUpdate();
+      }
+    };
+    timeline.addEventListener("scroll", () => {
+      const changed = height !== timeline.clientHeight || contentHeight !== timeline.scrollHeight;
+      if (!changed) following = nearBottom();
+      if (changed && following) settleLayout();
+      rememberLayout();
+      onUpdate();
+    }, { passive: true });
+    const pauseFollowing = () => { following = false; };
+    timeline.addEventListener("wheel", pauseFollowing, { passive: true });
+    timeline.addEventListener("touchmove", pauseFollowing, { passive: true });
+    timeline.addEventListener("keydown", (event) => {
+      if (["ArrowUp", "PageUp", "Home"].includes(event.key)) pauseFollowing();
+    });
+    if (typeof ResizeObserver !== "undefined") new ResizeObserver(layoutChanged).observe(timeline);
+    return {
+      layoutChanged,
+      followLatest() {
+        following = true;
+        pinToLatest();
+        settleLayout();
+      }
+    };
+  }
+
   function scrollMessageTimelineToLatest() {
-    el.messageTimeline.scrollTo({ top: el.messageTimeline.scrollHeight, behavior: "smooth" });
-    window.setTimeout(updateScrollToLatestButton, 120);
+    if (messageTimelineFollower) messageTimelineFollower.followLatest();
+    else el.messageTimeline.scrollTo({ top: el.messageTimeline.scrollHeight, behavior: "instant" });
+    scheduleVisibleMessageAcknowledgements();
+    updateScrollToLatestButton();
   }
 
   function addConversation() {
@@ -17291,7 +17432,7 @@
     state.photoViewer.attachment = attachment;
     el.photoViewerTitle.textContent = attachment.name || t("photo.viewer_title", "Photo");
     el.photoViewerImage.alt = attachment.name || t("upload.photo", "Photo");
-    el.photoViewerImage.src = attachment.url;
+    el.photoViewerImage.src = messageMediaUrl(attachment.url);
     el.photoViewerDialog.hidden = false;
     updatePhotoViewerTransform();
     el.photoViewerCloseButton.focus();
@@ -17496,8 +17637,14 @@
       return;
     }
 
+    const nativeDownload = window.TeleTypTelApp?.download(url, attachment.name);
+    if (nativeDownload) {
+      nativeDownload.catch(() => setConnectionStatus(t("download.failed", "Download failed"), "danger"));
+      return;
+    }
+
     const link = document.createElement("a");
-    link.href = url;
+    link.href = window.TeleTypTelApp?.publicUrl(url) || url;
     link.download = attachment.name || "download";
     link.rel = "noopener";
     document.body.appendChild(link);
@@ -17711,7 +17858,7 @@
     if (kind === "photo") {
       const preview = document.createElement("img");
       preview.className = "attachment-preview";
-      preview.src = attachment.url;
+      preview.src = messageMediaUrl(attachment.url);
       preview.alt = attachment.name || t("upload.photo", "Photo");
       preview.loading = "lazy";
       wrapper.append(preview, text, downloadButton);
@@ -17731,7 +17878,7 @@
       player.className = "attachment-audio-player";
       player.controls = true;
       player.preload = "metadata";
-      player.src = attachment.url;
+      player.src = messageMediaUrl(attachment.url);
       player.addEventListener("click", (event) => event.stopPropagation());
       wrapper.append(player, downloadButton);
     } else if (kind === "video") {
@@ -17745,7 +17892,7 @@
       player.controls = true;
       player.preload = "auto";
       player.playsInline = true;
-      player.src = attachment.url;
+      player.src = messageMediaUrl(attachment.url);
       player.addEventListener("click", (event) => event.stopPropagation());
       setupAttachmentVideoPreview(player, stage);
       stage.append(player, placeholder);
@@ -18424,8 +18571,8 @@
     const attachment = {
       id: file.id || "",
       name: file.name,
-      url: file.url,
-      downloadUrl: file.downloadUrl || file.url,
+      url: window.TeleTypTelApp?.publicUrl(file.url) || file.url,
+      downloadUrl: window.TeleTypTelApp?.publicUrl(file.downloadUrl || file.url) || file.downloadUrl || file.url,
       size: file.size,
       type: file.type,
       kind,
@@ -18433,7 +18580,7 @@
     };
 
     if (state.mode === "xmpp" && state.xmppSocket?.readyState === WebSocket.OPEN) {
-      const xml = createMessageStanza(`${text}\n${new URL(file.url, location.href).href}`, messageId);
+      const xml = createMessageStanza(`${text}\n${new URL(file.url, networkPageUrl()).href}`, messageId);
       sendXmppStanza(xml);
       addMessage("self", text, "RFC 7395", null, attachment, null, null, messageId);
       return;
@@ -18882,6 +19029,14 @@
     return parts.length > 1 ? parts[1] : bare;
   }
 
+  function networkPageUrl() {
+    return window.TeleTypTelApp?.serverUrl || location.href;
+  }
+
+  function messageMediaUrl(value) {
+    return window.TeleTypTelApp?.mediaUrl(value) || value;
+  }
+
   function isLocalAccountDomain(domain) {
     const normalized = String(domain ?? "").trim().toLowerCase();
     return normalized === "localhost"
@@ -18908,6 +19063,9 @@
   }
 
   function normalizeLocalWebSocketUrlForCurrentHost(url, fallbackPort = 8787) {
+    if (window.TeleTypTelApp && (!url || isLocalXmppWebSocketUrl(url))) {
+      return new URL("/rtt-relay", networkPageUrl()).href.replace(/^https:/, "wss:");
+    }
     const pageHost = location.hostname || "127.0.0.1";
     const protocol = location.protocol === "https:" ? "wss:" : "ws:";
     const fallback = location.protocol === "https:"
@@ -18946,6 +19104,15 @@
 
   function normalizeLocalXmppWebSocketUrlForCurrentHost(url) {
     const value = String(url ?? "").trim();
+    if (window.TeleTypTelApp) {
+      try {
+        const parsed = new URL(value);
+        if (isLocalAccountDomain(parsed.hostname) || parsed.hostname === new URL(networkPageUrl()).hostname) {
+          return defaultXmppWebSocketUrlForCurrentHost();
+        }
+        return parsed.protocol === "wss:" ? parsed.href : defaultXmppWebSocketUrlForCurrentHost();
+      } catch { return defaultXmppWebSocketUrlForCurrentHost(); }
+    }
     if (!value || value === "ws://127.0.0.1:8787" || value === "ws://localhost:8787") {
       return defaultXmppWebSocketUrlForCurrentHost();
     }
@@ -18970,6 +19137,9 @@
   }
 
   function defaultXmppWebSocketUrlForCurrentHost() {
+    if (window.TeleTypTelApp) {
+      return new URL("/xmpp-websocket", networkPageUrl()).href.replace(/^https:/, "wss:");
+    }
     if (location.protocol === "https:" && ["android", "ios"].includes(window.Capacitor?.getPlatform?.())) {
       return `wss://${location.host}/xmpp-websocket`;
     }
@@ -19069,7 +19239,7 @@
   }
 
   function registerServiceWorker() {
-    if ("serviceWorker" in navigator && location.protocol !== "file:") {
+    if (!window.TeleTypTelApp && "serviceWorker" in navigator && location.protocol !== "file:") {
       let reloadedForServiceWorker = false;
       navigator.serviceWorker.addEventListener("controllerchange", () => {
         if (reloadedForServiceWorker) {

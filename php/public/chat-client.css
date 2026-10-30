@@ -26,6 +26,10 @@
   --chat-background-image: none;
   --chat-background-overlay: rgba(5, 12, 24, .55);
   --radius: 8px;
+  --call-safe-area-top: env(safe-area-inset-top, 0px);
+  --call-safe-area-right: env(safe-area-inset-right, 0px);
+  --call-safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --call-safe-area-left: env(safe-area-inset-left, 0px);
   font-family: "Segoe UI", Arial, sans-serif;
 }
 
@@ -4882,12 +4886,14 @@ body[data-theme="dark"] .message-reaction-picker {
 }
 
 .composer-input-row textarea {
+  min-width: 0;
   min-height: 36px;
   max-height: 132px;
   border: 0;
   background: transparent;
   padding: 8px 6px;
   color: #0f172a;
+  font-size: 16px;
   resize: none;
 }
 
@@ -5666,17 +5672,17 @@ body.viewport-phone .video-preview-dialog-actions > button {
 }
 
 body.viewport-phone .message {
-  max-width: calc(100% - 24px);
+  max-width: calc(100% - 44px);
 }
 
 body.viewport-phone .message-body-wrap {
-  max-width: calc(100% - 44px);
+  max-width: 100%;
 }
 
 body.viewport-phone .message.with-avatar {
   grid-template-columns: 30px minmax(0, 1fr);
   column-gap: 8px;
-  max-width: calc(100% - 16px);
+  max-width: calc(100% - 56px);
   margin-left: 6px;
 }
 
@@ -6172,6 +6178,19 @@ body[data-theme="dark"] .attachment-menu-panel button:hover:not(:disabled) {
 }
 
 @media (max-width: 520px) {
+  body:not(.call-active):not(.account-gate):not(.account-booting) {
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  body:not(.call-active):not(.account-gate):not(.account-booting) .app-shell {
+    position: fixed;
+    top: var(--visual-viewport-top, 0px);
+    left: 0;
+    right: 0;
+    width: 100%;
+  }
+
   .app-shell {
     grid-template-rows: auto minmax(0, 1fr);
   }
@@ -7968,7 +7987,8 @@ body.tc-phone-landscape-active .call-status {
   text-align: left;
 }
 
-body.tc-phone-landscape-active .call-panel {
+body.viewport-phone.tc-phone-landscape-active.call-active .call-panel,
+body.viewport-phone.tc-phone-landscape-active.call-active .call-panel.local-video-main {
   display: grid;
   grid-row: 4;
   grid-template-rows: minmax(110px, 40dvh) auto auto;
@@ -7992,10 +8012,12 @@ body.tc-phone-landscape-active .call-panel.local-video-main #localVideo {
   object-fit: cover;
 }
 
-body.tc-phone-landscape-active .call-panel:not(.local-video-main) #localVideo {
+body.viewport-phone.tc-phone-landscape-active .call-panel:not(.local-video-main) #localVideo {
   top: 8px;
   right: 8px;
-  width: min(116px, 22vw);
+  width: min(116px, 22vw) !important;
+  height: auto !important;
+  aspect-ratio: 16 / 9;
 }
 
 body.tc-phone-landscape-active .tc-text-panel,
@@ -8098,7 +8120,8 @@ body.tc-phone-keyboard-active .call-status {
   text-overflow: ellipsis;
 }
 
-body.tc-phone-keyboard-active .call-panel {
+body.viewport-phone.tc-phone-landscape-active.tc-phone-keyboard-active.call-active .call-panel,
+body.viewport-phone.tc-phone-landscape-active.tc-phone-keyboard-active.call-active .call-panel.local-video-main {
   grid-template-rows: minmax(70px, 24dvh) auto auto;
 }
 
@@ -8443,6 +8466,241 @@ body.viewport-phone.tc-text-visible-active.call-active .composer {
     max-width: 100vw !important;
     padding: 6px 10px !important;
   }
+}
+
+body.viewport-phone.call-active:where(.tc-call-active, .tc-phone-keyboard-active) {
+  min-height: 0;
+  overflow: hidden;
+}
+
+body.viewport-phone.call-active .app-shell {
+  padding: var(--call-safe-area-top) var(--call-safe-area-right) var(--call-safe-area-bottom) var(--call-safe-area-left);
+}
+
+body.viewport-phone.call-active:where(.tc-call-active, .tc-phone-keyboard-active) .app-shell {
+  position: fixed;
+  top: var(--visual-viewport-top, 0px);
+  left: 0;
+  right: 0;
+  height: var(--visual-viewport-height, 100dvh) !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+body.viewport-phone.call-active:where(.tc-call-active) .chat-panel {
+  grid-template-rows: auto minmax(0, 1fr) auto !important;
+  min-height: 0;
+  overflow: hidden !important;
+}
+
+body.viewport-phone.call-active:where(.tc-call-active) .chat-header {
+  grid-row: 1;
+}
+
+body.viewport-phone.call-active:where(.tc-call-active) #callPanel {
+  display: grid;
+  grid-row: 2 !important;
+  grid-template-rows: minmax(0, 1fr) auto auto !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow: hidden !important;
+}
+
+body.viewport-phone.call-active:where(.tc-call-active) #composerForm {
+  grid-row: 3 !important;
+}
+
+body.viewport-phone.call-active:where(.tc-call-active) #callPanel.tc-text-full {
+  grid-template-rows: minmax(0, 1fr) auto !important;
+}
+
+body.viewport-phone.call-active:where(.tc-call-active) #callPanel.tc-text-full #totalConversationTextPanel {
+  grid-row: 1 !important;
+}
+
+body.viewport-phone.call-active:where(.tc-call-active) #callPanel.tc-text-full .call-media-controls {
+  grid-row: 2 !important;
+}
+
+body.viewport-phone.call-active .topbar {
+  padding: 6px 10px;
+}
+
+body.viewport-phone.call-active .chat-header {
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+}
+
+body.viewport-phone.call-active .chat-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  gap: 6px;
+}
+
+body.viewport-phone.call-active .chat-title > div:last-child {
+  display: block;
+  min-width: 0;
+}
+
+body.viewport-phone.call-active .chat-title h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+body.viewport-phone.call-active #activeConversationMeta {
+  display: none;
+}
+
+body.viewport-phone.call-active .avatar-header {
+  flex: 0 0 30px;
+}
+
+body.viewport-phone.call-active .chat-header-actions,
+body.viewport-phone.call-active .call-controls {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 4px;
+  width: auto;
+}
+
+body.viewport-phone.call-active .call-controls .call-mode-button {
+  flex: 0 0 44px;
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+}
+
+body.viewport-phone.call-active .call-status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+body.viewport-phone.tc-phone-keyboard-active.call-active .app-shell {
+  padding-bottom: 0;
+  grid-template-rows: minmax(0, 1fr);
+}
+
+body.viewport-phone.tc-phone-keyboard-active.call-active .chat-panel {
+  grid-template-rows: minmax(0, 1fr) auto !important;
+  min-height: 0;
+  overflow: hidden !important;
+}
+
+body.viewport-phone.tc-phone-keyboard-active.call-active .topbar,
+body.viewport-phone.tc-phone-keyboard-active.call-active .app-tabs,
+body.viewport-phone.tc-phone-keyboard-active.call-active .chat-header,
+body.viewport-phone.tc-phone-keyboard-active.call-active .back-to-contacts,
+body.viewport-phone.tc-phone-keyboard-active.call-active .send-row,
+body.viewport-phone.tc-phone-keyboard-active.call-active #callResizeHandle,
+body.viewport-phone.tc-phone-keyboard-active.call-active .call-device-controls,
+body.viewport-phone.tc-phone-keyboard-active.call-active .volume-control {
+  display: none !important;
+}
+
+body.viewport-phone.tc-phone-keyboard-active.call-active #callPanel {
+  display: grid;
+  grid-row: 1 !important;
+  grid-template-rows: minmax(0, 1fr) auto auto !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow: hidden !important;
+}
+
+body.viewport-phone.tc-phone-keyboard-active.call-active #callPanel > video {
+  grid-row: 1;
+  height: 100% !important;
+  min-height: 0 !important;
+  object-fit: contain !important;
+}
+
+body.viewport-phone.tc-phone-keyboard-active.call-active #callPanel:not(.local-video-main) #localVideo {
+  width: min(92px, 24vw) !important;
+  height: auto !important;
+  max-height: 64px;
+}
+
+body.viewport-phone.tc-phone-keyboard-active.call-active #totalConversationTextPanel {
+  grid-row: 2 !important;
+  gap: 4px !important;
+  padding: 4px !important;
+}
+
+body.viewport-phone.tc-phone-keyboard-active.call-active #totalConversationTextPanel .tc-text-line {
+  min-height: 0 !important;
+  height: 64px;
+  max-height: 64px !important;
+  padding: 4px 6px !important;
+  overflow: auto !important;
+}
+
+body.viewport-phone.tc-phone-keyboard-active.call-active #callPanel .call-media-controls {
+  position: static !important;
+  grid-row: 3 !important;
+  flex-wrap: nowrap;
+  gap: 6px;
+  padding: 4px !important;
+  margin: 0;
+  overflow-x: auto;
+}
+
+body.viewport-phone.tc-phone-keyboard-active.call-active #callPanel .call-media-icon-button {
+  flex: 0 0 36px;
+  height: 34px;
+}
+
+body.viewport-phone.tc-phone-keyboard-active.call-active #composerForm {
+  grid-row: 2 !important;
+  padding: 4px 8px !important;
+}
+
+body.viewport-phone.tc-phone-keyboard-active.call-active #callPanel.tc-text-full {
+  grid-template-rows: minmax(0, 1fr) auto !important;
+}
+
+body.viewport-phone.tc-phone-keyboard-active.call-active #callPanel.tc-text-full #totalConversationTextPanel {
+  grid-row: 1 !important;
+}
+
+body.viewport-phone.tc-phone-keyboard-active.call-active #callPanel.tc-text-full .call-media-controls {
+  grid-row: 2 !important;
+}
+
+body.viewport-phone.tc-phone-keyboard-active.tc-phone-landscape-active #callPanel:not(.tc-text-full) {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  grid-template-rows: minmax(0, 1fr) auto !important;
+}
+
+body.viewport-phone.tc-phone-keyboard-active.tc-phone-landscape-active #callPanel:not(.tc-text-full) > video {
+  grid-column: 1 !important;
+  grid-row: 1 / -1 !important;
+}
+
+body.viewport-phone.tc-phone-keyboard-active.tc-phone-landscape-active #callPanel:not(.local-video-main) #localVideo {
+  right: calc(50% + 8px) !important;
+}
+
+body.viewport-phone.tc-phone-keyboard-active.tc-phone-landscape-active #callPanel:not(.tc-text-full) #totalConversationTextPanel {
+  grid-column: 2 !important;
+  grid-row: 1 !important;
+  min-height: 0;
+  overflow: auto;
+}
+
+body.viewport-phone.tc-phone-keyboard-active.tc-phone-landscape-active #callPanel:not(.tc-text-full) .call-media-controls {
+  grid-column: 2 !important;
+  grid-row: 2 !important;
 }
 
 button.group-member-menu-button,
