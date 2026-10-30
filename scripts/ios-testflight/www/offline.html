@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; object-src 'none'; base-uri 'none'">
+  <title>TeleTypTel — verbinding controleren</title>
+  <link rel="stylesheet" href="shell.css">
+  <script src="connection.js" defer></script>
+  <script src="shell.js" defer></script>
+</head>
+<body><main>
+  <p class="brand">TeleTypTel · iPhone-test</p>
+  <h1>Je testserver is niet bereikbaar</h1>
+  <p>Verbind je iPhone met dezelfde wifi als de WAMP-computer en controleer of de server aanstaat.</p>
+  <p>Controleer in iPhone-instellingen of deze app toegang tot het lokale netwerk heeft. Controleer het HTTPS-adres ook in Safari: er mag geen certificaatwaarschuwing verschijnen.</p>
+  <p>Deze app omzeilt geen certificaatcontrole. Installeer alleen de bekende lokale test-CA en vertrouw die bewust via de iPhone-instellingen.</p>
+  <a id="retry">Opnieuw proberen</a><p id="server"></p>
+  <small>Geen spoeddienst. Achtergrondoproepen en pushmeldingen zijn nog niet beschikbaar.</small>
+</main></body>
+</html>

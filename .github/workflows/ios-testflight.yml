@@ -1,0 +1,95 @@
+name: iOS internal TestFlight
+
+on:
+  push:
+    branches: [codex/teletyptel-beta-polish]
+    paths:
+      - .github/workflows/ios-testflight.yml
+      - scripts/ios-testflight/**
+      - ios/App/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-testflight-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    runs-on: macos-15
+    timeout-minutes: 30
+    env:
+      IOS_SERVER_URL: https://192.168.0.105/chat.html
+      IOS_BUILD_NUMBER: ${{ github.run_number }}.${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+      - name: Select Xcode 26
+        run: |
+          XCODE_PATH=$(find /Applications -maxdepth 1 -name 'Xcode_26*.app' -type d | sort -r | head -n 1)
+          test -n "$XCODE_PATH"
+          echo "DEVELOPER_DIR=$XCODE_PATH/Contents/Developer" >> "$GITHUB_ENV"
+      - name: Prepare and compile without signing credentials
+        working-directory: scripts/ios-testflight
+        run: |
+          npm ci --ignore-scripts
+          npm run prepare:app
+          npm test
+          npm run build:check
+      - name: Save non-secret preflight report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ios-preflight-${{ github.run_id }}
+          path: artifacts/ios-testflight/reports/
+          retention-days: 7
+  internal-upload:
+    needs: preflight
+    if: github.ref == 'refs/heads/codex/teletyptel-beta-polish'
+    environment: ios-testflight
+    runs-on: macos-15
+    timeout-minutes: 40
+    env:
+      IOS_SERVER_URL: https://192.168.0.105/chat.html
+      IOS_BUILD_NUMBER: ${{ github.run_number }}.${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+      - name: Select Xcode 26
+        run: |
+          XCODE_PATH=$(find /Applications -maxdepth 1 -name 'Xcode_26*.app' -type d | sort -r | head -n 1)
+          test -n "$XCODE_PATH"
+          echo "DEVELOPER_DIR=$XCODE_PATH/Contents/Developer" >> "$GITHUB_ENV"
+      - name: Prepare isolated app without secrets
+        working-directory: scripts/ios-testflight
+        run: |
+          npm ci --ignore-scripts
+          npm run prepare:app
+          npm test
+      - name: Sign and upload for internal TestFlight only
+        working-directory: scripts/ios-testflight
+        env:
+          IOS_DISTRIBUTION_P12_BASE64: ${{ secrets.IOS_DISTRIBUTION_P12_BASE64 }}
+          IOS_DISTRIBUTION_P12_PASSWORD: ${{ secrets.IOS_DISTRIBUTION_P12_PASSWORD }}
+          IOS_PROVISION_PROFILE_BASE64: ${{ secrets.IOS_PROVISION_PROFILE_BASE64 }}
+          IOS_ASC_KEY_P8: ${{ secrets.IOS_ASC_KEY_P8 }}
+          IOS_ASC_KEY_ID: ${{ secrets.IOS_ASC_KEY_ID }}
+          IOS_ASC_ISSUER_ID: ${{ secrets.IOS_ASC_ISSUER_ID }}
+        run: npm run upload:internal
+      - name: Save non-secret upload status only
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ios-internal-upload-${{ github.run_id }}
+          path: artifacts/ios-testflight/reports/
+          retention-days: 7

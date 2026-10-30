@@ -1,0 +1,9 @@
+:root { color-scheme: light dark; font: 17px/1.6 system-ui, sans-serif; color: #183550; background: #edf4fa; }
+body { margin: 0; padding: max(24px, env(safe-area-inset-top)) 22px max(24px, env(safe-area-inset-bottom)); }
+main { max-width: 540px; margin: 6vh auto; }
+.brand { font-size: 24px; font-weight: 750; color: #165eaa; }
+h1 { font-size: 28px; line-height: 1.25; }
+a { display: inline-block; background: #165eaa; color: white; padding: 13px 20px; border-radius: 12px; text-decoration: none; margin: 12px 0; }
+a:focus-visible { outline: 3px solid #c35f14; outline-offset: 4px; }
+small, #server { font-size: 14px; overflow-wrap: anywhere; }
+@media (prefers-color-scheme: dark) { :root { color: #eef4fa; background: #101d2e; } .brand { color: #91c6ff; } }

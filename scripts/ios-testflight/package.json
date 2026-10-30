@@ -1,0 +1,16 @@
+{
+  "name": "teletyptel-ios-testflight",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "prepare:app": "node prepare.js",
+    "test": "node --test prepare.test.js",
+    "build:check": "node build.js --unsigned",
+    "upload:internal": "node build.js --upload-internal"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.4.3",
+    "@capacitor/core": "8.4.3",
+    "@capacitor/ios": "8.4.3"
+  }
+}
