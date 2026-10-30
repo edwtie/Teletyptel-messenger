@@ -41,7 +41,7 @@ test("Server URL and build number reject unsafe values", () => {
 });
 
 test("Only minimal offline assets are packaged", () => {
-  assert.deepEqual(fs.readdirSync(path.join(project, "www")).sort(), [...webAssets, "connection.js"].sort());
+  assert.deepEqual(fs.readdirSync(path.join(project, "www")).sort(), [...webAssets, "chat.html", "connection.js"].sort());
   const config = JSON.parse(fs.readFileSync(path.join(project, "capacitor.config.json"), "utf8"));
   assert.equal(config.webDir, "www");
   assert.equal(config.appId, "com.tiedragon.teletyptel");
@@ -58,4 +58,11 @@ test("Native TLS uses system validation only for the configured host", () => {
   const plist = fs.readFileSync(path.join(project, "ios/App/App/Info.plist"), "utf8");
   assert.match(plist, /NSLocalNetworkUsageDescription/);
   assert.doesNotMatch(plist, /NSAllowsArbitraryLoads|NSExceptionAllowsInsecureHTTPLoads/);
+});
+
+test("Capacitor's local startup file exists even when using a remote server", () => {
+  const config = JSON.parse(fs.readFileSync(path.join(project, "capacitor.config.json"), "utf8"));
+  const startFile = path.join(project, "www", config.server.appStartPath.replace(/^\/+/, ""));
+  assert.ok(fs.existsSync(startFile), "Missing bundled startup file: Capacitor exits before loading the remote URL");
+  assert.equal(fs.readFileSync(startFile, "utf8"), fs.readFileSync(path.join(project, "www/index.html"), "utf8"));
 });

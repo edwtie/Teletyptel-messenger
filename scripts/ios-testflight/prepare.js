@@ -22,6 +22,7 @@ function prepare() {
       && !/(?:public\/|capacitor\.config|xcuserdata|Package\.resolved)/.test(file));
   for (const file of files) write(file, execFileSync("git", ["show", "HEAD:" + file], { cwd: root, maxBuffer: 20 * 1024 * 1024 }));
   for (const file of webAssets) write("www/" + file, fs.readFileSync(path.join(__dirname, "www", file)));
+  write("www/chat.html", fs.readFileSync(path.join(__dirname, "www/index.html")));
   write("www/connection.js", "window.teletyptelServer = " + JSON.stringify(config.serverUrl) + ";\n");
   const delegate = "ios/App/App/AppDelegate.swift";
   write(delegate, "import WebKit\n" + fs.readFileSync(path.join(project, delegate), "utf8") + "\n"

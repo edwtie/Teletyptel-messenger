@@ -22,7 +22,7 @@ Workflow: `.github/workflows/ios-testflight.yml`, uitsluitend op `codex/teletypt
 
 1. Een macOS-runner met Xcode 26 installeert de vastgelegde afhankelijkheden van `scripts/ios-testflight`.
 2. `prepare.js` haalt de native bestanden uit de exacte Git-commit en maakt een geïsoleerde projectmap onder `artifacts/ios-testflight`.
-3. Tests en een ongetekende build voor fysieke iOS-apparaten draaien zonder ondertekeningssleutels.
+3. Tests, een ongetekende build voor fysieke iOS-apparaten en een Release-Simulator-opstarttest draaien zonder ondertekeningssleutels. De opstarttest reproduceert eerst het afsluiten zonder lokaal startbestand en controleert daarna twee stabiele starts met het bestand. Alleen de simulator gebruikt een onbereikbare loopback-URL; geen verbinding met WAMP vanuit de cloud.
 4. De GitHub-omgeving `ios-testflight` vraagt goedkeuring van de ingestelde reviewer voordat de ondertekende upload begint.
 5. De vervolgtaak maakt een tijdelijke keychain, valideert het provisioningprofiel, archiveert de app en exporteert met `testFlightInternalTestingOnly: true`.
 6. Upload naar Apple met de API-sleutel. Alleen niet-geheime statusrapporten worden als GitHub-artifact bewaard; geen IPA, keychain, provisioningprofiel of ruwe bouwlogs.
@@ -43,6 +43,10 @@ De uploadtaak ruimt zelf aangemaakte sleutels en profielen op. De macOS-runner i
 Een geslaagde upload betekent nog niet dat de app beschikbaar is: wacht op verwerking door Apple. Controleer App Store Connect → Teletyptel → TestFlight, beantwoord eventuele exportcompliancevragen op basis van de werkelijk gebruikte cryptografie en wijs de build toe aan interne testers. Deze bouwstraat doet geen automatische complianceverklaring en vraagt geen openbare App Review aan.
 
 Installeer vervolgens via Apples TestFlight-app op de iPhone. Test minimaal inloggen, XMPP, tweerichtingschat/RTT, vertaling, camera/microfoon, bijlagen, opnieuw verbinden en certificaatfouten. Gebruik voor eerste tests fictieve berichten.
+
+## Opstartbestand
+
+Capacitor 8.4.3 controleert `appStartFileURL` voordat het de externe server opent. Daarom moet `/chat.html` ook in de lokale appbundel bestaan. De bouwstraat maakt hiervoor een kopie van de minimale offline-startpagina, niet van de echte PHP/webclient. Ontbreekt dit bestand, dan sluit Capacitor met `exit(1)` af; alleen compileren vangt dat niet op. De bundelcontrole en Release-opstarttest blokkeren een nieuwe upload bij deze regressie.
 
 ## Lokale voorbereiding
 
