@@ -113,6 +113,25 @@ function ttAuthCallback(string $provider): void
     $pdo = Database::connect();
     ttAuthEnsureAccountSchema($pdo);
     $account = ttAuthPersistProviderAccount($pdo, $provider, $profile, $config, ttAuthClean((string)($session['link_account_id'] ?? ''), 96));
+    $result = ttAuthBindProviderSession($pdo, $account);
+
+    if (($request['format'] ?? '') === 'json') {
+        ttAuthJson(!empty($result['twoFactorRequired']) ? $result : ['ok' => true, 'account' => $account]);
+        return;
+    }
+
+    $loginToken = ttAuthCreateLoginToken((string)$account['account_id']);
+    header(
+        'Location: ' . ttAuthOrigin()
+        . '/chat.html?oauth=1&accountId=' . rawurlencode((string)$account['account_id'])
+        . '&loginToken=' . rawurlencode($loginToken),
+        true,
+        302
+    );
+}
+
+function ttAuthBindProviderSession(PDO $pdo, array $account): array
+{
     AccountAccess::bind($pdo, (string)$account['account_id'], $_SESSION);
     $_SESSION['teletyptel_account_id'] = $account['account_id'];
     unset($_SESSION['teletyptel_authenticated_at'], $_SESSION['teletyptel_intake_authenticated_id'], $_SESSION['teletyptel_intake_csrf']);
@@ -132,21 +151,9 @@ function ttAuthCallback(string $provider): void
         $_SESSION['teletyptel_intake_authenticated_id'] = $account['account_id'];
     }
 
-    if (($request['format'] ?? '') === 'json') {
-        ttAuthJson(!empty($security['two_factor_enabled'])
-            ? ['ok' => true, 'twoFactorRequired' => true, 'accountId' => $account['account_id'], 'method' => $security['two_factor_method']]
-            : ['ok' => true, 'account' => $account]);
-        return;
-    }
-
-    $loginToken = ttAuthCreateLoginToken((string)$account['account_id']);
-    header(
-        'Location: ' . ttAuthOrigin()
-        . '/chat.html?oauth=1&accountId=' . rawurlencode((string)$account['account_id'])
-        . '&loginToken=' . rawurlencode($loginToken),
-        true,
-        302
-    );
+    return !empty($security['two_factor_enabled'])
+        ? ['ok' => true, 'twoFactorRequired' => true, 'accountId' => $account['account_id'], 'method' => $security['two_factor_method']]
+        : ['ok' => true, 'accountId' => $account['account_id']];
 }
 
 function ttAuthProviderConfig(string $provider): array

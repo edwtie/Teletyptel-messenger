@@ -8,7 +8,26 @@ Deze aparte bouwstraat maakt een ondertekende iPhone-app voor de lokale TeleTypT
 - De app opent `https://192.168.0.105/chat.html`. WAMP en iPhone moeten op hetzelfde wifi-netwerk bereikbaar zijn.
 - Alleen de bestaande native iOS-broncode en een minimale offlinepagina worden verpakt. Geen PHP, PostNL-demo, gebruikersgegevens of geheime sleutels in de app.
 - Deze interne test gebruikt bewust een externe webclient via Capacitor `server.url`; dit is nog geen productie/offline-distributie.
-- Geen claim over werkende achtergrondoproepen, pushberichten, native Google-aanmelding of noodoproepen. Audio, video, RTT en netwerkherstel vereisen echte toesteltests.
+- Geen claim over werkende achtergrondoproepen, pushberichten of noodoproepen. Audio, video, RTT, Google-aanmelding en netwerkherstel vereisen echte toesteltests.
+
+## Google-aanmelding op iPhone
+
+De interne app gebruikt Google Sign-In iOS 9.0.0, niet de web-OAuth-redirect naar een LAN-IP-adres. De openbare iOS-client-ID en aparte web/server-client-ID staan in `scripts/ios-testflight/google-signin.js`. Beide horen bij hetzelfde Google-project; de iOS-client hoort bij `com.tiedragon.teletyptel`. De client-secret blijft uitsluitend in de bestaande PHP-serverconfiguratie.
+
+De Google-SDK opent de systeemauthenticatie en verwerkt de callback via het omgekeerde client-ID-URL-schema. De native bridge accepteert alleen de ingestelde HTTPS-server en controleert of diens server-client-ID overeenkomt. De server wisselt een eenmalige `serverAuthCode` rechtstreeks met Google uit en haalt het profiel bij Google UserInfo op. Geen door JavaScript aangeleverd profiel of ongeverifieerd ID-token wordt vertrouwd. Google-tokens worden niet opgeslagen; de SDK wordt na afloop lokaal afgemeld.
+
+`/api/auth/google/native.php` vereist HTTPS, dezelfde origin, JSON POST, een aparte request-header en een eenmalige sessiechallenge (10 minuten). De bestaande accountblokkering, sessierotatie en 2FA blijven gelden. De browser krijgt alleen het account-ID en een HttpOnly-sessiecookie, geen langdurig login-token in de URL. Een externe, niet door Google beheerde e-mail wordt niet gebruikt voor automatische koppeling aan een bestaand account. Google koppelen aan een reeds aangemeld account blijft voorlopig een desktop-webactie.
+
+Een oude TestFlight-build toont een updateverzoek. Installeer de nieuwe build, open Google-aanmelding, test annuleren en opnieuw aanmelden, en test een account met 2FA. De cloudtest kan alleen compilatie en opstarten controleren; echte Google-aanmelding en de lokale WAMP-verbinding moeten op de iPhone worden bevestigd.
+
+Lokale regressietests:
+
+- `node --test tests/native-google.test.js`
+- `php php/tests/native-google-signin-test.php`
+- `php php/tests/oauth-session-test.php`
+- Na voorbereiden van het geïsoleerde project: `node --test scripts/ios-testflight/prepare.test.js`.
+
+Referenties: [Google iOS-configuratie](https://developers.google.com/identity/sign-in/ios/start-integrating), [Google servercode-uitwisseling](https://developers.google.com/identity/sign-in/ios/offline-access).
 
 ## Certificaten en netwerk
 

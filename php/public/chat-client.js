@@ -2082,6 +2082,10 @@
     if (row?.hidden) {
       return;
     }
+    if (["ios", "android"].includes(window.Capacitor?.getPlatform?.())) {
+      resetGoogleSdkLoginButton();
+      return;
+    }
     if (wrapper?.classList.contains("sdk-ready") && el.dialogGoogleLoginButton.querySelector("iframe")) {
       return;
     }
@@ -2136,6 +2140,10 @@
 
   function activateGoogleSdkLoginButton() {
     if (!el.dialogGoogleLoginButton || !el.dialogGoogleLoginOverlayButton) {
+      return;
+    }
+    if (["ios", "android"].includes(window.Capacitor?.getPlatform?.())) {
+      resetGoogleSdkLoginButton();
       return;
     }
     const wrapper = el.dialogGoogleLoginButton.closest(".google-sdk-login-wrap");
@@ -3220,10 +3228,47 @@
   }
 
   function startProviderLoginFromDialog(provider) {
+    if (provider === "google" && window.Capacitor?.getPlatform?.() === "ios") {
+      void startNativeGoogleLoginFromDialog();
+      return;
+    }
     const name = providerDisplayName(provider);
     updateAccountStatus(t(`account.${provider}_redirecting`, `Opening ${name} sign-in...`));
     const target = new URL(authApiUrl(`${provider}/start`), location.href);
     location.assign(target.toString());
+  }
+
+  async function startNativeGoogleLoginFromDialog() {
+    if (state.nativeGoogleSignInPending) return;
+    state.nativeGoogleSignInPending = true;
+    setAccountDialogBusy(true, t("account.google_redirecting", "Opening Google sign-in..."));
+    try {
+      if (!window.TeleTypTelNativeGoogle) throw new Error("Update TeleTypTel in TestFlight to use Google sign-in.");
+      const payload = await window.TeleTypTelNativeGoogle.signIn(authApiUrl("google/native.php"));
+      if (payload.twoFactorRequired) {
+        showLoginTwoFactorChallenge(payload, { oauth: true, connectAfterSave: true });
+        return;
+      }
+      const target = new URL(location.href);
+      target.search = "";
+      target.hash = "";
+      target.searchParams.set("oauth", "1");
+      target.searchParams.set("accountId", payload.accountId);
+      location.assign(target.toString());
+    } catch (error) {
+      if (error.code === "BUSY") return;
+      const message = error.code === "CANCELLED"
+        ? t("account.google_cancelled", "Google sign-in cancelled.")
+        : error.code === "UPDATE_REQUIRED"
+          ? t("account.google_app_update", "Update TeleTypTel in TestFlight to use Google sign-in.")
+          : error.code === "account_access_denied"
+            ? accountApiErrorText("account_access_denied")
+            : t("account.google_native_failed", "Google sign-in failed. Check your connection and try again.");
+      el.dialogAccountStatus.textContent = message;
+    } finally {
+      state.nativeGoogleSignInPending = false;
+      setAccountDialogBusy(false);
+    }
   }
 
   function startGoogleLinkFromDialog() {
@@ -3235,6 +3280,10 @@
   }
 
   function startProviderLinkFromDialog(provider) {
+    if (provider === "google" && window.Capacitor?.getPlatform?.() === "ios") {
+      el.dialogAccountStatus.textContent = t("account.google_link_browser", "Link Google using the desktop website. Google sign-in is available in the iPhone app.");
+      return;
+    }
     if (!state.account?.accountId || state.account?.savedInDatabase !== true) {
       const name = providerDisplayName(provider);
       el.dialogAccountStatus.textContent = t(`account.save_before_${provider}_link`, `Save and sign in before linking ${name}.`);
@@ -18903,6 +18952,11 @@
 
     try {
       const parsed = new URL(value);
+      if (location.protocol === "https:" && ["android", "ios"].includes(window.Capacitor?.getPlatform?.())
+          && parsed.hostname === location.hostname && ["5443", "5280"].includes(parsed.port)
+          && ["/websocket", "/websocket/"].includes(parsed.pathname)) {
+        return defaultXmppWebSocketUrlForCurrentHost();
+      }
       if (isLocalAccountDomain(parsed.hostname) && (parsed.port === "8787" || parsed.pathname === "/rtt-relay")) {
         return defaultXmppWebSocketUrlForCurrentHost();
       }
@@ -18916,6 +18970,9 @@
   }
 
   function defaultXmppWebSocketUrlForCurrentHost() {
+    if (location.protocol === "https:" && ["android", "ios"].includes(window.Capacitor?.getPlatform?.())) {
+      return `wss://${location.host}/xmpp-websocket`;
+    }
     const host = String(location.hostname || "").trim();
     if (!host || isLocalAccountDomain(host)) {
       return "wss://localhost:5443/websocket/";

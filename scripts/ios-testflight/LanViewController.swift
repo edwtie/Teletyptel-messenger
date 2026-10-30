@@ -2,6 +2,7 @@ final class LanViewController: CAPBridgeViewController {
     override func capacitorDidLoad() {
         super.capacitorDidLoad()
         bridge?.registerPluginInstance(LanSystemTrustPlugin())
+        bridge?.registerPluginInstance(TeleTypTelGooglePlugin())
     }
 }
 

@@ -62,6 +62,7 @@ async function build() {
     fs.writeFileSync(path.join(reports, "xcode-version.txt"), run("xcodebuild", ["-version"]));
     fs.copyFileSync(path.join(output, "source.json"), path.join(reports, "source.json"));
     logged(process.execPath, [path.join(__dirname, "node_modules/@capacitor/cli/bin/capacitor"), "sync", "ios"], "capacitor-sync.log");
+    require("./google-signin").configureGooglePackage(project);
     const bundledStart = path.join(project, "ios/App/App/public", config.capacitor.server.appStartPath.replace(/^\/+/, ""));
     if (!fs.existsSync(bundledStart)) throw new Error("Missing native startup asset; Capacitor would exit before connecting");
     run("swift", [path.join(__dirname, "opaque-icon.swift"), path.join(project, "ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png")]);

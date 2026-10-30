@@ -1224,6 +1224,81 @@ body.account-gate .modal-shell {
   width: min(440px, calc(100vw - 32px));
 }
 
+@media (max-width: 720px) {
+  body.account-gate .app-shell {
+    display: none;
+  }
+
+  body.account-gate #accountDialog.account-start-dialog {
+    padding: 0;
+    align-items: start;
+  }
+
+  body.account-gate #accountDialog.account-start-dialog .account-dialog-card {
+    width: 100%;
+    min-width: 0;
+    height: var(--visual-viewport-height, 100dvh);
+    max-height: 100dvh;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  body.account-gate #accountDialog.account-start-dialog .modal-header {
+    padding: max(24px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) 20px max(20px, env(safe-area-inset-left));
+    background: var(--panel);
+  }
+
+  body.account-gate #accountDialog.account-start-dialog .modal-header h2 {
+    font-size: 26px;
+  }
+
+  body.account-gate #accountDialog.account-start-dialog .modal-body {
+    display: block;
+    padding: 20px max(20px, env(safe-area-inset-right)) 16px max(20px, env(safe-area-inset-left));
+    overscroll-behavior: contain;
+  }
+
+  body.account-gate #accountDialog.account-start-dialog .dialog-status {
+    margin-bottom: 20px;
+  }
+
+  body.account-gate #accountDialog.account-start-dialog #dialogRealAccountTitle {
+    display: none;
+  }
+
+  #accountDialog input:not([type="checkbox"]):not([type="radio"]),
+  #accountDialog select,
+  #accountDialog textarea {
+    min-width: 0;
+    min-height: 48px;
+    font-size: 16px;
+  }
+
+  body.account-gate #accountDialog.account-start-dialog .modal-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 48px;
+    gap: 10px;
+    padding: 16px max(20px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+    background: var(--panel);
+  }
+
+  body.account-gate #accountDialog.account-start-dialog .modal-actions button {
+    min-width: 0;
+    min-height: 48px;
+    margin: 0;
+    font-size: 16px;
+  }
+
+  body.account-gate #accountDialog.account-start-dialog #dialogConnectButton {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    background: #2563eb;
+    border-color: #2563eb;
+    color: #ffffff;
+  }
+}
+
 .account-start-dialog.server-settings-visible .account-dialog-card {
   width: min(720px, calc(100vw - 32px));
 }

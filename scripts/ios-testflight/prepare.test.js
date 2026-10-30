@@ -5,6 +5,7 @@ const path = require("node:path");
 const { settings } = require("./settings");
 const { project, webAssets } = require("./prepare");
 const { validateProfile } = require("./build");
+const google = require("./google-signin");
 
 test("Only an unexpired distribution profile for this app is accepted", () => {
   const config = settings("https://example.test/chat.html");
@@ -65,4 +66,31 @@ test("Capacitor's local startup file exists even when using a remote server", ()
   const startFile = path.join(project, "www", config.server.appStartPath.replace(/^\/+/, ""));
   assert.ok(fs.existsSync(startFile), "Missing bundled startup file: Capacitor exits before loading the remote URL");
   assert.equal(fs.readFileSync(startFile, "utf8"), fs.readFileSync(path.join(project, "www/index.html"), "utf8"));
+});
+
+test("Google native sign-in uses the supplied iOS client and a separate server client", () => {
+  const plist = fs.readFileSync(path.join(project, "ios/App/App/Info.plist"), "utf8");
+  assert.ok(plist.includes(google.clientId));
+  assert.ok(plist.includes(google.serverClientId));
+  assert.ok(plist.includes(google.urlScheme));
+  assert.notEqual(google.clientId, google.serverClientId);
+  assert.equal(google.urlScheme, "com.googleusercontent.apps.1072417513685-ntq135e2sdh73aufi552h0ml5l95s8no");
+  assert.equal((plist.match(/<key>CFBundleURLTypes<\/key>/g) || []).length, 1);
+  const native = fs.readFileSync(path.join(project, "ios/App/App/AppDelegate.swift"), "utf8");
+  assert.match(native, /GIDSignIn.sharedInstance.handle\(url\)/);
+  assert.match(native, /registerPluginInstance\(TeleTypTelGooglePlugin\(\)\)/);
+  assert.match(native, /serverAuthCode/);
+  assert.match(native, /current.scheme == "https"/);
+  assert.match(native, /current.host == expected.host && current.port == expected.port/);
+  assert.match(native, /call.getString\("serverClientId"\) == serverClientID/);
+  assert.doesNotMatch(native, /client_secret|clientSecret|accessToken|idToken/);
+});
+
+test("Google package is pinned and added after Capacitor sync without duplicating dependencies", () => {
+  const manifest = fs.readFileSync(path.join(project, "ios/App/CapApp-SPM/Package.swift"), "utf8");
+  const updated = google.addGooglePackage(manifest);
+  assert.match(updated, /GoogleSignIn-iOS.git", exact: "9.0.0"/);
+  assert.match(updated, /product\(name: "GoogleSignIn", package: "GoogleSignIn-iOS"\)/);
+  assert.throws(() => google.addGooglePackage(updated));
+  assert.throws(() => google.addGooglePackage("unrecognized manifest"));
 });

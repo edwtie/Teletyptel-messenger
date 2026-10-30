@@ -2,6 +2,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { execFileSync } = require("node:child_process");
 const { settings } = require("./settings");
+const google = require("./google-signin");
 
 const root = path.resolve(__dirname, "../..");
 const output = path.join(root, "artifacts/ios-testflight");
@@ -25,8 +26,13 @@ function prepare() {
   write("www/chat.html", fs.readFileSync(path.join(__dirname, "www/index.html")));
   write("www/connection.js", "window.teletyptelServer = " + JSON.stringify(config.serverUrl) + ";\n");
   const delegate = "ios/App/App/AppDelegate.swift";
-  write(delegate, "import WebKit\n" + fs.readFileSync(path.join(project, delegate), "utf8") + "\n"
-    + fs.readFileSync(path.join(__dirname, "LanViewController.swift"), "utf8"));
+  const originalDelegate = fs.readFileSync(path.join(project, delegate), "utf8");
+  const urlHandler = "return ApplicationDelegateProxy.shared.application(app, open: url, options: options)";
+  if (!originalDelegate.includes(urlHandler)) throw new Error("Review changed native URL handler");
+  write(delegate, "import WebKit\nimport GoogleSignIn\n" + originalDelegate.replace(urlHandler,
+    "if GIDSignIn.sharedInstance.handle(url) { return true }\n        " + urlHandler) + "\n"
+    + fs.readFileSync(path.join(__dirname, "LanViewController.swift"), "utf8") + "\n"
+    + fs.readFileSync(path.join(__dirname, "GoogleSignInPlugin.swift"), "utf8"));
   const storyboard = "ios/App/App/Base.lproj/Main.storyboard";
   const originalStoryboard = fs.readFileSync(path.join(project, storyboard), "utf8");
   const marker = 'customClass="CAPBridgeViewController" customModule="Capacitor"';
@@ -38,6 +44,10 @@ function prepare() {
   write(plist, originalPlist.replace("<dict>", "<dict>\n"
     + "<key>NSLocalNetworkUsageDescription</key><string>TeleTypTel maakt verbinding met jouw testserver op hetzelfde wifi-netwerk.</string>\n"
     + "<key>NSAppTransportSecurity</key><dict><key>NSAllowsLocalNetworking</key><true/></dict>\n"
+    + "<key>GIDClientID</key><string>" + google.clientId + "</string>\n"
+    + "<key>GIDServerClientID</key><string>" + google.serverClientId + "</string>\n"
+    + "<key>CFBundleURLTypes</key><array><dict><key>CFBundleURLSchemes</key><array><string>" + google.urlScheme + "</string></array></dict></array>\n"
+    + "<key>TeleTypTelServerOrigin</key><string>" + escape(new URL(config.serverUrl).origin) + "</string>\n"
     + "<key>TeleTypTelServerHost</key><string>" + escape(new URL(config.serverUrl).hostname) + "</string>\n"));
   write("capacitor.config.json", JSON.stringify(config.capacitor, null, 2));
   write("package.json", JSON.stringify({ name: "teletyptel-ios-lan-test", version: "1.0.0", private: true,

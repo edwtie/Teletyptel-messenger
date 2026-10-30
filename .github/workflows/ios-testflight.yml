@@ -41,6 +41,7 @@ jobs:
           npm ci --ignore-scripts
           npm run prepare:app
           npm test
+          node --test ../../tests/native-google.test.js
           npm run build:check
       - name: Save non-secret preflight report
         if: always()
