@@ -3,6 +3,21 @@
 This checklist tracks protocol and product progress. Use `[x]` only when the
 item is implemented, tested and documented.
 
+## Mobile number dialer — 2026-10-31
+
+- [x] Phone icon and keypad/contact choices use known TeleTypTel contact numbers;
+  selection fills the dialer without calling. Browser and unit fixtures cover
+  selection, empty state, keyboard navigation and contact eligibility.
+- [ ] Verify contact-number selection on the physical iPhone after a new build.
+  Device-address-book integration is not implemented or requested by this picker.
+- [x] Full-screen mobile dialer, compact desktop dialog, no number autofocus,
+  `inputmode="none"` and an independent keypad cursor. Local Chromium/WebKit
+  fixtures cover repeat opening, editing, hardware keys and orientation changes.
+- [ ] Include this follow-up in a new approved TestFlight build (not build 8.1).
+- [ ] On the physical iPhone, verify opening/tapping the dialer never raises the
+  software keyboard; check safe areas, rotation, closing and preserved chat drafts.
+- [ ] Configure and validate a real SIP/RTT gateway before enabling number calls.
+
 ## iPhone / XMPP Verification — 2026-10-31
 
 The following separates local fixtures from physical-device evidence. Earlier

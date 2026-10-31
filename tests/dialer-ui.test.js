@@ -53,7 +53,16 @@ async function check(engine, device, name) {
       if (mobile) await page.locator("#mobileActionsToggle").click();
       await page.locator("#phoneDialerButton").click();
       assert.equal(await dialog.evaluate((element) => element.open), true);
-      assert.equal(await input.evaluate((element) => element === document.activeElement), true);
+      assert.equal(await page.evaluate(() => document.activeElement.id), "phoneDialerClose");
+      assert.equal(await input.getAttribute("inputmode"), "none");
+      for (const digit of ["+", "3", "1"]) await page.locator('[data-digit="' + digit + '"]').click();
+      assert.equal(await input.inputValue(), "+31");
+      assert.equal(await input.evaluate((element) => element === document.activeElement), false);
+      await page.keyboard.press("2");
+      assert.equal(await input.inputValue(), "+312");
+      await page.keyboard.press("Backspace");
+      assert.equal(await input.inputValue(), "+31");
+      await input.evaluate((element) => { element.value = ""; });
     };
     for (const language of ["eng", "ned"]) {
       const labels = Object.fromEntries(fs.readFileSync(path.join(root, "lang/" + language + ".lng"), "utf8")
@@ -72,6 +81,32 @@ async function check(engine, device, name) {
       await open();
       assert.equal(await page.locator("#phoneDialerTitle").textContent(), labels["dialer.title"]);
       assert.equal(await page.locator("#phoneDialerCall").isDisabled(), true);
+      await page.locator("#phoneDialerContactsView").click();
+      assert.equal(await page.locator("#phoneDialerContactsEmpty").isVisible(), true);
+      assert.equal(await page.locator("#phoneDialerKeypadPanel").isVisible(), false);
+      await page.evaluate(() => {
+        window.dialerFixtureListener = event => {
+          event.detail.contacts = [{ id: "fixture", name: "Test <contact>", number: "+31 (20) 123-4567" }];
+        };
+        window.addEventListener("teletyptel:dialer-contacts-request", window.dialerFixtureListener);
+        window.dispatchEvent(new Event("teletyptel:dialer-contacts-changed"));
+      });
+      const contact = page.locator("#phoneDialerContactsList button");
+      assert.equal(await contact.locator("strong").textContent(), "Test <contact>");
+      await contact.click();
+      assert.equal(await input.inputValue(), "+31 (20) 123-4567");
+      assert.equal(await input.getAttribute("aria-invalid"), "false");
+      assert.equal(await page.evaluate(() => document.activeElement.id), "phoneDialerKeypadView");
+      assert.equal(await page.locator("#phoneDialerContactsPanel").isVisible(), false);
+      await page.locator("#phoneDialerContactsView").click();
+      await page.locator("#phoneDialerClose").focus();
+      await page.keyboard.press("Shift+Tab");
+      assert.equal(await contact.evaluate(element => element === document.activeElement), true);
+      await page.keyboard.press("Tab");
+      assert.equal(await page.evaluate(() => document.activeElement.id), "phoneDialerClose");
+      await page.locator("#phoneDialerKeypadView").click();
+      assert.equal(await input.inputValue(), "+31 (20) 123-4567");
+      await page.evaluate(() => window.removeEventListener("teletyptel:dialer-contacts-request", window.dialerFixtureListener));
       await input.fill("+31 (20) 123-4567");
       assert.equal(await input.getAttribute("aria-invalid"), "false");
       for (const invalid of ["112", "0201234567", "sip:test@example.test", "+012345", "+1234567890123456", "+31<script>", "+31\t1234567"]) {
@@ -96,6 +131,11 @@ async function check(engine, device, name) {
       assert.equal(await page.locator("#messageInput").inputValue(), "Unsent Messenger draft");
       const bounds = await dialog.boundingBox();
       assert.ok(bounds.x >= 0 && bounds.x + bounds.width <= device.viewport.width);
+      if (mobile || (device.viewport.width <= 1000 && device.viewport.height <= 500)) {
+        assert.deepEqual(bounds, { x: 0, y: 0, width: device.viewport.width, height: device.viewport.height });
+      } else {
+        assert.ok(bounds.width <= 380);
+      }
       assert.equal(await dialog.evaluate((element) => element.scrollWidth <= element.clientWidth), true);
       await page.locator("#phoneDialerClose").focus();
       await page.keyboard.press("Shift+Tab");
@@ -109,6 +149,18 @@ async function check(engine, device, name) {
       await open();
       assert.equal(await input.inputValue(), "");
       await input.fill("+31201234567");
+      await page.locator("#phoneDialerClose").click();
+      await page.waitForFunction(() => document.getElementById("phoneDialerNumber").value === "");
+    }
+    if (mobile) {
+      await open();
+      await input.fill("+31201234567");
+      await page.setViewportSize({ width: 844, height: 390 });
+      assert.deepEqual(await dialog.boundingBox(), { x: 0, y: 0, width: 844, height: 390 });
+      assert.equal(await input.inputValue(), "+31201234567");
+      await page.locator("#phoneDialerBackspace").click();
+      assert.equal(await input.inputValue(), "+3120123456");
+      await page.setViewportSize(device.viewport);
       await page.locator("#phoneDialerClose").click();
       await page.waitForFunction(() => document.getElementById("phoneDialerNumber").value === "");
     }
@@ -129,5 +181,6 @@ async function check(engine, device, name) {
   await check(chromium, { viewport: { width: 1280, height: 900 } }, "desktop");
   await check(chromium, devices["Pixel 7"], "android");
   await check(webkit, devices["iPhone 13"], "iphone");
+  await check(webkit, { ...devices["iPhone 13"], viewport: { width: 844, height: 390 } }, "iphone-landscape");
   await check(chromium, { viewport: { width: 320, height: 568 } }, "small");
 })().catch((error) => { console.error(error); process.exitCode = 1; });

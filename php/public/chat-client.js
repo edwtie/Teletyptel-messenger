@@ -1154,6 +1154,9 @@
     window.addEventListener("resize", () => handleViewportChange("resize"));
     window.addEventListener("orientationchange", () => handleViewportChange("orientationchange"));
     window.addEventListener("teletyptel:keyboard-layout", () => handleViewportChange("native-keyboard"));
+    window.addEventListener("teletyptel:dialer-contacts-request", (event) => {
+      event.detail.contacts = phoneDialerContacts();
+    });
     window.visualViewport?.addEventListener("resize", () => handleViewportChange("visual-viewport-resize"));
     window.visualViewport?.addEventListener("scroll", () => {
       applyViewportDetection();
@@ -14293,7 +14296,23 @@
     joinXmppGroupConversation(conversation);
   }
 
+  function phoneDialerContacts() {
+    return state.conversations
+      .filter(conversation => conversation.kind === "contact"
+        && !isOwnContact(conversation) && !isBlockedConversation(conversation)
+        && !isArchivedConversation(conversation) && !isInfrastructurePeer(conversation.peer))
+      .map(conversation => ({
+        id: conversation.id,
+        name: conversationDisplayName(conversation),
+        number: String(conversation.phoneNumber || conversation.phone || conversation.telephone || "").trim()
+      }))
+      .filter(contact => contact.number.length > 0 && contact.number.length <= 40
+        && /^[+0-9 ()-]+$/.test(contact.number))
+      .sort((first, second) => first.name.localeCompare(second.name));
+  }
+
   function renderConversations() {
+    window.dispatchEvent(new Event("teletyptel:dialer-contacts-changed"));
     el.conversationItems.replaceChildren();
     const query = normalizeConversationSearchText(el.conversationSearchInput.value);
     let visibleCount = 0;

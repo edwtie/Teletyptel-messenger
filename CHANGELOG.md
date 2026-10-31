@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+### Number selection from contacts — 2026-10-31
+
+- Use a phone icon to open number calling, with keypad and contacts choices.
+- Select a known TeleTypTel contact number without starting a call or opening
+  the device address book. Exclude groups, self, blocked/archived and service accounts.
+- Preserve typed numbers when switching views; validate selected local numbers
+  rather than guessing a country code. SIP calling remains disabled until configured.
+
+### Full-screen mobile number dialer — 2026-10-31
+
+- Open number dialing as a full-screen mobile view with safe-area spacing,
+  instead of a small floating dialog. Keep the compact desktop dialog.
+- Focus the close control, suppress the software keyboard and retain number
+  selection while using the custom keypad. Physical-keyboard editing still works.
+- Browser regressions cover repeat opening, portrait/landscape, number editing,
+  focus, preserved Messenger drafts and the disabled, unconnected SIP action.
+- Physical iPhone keyboard verification requires a new TestFlight build.
+
 ### RTT text loss correction — 2026-10-31
 
 - Preserve numeric and JSON-looking raw RTT payloads instead of dropping them.

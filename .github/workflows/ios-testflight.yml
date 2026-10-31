@@ -29,6 +29,7 @@ on:
       - tests/native-keyboard.test.js
       - tests/call-inputs.test.js
       - tests/rtt-text-loss.test.js
+      - tests/dialer-contacts.test.js
   workflow_dispatch:
 
 permissions:
