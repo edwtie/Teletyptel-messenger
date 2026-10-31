@@ -46,13 +46,33 @@ Referenties: [Google iOS-configuratie](https://developers.google.com/identity/si
 
 ## Mobiele chat en toetsenbord
 
+Eigen berichtballonnen en avatars staan rechts; ontvangen berichten links. De
+avatar sluit bij gewone berichten aan op de bovenkant van de ballon, zonder de
+ruimte voor een niet-zichtbare afzenderregel. Mobiele berichttekst gebruikt 16px
+en regelhoogte 1,4. `node --test tests/mobile-message-layout.test.js` controleert
+de uitlijning, lange groepsnamen, vertalingen, lange URL's, reactieknoppen en
+tijd/vinkjes in Chromium en WebKit op 320, 390, 430 en 844 pixels. Screenshotfixtures
+bevatten fictieve berichten en geen werkende camera. Voor de gebundelde iOS-app
+wordt deze CSS pas zichtbaar na een nieuwe TestFlight-build.
+
 De gewone mobiele chat (zonder actief gesprek) volgt de hoogte en verticale verschuiving van de visual viewport. De pagina zelf scrolt niet mee; de berichtenlijst blijft apart scrollbaar. Bij openen of sluiten van het toetsenbord blijft het nieuwste bericht in beeld als de gebruiker al onderaan stond. Teruglezen wordt niet onderbroken. Pinch-zoom blijft toegestaan en verkleint niet nogmaals de app-layout. Ruimte voor de reactieknop wordt buiten de berichtballon gereserveerd, niet van de al passende tekstbreedte afgetrokken.
 
-`node --test tests/mobile-chat-viewport.test.js` controleert Chromium en WebKit op 320, 390 en 430 pixels breed, korte eigen/ontvangen berichten, lange tekst, gesimuleerde toetsenbordhoogtes en viewportverschuivingen, teruglezen en zoom. Screenshots staan lokaal onder `artifacts/mobile-chat`. Dit simuleert viewportwijzigingen; het echte iPhone-toetsenbord moet nog op het toestel worden gecontroleerd. De aanpassing wordt door WAMP geserveerd en vereist geen nieuwe native build.
+`node --test tests/mobile-chat-viewport.test.js` controleert Chromium en WebKit op 320, 390 en 430 pixels breed, korte eigen/ontvangen berichten, lange tekst, gesimuleerde toetsenbordhoogtes en viewportverschuivingen, teruglezen en zoom. Screenshots staan lokaal onder `artifacts/mobile-chat`. Dit simuleert viewportwijzigingen; het echte iPhone-toetsenbord moet nog op het toestel worden gecontroleerd. De browser haalt wijzigingen op bij WAMP; de gebundelde TestFlight-app vereist hiervoor een nieuwe native build.
 
 De berichtenlijst onthoudt of zij onderaan stond vóór een hoogtewijziging. Een ResizeObserver en een controle in het volgende renderframe vangen ook late toetsenbord- en composerwijzigingen op. Automatisch volgen bij RTT gebeurt direct, zonder bij iedere letter opnieuw een scrollanimatie te starten. Focus op het tekstvak en de pijl hervatten volgen; handmatig terugscrollen onderbreekt het volgen tijdens hoogtewijzigingen. De regressietest controleert ook een resize vóór het viewport-event, snelle RTT-updates en een reeds ingeplande scrollcontrole na terugscrollen.
 
 ## Draaien tijdens videobellen
+
+Camera wisselen is afzonderlijk gecontroleerd met
+`node --test tests/call-camera-switch.test.js`: voor-/achtercamera, herhaald
+wisselen, cameratoestemming weigeren en opnieuw proberen, camera uit laten,
+gelijktijdige verzoeken en ophangen tijdens een wissel. De iOS-keuze wordt niet
+meer omgekeerd: `user` betekent selfiecamera en `environment` achtercamera
+volgens de [W3C-definitie](https://www.w3.org/TR/mediacapture-streams/#dom-videofacingmodeenum).
+Deze tests gebruiken gesimuleerde mediastreams, geen fysieke camera's. Na de
+volgende TestFlight-update: wissel tijdens een TC-gesprek voor/achter, draai
+portret/landschap en terug, typ RTT, en controleer beeld en geluid bij beide
+deelnemers. Herhaal met camera uit en hang op tijdens een camerawissel.
 
 Een gedetecteerde telefoon behoudt de telefoonlayout in beide richtingen. Horizontaal beeld alleen activeert niet langer de compacte toetsenbordmodus: daarvoor moet een invoerveld actief zijn en de visual viewport werkelijk lager zijn dan de layout viewport. Resize-events delen één uitgestelde layoutcontrole, gebonden aan hetzelfde gesprek; draaien bouwt de gespreksinterface niet opnieuw op en start videoweergave niet herhaald. De horizontale TC-layout heeft voorrang op de algemene lokale-videostijlen, zodat RTT onder het beeld blijft en het eigen voorbeeld klein blijft naast de andere deelnemer.
 
@@ -67,6 +87,16 @@ De mobiele gesprekskop toont avatar, contactnaam en gespreksiconen op één rij 
 De mobiele TC-weergave blijft ook zonder toetsenbord aan de visual viewport verankerd. Gesprekskop, media/RTT en composer gebruiken vaste gridrijen; lange RTT-tekst scrolt binnen het eigen vak in plaats van de hele gesprekskop mee te trekken. Een viewport-panoffset wordt begrensd tot de beschikbare ruimte tussen layout- en visual viewport, zodat een achterblijvende iOS-offset na toetsenbordsluiting geen dubbele bovenruimte oplevert. De rotatietest controleert deze offset, het vast blijven staan van de kop tijdens scrollpogingen en het zichtbaar blijven van de composer bij lange RTT-tekst. Fysieke iPhone-validatie blijft nodig; de browserfixture simuleert de native viewport-events.
 
 ## Focus bij mobiel aanmelden
+
+Het voorbereide iOS-project gebruikt het bestaande TeleTypTel-logo op een wit
+native opstartscherm en tijdens het laden van de lokale interface. Het logo blijft
+in verhouding en past ook in landschap; er is geen kunstmatige wachttijd. Deze
+aanpassing vereist een nieuwe app-build. WebKit-layouttests vervangen geen
+controle van het native opstartscherm op een fysieke iPhone.
+
+Uitloggen gebruikt een bevestigde JSON-POST via dezelfde `fetch`/native sessie als aanmelden, niet `sendBeacon` vanuit de lokale WebView. De app sluit de chat direct, wacht met opnieuw aanmelden tot het verzoek is afgerond en toont bij een fout een knop om uitloggen opnieuw te proberen. Een fout betekent dat afmelden bij de server niet is bevestigd; herhaal dit met een werkende verbinding. `tests/account-logout.test.js` en de gebundelde-runtime-test bewaken deze route en voorkomen dubbele verzoeken.
+
+Bij het kiezen van een contact op telefoon/tablet krijgt het berichtveld niet automatisch focus. Terug naar contacten haalt eerst de focus van de composer, zodat het toetsenbord niet onnodig actief blijft. Desktop behoudt de invoerfocus na contactkeuze. Contactlijst, bovenbalk en bedieningsknoppen krijgen `-webkit-user-select: none` en `-webkit-touch-callout: none`: lang aanraken hoort hier geen iOS-tekstselectie met Kopieer/Zoek op/Vertaal boven de knoppen te tonen. Zoekvelden, composer en chatberichttekst blijven selecteerbaar. Er worden geen algemene touch-events geblokkeerd; scrollen en de eigen contextmenuhandlers blijven beschikbaar. `tests/mobile-contact-navigation.test.js` controleert contactkeuze, terugkeren na expliciet tikken in het berichtveld en de WebKit-selectiestijlen. De native iOS-selectiepopover moet aanvullend op het toestel worden gecontroleerd.
 
 Op telefoons en tablets krijgen invoervelden niet automatisch focus bij openen van aanmelden, wachtwoordherstel of de tweestapscontrole, ook niet na een aanmeldfout. De dialoogtitel is programmatisch focusbaar voor toegankelijkheid, zonder een toetsenbord te openen of automatisch te scrollen. De gebruiker kan de velden gewoon aantikken. Desktopfocus blijft behouden en een late focuscallback doet niets als de dialoog inmiddels is gesloten. `node --test tests/account-login-focus.test.js tests/native-google.test.js` controleert deze overgangen in Chromium/WebKit en de bestaande native Google-aanmeldroute. Het echt openen van het iPhone-toetsenbord wordt niet door deze browserfixture nagebootst; test de aanmelding ook op het toestel.
 
@@ -103,6 +133,43 @@ De uploadtaak ruimt zelf aangemaakte sleutels en profielen op. De macOS-runner i
 Een geslaagde upload betekent nog niet dat de app beschikbaar is: wacht op verwerking door Apple. Controleer App Store Connect → Teletyptel → TestFlight, beantwoord eventuele exportcompliancevragen op basis van de werkelijk gebruikte cryptografie en wijs de build toe aan interne testers. Deze bouwstraat doet geen automatische complianceverklaring en vraagt geen openbare App Review aan.
 
 Installeer vervolgens via Apples TestFlight-app op de iPhone. Test minimaal inloggen, XMPP, tweerichtingschat/RTT, vertaling, camera/microfoon, bijlagen, opnieuw verbinden en certificaatfouten. Gebruik voor eerste tests fictieve berichten.
+
+## Echte iPhone-afvinklijst
+
+Status 2026-10-31: de lokale ontvangst-/leesstatusfixtures zijn opnieuw geslaagd
+in Chromium en WebKit. Dit is geen live ejabberd-test en geen toesteltest.
+Voor de nieuwe lokale wijzigingen is nog geen nieuwe TestFlight-build geüpload.
+Vul pas een toestelresultaat in na uitvoering, met buildnummer, iPhone-model,
+iOS-versie, netwerk, datum en eventueel een geschoonde opname.
+
+Gebruik twee eigen testaccounts en alleen fictieve berichten. Sluit voor de
+basistest andere sessies van de ontvanger: een ander ingelogd apparaat kan zelf
+ontvangst of weergave bevestigen terwijl de iPhone offline is.
+
+| Afvinken op echte iPhone | Verwachte waarneming | Status |
+| --- | --- | --- |
+| Ontvanger volledig offline, nieuw bericht sturen | Geen aflever-/weergavebevestiging zonder ontvangende client; geen blauwe vinkjes door presence alleen | Open |
+| Ontvanger online, gesprek niet geopend | Aflevering kan twee gewone vinkjes geven; nog geen blauwe vinkjes | Open |
+| Bericht zichtbaar in geopend gesprek | Displayed-marker met bericht-ID; blauwe dubbele vinkjes bij afzender | Open |
+| Andere chat open, scherm vergrendeld of app achtergrond | Geen nieuwe displayed-marker voor niet-zichtbare berichten | Open |
+| Terug naar chat, wifi onderbreken/herstellen | Geen valse leesstatus door geschiedenis laden; geldige blauwe vinkjes worden niet teruggedraaid | Open |
+| Beide richtingen testen | Herhaal met iPhone als afzender én ontvanger | Open |
+| In-/uitloggen en opnieuw openen | Sessie eindigt bevestigd; account niet ongemerkt opnieuw aangemeld | Open |
+| Contact aantikken, toetsenbord openen/sluiten | Juiste chat; laatste bericht zichtbaar; geen onbedoelde tekstselectie op knoppen | Open |
+| RTT en vertaling | Tekst in beide richtingen, origineel behouden; geen Nederlands-naar-Nederlands duplicaat | Open |
+| TC: camera voor/achter en portret/landschap | Beide deelnemers houden beeld en geluid; knoppen buiten camerauitsparing, RTT leesbaar | Open |
+| Camera uit, snel wisselen, ophangen tijdens wissel | Geen ongewenst opnieuw ingeschakelde camera of achterblijvende capture | Open |
+
+XEP-0184 bevestigt ontvangst door een client, niet het lezen door een mens.
+XEP-0333 bevestigt weergave tot een punt in het gesprek; de UI noemt dit
+"Gelezen", maar het bewijst niet dat iemand de tekst heeft begrepen.
+Bronnen: [XEP-0184](https://xmpp.org/extensions/xep-0184.html),
+[XEP-0333](https://xmpp.org/extensions/xep-0333.html).
+
+De huidige implementatie verwerkt displayed per bericht-ID en verstuurt deze
+alleen voor directe gesprekken. Cumulatieve afhandeling en MUC-leesstatus per
+deelnemer blijven open protocolpunten; de geslaagde lokale tests bewijzen geen
+volledige XEP-0333-interoperabiliteit.
 
 ## Opstartbestand
 

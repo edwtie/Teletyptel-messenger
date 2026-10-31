@@ -25,7 +25,7 @@ function bundleFrontend(write, serverUrl) {
     if (file === "chat.html") {
       const html = content.toString().replace(/\s*<link rel="manifest"[^>]+>/, "")
         .replace("<head>", '<head>\n  <script src="connection.js"></script>\n  <script src="native-server.js"></script>\n  <link rel="stylesheet" href="native-startup.css">')
-        .replace('<body class="account-booting">', '<body class="account-booting">\n  <section class="native-startup" role="status"><h1>TeleTypTel</h1><p>Verbinding controleren… / Connecting…</p></section>')
+        .replace('<body class="account-booting">', '<body class="account-booting">\n  <section class="native-startup" role="status" aria-label="TeleTypTel"><img src="assets/brand/teletyptel-logo-header@2x.png" width="599" height="128" alt="TeleTypTel"><p>Verbinding controleren… / Connecting…</p></section>')
         .replace(/href="(tolk\/|admin\/#[^"]*|aanmelden\/)"/g,
           (_, target) => 'href="' + new URL(target, serverUrl).href + '"');
       content = Buffer.from(html);
@@ -34,7 +34,7 @@ function bundleFrontend(write, serverUrl) {
     manifest.push({ file, sha256: crypto.createHash("sha256").update(content).digest("hex") });
   }
   write("www/native-server.js", fs.readFileSync(path.join(__dirname, "www/native-server.js")));
-  write("www/native-startup.css", '.native-startup { display: none; }\nbody.account-booting .native-startup { display: grid; min-height: 90dvh; align-content: center; justify-items: center; padding: 24px; text-align: center; font: 16px system-ui; color: #17395e; background: #fff; }\n');
+  write("www/native-startup.css", fs.readFileSync(path.join(__dirname, "www/native-startup.css")));
   write("www/connection.js", "window.teletyptelServer = " + JSON.stringify(serverUrl) + ";\n");
   return manifest;
 }

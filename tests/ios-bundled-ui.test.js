@@ -5,6 +5,40 @@ const path = require("node:path");
 const { webkit } = require("playwright");
 const { bundleFrontend } = require("../scripts/ios-testflight/bundle-frontend");
 
+test("Startup logo fits small, portrait and landscape screens and hides after boot", { timeout: 45000 }, async () => {
+  const files = new Map();
+  bundleFrontend((name, data) => files.set(name, Buffer.from(data)), "https://server.test/chat.html");
+  const browser = await webkit.launch({ headless: true });
+  try {
+    const page = await browser.newPage({ isMobile: true, hasTouch: true });
+    await page.route("https://startup.test/**", route => {
+      const name = "www" + new URL(route.request().url()).pathname;
+      if (!files.has(name)) return route.abort();
+      const contentType = name.endsWith(".css") ? "text/css" : "image/png";
+      return route.fulfill({ contentType, body: files.get(name) });
+    });
+    const startup = files.get("www/chat.html").toString().match(/<section class="native-startup"[\s\S]*?<\/section>/)[0];
+    for (const viewport of [{ width: 320, height: 568 }, { width: 390, height: 844 }, { width: 844, height: 390 }]) {
+      await page.setViewportSize(viewport);
+      await page.setContent('<meta name="viewport" content="width=device-width, initial-scale=1"><base href="https://startup.test/"><link rel="stylesheet" href="chat-client.css"><link rel="stylesheet" href="native-startup.css"><body class="account-booting">' + startup + '</body>');
+      await page.locator(".native-startup img").evaluate(image => image.decode());
+      const logo = await page.locator(".native-startup img").boundingBox();
+      assert.ok(logo.width > 200 && logo.width <= 280);
+      assert.ok(logo.x >= 24 && logo.x + logo.width <= viewport.width - 24);
+      assert.ok(logo.y >= 0 && logo.y + logo.height < viewport.height);
+      assert.ok(Math.abs(logo.width / logo.height - 599 / 128) < 0.01);
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+      if (viewport.width === 390) {
+        const screenshot = path.resolve(__dirname, "../artifacts/mobile-chat/ios-startup-logo.png");
+        fs.mkdirSync(path.dirname(screenshot), { recursive: true });
+        await page.screenshot({ path: screenshot });
+      }
+      await page.evaluate(() => document.body.classList.remove("account-booting"));
+      assert.equal(await page.locator(".native-startup").isVisible(), false);
+    }
+  } finally { await browser.close(); }
+});
+
 test("Bundled Messenger opens its real mobile sign-in UI without a reachable server", { timeout: 45000 }, async () => {
   const files = new Map();
   bundleFrontend((name, data) => files.set("/" + name.replace(/^www\//, ""), Buffer.from(data)), "https://server.test/chat.html");
@@ -77,6 +111,19 @@ test("Bundled Messenger opens its real mobile sign-in UI without a reachable ser
     });
     assert.equal(upload.ok, true);
     assert.deepEqual(upload.bytes, [0, 1, 128, 255]);
+    const client = fs.readFileSync(path.join(__dirname, "../php/public/chat-client.js"), "utf8");
+    const logoutSource = client.slice(client.indexOf("  async function sendLogoutAccountSession()"),
+      client.indexOf("  function handleAccountIdentityChanged()"));
+    const logout = await page.evaluate(async source => {
+      const performLogout = new Function(source + '\nconst accountApiPath = "api/account.php"; return sendLogoutAccountSession;')();
+      navigator.sendBeacon = () => { throw new Error("WebView logout beacon must not be used"); };
+      await performLogout();
+      const call = window.fixtureNativeCalls.at(-1);
+      return { path: call.path, body: JSON.parse(atob(call.body)), omitCookies: call.omitCookies };
+    }, logoutSource);
+    assert.equal(logout.path, "/api/account.php");
+    assert.equal(logout.body.action, "logout");
+    assert.equal(logout.omitCookies, false);
     const screenshot = path.resolve(__dirname, "../artifacts/mobile-chat/ios-bundled-offline.png");
     fs.mkdirSync(path.dirname(screenshot), { recursive: true });
     await page.screenshot({ path: screenshot });

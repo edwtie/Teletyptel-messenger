@@ -96,6 +96,18 @@ button:disabled {
   opacity: .45;
 }
 
+:where(button, button *, summary, summary *, .conversation-list, .conversation-list *, .topbar, .topbar *) {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+:where(input, textarea, [contenteditable="true"]) {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+}
+
 :where(button, input, select, textarea, summary, a, [role="button"], [role="menuitem"], .conversation-item, .message-body, .attachment-card, .location-card):focus-visible {
   outline: 3px solid var(--focus-ring);
   outline-offset: 2px;
@@ -5688,6 +5700,7 @@ body.viewport-phone .message.with-avatar {
 
 body.viewport-phone .message.with-avatar.self {
   grid-template-columns: minmax(0, 1fr) 30px;
+  margin-left: auto;
   margin-right: 6px;
 }
 
@@ -5696,6 +5709,16 @@ body.viewport-phone .message.with-avatar .message-avatar {
   height: 28px;
   margin-top: 18px;
   font-size: 11px;
+}
+
+body.viewport-phone .message.with-avatar.has-bubble-tail .message-avatar {
+  margin-top: 4px;
+}
+
+body.viewport-phone .message-body {
+  min-width: 0;
+  font-size: 16px;
+  line-height: 1.4;
 }
 
 body.viewport-phone .message.with-avatar:has(.call-message-card) .message-avatar {

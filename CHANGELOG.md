@@ -2,6 +2,38 @@
 
 ## Unreleased
 
+### Mobile message alignment — 2026-10-31
+
+- Restore right alignment for own message/avatar rows on phone layouts and align
+  avatars with bubble tails instead of an absent sender header.
+- Use consistent mobile message text size and line spacing; retain separate
+  translation sections and compact timestamps/receipts.
+- Prevent long group sender names from forcing bubbles outside the viewport.
+- Add Chromium/WebKit checks for both message directions, long text/URLs, group
+  names, translations, reaction controls and receipt bounds at 320–844 pixels.
+  Extend keyboard/latest-message fixtures with timestamps and delivery ticks.
+
+### Camera switching regressions — 2026-10-31
+
+- Correct the inverted iOS front/back camera preference. Keep audio and camera-off
+  state during a swap; ignore competing switches and release failed/late captures.
+- Restore camera preferences on failure; do not update a replacement or ended call.
+- Add simulated camera lifecycle tests and rerun Chromium/WebKit rotation, keyboard
+  and safe-area checks. Physical iPhone camera validation still requires a new build.
+
+### iOS logout and contact navigation — 2026-10-31
+
+- Show the existing TeleTypTel logo in the native launch screen and bundled
+  startup view, without stretching or adding an artificial startup delay.
+- Replace fire-and-forget logout beacons with a confirmed request through the
+  authenticated native transport. Gate sign-in during logout and expose a retry
+  when server sign-out is not confirmed.
+- Do not automatically open the keyboard when selecting contacts on touch devices;
+  blur the composer before returning to the list. Desktop input focus is retained.
+- Disable native text selection/callouts on contact rows and navigation controls,
+  while keeping message text and editable fields selectable.
+- Add logout transport, duplicate-request, failure/retry and contact-tap regressions.
+
 ### Bundled iOS Messenger — 2026-10-31
 
 - Package the actual Messenger interface, languages and static assets inside the

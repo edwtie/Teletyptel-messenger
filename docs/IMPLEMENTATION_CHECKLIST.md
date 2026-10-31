@@ -3,6 +3,35 @@
 This checklist tracks protocol and product progress. Use `[x]` only when the
 item is implemented, tested and documented.
 
+## iPhone / XMPP Verification — 2026-10-31
+
+The following separates local fixtures from physical-device evidence. Earlier
+successful sign-in reported by the user does not validate pending local fixes.
+The updated startup, logout, camera and layout changes are not yet uploaded.
+
+- [x] Rerun `node tests/message-receipts-ui.test.js`: Chromium/Android and
+  WebKit/iPhone emulation pass with synthetic XMPP and relay packets. Delivery
+  alone does not become displayed; background, unopened chats, history and
+  disconnected clients do not generate false displayed markers. Presence alone
+  does not determine receipt state; late delivery does not downgrade displayed.
+- [x] Local camera lifecycle fixtures and mobile layout/keyboard/rotation tests
+  pass. These do not operate iPhone hardware or a live ejabberd connection.
+- [ ] Publish/install a new approved internal TestFlight build containing the
+  pending fixes; record build number, iPhone model and iOS version.
+- [ ] Test direct-message delivery/displayed markers over real ejabberd between
+  the physical iPhone and a separate account; include offline, background,
+  unopened chat, visible chat, reconnection and other logged-in devices.
+- [ ] Validate cumulative XEP-0333 displayed-marker semantics with another client:
+  current code updates the individually referenced message, not all prior messages.
+- [ ] Validate MUC per-occupant displayed markers; current visible-message
+  acknowledgement code excludes group conversations. Do not label a group as
+  read by everyone based on one marker.
+- [ ] Complete physical iPhone checks for logout/relogin, contact taps, latest
+  message with keyboard, RTT/translation, front/back camera switching and rotation
+  during a two-way audio/video call. Test background/foreground and reconnect.
+
+Procedure and expected observations: [iOS TestFlight](IOS_TESTFLIGHT.md#echte-iphone-afvinklijst).
+
 ## Scope And Claim Boundaries
 
 - [x] README explains the current Alpha 2 evaluation scope.

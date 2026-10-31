@@ -126,6 +126,20 @@ test("Bundled Google exchange keeps the challenge and code on the native server 
   assert.equal(nativeCalls.length, 2);
 });
 
+test("Logout reaches the native authenticated transport instead of a WebView beacon", async () => {
+  const { context, nativeCalls, browserCalls } = fixture();
+  context.accountApiPath = "api/account.php";
+  context.navigator = { sendBeacon() { throw new Error("Wrong session transport"); } };
+  vm.runInNewContext(client.slice(client.indexOf("  async function sendLogoutAccountSession()"),
+    client.indexOf("  function handleAccountIdentityChanged()")), context);
+  await context.sendLogoutAccountSession();
+  assert.equal(nativeCalls.length, 1);
+  assert.equal(browserCalls.length, 0);
+  assert.equal(nativeCalls[0].path, "/api/account.php");
+  assert.equal(JSON.parse(Buffer.from(nativeCalls[0].body, "base64")).action, "logout");
+  assert.equal(nativeCalls[0].omitCookies, false);
+});
+
 test("Native bridge constrains trust, credentials, redirects, cancellation and temporary shares", () => {
   const native = fs.readFileSync(path.join(root, "scripts/ios-testflight/ServerBridge.swift"), "utf8");
   assert.match(native, /url\.scheme == origin\.scheme, url\.host == origin\.host, url\.port == origin\.port/);

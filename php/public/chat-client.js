@@ -3278,6 +3278,7 @@
   }
 
   function startProviderLoginFromDialog(provider) {
+    if (state.logoutInProgress) return;
     if (provider === "google" && window.Capacitor?.getPlatform?.() === "ios") {
       void startNativeGoogleLoginFromDialog();
       return;
@@ -4070,6 +4071,9 @@
   }
 
   function setAccountDialogBusy(busy, text = "") {
+    el.dialogGoogleLoginFallbackButton.disabled = busy;
+    el.dialogGoogleLoginOverlayButton.disabled = busy;
+    el.dialogFacebookLoginButton.disabled = busy;
     el.dialogCreateAccountButton.disabled = busy;
     el.dialogSaveAccountButton.disabled = busy;
     el.dialogConnectButton.disabled = busy;
@@ -4490,6 +4494,8 @@
   }
 
   async function logoutAccount(options = {}) {
+    if (state.logoutInProgress) return;
+    state.logoutInProgress = true;
     state.suppressAutoLoginDialog = false;
     window.clearTimeout(state.sessionIdleTimerId);
     state.sessionIdleTimerId = null;
@@ -4506,34 +4512,44 @@
     el.dialogRememberPasswordToggle.checked = false;
     appendDebug("account", "Signed out and cleared local account session");
     setAccountReady(false);
-    sendLogoutAccountSession()
-      .then(() => appendDebug("account", "Server account session cleared"))
-      .catch((error) => appendDebug("account-logout-error", error.message));
     disconnectAll(options.message || t("account.signed_out", "Signed out. Sign in to continue."), {
-      forceLogin: options.forceLogin === true,
+      forceLogin: true,
       reason: options.reason || "logout"
     });
+    setAccountDialogBusy(true, t("account.signing_out", "Signing out…"));
+    try {
+      await sendLogoutAccountSession();
+      appendDebug("account", "Server account session cleared");
+      el.dialogAccountStatus.textContent = options.message || t("account.signed_out", "Signed out. Sign in to continue.");
+    } catch (error) {
+      appendDebug("account-logout-error", error.message);
+      el.dialogAccountStatus.textContent = t("account.sign_out_failed", "Server sign-out could not be confirmed. Check your connection and try signing out again.");
+      const retry = document.createElement("button");
+      retry.type = "button";
+      retry.textContent = t("account.retry_sign_out", "Retry sign-out");
+      retry.addEventListener("click", () => logoutAccount(options));
+      el.dialogAccountStatus.appendChild(retry);
+    } finally {
+      state.logoutInProgress = false;
+      setAccountDialogBusy(false);
+    }
   }
 
-  function sendLogoutAccountSession() {
+  async function sendLogoutAccountSession() {
     const body = JSON.stringify({ action: "logout" });
-    if (navigator.sendBeacon) {
-      const sent = navigator.sendBeacon(accountApiPath, new Blob([body], { type: "application/json" }));
-      if (sent) {
-        return Promise.resolve();
-      }
-    }
-
-    return fetch(accountApiPath, {
+    const response = await fetch(accountApiPath, {
       method: "POST",
+      credentials: "same-origin",
+      cache: "no-store",
+      redirect: "error",
       headers: { "Content-Type": "application/json" },
       body,
       keepalive: true
-    }).then((response) => {
-      if (!response.ok) {
-        throw new Error(`logout API returned ${response.status}`);
-      }
     });
+    const payload = await response.json();
+    if (!response.ok || payload.ok !== true) {
+      throw new Error(`logout API returned ${response.status}`);
+    }
   }
 
   function handleAccountIdentityChanged() {
@@ -10913,6 +10929,9 @@
   }
 
   async function toggleCallVideoFacingMode() {
+    if (state.call?.mediaSwitches?.has("video")) {
+      return;
+    }
     const currentMode = normalizeVideoFacingMode(el.callVideoFacingInput?.value || state.mediaSettings.videoMessageFacingMode);
     if (el.callVideoFacingInput) {
       el.callVideoFacingInput.value = currentMode === "user" ? "environment" : "user";
@@ -11007,6 +11026,11 @@
   }
 
   async function handleMediaSettingsChange(kind, source = "main") {
+    if (state.call?.mediaSwitches?.has(kind)) {
+      renderMediaDeviceSelects();
+      return;
+    }
+    const previousSettings = { ...state.mediaSettings };
     saveMediaSettingsFromControls(false, source);
     if ((source === "dialog" || source === "recorder")
       && state.videoRecorder.previewStream
@@ -11032,11 +11056,24 @@
       setMediaStatus(kind === "audio"
         ? t("media.switching_microphone", "Switching microphone...")
         : t("media.switching_camera", "Switching camera..."));
-      await replaceLocalMediaTrack(kind);
+      const replaced = await replaceLocalMediaTrack(kind);
+      if (!replaced || state.call !== call) {
+        return;
+      }
       setMediaStatus(kind === "audio"
         ? t("media.microphone_switched", "Microphone switched for this call.")
         : t("media.camera_switched", "Camera switched for this call."));
     } catch (error) {
+      if (state.call !== call) {
+        return;
+      }
+      const fields = kind === "audio" ? ["microphoneDeviceId"]
+        : ["cameraDeviceId", "videoQuality", "videoMessageFacingMode"];
+      for (const field of fields) {
+        state.mediaSettings[field] = previousSettings[field];
+      }
+      localStorage.setItem(mediaSettingsStorageKey, JSON.stringify(state.mediaSettings));
+      renderMediaDeviceSelects();
       setMediaStatus(`${kind === "audio"
         ? t("media.microphone_switch_failed", "Microphone switch failed")
         : t("media.camera_switch_failed", "Camera switch failed")}: ${error.message}`);
@@ -12448,10 +12485,7 @@
   }
 
   function selectedVideoFacingModeForCapture() {
-    const mode = normalizeVideoFacingMode(state.mediaSettings.videoMessageFacingMode);
-    return isAppleMobileBrowser()
-      ? mode === "environment" ? "user" : "environment"
-      : mode;
+    return normalizeVideoFacingMode(state.mediaSettings.videoMessageFacingMode);
   }
 
   function normalizeVideoFacingMode(value) {
@@ -12530,55 +12564,66 @@
 
   async function replaceLocalMediaTrack(kind) {
     const call = state.call;
-    if (!call?.localStream || !call.pc) {
-      return;
+    if (!call?.localStream || !call.pc || call.mediaSwitches?.has(kind)) {
+      return false;
     }
-
-    const constraints = kind === "audio"
-      ? createAudioOnlyConstraints()
-      : createVideoOnlyConstraints();
-    markMediaCaptureTransition(`replace-${kind}-track`, 12000);
-    const replacementStream = await navigator.mediaDevices.getUserMedia(constraints);
-    const replacementTrack = replacementStream.getTracks().find((track) => track.kind === kind);
-    if (!replacementTrack) {
-      stopStream(replacementStream);
-      throw new Error(kind === "audio"
-        ? t("media.no_microphone_track", "No microphone track was returned.")
-        : t("media.no_camera_track", "No camera track was returned."));
-    }
-
-    const oldTracks = kind === "audio"
-      ? call.localStream.getAudioTracks()
-      : call.localStream.getVideoTracks();
-    const wasEnabled = oldTracks.length === 0 || oldTracks.some((track) => track.enabled);
-    replacementTrack.enabled = wasEnabled;
-
-    const sender = call.pc.getSenders().find((item) => item.track?.kind === kind);
-    if (!sender) {
-      stopStream(replacementStream);
-      throw new Error(kind === "audio"
-        ? t("media.no_microphone_sender", "No active microphone sender was found.")
-        : t("media.no_camera_sender", "No active camera sender was found."));
-    }
-
-    await sender.replaceTrack(replacementTrack);
-    for (const oldTrack of oldTracks) {
-      call.localStream.removeTrack(oldTrack);
-      oldTrack.stop();
-    }
-
-    call.localStream.addTrack(replacementTrack);
-    watchCallVideoTrack(call, replacementTrack);
-    for (const extraTrack of replacementStream.getTracks()) {
-      if (extraTrack !== replacementTrack) {
-        extraTrack.stop();
+    const localStream = call.localStream;
+    const connection = call.pc;
+    const isCurrent = () => state.call === call && call.localStream === localStream && call.pc === connection;
+    call.mediaSwitches ??= new Set();
+    call.mediaSwitches.add(kind);
+    let replacementStream;
+    let retainedTrack;
+    try {
+      const constraints = kind === "audio"
+        ? createAudioOnlyConstraints()
+        : createVideoOnlyConstraints();
+      markMediaCaptureTransition(`replace-${kind}-track`, 12000);
+      replacementStream = await navigator.mediaDevices.getUserMedia(constraints);
+      if (!isCurrent()) {
+        return false;
       }
+      const replacementTrack = replacementStream.getTracks().find((track) => track.kind === kind);
+      if (!replacementTrack) {
+        throw new Error(kind === "audio"
+          ? t("media.no_microphone_track", "No microphone track was returned.")
+          : t("media.no_camera_track", "No camera track was returned."));
+      }
+      const oldTracks = kind === "audio" ? localStream.getAudioTracks() : localStream.getVideoTracks();
+      replacementTrack.enabled = oldTracks.length === 0 || oldTracks.some((track) => track.enabled);
+      const sender = connection.getSenders().find((item) => item.track?.kind === kind);
+      if (!sender) {
+        throw new Error(kind === "audio"
+          ? t("media.no_microphone_sender", "No active microphone sender was found.")
+          : t("media.no_camera_sender", "No active camera sender was found."));
+      }
+      await sender.replaceTrack(replacementTrack);
+      if (!isCurrent()) {
+        return false;
+      }
+      replacementTrack.enabled = oldTracks.length === 0 || oldTracks.some((track) => track.enabled);
+      for (const oldTrack of oldTracks) {
+        localStream.removeTrack(oldTrack);
+        oldTrack.stop();
+      }
+      localStream.addTrack(replacementTrack);
+      retainedTrack = replacementTrack;
+      watchCallVideoTrack(call, replacementTrack);
+      updateVideoElementSource(el.localVideo, localStream);
+      el.callPanel.hidden = false;
+      await refreshMediaDevices(false);
+      if (isCurrent()) {
+        updateCallUi();
+      }
+      return true;
+    } finally {
+      for (const track of replacementStream?.getTracks() ?? []) {
+        if (track !== retainedTrack) {
+          track.stop();
+        }
+      }
+      call.mediaSwitches.delete(kind);
     }
-
-    updateVideoElementSource(el.localVideo, call.localStream);
-    el.callPanel.hidden = false;
-    await refreshMediaDevices(false);
-    updateCallUi();
   }
 
   function totalConversationTranscript(call) {
@@ -14181,7 +14226,7 @@
         renderConversations();
         renderActiveConversation();
         syncConversationMessageState(conversation, "select");
-        el.messageInput.focus();
+        focusConversationComposer();
       });
       button.addEventListener("contextmenu", (event) => showConversationContextMenu(event, conversation, button));
       button.addEventListener("keydown", (event) => {
@@ -14235,7 +14280,18 @@
     return badge;
   }
 
+  function focusConversationComposer() {
+    const touchDevice = ["phone", "tablet"].includes(document.body.dataset.deviceClass)
+      || window.matchMedia?.("(pointer: coarse)")?.matches === true;
+    if (touchDevice) {
+      if (document.activeElement?.matches("input, textarea")) document.activeElement.blur();
+      return;
+    }
+    el.messageInput.focus();
+  }
+
   function closeActiveConversation() {
+    if (document.activeElement === el.messageInput) el.messageInput.blur();
     state.activeConversationId = null;
     state.previousText = "";
     el.messageInput.value = "";

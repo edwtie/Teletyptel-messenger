@@ -25,6 +25,7 @@ on:
       - php/public/favicon.ico
       - tests/ios-bundled-runtime.test.js
       - tests/native-google.test.js
+      - tests/call-camera-switch.test.js
   workflow_dispatch:
 
 permissions:

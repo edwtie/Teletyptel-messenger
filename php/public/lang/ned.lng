@@ -777,4 +777,7 @@ button.admin_tools=Gebruikersbeheer
 account.native_provider_unavailable=Gebruik Google of e-mail om in deze app aan te melden. Andere providers zijn via de website beschikbaar.
 account.native_link_unavailable=Koppel aanmeldproviders via de website.
 download.failed=Downloaden is mislukt.
+account.signing_out=Bezig met uitloggen…
+account.sign_out_failed=Uitloggen bij de server is niet bevestigd. Controleer je verbinding en probeer opnieuw.
+account.retry_sign_out=Opnieuw uitloggen
 account.native_server_unavailable=De server is niet bereikbaar. Controleer wifi, WAMP en het vertrouwde certificaat en probeer opnieuw aan te melden.

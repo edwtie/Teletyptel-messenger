@@ -1,0 +1,31 @@
+.native-startup {
+  display: none;
+}
+
+body.account-booting .native-startup {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  place-content: center;
+  justify-items: center;
+  box-sizing: border-box;
+  padding: 24px;
+  text-align: center;
+  font: 16px system-ui;
+  color: #17395e;
+  background: #fff;
+  z-index: 10000;
+}
+
+.native-startup img {
+  display: block;
+  width: 280px;
+  max-width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+
+.native-startup p {
+  margin: 24px 0 0;
+}

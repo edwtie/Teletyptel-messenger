@@ -25,6 +25,13 @@ function prepare() {
     .filter(file => /\.(swift|pbxproj|plist|storyboard|xcconfig|json|png)$/.test(file)
       && !/(?:public\/|capacitor\.config|xcuserdata|Package\.resolved)/.test(file));
   for (const file of files) write(file, execFileSync("git", ["show", "HEAD:" + file], { cwd: root, maxBuffer: 20 * 1024 * 1024 }));
+  write("ios/App/App/Base.lproj/LaunchScreen.storyboard", fs.readFileSync(path.join(__dirname, "LaunchScreen.storyboard")));
+  const launchAssets = "ios/App/App/Assets.xcassets/TeleTypTelLaunch.imageset/";
+  write(launchAssets + "logo.png", fs.readFileSync(path.join(root, "php/public/assets/brand/teletyptel-logo-header@2x.png")));
+  write(launchAssets + "Contents.json", JSON.stringify({
+    images: [{ idiom: "universal", filename: "logo.png", scale: "2x" }],
+    info: { version: 1, author: "xcode" }
+  }, null, 2));
   for (const file of webAssets) write("www/" + file, fs.readFileSync(path.join(__dirname, "www", file)));
   const frontendAssets = bundleFrontend(write, config.serverUrl);
   const delegate = "ios/App/App/AppDelegate.swift";

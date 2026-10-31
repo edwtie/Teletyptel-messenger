@@ -55,7 +55,7 @@ for (const [name, engine] of Object.entries({ chromium, webkit })) {
               for (const text of ["Hallo test", "Dit is een gewoon bericht met meerdere woorden.", "https://example.test/" + "lang".repeat(30)]) {
                 const message = document.createElement("div");
                 message.className = "message with-avatar has-inline-meta has-bubble-tail " + direction;
-                message.innerHTML = '<div class="avatar message-avatar">ET</div><div class="message-content"><div class="message-body-wrap"><div class="message-body"><span class="message-text-content"></span></div><button class="message-reaction-button" type="button" aria-label="Reageren">☺</button></div></div>';
+                message.innerHTML = '<div class="avatar message-avatar">ET</div><div class="message-content"><div class="message-body-wrap"><div class="message-body"><span class="message-text-content"></span> <span class="message-inline-meta">12:34 <span class="message-receipt message-receipt-delivered">✓✓</span></span></div><button class="message-reaction-button" type="button" aria-label="Reageren">☺</button></div></div>';
                 message.querySelector(".message-text-content").textContent = text;
                 timeline.append(message);
               }

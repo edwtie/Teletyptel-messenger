@@ -77,6 +77,24 @@ test("The bundled startup file contains the real Messenger, not a server redirec
   assert.ok(html.indexOf('src="native-server.js"') < html.indexOf('src="chat-client.js'));
 });
 
+test("Native launch and web startup share the unchanged TeleTypTel logo", () => {
+  const storyboard = fs.readFileSync(path.join(project, "ios/App/App/Base.lproj/LaunchScreen.storyboard"), "utf8");
+  assert.match(storyboard, /launchScreen="YES"/);
+  assert.match(storyboard, /contentMode="scaleAspectFit" image="TeleTypTelLaunch"/);
+  assert.match(storyboard, /multiplier="599:128"/);
+  assert.match(storyboard, /id="logo-max-width"/);
+  assert.match(storyboard, /id="logo-max-height"/);
+  const catalog = path.join(project, "ios/App/App/Assets.xcassets/TeleTypTelLaunch.imageset");
+  const images = JSON.parse(fs.readFileSync(path.join(catalog, "Contents.json"), "utf8")).images;
+  assert.deepEqual(images, [{ idiom: "universal", filename: "logo.png", scale: "2x" }]);
+  assert.deepEqual(fs.readFileSync(path.join(catalog, "logo.png")),
+    fs.readFileSync(path.join(project, "www/assets/brand/teletyptel-logo-header@2x.png")));
+  const html = fs.readFileSync(path.join(project, "www/chat.html"), "utf8");
+  assert.match(html, /class="native-startup"[^>]*><img src="assets\/brand\/teletyptel-logo-header@2x.png"/);
+  const plist = fs.readFileSync(path.join(project, "ios/App/App/Info.plist"), "utf8");
+  assert.match(plist, /<key>UILaunchStoryboardName<\/key>\s*<string>LaunchScreen<\/string>/);
+});
+
 test("Google native sign-in uses the supplied iOS client and a separate server client", () => {
   const plist = fs.readFileSync(path.join(project, "ios/App/App/Info.plist"), "utf8");
   assert.ok(plist.includes(google.clientId));
