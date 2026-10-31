@@ -306,6 +306,7 @@
     xmppSession: null,
     intentionalDisconnect: false,
     xmppAuthRefreshAttempted: false,
+    xmppRecovery: { attempts: 0, connectionTimer: null, pingTimer: null, ping: null },
     account: null,
     pendingLoginTwoFactor: null,
     accountSettingsPanel: "profile",
@@ -1173,6 +1174,7 @@
     document.addEventListener("focusin", scheduleVisibleMessageAcknowledgements);
     el.scrollToLatestButton.addEventListener("click", scrollMessageTimelineToLatest);
     document.addEventListener("visibilitychange", handleVisibilityLifecycleChange);
+    window.addEventListener("online", () => recoverXmppConnection("network-online"));
     window.addEventListener("focus", () => setClientLifecycleState("active", "focus"));
     window.addEventListener("blur", handleWindowLifecycleBlur);
     window.addEventListener("pageshow", () => setClientLifecycleState("active", "pageshow"));
@@ -1412,6 +1414,7 @@
     state.clientLifecycle.current = normalized;
     if (changed || options.force === true) {
       flushClientLifecycleState(reason, options.force === true);
+      if (normalized === "active") recoverXmppConnection(reason);
     }
     if (normalized === "active") scheduleVisibleMessageAcknowledgements();
   }
@@ -6253,6 +6256,7 @@
   }
 
   function scheduleMediaTransportReconnect(kind, reason) {
+    if (kind === "xmpp") return scheduleXmppReconnect(reason);
     if (!shouldReconnectAfterMediaTransportClose()) {
       return false;
     }
@@ -6300,25 +6304,110 @@
     }
   }
 
+  function canRecoverXmppConnection() {
+    return state.mode === "xmpp" && state.accountReady && !state.accountGateRequired && !state.intentionalDisconnect;
+  }
+
+  function scheduleXmppReconnect(reason, immediate = false) {
+    if (!canRecoverXmppConnection()) return false;
+    setConnectionStatus(t("status.reconnecting", "Reconnecting..."), "warn");
+    if (navigator.onLine === false || (document.visibilityState === "hidden" && !state.call)) return true;
+    if (state.clientLifecycle.transientReconnectTimer) return true;
+    const delay = immediate ? 0 : Math.min(30000, 1000 * 2 ** Math.min(state.xmppRecovery.attempts, 5));
+    state.xmppRecovery.attempts += 1;
+    appendDebug("xmpp-reconnect", `${reason}; retry in ${delay}ms`);
+    state.clientLifecycle.transientReconnectTimer = window.setTimeout(() => {
+      state.clientLifecycle.transientReconnectTimer = null;
+      if (!canRecoverXmppConnection() || navigator.onLine === false
+        || (document.visibilityState === "hidden" && !state.call)) return;
+      connectXmppWebSocket();
+    }, delay);
+    return true;
+  }
+
+  function recoverXmppConnection(reason) {
+    if (!canRecoverXmppConnection() || navigator.onLine === false) return;
+    if (state.xmppSocket?.readyState === WebSocket.OPEN && state.xmppSession?.phase === "ready") {
+      clearXmppPing();
+      sendXmppHeartbeat();
+    } else if (!state.xmppSocket || state.xmppSocket.readyState >= WebSocket.CLOSING) {
+      window.clearTimeout(state.clientLifecycle.transientReconnectTimer);
+      state.clientLifecycle.transientReconnectTimer = null;
+      scheduleXmppReconnect(reason, true);
+    }
+  }
+
+  function retireXmppSocket(socket, reason) {
+    if (state.xmppSocket !== socket) return;
+    stopXmppHeartbeat();
+    window.clearTimeout(state.xmppRecovery.connectionTimer);
+    state.xmppRecovery.connectionTimer = null;
+    window.clearTimeout(state.xmppSession?.streamManagement?.fallbackTimer);
+    state.xmppSocket = null;
+    state.xmppSession = null;
+    state.clientLifecycle.xmppLastSent = null;
+    el.xmppOpenButton.disabled = false;
+    el.xmppCloseButton.disabled = true;
+    setAllContactPresence("offline");
+    updateComposerAvailability();
+    updateConnectButtonAvailability();
+    try { socket.close(); } catch { }
+    appendDebug("xmpp", reason);
+    scheduleXmppReconnect(reason);
+  }
+
+  function clearXmppPing() {
+    window.clearTimeout(state.xmppRecovery.pingTimer);
+    state.xmppRecovery.pingTimer = null;
+    state.xmppRecovery.ping = null;
+  }
+
+  function sendXmppHeartbeat() {
+    const socket = state.xmppSocket;
+    if (socket?.readyState !== WebSocket.OPEN || state.xmppSession?.phase !== "ready"
+      || state.xmppRecovery.ping || state.intentionalDisconnect
+      || (document.visibilityState === "hidden" && !state.call)) return;
+    const id = createMessageId("ping");
+    state.xmppRecovery.ping = { id, socket };
+    state.xmppRecovery.pingTimer = window.setTimeout(() => {
+      if (state.xmppRecovery.ping?.id !== id || state.xmppSocket !== socket) return;
+      clearXmppPing();
+      if (document.visibilityState === "hidden" && !state.call) return;
+      retireXmppSocket(socket, "ping-timeout");
+    }, 15000);
+    try {
+      sendXmppStanza(`<iq xmlns="jabber:client" type="get" id="${escapeXml(id)}"><ping xmlns="urn:xmpp:ping"/></iq>`, `ping ${id}`);
+    } catch {
+      retireXmppSocket(socket, "ping-send-failed");
+    }
+  }
+
+  function handleXmppPing(iq) {
+    const type = iq.getAttribute("type");
+    const id = iq.getAttribute("id");
+    const from = iq.getAttribute("from") || "";
+    const pending = state.xmppRecovery.ping;
+    if ((type === "result" || type === "error") && pending?.id === id
+      && pending.socket === state.xmppSocket
+      && (!from || from === state.xmppSession?.domain || from === bareJid(state.xmppSession?.boundJid || ""))) {
+      clearXmppPing();
+      return true;
+    }
+    const ping = Array.from(iq.children || []).some(child => child.localName === "ping" && child.namespaceURI === "urn:xmpp:ping");
+    if (type === "get" && id && ping) {
+      sendXmppStanza(`<iq xmlns="jabber:client" type="result" id="${escapeXml(id)}"${from ? ` to="${escapeXml(from)}"` : ""}/>`, "<iq ping-result/>");
+      return true;
+    }
+    return false;
+  }
+
   function startXmppHeartbeat() {
     stopXmppHeartbeat();
-    state.websocketHeartbeat.xmppTimer = window.setInterval(() => {
-      if (state.xmppSocket?.readyState !== WebSocket.OPEN || !state.xmppSession?.authenticated) {
-        return;
-      }
-
-      const id = createMessageId("ping");
-      const xml = `<iq xmlns="jabber:client" type="get" id="${escapeXml(id)}"><ping xmlns="urn:xmpp:ping"/></iq>`;
-      try {
-        sendXmppStanza(xml, `ping ${id}`);
-        appendDebug("xmpp-heartbeat", id);
-      } catch (error) {
-        appendDebug("xmpp-heartbeat-error", error.message);
-      }
-    }, websocketHeartbeatMs);
+    state.websocketHeartbeat.xmppTimer = window.setInterval(sendXmppHeartbeat, websocketHeartbeatMs);
   }
 
   function stopXmppHeartbeat() {
+    clearXmppPing();
     if (state.websocketHeartbeat.xmppTimer) {
       window.clearInterval(state.websocketHeartbeat.xmppTimer);
       state.websocketHeartbeat.xmppTimer = null;
@@ -6435,6 +6524,8 @@
 
   function returnToLoginScreenAfterDisconnect(message, options = {}) {
     state.intentionalDisconnect = true;
+    window.clearTimeout(state.xmppRecovery.connectionTimer);
+    state.xmppRecovery.connectionTimer = null;
     clearTimeout(state.clientLifecycle.transientReconnectTimer);
     state.clientLifecycle.transientReconnectTimer = null;
     setAccountReady(false);
@@ -8192,20 +8283,33 @@
   }
 
   function connectXmppWebSocket() {
-    if (state.xmppSocket && state.xmppSocket.readyState === WebSocket.OPEN) {
+    if (state.xmppSocket && [WebSocket.CONNECTING, WebSocket.OPEN].includes(state.xmppSocket.readyState)) {
       return;
     }
 
     state.intentionalDisconnect = false;
     const url = normalizeXmppWebSocketUrl(normalizeLocalXmppWebSocketUrlForCurrentHost(el.xmppUrlInput.value.trim()));
     el.xmppUrlInput.value = url;
-    const socket = new WebSocket(url, "xmpp");
+    let socket;
+    try {
+      socket = new WebSocket(url, "xmpp");
+    } catch {
+      returnToLoginScreenAfterDisconnect(t("account.connection_failed_login_required", "Connection failed. Sign in to try again."));
+      return;
+    }
+    window.clearTimeout(state.clientLifecycle.transientReconnectTimer);
+    state.clientLifecycle.transientReconnectTimer = null;
+    window.clearTimeout(state.xmppRecovery.connectionTimer);
+    state.xmppRecovery.connectionTimer = window.setTimeout(() => {
+      if (state.xmppSocket === socket && state.xmppSession?.phase !== "ready") retireXmppSocket(socket, "connection-timeout");
+    }, 30000);
     state.xmppSocket = socket;
     state.xmppSession = createXmppSession();
     setMode("xmpp");
     appendDebug("xmpp", "Connecting " + url);
 
     socket.addEventListener("open", () => {
+      if (state.xmppSocket !== socket || state.intentionalDisconnect) return;
       el.xmppOpenButton.disabled = true;
       el.xmppCloseButton.disabled = false;
       setDefaultComposerState();
@@ -8214,6 +8318,7 @@
     });
 
     socket.addEventListener("message", (event) => {
+      if (state.xmppSocket !== socket || state.intentionalDisconnect) return;
       appendDebug("S", event.data);
       if (String(event.data).includes("urn:xmpp:csi:0")) {
         flushClientLifecycleState("xmpp-csi-feature", true);
@@ -8221,41 +8326,18 @@
       handleXmppIncomingFrame(event.data);
     });
 
-    socket.addEventListener("close", () => {
-      stopXmppHeartbeat();
-      window.clearTimeout(state.xmppSession?.streamManagement?.fallbackTimer);
-      el.xmppOpenButton.disabled = false;
-      el.xmppCloseButton.disabled = true;
-      const wasReady = state.accountReady;
-      state.xmppSocket = null;
-      state.xmppSession = null;
-      state.clientLifecycle.xmppLastSent = null;
-      appendDebug("xmpp", "Closed");
-      updateComposerAvailability();
-      updateConnectButtonAvailability();
-      if (scheduleMediaTransportReconnect("xmpp", "close")) {
-        return;
-      }
-
-      if (!state.intentionalDisconnect && wasReady) {
+    socket.addEventListener("close", (event) => {
+      if (state.xmppSocket !== socket) return;
+      if (event.code === 1008 && !state.intentionalDisconnect) {
         returnToLoginScreenAfterDisconnect(t("account.disconnected_login_required", "Connection closed. Sign in to continue."));
       }
+      retireXmppSocket(socket, `closed code=${event.code}`);
     });
 
     socket.addEventListener("error", () => {
+      if (state.xmppSocket !== socket || state.intentionalDisconnect) return;
       appendDebug("xmpp-error", "WebSocket error");
-      setConnectionStatus(t("status.xmpp_error", "XMPP connection error"), "danger");
-      if (!state.intentionalDisconnect && state.accountReady) {
-        window.setTimeout(() => {
-          if (!state.xmppSocket || state.xmppSocket.readyState === WebSocket.CLOSED) {
-            if (scheduleMediaTransportReconnect("xmpp", "error")) {
-              return;
-            }
-
-            returnToLoginScreenAfterDisconnect(t("account.connection_failed_login_required", "Connection failed. Sign in to try again."));
-          }
-        }, 0);
-      }
+      retireXmppSocket(socket, "transport-error");
     });
   }
 
@@ -8478,6 +8560,9 @@
     }
 
     state.xmppAuthRefreshAttempted = false;
+    state.xmppRecovery.attempts = 0;
+    window.clearTimeout(state.xmppRecovery.connectionTimer);
+    state.xmppRecovery.connectionTimer = null;
     state.xmppSession.phase = "ready";
     state.xmppPresenceSubscriptionRequests.clear();
     setAllContactPresence("offline");
@@ -8586,6 +8671,12 @@
   }
 
   function closeXmppWebSocket() {
+    state.intentionalDisconnect = true;
+    window.clearTimeout(state.clientLifecycle.transientReconnectTimer);
+    state.clientLifecycle.transientReconnectTimer = null;
+    window.clearTimeout(state.xmppRecovery.connectionTimer);
+    state.xmppRecovery.connectionTimer = null;
+    stopXmppHeartbeat();
     xmppTranslation.disconnect();
     xmppRttStates = new WeakMap();
     for (const conversation of state.conversations) {
@@ -9215,6 +9306,19 @@
     trackIncomingXmppStanzas(doc);
     handleXmppStreamManagement(doc);
     handleXmppMamFin(doc);
+
+    const streamError = doc.getElementsByTagNameNS("http://etherx.jabber.org/streams", "error")[0];
+    if (streamError) {
+      const terminal = ["conflict", "not-authorized", "policy-violation"].some(condition =>
+        streamError.getElementsByTagNameNS("urn:ietf:params:xml:ns:xmpp-streams", condition).length > 0);
+      if (terminal) {
+        returnToLoginScreenAfterDisconnect(t("account.disconnected_login_required", "Connection closed. Sign in to continue."));
+        closeXmppWebSocket();
+      } else {
+        retireXmppSocket(state.xmppSocket, "stream-error");
+      }
+      return;
+    }
 
     const features = doc.getElementsByTagNameNS("http://etherx.jabber.org/streams", "features")[0];
     if (features) {
@@ -14208,6 +14312,7 @@
   }
 
   function handleXmppIqElement(iqElement) {
+    if (handleXmppPing(iqElement)) return true;
     if (xmppTranslation.handleIq(iqElement)) return true;
     const rosterQuery = iqElement.getElementsByTagNameNS(xmppRosterNamespace, "query")[0];
     if (!rosterQuery) {

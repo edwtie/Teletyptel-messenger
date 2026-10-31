@@ -3,6 +3,47 @@
 This checklist tracks protocol and product progress. Use `[x]` only when the
 item is implemented, tested and documented.
 
+## XMPP connection recovery — 2026-10-31
+
+- [x] Reconnect ordinary signed-in chats after transient socket loss without clearing
+  their draft or opening sign-in. Back off from 1 to 30 seconds, wait while offline
+  or hidden without a call, and recover on foreground/network return.
+- [x] Guard stale socket callbacks and duplicate connection attempts. Time out a
+  stalled handshake and unanswered ping. Answer server IQ pings, accept matching
+  result/error replies only from the server or the user's bare JID.
+- [x] Keep logout, account gates and authentication/policy rejection authoritative;
+  do not weaken the existing optional 30-minute inactivity logout.
+- [ ] Test the new build on a physical iPhone: active chat, lock/unlock, app switching,
+  Wi-Fi loss/return and a server restart. Verify the draft survives, contacts return,
+  messages/calls work again and explicit logout never reconnects automatically.
+- [ ] Diagnose any remaining real-device disconnect using its close code/timing.
+  Local controlled recovery tests do not identify every possible network cause.
+
+Ping behavior follows [XEP-0199](https://xmpp.org/extensions/xep-0199.html).
+This does not promise an always-running background socket or implement push calling.
+
+## Opt-in iPhone contact selection — 2026-10-31
+
+- [x] Add a bundled-app-only action to request one phone number through a native
+  bridge. JavaScript fixtures cover opt-in behavior, cancellation, errors, duplicate
+  taps and stale results. No fetch, storage or address-book synchronization is used.
+- [x] Prepare `ContactsPlugin.swift` for the isolated native build, with an explicit
+  allow/cancel alert before `CNContactPickerViewController` and selection restricted
+  to a phone-number property. No `CNContactStore` enumeration or full-access request.
+- [ ] Compile the new Swift plugin with Xcode in a new approved build; build 9.1
+  does not contain this feature. Local source checks are not a native runtime test.
+- [ ] Physical iPhone: decline consent; cancel the picker; choose between multiple
+  numbers; choose a contact with no number; verify draft preservation, rotation and
+  no automatic call/upload. Contacts without numbers should not be selectable.
+- [ ] Physical iPhone: verify selection also works without granting broad Contacts
+  access, and that only the selected number reaches the dialer. No names, notes,
+  photos or contact identifiers are returned by the plugin.
+
+This is one-time selection, not ongoing synchronization. Apple describes the picker
+as one-time access to user-selected contacts, independent of broad Contacts access:
+[Apple: Meet the Contact Access Button](https://developer.apple.com/videos/play/wwdc2024/10121/).
+TeleTypTel additionally asks for consent in its own native confirmation dialog.
+
 ## Mobile number dialer — 2026-10-31
 
 - [x] Phone icon and keypad/contact choices use known TeleTypTel contact numbers;

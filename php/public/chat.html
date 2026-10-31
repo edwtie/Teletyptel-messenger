@@ -15,8 +15,8 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="favicon.ico" sizes="any">
   <link rel="apple-touch-icon" href="assets/brand/teletyptel-icon-192.png">
-  <link rel="stylesheet" href="chat-client.css?v=20261031-login-heading">
-  <link rel="stylesheet" href="chat-dialer.css?v=20261031-dialer-contacts">
+  <link rel="stylesheet" href="chat-client.css?v=20261031-chat-button-spacing">
+  <link rel="stylesheet" href="chat-dialer.css?v=20261031-keypad-letters">
 </head>
 <body class="account-booting">
   <a class="skip-link" href="#messageInput" data-i18n="button.skip_to_message">Skip to message</a>
@@ -1339,34 +1339,39 @@
         </button>
       </nav>
       <section id="phoneDialerContactsPanel" aria-labelledby="phoneDialerContactsView" hidden>
-        <p class="phone-dialer-hint" data-i18n="dialer.contacts_hint">Choose a known TeleTypTel contact number. Your phone's address book is not accessed.</p>
+        <button id="phoneDialerDeviceContact" type="button" hidden data-i18n="dialer.iphone_contact">Choose an iPhone contact</button>
+        <p id="phoneDialerDeviceError" class="phone-dialer-error" role="status" hidden data-i18n="dialer.device_error">Could not select a phone number. Please try again.</p>
+        <p class="phone-dialer-hint" data-i18n="dialer.contacts_hint">Choose a known TeleTypTel number, or use the iPhone app to select one from your device after permission. No automatic address book import.</p>
         <p id="phoneDialerContactsEmpty" role="status" data-i18n="dialer.contacts_empty">No contact phone numbers available yet.</p>
         <div id="phoneDialerContactsList" class="phone-dialer-contacts"></div>
       </section>
       <section id="phoneDialerKeypadPanel" aria-labelledby="phoneDialerKeypadView">
-      <p class="phone-dialer-mode" data-i18n="dialer.mode">RTT as standard when supported</p>
+      <p class="phone-dialer-mode" data-i18n="dialer.mode">TC (Total Conversation), where supported</p>
       <label for="phoneDialerNumber" data-i18n="dialer.number">Phone number</label>
       <input id="phoneDialerNumber" type="tel" inputmode="none" autocomplete="off" spellcheck="false" maxlength="40" placeholder="+31 …" aria-describedby="phoneDialerHint phoneDialerInvalid">
       <p id="phoneDialerHint" class="phone-dialer-hint" data-i18n="dialer.hint">Include the country code, for example +31.</p>
       <p id="phoneDialerInvalid" class="phone-dialer-error" role="status" hidden data-i18n="dialer.invalid">Use + and digits, with a country code (at most 15 digits). No extensions or SIP addresses.</p>
       <div id="phoneDialerKeys" class="phone-dialer-keys" role="group" aria-label="Keypad" data-i18n-aria-label="dialer.keypad">
         <button type="button" data-digit="1">1</button>
-        <button type="button" data-digit="2">2</button>
-        <button type="button" data-digit="3">3</button>
-        <button type="button" data-digit="4">4</button>
-        <button type="button" data-digit="5">5</button>
-        <button type="button" data-digit="6">6</button>
-        <button type="button" data-digit="7">7</button>
-        <button type="button" data-digit="8">8</button>
-        <button type="button" data-digit="9">9</button>
+        <button type="button" data-digit="2"><span>2</span><span class="phone-dialer-letters">ABC</span></button>
+        <button type="button" data-digit="3"><span>3</span><span class="phone-dialer-letters">DEF</span></button>
+        <button type="button" data-digit="4"><span>4</span><span class="phone-dialer-letters">GHI</span></button>
+        <button type="button" data-digit="5"><span>5</span><span class="phone-dialer-letters">JKL</span></button>
+        <button type="button" data-digit="6"><span>6</span><span class="phone-dialer-letters">MNO</span></button>
+        <button type="button" data-digit="7"><span>7</span><span class="phone-dialer-letters">PQRS</span></button>
+        <button type="button" data-digit="8"><span>8</span><span class="phone-dialer-letters">TUV</span></button>
+        <button type="button" data-digit="9"><span>9</span><span class="phone-dialer-letters">WXYZ</span></button>
         <button type="button" data-digit="+">+</button>
         <button type="button" data-digit="0">0</button>
         <button id="phoneDialerBackspace" type="button" aria-label="Delete digit" data-i18n-aria-label="dialer.delete">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M9 5h12v14H9l-7-7ZM12 9l6 6m0-6-6 6"/></svg>
         </button>
       </div>
-      <p id="phoneDialerAvailability" class="phone-dialer-availability" data-i18n="dialer.unavailable">Not connected yet. The SIP/RTT provider will be added later.</p>
-      <button id="phoneDialerCall" type="submit" disabled aria-describedby="phoneDialerAvailability" data-i18n="dialer.call">Call with RTT</button>
+      <p id="phoneDialerAvailability" class="phone-dialer-availability" data-i18n="dialer.unavailable">Not connected yet. The SIP provider will be added later.</p>
+      <button id="phoneDialerCall" class="icon-button total-conversation-button" type="submit" disabled aria-describedby="phoneDialerAvailability" title="Call with TC" aria-label="Call with TC" data-i18n-title="dialer.call" data-i18n-aria-label="dialer.call">
+        <span class="material-icon" data-icon="rtt" aria-hidden="true"></span>
+        <span class="sr-only" data-i18n="dialer.call">Call with TC</span>
+      </button>
       <p class="phone-dialer-hint" data-i18n="dialer.no_calls">No calls or emergency calls yet. Numbers are not sent or saved.</p>
       </section>
     </form>
@@ -1401,13 +1406,13 @@
     </div>
     <button id="callKeypadTextButton" type="button" data-i18n="call.keyboard">Type real-time text</button>
   </dialog>
-  <script src="chat-dialer.js?v=20261031-dialer-contacts"></script>
+  <script src="chat-dialer.js?v=20261031-iphone-contacts"></script>
   <script src="vendor/qrcode.js?v=20260623-history-privacy-copy"></script>
   <script src="jingle-history.js?v=20260615-jingle-history"></script>
   <script src="chat-xmpp-translation.js?v=20261027-inline-interpreter"></script>
   <script src="chat-translation.js?v=20261031-bundled-interface"></script>
   <script src="native-google.js?v=20261031-bundled-interface"></script>
-  <script src="chat-client.js?v=20261031-dialer-contacts"></script>
+  <script src="chat-client.js?v=20261031-xmpp-recovery"></script>
   <script src="chat-interpreter.js?v=20261027-inline-interpreter"></script>
   <script src="mobile-navigation.js?v=20261031-contact-actions"></script>
 </body>

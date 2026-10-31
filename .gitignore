@@ -36,3 +36,14 @@ php/public/config/google-maps.json
 php/public/uploads/*
 !php/public/uploads/.gitkeep
 tmp-oauth-smoke.png
+mobile/android/local.config.json
+mobile/android/www/connection.js
+android/.gradle/
+android/local.properties
+android/**/build/
+android/app/src/main/assets/
+android/app/src/debug/res/raw/
+android/app/src/debug/res/xml/network_security_config.xml
+android/capacitor-cordova-android-plugins/
+*.jks
+*.keystore

@@ -1,0 +1,4 @@
+{
+  "serverUrl": "https://192.168.0.105/chat.html",
+  "caCertificate": "C:/path/to/public-test-ca.cer"
+}

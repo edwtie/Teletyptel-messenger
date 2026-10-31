@@ -6779,7 +6779,7 @@ body[data-theme="dark"] .attachment-menu-panel button:hover:not(:disabled) {
     flex: 0 0 auto;
     flex-wrap: nowrap;
     width: auto;
-    gap: 0;
+    gap: 8px;
   }
 
   body.compact-chat-header .call-controls .call-mode-button,
@@ -6795,7 +6795,7 @@ body[data-theme="dark"] .attachment-menu-panel button:hover:not(:disabled) {
   }
 
   body.compact-chat-header .chat-header-actions {
-    gap: 6px;
+    gap: 8px;
   }
 
   body.compact-chat-header #startTotalCallOption {

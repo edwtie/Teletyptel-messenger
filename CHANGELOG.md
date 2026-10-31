@@ -2,6 +2,50 @@
 
 ## Unreleased
 
+### Android LAN test deployment — 2026-10-31
+
+- Prepare Android `1.0.1-lan-test` (version code 2) alongside the next internal
+  iPhone build. Load the shared WAMP Messenger over scoped, verified HTTPS.
+- Keep Android debug-only: ordinary account sign-in, no native Google sign-in,
+  device contact picker, background push or Play Store release yet.
+
+### XMPP transient connection recovery — 2026-10-31
+
+- Recover ordinary chats as well as calls after unexpected transport loss, using
+  bounded backoff, foreground/network recovery and one connection attempt at a time.
+  Preserve the signed-in session and composer draft during transient failures.
+- Reply to server XMPP pings and check matching ping results/errors. Detect silent
+  connections and stalled handshakes; ignore callbacks from superseded sockets.
+- Keep explicit logout, account gates, authentication rejection, stream policy
+  errors and the existing inactivity logout effective. Physical iPhone verification
+  and a new TestFlight build are still required; this is not background push support.
+
+### Mobile conversation button spacing — 2026-10-31
+
+- Separate the blue TC button, interpreter button and conversation menu with
+  consistent spacing, preserving one header row and 44-pixel touch targets.
+
+### Number keypad letters — 2026-10-31
+
+- Show ABC–WXYZ beneath digits 2–9 in the number dialer. Tapping a letter
+  still enters only its digit, without opening the system keyboard.
+
+### TC naming in number calling — 2026-10-31
+
+- Reuse the existing T/TC call symbol in a centered, touch-sized dialer button,
+  retaining translated accessible labels and the disabled gateway state.
+- Label the number dialer as TC (Total Conversation), where supported, in Dutch
+  and English. Keep RTT protocol names and the disabled SIP call action unchanged.
+
+### Opt-in iPhone contact number selection — 2026-10-31
+
+- Add a native iPhone contact picker behind an explicit consent confirmation.
+  Return only the selected phone number to the dialer, without address-book sync,
+  persistence, upload or automatic calls. Cancellation preserves the typed number.
+- Limit the bridge to the bundled Messenger, reject concurrent selections and
+  ignore results after closing/reopening the dialer. Hide the action on the website
+  and app builds without the plugin. Native compilation/device verification pending.
+
 ### Number selection from contacts — 2026-10-31
 
 - Use a phone icon to open number calling, with keypad and contacts choices.

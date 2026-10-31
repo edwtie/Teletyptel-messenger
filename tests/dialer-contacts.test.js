@@ -6,6 +6,25 @@ const vm = require("node:vm");
 const client = fs.readFileSync(path.join(__dirname, "../php/public/chat-client.js"), "utf8");
 const source = client.slice(client.indexOf("  function phoneDialerContacts()"), client.indexOf("  function renderConversations()"));
 
+test("Number calling uses TC labels without enabling an unconnected call action", () => {
+  const html = fs.readFileSync(path.join(__dirname, "../php/public/chat.html"), "utf8");
+  const button = html.match(/<button id="phoneDialerCall"[^>]*>[\s\S]*?<\/button>/)?.[0];
+  assert.ok(button);
+  assert.match(button, /<button[^>]*\bdisabled\b/);
+  assert.match(button, /data-i18n-aria-label="dialer.call"/);
+  assert.match(button, /data-i18n-title="dialer.call"/);
+  assert.doesNotMatch(button, /<button[^>]*\sdata-i18n=/);
+  assert.match(button, /class="sr-only" data-i18n="dialer.call">Call with TC<\/span>/);
+  const primary = html.match(/<button id="startTotalCallOption"[^>]*>[\s\S]*?<\/button>/)?.[0];
+  assert.equal(button.match(/data-icon="([^"]+)"/)[1], primary.match(/data-icon="([^"]+)"/)[1]);
+  for (const language of ["ned", "eng"]) {
+    const labels = fs.readFileSync(path.join(__dirname, `../php/public/lang/${language}.lng`), "utf8");
+    assert.match(labels, /^dialer\.mode=TC \(/m);
+    assert.match(labels, /^dialer\.call=.*\bTC\r?$/m);
+    assert.doesNotMatch(labels, /^dialer\.(mode|call|unavailable)=.*RTT/m);
+  }
+});
+
 test("Dialer uses only eligible contact numbers, not groups, own account or service accounts", () => {
   const contact = { id: "test", kind: "contact", peer: "contact@example.test", name: "Example", phoneNumber: "+31 (20) 123-4567" };
   const state = { conversations: [

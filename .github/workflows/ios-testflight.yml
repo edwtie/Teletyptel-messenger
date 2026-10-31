@@ -30,6 +30,8 @@ on:
       - tests/call-inputs.test.js
       - tests/rtt-text-loss.test.js
       - tests/dialer-contacts.test.js
+      - tests/native-contacts.test.js
+      - tests/xmpp-recovery.test.js
   workflow_dispatch:
 
 permissions:

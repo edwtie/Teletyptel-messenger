@@ -14,8 +14,14 @@
     "test:translation": "node tests/translation-ui.test.js && node tests/xmpp-translation-ui.test.js && node tests/live-rtt-integration.test.js",
     "ios:sync": "cap sync ios",
     "ios:open": "cap open ios",
-    "mobile:sync": "cap sync",
-    "test": "node tests/jingle-history.test.js && node tests/admin-ui.test.js && node tests/intake-ui.test.js && C:\\wamp64\\bin\\php\\php8.4.15\\php.exe php/tests/admin-account-actions-smoke.php"
+    "mobile:sync": "npm run ios:sync && npm run android:sync",
+    "test": "node tests/jingle-history.test.js && node tests/admin-ui.test.js && node tests/intake-ui.test.js && C:\\wamp64\\bin\\php\\php8.4.15\\php.exe php/tests/admin-account-actions-smoke.php",
+    "android:add": "node scripts/android-app.js add",
+    "android:sync": "node scripts/android-app.js sync",
+    "android:build": "node scripts/android-app.js build",
+    "android:open": "node scripts/android-app.js open",
+    "android:check": "node scripts/android-app.js check",
+    "test:android": "node --test tests/android-config.test.js"
   },
   "repository": {
     "type": "git",
@@ -30,9 +36,10 @@
   },
   "homepage": "https://github.com/edwtie/Teletyptel-messenger#readme",
   "devDependencies": {
-    "@capacitor/cli": "^8.4.0",
-    "@capacitor/core": "^8.4.0",
-    "@capacitor/ios": "^8.4.0",
+    "@capacitor/android": "8.4.3",
+    "@capacitor/cli": "8.4.3",
+    "@capacitor/core": "8.4.3",
+    "@capacitor/ios": "8.4.3",
     "playwright": "^1.60.0"
   },
   "dependencies": {

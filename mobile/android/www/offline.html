@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'; object-src 'none'; base-uri 'none'">
+  <title>TeleTypTel — verbinding controleren</title>
+  <link rel="stylesheet" href="shell.css">
+  <script src="connection.js" defer></script>
+  <script src="shell.js" defer></script>
+</head>
+<body>
+  <main>
+    <p class="brand">TeleTypTel <span>Android-testapp</span></p>
+    <h1>Je server is niet bereikbaar</h1>
+    <p>Verbind je telefoon met hetzelfde wifi-netwerk als de computer. Controleer of WAMP aanstaat en het HTTPS-adres nog klopt.</p>
+    <p>De app accepteert alleen een geldig certificaat van de ingestelde server. Bij een certificaatfout moet de configuratie worden hersteld.</p>
+    <a id="retry">Opnieuw proberen</a>
+    <p id="server"></p>
+    <small>Deze eerste testversie is geen spoeddienst. Berichten en oproepen op de achtergrond zijn nog niet gegarandeerd.</small>
+  </main>
+</body>
+</html>

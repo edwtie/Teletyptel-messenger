@@ -42,6 +42,7 @@ function prepare() {
     "if GIDSignIn.sharedInstance.handle(url) { return true }\n        " + urlHandler) + "\n"
     + fs.readFileSync(path.join(__dirname, "LanViewController.swift"), "utf8") + "\n"
     + fs.readFileSync(path.join(__dirname, "GoogleSignInPlugin.swift"), "utf8") + "\n"
+    + fs.readFileSync(path.join(__dirname, "ContactsPlugin.swift"), "utf8") + "\n"
     + fs.readFileSync(path.join(__dirname, "ServerBridge.swift"), "utf8"));
   const storyboard = "ios/App/App/Base.lproj/Main.storyboard";
   const originalStoryboard = fs.readFileSync(path.join(project, storyboard), "utf8");

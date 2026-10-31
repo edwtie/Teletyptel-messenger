@@ -47,6 +47,10 @@ TeleTypTel is being built for:
 
 ## What is in this repository
 
+An Android LAN test app can connect to the existing WAMP Messenger over HTTPS.
+See [Android setup and limitations](docs/ANDROID_APP.md) for building and installing
+the APK. It is a foreground test build, not a production mobile release.
+
 This repository contains the TeleTypTel web client, local PHP backend, account
 and profile API, browser chat interface, call and media controls, language files,
 server-side test tools, C# protocol library and automated tests.

@@ -55,6 +55,15 @@ async function check(engine, device, name) {
       assert.equal(await dialog.evaluate((element) => element.open), true);
       assert.equal(await page.evaluate(() => document.activeElement.id), "phoneDialerClose");
       assert.equal(await input.getAttribute("inputmode"), "none");
+      for (const [digit, letters] of Object.entries({ 2: "ABC", 3: "DEF", 4: "GHI", 5: "JKL", 6: "MNO", 7: "PQRS", 8: "TUV", 9: "WXYZ" })) {
+        const label = page.locator(`[data-digit="${digit}"] .phone-dialer-letters`);
+        assert.equal(await label.textContent(), letters);
+        assert.equal(await label.isVisible(), true);
+      }
+      await page.locator('[data-digit="2"] .phone-dialer-letters').click();
+      assert.equal(await input.inputValue(), "2");
+      assert.equal(await input.evaluate(element => element === document.activeElement), false);
+      await page.locator("#phoneDialerBackspace").click();
       for (const digit of ["+", "3", "1"]) await page.locator('[data-digit="' + digit + '"]').click();
       assert.equal(await input.inputValue(), "+31");
       assert.equal(await input.evaluate((element) => element === document.activeElement), false);
@@ -83,6 +92,7 @@ async function check(engine, device, name) {
       assert.equal(await page.locator("#phoneDialerCall").isDisabled(), true);
       await page.locator("#phoneDialerContactsView").click();
       assert.equal(await page.locator("#phoneDialerContactsEmpty").isVisible(), true);
+      assert.equal(await page.locator("#phoneDialerDeviceContact").isVisible(), false);
       assert.equal(await page.locator("#phoneDialerKeypadPanel").isVisible(), false);
       await page.evaluate(() => {
         window.dialerFixtureListener = event => {

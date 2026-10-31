@@ -11,6 +11,10 @@
   const keypadView = document.getElementById("phoneDialerKeypadView");
   const contactsView = document.getElementById("phoneDialerContactsView");
   const contactsList = document.getElementById("phoneDialerContactsList");
+  const deviceContact = document.getElementById("phoneDialerDeviceContact");
+  const deviceError = document.getElementById("phoneDialerDeviceError");
+  let pickerBusy = false;
+  let viewGeneration = 0;
   let returnFocus = trigger;
   let selectionStart = 0;
   let selectionEnd = 0;
@@ -20,7 +24,26 @@
     selectionEnd = number.selectionEnd ?? selectionStart;
   };
 
+  const nativeContacts = () => {
+    const capacitor = window.Capacitor;
+    if (window.location.protocol !== "capacitor:" || window.location.hostname !== "localhost"
+        || capacitor?.getPlatform?.() !== "ios" || !capacitor.isPluginAvailable?.("TeleTypTelContacts")) return null;
+    const plugin = capacitor.Plugins?.TeleTypTelContacts;
+    return typeof plugin?.pickPhoneNumber === "function" ? plugin : null;
+  };
+
+  const chooseNumber = (value) => {
+    number.value = value;
+    selectionStart = selectionEnd = number.value.length;
+    number.setSelectionRange(selectionStart, selectionEnd);
+    validate();
+    showContacts(false);
+    keypadView.focus({ preventScroll: true });
+    dialog.scrollTop = 0;
+  };
+
   const renderContacts = () => {
+    deviceContact.hidden = !nativeContacts();
     const detail = { contacts: [] };
     window.dispatchEvent(new CustomEvent("teletyptel:dialer-contacts-request", { detail }));
     const focusedId = document.activeElement?.dataset.contactId;
@@ -35,13 +58,7 @@
       phone.textContent = contact.number;
       button.append(name, phone);
       button.addEventListener("click", () => {
-        number.value = contact.number;
-        selectionStart = selectionEnd = number.value.length;
-        number.setSelectionRange(selectionStart, selectionEnd);
-        validate();
-        showContacts(false);
-        keypadView.focus({ preventScroll: true });
-        dialog.scrollTop = 0;
+        chooseNumber(contact.number);
       });
       contactsList.appendChild(button);
       if (focusedId === contact.id) button.focus({ preventScroll: true });
@@ -67,6 +84,8 @@
     number.setAttribute("aria-invalid", String(!valid));
   };
   const reset = () => {
+    viewGeneration++;
+    deviceError.hidden = true;
     form.reset();
     showContacts(false);
     contactsList.replaceChildren();
@@ -100,6 +119,27 @@
   document.getElementById("phoneDialerClose").addEventListener("click", () => dialog.close());
   keypadView.addEventListener("click", () => showContacts(false));
   contactsView.addEventListener("click", () => showContacts(true));
+  deviceContact.addEventListener("click", async () => {
+    const plugin = nativeContacts();
+    if (!dialog.open || contactsPanel.hidden || !plugin || pickerBusy) return;
+    const generation = viewGeneration;
+    pickerBusy = true;
+    deviceContact.disabled = true;
+    deviceError.hidden = true;
+    try {
+      const result = await plugin.pickPhoneNumber({ language: document.documentElement.lang.startsWith("en") ? "en" : "nl" });
+      if (!dialog.open || generation !== viewGeneration) return;
+      if (typeof result?.phoneNumber !== "string" || !result.phoneNumber.trim() || result.phoneNumber.length > 40) {
+        throw new Error("Invalid contact selection");
+      }
+      chooseNumber(result.phoneNumber.trim());
+    } catch (error) {
+      if (dialog.open && generation === viewGeneration && error?.code !== "CANCELLED") deviceError.hidden = false;
+    } finally {
+      pickerBusy = false;
+      deviceContact.disabled = false;
+    }
+  });
   window.addEventListener("teletyptel:dialer-contacts-changed", () => {
     if (dialog.open && !contactsPanel.hidden) renderContacts();
   });
