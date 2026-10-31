@@ -15,7 +15,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="favicon.ico" sizes="any">
   <link rel="apple-touch-icon" href="assets/brand/teletyptel-icon-192.png">
-  <link rel="stylesheet" href="chat-client.css?v=20261031-incoming-call">
+  <link rel="stylesheet" href="chat-client.css?v=20261031-login-heading">
   <link rel="stylesheet" href="chat-dialer.css?v=20261027-number-dialer">
 </head>
 <body class="account-booting">
@@ -106,9 +106,14 @@
           <input id="conversationSearchInput" type="search" autocomplete="off" spellcheck="false" placeholder="Search contacts" data-i18n-placeholder="placeholder.search_contacts" aria-label="Search contacts" data-i18n-aria-label="placeholder.search_contacts">
         </label>
         <div id="conversationItems" class="conversation-items"></div>
-        <div class="conversation-actions">
-          <button id="addConversationButton" type="button" data-i18n="button.new_contact">New contact</button>
-          <button id="addGroupButton" type="button" data-i18n="button.new_group">New group</button>
+        <div class="conversation-actions-footer">
+          <div id="conversationActionsPanel" class="conversation-actions" hidden>
+            <button id="addConversationButton" type="button" data-i18n="button.new_contact">New contact</button>
+            <button id="addGroupButton" type="button" data-i18n="button.new_group">New group</button>
+          </div>
+          <button id="conversationActionsToggle" class="conversation-add-toggle" type="button" aria-expanded="false" aria-controls="conversationActionsPanel" aria-label="Add contact or group" title="Add contact or group" data-i18n-aria-label="button.add_contact_or_group" data-i18n-title="button.add_contact_or_group">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
         </div>
       </aside>
 
@@ -232,6 +237,12 @@
             <button id="toggleTotalConversationTextButton" class="icon-button call-media-icon-button" type="button" disabled title="Hide real-time text" aria-label="Hide real-time text" data-i18n-title="button.hide_tc_text" data-i18n-aria-label="button.hide_tc_text">
               <span class="material-icon" data-icon="rtt" aria-hidden="true"></span>
               <span class="sr-only" data-i18n="button.hide_tc_text">Hide real-time text</span>
+            </button>
+            <button id="callKeypadButton" class="icon-button call-media-icon-button" type="button" disabled aria-haspopup="dialog" aria-controls="callKeypadDialog" title="Call keypad" aria-label="Call keypad" data-i18n-title="call.keypad" data-i18n-aria-label="call.keypad">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M5 3h3v3H5zm6 0h3v3h-3zm6 0h3v3h-3zM5 8h3v3H5zm6 0h3v3h-3zm6 0h3v3h-3zM5 13h3v3H5zm6 0h3v3h-3zm6 0h3v3h-3zm-6 5h3v3h-3z"/></svg>
+            </button>
+            <button id="callKeyboardButton" class="icon-button call-media-icon-button" type="button" disabled title="Type real-time text" aria-label="Type real-time text" data-i18n-title="call.keyboard" data-i18n-aria-label="call.keyboard">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M5 9h2m2 0h2m2 0h2m2 0h2M5 12h2m2 0h2m2 0h2m2 0h2M7 16h10"/></svg>
             </button>
             <button id="hangupCallPanelButton" class="icon-button call-media-icon-button hangup-icon-button call-panel-hangup-button" type="button" disabled hidden title="Hang up" aria-label="Hang up" data-i18n-title="button.hangup_call" data-i18n-aria-label="button.hangup_call">
               <span class="material-icon" data-icon="callEnd" aria-hidden="true"></span>
@@ -1359,14 +1370,28 @@
       </div>
     </div>
   </div>
+  <dialog id="callKeypadDialog" class="call-keypad-dialog" aria-labelledby="callKeypadTitle" aria-describedby="callKeypadStatus">
+    <div class="call-keypad-heading">
+      <h2 id="callKeypadTitle" data-i18n="call.keypad">Call keypad</h2>
+      <button id="callKeypadClose" type="button" autofocus aria-label="Close" data-i18n-aria-label="button.close">×</button>
+    </div>
+    <p id="callKeypadStatus" role="status"></p>
+    <div id="callKeypadKeys" class="call-keypad-keys">
+      <button type="button" data-call-digit="1">1</button><button type="button" data-call-digit="2">2</button><button type="button" data-call-digit="3">3</button>
+      <button type="button" data-call-digit="4">4</button><button type="button" data-call-digit="5">5</button><button type="button" data-call-digit="6">6</button>
+      <button type="button" data-call-digit="7">7</button><button type="button" data-call-digit="8">8</button><button type="button" data-call-digit="9">9</button>
+      <button type="button" data-call-digit="*">*</button><button type="button" data-call-digit="0">0</button><button type="button" data-call-digit="#">#</button>
+    </div>
+    <button id="callKeypadTextButton" type="button" data-i18n="call.keyboard">Type real-time text</button>
+  </dialog>
   <script src="chat-dialer.js?v=20261027-number-dialer"></script>
   <script src="vendor/qrcode.js?v=20260623-history-privacy-copy"></script>
   <script src="jingle-history.js?v=20260615-jingle-history"></script>
   <script src="chat-xmpp-translation.js?v=20261027-inline-interpreter"></script>
   <script src="chat-translation.js?v=20261031-bundled-interface"></script>
   <script src="native-google.js?v=20261031-bundled-interface"></script>
-  <script src="chat-client.js?v=20261031-incoming-call"></script>
+  <script src="chat-client.js?v=20261031-rtt-text-loss"></script>
   <script src="chat-interpreter.js?v=20261027-inline-interpreter"></script>
-  <script src="mobile-navigation.js?v=20260929-rtt-first"></script>
+  <script src="mobile-navigation.js?v=20261031-contact-actions"></script>
 </body>
 </html>

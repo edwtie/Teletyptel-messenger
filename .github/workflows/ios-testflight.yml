@@ -27,6 +27,8 @@ on:
       - tests/native-google.test.js
       - tests/call-camera-switch.test.js
       - tests/native-keyboard.test.js
+      - tests/call-inputs.test.js
+      - tests/rtt-text-loss.test.js
   workflow_dispatch:
 
 permissions:

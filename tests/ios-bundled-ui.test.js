@@ -91,9 +91,18 @@ test("Bundled Messenger opens its real mobile sign-in UI without a reachable ser
     assert.equal(await page.locator("#dialogJidInput").isVisible(), true);
     assert.match(await page.locator("#dialogAccountStatus").innerText(), /server.*unavailable|server.*bereikbaar/i);
     assert.equal(await page.evaluate(() => document.activeElement.matches("input,textarea")), false);
+    await page.locator("#accountDialogTitle").focus();
+    assert.deepEqual(await page.locator("#accountDialogTitle").evaluate(element => ({
+      focused: document.activeElement === element,
+      outline: getComputedStyle(element).outlineStyle,
+      shadow: getComputedStyle(element).boxShadow
+    })), { focused: true, outline: "none", shadow: "none" });
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
     await page.locator("#dialogJidInput").click();
     assert.equal(await page.evaluate(() => document.activeElement.id), "dialogJidInput");
+    assert.equal(await page.locator("#dialogJidInput").evaluate(element => getComputedStyle(element).outlineStyle), "solid");
+    await page.keyboard.press("Tab");
+    assert.equal(await page.evaluate(() => getComputedStyle(document.activeElement).outlineStyle), "solid");
     assert.deepEqual(errors, []);
     assert.deepEqual(missing, []);
     const requests = await page.evaluate(() => fixtureNativeRequests);

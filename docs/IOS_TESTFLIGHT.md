@@ -46,6 +46,24 @@ Referenties: [Google iOS-configuratie](https://developers.google.com/identity/si
 
 ## Mobiele chat en toetsenbord
 
+### Cijfertoetsen en tekst tijdens Total Conversation
+
+De lokale vervolgversie heeft twee aparte invoerknoppen: cijfertoetsen openen een
+gespreksgebonden toetsenblok (0–9, `*`, `#`); het toetsenbordsymbool toont RTT en
+focust het bestaande tekstveld uitsluitend na aantikken. De bestaande RTT-weergaveknop
+blijft beschikbaar. De concepttekst wordt niet gewist.
+
+Cijfertoetsen gebruiken de [WebRTC DTMF-interface](https://www.w3.org/TR/webrtc/#peer-to-peer-dtmf)
+alleen bij een verbonden audio-sender met `canInsertDTMF`. Geen ondersteuning betekent
+uitgeschakelde toetsen met uitleg. Succes betekent uitsluitend doorgegeven aan de
+lokale oproepverbinding, niet bevestigd verwerkt door een keuzemenu. Toetsen worden
+niet als XMPP-chat of RTT verstuurd, opgeslagen of gelogd. Een vervangen of beëindigde
+oproep sluit het toetsenblok; een fout tijdens verzenden wordt getoond.
+
+Dit koppelt nog geen SIP-provider. De unit- en browserfixtures gebruiken een
+gesimuleerde sender; toetsen bij een echte ontvanger en het iPhone-toetsenbord
+moeten nog worden getest. Deze toevoeging zit niet in build 7.1.
+
 ### Fysieke test build 6.1 — 2026-10-31
 
 Een inkomende oproep toonde drie sets opnemen/weigeren en een smalle banner achter

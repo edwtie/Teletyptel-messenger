@@ -347,6 +347,7 @@
     outgoingXmppRttIds: new Set(),
     editingMessage: null,
     call: null,
+    callKeypadSession: null,
     callVideoResize: {
       pointerId: null,
       startY: 0,
@@ -640,6 +641,11 @@
     muteMicrophoneButton: byId("muteMicrophoneButton"),
     muteRemoteAudioButton: byId("muteRemoteAudioButton"),
     toggleTotalConversationTextButton: byId("toggleTotalConversationTextButton"),
+    callKeypadButton: byId("callKeypadButton"),
+    callKeyboardButton: byId("callKeyboardButton"),
+    callKeypadDialog: byId("callKeypadDialog"),
+    callKeypadKeys: byId("callKeypadKeys"),
+    callKeypadStatus: byId("callKeypadStatus"),
     hangupCallPanelButton: byId("hangupCallPanelButton"),
     remoteVolumeInput: byId("remoteVolumeInput"),
     remoteVolumeValue: byId("remoteVolumeValue"),
@@ -1053,6 +1059,24 @@
     el.muteMicrophoneButton.addEventListener("click", toggleMicrophoneMute);
     el.muteRemoteAudioButton.addEventListener("click", toggleRemoteAudioMute);
     el.toggleTotalConversationTextButton.addEventListener("click", toggleTotalConversationText);
+    el.callKeypadButton.addEventListener("click", openCallKeypad);
+    el.callKeyboardButton.addEventListener("click", focusCallTextKeyboard);
+    byId("callKeypadClose").addEventListener("click", () => el.callKeypadDialog.close());
+    byId("callKeypadTextButton").addEventListener("click", focusCallTextKeyboard);
+    el.callKeypadDialog.addEventListener("close", () => {
+      state.callKeypadSession = null;
+      el.callKeypadStatus.textContent = "";
+    });
+    el.callKeypadKeys.addEventListener("click", event => {
+      const button = event.target.closest("button[data-call-digit]");
+      if (button && !button.disabled) sendCallDigit(button.dataset.callDigit);
+    });
+    el.callKeypadDialog.addEventListener("keydown", event => {
+      if (!event.repeat && !event.ctrlKey && !event.altKey && !event.metaKey && /^[0-9*#]$/.test(event.key)) {
+        event.preventDefault();
+        sendCallDigit(event.key);
+      }
+    });
     el.callResizeHandle.addEventListener("pointerdown", startCallVideoResize);
     el.callCameraInput.addEventListener("change", () => handleMediaSettingsChange("video", "call"));
     el.callVideoFacingToggle.addEventListener("click", toggleCallVideoFacingMode);
@@ -9562,7 +9586,7 @@
     if (sendXmppRttPacket("edit", text)) {
       return;
     }
-    sendRttPacket("edit", text, actions);
+    sendRttPacket(hasJingleRtt || state.call?.rttNeedsReset ? "reset" : "edit", text, actions);
   }
 
   function isXmppRttConnected() {
@@ -11546,6 +11570,7 @@
       remoteStream: null,
       remoteVideoMuted: false,
       rttChannel: null,
+      rttNeedsReset: true,
       rttSync: rttEnabled ? createJingleRttSyncDescriptor(sid, "offered") : null,
       notificationMessageId: "",
       transcript: [],
@@ -11834,6 +11859,7 @@
 
     pc.addEventListener("connectionstatechange", () => {
       appendWebRtcStateDebug(call, "connectionstatechange");
+      if (state.call === call) updateCallInputUi();
       if (pc.connectionState === "connected") {
         setCallStatus(jingleRttSyncStatusText(call));
         scheduleTotalConversationRecorder(call);
@@ -12044,6 +12070,7 @@
     }
 
     channel.teletyptelRttConfigured = true;
+    call.rttNeedsReset = true;
     channel.binaryType = "arraybuffer";
     call.rttEnabled = true;
     call.callMode = callModeName(call.mediaKind, true);
@@ -12070,6 +12097,7 @@
       }
 
       call.rttSync.state = "fallback";
+      call.rttNeedsReset = true;
       setCallStatus(t("call.connected_total", "Total conversation connected - live text synchronized"));
       appendDebug("jingle-rtt", `Datachannel closed ${dataChannelDebugSummary(call, channel)}`);
       updateCallUi();
@@ -12077,6 +12105,7 @@
 
     channel.addEventListener("error", (event) => {
       call.rttSync.state = "fallback";
+      call.rttNeedsReset = true;
       appendDebug("jingle-rtt-error", `Datachannel error ${dataChannelDebugSummary(call, channel)} ${event?.error?.message || ""}`.trim());
     });
 
@@ -12092,7 +12121,11 @@
       return null;
     }
 
-    return call.rttChannel?.readyState === "open" ? call : null;
+    if (call.rttChannel?.readyState !== "open") {
+      call.rttNeedsReset = true;
+      return null;
+    }
+    return call;
   }
 
   function sendJingleRttSyncPacket(eventName, text, options = {}) {
@@ -12102,16 +12135,22 @@
     }
 
     call.rttSync = normalizeJingleRttSyncDescriptor(call.rttSync, call.sid, "connected");
-    if (eventName === "edit") {
+    if (eventName === "edit" && !call.rttNeedsReset) {
       const t140Delta = createT140LinearDelta(options.previousText ?? "", String(text ?? ""));
-      if (t140Delta !== null) {
-        if (t140Delta !== "") {
-          call.rttChannel.send(t140Delta);
-          appendDebug("jingle-rtt-t140-out", `<t140 sid="${escapeXml(call.sid)}">${escapeXml(t140Delta)}</t140>`);
+      if (t140Delta !== null && !isJsonRttText(t140Delta)) {
+        try {
+          if (t140Delta !== "") {
+            call.rttChannel.send(t140Delta);
+            appendDebug("jingle-rtt-t140-out", `<t140 sid="${escapeXml(call.sid)}">${escapeXml(t140Delta)}</t140>`);
+          }
+          recordTotalConversationText(call, "self", text, currentFromJid());
+          return true;
+        } catch (error) {
+          call.rttSync.state = "fallback";
+          call.rttNeedsReset = true;
+          appendDebug("jingle-rtt-error", error.message);
+          return false;
         }
-
-        recordTotalConversationText(call, "self", text, currentFromJid());
-        return true;
       }
     }
 
@@ -12119,7 +12158,7 @@
       type: "jingle-rtt-sync",
       namespace: jingleRttSyncNamespace,
       profile: call.rttSync.profile,
-      event: eventName,
+      event: eventName === "edit" && call.rttNeedsReset ? "reset" : eventName,
       sid: call.sid,
       from: currentFromJid(),
       to: call.peer,
@@ -12137,6 +12176,7 @@
 
     try {
       call.rttChannel.send(JSON.stringify(packet));
+      call.rttNeedsReset = false;
       appendDebug("jingle-rtt-out", createJingleRttPacketDebugXml(packet));
       recordTotalConversationText(call, "self", text, currentFromJid(), {
         timestamp: packet.timestamp,
@@ -12145,13 +12185,16 @@
       return true;
     } catch (error) {
       call.rttSync.state = "fallback";
+      call.rttNeedsReset = true;
       appendDebug("jingle-rtt-error", error.message);
       return false;
     }
   }
 
   async function handleJingleRttSyncPacket(call, data) {
+    if (state.call !== call) return;
     const text = await decodeRttDataChannelText(data);
+    if (state.call !== call) return;
     if (text === null || text === "") {
       appendDebug("jingle-rtt-skip", "Ignored empty RTT datachannel packet");
       return;
@@ -12166,7 +12209,7 @@
     }
 
     if (packet?.type !== "jingle-rtt-sync" || packet.namespace !== jingleRttSyncNamespace) {
-      appendDebug("jingle-rtt-skip", "Ignored unknown datachannel packet");
+      applyT140DataChannelText(call, text);
       return;
     }
 
@@ -12202,6 +12245,15 @@
     }
 
     return data == null ? null : String(data);
+  }
+
+  function isJsonRttText(text) {
+    try {
+      JSON.parse(text);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   function applyT140DataChannelText(call, payload) {
@@ -13501,6 +13553,7 @@
   }
 
   function updateTotalConversationTextToggleUi() {
+    updateCallInputUi();
     const hasTotalConversation = Boolean(state.call?.rttEnabled && !state.call?.incomingOffer);
     el.toggleTotalConversationTextButton.disabled = !hasTotalConversation;
     setIconButtonAction(
@@ -13514,6 +13567,67 @@
 
   function setCallStatus(text) {
     el.callStatus.textContent = text;
+  }
+
+  function activeCallDtmf(call = state.call) {
+    if (!call || call.incomingOffer || call.pc?.connectionState !== "connected") return null;
+    return call.pc.getSenders?.().find(sender => sender.track?.kind === "audio"
+      && sender.track.readyState !== "ended" && sender.dtmf?.canInsertDTMF)?.dtmf || null;
+  }
+
+  function updateCallInputUi() {
+    const active = Boolean(state.call && !state.call.incomingOffer);
+    el.callKeypadButton.disabled = !active;
+    el.callKeyboardButton.disabled = !active || !state.call.rttEnabled;
+    byId("callKeypadTextButton").disabled = el.callKeyboardButton.disabled;
+    if (!el.callKeypadDialog.open) return;
+    if (!active || state.callKeypadSession !== state.call) {
+      el.callKeypadDialog.close();
+      state.callKeypadSession = null;
+      return;
+    }
+    const available = Boolean(activeCallDtmf());
+    el.callKeypadKeys.querySelectorAll("button").forEach(button => { button.disabled = !available; });
+    el.callKeypadStatus.textContent = available
+      ? t("call.keypad_ready", "Keys are sent to the active call, not as chat messages.")
+      : t("call.keypad_unavailable", "This call cannot send keypad tones. A connected audio call with DTMF support is required.");
+  }
+
+  function openCallKeypad() {
+    if (!state.call || state.call.incomingOffer || el.callKeypadDialog.open) return;
+    el.messageInput.blur();
+    state.callKeypadSession = state.call;
+    el.callKeypadDialog.showModal();
+    updateCallInputUi();
+  }
+
+  function focusCallTextKeyboard() {
+    if (!state.call?.rttEnabled || state.call.incomingOffer) return;
+    if (el.callKeypadDialog.open) el.callKeypadDialog.close();
+    state.callKeypadSession = null;
+    state.totalConversationTextVisible = true;
+    updateCallUi();
+    if (!el.messageInput.disabled) el.messageInput.focus({ preventScroll: true });
+  }
+
+  function sendCallDigit(digit) {
+    if (!el.callKeypadDialog.open || state.callKeypadSession !== state.call || !/^[0-9*#]$/.test(digit)) return;
+    const sender = activeCallDtmf();
+    if (!sender) {
+      updateCallInputUi();
+      return;
+    }
+    const queued = sender.toneBuffer || "";
+    if (queued.length >= 32) {
+      el.callKeypadStatus.textContent = t("call.keypad_busy", "Please wait before pressing another key.");
+      return;
+    }
+    try {
+      sender.insertDTMF(queued + digit, 100, 70);
+      el.callKeypadStatus.textContent = t("call.keypad_sent", "Key passed to the call connection.");
+    } catch {
+      el.callKeypadStatus.textContent = t("call.keypad_failed", "Key could not be sent. Check the call connection.");
+    }
   }
 
   function supportsWebRtc() {

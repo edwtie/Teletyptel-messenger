@@ -2,6 +2,36 @@
 
 ## Unreleased
 
+### RTT text loss correction — 2026-10-31
+
+- Preserve numeric and JSON-looking raw RTT payloads instead of dropping them.
+  Send ambiguous deltas as existing private snapshots for older TeleTypTel clients.
+- Catch raw send failures, use full fallback snapshots and reset the baseline on
+  channel recovery. Ignore late decoded packets from ended or replaced calls.
+- Add unit regressions and real-handler browser coverage. This is a compatibility
+  repair, not a migration to pure T.140 or proof of RFC 8865/SIP interoperability.
+
+### Total Conversation input controls — 2026-10-31
+
+- Add separate call keypad and RTT keyboard buttons. RTT focus follows an explicit
+  user tap, preserves the draft and shows the text panel.
+- Send only 0–9, star and hash through a connected audio sender with negotiated
+  DTMF support. Preserve queued tones, bound the queue, reject stale call sessions
+  and show unavailable/error states instead of pretending tones were delivered.
+- Do not record keypad digits in chat, RTT, storage or debug logs. This is not a
+  SIP provider connection; gateway and physical-device tests remain pending.
+
+### Contact actions menu — 2026-10-31
+
+- Place new contact and new group under one bottom plus button. Keep the contact
+  list independently scrollable, including empty lists and landscape phones.
+- Preserve existing creation actions, add translated accessible labels and close
+  the disclosure on selection, outside focus/click, Escape and navigation.
+- Add Chromium/WebKit checks for 60 contacts, fixed footer geometry and menu
+  actions at phone and desktop sizes. Physical iPhone verification is pending.
+- Remove the decorative focus outline from the sign-in heading only; keep focus
+  indicators on fields/buttons and avoid opening the keyboard on startup.
+
 ### Incoming call presentation — 2026-10-31
 
 - Show only the incoming-call dialog, not the duplicate banner and header actions.

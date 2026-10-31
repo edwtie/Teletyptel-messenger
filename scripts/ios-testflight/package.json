@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "prepare:app": "node prepare.js",
-    "test": "node --test prepare.test.js ../../tests/ios-bundled-runtime.test.js ../../tests/native-google.test.js ../../tests/account-logout.test.js ../../tests/call-camera-switch.test.js ../../tests/native-keyboard.test.js",
+    "test": "node --test prepare.test.js ../../tests/ios-bundled-runtime.test.js ../../tests/native-google.test.js ../../tests/account-logout.test.js ../../tests/call-camera-switch.test.js ../../tests/native-keyboard.test.js ../../tests/call-inputs.test.js ../../tests/rtt-text-loss.test.js",
     "build:check": "node build.js --unsigned",
     "upload:internal": "node build.js --upload-internal"
   },

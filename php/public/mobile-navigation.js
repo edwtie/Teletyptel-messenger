@@ -1,5 +1,30 @@
 "use strict";
 (() => {
+  const contactToggle = document.getElementById("conversationActionsToggle");
+  const contactActions = document.getElementById("conversationActionsPanel");
+  const contactFooter = contactToggle.closest(".conversation-actions-footer");
+  const setContactActionsOpen = (open, restoreFocus = false) => {
+    contactActions.hidden = !open;
+    contactToggle.setAttribute("aria-expanded", String(open));
+    if (restoreFocus) contactToggle.focus({ preventScroll: true });
+  };
+  contactToggle.addEventListener("click", () => setContactActionsOpen(contactActions.hidden));
+  contactActions.addEventListener("click", event => {
+    if (event.target.closest("button")) setContactActionsOpen(false);
+  });
+  for (const eventName of ["click", "focusin"]) {
+    document.addEventListener(eventName, event => {
+      if (!contactFooter.contains(event.target)) setContactActionsOpen(false);
+    });
+  }
+  document.addEventListener("keydown", event => {
+    if (event.key === "Escape" && !contactActions.hidden) {
+      event.preventDefault();
+      setContactActionsOpen(false, true);
+    }
+  });
+  window.addEventListener("pagehide", () => setContactActionsOpen(false));
+  new MutationObserver(() => setContactActionsOpen(false)).observe(document.body, { attributes: true, attributeFilter: ["class"] });
   const toggle = document.getElementById("mobileActionsToggle");
   const panel = document.getElementById("mobileActionsPanel");
   const header = toggle.closest(".topbar");

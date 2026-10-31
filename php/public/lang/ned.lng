@@ -2,6 +2,14 @@
 # Format: key=value
 
 app.title=TeleTypTel Messenger
+button.add_contact_or_group=Contact of groep toevoegen
+call.keypad=Cijfertoetsen tijdens gesprek
+call.keyboard=Realtime tekst typen
+call.keypad_ready=Toetsen gaan naar het actieve gesprek, niet als chatbericht.
+call.keypad_unavailable=Deze oproep kan geen toetstonen versturen. Een verbonden audiogesprek met DTMF-ondersteuning is nodig.
+call.keypad_sent=Toets doorgegeven aan de oproepverbinding.
+call.keypad_failed=Toets niet verstuurd. Controleer de oproepverbinding.
+call.keypad_busy=Wacht even voordat je nog een toets indrukt.
 dialer.title=Nummer bellen
 dialer.mode=RTT standaard, wanneer ondersteund
 dialer.number=Telefoonnummer

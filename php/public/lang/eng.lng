@@ -2,6 +2,14 @@
 # Format: key=value
 
 app.title=TeleTypTel Messenger
+button.add_contact_or_group=Add contact or group
+call.keypad=Call keypad
+call.keyboard=Type real-time text
+call.keypad_ready=Keys are sent to the active call, not as chat messages.
+call.keypad_unavailable=This call cannot send keypad tones. A connected audio call with DTMF support is required.
+call.keypad_sent=Key passed to the call connection.
+call.keypad_failed=Key could not be sent. Check the call connection.
+call.keypad_busy=Please wait before pressing another key.
 dialer.title=Call a number
 dialer.mode=RTT as standard when supported
 dialer.number=Phone number

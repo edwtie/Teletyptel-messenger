@@ -35,6 +35,7 @@ const hook = `
     call() { state.call = createCallState("fixture-call", "noor@example.test", "callee", "video", true); state.totalConversationTextVisible = true; updateCallUi(); },
     jingle(text) { applyJingleRttSyncDraft(state.call, { text, from: "noor@example.test" }); },
     t140(text) { applyT140DataChannelText(state.call, text); },
+    packet(text) { return handleJingleRttSyncPacket(state.call, text); },
     final(text) { applyJingleRttSyncFinal(state.call, { text, from: "noor@example.test", messageId: "fixture-final" }); },
     sendOwn() {
       const packets = [];
@@ -269,6 +270,13 @@ async function check(engine, device, name) {
     assert.equal(await page.locator("#messageInput").inputValue(), "");
     assert.equal(await page.locator("#totalConversationLocalTranslation .live-rtt-translation").count(), 0);
     await page.locator("#totalConversationRemoteTranslation").getByText("Translated: Video call text!", { exact: true }).waitFor();
+    for (const text of ["123", "true", '"Hallo"', "{}", "[]", " 123 ", "Hoi 👋"]) {
+      await page.evaluate(async text => {
+        window.rttFixture.jingle("");
+        await window.rttFixture.packet(text);
+      }, text);
+      assert.equal(await page.locator("#totalConversationRemoteText").textContent(), text, "Raw RTT dispatcher preserves literal text");
+    }
     await page.evaluate(() => window.rttFixture.final("Final message"));
     assert.equal(await page.locator(".live-rtt-translation").count(), 0, "Final message clears draft translation");
     const xmppOriginal = "XMPP <test> & 👋";

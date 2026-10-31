@@ -38,10 +38,35 @@ and TC, even without rotation. The native keyboard follow-up is local and unship
 - [ ] Retest incoming calls on iPhone: one readable answer/reject dialog, no narrow
   duplicate banner or RTT strip behind it. Local rendering regressions pass; test
   answering, rejecting and caller cancellation with two real accounts.
+- [ ] Retest the contacts bottom plus menu on iPhone: new contact/group actions,
+  long-list scrolling, empty search results and rotation. Local browser fixtures pass;
+  this change is not included in TestFlight build 7.1.
+- [ ] Test the separate in-call keypad and RTT keyboard on a physical iPhone.
+  Verify unsupported/disconnected states and real DTMF reception with a compatible
+  endpoint. SIP provider integration remains separate; local fixtures use mock senders.
 
 Procedure and expected observations: [iOS TestFlight](IOS_TESTFLIGHT.md#echte-iphone-afvinklijst).
 
 ## Scope And Claim Boundaries
+
+### RTT standards review — 2026-10-31
+
+See [RTT standards audit](RTT_STANDARDS_AUDIT.md) for reproduced failures and
+claim boundaries. Existing checked helper/fixture items are not conformance proof.
+
+- [x] Review current RTT paths and rerun browser fixtures and the C# suite.
+- [x] Locally preserve numeric and JSON-looking raw RTT text through the packet
+  dispatcher; new senders wrap ambiguous deltas for legacy TeleTypTel receivers.
+- [x] Catch raw-send errors and reset the full draft on fallback/channel recovery;
+  cover late packets from ended calls with regressions.
+- [ ] Verify this RTT repair on the next physical iPhone build, including loss and
+  recovery of the datachannel. Build 7.1 does not contain the repair.
+- [ ] Separate private JSON metadata from negotiated T.140 text without silently
+  breaking installed clients. A legacy-looking literal envelope from an old sender
+  remains ambiguous until that negotiation exists.
+- [ ] Complete RFC 8865 negotiation and independent endpoint interoperability tests.
+- [ ] Distinguish co-session and fallback RTT from media-clock synchronization in UI.
+- [ ] Connect and test the RFC 4103 helper layer through a real SIP/RTP gateway.
 
 - [x] README explains the current Alpha 2 evaluation scope.
 - [x] README separates working protocol/client pieces from production hosting
