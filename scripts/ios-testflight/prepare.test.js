@@ -40,13 +40,14 @@ test("Server URL and build number reject unsafe values", () => {
   assert.equal(config.capacitor.server.cleartext, false);
   assert.equal(config.capacitor.plugins.CapacitorHttp.enabled, false);
   assert.equal(config.capacitor.ios.webContentsDebuggingEnabled, false);
+  assert.equal(config.capacitor.ios.contentInset, "never");
 });
 
 test("Only allowlisted Messenger assets and the native adapter are packaged", () => {
   const walk = (directory, prefix = "") => fs.readdirSync(directory, { withFileTypes: true }).flatMap(entry =>
     entry.isDirectory() ? walk(path.join(directory, entry.name), prefix + entry.name + "/") : [prefix + entry.name]);
   const files = walk(path.join(project, "www"));
-  assert.deepEqual(files.sort(), [...new Set([...webAssets, ...assetFiles(), "connection.js", "native-server.js", "native-startup.css"])].sort());
+  assert.deepEqual(files.sort(), [...new Set([...webAssets, ...assetFiles(), "connection.js", "native-server.js", "native-keyboard.js", "native-startup.css"])].sort());
   assert.ok(files.every(file => !/postnl|demo|config\/|\.php|uploads\/|admin\//i.test(file)));
   const config = JSON.parse(fs.readFileSync(path.join(project, "capacitor.config.json"), "utf8"));
   assert.equal(config.webDir, "www");
@@ -54,6 +55,11 @@ test("Only allowlisted Messenger assets and the native adapter are packaged", ()
   assert.equal(config.server.url, undefined);
   assert.equal(config.server.appStartPath, "/chat.html");
   assert.equal(config.server.allowNavigation, undefined);
+  assert.equal(config.ios.scrollEnabled, false);
+  assert.equal(config.ios.contentInset, "never");
+  assert.equal(config.plugins.Keyboard.resize, "native");
+  const packages = JSON.parse(fs.readFileSync(path.join(project, "package.json"), "utf8"));
+  assert.equal(packages.dependencies["@capacitor/keyboard"], "8.0.6");
 });
 
 test("Native TLS uses system validation only for the configured host", () => {

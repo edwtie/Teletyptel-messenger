@@ -2620,7 +2620,8 @@ body.viewport-phone.viewport-portrait.tc-text-visible-active.call-active .call-p
   z-index: 1000;
   display: grid;
   place-items: center;
-  padding: 24px;
+  padding: max(24px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left));
+  overflow-y: auto;
   background: rgba(5, 12, 24, .58);
 }
 
@@ -2643,7 +2644,7 @@ body.viewport-phone.viewport-portrait.tc-text-visible-active.call-active .call-p
   font-size: 22px;
 }
 
-.incoming-call-card span {
+.incoming-call-card > span {
   color: var(--muted);
 }
 
@@ -2653,6 +2654,7 @@ body.viewport-phone.viewport-portrait.tc-text-visible-active.call-active .call-p
 
 .incoming-call-card .incoming-call-actions button {
   flex: 1 1 0;
+  min-height: 44px;
 }
 
 .call-panel {

@@ -15,7 +15,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="favicon.ico" sizes="any">
   <link rel="apple-touch-icon" href="assets/brand/teletyptel-icon-192.png">
-  <link rel="stylesheet" href="chat-client.css?v=20261031-message-layout">
+  <link rel="stylesheet" href="chat-client.css?v=20261031-incoming-call">
   <link rel="stylesheet" href="chat-dialer.css?v=20261027-number-dialer">
 </head>
 <body class="account-booting">
@@ -204,23 +204,6 @@
             </button>
           </div>
         </section>
-
-        <div id="incomingCallDialog" class="incoming-call-dialog" hidden role="alertdialog" aria-modal="true" aria-labelledby="incomingCallDialogTitle">
-          <div class="incoming-call-card">
-            <strong id="incomingCallDialogTitle">Incoming video call</strong>
-            <span id="incomingCallDialogText">Incoming call from remote</span>
-            <div class="incoming-call-actions">
-              <button id="dialogAnswerButton" class="call-answer-button" type="button">
-                <span class="material-icon" data-icon="call" aria-hidden="true"></span>
-                <span data-i18n="button.answer_call">Answer</span>
-              </button>
-              <button id="dialogRejectButton" class="call-reject-button" type="button">
-                <span class="material-icon" data-icon="callEnd" aria-hidden="true"></span>
-                <span data-i18n="button.reject_call">Reject</span>
-              </button>
-            </div>
-          </div>
-        </div>
 
         <section id="callPanel" class="call-panel" hidden aria-label="Call media">
           <div id="interpreterTile" class="interpreter-tile" hidden>
@@ -1360,13 +1343,29 @@
       <p class="phone-dialer-hint" data-i18n="dialer.no_calls">No calls or emergency calls yet. Numbers are not sent or saved.</p>
     </form>
   </dialog>
+  <div id="incomingCallDialog" class="incoming-call-dialog" hidden role="alertdialog" aria-modal="true" aria-labelledby="incomingCallDialogTitle" aria-describedby="incomingCallDialogText">
+    <div class="incoming-call-card">
+      <strong id="incomingCallDialogTitle">Incoming video call</strong>
+      <span id="incomingCallDialogText">Incoming call from remote</span>
+      <div class="incoming-call-actions">
+        <button id="dialogAnswerButton" class="call-answer-button" type="button">
+          <span class="material-icon" data-icon="call" aria-hidden="true"></span>
+          <span data-i18n="button.answer_call">Answer</span>
+        </button>
+        <button id="dialogRejectButton" class="call-reject-button" type="button">
+          <span class="material-icon" data-icon="callEnd" aria-hidden="true"></span>
+          <span data-i18n="button.reject_call">Reject</span>
+        </button>
+      </div>
+    </div>
+  </div>
   <script src="chat-dialer.js?v=20261027-number-dialer"></script>
   <script src="vendor/qrcode.js?v=20260623-history-privacy-copy"></script>
   <script src="jingle-history.js?v=20260615-jingle-history"></script>
   <script src="chat-xmpp-translation.js?v=20261027-inline-interpreter"></script>
   <script src="chat-translation.js?v=20261031-bundled-interface"></script>
   <script src="native-google.js?v=20261031-bundled-interface"></script>
-  <script src="chat-client.js?v=20261031-message-layout"></script>
+  <script src="chat-client.js?v=20261031-incoming-call"></script>
   <script src="chat-interpreter.js?v=20261027-inline-interpreter"></script>
   <script src="mobile-navigation.js?v=20260929-rtt-first"></script>
 </body>

@@ -13,8 +13,8 @@ function settings(serverUrl, buildNumber = "1.0") {
     capacitor: {
       appId: bundleId, appName: "TeleTypTel Test", webDir: "www", loggingBehavior: "none",
       server: { appStartPath: server.pathname, hostname: "localhost", iosScheme: "capacitor", cleartext: false, errorPath: "offline.html" },
-      ios: { contentInset: "automatic", webContentsDebuggingEnabled: false },
-      plugins: { CapacitorHttp: { enabled: false } }
+      ios: { contentInset: "never", scrollEnabled: false, webContentsDebuggingEnabled: false },
+      plugins: { CapacitorHttp: { enabled: false }, Keyboard: { resize: "native" } }
     }
   };
 }

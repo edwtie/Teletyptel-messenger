@@ -46,6 +46,40 @@ Referenties: [Google iOS-configuratie](https://developers.google.com/identity/si
 
 ## Mobiele chat en toetsenbord
 
+### Fysieke test build 6.1 — 2026-10-31
+
+Een inkomende oproep toonde drie sets opnemen/weigeren en een smalle banner achter
+de melding. Lokaal gebruikt de weergave nu alleen de dialoog buiten het chat-grid;
+media blijft verborgen zolang de offer niet is geaccepteerd. Herhaalde updates
+scrollen niet naar de banner en verplaatsen de focus niet opnieuw. Knoplabels
+erven wit in plaats van de grijze beschrijvingstekst. Chromium/WebKit controleren
+de weergavestaten; opnemen, weigeren en annuleren door de beller moeten nog met
+twee echte accounts op de volgende iPhone-build worden getest.
+
+Een screenshot toont daarnaast te veel wit boven het logo in de contactenlijst.
+De lokale configuratie gebruikt nu `ios.contentInset: "never"`: CSS verzorgt al
+de veilige afstand tot de statusbalk en camera. Dit voorkomt een tweede native
+inset; de bestaande CSS-safe-areas blijven behouden. Een WebKit-fixture controleert
+de kop en het inlogscherm met gesimuleerde insets. Controle op een echte iPhone,
+ook tijdens rotatie en bellen, blijft vereist in de volgende build.
+
+De gebruiker bevestigde openen en aanmelden op de echte iPhone. Opnamen tonen
+een groot leeg vlak tussen composer en toetsenbord, zowel in gewone chat als TC;
+dit gebeurt ook zonder rotatie. Deze toesteltest is dus **niet geslaagd**.
+
+De lokale vervolgwijziging voegt `@capacitor/keyboard` 8.0.6 toe met native resize
+en uitgeschakelde buitenste WebView-scroll. De app gebruikt daarna de reeds
+verkleinde WebView-hoogte, zonder nogmaals visualViewport-hoogte/pan toe te passen.
+Native toetsenbordevents bepalen de compacte TC-layout; de schermoriëntatie wordt
+niet afgeleid van de door het toetsenbord verkleinde hoogte. Interne berichten-
+en RTT-scrollgebieden blijven behouden. Browsergebruik houdt de bestaande logica.
+Dit volgt de [Capacitor Keyboard API](https://capacitorjs.com/docs/apis/keyboard).
+
+`tests/native-keyboard.test.js` en de uitgebreide chat-/rotatiefixtures controleren
+dubbele hoogtecorrectie, panoffset, openen/sluiten en portret/landschap. Zij vervangen
+geen native toetsenbordtest. Deze wijziging vereist een nieuwe native build en
+herhaling van dezelfde handelingen op de fysieke iPhone.
+
 Eigen berichtballonnen en avatars staan rechts; ontvangen berichten links. De
 avatar sluit bij gewone berichten aan op de bovenkant van de ballon, zonder de
 ruimte voor een niet-zichtbare afzenderregel. Mobiele berichttekst gebruikt 16px

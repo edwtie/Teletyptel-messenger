@@ -26,6 +26,7 @@ on:
       - tests/ios-bundled-runtime.test.js
       - tests/native-google.test.js
       - tests/call-camera-switch.test.js
+      - tests/native-keyboard.test.js
   workflow_dispatch:
 
 permissions:

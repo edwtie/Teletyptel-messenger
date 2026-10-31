@@ -1129,6 +1129,7 @@
     window.addEventListener("resize", closeMessageReactionPicker);
     window.addEventListener("resize", () => handleViewportChange("resize"));
     window.addEventListener("orientationchange", () => handleViewportChange("orientationchange"));
+    window.addEventListener("teletyptel:keyboard-layout", () => handleViewportChange("native-keyboard"));
     window.visualViewport?.addEventListener("resize", () => handleViewportChange("visual-viewport-resize"));
     window.visualViewport?.addEventListener("scroll", () => {
       applyViewportDetection();
@@ -1434,7 +1435,9 @@
       && document.activeElement?.matches('textarea, input, [contenteditable="true"]')
       && Number(window.visualViewport?.scale || 1) <= 1.05
       && Math.abs(metrics.visualWidth - metrics.width) <= 2
-      && metrics.layoutHeight - metrics.visualHeight > 80;
+      && (window.TeleTypTelKeyboard?.nativeResize
+        ? window.TeleTypTelKeyboard.active
+        : metrics.layoutHeight - metrics.visualHeight > 80);
     document.body.classList.toggle(
       "tc-phone-landscape-active",
       Boolean(state.call && visible && landscape && phoneSized));
@@ -1497,16 +1500,17 @@
     const layoutWidth = Number(window.innerWidth || document.documentElement.clientWidth || visualWidth || 0);
     const layoutHeight = Number(window.innerHeight || document.documentElement.clientHeight || visualHeight || 0);
     const zoomed = Number(visualViewport?.scale || 1) > 1.05;
+    const nativeKeyboard = window.TeleTypTelKeyboard?.nativeResize === true;
     const width = Math.round(layoutWidth || visualWidth || 0);
-    const height = Math.round((zoomed ? layoutHeight : visualHeight) || layoutHeight || 0);
+    const height = Math.round((zoomed || nativeKeyboard ? layoutHeight : visualHeight) || layoutHeight || 0);
     return {
       width,
       height,
       layoutHeight,
-      offsetTop: zoomed ? 0 : Math.min(Math.max(0, layoutHeight - height), Math.max(0, Number(visualViewport?.offsetTop || 0))),
+      offsetTop: zoomed || nativeKeyboard ? 0 : Math.min(Math.max(0, layoutHeight - height), Math.max(0, Number(visualViewport?.offsetTop || 0))),
       visualWidth: Math.round(visualWidth || width),
       visualHeight: Math.round(visualHeight || height),
-      landscape: layoutWidth > layoutHeight
+      landscape: nativeKeyboard ? window.TeleTypTelKeyboard.landscape : layoutWidth > layoutHeight
     };
   }
 
@@ -13205,7 +13209,8 @@
   function updateCallUi() {
     const call = state.call;
     const incoming = Boolean(call?.incomingOffer);
-    el.incomingCallBanner.hidden = !incoming;
+    const openingIncomingDialog = incoming && el.incomingCallDialog.hidden;
+    el.incomingCallBanner.hidden = true;
     el.incomingCallDialog.hidden = !incoming;
     if (incoming) {
       const title = incomingCallTitle(call);
@@ -13215,14 +13220,13 @@
       el.incomingCallText.textContent = text;
       el.incomingCallDialogText.textContent = text;
       showIncomingCallBrowserNotification(call);
-      el.incomingCallBanner.scrollIntoView({ block: "nearest" });
-      el.dialogAnswerButton.focus();
+      if (openingIncomingDialog) el.dialogAnswerButton.focus({ preventScroll: true });
     } else {
       closeIncomingCallBrowserNotification();
     }
 
-    el.answerCallButton.hidden = !incoming;
-    el.rejectCallButton.hidden = !incoming;
+    el.answerCallButton.hidden = true;
+    el.rejectCallButton.hidden = true;
     setCallButtonsDisabled(Boolean(call));
     setCallModeButtonsHidden(Boolean(call));
     el.hangupCallButton.hidden = !call || incoming;
@@ -13246,7 +13250,7 @@
       && !call.incomingOffer
     );
     const showLocalPreview = hasLocalVideo;
-    const showCallPanel = hasRemoteVideo || hasLocalVideo || totalConversationVisible || interpreter?.hasMedia();
+    const showCallPanel = !incoming && (hasRemoteVideo || hasLocalVideo || totalConversationVisible || interpreter?.hasMedia());
     el.callPanel.hidden = !showCallPanel;
     el.localVideo.hidden = !showLocalPreview;
     el.remoteVideo.hidden = !hasRemoteVideo;

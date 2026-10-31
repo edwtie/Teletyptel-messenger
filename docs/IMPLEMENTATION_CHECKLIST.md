@@ -7,7 +7,9 @@ item is implemented, tested and documented.
 
 The following separates local fixtures from physical-device evidence. Earlier
 successful sign-in reported by the user does not validate pending local fixes.
-The updated startup, logout, camera and layout changes are not yet uploaded.
+Build 6.1 was uploaded and the user confirmed opening/sign-in on the physical
+iPhone. Keyboard screenshots then revealed a gap below the composer in both chat
+and TC, even without rotation. The native keyboard follow-up is local and unshipped.
 
 - [x] Rerun `node tests/message-receipts-ui.test.js`: Chromium/Android and
   WebKit/iPhone emulation pass with synthetic XMPP and relay packets. Delivery
@@ -29,6 +31,13 @@ The updated startup, logout, camera and layout changes are not yet uploaded.
 - [ ] Complete physical iPhone checks for logout/relogin, contact taps, latest
   message with keyboard, RTT/translation, front/back camera switching and rotation
   during a two-way audio/video call. Test background/foreground and reconnect.
+- [ ] Retest keyboard on the next native build: build 6.1 failed with the composer
+  shifted above a large empty area. Do not mark this passed based on browser fixtures.
+- [ ] Retest contacts header spacing below the iPhone status bar. Native automatic
+  insets are disabled locally; CSS retains notch protection. Check login and calls too.
+- [ ] Retest incoming calls on iPhone: one readable answer/reject dialog, no narrow
+  duplicate banner or RTT strip behind it. Local rendering regressions pass; test
+  answering, rejecting and caller cancellation with two real accounts.
 
 Procedure and expected observations: [iOS TestFlight](IOS_TESTFLIGHT.md#echte-iphone-afvinklijst).
 

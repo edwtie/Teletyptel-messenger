@@ -10,6 +10,46 @@ const markup = fs.readFileSync(path.join(root, "chat.html"), "utf8")
 const render = client.slice(client.indexOf("  function renderConversations()"), client.indexOf("  function normalizeConversationSearchText("));
 const navigation = client.slice(client.indexOf("  function focusConversationComposer()"), client.indexOf("  function syncActiveConversationAvatarButton("));
 
+test("iPhone contacts and login reserve the top safe area only once in CSS", { timeout: 30000 }, async () => {
+  const { settings } = require("../scripts/ios-testflight/settings");
+  assert.equal(settings("https://example.test/chat.html").capacitor.ios.contentInset, "never");
+  const browser = await webkit.launch({ headless: true });
+  try {
+    for (const [width, safeTop] of [[390, 59], [430, 62], [375, 20]]) {
+      const page = await browser.newPage({ viewport: { width, height: 844 }, hasTouch: true, isMobile: true });
+      await page.route("**/*", route => route.abort());
+      await page.setContent(markup);
+      const css = fs.readFileSync(path.join(root, "chat-client.css"), "utf8")
+        .replace(/env\(safe-area-inset-top(?:,\s*0px)?\)/g, safeTop + "px");
+      await page.addStyleTag({ content: css });
+      await page.evaluate(() => {
+        document.body.className = "viewport-phone mobile-navigation-ready";
+        document.body.dataset.deviceClass = "phone";
+        document.querySelectorAll(".modal-shell").forEach(element => { element.hidden = true; });
+      });
+      const header = await page.evaluate(() => ({
+        top: document.querySelector(".topbar").getBoundingClientRect().top,
+        padding: parseFloat(getComputedStyle(document.querySelector(".topbar")).paddingTop),
+        logo: document.querySelector(".brand-logo").getBoundingClientRect().top
+      }));
+      assert.equal(header.top, 0);
+      assert.equal(header.padding, safeTop);
+      assert.ok(header.logo >= safeTop && header.logo <= safeTop + 16, JSON.stringify(header));
+      const login = await page.evaluate(() => {
+        document.body.classList.add("account-gate");
+        const dialog = document.querySelector("#accountDialog");
+        dialog.classList.add("account-start-dialog");
+        dialog.hidden = false;
+        const header = dialog.querySelector(".modal-header");
+        return { top: header.getBoundingClientRect().top, padding: parseFloat(getComputedStyle(header).paddingTop) };
+      });
+      assert.equal(login.top, 0);
+      assert.equal(login.padding, Math.max(24, safeTop));
+      await page.close();
+    }
+  } finally { await browser.close(); }
+});
+
 test("iPhone contact taps do not open the keyboard; returning to contacts blurs the composer", { timeout: 30000 }, async () => {
   const browser = await webkit.launch({ headless: true });
   try {

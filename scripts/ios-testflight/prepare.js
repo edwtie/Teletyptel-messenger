@@ -61,7 +61,7 @@ function prepare() {
     + "<key>TeleTypTelServerHost</key><string>" + escape(new URL(config.serverUrl).hostname) + "</string>\n"));
   write("capacitor.config.json", JSON.stringify(config.capacitor, null, 2));
   write("package.json", JSON.stringify({ name: "teletyptel-ios-lan-test", version: "1.0.0", private: true,
-    dependencies: { "@capacitor/core": "8.4.3", "@capacitor/ios": "8.4.3" } }, null, 2));
+    dependencies: { "@capacitor/core": "8.4.3", "@capacitor/ios": "8.4.3", "@capacitor/keyboard": "8.0.6" } }, null, 2));
   fs.symlinkSync(path.join(__dirname, "node_modules"), path.join(project, "node_modules"), process.platform === "win32" ? "junction" : "dir");
   fs.writeFileSync(path.join(output, "settings.json"), JSON.stringify(config, null, 2));
   fs.writeFileSync(path.join(output, "source.json"), JSON.stringify({ revision: execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim(), nativeFiles: files, webAssets, frontendAssets }, null, 2));

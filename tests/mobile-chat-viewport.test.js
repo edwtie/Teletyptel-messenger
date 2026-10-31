@@ -159,6 +159,21 @@ for (const [name, engine] of Object.entries({ chromium, webkit })) {
           });
           assert.equal(zoom.height, 844, "Pinch zoom must not shrink the app layout again");
           assert.doesNotMatch(zoom.viewport, /user-scalable\s*=\s*no|maximum-scale\s*=\s*1/);
+          await page.setViewportSize({ width, height: 350 });
+          const native = await page.evaluate(() => {
+            window.TeleTypTelKeyboard = { nativeResize: true, active: true, landscape: false };
+            Object.assign(window.visualViewport, { width: innerWidth, height: 120, offsetTop: 230, scale: 1 });
+            window.updateChatViewport();
+            window.followLatestMessage();
+            const shell = document.querySelector(".app-shell").getBoundingClientRect();
+            const composer = document.getElementById("composerForm").getBoundingClientRect();
+            return { top: shell.top, height: shell.height, composerBottom: composer.bottom,
+              landscape: document.body.dataset.viewportOrientation };
+          });
+          assert.equal(native.top, 0, "Native WebView must not be panned twice");
+          assert.equal(native.height, 350, "Native keyboard resize already reserves keyboard space");
+          assert.ok(Math.abs(native.composerBottom - 350) <= 1, "No blank gap between composer and native keyboard");
+          assert.equal(native.landscape, "portrait", "Keyboard-reduced native height does not imply rotation");
         } finally { await context.close(); }
       }
     } finally { await browser.close(); }

@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+### Incoming call presentation — 2026-10-31
+
+- Show only the incoming-call dialog, not the duplicate banner and header actions.
+  Keep media hidden until the offer is accepted and avoid scrolling/refocusing on
+  repeated call updates.
+- Place the overlay outside the chat grid so it covers the header too; preserve
+  safe-area spacing and readable white labels on the answer/reject buttons.
+- Check dialog geometry, background stability and ringing/accepted/ended rendering
+  in Chromium and WebKit. Physical iPhone verification is still pending.
+
+### Native iPhone keyboard follow-up — 2026-10-31
+
+- Record the physical build 6.1 keyboard failure in normal chat and TC.
+- Disable automatic native content insets while retaining CSS safe-area padding,
+  avoiding a second top margin above the contacts logo. Real-device retest pending.
+- Add the pinned Capacitor keyboard plugin to the isolated iOS build, using native
+  resizing and disabling outer WebView scrolling; preserve nested message scrolling.
+- Use the already-resized native viewport once and native keyboard/orientation
+  signals for compact TC layout. Leave browser viewport behavior unchanged.
+- Add native-event and double-resize/pan regressions. New native compilation and
+  physical iPhone retesting are required before claiming the reported gap is fixed.
+
 ### Mobile message alignment — 2026-10-31
 
 - Restore right alignment for own message/avatar rows on phone layouts and align

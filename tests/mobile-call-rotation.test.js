@@ -304,6 +304,29 @@ for (const [name, engine] of Object.entries({ chromium, webkit })) {
       assert.equal(anchored.after, anchored.before, "Scrolling RTT or the page cannot move the header into the Dynamic Island");
       assert.ok(anchored.rttScroll > 0, "Long RTT remains independently scrollable");
       assert.ok(anchored.composerBottom <= 844, "Long RTT cannot push the composer outside the pinned call");
+      for (const [width, height, landscape] of [[390, 350, false], [844, 180, true], [390, 350, false]]) {
+        await page.setViewportSize({ width, height });
+        const native = await page.evaluate(({ width, height, landscape }) => {
+          window.TeleTypTelKeyboard = { nativeResize: true, active: true, landscape };
+          Object.assign(window.visualViewport, { width, height: Math.max(80, height - 200), offsetTop: 200, scale: 1 });
+          document.documentElement.style.setProperty("--call-safe-area-top", landscape ? "0px" : "59px");
+          document.getElementById("messageInput").focus();
+          window.rotation();
+          const shell = document.querySelector(".app-shell").getBoundingClientRect();
+          const video = document.getElementById("localVideo").getBoundingClientRect();
+          return { top: shell.top, height: shell.height, videoHeight: video.height,
+            composerBottom: document.getElementById("composerForm").getBoundingClientRect().bottom,
+            keyboard: document.body.classList.contains("tc-phone-keyboard-active"),
+            landscape: document.body.classList.contains("tc-phone-landscape-active") };
+        }, { width, height, landscape });
+        assert.equal(native.top, 0);
+        assert.equal(native.height, height);
+        assert.equal(native.keyboard, true);
+        assert.equal(native.landscape, landscape);
+        assert.ok(native.videoHeight >= 80, "Native keyboard leaves useful video space");
+        assert.ok(Math.abs(native.composerBottom - height) <= 1, "Call composer touches the native keyboard boundary without a blank gap");
+      }
+      await page.screenshot({ path: path.join(output, `${name}-native-call-keyboard.png`) });
       assert.deepEqual(errors, []);
     } finally { await browser.close(); }
   });
