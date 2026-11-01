@@ -3313,8 +3313,8 @@
 
   function startProviderLoginFromDialog(provider) {
     if (state.logoutInProgress) return;
-    if (provider === "google" && window.Capacitor?.getPlatform?.() === "ios") {
-      void startNativeGoogleLoginFromDialog();
+    if (["google", "facebook"].includes(provider) && window.Capacitor?.getPlatform?.() === "ios") {
+      void startNativeProviderLoginFromDialog(provider);
       return;
     }
     if (window.TeleTypTelApp) {
@@ -3327,13 +3327,15 @@
     location.assign(target.toString());
   }
 
-  async function startNativeGoogleLoginFromDialog() {
-    if (state.nativeGoogleSignInPending) return;
-    state.nativeGoogleSignInPending = true;
-    setAccountDialogBusy(true, t("account.google_redirecting", "Opening Google sign-in..."));
+  async function startNativeProviderLoginFromDialog(provider) {
+    if (state.nativeProviderSignInPending) return;
+    state.nativeProviderSignInPending = true;
+    const name = providerDisplayName(provider);
+    setAccountDialogBusy(true, t(`account.${provider}_redirecting`, `Opening ${name} sign-in...`));
     try {
-      if (!window.TeleTypTelNativeGoogle) throw new Error("Update TeleTypTel in TestFlight to use Google sign-in.");
-      const payload = await window.TeleTypTelNativeGoogle.signIn(authApiUrl("google/native.php"));
+      const adapter = provider === "google" ? window.TeleTypTelNativeGoogle : window.TeleTypTelNativeFacebook;
+      if (!adapter) throw Object.assign(new Error("App update required."), { code: "UPDATE_REQUIRED" });
+      const payload = await adapter.signIn(authApiUrl(`${provider}/native.php`));
       if (payload.twoFactorRequired) {
         showLoginTwoFactorChallenge(payload, { oauth: true, connectAfterSave: true });
         return;
@@ -3347,15 +3349,17 @@
     } catch (error) {
       if (error.code === "BUSY") return;
       const message = error.code === "CANCELLED"
-        ? t("account.google_cancelled", "Google sign-in cancelled.")
+        ? t(`account.${provider}_cancelled`, `${name} sign-in cancelled.`)
         : error.code === "UPDATE_REQUIRED"
-          ? t("account.google_app_update", "Update TeleTypTel in TestFlight to use Google sign-in.")
+          ? t(`account.${provider}_app_update`, `Update TeleTypTel in TestFlight to use ${name} sign-in.`)
           : error.code === "account_access_denied"
             ? accountApiErrorText("account_access_denied")
-            : t("account.google_native_failed", "Google sign-in failed. Check your connection and try again.");
+            : ["CONFIGURATION", "facebook_not_configured"].includes(error.code)
+              ? t(`account.${provider}_configuration`, `${name} sign-in is not configured for this app. Contact the administrator.`)
+              : t(`account.${provider}_native_failed`, `${name} sign-in failed. Check your connection and try again.`);
       el.dialogAccountStatus.textContent = message;
     } finally {
-      state.nativeGoogleSignInPending = false;
+      state.nativeProviderSignInPending = false;
       setAccountDialogBusy(false);
     }
   }

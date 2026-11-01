@@ -4,10 +4,12 @@ const os = require("node:os");
 const crypto = require("node:crypto");
 const { spawnSync } = require("node:child_process");
 const { output, project } = require("./prepare");
+const facebook = require("./facebook-signin");
 
 const reports = path.join(output, "reports");
 const secretNames = ["IOS_DISTRIBUTION_P12_BASE64", "IOS_DISTRIBUTION_P12_PASSWORD", "IOS_PROVISION_PROFILE_BASE64", "IOS_ASC_KEY_P8", "IOS_ASC_KEY_ID", "IOS_ASC_ISSUER_ID"];
 const secrets = Object.fromEntries(secretNames.map(name => [name, process.env[name]]));
+const diagnosticSecrets = [];
 const environment = { ...process.env };
 for (const name of Object.keys(environment)) if (name.startsWith("IOS_")) delete environment[name];
 
@@ -23,7 +25,7 @@ function logged(command, args, filename, options = {}) {
   try { return run(command, args, { ...options, stdio: ["ignore", descriptor, descriptor] }); }
   catch (error) {
     let detail = fs.readFileSync(logfile, "utf8").split(/\r?\n/).filter(line => /\berror:|\berror\]|Error Domain|^\s*ERROR\b|BUILD FAILED|EXPORT FAILED/i.test(line)).slice(-12).join("\n");
-    for (const value of Object.values(secrets)) if (value) detail = detail.split(value).join("[redacted]");
+    for (const value of [...Object.values(secrets), ...diagnosticSecrets]) if (value) detail = detail.split(value).join("[redacted]");
     console.error(detail.slice(-5000));
     throw error;
   } finally { fs.closeSync(descriptor); }
@@ -50,6 +52,11 @@ async function build() {
   const upload = process.argv.includes("--upload-internal");
   if (!upload && !process.argv.includes("--unsigned")) throw new Error("Choose --unsigned or --upload-internal explicitly.");
   if (upload && secretNames.some(name => !secrets[name])) throw new Error("Missing protected environment secrets");
+  const expectedFacebook = upload ? facebook.loadConfig() : undefined;
+  if (expectedFacebook) diagnosticSecrets.push(expectedFacebook.clientToken);
+  const stagedPlist = JSON.parse(run("plutil", ["-convert", "json", "-o", "-", path.join(project, "ios/App/App/Info.plist")]));
+  if (typeof stagedPlist.FacebookClientToken === "string") diagnosticSecrets.push(stagedPlist.FacebookClientToken);
+  const facebookConfig = facebook.validateStagedConfig(stagedPlist, { required: upload, expected: expectedFacebook });
   process.umask(0o077);
   fs.mkdirSync(reports, { recursive: true });
   const config = JSON.parse(fs.readFileSync(path.join(output, "settings.json"), "utf8"));
@@ -63,6 +70,7 @@ async function build() {
     fs.copyFileSync(path.join(output, "source.json"), path.join(reports, "source.json"));
     logged(process.execPath, [path.join(__dirname, "node_modules/@capacitor/cli/bin/capacitor"), "sync", "ios"], "capacitor-sync.log");
     require("./google-signin").configureGooglePackage(project);
+    if (facebookConfig) facebook.configureFacebookPackage(project);
     const bundledStart = path.join(project, "ios/App/App/public", config.capacitor.server.appStartPath.replace(/^\/+/, ""));
     if (!fs.existsSync(bundledStart)) throw new Error("Missing native startup asset; Capacitor would exit before connecting");
     run("swift", [path.join(__dirname, "opaque-icon.swift"), path.join(project, "ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png")]);
@@ -108,6 +116,7 @@ async function build() {
     } else {
       logged("xcodebuild", [...buildArgs, "-archivePath", archive, "archive"], "xcode-archive.log");
       const app = path.join(archive, "Products/Applications/App.app");
+      facebook.validateStagedConfig(JSON.parse(run("plutil", ["-convert", "json", "-o", "-", path.join(app, "Info.plist")])), { required: true, expected: expectedFacebook });
       run("codesign", ["--verify", "--deep", "--strict", app]);
       if (run("plutil", ["-extract", "CFBundleIdentifier", "raw", "-o", "-", path.join(app, "Info.plist")]).trim() !== config.bundleId) throw new Error("Archived wrong bundle ID");
       const exportJson = path.join(output, "export-options.json");

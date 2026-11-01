@@ -16,11 +16,50 @@ De interne app gebruikt Google Sign-In iOS 9.0.0, niet de web-OAuth-redirect naa
 
 De Google-SDK opent de systeemauthenticatie en verwerkt de callback via het omgekeerde client-ID-URL-schema. De native bridge accepteert alleen het hoofddocument van de ingebouwde Messenger en controleert of de server-client-ID overeenkomt. De server wisselt een eenmalige `serverAuthCode` rechtstreeks met Google uit en haalt het profiel bij Google UserInfo op. Geen door JavaScript aangeleverd profiel of ongeverifieerd ID-token wordt vertrouwd. Google-tokens worden niet opgeslagen; de SDK wordt na afloop lokaal afgemeld.
 
-`/api/auth/google/native.php` vereist HTTPS, dezelfde origin, JSON POST, een aparte request-header en een eenmalige sessiechallenge (10 minuten). De native transportlaag zet de origin uitsluitend voor de vaste server. De bestaande accountblokkering, sessierotatie en 2FA blijven gelden. JavaScript krijgt het account-ID; de HttpOnly-sessiecookie blijft in de native cookie-opslag. Geen langdurig login-token in de URL. Een externe, niet door Google beheerde e-mail wordt niet gebruikt voor automatische koppeling aan een bestaand account. Providers koppelen blijft een website-actie; aanmelden in deze ingebouwde versie kan via Google of e-mail, niet via de Facebook-webredirect.
+`/api/auth/google/native.php` vereist HTTPS, dezelfde origin, JSON POST, een aparte request-header en een eenmalige sessiechallenge (10 minuten). De native transportlaag zet de origin uitsluitend voor de vaste server. De bestaande accountblokkering, sessierotatie en 2FA blijven gelden. JavaScript krijgt het account-ID; de HttpOnly-sessiecookie blijft in de native cookie-opslag. Geen langdurig login-token in de URL. Een externe, niet door Google beheerde e-mail wordt niet gebruikt voor automatische koppeling aan een bestaand account. Providers koppelen blijft een website-actie. Facebook-aanmelding gebruikt de aparte native integratie hieronder, niet de Facebook-webredirect.
 
 Een oude TestFlight-build toont een updateverzoek. Installeer de nieuwe build, open Google-aanmelding, test annuleren en opnieuw aanmelden, en test een account met 2FA. De cloudtest kan alleen compilatie en opstarten controleren; echte Google-aanmelding en de lokale WAMP-verbinding moeten op de iPhone worden bevestigd.
 
 De interface gebruikt `window.Capacitor.Plugins.TeleTypTelGoogle.signIn`, zoals de native iOS-bridge die bij het laden injecteert. Er is geen afhankelijkheid van de JavaScript-`registerPlugin`-functie.
+
+## Facebook-aanmelding op iPhone
+
+De nieuwe native integratie gebruikt Facebook Limited Login via de Meta iOS-SDK.
+De Facebook-knop in een oudere TestFlight-app kan deze koppeling niet activeren:
+een nieuwe native build en toesteltest zijn noodzakelijk. De website behoudt
+zijn bestaande Facebook-webaanmelding; dit voegt geen Android Facebook-SDK toe.
+
+Meta moet het iOS-platform met bundle-ID `com.tiedragon.teletyptel` bevatten.
+Bewaar lokaal de `appId` en `clientToken` in
+`scripts/ios-testflight/facebook.local.json` (gitignored), of geef beide via
+`IOS_FACEBOOK_APP_ID` en `IOS_FACEBOOK_CLIENT_TOKEN` door. Gebruik nooit de App
+Secret als Client Token. De App Secret blijft op de PHP-server. Het Client Token
+is SDK-clientconfiguratie en komt noodzakelijk in de geïnstalleerde app terecht;
+het is geen servergeheim, ook al publiceren we het niet in de repository.
+
+De beveiligde GitHub-omgeving `ios-testflight` heeft voor een echte upload beide
+gelijknamige secrets nodig. De preflight gebruikt uitsluitend fictieve waarden:
+dat controleert compilatie/opstarten, niet aanmelding bij Meta. Publiceer het lokale
+configbestand niet. Geef het token niet via opdrachtregelargumenten of logs door.
+Het bouwscript mag ontbrekende configuratie niet stilzwijgend accepteren.
+
+De server maakt een sessiegebonden, eenmalige challenge; de SDK krijgt diezelfde
+waarde als nonce. `/api/auth/facebook/native.php` verifieert het ondertekende
+RS256-authenticatietoken met Meta's vaste HTTPS-JWKS, de issuer, App ID, tijdclaims
+en nonce. Een aangeleverd profiel of een alleen gedecodeerd JWT wordt niet vertrouwd.
+De e-mailclaim wordt niet als geverifieerde grond voor automatische accountkoppeling
+gebruikt. Bestaande Facebook-identiteiten, blokkering, sessierotatie en 2FA blijven
+via de gedeelde accountlaag lopen. Tokens gaan alleen via POST naar de vaste server,
+niet via URL, lokale browseropslag of logs. Er wordt geen trackingtoestemming gevraagd;
+automatische app-events en advertentie-ID-verzameling staan uit.
+
+Controleer op de echte iPhone: openen van Facebook, annuleren en opnieuw proberen,
+inloggen op het bestaande gekoppelde account, een account met 2FA, uitloggen en
+aanmelden bij een onbereikbare server. Lokale fixtures bewijzen geen geslaagde
+Meta-aanmelding op een fysiek toestel.
+
+Protocolbronnen: [Meta iOS-SDK](https://github.com/facebook/facebook-ios-sdk) en
+[Meta OpenID-configuratie](https://www.facebook.com/.well-known/openid-configuration/).
 
 ## Ingebouwde interface en servertransport
 

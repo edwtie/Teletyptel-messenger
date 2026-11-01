@@ -14,6 +14,7 @@ on:
       - php/public/chat-xmpp-translation.js
       - php/public/chat-interpreter.js
       - php/public/native-google.js
+      - php/public/native-facebook.js
       - php/public/mobile-navigation.js
       - php/public/jingle-history.js
       - php/public/lang/**
@@ -25,6 +26,7 @@ on:
       - php/public/favicon.ico
       - tests/ios-bundled-runtime.test.js
       - tests/native-google.test.js
+      - tests/native-facebook.test.js
       - tests/call-camera-switch.test.js
       - tests/native-keyboard.test.js
       - tests/call-inputs.test.js
@@ -62,6 +64,9 @@ jobs:
           echo "DEVELOPER_DIR=$XCODE_PATH/Contents/Developer" >> "$GITHUB_ENV"
       - name: Prepare and compile without signing credentials
         working-directory: scripts/ios-testflight
+        env:
+          IOS_FACEBOOK_APP_ID: "123456789"
+          IOS_FACEBOOK_CLIENT_TOKEN: "00000000000000000000000000000000"
         run: |
           npm ci --ignore-scripts
           npm run prepare:app
@@ -96,8 +101,11 @@ jobs:
           XCODE_PATH=$(find /Applications -maxdepth 1 -name 'Xcode_26*.app' -type d | sort -r | head -n 1)
           test -n "$XCODE_PATH"
           echo "DEVELOPER_DIR=$XCODE_PATH/Contents/Developer" >> "$GITHUB_ENV"
-      - name: Prepare isolated app without secrets
+      - name: Prepare isolated app with Facebook client configuration
         working-directory: scripts/ios-testflight
+        env:
+          IOS_FACEBOOK_APP_ID: ${{ secrets.IOS_FACEBOOK_APP_ID }}
+          IOS_FACEBOOK_CLIENT_TOKEN: ${{ secrets.IOS_FACEBOOK_CLIENT_TOKEN }}
         run: |
           npm ci --ignore-scripts
           npm run prepare:app
@@ -105,6 +113,8 @@ jobs:
       - name: Sign and upload for internal TestFlight only
         working-directory: scripts/ios-testflight
         env:
+          IOS_FACEBOOK_APP_ID: ${{ secrets.IOS_FACEBOOK_APP_ID }}
+          IOS_FACEBOOK_CLIENT_TOKEN: ${{ secrets.IOS_FACEBOOK_CLIENT_TOKEN }}
           IOS_DISTRIBUTION_P12_BASE64: ${{ secrets.IOS_DISTRIBUTION_P12_BASE64 }}
           IOS_DISTRIBUTION_P12_PASSWORD: ${{ secrets.IOS_DISTRIBUTION_P12_PASSWORD }}
           IOS_PROVISION_PROFILE_BASE64: ${{ secrets.IOS_PROVISION_PROFILE_BASE64 }}

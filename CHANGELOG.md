@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Native iPhone Facebook sign-in — 2026-11-01
+
+- Add a bundled-app Facebook Limited Login bridge instead of blocking the button
+  or redirecting the iPhone WebView through the website login.
+- Validate signed identity tokens, app audience, time and a one-time session nonce
+  on the server; preserve account access checks and 2FA without email auto-linking.
+- Keep SDK client configuration local/protected and the App Secret server-only.
+  A new native build and physical iPhone login test are still required.
+
 ### Android LAN test deployment — 2026-10-31
 
 - Prepare Android `1.0.1-lan-test` (version code 2) alongside the next internal

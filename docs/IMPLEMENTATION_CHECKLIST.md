@@ -3,6 +3,23 @@
 This checklist tracks protocol and product progress. Use `[x]` only when the
 item is implemented, tested and documented.
 
+## Native iPhone Facebook login — 2026-11-01
+
+- [x] Route the iPhone Facebook action through the native adapter; keep website
+  OAuth and Google sign-in intact. JS fixtures cover cancellation, retry, blocked
+  accounts, 2FA, old builds and the scoped native cookie transport.
+- [x] Verify RS256 tokens against the fixed Meta JWKS with audience, issuer,
+  time and a one-time session nonce. 223 generated-key PHP checks pass, including
+  unverified email handling. WAMP HTTPS begin, secure cookie, origin/invalid-token
+  rejection and replay rejection pass without accessing real accounts.
+- [x] Prepare the native SDK integration and isolated app configuration; 84 Node
+  tests and both provider bridge fixtures pass. This is not Xcode compilation.
+- [ ] Provision Facebook client configuration in the protected build environment,
+  compile with Xcode, run simulator startup and upload an approved TestFlight build.
+- [ ] Physical iPhone: complete Meta login on the linked account; test cancellation,
+  repeat login, 2FA, logout and unreachable WAMP. Simulator fixtures are not proof
+  of a successful real-device Facebook login.
+
 ## XMPP connection recovery — 2026-10-31
 
 - [x] Reconnect ordinary signed-in chats after transient socket loss without clearing

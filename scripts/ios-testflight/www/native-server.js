@@ -17,7 +17,7 @@
     if (url.username || url.password || !(local(url) || url.origin === server.origin)) return null;
     return url.pathname + url.search;
   };
-  const apiPath = value => /^\/api\/(?:[a-z-]+\.php|auth\/(?:public-config\.php|google\/native\.php))$/.test(value.split("?")[0])
+  const apiPath = value => /^\/api\/(?:[a-z-]+\.php|auth\/(?:public-config\.php|(?:google|facebook)\/native\.php))$/.test(value.split("?")[0])
     || /^\/config\/(?:account-profile\.json|google-maps\.json|providers\/[a-zA-Z0-9_-]+\.json)$/.test(value.split("?")[0]);
   const publicUrl = value => {
     const url = new URL(value, root.location.href);

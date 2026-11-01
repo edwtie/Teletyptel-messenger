@@ -42,7 +42,7 @@ private final class MessengerServerConnection: NSObject, URLSessionTaskDelegate 
             throw URLError(.unsupportedURL)
         }
         let route = components.percentEncodedPath
-        let allowed = #"^/api/([a-z-]+\.php|auth/(public-config\.php|google/native\.php))$|^/config/(account-profile\.json|google-maps\.json|providers/[a-zA-Z0-9_-]+\.json)$"#
+        let allowed = #"^/api/([a-z-]+\.php|auth/(public-config\.php|google/native\.php|facebook/native\.php))$|^/config/(account-profile\.json|google-maps\.json|providers/[a-zA-Z0-9_-]+\.json)$"#
         guard route.range(of: allowed, options: .regularExpression) != nil,
               !fileOnly || route == "/api/file.php",
               ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"].contains(method),

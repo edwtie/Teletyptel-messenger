@@ -1,5 +1,5 @@
-const CACHE_NAME = "teletyptel-webclient-v464";
-const BUILD_VERSION = "20261031-xmpp-recovery";
+const CACHE_NAME = "teletyptel-webclient-v465";
+const BUILD_VERSION = "20261101-native-facebook";
 const ASSETS = [
   "chat.html",
   "chat-dialer.css?v=20261031-keypad-letters",
@@ -12,6 +12,7 @@ const ASSETS = [
   "chat-interpreter.js?v=20261027-inline-interpreter",
   `chat-client.js?v=${BUILD_VERSION}`,
   "native-google.js?v=20261031-bundled-interface",
+  "native-facebook.js?v=20261101-native-facebook",
   `vendor/qrcode.js?v=${BUILD_VERSION}`,
   "favicon.ico",
   "manifest.webmanifest",

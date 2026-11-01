@@ -126,6 +126,28 @@ test("Bundled Google exchange keeps the challenge and code on the native server 
   assert.equal(nativeCalls.length, 2);
 });
 
+test("Bundled Facebook exchange uses the native cookie session and preserves 2FA", async () => {
+  const nonce = "a".repeat(64);
+  let count = 0;
+  const { context, nativeCalls, browserCalls } = fixture(async () => reply(++count === 1
+    ? { ok: true, challenge: nonce, appId: "123456789" }
+    : { ok: true, accountId: "fixture", twoFactorRequired: true }));
+  context.Capacitor.getPlatform = () => "ios";
+  context.Capacitor.isPluginAvailable = () => true;
+  context.Capacitor.Plugins.TeleTypTelFacebook = { signIn: async options => {
+    assert.equal(options.nonce, nonce);
+    return { token: "fixture-jwt" };
+  } };
+  vm.runInNewContext(fs.readFileSync(path.join(root, "php/public/native-facebook.js"), "utf8"), context);
+  const result = await context.TeleTypTelNativeFacebook.signIn("/api/auth/facebook/native.php");
+  assert.equal(result.twoFactorRequired, true);
+  assert.equal(browserCalls.length, 0);
+  assert.equal(nativeCalls.length, 2);
+  assert.equal(nativeCalls[1].headers["x-teletyptel-native"], "facebook");
+  assert.equal(nativeCalls[1].omitCookies, false);
+  assert.equal(JSON.parse(Buffer.from(nativeCalls[1].body, "base64")).token, "fixture-jwt");
+});
+
 test("Logout reaches the native authenticated transport instead of a WebView beacon", async () => {
   const { context, nativeCalls, browserCalls } = fixture();
   context.accountApiPath = "api/account.php";

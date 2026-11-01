@@ -3,6 +3,7 @@ const path = require("node:path");
 const { execFileSync } = require("node:child_process");
 const { settings } = require("./settings");
 const google = require("./google-signin");
+const facebook = require("./facebook-signin");
 const { bundleFrontend } = require("./bundle-frontend");
 
 const root = path.resolve(__dirname, "../..");
@@ -13,6 +14,7 @@ const project = path.join(output, "project");
 const webAssets = ["index.html", "offline.html", "shell.js", "shell.css"];
 
 function prepare() {
+  const facebookConfig = facebook.loadConfig({ required: !process.argv.includes("--allow-unconfigured-facebook") || process.argv.includes("--require-facebook") });
   const config = settings(process.env.IOS_SERVER_URL, process.env.IOS_BUILD_NUMBER || "1.0");
   if (fs.existsSync(project)) throw new Error("Staging project already exists. Use a fresh checkout; do not overwrite signing outputs.");
   function write(file, content) {
@@ -38,10 +40,11 @@ function prepare() {
   const originalDelegate = fs.readFileSync(path.join(project, delegate), "utf8");
   const urlHandler = "return ApplicationDelegateProxy.shared.application(app, open: url, options: options)";
   if (!originalDelegate.includes(urlHandler)) throw new Error("Review changed native URL handler");
-  write(delegate, "import WebKit\nimport GoogleSignIn\n" + originalDelegate.replace(urlHandler,
-    "if GIDSignIn.sharedInstance.handle(url) { return true }\n        " + urlHandler) + "\n"
+  write(delegate, "import WebKit\nimport GoogleSignIn\n" + facebook.configureDelegate(originalDelegate.replace(urlHandler,
+    "if GIDSignIn.sharedInstance.handle(url) { return true }\n        " + urlHandler)) + "\n"
     + fs.readFileSync(path.join(__dirname, "LanViewController.swift"), "utf8") + "\n"
     + fs.readFileSync(path.join(__dirname, "GoogleSignInPlugin.swift"), "utf8") + "\n"
+    + fs.readFileSync(path.join(__dirname, "FacebookSignInPlugin.swift"), "utf8") + "\n"
     + fs.readFileSync(path.join(__dirname, "ContactsPlugin.swift"), "utf8") + "\n"
     + fs.readFileSync(path.join(__dirname, "ServerBridge.swift"), "utf8"));
   const storyboard = "ios/App/App/Base.lproj/Main.storyboard";
@@ -51,13 +54,17 @@ function prepare() {
   write(storyboard, originalStoryboard.replace(marker, 'customClass="LanViewController" customModule="App" customModuleProvider="target"'));
   const plist = "ios/App/App/Info.plist";
   const originalPlist = fs.readFileSync(path.join(project, plist), "utf8");
+  if (!originalPlist.includes("<dict>") || /<key>(?:CFBundleURLTypes|Facebook[^<]*|TeleTypTelFacebookEnabled|NSUserTrackingUsageDescription)<\/key>/.test(originalPlist)) {
+    throw new Error("Review existing native URL schemes or Facebook privacy configuration");
+  }
   const escape = value => value.replace(/[&<>"']/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" })[character]);
   write(plist, originalPlist.replace("<dict>", "<dict>\n"
     + "<key>NSLocalNetworkUsageDescription</key><string>TeleTypTel maakt verbinding met jouw testserver op hetzelfde wifi-netwerk.</string>\n"
     + "<key>NSAppTransportSecurity</key><dict><key>NSAllowsLocalNetworking</key><true/></dict>\n"
     + "<key>GIDClientID</key><string>" + google.clientId + "</string>\n"
     + "<key>GIDServerClientID</key><string>" + google.serverClientId + "</string>\n"
-    + "<key>CFBundleURLTypes</key><array><dict><key>CFBundleURLSchemes</key><array><string>" + google.urlScheme + "</string></array></dict></array>\n"
+    + "<key>CFBundleURLTypes</key><array><dict><key>CFBundleURLSchemes</key><array><string>" + google.urlScheme + "</string></array></dict>" + facebook.urlType(facebookConfig) + "</array>\n"
+    + facebook.plistEntries(facebookConfig)
     + "<key>TeleTypTelServerOrigin</key><string>" + escape(new URL(config.serverUrl).origin) + "</string>\n"
     + "<key>TeleTypTelServerHost</key><string>" + escape(new URL(config.serverUrl).hostname) + "</string>\n"));
   write("capacitor.config.json", JSON.stringify(config.capacitor, null, 2));
