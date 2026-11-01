@@ -1,14 +1,18 @@
-const CACHE_NAME = "teletyptel-webclient-v465";
-const BUILD_VERSION = "20261101-native-facebook";
+const CACHE_NAME = "teletyptel-webclient-v468";
+const BUILD_VERSION = "20261102-ipad";
 const ASSETS = [
   "chat.html",
+  "chat-tablet.css?v=20261102-ipad",
+  "native-biometric.js?v=20261102-faceid",
+  "xmpp-availability.css?v=20261102-xmpp-availability",
+  "xmpp-availability.js?v=20261102-xmpp-availability",
   "chat-dialer.css?v=20261031-keypad-letters",
   "chat-dialer.js?v=20261031-iphone-contacts",
   "dev.html",
-  "chat-client.css?v=20261031-chat-button-spacing",
+  "chat-client.css?v=20261102-ipad",
   "chat-xmpp-translation.js?v=20261027-inline-interpreter",
   "chat-translation.js?v=20261031-bundled-interface",
-  "mobile-navigation.js?v=20261031-contact-actions",
+  "mobile-navigation.js?v=20261102-ipad",
   "chat-interpreter.js?v=20261027-inline-interpreter",
   `chat-client.js?v=${BUILD_VERSION}`,
   "native-google.js?v=20261031-bundled-interface",

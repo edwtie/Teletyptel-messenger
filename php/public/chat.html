@@ -15,8 +15,10 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="favicon.ico" sizes="any">
   <link rel="apple-touch-icon" href="assets/brand/teletyptel-icon-192.png">
-  <link rel="stylesheet" href="chat-client.css?v=20261031-chat-button-spacing">
+  <link rel="stylesheet" href="chat-client.css?v=20261102-ipad">
+  <link rel="stylesheet" href="xmpp-availability.css?v=20261102-xmpp-availability">
   <link rel="stylesheet" href="chat-dialer.css?v=20261031-keypad-letters">
+  <link rel="stylesheet" href="chat-tablet.css?v=20261102-ipad">
 </head>
 <body class="account-booting">
   <a class="skip-link" href="#messageInput" data-i18n="button.skip_to_message">Skip to message</a>
@@ -116,6 +118,12 @@
           </button>
         </div>
       </aside>
+
+      <section class="tablet-chat-placeholder" aria-labelledby="tabletWelcomeTitle">
+        <img src="assets/brand/teletyptel-logo-header@2x.png" width="599" height="128" alt="TeleTypTel">
+        <h2 id="tabletWelcomeTitle" data-i18n="tablet.choose_chat">Choose a conversation</h2>
+        <p data-i18n="tablet.choose_chat_hint">Select a contact on the left to chat, call or use Total Conversation.</p>
+      </section>
 
       <section class="chat-panel" aria-label="Chat">
         <div id="dropOverlay" class="drop-overlay" hidden>
@@ -840,6 +848,7 @@
             </div>
             <div class="button-row">
               <button type="button" id="settingsLogoutButton" data-i18n="button.logout">Sign out</button>
+              <button type="button" id="faceIdButton" hidden>Face ID</button>
             </div>
           </div>
           <div class="identity-link-panel">
@@ -1413,8 +1422,10 @@
   <script src="chat-translation.js?v=20261031-bundled-interface"></script>
   <script src="native-google.js?v=20261031-bundled-interface"></script>
   <script src="native-facebook.js?v=20261101-native-facebook"></script>
-  <script src="chat-client.js?v=20261101-native-facebook"></script>
+  <script src="native-biometric.js?v=20261102-faceid"></script>
+  <script src="xmpp-availability.js?v=20261102-xmpp-availability"></script>
+  <script src="chat-client.js?v=20261102-ipad"></script>
   <script src="chat-interpreter.js?v=20261027-inline-interpreter"></script>
-  <script src="mobile-navigation.js?v=20261031-contact-actions"></script>
+  <script src="mobile-navigation.js?v=20261102-ipad"></script>
 </body>
 </html>

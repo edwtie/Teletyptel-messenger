@@ -3,6 +3,62 @@
 This checklist tracks protocol and product progress. Use `[x]` only when the
 item is implemented, tested and documented.
 
+## iPad adaptive layout — 2026-11-02
+
+- [x] Recognize iPad Safari (including desktop mode with a Mobile token) as a
+  tablet. Keep iPhone detection and narrow-window phone layout intact.
+- [x] Show contacts alongside chat at tablet widths of 800px or greater, with
+  independent scrolling, a compact action menu and a welcome view before selection.
+- [x] Keep TC text, video controls and composer inside the reduced viewport.
+  Chromium/WebKit fixtures exercise portrait, landscape, narrow windows and a
+  keyboard-sized viewport; resizing preserves the existing draft element/value.
+- [ ] Verify on the physical iPad Pro 11: native keyboard, rotation, multitasking,
+  front/back camera, real media/RTT, incoming calls, interpreter and Face ID.
+  Synthetic layout fixtures do not test camera hardware or real iPadOS behavior.
+
+Browser layout checks: `node --test tests/tablet-layout.test.js`.
+
+## Optional Face ID — 2026-11-02
+
+- [x] Add a consent-driven JS flow after successful sign-in, a Not now choice and
+  an iPhone-only Settings action. Browser/Android behavior remains unchanged.
+- [x] Test JS orchestration: no pre-consent evaluation, one automatic unlock,
+  cancellation, expired/mismatched accounts, temporary server failure, foreground
+  revalidation, settings and late unlock invalidation during logout.
+- [x] Include the native plugin, usage description and shared JS in isolated iOS
+  staging. Static checks cover device-only biometric Keychain access, scoped native
+  origin, memory-only protected cookies and removal on logout.
+- [ ] Compile the new Swift implementation with Xcode and run simulator tests.
+- [ ] Real iPhone: fresh consent/Not now, OS permission denial, automatic launch,
+  cancel, biometric failure/lockout, changed Face ID enrollment, background/return,
+  active call, expired/revoked session, offline retry, explicit logout and relaunch.
+  Verify server logout and that neither app snapshots nor VoiceOver reveal locked UI.
+
+See `IOS_TESTFLIGHT.md` for the security model and limitations.
+
+## XMPP availability before Messenger — 2026-11-02
+
+- [x] Probe the configured secure XMPP WebSocket without credentials, requiring
+  RFC7395 stream opening plus SASL features rather than just a socket open event.
+  Bound checks to 8 seconds; close probe sockets and reject malformed responses.
+- [x] Gate website/iPhone startup and sign-in while unavailable. Show a translated
+  Retry action, keep background controls inert and avoid focusing a text input.
+  A successful availability probe does not replace authenticated XMPP readiness.
+- [x] Show transport failures without deleting the stored account or draft.
+  Preserve reconnect backoff, deliberate logout and authentication rejection.
+  Active calls keep their controls accessible and receive the connection status.
+- [x] Run 46 targeted checks, including complete-page Chromium/WebKit startup,
+  offline/retry recovery, mobile portrait/landscape layout and cancellation.
+  Prepare an isolated iOS frontend package and pass its 90 local Node checks.
+  Observe a verified-TLS stream/features response from local ejabberd without
+  signing in or stopping the live server; this is not an authenticated device test.
+- [ ] Build/upload the updated iPhone app after approval. On a real iPhone, verify
+  server unavailable at startup, restored connectivity, unexpected interruption
+  during chat, preserved draft, and logout. WebKit fixtures are not device tests.
+
+Local browser regression command:
+`node --test tests/xmpp-availability.test.js tests/xmpp-availability-page.test.js tests/xmpp-startup-gate.test.js tests/xmpp-recovery.test.js tests/native-facebook.test.js tests/account-logout.test.js`
+
 ## Native iPhone Facebook login — 2026-11-01
 
 - [x] Route the iPhone Facebook action through the native adapter; keep website

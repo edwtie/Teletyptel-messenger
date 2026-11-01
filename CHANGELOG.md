@@ -2,6 +2,39 @@
 
 ## Unreleased
 
+### Adaptive iPad Messenger layout — 2026-11-02
+
+- Correct iPad detection when its user agent also contains Mobile. Use a
+  two-pane contacts/chat layout on wide tablet windows and one pane in narrow ones.
+- Keep the TC action prominent, move secondary actions into menus, and reserve
+  visible space for the composer and TC controls when the viewport shrinks.
+- Add Chromium/WebKit layout regression fixtures. Native iPad testing and a new
+  TestFlight build remain pending; iPhone tests alone do not validate iPad hardware.
+
+### Optional iPhone Face ID sign-in — 2026-11-02
+
+- Offer a native opt-in after successful sign-in, with Enable Face ID / Not now.
+  Never evaluate biometrics before consent; allow changing the choice in Settings.
+- Keep the server session credential in a device-only Keychain item protected by
+  the current biometric enrollment. Restore it natively after Face ID, not through
+  JavaScript storage. The server still validates the account/session and XMPP.
+- Cover the app and block native server access while biometrically locked after
+  backgrounding. Preserve ordinary sign-in; logout removes biometric credentials.
+- Local behavior/packaging checks pass. Native Xcode compilation, TestFlight and
+  actual Face ID device testing remain pending; this is not a released feature.
+
+### XMPP server availability gate — 2026-11-02
+
+- Check the configured ejabberd WebSocket's XMPP opening and authentication
+  features before continuing startup or account sign-in; a reachable website
+  alone is not sufficient. The credential-free check times out within 8 seconds.
+- Show a translated offline/unreachable screen with Retry instead of opening
+  Messenger without a connection. Keep the main gate until XMPP authentication
+  completes, and retain account settings and drafts during transport recovery.
+- Package the shared gate for the iPhone app. Chromium/WebKit outage fixtures and
+  the local iOS packaging suite pass; a new TestFlight build and physical-device
+  outage/recovery test are still required. Existing calls retain their controls.
+
 ### Native iPhone Facebook sign-in — 2026-11-01
 
 - Add a bundled-app Facebook Limited Login bridge instead of blocking the button

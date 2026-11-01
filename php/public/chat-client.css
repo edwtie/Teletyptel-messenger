@@ -6600,7 +6600,7 @@ body[data-theme="dark"] .attachment-menu-panel button:hover:not(:disabled) {
   display: none;
 }
 
-@media (max-width: 520px) {
+@media (max-width: 520px), (max-width: 1400px) and (pointer: coarse) {
   body.mobile-navigation-ready:not(.call-active) .topbar {
     position: relative;
     z-index: 60;

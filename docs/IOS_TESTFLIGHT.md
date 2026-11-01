@@ -4,6 +4,34 @@ Deze aparte bouwstraat maakt een ondertekende iPhone-app voor de lokale TeleTypT
 
 ## Afbakening
 
+### Face ID (nieuwe code, nog geen vrijgegeven build)
+
+- Na succesvol aanmelden biedt de app een native toestemmingsvenster met
+  **Face ID inschakelen** en **Niet nu**. Alleen inschakelen start de iOS-controle.
+  De keuze kan later onder Instellingen → App-beveiliging worden gewijzigd.
+- Bij een volgende start ontgrendelt Face ID de server-sessiecookie uit de
+  iOS-Keychain. Deze blijft in native code; JavaScript ontvangt alleen account-ID
+  en JID. Er wordt geen gezicht, wachtwoord of cookie in webopslag bewaard door
+  deze functie. Bestaande serverauthenticatie en XMPP-controles blijven gelden.
+- De Keychain gebruikt `WhenPasscodeSetThisDeviceOnly` en `biometryCurrentSet`:
+  geen iCloud-synchronisatie; gewijzigde biometrische inschrijving vereist opnieuw
+  aanmelden. De lokale bewaarlimiet is maximaal 30 dagen, maar de server kan de
+  sessie eerder laten verlopen of intrekken. Dit is geen nieuwe refresh-token-API.
+- Zolang Face ID aanstaat gebruikt het native transport alleen geheugencookies.
+  Oude cookies van deze server worden uit de gedeelde opslag verwijderd. De
+  native bridge weigert serververzoeken terwijl de app vergrendeld is; na naar
+  de achtergrond gaan wordt de interface afgedekt tot de volgende controle.
+- Annuleren/mislukken leidt naar normaal aanmelden en verwijdert de bewaarde
+  Face ID-toegang. Uitloggen verwijdert deze toegang vóór serverafmelding en
+  houdt de cookie alleen tijdelijk in geheugen voor die afmelding. Uitschakelen
+  vanuit Instellingen laat de huidige sessie werken, maar bewaart haar niet opnieuw
+  onbeveiligd voor een volgende start.
+- Lokale JS- en verpakkingscontroles zijn geen bewijs van werkende Face ID op
+  hardware. Xcode-compilatie, simulatorcontrole en de praktijktests uit
+  `IMPLEMENTATION_CHECKLIST.md` moeten nog plaatsvinden vóór vrijgave.
+
+### Bestaande app-inrichting
+
 - Bundle ID: `com.tiedragon.teletyptel`; Apple-team: `H29RTRBD9D`.
 - De app opent de ingebouwde Messenger op `capacitor://localhost/chat.html`. WAMP op `https://192.168.0.105` blijft de server voor aanmelden, gegevens en gesprekken; iPhone en computer moeten daarvoor op hetzelfde wifi-netwerk bereikbaar zijn.
 - Een allowlist verpakt de Messenger-interface, talen, iconen, achtergronden en smileys. Geen PHP, serverconfiguratie, PostNL-demo, gebruikersgegevens of geheime sleutels in de app. De bronmanifesten bevatten hashes van de verpakte frontendbestanden.

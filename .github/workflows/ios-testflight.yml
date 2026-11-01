@@ -15,6 +15,9 @@ on:
       - php/public/chat-interpreter.js
       - php/public/native-google.js
       - php/public/native-facebook.js
+      - php/public/native-biometric.js
+      - php/public/xmpp-availability.*
+      - php/public/chat-tablet.css
       - php/public/mobile-navigation.js
       - php/public/jingle-history.js
       - php/public/lang/**
@@ -27,6 +30,7 @@ on:
       - tests/ios-bundled-runtime.test.js
       - tests/native-google.test.js
       - tests/native-facebook.test.js
+      - tests/native-biometric.test.js
       - tests/call-camera-switch.test.js
       - tests/native-keyboard.test.js
       - tests/call-inputs.test.js
@@ -34,6 +38,7 @@ on:
       - tests/dialer-contacts.test.js
       - tests/native-contacts.test.js
       - tests/xmpp-recovery.test.js
+      - tests/xmpp-startup-gate.test.js
   workflow_dispatch:
 
 permissions:

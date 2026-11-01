@@ -1,0 +1,90 @@
+.xmpp-availability {
+  position: fixed;
+  inset: 0;
+  z-index: 20000;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  height: 100dvh;
+  max-height: none;
+  margin: 0;
+  padding: max(24px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right))
+    max(24px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+  border: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  background: #f6f8fc;
+  color: #18263a;
+  font: 1rem/1.6 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  text-align: center;
+  isolation: isolate;
+}
+
+.xmpp-availability:not([open]) {
+  display: none;
+}
+
+.xmpp-availability[open] {
+  display: flex;
+}
+
+.xmpp-availability::backdrop {
+  background: #f6f8fc;
+}
+
+.xmpp-availability__panel {
+  width: 100%;
+  max-width: 32rem;
+  margin: auto;
+  overflow-wrap: anywhere;
+}
+
+.xmpp-availability__brand {
+  display: block;
+  margin-bottom: 1.5rem;
+  font-size: clamp(1.5rem, 6vw, 2.25rem);
+}
+
+.xmpp-availability [role="status"] {
+  margin: 0 0 1.5rem;
+}
+
+.xmpp-availability [role="status"]:focus {
+  outline: none;
+}
+
+.xmpp-availability button,
+body[data-theme] .xmpp-availability button {
+  min-height: 48px;
+  max-width: 100%;
+  padding: 0.75rem 1.5rem;
+  border: 2px solid transparent;
+  border-radius: 0.6rem;
+  background: #1555a2;
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.xmpp-availability button:hover:not(:disabled),
+body[data-theme] .xmpp-availability button:hover:not(:disabled) {
+  background: #104482;
+  color: #fff;
+}
+
+.xmpp-availability button[hidden] {
+  display: none;
+}
+
+.xmpp-availability button:focus-visible {
+  outline: 3px solid #18263a;
+  outline-offset: 4px;
+}
+
+.xmpp-availability button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}

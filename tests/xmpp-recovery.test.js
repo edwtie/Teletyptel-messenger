@@ -13,6 +13,7 @@ function fixture() {
   const sockets = [];
   const sent = [];
   const statuses = [];
+  const availability = [];
   class Socket {
     static CONNECTING = 0;
     static OPEN = 1;
@@ -43,6 +44,10 @@ function fixture() {
     el: new Proxy(elements, { get(target, key) { return target[key] ??= {}; } }),
     websocketHeartbeatMs: 25000,
     t: (key, fallback) => fallback,
+    xmppAvailability: {
+      connecting: () => availability.push("checking"), ready: () => availability.push("ready"), hide: () => availability.push("hidden"),
+      unavailable: retry => { availability.push("offline"); context.retryAvailability = retry; }
+    },
     appendDebug() {}, setConnectionStatus: text => statuses.push(text),
     setMode: mode => { state.mode = mode; },
     normalizeLocalXmppWebSocketUrlForCurrentHost: value => value,
@@ -61,7 +66,8 @@ function fixture() {
     handleXmppIncomingFrame() {}, sendPresence() {}, requestXmppRoster() {},
     syncXmppContactPresenceSubscriptions() {}, joinActiveXmppGroupConversation() {}, syncXmppMamArchive() {}
   });
-  vm.runInContext("let xmppRttStates;" + section("canRecoverXmppConnection", "connectRelay")
+  vm.runInContext("let xmppRttStates;" + source.slice(source.indexOf("  function showXmppServerUnavailable()"), source.indexOf("  async function loadPlatformConfig()"))
+    + section("canRecoverXmppConnection", "connectRelay")
     + section("connectXmppWebSocket", "normalizeXmppWebSocketUrl")
     + section("finishXmppReady", "syncXmppContactPresenceSubscriptions")
     + section("closeXmppWebSocket", "handleXmppIncomingFrame"), context);
@@ -76,8 +82,36 @@ function fixture() {
     run("finishXmppReady()");
     return socket;
   };
-  return { state, context, timers, sockets, sent, statuses, elements, run, fire, ready };
+  return { state, context, timers, sockets, sent, statuses, availability, elements, run, fire, ready };
 }
+
+test("Chat stays gated until actual XMPP readiness and returns to offline screen on transport loss", () => {
+  const app = fixture();
+  app.run("connectXmppWebSocket()");
+  const socket = app.state.xmppSocket;
+  assert.deepEqual(app.availability, ["checking"]);
+  socket.readyState = 1;
+  socket.emit("open");
+  assert.deepEqual(app.availability, ["checking"]);
+  app.state.xmppSession.authenticated = true;
+  app.run("finishXmppReady()");
+  assert.equal(app.availability.at(-1), "ready");
+  socket.emit("close", { code: 1006 });
+  assert.equal(app.availability.at(-1), "offline");
+  assert.match(app.statuses.at(-1), /offline or unreachable/);
+  assert.equal(app.elements.messageInput.value, "Unsent draft");
+  app.context.retryAvailability();
+  assert.equal(app.timers.get(app.state.clientLifecycle.transientReconnectTimer).delay, 0);
+});
+
+test("A running call keeps its controls accessible when signalling is temporarily offline", () => {
+  const app = fixture();
+  const socket = app.ready();
+  app.state.call = { id: "ongoing-call" };
+  socket.emit("close", { code: 1006 });
+  assert.notEqual(app.availability.at(-1), "offline");
+  assert.match(app.statuses.at(-1), /offline or unreachable/);
+});
 
 function iq(type, id, from = "example.test", ping = false) {
   return { getAttribute: key => ({ type, id, from })[key] ?? null,

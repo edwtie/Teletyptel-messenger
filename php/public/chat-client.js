@@ -908,6 +908,26 @@
       control.focus({ preventScroll: true });
     } });
 
+  const xmppAvailability = window.TeleTypTelXmppAvailability?.create({ translate: t });
+  window.TeleTypTelFaceID = window.TeleTypTelBiometric?.create({
+    translate: t,
+    settingsButton: byId("faceIdButton"),
+    signedIn: () => state.accountReady && !state.logoutInProgress,
+    signedOut: () => logoutAccount(),
+    clearSaved: () => {
+      localStorage.removeItem(accountStorageKeyFor(state.sessionProfile));
+      sessionStorage.removeItem(accountStorageKeyFor(state.sessionProfile));
+    },
+    verifySession: async () => {
+      if (!await checkXmppServerAvailable()) return null;
+      const verified = await loadDatabaseAccount(state.account?.accountId, accountLoginToken());
+      const valid = await window.TeleTypTelFaceID.validate(state.account, verified, !state.accountReadStatus || state.accountReadStatus >= 500);
+      if (valid === null) showXmppServerUnavailable();
+      return valid;
+    },
+    restoreProfile: profile => sessionStorage.setItem(accountStorageKeyFor(state.sessionProfile), JSON.stringify(profile)),
+    notify: message => { el.dialogAccountStatus.textContent = message; }
+  });
   document.body.classList.toggle("account-booting", state.accountBooting);
   let interpreter = null;
   window.addEventListener("DOMContentLoaded", () => {
@@ -1559,7 +1579,7 @@
 
     const platform = ios ? "ios" : android ? "android" : windows ? "windows" : macos ? "macos" : linux ? "linux" : "unknown";
     const os = ios ? "iOS" : android ? "Android" : windows ? "Windows" : macos ? "macOS" : linux ? "Linux" : "Unknown";
-    const deviceClass = mobileUa ? "phone" : tabletUa ? "tablet" : "desktop";
+    const deviceClass = tabletUa ? "tablet" : mobileUa ? "phone" : "desktop";
     return { platform, os, deviceClass, userAgent };
   }
 
@@ -2054,10 +2074,34 @@
     el.xmppUrlInput.value = normalizeLocalXmppWebSocketUrlForCurrentHost(el.xmppUrlInput.value);
   }
 
+  async function checkXmppServerAvailable(retry = () => { void checkXmppServerAvailable(); }) {
+    if (state.xmppSocket?.readyState === WebSocket.OPEN && state.xmppSession?.phase === "ready") return true;
+    const url = normalizeXmppWebSocketUrl(normalizeLocalXmppWebSocketUrlForCurrentHost(el.xmppUrlInput.value.trim()));
+    const domain = state.account?.xmppDomain || domainFromJid(state.account?.jid || el.jidInput.value) || "localhost";
+    if (!xmppAvailability) {
+      setAccountReady(false);
+      requestLoginRequired(t("status.xmpp_server_offline", "The chat server is offline or unreachable. Please try again later."), { forceLogin: true });
+      return false;
+    }
+    return xmppAvailability.check({ url, domain, retry });
+  }
+
+  function showXmppServerUnavailable() {
+    const notice = t("status.xmpp_server_offline", "The chat server is offline or unreachable. Please try again later.");
+    setConnectionStatus(notice, "danger");
+    if (!state.call) {
+      xmppAvailability?.unavailable(() => {
+        if (canRecoverXmppConnection()) recoverXmppConnection("manual-retry");
+        else void loadPlatformConfig();
+      });
+    }
+  }
+
   async function loadPlatformConfig() {
     let savedAccount = null;
     let databaseLoaded = false;
     try {
+      await window.TeleTypTelFaceID?.prepare();
       savedAccount = loadSavedAccountProfile();
       const hasSavedAccountSession = Boolean(savedAccount?.accountId || savedAccount?.jid);
       state.suppressAutoLoginDialog = hasSavedAccountSession;
@@ -2070,7 +2114,27 @@
       }
       state.account = account;
       applyAccountProfile(account);
+      await loadLanguage(state.account.preferredLanguage ?? "eng");
+      if (!await checkXmppServerAvailable(() => { void loadPlatformConfig(); })) {
+        setAccountBooting(false);
+        return;
+      }
       databaseLoaded = await loadDatabaseAccount(account.accountId, accountLoginToken(account));
+      const biometricValidation = await window.TeleTypTelFaceID?.validate(state.account, databaseLoaded, !state.accountReadStatus || state.accountReadStatus >= 500);
+      if (biometricValidation === null) {
+        setAccountBooting(false);
+        showXmppServerUnavailable();
+        return;
+      }
+      if (biometricValidation === false) {
+        state.account.password = "";
+        state.account.loginToken = "";
+        state.suppressAutoLoginDialog = false;
+        setAccountReady(false);
+        setAccountBooting(false);
+        requestLoginRequired(t("account.faceid_sign_in", "Your session expired. Sign in again."), { forceLogin: true });
+        return;
+      }
       if (databaseLoaded) {
         if (oauthAccountId || state.account.savedInDatabase) {
           storeServerAccountBrowserSession(state.account);
@@ -2102,6 +2166,11 @@
       appendDebug("config-error", error.message);
       await loadLanguage(state.account?.preferredLanguage ?? "eng");
       const nativeServerUnavailable = window.TeleTypTelApp && error.code === "SERVER_UNAVAILABLE";
+      if (!databaseLoaded) {
+        setAccountBooting(false);
+        showXmppServerUnavailable();
+        return;
+      }
       if (!nativeServerUnavailable) {
         await loadRtcConfig();
         await loadGoogleMapsConfig();
@@ -2453,6 +2522,7 @@
   }
 
   async function loadDatabaseAccount(accountId, loginToken = "") {
+    state.accountReadStatus = 0;
     try {
       const query = new URLSearchParams({ accountId });
       if (loginToken) {
@@ -2461,6 +2531,7 @@
       const response = await fetch(`${accountApiPath}?${query.toString()}`, {
         cache: "no-store"
       });
+      state.accountReadStatus = response.status;
       if (response.status === 404) {
         appendDebug("account-db", "No server account yet");
         return;
@@ -3304,15 +3375,16 @@
   }
 
   function startGoogleLoginFromDialog() {
-    startProviderLoginFromDialog("google");
+    return startProviderLoginFromDialog("google");
   }
 
   function startFacebookLoginFromDialog() {
-    startProviderLoginFromDialog("facebook");
+    return startProviderLoginFromDialog("facebook");
   }
 
-  function startProviderLoginFromDialog(provider) {
+  async function startProviderLoginFromDialog(provider) {
     if (state.logoutInProgress) return;
+    if (!await checkXmppServerAvailable()) return;
     if (["google", "facebook"].includes(provider) && window.Capacitor?.getPlatform?.() === "ios") {
       void startNativeProviderLoginFromDialog(provider);
       return;
@@ -3609,6 +3681,7 @@
       return;
     }
 
+    if (!await checkXmppServerAvailable()) return;
     setAccountDialogBusy(true, t("account.login_two_factor_verifying", "Checking 2FA code..."));
     try {
       const payload = await postAccountAction({
@@ -3786,6 +3859,7 @@
     setAccountDialogBusy(true, t("account.creating", "Creating account profile..."));
     try {
       applyAccountDialogToControls({ requirePassword: true });
+      if (!await checkXmppServerAvailable()) return;
       const bareJid = stripGeneratedResourceSuffix(el.jidInput.value.trim());
       const xmppDomain = state.account?.xmppDomain || el.dialogXmppDomainInput.value.trim() || domainFromJid(bareJid);
       const isLocalAccount = isLocalAccountDomain(xmppDomain);
@@ -4073,6 +4147,7 @@
       const wasGateRequired = state.accountGateRequired;
       if (!wasGateRequired) messageTranslation.validatePreferences();
       applyAccountDialogToControls({ requirePassword: wasGateRequired });
+      if ((wasGateRequired || connectAfterSave) && !await checkXmppServerAvailable()) return;
       const result = await saveAccountProfile(wasGateRequired ? "login" : "save");
       if (result?.twoFactorRequired) {
         showLoginTwoFactorChallenge(result, { profile: result.profile, connectAfterSave: connectAfterSave || wasGateRequired });
@@ -4556,6 +4631,7 @@
     });
     setAccountDialogBusy(true, t("account.signing_out", "Signing out…"));
     try {
+      if (window.TeleTypTelFaceID) await window.TeleTypTelFaceID.revoke();
       await sendLogoutAccountSession();
       appendDebug("account", "Server account session cleared");
       el.dialogAccountStatus.textContent = options.message || t("account.signed_out", "Signed out. Sign in to continue.");
@@ -4568,6 +4644,8 @@
       retry.addEventListener("click", () => logoutAccount(options));
       el.dialogAccountStatus.appendChild(retry);
     } finally {
+      try { await window.TeleTypTelFaceID?.logout(); }
+      catch { el.dialogAccountStatus.textContent = t("account.faceid_failed", "Face ID access could not be removed. Try signing out again."); }
       state.logoutInProgress = false;
       setAccountDialogBusy(false);
     }
@@ -6314,7 +6392,7 @@
 
   function scheduleXmppReconnect(reason, immediate = false) {
     if (!canRecoverXmppConnection()) return false;
-    setConnectionStatus(t("status.reconnecting", "Reconnecting..."), "warn");
+    showXmppServerUnavailable();
     if (navigator.onLine === false || (document.visibilityState === "hidden" && !state.call)) return true;
     if (state.clientLifecycle.transientReconnectTimer) return true;
     const delay = immediate ? 0 : Math.min(30000, 1000 * 2 ** Math.min(state.xmppRecovery.attempts, 5));
@@ -6527,6 +6605,7 @@
   }
 
   function returnToLoginScreenAfterDisconnect(message, options = {}) {
+    xmppAvailability?.hide();
     state.intentionalDisconnect = true;
     window.clearTimeout(state.xmppRecovery.connectionTimer);
     state.xmppRecovery.connectionTimer = null;
@@ -8292,13 +8371,14 @@
     }
 
     state.intentionalDisconnect = false;
+    if (!state.call && state.xmppRecovery.attempts === 0) xmppAvailability?.connecting();
     const url = normalizeXmppWebSocketUrl(normalizeLocalXmppWebSocketUrlForCurrentHost(el.xmppUrlInput.value.trim()));
     el.xmppUrlInput.value = url;
     let socket;
     try {
       socket = new WebSocket(url, "xmpp");
     } catch {
-      returnToLoginScreenAfterDisconnect(t("account.connection_failed_login_required", "Connection failed. Sign in to try again."));
+      showXmppServerUnavailable();
       return;
     }
     window.clearTimeout(state.clientLifecycle.transientReconnectTimer);
@@ -8306,7 +8386,7 @@
     window.clearTimeout(state.xmppRecovery.connectionTimer);
     state.xmppRecovery.connectionTimer = window.setTimeout(() => {
       if (state.xmppSocket === socket && state.xmppSession?.phase !== "ready") retireXmppSocket(socket, "connection-timeout");
-    }, 30000);
+    }, 10000);
     state.xmppSocket = socket;
     state.xmppSession = createXmppSession();
     setMode("xmpp");
@@ -8568,6 +8648,8 @@
     window.clearTimeout(state.xmppRecovery.connectionTimer);
     state.xmppRecovery.connectionTimer = null;
     state.xmppSession.phase = "ready";
+    xmppAvailability?.ready();
+    void window.TeleTypTelFaceID?.ready(state.account).catch(() => {});
     state.xmppPresenceSubscriptionRequests.clear();
     setAllContactPresence("offline");
     sendPresence("online");

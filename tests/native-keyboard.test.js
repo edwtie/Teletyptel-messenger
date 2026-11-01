@@ -6,6 +6,20 @@ const vm = require("node:vm");
 const script = fs.readFileSync(path.join(__dirname, "../scripts/ios-testflight/www/native-keyboard.js"), "utf8");
 const client = fs.readFileSync(path.join(__dirname, "../php/public/chat-client.js"), "utf8");
 
+test("iPad detection takes priority over the Mobile token, including desktop-mode Safari", () => {
+  const detection = client.slice(client.indexOf("  function detectClientDevice()"), client.indexOf("  function isPhoneDevice()"));
+  for (const [userAgent, platform, touch, expected] of [
+    ["Mozilla iPad OS 18_0 Mobile/15E148 Safari", "iPad", 5, "tablet"],
+    ["Mozilla Macintosh Mobile/15E148 Safari", "MacIntel", 5, "tablet"],
+    ["Mozilla iPhone Mobile Safari", "iPhone", 5, "phone"],
+    ["Mozilla Macintosh Safari", "MacIntel", 0, "desktop"]
+  ]) {
+    assert.equal(vm.runInNewContext(detection + "detectClientDevice().deviceClass", {
+      navigator: { userAgent, platform, maxTouchPoints: touch }
+    }), expected);
+  }
+});
+
 function fixture(native = true) {
   const window = new EventTarget();
   const orientation = Object.assign(new EventTarget(), { type: "portrait-primary" });

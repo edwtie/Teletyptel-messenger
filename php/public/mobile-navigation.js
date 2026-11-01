@@ -28,7 +28,7 @@
   const toggle = document.getElementById("mobileActionsToggle");
   const panel = document.getElementById("mobileActionsPanel");
   const header = toggle.closest(".topbar");
-  const mobile = window.matchMedia("(max-width: 520px)");
+  const mobile = window.matchMedia("(max-width: 520px), (max-width: 1400px) and (pointer: coarse)");
   const setOpen = (open, restoreFocus = false) => {
     header.classList.toggle("mobile-actions-open", open);
     toggle.setAttribute("aria-expanded", String(open));

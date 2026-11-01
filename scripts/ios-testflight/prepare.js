@@ -46,7 +46,8 @@ function prepare() {
     + fs.readFileSync(path.join(__dirname, "GoogleSignInPlugin.swift"), "utf8") + "\n"
     + fs.readFileSync(path.join(__dirname, "FacebookSignInPlugin.swift"), "utf8") + "\n"
     + fs.readFileSync(path.join(__dirname, "ContactsPlugin.swift"), "utf8") + "\n"
-    + fs.readFileSync(path.join(__dirname, "ServerBridge.swift"), "utf8"));
+    + fs.readFileSync(path.join(__dirname, "ServerBridge.swift"), "utf8") + "\n"
+    + fs.readFileSync(path.join(__dirname, "BiometricSession.swift"), "utf8"));
   const storyboard = "ios/App/App/Base.lproj/Main.storyboard";
   const originalStoryboard = fs.readFileSync(path.join(project, storyboard), "utf8");
   const marker = 'customClass="CAPBridgeViewController" customModule="Capacitor"';
@@ -60,6 +61,7 @@ function prepare() {
   const escape = value => value.replace(/[&<>"']/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" })[character]);
   write(plist, originalPlist.replace("<dict>", "<dict>\n"
     + "<key>NSLocalNetworkUsageDescription</key><string>TeleTypTel maakt verbinding met jouw testserver op hetzelfde wifi-netwerk.</string>\n"
+    + "<key>NSFaceIDUsageDescription</key><string>Alleen met jouw toestemming gebruikt TeleTypTel Face ID om je bewaarde aanmeldsessie op deze iPhone te ontgrendelen.</string>\n"
     + "<key>NSAppTransportSecurity</key><dict><key>NSAllowsLocalNetworking</key><true/></dict>\n"
     + "<key>GIDClientID</key><string>" + google.clientId + "</string>\n"
     + "<key>GIDServerClientID</key><string>" + google.serverClientId + "</string>\n"

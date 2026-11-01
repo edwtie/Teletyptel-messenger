@@ -111,7 +111,7 @@ function dialogFixture(provider, result, error) {
     providerDisplayName: name => name === "facebook" ? "Facebook" : "Google", t: (key, fallback) => fallback,
     setAccountDialogBusy: value => busy.push(value), authApiUrl: value => "/api/auth/" + value,
     accountApiErrorText: () => "Account blocked", showLoginTwoFactorChallenge: value => challenges.push(value),
-    updateAccountStatus: () => {}, Capacitor: { getPlatform: () => "ios" }
+    updateAccountStatus: () => {}, Capacitor: { getPlatform: () => "ios" }, checkXmppServerAvailable: async () => true
   };
   context.window = context;
   const adapter = { signIn: async value => { calls.push(value); if (error) throw error; return result; } };
@@ -141,15 +141,29 @@ test("Both native providers retain login/2FA handling and never navigate to web 
   }
 });
 
-test("Facebook button routes to native provider; website still uses the web flow", () => {
+test("Facebook button routes to native provider; website still uses the web flow", async () => {
   const native = dialogFixture("facebook", {});
   const providers = [];
   native.context.startNativeProviderLoginFromDialog = provider => providers.push(provider);
-  native.context.startFacebookLoginFromDialog();
+  await native.context.startFacebookLoginFromDialog();
   assert.deepEqual(providers, ["facebook"]);
   assert.equal(native.locations.length, 0);
   native.context.Capacitor.getPlatform = () => "web";
   native.context.location.href = "https://server.test/chat.html";
-  native.context.startFacebookLoginFromDialog();
+  await native.context.startFacebookLoginFromDialog();
   assert.equal(native.locations[0], "https://server.test/api/auth/facebook/start");
+});
+
+test("Unavailable XMPP blocks both native and website provider login without losing account state", async () => {
+  for (const provider of ["google", "facebook"]) {
+    const app = dialogFixture(provider, {});
+    app.context.checkXmppServerAvailable = async () => false;
+    app.context.state.account = { accountId: "retained-account" };
+    await app.context.startProviderLoginFromDialog(provider);
+    app.context.Capacitor.getPlatform = () => "web";
+    await app.context.startProviderLoginFromDialog(provider);
+    assert.equal(app.calls.length, 0);
+    assert.equal(app.locations.length, 0);
+    assert.equal(app.context.state.account.accountId, "retained-account");
+  }
 });

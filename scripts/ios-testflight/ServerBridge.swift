@@ -19,19 +19,39 @@ final class MessengerScriptHandler: NSObject, WKScriptMessageHandler {
 
 private final class MessengerServerConnection: NSObject, URLSessionTaskDelegate {
     static let shared = MessengerServerConnection()
-    private lazy var session: URLSession = {
-        let config = URLSessionConfiguration.default
-        config.httpCookieStorage = HTTPCookieStorage.shared
+    private var session: URLSession?
+    private var sessionGeneration = -1
+    private let sessionLock = NSLock()
+
+    func resetSession() {
+        sessionLock.lock()
+        defer { sessionLock.unlock() }
+        session?.invalidateAndCancel()
+        session = nil
+    }
+
+    private func currentSession() -> URLSession {
+        sessionLock.lock()
+        defer { sessionLock.unlock() }
+        let biometrics = MessengerBiometricSession.shared
+        if let session = session, sessionGeneration == biometrics.generation { return session }
+        session?.invalidateAndCancel()
+        let config = biometrics.protectedStorage ? URLSessionConfiguration.ephemeral : URLSessionConfiguration.default
+        config.httpCookieStorage = biometrics.storage
         config.httpShouldSetCookies = true
         config.urlCache = nil
         config.requestCachePolicy = .reloadIgnoringLocalCacheData
         config.timeoutIntervalForRequest = 15
         config.timeoutIntervalForResource = 120
-        return URLSession(configuration: config, delegate: self, delegateQueue: nil)
-    }()
+        let created = URLSession(configuration: config, delegate: self, delegateQueue: nil)
+        session = created
+        sessionGeneration = biometrics.generation
+        return created
+    }
 
     func makeRequest(path: String, method: String = "GET", headers: [String: String] = [:],
                      body: Data? = nil, omitCookies: Bool = false, fileOnly: Bool = false) throws -> URLRequest {
+        guard MessengerBiometricSession.shared.permitsRequests else { throw URLError(.userAuthenticationRequired) }
         guard let address = Bundle.main.object(forInfoDictionaryKey: "TeleTypTelServerOrigin") as? String,
               let origin = URL(string: address), origin.scheme == "https", origin.user == nil, origin.password == nil,
               path.hasPrefix("/"), !path.hasPrefix("//"),
@@ -64,7 +84,7 @@ private final class MessengerServerConnection: NSObject, URLSessionTaskDelegate 
     }
 
     func load(_ request: URLRequest, completion: @escaping (Data?, HTTPURLResponse?, Error?) -> Void) -> URLSessionDataTask {
-        return session.dataTask(with: request) { data, response, error in
+        return currentSession().dataTask(with: request) { data, response, error in
             guard let response = response as? HTTPURLResponse else {
                 completion(nil, nil, error ?? URLError(.badServerResponse))
                 return

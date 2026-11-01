@@ -168,7 +168,8 @@ test("Native bridge constrains trust, credentials, redirects, cancellation and t
   assert.match(native, /url\.path == "\/chat.html"/);
   assert.match(native, /completionHandler\(nil\)/);
   assert.match(native, /request\.setValue\(address, forHTTPHeaderField: "Origin"\)/);
-  assert.match(native, /httpCookieStorage = HTTPCookieStorage.shared/);
+  assert.match(native, /httpCookieStorage = biometrics.storage/);
+  assert.match(native, /MessengerBiometricSession.shared.permitsRequests/);
   assert.match(native, /removeValue\(forKey: identifier\)\?\.cancel\(\)/);
   assert.match(native, /completeFileProtection/);
   assert.match(native, /message.frameInfo.isMainFrame, isBundledMessenger\(message.frameInfo.request.url\)/);
