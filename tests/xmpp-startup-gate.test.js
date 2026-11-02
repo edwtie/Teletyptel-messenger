@@ -6,13 +6,13 @@ const vm = require("node:vm");
 const source = fs.readFileSync(path.join(__dirname, "../php/public/chat-client.js"), "utf8");
 const startup = source.slice(source.indexOf("  async function loadPlatformConfig()"), source.indexOf("  async function loadGoogleMapsConfig()"));
 
-function fixture({ reachable = true, configFailure = false } = {}) {
+function fixture({ reachable = true, configFailure = false, errorCode } = {}) {
   const calls = [], gates = [];
   const saved = { accountId: "fixture", jid: "fixture@localhost", password: "fixture-only", preferredLanguage: "eng" };
   const context = { state: {}, window: {}, oauthAccountId: "", oauthLoginToken: "",
     el: { providerSummary: {}, dialogAccountStatus: {} },
     loadSavedAccountProfile: () => saved,
-    fetchJson: async () => { if (configFailure) throw new Error("Offline"); return {}; },
+    fetchJson: async () => { if (configFailure) throw Object.assign(new Error("Offline"), { code: errorCode }); return {}; },
     applySessionAccountDefaults: () => saved, mergeAccountProfiles: () => saved,
     applyAccountProfile: () => {}, loadLanguage: async () => {},
     checkXmppServerAvailable: async retry => { gates.push(retry); return reachable; },
@@ -25,7 +25,7 @@ function fixture({ reachable = true, configFailure = false } = {}) {
     setAccountReady: value => calls.push(["accountReady", value]),
     autoConnectIfReady: () => calls.push("connect"), openPasswordResetDialogIfRequested() {},
     appendDebug() {}, t: (key, fallback) => fallback,
-    showXmppServerUnavailable: () => calls.push("offline")
+    showXmppServerUnavailable: reason => calls.push(reason || "offline")
   };
   vm.runInNewContext(startup, context);
   return { context, calls, gates, saved };
@@ -57,6 +57,23 @@ test("Unavailable web configuration cannot fall through to a stale authenticated
   assert.deepEqual(app.calls, [["booting", false], "offline"]);
   assert.equal(app.calls.includes("connect"), false);
   assert.equal(app.saved.accountId, "fixture");
+});
+
+test("A native certificate failure is distinct from offline and preserves the saved account", async () => {
+  const app = fixture({ configFailure: true, errorCode: "SERVER_CERTIFICATE_ERROR" });
+  app.context.window.TeleTypTelApp = {};
+  await app.context.loadPlatformConfig();
+  assert.deepEqual(app.calls, [["booting", false], "certificate"]);
+  assert.equal(app.saved.accountId, "fixture");
+  assert.equal(app.gates.length, 0);
+  assert.equal(app.calls.includes("connect"), false);
+});
+
+test("Generic native network errors are not falsely labelled certificate failures", async () => {
+  const app = fixture({ configFailure: true, errorCode: "SERVER_UNAVAILABLE" });
+  app.context.window.TeleTypTelApp = {};
+  await app.context.loadPlatformConfig();
+  assert.deepEqual(app.calls, [["booting", false], "offline"]);
 });
 
 test("Face ID must complete before any server/account startup", async () => {

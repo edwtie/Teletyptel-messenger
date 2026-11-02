@@ -132,6 +132,31 @@ for (const [engineName, engine] of Object.entries({ chromium, webkit })) {
       });
     }
     try {
+      await check("Confirmed certificate errors show actionable text; opaque socket failures remain offline", async page => {
+        const result = await page.evaluate(async options => {
+          const harness = window.fixture;
+          const controller = harness.api.create();
+          let retries = 0;
+          controller.unavailable(() => { retries++; controller.connecting(); }, "certificate");
+          const overlay = document.querySelector(".xmpp-availability[open]");
+          const certificate = overlay.querySelector('[role="status"]').textContent;
+          overlay.querySelector("button").click();
+          const checking = overlay.dataset.state === "checking" && overlay.dataset.reason === "offline";
+          const pending = controller.check(options);
+          harness.sockets.at(-1).emit("error");
+          await pending;
+          const network = overlay.querySelector('[role="status"]').textContent;
+          const reason = overlay.dataset.reason;
+          controller.hide();
+          return { certificate, retries, checking, network, reason };
+        }, options);
+        assert.match(result.certificate, /Certificaatfout/);
+        assert.doesNotMatch(result.certificate, /chatserver is niet online/);
+        assert.equal(result.retries, 1);
+        assert.equal(result.checking, true);
+        assert.match(result.network, /chatserver is niet online/);
+        assert.equal(result.reason, "offline");
+      });
       await check("Only native iOS, Android and Windows WebView2 show startup branding", async page => {
         const results = await page.evaluate(() => {
           const harness = window.fixture;

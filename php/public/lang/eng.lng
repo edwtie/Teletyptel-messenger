@@ -661,6 +661,7 @@ account.facebook_cancelled=Facebook sign-in cancelled.
 status.xmpp_server_checking=Checking the chat server connection…
 status.xmpp_server_offline=The chat server is offline or unreachable. Please try again later.
 status.xmpp_server_retry=Try again
+status.server_certificate_error=Certificate error: the server certificate is invalid or not trusted on this device. Check the date/time and the known TeleTypTel certificate in Settings. Do not trust unknown certificates.
 account.faceid_enable=Enable Face ID
 tablet.choose_chat=Choose a conversation
 tablet.choose_chat_hint=Select a contact on the left to chat, call or use Total Conversation.

@@ -66,7 +66,7 @@ function fixture() {
     handleXmppIncomingFrame() {}, sendPresence() {}, requestXmppRoster() {},
     syncXmppContactPresenceSubscriptions() {}, joinActiveXmppGroupConversation() {}, syncXmppMamArchive() {}
   });
-  vm.runInContext("let xmppRttStates;" + source.slice(source.indexOf("  function showXmppServerUnavailable()"), source.indexOf("  async function loadPlatformConfig()"))
+  vm.runInContext("let xmppRttStates;" + source.slice(source.indexOf("  function showXmppServerUnavailable("), source.indexOf("  async function loadPlatformConfig()"))
     + section("canRecoverXmppConnection", "connectRelay")
     + section("connectXmppWebSocket", "normalizeXmppWebSocketUrl")
     + section("finishXmppReady", "syncXmppContactPresenceSubscriptions")

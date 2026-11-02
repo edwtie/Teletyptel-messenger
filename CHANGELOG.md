@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Distinguish native certificate failures — 2026-11-02
+
+- Preserve specific iOS URLSession server-certificate failures as a safe error
+  code and show a translated certificate message at startup instead of offline.
+- Keep retry and stored accounts intact. Unknown WebSocket/network failures are
+  not guessed to be certificate errors; TLS validation is never bypassed.
+- JavaScript regression tests cover propagation and UI; the Swift change still
+  requires a new native build and device verification.
+
 ### Native-only startup logo — 2026-11-02
 
 - Show the separate server-check logo only inside iOS/Android Capacitor apps

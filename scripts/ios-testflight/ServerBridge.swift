@@ -1,3 +1,14 @@
+private func messengerServerErrorCode(_ error: Error?) -> String {
+    guard let failure = error as NSError?, failure.domain == NSURLErrorDomain else { return "SERVER_UNAVAILABLE" }
+    switch failure.code {
+    case NSURLErrorServerCertificateHasBadDate, NSURLErrorServerCertificateUntrusted,
+         NSURLErrorServerCertificateHasUnknownRoot, NSURLErrorServerCertificateNotYetValid:
+        return "SERVER_CERTIFICATE_ERROR"
+    default:
+        return "SERVER_UNAVAILABLE"
+    }
+}
+
 private func isBundledMessenger(_ url: URL?) -> Bool {
     guard let url = url else { return false }
     return url.scheme == "capacitor" && url.host == "localhost" && url.port == nil && url.path == "/chat.html"
@@ -146,7 +157,11 @@ final class TeleTypTelServerPlugin: CAPPlugin, CAPBridgedPlugin {
                         self.tasks.removeValue(forKey: identifier)
                         guard error == nil, let response = response, let data = data,
                               isBundledMessenger(self.bridge?.webView?.url) else {
-                            call.reject("Cannot reach the secure TeleTypTel server. Check Wi-Fi and certificate trust.", "SERVER_UNAVAILABLE")
+                            let code = messengerServerErrorCode(error)
+                            let message = code == "SERVER_CERTIFICATE_ERROR"
+                                ? "Certificate error: the server certificate is invalid or not trusted on this device."
+                                : "Cannot reach the secure TeleTypTel server. Check Wi-Fi and server availability."
+                            call.reject(message, code)
                             return
                         }
                         call.resolve(["status": response.statusCode,

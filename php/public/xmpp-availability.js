@@ -106,6 +106,7 @@
     let observer;
     let pending;
     let state = "hidden";
+    let failureReason = "offline";
     let retry;
     let waitingForBody = false;
     const inertStates = new Map();
@@ -175,8 +176,11 @@
       }
       const wasHidden = !overlay.open;
       overlay.dataset.state = state;
+      overlay.dataset.reason = failureReason;
       status.textContent = state === "offline"
-        ? text("status.xmpp_server_offline", "De chatserver is niet online of niet bereikbaar. Probeer het later opnieuw.")
+        ? failureReason === "certificate"
+          ? text("status.server_certificate_error", "Certificaatfout: het servercertificaat is ongeldig of wordt niet vertrouwd op dit apparaat. Controleer datum/tijd en het bekende TeleTypTel-certificaat in Instellingen. Vertrouw geen onbekende certificaten.")
+          : text("status.xmpp_server_offline", "De chatserver is niet online of niet bereikbaar. Probeer het later opnieuw.")
         : text("status.xmpp_server_checking", "De bereikbaarheid van de chatserver wordt gecontroleerd…");
       retryButton.textContent = text("status.xmpp_server_retry", "Opnieuw proberen");
       retryButton.hidden = state !== "offline";
@@ -196,8 +200,9 @@
       waitingForBody = false;
       render();
     }
-    function show(nextState, nextRetry) {
+    function show(nextState, nextRetry, reason = "offline") {
       state = nextState;
+      failureReason = reason === "certificate" ? "certificate" : "offline";
       retry = nextRetry;
       render();
     }
@@ -241,7 +246,7 @@
         return request.promise;
       },
       connecting() { cancelPending(); show("checking"); },
-      unavailable(onRetry) { cancelPending(); show("offline", onRetry); },
+      unavailable(onRetry, reason) { cancelPending(); show("offline", onRetry, reason); },
       ready() { cancelPending(); hideView(); },
       hide() { cancelPending(); hideView(); }
     };

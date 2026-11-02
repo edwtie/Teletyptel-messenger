@@ -661,6 +661,7 @@ account.facebook_cancelled=Facebook-aanmelding geannuleerd.
 status.xmpp_server_checking=Verbinding met de chatserver controleren…
 status.xmpp_server_offline=De chatserver is niet online of niet bereikbaar. Probeer het later opnieuw.
 status.xmpp_server_retry=Opnieuw proberen
+status.server_certificate_error=Certificaatfout: het servercertificaat is ongeldig of wordt niet vertrouwd op dit apparaat. Controleer datum/tijd en het bekende TeleTypTel-certificaat in Instellingen. Vertrouw geen onbekende certificaten.
 account.faceid_enable=Face ID inschakelen
 tablet.choose_chat=Kies een gesprek
 tablet.choose_chat_hint=Kies links een contact om te chatten, bellen of Total Conversation te gebruiken.

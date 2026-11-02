@@ -175,3 +175,19 @@ test("Native bridge constrains trust, credentials, redirects, cancellation and t
   assert.match(native, /message.frameInfo.isMainFrame, isBundledMessenger\(message.frameInfo.request.url\)/);
   assert.doesNotMatch(native, /useCredential|URLCredential\(trust|SecTrustSetAnchor|"set-cookie"|"authorization"|"cookie"/i);
 });
+
+test("Native certificate error codes reach the frontend without URLs, certificates or credentials", async () => {
+  const failure = Object.assign(new Error("Certificate error"), { code: "SERVER_CERTIFICATE_ERROR" });
+  const { context } = fixture(async () => { throw failure; });
+  await assert.rejects(context.fetch("config/account-profile.json"), error => error.code === "SERVER_CERTIFICATE_ERROR");
+  const native = fs.readFileSync(path.join(root, "scripts/ios-testflight/ServerBridge.swift"), "utf8");
+  const classifier = native.slice(native.indexOf("private func messengerServerErrorCode"), native.indexOf("private func isBundledMessenger"));
+  assert.match(classifier, /failure.domain == NSURLErrorDomain/);
+  for (const code of ["HasBadDate", "Untrusted", "HasUnknownRoot", "NotYetValid"]) {
+    assert.ok(classifier.includes("NSURLErrorServerCertificate" + code));
+  }
+  assert.match(classifier, /default:\s*return "SERVER_UNAVAILABLE"/);
+  assert.doesNotMatch(classifier, /localizedDescription|userInfo|NSURLErrorSecureConnectionFailed/);
+  assert.match(native, /let code = messengerServerErrorCode\(error\)/);
+  assert.match(native, /call.reject\(message, code\)/);
+});

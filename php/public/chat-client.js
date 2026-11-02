@@ -2086,14 +2086,16 @@
     return xmppAvailability.check({ url, domain, retry });
   }
 
-  function showXmppServerUnavailable() {
-    const notice = t("status.xmpp_server_offline", "The chat server is offline or unreachable. Please try again later.");
+  function showXmppServerUnavailable(reason = "offline") {
+    const notice = reason === "certificate"
+      ? t("status.server_certificate_error", "Certificate error: the server certificate is invalid or not trusted on this device. Check the date/time and the known TeleTypTel certificate in Settings. Do not trust unknown certificates.")
+      : t("status.xmpp_server_offline", "The chat server is offline or unreachable. Please try again later.");
     setConnectionStatus(notice, "danger");
     if (!state.call) {
       xmppAvailability?.unavailable(() => {
         if (canRecoverXmppConnection()) recoverXmppConnection("manual-retry");
         else void loadPlatformConfig();
-      });
+      }, reason);
     }
   }
 
@@ -2166,6 +2168,11 @@
       appendDebug("config-error", error.message);
       await loadLanguage(state.account?.preferredLanguage ?? "eng");
       const nativeServerUnavailable = window.TeleTypTelApp && error.code === "SERVER_UNAVAILABLE";
+      if (window.TeleTypTelApp && error.code === "SERVER_CERTIFICATE_ERROR") {
+        setAccountBooting(false);
+        showXmppServerUnavailable("certificate");
+        return;
+      }
       if (!databaseLoaded) {
         setAccountBooting(false);
         showXmppServerUnavailable();
