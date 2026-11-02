@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### iPad TC viewport and controls — 2026-11-02
+
+- Prevent phone portrait rules from expanding tablet calls beyond the available
+  screen. Keep safe-area spacing and a stable layout when rotating or typing.
+- Respect hidden call actions, keep media icons in 44px touch targets and show
+  volume below the buttons instead of outside a horizontally scrolling toolbar.
+- Test Chromium/WebKit tablet layouts with RTT shown/hidden and both camera
+  layouts, alongside iPhone rotation, incoming-call and keypad regressions.
+  Physical iPad call verification and an updated TestFlight build remain pending.
+
 ### Distinguish native certificate failures — 2026-11-02
 
 - Preserve specific iOS URLSession server-certificate failures as a safe error

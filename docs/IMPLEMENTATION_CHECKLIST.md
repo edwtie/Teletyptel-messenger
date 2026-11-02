@@ -5,6 +5,13 @@ item is implemented, tested and documented.
 
 ## iPad adaptive layout — 2026-11-02
 
+- [x] User confirmed certificate trust, sign-in and the contact list on the physical
+  iPad. This does not yet validate real TC media or rotation during a call.
+- [x] Keep the tablet shell viewport-sized during portrait TC calls instead of
+  inheriting the phone's auto-height rule. Preserve safe-area spacing, hide inactive
+  call actions, use 44px media controls and keep volume on a separate visible row.
+  Chromium/WebKit regression fixtures cover rotation, keyboard-sized viewports,
+  both camera layouts and RTT hidden/shown. Real iPad retest remains pending.
 - [x] Recognize iPad Safari (including desktop mode with a Mobile token) as a
   tablet. Keep iPhone detection and narrow-window phone layout intact.
 - [x] Show contacts alongside chat at tablet widths of 800px or greater, with

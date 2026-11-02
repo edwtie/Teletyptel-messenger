@@ -7,11 +7,14 @@ body.device-tablet {
   overflow: hidden;
 }
 
-body.device-tablet .app-shell {
+body.device-tablet .app-shell,
+body.device-tablet.call-active .app-shell {
   position: fixed;
   top: var(--visual-viewport-top, 0px);
   inset-inline: 0;
   width: 100%;
+  max-width: none;
+  margin: 0;
   height: var(--visual-viewport-height, 100dvh) !important;
   min-height: 0 !important;
   grid-template-rows: auto minmax(0, 1fr);
@@ -140,17 +143,35 @@ body.device-tablet .message-body {
     overscroll-behavior: contain;
   }
 
-  body.device-tablet.tc-text-visible-active.call-active .chat-panel {
+  body.device-tablet:is(.tc-text-visible-active, .tc-call-active).call-active .chat-panel {
     grid-template-rows: auto auto auto minmax(0, 1fr) 0 auto auto !important;
     overflow: hidden;
     align-content: stretch !important;
   }
 
-  body.device-tablet.tc-text-visible-active.call-active .message-timeline {
+  body.device-tablet:is(.tc-text-visible-active, .tc-call-active).call-active .app-shell {
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  body.device-tablet:is(.tc-text-visible-active, .tc-call-active).call-active .topbar {
     display: none;
   }
 
-  body.device-tablet.tc-text-visible-active.call-active #composerForm {
+  body.device-tablet:is(.tc-text-visible-active, .tc-call-active).call-active .chat-header {
+    padding-top: max(12px, env(safe-area-inset-top));
+    padding-right: max(16px, env(safe-area-inset-right));
+  }
+
+  body.device-tablet:is(.tc-text-visible-active, .tc-call-active).call-active .conversation-list {
+    padding-top: max(16px, env(safe-area-inset-top));
+    padding-left: max(12px, env(safe-area-inset-left));
+  }
+
+  body.device-tablet:is(.tc-text-visible-active, .tc-call-active).call-active .message-timeline {
+    display: none;
+  }
+
+  body.device-tablet:is(.tc-text-visible-active, .tc-call-active).call-active #composerForm {
     grid-row: 7 !important;
     grid-column: 1 !important;
     min-height: 70px;
@@ -160,7 +181,7 @@ body.device-tablet .message-body {
   body.device-tablet.call-active .chat-header,
   body.device-tablet.call-active .chat-header-actions,
   body.device-tablet.call-active .call-controls,
-  body.device-tablet.call-active .call-mode-buttons {
+  body.device-tablet.call-active .call-mode-buttons:not([hidden]) {
     display: flex !important;
     flex-wrap: nowrap;
     align-items: center;
@@ -182,7 +203,7 @@ body.device-tablet .message-body {
     display: none;
   }
 
-  body.device-tablet.tc-text-visible-active.call-active #callPanel:not(.has-interpreter) {
+  body.device-tablet:is(.tc-text-visible-active, .tc-call-active).call-active #callPanel:not(.has-interpreter) {
     display: grid !important;
     grid-row: 4 !important;
     grid-template-rows: minmax(60px, 1fr) auto auto !important;
@@ -193,7 +214,7 @@ body.device-tablet .message-body {
     aspect-ratio: auto !important;
   }
 
-  body.device-tablet.tc-text-visible-active.call-active #callPanel:not(.has-interpreter) > video {
+  body.device-tablet:is(.tc-text-visible-active, .tc-call-active).call-active #callPanel:not(.has-interpreter) > video {
     grid-row: 1;
     grid-column: 1;
     width: 100% !important;
@@ -204,7 +225,7 @@ body.device-tablet .message-body {
     aspect-ratio: auto !important;
   }
 
-  body.device-tablet.tc-text-visible-active.call-active #callPanel:not(.has-interpreter):not(.local-video-main) #localVideo {
+  body.device-tablet:is(.tc-text-visible-active, .tc-call-active).call-active #callPanel:not(.has-interpreter):not(.local-video-main) #localVideo {
     position: absolute !important;
     inset: 12px 12px auto auto !important;
     width: 26% !important;
@@ -212,7 +233,7 @@ body.device-tablet .message-body {
     border-radius: 12px;
   }
 
-  body.device-tablet.tc-text-visible-active.call-active #callPanel:not(.has-interpreter) .tc-text-panel {
+  body.device-tablet:is(.tc-text-visible-active, .tc-call-active).call-active #callPanel:not(.has-interpreter) .tc-text-panel:not([hidden]) {
     position: static !important;
     grid-row: 2 !important;
     display: grid !important;
@@ -224,27 +245,60 @@ body.device-tablet .message-body {
     overflow: auto;
   }
 
-  body.device-tablet.tc-text-visible-active.call-active #callPanel:not(.has-interpreter) .tc-text-line {
+  body.device-tablet:is(.tc-text-visible-active, .tc-call-active).call-active #callPanel:not(.has-interpreter) .tc-text-line {
     min-width: 0;
     min-height: 64px !important;
     max-height: 130px !important;
     overflow: auto;
   }
 
-  body.device-tablet.tc-text-visible-active.call-active #callPanel:not(.has-interpreter) .call-media-controls {
+  body.device-tablet:is(.tc-text-visible-active, .tc-call-active).call-active #callPanel:not(.has-interpreter) .call-media-controls {
     position: static !important;
     grid-row: 3 !important;
     width: 100% !important;
     max-width: none;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     justify-content: flex-start;
     gap: 8px;
-    overflow-x: auto;
+    overflow: visible;
     padding: 8px;
     border-radius: 0;
   }
 
   body.device-tablet .call-media-controls > * {
     flex-shrink: 0;
+  }
+
+  body.device-tablet.call-active #callPanel #totalConversationTextPanel[hidden],
+  body.device-tablet:is(.tc-text-visible-active, .tc-call-active).call-active #callResizeHandle {
+    display: none !important;
+  }
+
+  body.device-tablet.call-active .call-media-controls .call-media-icon-button,
+  body.device-tablet.call-active .call-media-controls .call-facing-toggle,
+  body.device-tablet.call-active .call-media-controls .ios-facing-control {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    min-height: 44px;
+    flex: 0 0 44px;
+  }
+
+  body.device-tablet.call-active .call-device-controls {
+    flex: 0 0 auto;
+    order: 0;
+  }
+
+  body.device-tablet.call-active .call-media-controls .volume-control {
+    flex: 1 0 100%;
+    width: 100%;
+    min-width: 0;
+    order: 1;
+  }
+
+  body.device-tablet.call-active .volume-control input {
+    flex: 1 1 auto;
+    min-width: 0;
+    width: auto;
   }
 }
