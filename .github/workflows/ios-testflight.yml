@@ -40,6 +40,11 @@ on:
       - tests/xmpp-recovery.test.js
       - tests/xmpp-startup-gate.test.js
   workflow_dispatch:
+    inputs:
+      build_number:
+        description: Optional unique Apple build number (for example 12.2)
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -54,7 +59,7 @@ jobs:
     timeout-minutes: 30
     env:
       IOS_SERVER_URL: https://192.168.0.105/chat.html
-      IOS_BUILD_NUMBER: ${{ github.run_number }}.${{ github.run_attempt }}
+      IOS_BUILD_NUMBER: ${{ inputs.build_number || format('{0}.{1}', github.run_number, github.run_attempt) }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -93,7 +98,7 @@ jobs:
     timeout-minutes: 40
     env:
       IOS_SERVER_URL: https://192.168.0.105/chat.html
-      IOS_BUILD_NUMBER: ${{ github.run_number }}.${{ github.run_attempt }}
+      IOS_BUILD_NUMBER: ${{ inputs.build_number || format('{0}.{1}', github.run_number, github.run_attempt) }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:

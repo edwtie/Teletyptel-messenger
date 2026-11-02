@@ -140,9 +140,12 @@
         });
         const panel = document.createElement("div");
         panel.className = "xmpp-availability__panel";
-        const brand = document.createElement("strong");
+        const brand = document.createElement("img");
         brand.className = "xmpp-availability__brand";
-        brand.textContent = "TeleTypTel";
+        brand.src = "assets/brand/teletyptel-logo-header@2x.png";
+        brand.alt = "TeleTypTel";
+        brand.width = 599;
+        brand.height = 128;
         status = document.createElement("p");
         status.setAttribute("role", "status");
         status.setAttribute("aria-live", "polite");

@@ -1,11 +1,11 @@
-const CACHE_NAME = "teletyptel-webclient-v468";
-const BUILD_VERSION = "20261102-ipad";
+const CACHE_NAME = "teletyptel-webclient-v469";
+const BUILD_VERSION = "20261102-startup-brand";
 const ASSETS = [
   "chat.html",
   "chat-tablet.css?v=20261102-ipad",
   "native-biometric.js?v=20261102-faceid",
-  "xmpp-availability.css?v=20261102-xmpp-availability",
-  "xmpp-availability.js?v=20261102-xmpp-availability",
+  "xmpp-availability.css?v=20261102-startup-brand",
+  "xmpp-availability.js?v=20261102-startup-brand",
   "chat-dialer.css?v=20261031-keypad-letters",
   "chat-dialer.js?v=20261031-iphone-contacts",
   "dev.html",

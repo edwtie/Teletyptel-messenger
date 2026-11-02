@@ -5,7 +5,7 @@ const path = require("node:path");
 const { webkit } = require("playwright");
 const { bundleFrontend } = require("../scripts/ios-testflight/bundle-frontend");
 
-test("Startup logo fits small, portrait and landscape screens and hides after boot", { timeout: 45000 }, async () => {
+test("Startup logo stays consistent during server checking on phone and tablet", { timeout: 45000 }, async () => {
   const files = new Map();
   bundleFrontend((name, data) => files.set(name, Buffer.from(data)), "https://server.test/chat.html");
   const browser = await webkit.launch({ headless: true });
@@ -18,9 +18,10 @@ test("Startup logo fits small, portrait and landscape screens and hides after bo
       return route.fulfill({ contentType, body: files.get(name) });
     });
     const startup = files.get("www/chat.html").toString().match(/<section class="native-startup"[\s\S]*?<\/section>/)[0];
-    for (const viewport of [{ width: 320, height: 568 }, { width: 390, height: 844 }, { width: 844, height: 390 }]) {
+    for (const viewport of [{ width: 320, height: 568 }, { width: 390, height: 844 }, { width: 844, height: 390 },
+      { width: 834, height: 1194 }, { width: 1194, height: 834 }]) {
       await page.setViewportSize(viewport);
-      await page.setContent('<meta name="viewport" content="width=device-width, initial-scale=1"><base href="https://startup.test/"><link rel="stylesheet" href="chat-client.css"><link rel="stylesheet" href="native-startup.css"><body class="account-booting">' + startup + '</body>');
+      await page.setContent('<meta name="viewport" content="width=device-width, initial-scale=1"><base href="https://startup.test/"><link rel="stylesheet" href="chat-client.css"><link rel="stylesheet" href="native-startup.css"><link rel="stylesheet" href="xmpp-availability.css"><body class="account-booting">' + startup + '</body>');
       await page.locator(".native-startup img").evaluate(image => image.decode());
       const logo = await page.locator(".native-startup img").boundingBox();
       assert.ok(logo.width > 200 && logo.width <= 280);
@@ -33,6 +34,27 @@ test("Startup logo fits small, portrait and landscape screens and hides after bo
         fs.mkdirSync(path.dirname(screenshot), { recursive: true });
         await page.screenshot({ path: screenshot });
       }
+      await page.addScriptTag({ content: files.get("www/xmpp-availability.js").toString() });
+      await page.evaluate(() => {
+        window.brandingGate = TeleTypTelXmppAvailability.create();
+        window.brandingGate.connecting();
+      });
+      const gateLogo = page.locator(".xmpp-availability__brand");
+      await gateLogo.evaluate(image => image.decode());
+      assert.equal(await gateLogo.getAttribute("src"), await page.locator(".native-startup img").getAttribute("src"));
+      assert.equal(await gateLogo.getAttribute("alt"), "TeleTypTel");
+      const gateBounds = await gateLogo.boundingBox();
+      for (const key of ["x", "y", "width", "height"]) {
+        assert.ok(Math.abs(gateBounds[key] - logo[key]) < 2, `Logo ${key} must not jump during server checking`);
+      }
+      for (const colorScheme of ["light", "dark"]) {
+        await page.emulateMedia({ colorScheme });
+        assert.equal(await page.locator(".xmpp-availability").evaluate(element => getComputedStyle(element).backgroundColor), "rgb(255, 255, 255)");
+      }
+      if (viewport.width === 390 || viewport.width === 834) {
+        await page.screenshot({ path: path.resolve(__dirname, `../artifacts/mobile-chat/ios-checking-logo-${viewport.width}.png`) });
+      }
+      await page.evaluate(() => window.brandingGate.hide());
       await page.evaluate(() => document.body.classList.remove("account-booting"));
       assert.equal(await page.locator(".native-startup").isVisible(), false);
     }

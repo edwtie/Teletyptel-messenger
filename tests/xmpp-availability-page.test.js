@@ -77,6 +77,12 @@ for (const engine of [chromium, webkit]) {
       await page.goto("https://messenger.test/chat.html");
       const gate = page.locator('.xmpp-availability[open][data-state="offline"]');
       await gate.waitFor();
+      const logo = gate.getByRole("img", { name: "TeleTypTel" });
+      await logo.evaluate(image => image.decode());
+      assert.equal(await logo.getAttribute("src"), "assets/brand/teletyptel-logo-header@2x.png");
+      const logoBounds = await logo.boundingBox();
+      assert.equal(logoBounds.width, 280);
+      assert.ok(Math.abs(logoBounds.width / logoBounds.height - 599 / 128) < 0.01);
       assert.match(await gate.innerText(), /De chatserver is niet online of niet bereikbaar/);
       assert.deepEqual(accountRequests.filter(url => !url.includes("lookupJid=")), []);
       assert.equal(await page.locator(".app-shell").evaluate(element => element.inert), true);

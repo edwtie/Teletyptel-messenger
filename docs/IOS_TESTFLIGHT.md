@@ -229,6 +229,15 @@ De lokale webclient moet voor native iOS dezelfde beveiligde XMPP-proxy gebruike
 
 Workflow: `.github/workflows/ios-testflight.yml`, uitsluitend op `codex/teletyptel-beta-polish`.
 
+Voor een kleine correctie kan **Run workflow** het optionele veld `build_number`
+gebruiken, bijvoorbeeld `12.2`. Zowel preflight als upload gebruiken ditzelfde
+gevalideerde nummer. Laat het leeg voor het automatische run-/pogingsnummer.
+Kies altijd een nog niet geüpload, oplopend Apple-buildnummer; opnieuw uitvoeren
+met hetzelfde handmatige nummer maakt geen nieuw nummer. De beveiligde
+`ios-testflight`-goedkeuring blijft verplicht. Voor een uitsluitend handmatige
+release kan de publicatiecommit `[skip actions]` bevatten om een tweede,
+automatische push-build te voorkomen; start daarna de workflow op die commit.
+
 1. Een macOS-runner met Xcode 26 installeert de vastgelegde afhankelijkheden van `scripts/ios-testflight`.
 2. `prepare.js` haalt de native basisbestanden uit de exacte Git-commit, voegt de native bridges en frontendallowlist toe en maakt een geïsoleerde projectmap onder `artifacts/ios-testflight`.
 3. Tests, een ongetekende build voor fysieke iOS-apparaten en een Release-Simulator-opstarttest draaien zonder ondertekeningssleutels. De opstarttest reproduceert eerst het afsluiten zonder lokaal startbestand en controleert daarna twee stabiele starts met de echte lokale interface. Alleen de simulator krijgt een onbereikbare loopback-server in Info.plist én connection.js; geen verbinding met WAMP vanuit de cloud.

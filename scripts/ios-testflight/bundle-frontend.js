@@ -28,7 +28,7 @@ function bundleFrontend(write, serverUrl) {
     if (file === "chat.html") {
       const html = content.toString().replace(/\s*<link rel="manifest"[^>]+>/, "")
         .replace("<head>", '<head>\n  <script src="connection.js"></script>\n  <script src="native-server.js"></script>\n  <script src="native-keyboard.js"></script>\n  <link rel="stylesheet" href="native-startup.css">')
-        .replace('<body class="account-booting">', '<body class="account-booting">\n  <section class="native-startup" role="status" aria-label="TeleTypTel"><img src="assets/brand/teletyptel-logo-header@2x.png" width="599" height="128" alt="TeleTypTel"><p>Verbinding controleren… / Connecting…</p></section>')
+        .replace('<body class="account-booting">', '<body class="account-booting">\n  <section class="native-startup" role="status" aria-label="TeleTypTel"><img src="assets/brand/teletyptel-logo-header@2x.png" width="599" height="128" alt="TeleTypTel"><p data-i18n="status.xmpp_server_checking">De bereikbaarheid van de chatserver wordt gecontroleerd…</p></section>')
         .replace(/href="(tolk\/|admin\/#[^"]*|aanmelden\/)"/g,
           (_, target) => 'href="' + new URL(target, serverUrl).href + '"');
       content = Buffer.from(html);

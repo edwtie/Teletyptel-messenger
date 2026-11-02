@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Consistent startup branding — 2026-11-02
+
+- Prepare the small correction as internal build 12.2; add an optional validated
+  workflow build number shared by preflight and protected upload.
+- Use the existing TeleTypTel logo on the XMPP server-check and offline screens,
+  matching the native startup logo, size, white background and status text.
+- Replace text-only branding on the bundled connection fallback pages; add
+  phone/tablet WebKit and offline-page regression checks.
+
 ### Adaptive iPad Messenger layout — 2026-11-02
 
 - Correct iPad detection when its user agent also contains Mobile. Use a

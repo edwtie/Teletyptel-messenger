@@ -9,13 +9,14 @@
   height: 100dvh;
   max-height: none;
   margin: 0;
-  padding: max(24px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right))
-    max(24px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+  padding: max(24px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right))
+    max(24px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left));
   border: 0;
   overflow: auto;
   overscroll-behavior: contain;
-  background: #f6f8fc;
-  color: #18263a;
+  background: #fff;
+  color: #17395e;
+  color-scheme: light;
   font: 1rem/1.6 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   text-align: center;
   isolation: isolate;
@@ -30,7 +31,7 @@
 }
 
 .xmpp-availability::backdrop {
-  background: #f6f8fc;
+  background: #fff;
 }
 
 .xmpp-availability__panel {
@@ -42,12 +43,19 @@
 
 .xmpp-availability__brand {
   display: block;
-  margin-bottom: 1.5rem;
-  font-size: clamp(1.5rem, 6vw, 2.25rem);
+  width: 280px;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto 24px;
+  object-fit: contain;
 }
 
 .xmpp-availability [role="status"] {
-  margin: 0 0 1.5rem;
+  margin: 0;
+}
+
+.xmpp-availability[data-state="offline"] [role="status"] {
+  margin-bottom: 24px;
 }
 
 .xmpp-availability [role="status"]:focus {

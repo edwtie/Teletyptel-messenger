@@ -8,6 +8,16 @@ const { assetFiles } = require("./bundle-frontend");
 const { validateProfile } = require("./build");
 const google = require("./google-signin");
 
+test("Manual patch releases use the same validated build number for preflight and upload", () => {
+  assert.equal(settings("https://server.test/chat.html", "12.2").buildNumber, "12.2");
+  assert.throws(() => settings("https://server.test/chat.html", "12.2;echo unexpected"));
+  const workflow = fs.readFileSync(path.resolve(__dirname, "../../.github/workflows/ios-testflight.yml"), "utf8");
+  const buildLines = workflow.split(/\r?\n/).filter(line => line.includes("IOS_BUILD_NUMBER:"));
+  assert.equal(buildLines.length, 2);
+  assert.equal(buildLines[0], buildLines[1]);
+  assert.ok(buildLines[0].includes("inputs.build_number || format('{0}.{1}', github.run_number, github.run_attempt)"));
+});
+
 test("Only an unexpired distribution profile for this app is accepted", () => {
   const config = settings("https://example.test/chat.html");
   const profile = {
@@ -97,6 +107,14 @@ test("Native launch and web startup share the unchanged TeleTypTel logo", () => 
     fs.readFileSync(path.join(project, "www/assets/brand/teletyptel-logo-header@2x.png")));
   const html = fs.readFileSync(path.join(project, "www/chat.html"), "utf8");
   assert.match(html, /class="native-startup"[^>]*><img src="assets\/brand\/teletyptel-logo-header@2x.png"/);
+  assert.match(html, /data-i18n="status.xmpp_server_checking"/);
+  const availability = fs.readFileSync(path.join(project, "www/xmpp-availability.js"), "utf8");
+  assert.match(availability, /brand.src = "assets\/brand\/teletyptel-logo-header@2x.png"/);
+  for (const page of ["index.html", "offline.html"]) {
+    const fallback = fs.readFileSync(path.join(project, "www", page), "utf8");
+    assert.match(fallback, /<img class="brand" src="assets\/brand\/teletyptel-logo-header@2x.png"/);
+    assert.doesNotMatch(fallback, /<p class="brand">/);
+  }
   const plist = fs.readFileSync(path.join(project, "ios/App/App/Info.plist"), "utf8");
   assert.match(plist, /<key>UILaunchStoryboardName<\/key>\s*<string>LaunchScreen<\/string>/);
 });

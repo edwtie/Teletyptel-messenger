@@ -10,11 +10,13 @@ body.account-booting .native-startup {
   place-content: center;
   justify-items: center;
   box-sizing: border-box;
-  padding: 24px;
+  padding: max(24px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right))
+    max(24px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left));
   text-align: center;
-  font: 16px system-ui;
+  font: 1rem/1.6 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color: #17395e;
   background: #fff;
+  color-scheme: light;
   z-index: 10000;
 }
 
@@ -27,5 +29,6 @@ body.account-booting .native-startup {
 }
 
 .native-startup p {
+  max-width: 32rem;
   margin: 24px 0 0;
 }
