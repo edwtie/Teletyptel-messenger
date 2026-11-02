@@ -107,8 +107,10 @@
     let pending;
     let state = "hidden";
     let failureReason = "offline";
+    let phase = "checking";
     let retry;
     let waitingForBody = false;
+    let waitingForStartup = false;
     const inertStates = new Map();
     const text = (key, fallback) => {
       try {
@@ -134,8 +136,9 @@
         return;
       }
       if (!overlay) {
-        overlay = document.createElement("dialog");
-        overlay.className = "xmpp-availability";
+        overlay = isNativeApp() ? document.querySelector("dialog.native-startup") : null;
+        overlay ||= document.createElement("dialog");
+        overlay.classList.add("xmpp-availability");
         overlay.setAttribute("aria-label", "TeleTypTel");
         overlay.setAttribute("aria-modal", "true");
         overlay.setAttribute("closedby", "none");
@@ -146,9 +149,9 @@
             event.stopPropagation();
           }
         });
-        const panel = document.createElement("div");
+        const panel = overlay.querySelector(".xmpp-availability__panel") || document.createElement("div");
         panel.className = "xmpp-availability__panel";
-        if (isNativeApp()) {
+        if (isNativeApp() && !panel.querySelector("img")) {
           const brand = document.createElement("img");
           brand.className = "xmpp-availability__brand";
           brand.src = "assets/brand/teletyptel-logo-header@2x.png";
@@ -157,7 +160,8 @@
           brand.height = 128;
           panel.append(brand);
         }
-        status = document.createElement("p");
+        status = panel.querySelector('[role="status"]') || document.createElement("p");
+        status.removeAttribute("data-i18n");
         status.setAttribute("role", "status");
         status.setAttribute("aria-live", "polite");
         status.setAttribute("aria-atomic", "true");
@@ -166,31 +170,43 @@
         retryButton.type = "button";
         retryButton.addEventListener("click", async () => {
           if (state !== "offline" || retryButton.disabled || typeof retry !== "function") return;
-          retryButton.disabled = true;
-          try { await retry(); } catch (_) {}
-          if (state === "offline") retryButton.disabled = typeof retry !== "function";
+          const retryAction = retry;
+          const previousReason = failureReason;
+          show("checking", retryAction);
+          try { await retryAction(); }
+          catch (_) { if (state === "checking") show("offline", retryAction, previousReason); }
         });
-        panel.append(status, retryButton);
-        overlay.append(panel);
-        document.body.append(overlay);
+        const actions = panel.querySelector(".xmpp-availability__actions") || document.createElement("div");
+        actions.className = "xmpp-availability__actions";
+        actions.append(retryButton);
+        panel.append(status, actions);
+        if (!panel.parentNode) overlay.append(panel);
+        if (!overlay.parentNode) document.body.append(overlay);
       }
-      const wasHidden = !overlay.open;
+      const wasHidden = !overlay.matches(":modal");
       overlay.dataset.state = state;
       overlay.dataset.reason = failureReason;
+      overlay.dataset.phase = phase;
       status.textContent = state === "offline"
         ? failureReason === "certificate"
           ? text("status.server_certificate_error", "Certificaatfout: het servercertificaat is ongeldig of wordt niet vertrouwd op dit apparaat. Controleer datum/tijd en het bekende TeleTypTel-certificaat in Instellingen. Vertrouw geen onbekende certificaten.")
           : text("status.xmpp_server_offline", "De chatserver is niet online of niet bereikbaar. Probeer het later opnieuw.")
-        : text("status.xmpp_server_checking", "De bereikbaarheid van de chatserver wordt gecontroleerd…");
+        : phase === "connecting"
+          ? text("status.xmpp_server_connecting", "Verbinding maken…")
+          : text("status.xmpp_server_checking", "De bereikbaarheid van de chatserver wordt gecontroleerd…");
       retryButton.textContent = text("status.xmpp_server_retry", "Opnieuw proberen");
       retryButton.hidden = state !== "offline";
       retryButton.disabled = typeof retry !== "function";
       blockBackground();
       if (!observer && root.MutationObserver) {
-        observer = new root.MutationObserver(blockBackground);
-        observer.observe(document.body, { childList: true });
+        observer = new root.MutationObserver(() => {
+          if (waitingForStartup && !document.body.classList.contains("account-booting")) hideView();
+          else blockBackground();
+        });
+        observer.observe(document.body, { childList: true, attributes: true, attributeFilter: ["class"] });
       }
       if (wasHidden) {
+        if (overlay.open && typeof overlay.close === "function") overlay.close();
         if (typeof overlay.showModal === "function") overlay.showModal();
         else overlay.setAttribute("open", "");
         status.focus({ preventScroll: true });
@@ -200,13 +216,16 @@
       waitingForBody = false;
       render();
     }
-    function show(nextState, nextRetry, reason = "offline") {
+    function show(nextState, nextRetry, reason = "offline", nextPhase = "checking") {
+      waitingForStartup = false;
       state = nextState;
       failureReason = reason === "certificate" ? "certificate" : "offline";
+      phase = nextPhase;
       retry = nextRetry;
       render();
     }
     function hideView() {
+      waitingForStartup = false;
       state = "hidden";
       retry = undefined;
       observer?.disconnect();
@@ -239,13 +258,15 @@
         request.promise = request.promise.then(available => {
           if (pending !== request) return false;
           pending = undefined;
-          if (available) hideView();
+          if (available && overlay?.classList.contains("native-startup")
+              && root.document.body.classList.contains("account-booting")) waitingForStartup = true;
+          else if (available) hideView();
           else show("offline", retryCheck);
           return available;
         });
         return request.promise;
       },
-      connecting() { cancelPending(); show("checking"); },
+      connecting() { cancelPending(); show("checking", undefined, "offline", "connecting"); },
       unavailable(onRetry, reason) { cancelPending(); show("offline", onRetry, reason); },
       ready() { cancelPending(); hideView(); },
       hide() { cancelPending(); hideView(); }

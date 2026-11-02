@@ -1,34 +1,13 @@
-.native-startup {
-  display: none;
+body:not(.account-booting) .native-startup:not([data-state]),
+.native-startup:not([open]) {
+  display: none !important;
 }
 
-body.account-booting .native-startup {
-  position: fixed;
-  inset: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  place-content: center;
-  justify-items: center;
-  box-sizing: border-box;
-  padding: max(24px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right))
-    max(24px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left));
-  text-align: center;
-  font: 1rem/1.6 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  color: #17395e;
-  background: #fff;
-  color-scheme: light;
-  z-index: 10000;
+.native-startup .xmpp-availability__panel {
+  min-height: 240px;
 }
 
-.native-startup img {
-  display: block;
-  width: 280px;
-  max-width: 100%;
-  height: auto;
-  object-fit: contain;
-}
-
-.native-startup p {
-  max-width: 32rem;
-  margin: 24px 0 0;
+.native-startup .xmpp-availability__actions {
+  min-height: 64px;
+  padding-top: 16px;
 }

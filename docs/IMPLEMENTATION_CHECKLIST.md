@@ -3,8 +3,34 @@
 This checklist tracks protocol and product progress. Use `[x]` only when the
 item is implemented, tested and documented.
 
+## Unified native startup — 2026-11-02
+
+- [x] Use one native startup dialog with the same logo and live status node for
+  checking, connecting, offline and certificate failures. Retry stays on this
+  screen; the account-preparation transition does not introduce a blank screen.
+- [x] Preserve certificate checks, background inertness and accessible retry.
+  Do not add a branded splash to ordinary browser sessions. Keep native fallback
+  pages identical and neutral rather than displaying a separate error narrative.
+- [x] Test bundled UI recovery into sign-in, repeated offline retries, status-node
+  identity, preparation/connection races and phone/tablet viewport sizes using
+  browser fixtures. Run the native bundle JavaScript regression suite.
+- [ ] Publish an approved native build and verify startup, certificate errors and
+  retry on real iPhone/iPad devices. These changes are not in build 12.4.
+
 ## iPad adaptive layout — 2026-11-02
 
+- [x] Add a tablet TC contact drawer (800px and wider), with button/edge-swipe
+  access, Escape/backdrop dismissal, hidden-list inertness and post-call restore.
+  Preserve existing video/composer elements and prevent search-keyboard autofocus.
+- [x] Expand text-only RTT across the call canvas; use proportional cover sizing
+  for main video and a bounded local preview. Browser fixtures cover both rotations,
+  drawer gestures, vertical-scroll exclusion, focus and draft preservation.
+- [x] Repeat portrait/landscape round trips with the drawer open, simulated
+  24px/20px safe-area insets and keyboard-reduced viewports. Check both camera
+  layouts with synthetic video posters, full-canvas bounds and RTT panel ordering
+  in Chromium/WebKit. These checks do not simulate live media or the iPad keyboard.
+- [ ] Verify these drawer/RTT/video changes in a new TestFlight build on the iPad;
+  build 12.4 does not contain them. Check real edge gestures and video cropping.
 - [x] User confirmed certificate trust, sign-in and the contact list on the physical
   iPad. This does not yet validate real TC media or rotation during a call.
 - [x] Keep the tablet shell viewport-sized during portrait TC calls instead of

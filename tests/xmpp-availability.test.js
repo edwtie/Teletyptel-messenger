@@ -368,6 +368,40 @@ for (const [engineName, engine] of Object.entries({ chromium, webkit })) {
           draft: "Unsent draft", inputFocused: false, clean: true });
       });
 
+      await check("Native startup stays visible until account preparation ends, without hiding newer errors", async page => {
+        await page.evaluate(() => {
+          window.fixture.environment.Capacitor = { getPlatform: () => "ios" };
+          const startup = document.createElement("dialog");
+          startup.className = "native-startup";
+          document.body.append(startup);
+        });
+        for (const transition of ["prepared", "connecting", "unavailable"]) {
+          const result = await page.evaluate(async ({ options, open, features, transition }) => {
+            const harness = window.fixture;
+            document.body.classList.add("account-booting");
+            const controller = harness.api.create();
+            const promise = controller.check(options);
+            const socket = harness.sockets.at(-1);
+            socket.emit("open");
+            socket.emit("message", open + features);
+            const available = await promise;
+            const overlay = document.querySelector(".native-startup");
+            const keptVisible = overlay.open;
+            document.body.classList.remove("account-booting");
+            if (transition !== "prepared") controller[transition](() => {});
+            await Promise.resolve();
+            const visible = overlay.open;
+            controller.hide();
+            overlay.remove();
+            const next = document.createElement("dialog");
+            next.className = "native-startup";
+            document.body.append(next);
+            return { available, keptVisible, visible };
+          }, { options, open, features, transition });
+          assert.deepEqual(result, { available: true, keptVisible: true, visible: transition !== "prepared" });
+        }
+      });
+
       await check("State transitions cancel probes and ignore even queued late failures", async page => {
         for (const transition of ["ready", "hide", "connecting", "unavailable"]) {
           const result = await page.evaluate(async ({ options, transition }) => {
@@ -427,7 +461,7 @@ for (const [engineName, engine] of Object.entries({ chromium, webkit })) {
           document.getElementById("nativeDialog").showModal();
           window.controller = harness.api.create({ translate: key => {
             window.translationKeys.push(key);
-            return { "status.xmpp_server_checking": "Checking", "status.xmpp_server_offline": "Offline",
+            return { "status.xmpp_server_checking": "Checking", "status.xmpp_server_connecting": "Connecting", "status.xmpp_server_offline": "Offline",
               "status.xmpp_server_retry": "Retry" }[key];
           } });
           window.controller.connecting();
@@ -444,7 +478,7 @@ for (const [engineName, engine] of Object.entries({ chromium, webkit })) {
             modal: overlay.matches(":modal"), otherModal: document.getElementById("nativeDialog").open };
         }), { open: true, retries: 1, disabled: false, text: "Offline", nativeStartup: "native-startup",
           zIndex: 20000, modal: true, otherModal: true,
-          keys: ["status.xmpp_server_checking", "status.xmpp_server_offline", "status.xmpp_server_retry"] });
+          keys: ["status.xmpp_server_checking", "status.xmpp_server_connecting", "status.xmpp_server_offline", "status.xmpp_server_retry"] });
         for (const viewport of [{ width: 320, height: 568 }, { width: 844, height: 390 }, { width: 1280, height: 720 }]) {
           await page.setViewportSize(viewport);
           const bounds = await page.locator(".xmpp-availability").boundingBox();

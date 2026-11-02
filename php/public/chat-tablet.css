@@ -221,16 +221,18 @@ body.device-tablet .message-body {
     height: 100% !important;
     min-height: 0 !important;
     max-height: none !important;
-    object-fit: contain !important;
+    object-fit: cover !important;
     aspect-ratio: auto !important;
   }
 
   body.device-tablet:is(.tc-text-visible-active, .tc-call-active).call-active #callPanel:not(.has-interpreter):not(.local-video-main) #localVideo {
     position: absolute !important;
     inset: 12px 12px auto auto !important;
-    width: 26% !important;
-    height: 25% !important;
-    border-radius: 12px;
+    width: min(26%, 220px) !important;
+    height: auto !important;
+    max-height: 30% !important;
+    aspect-ratio: 4 / 3 !important;
+    border-radius: 12px !important;
   }
 
   body.device-tablet:is(.tc-text-visible-active, .tc-call-active).call-active #callPanel:not(.has-interpreter) .tc-text-panel:not([hidden]) {
@@ -300,5 +302,109 @@ body.device-tablet .message-body {
     flex: 1 1 auto;
     min-width: 0;
     width: auto;
+  }
+
+  body.device-tablet.call-active .call-media-controls {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  body.device-tablet.tablet-call-drawer .client-grid {
+    --conversation-list-width: 0px !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  body.device-tablet.tablet-call-drawer .chat-panel {
+    grid-column: 1 !important;
+  }
+
+  body.device-tablet.tablet-call-drawer .chat-header {
+    padding-left: max(16px, env(safe-area-inset-left));
+  }
+
+  body.device-tablet.tablet-call-drawer .conversation-list {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: min(340px, calc(100% - 64px));
+    height: 100%;
+    z-index: 9;
+    visibility: hidden;
+    transform: translateX(-100%);
+    transition: transform 180ms ease;
+    background: var(--panel);
+    box-shadow: 12px 0 32px rgba(0, 0, 0, .24);
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+    touch-action: pan-y;
+  }
+
+  body.device-tablet.tablet-call-drawer.call-contacts-open .conversation-list {
+    visibility: visible;
+    transform: translateX(0);
+  }
+
+  .call-contacts-toggle,
+  .call-contacts-close {
+    min-width: 44px;
+    min-height: 44px;
+    flex: 0 0 44px;
+  }
+
+  #callContactsBackdrop {
+    position: absolute;
+    inset: 0;
+    z-index: 8;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    border-radius: 0;
+    padding: 0;
+    box-shadow: none;
+    background: rgba(0, 0, 0, .35) !important;
+  }
+
+  .call-contacts-edge {
+    position: absolute;
+    inset: 80px auto 140px 0;
+    width: 18px;
+    z-index: 4;
+    touch-action: pan-y;
+  }
+
+  body.device-tablet.call-active #callPanel.tc-text-full:not(.has-interpreter) {
+    grid-template-rows: 0 minmax(0, 1fr) auto !important;
+  }
+
+  body.device-tablet.call-active #callPanel.tc-text-full:not(.has-interpreter) .tc-text-panel:not([hidden]) {
+    height: 100%;
+    max-height: none;
+    min-height: 0;
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: repeat(2, minmax(0, 1fr));
+    pointer-events: auto;
+  }
+
+  body.device-tablet.call-active #callPanel.tc-text-full:not(.has-interpreter) .tc-text-line {
+    min-height: 0 !important;
+    max-height: none !important;
+    align-content: start;
+    font-size: 20px;
+  }
+
+  body.device-tablet.call-active #callPanel.tc-text-full:not(.has-interpreter) .tc-text-line p {
+    font-size: clamp(18px, 2vw, 24px) !important;
+    line-height: 1.5 !important;
+  }
+}
+
+@media (min-width: 800px) and (orientation: landscape) {
+  body.device-tablet.call-active #callPanel.tc-text-full:not(.has-interpreter) .tc-text-panel:not([hidden]) {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    grid-template-rows: minmax(0, 1fr);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.device-tablet.tablet-call-drawer .conversation-list {
+    transition: none;
   }
 }

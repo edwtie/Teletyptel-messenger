@@ -1740,6 +1740,13 @@ textarea {
   min-height: 96px;
 }
 
+.call-contacts-toggle[hidden],
+.call-contacts-close[hidden],
+.call-contacts-backdrop[hidden],
+.call-contacts-edge[hidden] {
+  display: none !important;
+}
+
 .app-shell {
   display: grid;
   grid-template-rows: 58px minmax(0, 1fr);

@@ -806,4 +806,6 @@ download.failed=Download failed.
 account.signing_out=Signing out…
 account.sign_out_failed=Server sign-out could not be confirmed. Check your connection and try again.
 account.retry_sign_out=Retry sign-out
+tablet.close_contacts=Close contacts
+status.xmpp_server_connecting=Connecting…
 account.native_server_unavailable=The server is unavailable. Check Wi-Fi, WAMP and certificate trust, then try signing in again.

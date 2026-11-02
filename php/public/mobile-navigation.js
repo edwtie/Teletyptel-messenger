@@ -1,5 +1,82 @@
 "use strict";
 (() => {
+  const sidebar = document.getElementById("conversationSidebar");
+  const toggle = document.getElementById("callContactsToggle");
+  const close = document.getElementById("callContactsClose");
+  const backdrop = document.getElementById("callContactsBackdrop");
+  const edge = document.getElementById("callContactsEdge");
+  if (!sidebar || !toggle || !close || !backdrop || !edge) return;
+  const tabletWidth = window.matchMedia("(min-width: 800px)");
+  let active = false;
+  let open = false;
+  let gesture = null;
+  const setOpen = (next, restoreFocus = false) => {
+    open = active && next;
+    document.body.classList.toggle("call-contacts-open", open);
+    toggle.setAttribute("aria-expanded", String(open));
+    close.hidden = !open;
+    backdrop.hidden = !open;
+    edge.hidden = !active || open;
+    sidebar.inert = active && !open;
+    if (active && !open) sidebar.setAttribute("aria-hidden", "true");
+    else sidebar.removeAttribute("aria-hidden");
+    if (open) close.focus({ preventScroll: true });
+    else if (restoreFocus && active) toggle.focus({ preventScroll: true });
+  };
+  const sync = () => {
+    const classes = document.body.classList;
+    const next = tabletWidth.matches && classes.contains("device-tablet") && classes.contains("call-active")
+      && (classes.contains("tc-call-active") || classes.contains("tc-text-visible-active"))
+      && !classes.contains("history-page-active") && !classes.contains("account-gate");
+    if (active === next) return;
+    active = next;
+    classes.toggle("tablet-call-drawer", active);
+    toggle.hidden = !active;
+    setOpen(false);
+  };
+  toggle.addEventListener("click", () => setOpen(!open, open));
+  close.addEventListener("click", () => setOpen(false, true));
+  backdrop.addEventListener("click", () => setOpen(false, true));
+  sidebar.addEventListener("click", event => {
+    if (open && event.target.closest(".conversation-item, .conversation-actions button")) setOpen(false, true);
+  });
+  document.addEventListener("keydown", event => {
+    if (open && event.key === "Escape") {
+      event.preventDefault();
+      setOpen(false, true);
+    }
+  });
+  document.addEventListener("focusin", event => {
+    if (open && !sidebar.contains(event.target) && event.target !== toggle) setOpen(false);
+  });
+  const startGesture = event => {
+    gesture = active && event.touches.length === 1 && !event.target.closest("input, textarea, select, [contenteditable='true']")
+      ? { x: event.touches[0].clientX, y: event.touches[0].clientY, open, time: Date.now() } : null;
+  };
+  const endGesture = event => {
+    const start = gesture;
+    gesture = null;
+    if (!start || !active || start.open !== open || event.touches.length || Date.now() - start.time > 800) return;
+    const touch = event.changedTouches[0];
+    if (!touch) return;
+    const distance = touch.clientX - start.x;
+    if (Math.abs(distance) < 60 || Math.abs(touch.clientY - start.y) > Math.abs(distance) / 2) return;
+    if ((!open && distance > 0) || (open && distance < 0)) {
+      if (event.cancelable) event.preventDefault();
+      setOpen(!open, open);
+    }
+  };
+  for (const target of [edge, sidebar]) {
+    target.addEventListener("touchstart", startGesture, { passive: true });
+    target.addEventListener("touchend", endGesture, { passive: false });
+    target.addEventListener("touchcancel", () => { gesture = null; }, { passive: true });
+  }
+  tabletWidth.addEventListener("change", sync);
+  window.addEventListener("pagehide", () => setOpen(false));
+  new MutationObserver(sync).observe(document.body, { attributes: true, attributeFilter: ["class"] });
+  sync();
+})();
+(() => {
   const contactToggle = document.getElementById("conversationActionsToggle");
   const contactActions = document.getElementById("conversationActionsPanel");
   const contactFooter = contactToggle.closest(".conversation-actions-footer");

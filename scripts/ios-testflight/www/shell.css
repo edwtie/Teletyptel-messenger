@@ -1,6 +1,6 @@
 :root { color-scheme: light; font: 17px/1.6 system-ui, sans-serif; color: #17395e; background: #fff; }
-body { margin: 0; padding: max(24px, env(safe-area-inset-top)) 22px max(24px, env(safe-area-inset-bottom)); }
-main { max-width: 540px; margin: 6vh auto; }
+body { margin: 0; min-height: 100dvh; box-sizing: border-box; display: grid; place-items: center; padding: max(24px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom)); }
+main { width: 100%; max-width: 512px; min-height: 240px; text-align: center; }
 .brand { display: block; width: 280px; max-width: 100%; height: auto; margin: 0 auto 24px; object-fit: contain; }
 h1 { font-size: 28px; line-height: 1.25; }
 a { display: inline-block; background: #165eaa; color: white; padding: 13px 20px; border-radius: 12px; text-decoration: none; margin: 12px 0; }

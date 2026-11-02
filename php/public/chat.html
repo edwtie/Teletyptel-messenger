@@ -15,10 +15,10 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="favicon.ico" sizes="any">
   <link rel="apple-touch-icon" href="assets/brand/teletyptel-icon-192.png">
-  <link rel="stylesheet" href="chat-client.css?v=20261102-ipad">
-  <link rel="stylesheet" href="xmpp-availability.css?v=20261102-startup-brand">
+  <link rel="stylesheet" href="chat-client.css?v=20261102-tc-drawer">
+  <link rel="stylesheet" href="xmpp-availability.css?v=20261102-unified-startup">
   <link rel="stylesheet" href="chat-dialer.css?v=20261031-keypad-letters">
-  <link rel="stylesheet" href="chat-tablet.css?v=20261102-ipad-tc">
+  <link rel="stylesheet" href="chat-tablet.css?v=20261102-tc-drawer">
 </head>
 <body class="account-booting">
   <a class="skip-link" href="#messageInput" data-i18n="button.skip_to_message">Skip to message</a>
@@ -99,9 +99,10 @@
     </header>
 
     <main class="client-grid">
-      <aside class="conversation-list" aria-label="Conversations">
+      <aside id="conversationSidebar" class="conversation-list" aria-label="Conversations" data-i18n-aria-label="section.conversations">
         <div class="section-heading">
           <span data-i18n="section.conversations">Conversations</span>
+          <button id="callContactsClose" class="icon-button call-contacts-close" type="button" aria-label="Close contacts" data-i18n-aria-label="tablet.close_contacts" hidden><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
         </div>
         <label class="conversation-search">
           <span class="material-icon" data-icon="search" aria-hidden="true"></span>
@@ -118,6 +119,8 @@
           </button>
         </div>
       </aside>
+      <button id="callContactsBackdrop" class="call-contacts-backdrop" type="button" tabindex="-1" aria-hidden="true" hidden></button>
+      <div id="callContactsEdge" class="call-contacts-edge" aria-hidden="true" hidden></div>
 
       <section class="tablet-chat-placeholder" aria-labelledby="tabletWelcomeTitle">
         <img src="assets/brand/teletyptel-logo-header@2x.png" width="599" height="128" alt="TeleTypTel">
@@ -135,6 +138,7 @@
         <nav id="appTabs" class="app-tabs" aria-label="Teletyptel tabs"></nav>
 
         <div class="chat-header">
+          <button id="callContactsToggle" class="icon-button call-contacts-toggle" type="button" aria-label="Contacts" title="Contacts" data-i18n-aria-label="button.back_to_contacts" data-i18n-title="button.back_to_contacts" aria-controls="conversationSidebar" aria-expanded="false" hidden><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18m4-12h5m-5 6h5"/></svg></button>
           <div class="chat-title">
             <button id="backToContactsButton" class="back-to-contacts" type="button" title="Contacts" aria-label="Contacts" data-i18n-title="button.back_to_contacts" data-i18n-aria-label="button.back_to_contacts">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 5-7 7 7 7M5 12h15"/></svg>
@@ -1423,9 +1427,9 @@
   <script src="native-google.js?v=20261031-bundled-interface"></script>
   <script src="native-facebook.js?v=20261101-native-facebook"></script>
   <script src="native-biometric.js?v=20261102-faceid"></script>
-  <script src="xmpp-availability.js?v=20261102-certificate-error"></script>
-  <script src="chat-client.js?v=20261102-certificate-error"></script>
+  <script src="xmpp-availability.js?v=20261102-unified-startup"></script>
+  <script src="chat-client.js?v=20261102-tc-drawer"></script>
   <script src="chat-interpreter.js?v=20261027-inline-interpreter"></script>
-  <script src="mobile-navigation.js?v=20261102-ipad"></script>
+  <script src="mobile-navigation.js?v=20261102-tc-drawer"></script>
 </body>
 </html>

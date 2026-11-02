@@ -17,7 +17,7 @@ test("Startup logo stays consistent during server checking on phone and tablet",
       const contentType = name.endsWith(".css") ? "text/css" : "image/png";
       return route.fulfill({ contentType, body: files.get(name) });
     });
-    const startup = files.get("www/chat.html").toString().match(/<section class="native-startup"[\s\S]*?<\/section>/)[0];
+    const startup = files.get("www/chat.html").toString().match(/<dialog class="native-startup[\s\S]*?<\/dialog>/)[0];
     for (const viewport of [{ width: 320, height: 568 }, { width: 390, height: 844 }, { width: 844, height: 390 },
       { width: 834, height: 1194 }, { width: 1194, height: 834 }]) {
       await page.setViewportSize(viewport);
@@ -36,6 +36,9 @@ test("Startup logo stays consistent during server checking on phone and tablet",
       }
       await page.addScriptTag({ content: files.get("www/xmpp-availability.js").toString() });
       await page.evaluate(() => {
+        window.initialStartup = document.querySelector(".native-startup");
+        window.initialStatus = window.initialStartup.querySelector('[role="status"]');
+        window.initialLogo = window.initialStartup.querySelector("img");
         window.Capacitor = { getPlatform: () => "ios" };
         window.brandingGate = TeleTypTelXmppAvailability.create();
         window.brandingGate.connecting();
@@ -55,6 +58,28 @@ test("Startup logo stays consistent during server checking on phone and tablet",
       if (viewport.width === 390 || viewport.width === 834) {
         await page.screenshot({ path: path.resolve(__dirname, `../artifacts/mobile-chat/ios-checking-logo-${viewport.width}.png`) });
       }
+      for (const reason of ["offline", "certificate"]) {
+        await page.evaluate(reason => {
+          window.brandingGate.unavailable(() => window.brandingGate.connecting(), reason);
+          document.body.classList.remove("account-booting");
+        }, reason);
+        assert.equal(await page.locator(".xmpp-availability").count(), 1);
+        assert.equal(await page.locator(".native-startup").isVisible(), true);
+        assert.equal(await page.evaluate(() => document.querySelector(".xmpp-availability") === window.initialStartup
+          && document.querySelector('.xmpp-availability [role="status"]') === window.initialStatus
+          && document.querySelector(".xmpp-availability img") === window.initialLogo), true,
+        "checking, offline and certificate failures reuse the original screen, logo and status");
+        assert.equal(await page.locator(".xmpp-availability").evaluate(element => element.matches(":modal")), true);
+        assert.match(await page.locator('.xmpp-availability [role="status"]').textContent(),
+          reason === "certificate" ? /Certificaatfout/ : /niet online/);
+        if (viewport.width === 390 || viewport.width === 834) {
+          await page.screenshot({ path: path.resolve(__dirname, `../artifacts/mobile-chat/ios-startup-${reason}-${viewport.width}.png`) });
+        }
+        await page.locator(".xmpp-availability button").click();
+        assert.equal(await page.locator(".xmpp-availability").getAttribute("data-phase"), "connecting");
+        assert.equal(await page.locator(".xmpp-availability button").isVisible(), false);
+        assert.equal(await page.locator(".xmpp-availability").count(), 1);
+      }
       await page.evaluate(() => window.brandingGate.hide());
       await page.evaluate(() => document.body.classList.remove("account-booting"));
       assert.equal(await page.locator(".native-startup").isVisible(), false);
@@ -62,7 +87,7 @@ test("Startup logo stays consistent during server checking on phone and tablet",
   } finally { await browser.close(); }
 });
 
-test("Bundled Messenger opens its real mobile sign-in UI without a reachable server", { timeout: 45000 }, async () => {
+test("Bundled Messenger keeps offline status on its startup screen and retries into sign-in", { timeout: 45000 }, async () => {
   const files = new Map();
   bundleFrontend((name, data) => files.set("/" + name.replace(/^www\//, ""), Buffer.from(data)), "https://server.test/chat.html");
   const browser = await webkit.launch({ headless: true });
@@ -74,13 +99,47 @@ test("Bundled Messenger opens its real mobile sign-in UI without a reachable ser
       window.fixtureNativeRequests = [];
       window.fixtureNativeCalls = [];
       window.fixtureNativeOffline = true;
+      class FixtureSocket extends EventTarget {
+        static OPEN = 1;
+        constructor() {
+          super();
+          this.protocol = "xmpp";
+          this.readyState = 0;
+          setTimeout(() => {
+            this.readyState = 1;
+            this.dispatchEvent(new Event("open"));
+          }, 10);
+        }
+        send(data) {
+          if (!data.startsWith("<open")) return;
+          setTimeout(() => this.dispatchEvent(new MessageEvent("message", {
+            data: '<open xmlns="urn:ietf:params:xml:ns:xmpp-framing" from="localhost" version="1.0"/>'
+              + '<stream:features xmlns:stream="http://etherx.jabber.org/streams">'
+              + '<mechanisms xmlns="urn:ietf:params:xml:ns:xmpp-sasl"><mechanism>PLAIN</mechanism></mechanisms>'
+              + '</stream:features>'
+          })), 10);
+        }
+        close() { this.readyState = 3; }
+      }
+      window.WebSocket = FixtureSocket;
       window.Capacitor = { getPlatform: () => "ios", isPluginAvailable: () => true, Plugins: {
         TeleTypTelGoogle: { signIn: async () => ({ serverAuthCode: "unused-fixture" }) },
         TeleTypTelServer: { request: async options => {
           window.fixtureNativeRequests.push(options.path);
           window.fixtureNativeCalls.push(options);
           if (window.fixtureNativeOffline) throw Object.assign(new Error("Offline fixture"), { code: "SERVER_UNAVAILABLE" });
-          return { status: 200, headers: { "content-type": "application/json" }, body: btoa('{"ok":true}') };
+          let status = 200;
+          let payload = { ok: true, messages: [], conversations: [], groups: [] };
+          if (options.path === "/config/account-profile.json") payload = {
+            accountId: "fixture-guest", jid: "fixture@localhost", displayName: "Fixture",
+            preferredLanguage: "eng", providerId: "fixture", password: "",
+            xmppDomain: "localhost", xmppWebSocket: "wss://server.test/xmpp"
+          };
+          if (options.path === "/config/providers/fixture.json") payload = {
+            providerId: "fixture", name: "Fixture", version: "1", capabilities: [], tabs: []
+          };
+          if (options.path.startsWith("/api/account.php") && options.method !== "POST") { status = 404; payload = { ok: false }; }
+          return { status, headers: { "content-type": "application/json" }, body: btoa(JSON.stringify(payload)) };
         }, cancel: async () => {} }
       } };
       window.nativeFixtureRoot = { location: new URL("capacitor://localhost/chat.html"),
@@ -109,10 +168,28 @@ test("Bundled Messenger opens its real mobile sign-in UI without a reachable ser
     });
     await page.goto("https://bundled.teletyptel.test/chat.html");
     await page.waitForFunction(() => !document.body.classList.contains("account-booting"));
+    const gate = page.locator('.native-startup[data-state="offline"]');
+    await gate.waitFor();
+    assert.equal(await page.locator(".xmpp-availability").count(), 1);
+    assert.match(await gate.innerText(), /server.*offline|server.*bereikbaar/i);
+    assert.equal(await page.locator(".app-shell").evaluate(element => element.inert), true);
+    const requests = await page.evaluate(() => fixtureNativeRequests);
+    assert.ok(requests.includes("/config/account-profile.json"));
+    assert.ok(!requests.includes("/api/rtc-config.php"), "offline startup must not wait for another server timeout");
+    await gate.getByRole("button").click();
+    await page.waitForFunction(() => fixtureNativeRequests.filter(path => path === "/config/account-profile.json").length >= 2);
+    await gate.getByRole("button").waitFor();
+    assert.equal(await page.locator(".xmpp-availability").count(), 1);
+    const screenshot = path.resolve(__dirname, "../artifacts/mobile-chat/ios-bundled-offline.png");
+    fs.mkdirSync(path.dirname(screenshot), { recursive: true });
+    await page.screenshot({ path: screenshot });
+    await page.evaluate(() => { window.fixtureNativeOffline = false; });
+    await gate.getByRole("button").click();
     await page.locator("#accountDialogTitle").waitFor({ state: "visible" });
+    assert.equal(await page.locator(".native-startup").isVisible(), false);
+    assert.equal(await page.locator(".app-shell").evaluate(element => element.inert), false);
     assert.equal(await page.locator("#dialogGoogleLoginFallbackButton").isVisible(), true);
     assert.equal(await page.locator("#dialogJidInput").isVisible(), true);
-    assert.match(await page.locator("#dialogAccountStatus").innerText(), /server.*unavailable|server.*bereikbaar/i);
     assert.equal(await page.evaluate(() => document.activeElement.matches("input,textarea")), false);
     await page.locator("#accountDialogTitle").focus();
     assert.deepEqual(await page.locator("#accountDialogTitle").evaluate(element => ({
@@ -128,9 +205,6 @@ test("Bundled Messenger opens its real mobile sign-in UI without a reachable ser
     assert.equal(await page.evaluate(() => getComputedStyle(document.activeElement).outlineStyle), "solid");
     assert.deepEqual(errors, []);
     assert.deepEqual(missing, []);
-    const requests = await page.evaluate(() => fixtureNativeRequests);
-    assert.ok(requests.includes("/config/account-profile.json"));
-    assert.ok(!requests.includes("/api/rtc-config.php"), "offline startup must not wait for another server timeout");
     const upload = await page.evaluate(async () => {
       window.fixtureNativeOffline = false;
       const form = new FormData();
@@ -156,8 +230,6 @@ test("Bundled Messenger opens its real mobile sign-in UI without a reachable ser
     assert.equal(logout.path, "/api/account.php");
     assert.equal(logout.body.action, "logout");
     assert.equal(logout.omitCookies, false);
-    const screenshot = path.resolve(__dirname, "../artifacts/mobile-chat/ios-bundled-offline.png");
-    fs.mkdirSync(path.dirname(screenshot), { recursive: true });
-    await page.screenshot({ path: screenshot });
+    await page.screenshot({ path: path.resolve(__dirname, "../artifacts/mobile-chat/ios-bundled-recovered.png") });
   } finally { await browser.close(); }
 });

@@ -106,7 +106,8 @@ test("Native launch and web startup share the unchanged TeleTypTel logo", () => 
   assert.deepEqual(fs.readFileSync(path.join(catalog, "logo.png")),
     fs.readFileSync(path.join(project, "www/assets/brand/teletyptel-logo-header@2x.png")));
   const html = fs.readFileSync(path.join(project, "www/chat.html"), "utf8");
-  assert.match(html, /class="native-startup"[^>]*><img src="assets\/brand\/teletyptel-logo-header@2x.png"/);
+  assert.match(html, /<dialog class="native-startup xmpp-availability" open/);
+  assert.match(html, /class="xmpp-availability__brand" src="assets\/brand\/teletyptel-logo-header@2x.png"/);
   assert.match(html, /data-i18n="status.xmpp_server_checking"/);
   const availability = fs.readFileSync(path.join(project, "www/xmpp-availability.js"), "utf8");
   assert.match(availability, /brand.src = "assets\/brand\/teletyptel-logo-header@2x.png"/);
@@ -114,7 +115,10 @@ test("Native launch and web startup share the unchanged TeleTypTel logo", () => 
     const fallback = fs.readFileSync(path.join(project, "www", page), "utf8");
     assert.match(fallback, /<img class="brand" src="assets\/brand\/teletyptel-logo-header@2x.png"/);
     assert.doesNotMatch(fallback, /<p class="brand">/);
+    assert.doesNotMatch(fallback, /<h1>|Je testserver is niet bereikbaar/);
   }
+  assert.equal(fs.readFileSync(path.join(project, "www/index.html"), "utf8"),
+    fs.readFileSync(path.join(project, "www/offline.html"), "utf8"));
   const plist = fs.readFileSync(path.join(project, "ios/App/App/Info.plist"), "utf8");
   assert.match(plist, /<key>UILaunchStoryboardName<\/key>\s*<string>LaunchScreen<\/string>/);
 });

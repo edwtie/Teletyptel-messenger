@@ -806,4 +806,6 @@ download.failed=Downloaden is mislukt.
 account.signing_out=Bezig met uitloggen…
 account.sign_out_failed=Uitloggen bij de server is niet bevestigd. Controleer je verbinding en probeer opnieuw.
 account.retry_sign_out=Opnieuw uitloggen
+tablet.close_contacts=Contacten sluiten
+status.xmpp_server_connecting=Verbinding maken…
 account.native_server_unavailable=De server is niet bereikbaar. Controleer wifi, WAMP en het vertrouwde certificaat en probeer opnieuw aan te melden.

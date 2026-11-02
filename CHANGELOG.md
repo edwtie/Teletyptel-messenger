@@ -2,6 +2,34 @@
 
 ## Unreleased
 
+### One native startup screen — 2026-11-02
+
+- Reuse the native startup dialog, logo and live status for checking, connecting,
+  offline and certificate errors. Retry updates that same screen; no separate
+  error page or duplicate logo is created. Keep the startup visible while account
+  preparation completes, then release it to sign-in or the connection state.
+- Keep certificate validation unchanged and retain actionable certificate errors.
+  Ordinary browser startup still has no extra branded splash. Simplify the native
+  fallback pages to the same neutral Messenger entry instead of separate errors.
+- Verify native-bundle JavaScript tests and Chromium/WebKit startup transitions,
+  retry, inertness, portrait/landscape sizing and unchanged logo proportions.
+  A new native release and physical iPhone/iPad verification remain pending.
+
+### Tablet TC canvas and contact drawer — 2026-11-02
+
+- Hide the contact sidebar during tablet TC at widths of at least 800px. Open
+  it as an overlay using the contacts button or a horizontal swipe from the left
+  edge; close with its button, Escape, the backdrop or a leftward swipe. Restore
+  the ordinary contacts layout after the call or when leaving the tablet layout.
+- Keep hidden contacts out of keyboard/accessibility navigation, focus the close
+  button rather than opening the search keyboard, and preserve the composer and
+  video elements. Vertical scrolling and gestures in search fields are ignored.
+- Give text-only RTT the full remaining canvas, stacked in portrait and side by
+  side in landscape. Main video fills its canvas without distortion (edges may
+  be cropped); the local preview keeps a bounded rectangular shape.
+- Chromium/WebKit fixtures cover drawer interactions, rotation, text-only layout,
+  and draft preservation. Native device verification and release remain pending.
+
 ### iPad TC viewport and controls — 2026-11-02
 
 - Prevent phone portrait rules from expanding tablet calls beyond the available

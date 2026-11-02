@@ -54,8 +54,8 @@
   margin: 0;
 }
 
-.xmpp-availability[data-state="offline"] [role="status"] {
-  margin-bottom: 24px;
+.xmpp-availability__actions {
+  padding-top: 16px;
 }
 
 .xmpp-availability [role="status"]:focus {
