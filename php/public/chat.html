@@ -15,10 +15,10 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="favicon.ico" sizes="any">
   <link rel="apple-touch-icon" href="assets/brand/teletyptel-icon-192.png">
-  <link rel="stylesheet" href="chat-client.css?v=20261102-tc-drawer">
+  <link rel="stylesheet" href="chat-client.css?v=20261102-all-call-layout">
   <link rel="stylesheet" href="xmpp-availability.css?v=20261102-unified-startup">
   <link rel="stylesheet" href="chat-dialer.css?v=20261031-keypad-letters">
-  <link rel="stylesheet" href="chat-tablet.css?v=20261102-tc-drawer">
+  <link rel="stylesheet" href="chat-tablet.css?v=20261102-all-call-layout">
 </head>
 <body class="account-booting">
   <a class="skip-link" href="#messageInput" data-i18n="button.skip_to_message">Skip to message</a>
@@ -223,6 +223,10 @@
         </section>
 
         <section id="callPanel" class="call-panel" hidden aria-label="Call media">
+          <div class="call-audio-placeholder">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 2 .7 2.9a2 2 0 0 1-.5 2.1L8 10a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.5c.9.3 1.9.6 2.9.7a2 2 0 0 1 1.7 2Z"/></svg>
+            <span data-i18n="button.audio_call">Audio call</span>
+          </div>
           <div id="interpreterTile" class="interpreter-tile" hidden>
             <video id="interpreterVideo" autoplay playsinline></video>
             <div class="interpreter-caption"><strong id="interpreterName"></strong><button id="interpreterRemove" type="button" title="Tolk verwijderen" aria-label="Tolk verwijderen" data-i18n-title="interpreter.remove" data-i18n-aria-label="interpreter.remove">×</button><button id="interpreterPlay" type="button" hidden data-i18n="interpreter.play">Beeld / geluid starten</button></div>
@@ -1428,8 +1432,8 @@
   <script src="native-facebook.js?v=20261101-native-facebook"></script>
   <script src="native-biometric.js?v=20261102-faceid"></script>
   <script src="xmpp-availability.js?v=20261102-unified-startup"></script>
-  <script src="chat-client.js?v=20261102-tc-drawer"></script>
+  <script src="chat-client.js?v=20261102-all-call-layout"></script>
   <script src="chat-interpreter.js?v=20261027-inline-interpreter"></script>
-  <script src="mobile-navigation.js?v=20261102-tc-drawer"></script>
+  <script src="mobile-navigation.js?v=20261102-all-call-layout"></script>
 </body>
 </html>

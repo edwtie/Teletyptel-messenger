@@ -13488,13 +13488,6 @@
     const hasLocalVideo = hasVideoTrack(call?.localStream);
     const hasRemoteVideo = hasVideoTrack(call?.remoteStream);
     const conversation = activeConversation();
-    const totalConversationVisible = Boolean(
-      call?.rttEnabled
-      && conversation
-      && addressMatches(conversation.peer, call.peer)
-      && !call.incomingOffer
-      && state.totalConversationTextVisible
-    );
     const totalConversationCallActive = Boolean(
       call?.rttEnabled
       && conversation
@@ -13502,8 +13495,9 @@
       && !call.incomingOffer
     );
     const showLocalPreview = hasLocalVideo;
-    const showCallPanel = !incoming && (hasRemoteVideo || hasLocalVideo || totalConversationVisible || interpreter?.hasMedia());
+    const showCallPanel = !incoming && Boolean(call || interpreter?.hasMedia());
     el.callPanel.hidden = !showCallPanel;
+    el.callPanel.classList.toggle("no-call-video", !hasLocalVideo && !hasRemoteVideo);
     el.localVideo.hidden = !showLocalPreview;
     el.remoteVideo.hidden = !hasRemoteVideo;
     el.callPanel.classList.toggle("has-local-video", showLocalPreview);

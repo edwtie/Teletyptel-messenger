@@ -26,7 +26,6 @@
   const sync = () => {
     const classes = document.body.classList;
     const next = tabletWidth.matches && classes.contains("device-tablet") && classes.contains("call-active")
-      && (classes.contains("tc-call-active") || classes.contains("tc-text-visible-active"))
       && !classes.contains("history-page-active") && !classes.contains("account-gate");
     if (active === next) return;
     active = next;

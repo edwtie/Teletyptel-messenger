@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### Audio and audio/video call layout — 2026-11-02
+
+- Keep the call panel available for audio-only calls even without video or RTT,
+  so microphone, sound, keypad and hang-up controls remain reachable. Use a
+  neutral audio placeholder when neither participant has a video track.
+- Apply the tablet full-canvas layout and contact drawer to audio/video calls,
+  not only TC. Give ordinary phone calls a viewport-sized canvas, safe-area
+  header/composer, proportional video and a bounded camera preview.
+- Keep 44px controls and wrap the toolbar; in very short phone viewports use a
+  scrollable row and hide the volume slider to leave room for video and typing.
+- Chromium/WebKit fixtures cover audio, remote/local video, rotation, reduced
+  viewport heights, drawer access and draft/media-element preservation. Actual
+  iPhone/iPad media testing and a new native release are still required.
+
 ### One native startup screen — 2026-11-02
 
 - Reuse the native startup dialog, logo and live status for checking, connecting,

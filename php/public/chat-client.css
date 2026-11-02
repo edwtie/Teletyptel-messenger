@@ -2803,6 +2803,24 @@ body.tc-text-full-active .call-panel {
   display: none;
 }
 
+.call-audio-placeholder {
+  display: none;
+}
+
+.call-panel.no-call-video:not(.tc-text-full):not(.has-interpreter) .call-audio-placeholder {
+  display: grid;
+  grid-row: 1;
+  grid-column: 1;
+  place-content: center;
+  justify-items: center;
+  gap: 12px;
+  min-height: 0;
+  overflow: auto;
+  padding: 12px;
+  color: #eaf2ff;
+  font-size: 18px;
+}
+
 .call-panel video {
   width: 100%;
   height: 100%;

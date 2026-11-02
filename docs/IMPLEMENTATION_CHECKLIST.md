@@ -3,6 +3,20 @@
 This checklist tracks protocol and product progress. Use `[x]` only when the
 item is implemented, tested and documented.
 
+## Audio and audio/video layout — 2026-11-02
+
+- [x] Keep controls visible for calls without video/RTT. Hide the call panel for
+  incoming offers until accepted and after a call ends; show an audio placeholder
+  when no camera tracks exist instead of an empty video canvas.
+- [x] Extend the iPad TC canvas/contact drawer to ordinary calls and add a fitted
+  iPhone audio/video layout with safe-area spacing, 44px controls and bounded
+  preview. Preserve the composer and media elements through rotation.
+- [x] Exercise audio, remote-video and local-preview layouts in Chromium/WebKit
+  across portrait, landscape and keyboard-sized viewports. These fixtures do not
+  validate real camera/microphone hardware or native keyboard behavior.
+- [ ] Publish in a new native build (not build 13), then test audio, camera on/off,
+  microphone mute, DTMF, rotation and the keyboard on physical iPhone and iPad.
+
 ## Unified native startup — 2026-11-02
 
 - [x] Use one native startup dialog with the same logo and live status node for

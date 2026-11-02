@@ -143,35 +143,35 @@ body.device-tablet .message-body {
     overscroll-behavior: contain;
   }
 
-  body.device-tablet:is(.tc-text-visible-active, .tc-call-active).call-active .chat-panel {
+  body.device-tablet.call-active .chat-panel {
     grid-template-rows: auto auto auto minmax(0, 1fr) 0 auto auto !important;
     overflow: hidden;
     align-content: stretch !important;
   }
 
-  body.device-tablet:is(.tc-text-visible-active, .tc-call-active).call-active .app-shell {
+  body.device-tablet.call-active .app-shell {
     grid-template-rows: minmax(0, 1fr);
   }
 
-  body.device-tablet:is(.tc-text-visible-active, .tc-call-active).call-active .topbar {
+  body.device-tablet.call-active .topbar {
     display: none;
   }
 
-  body.device-tablet:is(.tc-text-visible-active, .tc-call-active).call-active .chat-header {
+  body.device-tablet.call-active .chat-header {
     padding-top: max(12px, env(safe-area-inset-top));
     padding-right: max(16px, env(safe-area-inset-right));
   }
 
-  body.device-tablet:is(.tc-text-visible-active, .tc-call-active).call-active .conversation-list {
+  body.device-tablet.call-active .conversation-list {
     padding-top: max(16px, env(safe-area-inset-top));
     padding-left: max(12px, env(safe-area-inset-left));
   }
 
-  body.device-tablet:is(.tc-text-visible-active, .tc-call-active).call-active .message-timeline {
+  body.device-tablet.call-active .message-timeline {
     display: none;
   }
 
-  body.device-tablet:is(.tc-text-visible-active, .tc-call-active).call-active #composerForm {
+  body.device-tablet.call-active #composerForm {
     grid-row: 7 !important;
     grid-column: 1 !important;
     min-height: 70px;
@@ -203,7 +203,7 @@ body.device-tablet .message-body {
     display: none;
   }
 
-  body.device-tablet:is(.tc-text-visible-active, .tc-call-active).call-active #callPanel:not(.has-interpreter) {
+  body.device-tablet.call-active #callPanel:not(.has-interpreter) {
     display: grid !important;
     grid-row: 4 !important;
     grid-template-rows: minmax(60px, 1fr) auto auto !important;
@@ -214,7 +214,7 @@ body.device-tablet .message-body {
     aspect-ratio: auto !important;
   }
 
-  body.device-tablet:is(.tc-text-visible-active, .tc-call-active).call-active #callPanel:not(.has-interpreter) > video {
+  body.device-tablet.call-active #callPanel:not(.has-interpreter) > video {
     grid-row: 1;
     grid-column: 1;
     width: 100% !important;
@@ -225,7 +225,7 @@ body.device-tablet .message-body {
     aspect-ratio: auto !important;
   }
 
-  body.device-tablet:is(.tc-text-visible-active, .tc-call-active).call-active #callPanel:not(.has-interpreter):not(.local-video-main) #localVideo {
+  body.device-tablet.call-active #callPanel:not(.has-interpreter):not(.local-video-main) #localVideo {
     position: absolute !important;
     inset: 12px 12px auto auto !important;
     width: min(26%, 220px) !important;
@@ -235,7 +235,7 @@ body.device-tablet .message-body {
     border-radius: 12px !important;
   }
 
-  body.device-tablet:is(.tc-text-visible-active, .tc-call-active).call-active #callPanel:not(.has-interpreter) .tc-text-panel:not([hidden]) {
+  body.device-tablet.call-active #callPanel:not(.has-interpreter) .tc-text-panel:not([hidden]) {
     position: static !important;
     grid-row: 2 !important;
     display: grid !important;
@@ -247,14 +247,14 @@ body.device-tablet .message-body {
     overflow: auto;
   }
 
-  body.device-tablet:is(.tc-text-visible-active, .tc-call-active).call-active #callPanel:not(.has-interpreter) .tc-text-line {
+  body.device-tablet.call-active #callPanel:not(.has-interpreter) .tc-text-line {
     min-width: 0;
     min-height: 64px !important;
     max-height: 130px !important;
     overflow: auto;
   }
 
-  body.device-tablet:is(.tc-text-visible-active, .tc-call-active).call-active #callPanel:not(.has-interpreter) .call-media-controls {
+  body.device-tablet.call-active #callPanel:not(.has-interpreter) .call-media-controls {
     position: static !important;
     grid-row: 3 !important;
     width: 100% !important;
@@ -272,7 +272,7 @@ body.device-tablet .message-body {
   }
 
   body.device-tablet.call-active #callPanel #totalConversationTextPanel[hidden],
-  body.device-tablet:is(.tc-text-visible-active, .tc-call-active).call-active #callResizeHandle {
+  body.device-tablet.call-active #callResizeHandle {
     display: none !important;
   }
 
@@ -400,6 +400,128 @@ body.device-tablet .message-body {
   body.device-tablet.call-active #callPanel.tc-text-full:not(.has-interpreter) .tc-text-panel:not([hidden]) {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     grid-template-rows: minmax(0, 1fr);
+  }
+}
+
+body.viewport-phone.call-active:not(.tc-call-active):not(.tc-text-visible-active) .app-shell {
+  position: fixed;
+  top: var(--visual-viewport-top, 0px);
+  inset-inline: 0;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  height: var(--visual-viewport-height, 100dvh) !important;
+  min-height: 0 !important;
+  grid-template-rows: minmax(0, 1fr);
+  overflow: hidden;
+}
+
+body.viewport-phone.call-active:not(.tc-call-active):not(.tc-text-visible-active) .chat-panel {
+  grid-template-rows: auto auto auto minmax(0, 1fr) 0 auto auto !important;
+  align-content: stretch !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+body.viewport-phone.call-active:not(.tc-call-active):not(.tc-text-visible-active) :is(.topbar, .message-timeline, .remote-draft, #callResizeHandle),
+body.call-active #callPanel #totalConversationTextPanel[hidden] {
+  display: none !important;
+}
+
+body.viewport-phone.call-active:not(.tc-call-active):not(.tc-text-visible-active) .chat-header {
+  padding: max(6px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) 6px max(10px, env(safe-area-inset-left));
+}
+
+body.viewport-phone.call-active:not(.tc-call-active):not(.tc-text-visible-active) #callPanel:not(.has-interpreter) {
+  display: grid !important;
+  grid-row: 4 !important;
+  grid-template-rows: minmax(0, 1fr) 0 auto !important;
+  grid-template-columns: minmax(0, 1fr);
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
+body.viewport-phone.call-active:not(.tc-call-active):not(.tc-text-visible-active) #callPanel:not(.has-interpreter) > video {
+  grid-row: 1;
+  grid-column: 1;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  aspect-ratio: auto !important;
+  object-fit: cover !important;
+}
+
+body.viewport-phone.call-active:not(.tc-call-active):not(.tc-text-visible-active) #callPanel:not(.has-interpreter):not(.local-video-main) #localVideo {
+  position: absolute !important;
+  inset: 8px max(8px, env(safe-area-inset-right)) auto auto !important;
+  width: min(26%, 150px) !important;
+  height: auto !important;
+  max-height: 28% !important;
+  aspect-ratio: 4 / 3 !important;
+  border-radius: 12px !important;
+}
+
+body.viewport-phone.call-active:not(.tc-call-active):not(.tc-text-visible-active) #callPanel:not(.has-interpreter) .call-media-controls {
+  position: static !important;
+  grid-row: 3 !important;
+  width: 100% !important;
+  max-width: none;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 6px;
+  padding: 6px max(6px, env(safe-area-inset-right)) 6px max(6px, env(safe-area-inset-left)) !important;
+  overflow: visible;
+  border-radius: 0;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+body.viewport-phone.call-active:not(.tc-call-active):not(.tc-text-visible-active) .call-media-controls :is(.call-media-icon-button, .call-facing-toggle, .ios-facing-control) {
+  flex: 0 0 44px;
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  min-height: 44px;
+}
+
+body.viewport-phone.call-active:not(.tc-call-active):not(.tc-text-visible-active) .call-device-controls {
+  flex: 0 0 auto;
+  order: 0;
+}
+
+body.viewport-phone.call-active:not(.tc-call-active):not(.tc-text-visible-active) .call-media-controls .volume-control {
+  display: flex;
+  flex: 1 0 100%;
+  min-width: 0;
+  width: 100%;
+  order: 1;
+}
+
+body.viewport-phone.call-active:not(.tc-call-active):not(.tc-text-visible-active) .volume-control input {
+  min-width: 0;
+  flex: 1 1 auto;
+  width: auto;
+}
+
+body.viewport-phone.call-active:not(.tc-call-active):not(.tc-text-visible-active) #composerForm {
+  grid-row: 7 !important;
+  padding: 6px max(10px, env(safe-area-inset-right)) max(6px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left)) !important;
+}
+
+@media (max-height: 360px) {
+  body.viewport-phone.call-active:not(.tc-call-active):not(.tc-text-visible-active) .call-media-controls .volume-control,
+  body.viewport-phone.call-active:not(.tc-call-active):not(.tc-text-visible-active) .call-audio-placeholder svg {
+    display: none;
+  }
+
+  body.viewport-phone.call-active:not(.tc-call-active):not(.tc-text-visible-active) #callPanel:not(.has-interpreter) .call-media-controls {
+    flex-wrap: nowrap;
+    overflow-x: auto;
   }
 }
 
