@@ -132,6 +132,35 @@ for (const [engineName, engine] of Object.entries({ chromium, webkit })) {
       });
     }
     try {
+      await check("Only native iOS, Android and Windows WebView2 show startup branding", async page => {
+        const results = await page.evaluate(() => {
+          const harness = window.fixture;
+          return ["browser", "chrome", "capacitor-web", "ios", "android", "webview2", "broken-bridge"].map(platform => {
+            delete harness.environment.Capacitor;
+            delete harness.environment.chrome;
+            if (["capacitor-web", "ios", "android"].includes(platform)) {
+              harness.environment.Capacitor = { getPlatform: () => platform === "capacitor-web" ? "web" : platform };
+            }
+            if (platform === "chrome") harness.environment.chrome = {};
+            if (platform === "webview2") harness.environment.chrome = { webview: { postMessage() {} } };
+            if (platform === "broken-bridge") harness.environment.Capacitor = { getPlatform() { throw new Error("unavailable"); } };
+            const controller = harness.api.create();
+            controller.connecting();
+            const overlay = document.querySelector(".xmpp-availability[open]");
+            const brand = overlay.querySelector("img");
+            const checking = overlay.dataset.state === "checking" && !!overlay.querySelector('[role="status"]').textContent;
+            controller.unavailable(() => {});
+            const offline = overlay.dataset.state === "offline" && !overlay.querySelector("button").hidden;
+            const result = { platform, branded: !!brand, checking, offline };
+            controller.hide();
+            overlay.remove();
+            return result;
+          });
+        });
+        assert.deepEqual(results, ["browser", "chrome", "capacitor-web", "ios", "android", "webview2", "broken-bridge"].map(platform => ({
+          platform, branded: ["ios", "android", "webview2"].includes(platform), checking: true, offline: true
+        })));
+      });
       await check("Requires framing open and SASL features; sends no authentication", async page => {
         for (const combined of [false, true]) {
           const result = await page.evaluate(async ({ options, open, features, combined }) => {

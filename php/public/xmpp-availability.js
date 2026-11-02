@@ -92,6 +92,13 @@
     return { promise, cancel };
   }
 
+  function isNativeApp() {
+    try {
+      return ["ios", "android"].includes(root.Capacitor?.getPlatform?.())
+        || typeof root.chrome?.webview?.postMessage === "function";
+    } catch (_) { return false; }
+  }
+
   function create({ translate, WebSocket = root.WebSocket } = {}) {
     let overlay;
     let status;
@@ -140,12 +147,15 @@
         });
         const panel = document.createElement("div");
         panel.className = "xmpp-availability__panel";
-        const brand = document.createElement("img");
-        brand.className = "xmpp-availability__brand";
-        brand.src = "assets/brand/teletyptel-logo-header@2x.png";
-        brand.alt = "TeleTypTel";
-        brand.width = 599;
-        brand.height = 128;
+        if (isNativeApp()) {
+          const brand = document.createElement("img");
+          brand.className = "xmpp-availability__brand";
+          brand.src = "assets/brand/teletyptel-logo-header@2x.png";
+          brand.alt = "TeleTypTel";
+          brand.width = 599;
+          brand.height = 128;
+          panel.append(brand);
+        }
         status = document.createElement("p");
         status.setAttribute("role", "status");
         status.setAttribute("aria-live", "polite");
@@ -159,7 +169,7 @@
           try { await retry(); } catch (_) {}
           if (state === "offline") retryButton.disabled = typeof retry !== "function";
         });
-        panel.append(brand, status, retryButton);
+        panel.append(status, retryButton);
         overlay.append(panel);
         document.body.append(overlay);
       }

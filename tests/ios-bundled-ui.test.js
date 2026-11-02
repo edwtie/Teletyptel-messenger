@@ -36,6 +36,7 @@ test("Startup logo stays consistent during server checking on phone and tablet",
       }
       await page.addScriptTag({ content: files.get("www/xmpp-availability.js").toString() });
       await page.evaluate(() => {
+        window.Capacitor = { getPlatform: () => "ios" };
         window.brandingGate = TeleTypTelXmppAvailability.create();
         window.brandingGate.connecting();
       });

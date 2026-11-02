@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Native-only startup logo — 2026-11-02
+
+- Show the separate server-check logo only inside iOS/Android Capacitor apps
+  and Windows WebView2. Ordinary browsers keep their normal header logo without
+  an additional startup logo; server checks, offline messages and retry remain.
+- Cover browser and native bridge detection with Chromium/WebKit fixtures.
+
 ### Consistent startup branding — 2026-11-02
 
 - Prepare the small correction as internal build 12.2; add an optional validated
