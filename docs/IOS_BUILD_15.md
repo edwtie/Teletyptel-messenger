@@ -50,3 +50,23 @@ No real translation API calls were made by the browser tests. Real iPhone/iPad
 retesting and the protected TestFlight build/upload are still required.
 
 The exclusions below also apply to patch 15.2.
+
+## Pending connection-stability changes
+
+The user reports disconnects during active iPhone chat/calls. The exact device-side
+trigger has not been captured. The client previously retired the XMPP socket after
+one 15-second unanswered ping, resetting Jingle sessions as well. It now sends one
+confirmation probe and waits another 15 seconds before retiring the connection.
+Sender-validated replies to either probe stop the timeout. Repeated foreground
+events cannot restart this deadline; send failures still recover immediately.
+
+Regression coverage includes delayed replies, forged senders, stale callbacks,
+bounded retry, lifecycle events, failed sends, logout and preservation of drafts.
+Additional health diagnostics record elapsed time, queued bytes and close status.
+There is no change to TLS, authentication or cleanup after a real signalling loss.
+
+Not yet included in a TestFlight build. On a real iPhone, test active chat and TC
+for several minutes, rotate the device and briefly interrupt Wi-Fi. Record the
+time of any remaining outage and the `xmpp-health` / WebSocket close diagnostics.
+Confirm automatic reconnect, draft preservation and normal hangup. Successful
+unit tests do not establish stable physical-device calls or media recovery.

@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### XMPP heartbeat recovery hardening — 2026-11-03
+
+- Send one bounded confirmation probe before retiring an unresponsive connection;
+  accept a late, sender-validated reply to either probe without resetting calls.
+- Repeated foreground notifications no longer replace a pending probe or postpone
+  dead-connection detection. Failed sends still trigger immediate recovery.
+- Log probe count, elapsed time, buffered bytes and WebSocket close status without
+  adding message content or credentials to these diagnostics.
+- This addresses reproducible recovery weaknesses, not a confirmed diagnosis of
+  the reported iPhone outage. Physical-device validation and a new build remain pending.
+
 ### Camera-off RTT and mobile status fixes — 2026-11-03
 
 - Hide disabled camera surfaces and let phone RTT use the call area in portrait,

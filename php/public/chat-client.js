@@ -6430,7 +6430,6 @@
   function recoverXmppConnection(reason) {
     if (!canRecoverXmppConnection() || navigator.onLine === false) return;
     if (state.xmppSocket?.readyState === WebSocket.OPEN && state.xmppSession?.phase === "ready") {
-      clearXmppPing();
       sendXmppHeartbeat();
     } else if (!state.xmppSocket || state.xmppSocket.readyState >= WebSocket.CLOSING) {
       window.clearTimeout(state.clientLifecycle.transientReconnectTimer);
@@ -6470,18 +6469,35 @@
     if (socket?.readyState !== WebSocket.OPEN || state.xmppSession?.phase !== "ready"
       || state.xmppRecovery.ping || state.intentionalDisconnect
       || (document.visibilityState === "hidden" && !state.call)) return;
-    const id = createMessageId("ping");
-    state.xmppRecovery.ping = { id, socket };
-    state.xmppRecovery.pingTimer = window.setTimeout(() => {
-      if (state.xmppRecovery.ping?.id !== id || state.xmppSocket !== socket) return;
-      clearXmppPing();
-      if (document.visibilityState === "hidden" && !state.call) return;
-      retireXmppSocket(socket, "ping-timeout");
-    }, 15000);
-    try {
-      sendXmppStanza(`<iq xmlns="jabber:client" type="get" id="${escapeXml(id)}"><ping xmlns="urn:xmpp:ping"/></iq>`, `ping ${id}`);
-    } catch {
-      retireXmppSocket(socket, "ping-send-failed");
+    const pending = { id: "", ids: [], socket, startedAt: Date.now() };
+    state.xmppRecovery.ping = pending;
+    sendProbe();
+
+    function sendProbe() {
+      const id = createMessageId("ping");
+      pending.id = id;
+      pending.ids.push(id);
+      state.xmppRecovery.pingTimer = window.setTimeout(() => {
+        if (state.xmppRecovery.ping !== pending || state.xmppSocket !== socket || pending.id !== id) return;
+        if (document.visibilityState === "hidden" && !state.call) {
+          clearXmppPing();
+          return;
+        }
+        const elapsed = Date.now() - pending.startedAt;
+        appendDebug("xmpp-health", `ping unanswered; probes=${pending.ids.length}; elapsed=${elapsed}ms; buffered=${socket.bufferedAmount || 0}`);
+        if (pending.ids.length < 2) {
+          sendProbe();
+          return;
+        }
+        retireXmppSocket(socket, "ping-timeout");
+      }, 15000);
+      try {
+        if (!sendXmppStanza(`<iq xmlns="jabber:client" type="get" id="${escapeXml(id)}"><ping xmlns="urn:xmpp:ping"/></iq>`, `ping ${id}`)) {
+          retireXmppSocket(socket, "ping-send-failed");
+        }
+      } catch {
+        retireXmppSocket(socket, "ping-send-failed");
+      }
     }
   }
 
@@ -6490,7 +6506,7 @@
     const id = iq.getAttribute("id");
     const from = iq.getAttribute("from") || "";
     const pending = state.xmppRecovery.ping;
-    if ((type === "result" || type === "error") && pending?.id === id
+    if ((type === "result" || type === "error") && pending?.ids.includes(id)
       && pending.socket === state.xmppSocket
       && (!from || from === state.xmppSession?.domain || from === bareJid(state.xmppSession?.boundJid || ""))) {
       clearXmppPing();
@@ -8436,7 +8452,7 @@
       if (event.code === 1008 && !state.intentionalDisconnect) {
         returnToLoginScreenAfterDisconnect(t("account.disconnected_login_required", "Connection closed. Sign in to continue."));
       }
-      retireXmppSocket(socket, `closed code=${event.code}`);
+      retireXmppSocket(socket, `closed code=${event.code}; clean=${event.wasClean === true}; buffered=${socket.bufferedAmount || 0}`);
     });
 
     socket.addEventListener("error", () => {

@@ -1,5 +1,5 @@
-const CACHE_NAME = "teletyptel-webclient-v484";
-const BUILD_VERSION = "20261103-camera-off-rtt";
+const CACHE_NAME = "teletyptel-webclient-v485";
+const BUILD_VERSION = "20261103-xmpp-health-retry";
 const ASSETS = [
   "chat.html",
   "chat-tablet.css?v=20261103-camera-off-rtt",

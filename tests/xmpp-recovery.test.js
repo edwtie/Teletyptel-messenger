@@ -194,8 +194,89 @@ test("Stalled handshakes and unanswered pings recover; matching results or error
   }
   app.run("sendXmppHeartbeat()");
   app.fire(app.state.xmppRecovery.pingTimer);
+  assert.ok(app.state.xmppSocket);
+  assert.equal(app.state.xmppRecovery.ping.ids.length, 2);
+  assert.equal(app.jingleResets(), 1);
+  app.fire(app.state.xmppRecovery.pingTimer);
   assert.equal(app.state.xmppSocket, null);
   assert.ok(app.state.clientLifecycle.transientReconnectTimer);
+});
+
+test("A delayed response to either probe preserves an active call without reconnecting", () => {
+  for (const responseIndex of [0, 1]) {
+    for (const type of ["result", "error"]) {
+      const app = fixture();
+      const socket = app.ready();
+      app.state.call = { id: "active-call" };
+      app.run("sendXmppHeartbeat()");
+      const expiredTimer = app.timers.get(app.state.xmppRecovery.pingTimer).callback;
+      app.fire(app.state.xmppRecovery.pingTimer);
+      assert.equal(app.state.xmppSocket, socket);
+      assert.equal(app.jingleResets(), 0);
+      const pending = app.state.xmppRecovery.ping;
+      const retryTimer = app.state.xmppRecovery.pingTimer;
+      assert.equal(app.timers.get(retryTimer).delay, 15000);
+      app.context.reply = iq(type, pending.ids[responseIndex], "forged@example.test");
+      assert.equal(app.run("handleXmppPing(reply)"), false);
+      app.context.reply = iq(type, pending.ids[responseIndex]);
+      assert.equal(app.run("handleXmppPing(reply)"), true);
+      assert.equal(app.state.xmppRecovery.ping, null);
+      assert.equal(app.timers.has(retryTimer), false);
+      expiredTimer();
+      assert.equal(app.state.xmppSocket, socket);
+      assert.equal(app.jingleResets(), 0);
+      assert.equal(app.state.clientLifecycle.transientReconnectTimer, null);
+    }
+  }
+});
+
+test("Repeated foreground events and heartbeat intervals cannot postpone dead-connection detection", () => {
+  const app = fixture();
+  app.ready();
+  app.run("sendXmppHeartbeat()");
+  for (let probe = 0; probe < 2; probe++) {
+    const pending = app.state.xmppRecovery.ping;
+    const timer = app.state.xmppRecovery.pingTimer;
+    app.run('recoverXmppConnection("native-active"); recoverXmppConnection("network-online"); sendXmppHeartbeat()');
+    assert.equal(app.state.xmppRecovery.ping, pending);
+    assert.equal(app.state.xmppRecovery.pingTimer, timer);
+    assert.equal(app.sent.filter(value => value.includes('type="get"')).length, probe + 1);
+    app.fire(timer);
+  }
+  assert.equal(app.state.xmppSocket, null);
+  assert.equal(app.jingleResets(), 1);
+  assert.ok(app.state.clientLifecycle.transientReconnectTimer);
+  assert.equal(app.elements.messageInput.value, "Unsent draft");
+});
+
+test("Failed ping sends reconnect immediately and clear their pending timers", () => {
+  for (const throws of [false, true]) {
+    const app = fixture();
+    app.ready();
+    app.context.sendXmppStanza = () => {
+      if (throws) throw new Error("Disconnected");
+      return false;
+    };
+    app.run("sendXmppHeartbeat()");
+    assert.equal(app.state.xmppSocket, null);
+    assert.equal(app.state.xmppRecovery.ping, null);
+    assert.equal(app.state.xmppRecovery.pingTimer, null);
+    assert.ok(app.state.clientLifecycle.transientReconnectTimer);
+  }
+});
+
+test("Suspending chat cancels the second probe but a call still detects a dead transport", () => {
+  for (const calling of [false, true]) {
+    const app = fixture();
+    const socket = app.ready();
+    app.state.call = calling ? { id: "active-call" } : null;
+    app.run("sendXmppHeartbeat()");
+    app.fire(app.state.xmppRecovery.pingTimer);
+    app.context.document.visibilityState = "hidden";
+    app.fire(app.state.xmppRecovery.pingTimer);
+    assert.equal(app.state.xmppRecovery.ping, null);
+    assert.equal(app.state.xmppSocket, calling ? null : socket);
+  }
 });
 
 test("Server pings receive an addressed IQ result, never a chat message", () => {
