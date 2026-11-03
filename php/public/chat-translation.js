@@ -119,7 +119,7 @@ window.TeleTypTelTranslation = {
         requests.delete(controller);
       }
     };
-    const errorKey = (error) => ["unavailable", "disabled", "consent_required", "cookie_blocked", "limit_reached", "text_too_long", "invalid_text", "sign_in", "session_expired", "preferences_changed"].includes(error.message)
+    const errorKey = (error) => ["unavailable", "service_unreachable", "disabled", "consent_required", "cookie_blocked", "limit_reached", "text_too_long", "invalid_text", "sign_in", "session_expired", "preferences_changed"].includes(error.message)
       ? error.message : "failed";
     const setAccount = async (nextAccount, force = false) => {
       if (nextAccount === accountId && !force) return;
@@ -288,6 +288,7 @@ window.TeleTypTelTranslation = {
         liveDraft = liveDrafts[draftKey] = { conversationId, sender, text: "", dirtySince: 0, result: null };
       }
       if (text === liveDraft.text) return;
+      if (["service_unreachable", "failed"].includes(liveFailure)) liveFailure = "";
       liveDraft.text = text;
       liveDraft.changedAt = Date.now();
       liveDraft.dirtySince ||= liveDraft.changedAt;

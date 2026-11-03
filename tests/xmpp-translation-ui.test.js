@@ -25,6 +25,11 @@ const { chromium, webkit, devices } = require("playwright");
           const target = request.getElementsByTagNameNS("urn:xmpp:langtrans", "translation")[0]?.getAttribute("destination_lang");
           queueMicrotask(() => {
             if (behavior === "silent") return;
+            if (behavior === "offline" || behavior === "unconfigured") {
+              const failure = behavior === "unconfigured" ? '<failure xmlns="urn:teletyptel:translation:0" code="unavailable"/>' : "";
+              client.handleIq(parse(`<iq type="error" from="${service}" id="${id}"><error type="cancel"><service-unavailable xmlns="urn:ietf:params:xml:ns:xmpp-stanzas"/>${failure}</error></iq>`));
+              return;
+            }
             if (!target) {
               const payload = request.getElementsByTagNameNS("urn:xmpp:langtrans:items", "query").length
                 ? '<query xmlns="urn:xmpp:langtrans:items"><item source_lang="nl" destination_lang="en"/><item source_lang="nl" destination_lang="tr"/></query>'
@@ -41,16 +46,20 @@ const { chromium, webkit, devices } = require("playwright");
         client.configure(service);
         const english = await client.translate({ text: "Hallo <groep> & 👋", targetLanguage: "en", automatic: true });
         const turkish = await client.translate({ text: "Hallo <groep> & 👋", targetLanguage: "tr", liveRtt: true, liveDirection: "self" });
+        behavior = "offline";
+        const offline = await client.translate({ text: "Offline", targetLanguage: "en" }).catch(error => error.message);
+        behavior = "unconfigured";
+        const unconfigured = await client.translate({ text: "Unconfigured", targetLanguage: "en" }).catch(error => error.message);
         behavior = "silent";
         const controller = new AbortController();
         const cancelled = client.translate({ text: "Cancelled", targetLanguage: "en" }, controller.signal).then(() => false, () => true);
         await Promise.resolve();
         controller.abort();
         const cancelledOk = await cancelled;
-        const disconnected = client.translate({ text: "Disconnect", targetLanguage: "en" }).then(() => false, () => true);
+        const disconnected = client.translate({ text: "Disconnect", targetLanguage: "en" }).catch(error => error.message);
         await Promise.resolve();
         client.disconnect();
-        return { english, turkish, forgedAccepted, cancelledOk, disconnectedOk: await disconnected,
+        return { english, turkish, offline, unconfigured, forgedAccepted, cancelledOk, disconnectedError: await disconnected,
           packets: sent.map((xml) => {
             const packet = parse(xml);
             return { to: packet.getAttribute("to"), type: packet.getAttribute("type"), name: packet.localName,
@@ -62,7 +71,9 @@ const { chromium, webkit, devices } = require("playwright");
       assert.equal(result.turkish.translation.text, "Private tr & <safe>");
       assert.equal(result.forgedAccepted, false);
       assert.equal(result.cancelledOk, true);
-      assert.equal(result.disconnectedOk, true);
+      assert.equal(result.offline, "service_unreachable");
+      assert.equal(result.unconfigured, "unavailable");
+      assert.equal(result.disconnectedError, "service_unreachable");
       assert.ok(result.packets.every((packet) => packet.name === "iq" && packet.type === "get" && packet.to === "translation@example.test/service"));
       assert.equal(result.packets[2].source, "Hallo <groep> & 👋");
       assert.equal(result.packets[3].direction, "self");

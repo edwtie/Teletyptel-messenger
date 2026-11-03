@@ -326,9 +326,17 @@ async function checkBrowser(engine, device) {
     await page.locator("#translationLiveConsent").check();
     await page.locator("#dialogSaveAccountButton").click();
     await page.getByText(language["translation.saved"], { exact: true }).waitFor();
+    failure = "service_unreachable";
+    await draft("Service temporarily offline");
+    await tick(4000);
+    await page.locator(".live-rtt-translation").getByText(language["translation.service_unreachable"], { exact: true }).waitFor();
+    failure = "";
+    await draft("Service back online");
+    await tick(4000);
+    await page.getByText("Live: Service back online", { exact: true }).waitFor();
     failure = "limit_reached";
     await draft("Over quota");
-    await tick(800);
+    await tick(4000);
     await page.locator(".live-rtt-translation").getByText(language["translation.limit_reached"], { exact: true }).waitFor();
     const afterFailure = liveRequests().length;
     await draft("Do not retry every letter");

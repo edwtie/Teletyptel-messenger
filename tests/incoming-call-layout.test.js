@@ -8,6 +8,8 @@ const root = path.resolve(__dirname, "../php/public");
 const client = fs.readFileSync(path.join(root, "chat-client.js"), "utf8");
 const section = (start, end) => client.slice(client.indexOf(`  function ${start}`), client.indexOf(`  function ${end}`));
 const source = section("updateCallUi()", "savedCallVideoHeight()")
+  + section("isLocalCameraOff(", "isVideoMissingForTotalConversation(")
+  + section("activeVideoTracks(", "updateVideoElementSource(")
   + section("setCallModeButtonsHidden(", "updateMicrophoneMuteUi()")
   + section("updateTotalConversationTextPanel(", "lastLocalConversationText(");
 const markup = fs.readFileSync(path.join(root, "chat.html"), "utf8")
@@ -95,6 +97,14 @@ for (const [name, engine] of Object.entries({ chromium, webkit })) {
           await page.evaluate(() => { callFixture.state.call.incomingOffer = null; callFixture.update(); });
           assert.equal(await page.locator("#incomingCallDialog").isVisible(), false);
           assert.equal(await page.locator("#callPanel").isVisible(), true);
+          await page.evaluate(() => {
+            callFixture.state.call.localStream = { getVideoTracks: () => [{ enabled: false, readyState: "live" }] };
+            callFixture.state.call.remoteStream = { getVideoTracks: () => [{ muted: true, readyState: "live" }] };
+            callFixture.update();
+          });
+          assert.equal(await page.locator("#localVideo").isVisible(), false);
+          assert.equal(await page.locator("#remoteVideo").isVisible(), false);
+          assert.equal(await page.locator("#callPanel").evaluate(panel => panel.classList.contains("no-call-video")), true);
           await page.evaluate(() => { callFixture.state.call = null; callFixture.update(); });
           assert.equal(await page.locator("#callPanel").isVisible(), false);
           assert.equal(await page.locator("#incomingCallDialog").isVisible(), false);

@@ -33,3 +33,20 @@ After installation, test on two real accounts/devices: Google/Facebook login,
 audio, video, TC with Unicode/backspace, both-direction hangup, rotation, camera
 switching, lock/unlock and Wi-Fi loss. Keep WAMP/ejabberd reachable on the configured
 local HTTPS address and keep the test certificate trusted on each device.
+# Patch 15.2 — 2026-11-03
+
+- Camera-off TC uses the full RTT area on phones, in portrait, landscape and
+  keyboard layouts. Disabled local/remote video no longer leaves a black surface.
+- Phone live text stays in its chat bubble without a duplicate composer panel.
+- File uploads and TC recording uploads restore the current connection status.
+- Translation transport failures are distinguished from missing configuration;
+  transient live failures can retry on the next edit, respecting consent/throttle.
+
+Local verification: 23 layout/camera/upload tests, 32 focused runtime/RTT/incoming
+call tests, and the translation and XMPP-translation browser suites passed. The
+older full-page `live-rtt-integration.test.js` timed out finding its mock contact
+before exercising translation, so it is not counted as a passing end-to-end test.
+No real translation API calls were made by the browser tests. Real iPhone/iPad
+retesting and the protected TestFlight build/upload are still required.
+
+The exclusions below also apply to patch 15.2.

@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### Camera-off RTT and mobile status fixes — 2026-11-03
+
+- Hide disabled camera surfaces and let phone RTT use the call area in portrait,
+  landscape and keyboard layouts, without covering call controls or the composer.
+- Keep mobile live drafts in their existing chat bubbles rather than duplicating
+  them in a large panel above the composer.
+- Restore the actual connection status after uploads, including TC recordings;
+  late completion must not overwrite a newer connection error.
+- Distinguish an unreachable XMPP translator from an unconfigured service. Retry
+  transient live-translation failures on new edits while retaining consent and throttling.
+- Browser regression checks do not replace testing the next build on real devices.
+
 ### iOS internal build 15.1 — 2026-11-03
 
 - Bundle direct Jingle audio/video/TC routing, reliable T.140 edits and safe hangup.

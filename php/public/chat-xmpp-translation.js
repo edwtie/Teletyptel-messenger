@@ -12,14 +12,14 @@ window.TeleTypTelXmppTranslation = {
       discovered = false;
       targets = new Set();
       discovering = null;
-      for (const request of Array.from(pending.values())) request.reject(new Error("unavailable"));
+      for (const request of Array.from(pending.values())) request.reject(new Error("service_unreachable"));
     };
     const configure = (jid) => {
       if (service !== (jid || "")) disconnect();
       service = jid || "";
     };
     const iq = (content, signal) => new Promise((resolve, reject) => {
-      if (!service || !connected() || signal?.aborted) return reject(new Error("unavailable"));
+      if (!service || !connected() || signal?.aborted) return reject(new Error("service_unreachable"));
       const id = "translation-" + crypto.randomUUID();
       const finish = (callback, value) => {
         clearTimeout(timer);
@@ -27,7 +27,7 @@ window.TeleTypTelXmppTranslation = {
         pending.delete(id);
         callback(value);
       };
-      const abort = () => finish(reject, new Error("unavailable"));
+      const abort = () => finish(reject, new Error("service_unreachable"));
       const timer = setTimeout(abort, 20000);
       pending.set(id, { service, resolve: (value) => finish(resolve, value), reject: (error) => finish(reject, error) });
       signal?.addEventListener("abort", abort, { once: true });
@@ -40,7 +40,7 @@ window.TeleTypTelXmppTranslation = {
       if (!["result", "error"].includes(type)) return false;
       if (type === "error") {
         const code = element.getElementsByTagNameNS("urn:teletyptel:translation:0", "failure")[0]?.getAttribute("code");
-        request.reject(new Error(["disabled", "consent_required", "limit_reached", "preferences_changed", "sign_in", "text_too_long"].includes(code) ? code : "unavailable"));
+        request.reject(new Error(["unavailable", "disabled", "consent_required", "limit_reached", "preferences_changed", "sign_in", "text_too_long", "failed"].includes(code) ? code : "service_unreachable"));
       } else request.resolve(element);
       return true;
     };
@@ -50,19 +50,19 @@ window.TeleTypTelXmppTranslation = {
         const result = await iq('<query xmlns="http://jabber.org/protocol/disco#info"/>');
         const supported = Array.from(result.getElementsByTagNameNS("http://jabber.org/protocol/disco#info", "feature"))
           .some((feature) => feature.getAttribute("var") === namespace);
-        if (!supported) throw new Error("unavailable");
+        if (!supported) throw new Error("service_unreachable");
         const languages = await iq('<query xmlns="urn:xmpp:langtrans:items"/>');
         targets = new Set(Array.from(languages.getElementsByTagNameNS("urn:xmpp:langtrans:items", "item"))
           .map((item) => item.getAttribute("destination_lang")));
-        if (!targets.size) throw new Error("unavailable");
+        if (!targets.size) throw new Error("service_unreachable");
         discovered = true;
       })().finally(() => { discovering = null; });
       await discovering;
     };
     const translate = async (body, signal) => {
       await discover();
-      if (!targets.has(body.targetLanguage)) throw new Error("unavailable");
-      if (signal?.aborted) throw new Error("unavailable");
+      if (!targets.has(body.targetLanguage)) throw new Error("failed");
+      if (signal?.aborted) throw new Error("service_unreachable");
       const context = `<context xmlns="urn:teletyptel:translation:0" automatic="${body.automatic === true}" live="${body.liveRtt === true}" direction="${body.liveDirection === "self" ? "self" : "peer"}"/>`;
       const result = await iq(`<x xmlns="${namespace}"><source xml:lang="und">${escape(body.text)}</source><translation destination_lang="${escape(body.targetLanguage)}"/></x>${context}`, signal);
       const payload = Array.from(result.children).find((child) => child.localName === "x" && child.namespaceURI === namespace);

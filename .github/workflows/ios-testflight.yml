@@ -85,7 +85,7 @@ jobs:
           npm ci --ignore-scripts
           npm run prepare:app
           npm test
-          node --test ../../tests/native-google.test.js ../../tests/jingle-t140.test.js
+          node --test ../../tests/native-google.test.js ../../tests/jingle-t140.test.js ../../tests/upload-status.test.js
           npm run build:check
       - name: Save non-secret preflight report
         if: always()

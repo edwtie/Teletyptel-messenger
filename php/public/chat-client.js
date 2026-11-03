@@ -888,6 +888,7 @@
   let xmppRttStates = new WeakMap();
   let messageTimelineFollower = null;
   let callViewportTimer = null;
+  let uploadStatusOwner = null;
   const displayedMessageAcknowledgements = new WeakMap();
   let displayedMessageFrame = null;
   const jingleSessions = window.TeleTypTelJingleCalls?.create({
@@ -12351,9 +12352,7 @@
     }
 
     const file = new File([blob], fileName, { type: mimeType });
-    const payload = file.size > uploadChunkSize
-      ? await uploadFileInChunks(file)
-      : await uploadFileDirect(file);
+    const payload = await runFileUpload(file);
     if (!payload?.file) {
       return;
     }
@@ -13675,8 +13674,8 @@
     el.hangupCallButton.disabled = !call;
     el.hangupCallPanelButton.hidden = !call || incoming;
     el.hangupCallPanelButton.disabled = !call;
-    const hasLocalVideo = hasVideoTrack(call?.localStream);
-    const hasRemoteVideo = hasVideoTrack(call?.remoteStream);
+    const hasLocalVideo = hasVideoTrack(call?.localStream) && !isLocalCameraOff(call);
+    const hasRemoteVideo = hasVideoTrack(call?.remoteStream) && !isRemoteCameraOff(call);
     const conversation = activeConversation();
     const totalConversationCallActive = Boolean(
       call?.rttEnabled
@@ -18991,7 +18990,6 @@
     }
 
     el.uploadFileButton.disabled = true;
-    setConnectionStatus(t("button.uploading", "Uploading..."), "warn");
     try {
       for (const file of uploadable) {
         await uploadOneFile(file);
@@ -19004,15 +19002,33 @@
   async function uploadOneFile(file, options = {}) {
     appendDebug("upload", `${file.name} (${file.size} bytes)`);
     try {
-      const payload = file.size > uploadChunkSize
-        ? await uploadFileInChunks(file)
-        : await uploadFileDirect(file);
+      const payload = await runFileUpload(file);
       sendFileMessage(payload.file);
     } catch (error) {
       appendDebug("upload-error", error.message);
       addMessage("self", `${t("upload.failed", "Upload failed")}: ${file.name}`, "error");
       if (options.throwOnError) {
         throw error;
+      }
+    }
+  }
+
+  async function runFileUpload(file) {
+    const owner = {};
+    const progress = (text) => {
+      setConnectionStatus(text, "warn");
+      uploadStatusOwner = owner;
+    };
+    progress(t("button.uploading", "Uploading..."));
+    try {
+      return await (file.size > uploadChunkSize
+        ? uploadFileInChunks(file, progress)
+        : uploadFileDirect(file));
+    } finally {
+      if (uploadStatusOwner === owner) {
+        if (isXmppRttConnected()) setConnectionStatus(t("status.xmpp_connected", "XMPP connected"), "good");
+        else if (isRelayConnected()) setConnectionStatus(t("status.relay_connected", "Relay connected"), "good");
+        else setConnectionStatus(t("status.not_connected", "Not connected."), "danger");
       }
     }
   }
@@ -19032,7 +19048,7 @@
     return payload;
   }
 
-  async function uploadFileInChunks(file) {
+  async function uploadFileInChunks(file, progress = () => {}) {
     const uploadId = createUploadId();
     const totalChunks = Math.ceil(file.size / uploadChunkSize);
     for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
@@ -19056,7 +19072,7 @@
       }
 
       const sent = chunkIndex + 1;
-      setConnectionStatus(`${t("upload.uploading", "Uploading...")} ${sent}/${totalChunks}`, "warn");
+      progress(`${t("upload.uploading", "Uploading...")} ${sent}/${totalChunks}`);
       if (payload.file) {
         return payload;
       }
@@ -19796,6 +19812,7 @@
   }
 
   function setConnectionStatus(text, level) {
+    uploadStatusOwner = null;
     el.connectionSummary.textContent = text;
     el.connectionSummary.className = level === "good"
       ? "status-good"

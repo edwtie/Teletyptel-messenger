@@ -530,3 +530,48 @@ body.viewport-phone.call-active:not(.tc-call-active):not(.tc-text-visible-active
     transition: none;
   }
 }
+body.call-active #callPanel.tc-text-full:not(.has-interpreter) > video {
+  display: none !important;
+}
+
+body.viewport-phone.call-active #callPanel.tc-text-full:not(.has-interpreter) {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  grid-template-rows: minmax(0, 1fr) auto !important;
+  padding: 0 !important;
+}
+
+body.viewport-phone.call-active #callPanel.tc-text-full:not(.has-interpreter) #totalConversationTextPanel:not([hidden]) {
+  grid-column: 1 !important;
+  grid-row: 1 !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  align-self: stretch;
+}
+
+body.viewport-phone.call-active #callPanel.tc-text-full:not(.has-interpreter) #totalConversationTextPanel .tc-text-line {
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  align-content: start;
+  overflow: auto !important;
+}
+
+body.viewport-phone.call-active #callPanel.tc-text-full:not(.has-interpreter) .call-media-controls {
+  grid-column: 1 !important;
+  grid-row: 2 !important;
+}
+
+body.viewport-phone #remoteDraft {
+  display: none !important;
+}
+
+@media (orientation: landscape) {
+  body.viewport-phone.call-active #callPanel.tc-text-full:not(.has-interpreter) #totalConversationTextPanel:not([hidden]) {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    grid-template-rows: minmax(0, 1fr);
+  }
+}
