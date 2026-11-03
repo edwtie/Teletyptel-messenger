@@ -47,6 +47,12 @@ function validateProfile(profile, config) {
   }
 }
 
+function validateEncryptionDeclaration(plist) {
+  if (plist.ITSAppUsesNonExemptEncryption !== false) {
+    throw new Error("Missing or changed encryption export declaration; review compliance before upload.");
+  }
+}
+
 async function build() {
   if (process.platform !== "darwin") throw new Error("This build requires the GitHub macOS runner.");
   const upload = process.argv.includes("--upload-internal");
@@ -55,6 +61,7 @@ async function build() {
   const expectedFacebook = upload ? facebook.loadConfig() : undefined;
   if (expectedFacebook) diagnosticSecrets.push(expectedFacebook.clientToken);
   const stagedPlist = JSON.parse(run("plutil", ["-convert", "json", "-o", "-", path.join(project, "ios/App/App/Info.plist")]));
+  validateEncryptionDeclaration(stagedPlist);
   if (typeof stagedPlist.FacebookClientToken === "string") diagnosticSecrets.push(stagedPlist.FacebookClientToken);
   const facebookConfig = facebook.validateStagedConfig(stagedPlist, { required: upload, expected: expectedFacebook });
   process.umask(0o077);
@@ -116,6 +123,7 @@ async function build() {
     } else {
       logged("xcodebuild", [...buildArgs, "-archivePath", archive, "archive"], "xcode-archive.log");
       const app = path.join(archive, "Products/Applications/App.app");
+      validateEncryptionDeclaration(JSON.parse(run("plutil", ["-convert", "json", "-o", "-", path.join(app, "Info.plist")])));
       facebook.validateStagedConfig(JSON.parse(run("plutil", ["-convert", "json", "-o", "-", path.join(app, "Info.plist")])), { required: true, expected: expectedFacebook });
       run("codesign", ["--verify", "--deep", "--strict", app]);
       if (run("plutil", ["-extract", "CFBundleIdentifier", "raw", "-o", "-", path.join(app, "Info.plist")]).trim() !== config.bundleId) throw new Error("Archived wrong bundle ID");
@@ -153,4 +161,4 @@ async function build() {
 }
 
 if (require.main === module) build().catch(error => { console.error(error.message); process.exitCode = 1; });
-module.exports = { validateProfile };
+module.exports = { validateProfile, validateEncryptionDeclaration };

@@ -5,7 +5,7 @@ const path = require("node:path");
 const { settings } = require("./settings");
 const { project, webAssets } = require("./prepare");
 const { assetFiles } = require("./bundle-frontend");
-const { validateProfile } = require("./build");
+const { validateProfile, validateEncryptionDeclaration } = require("./build");
 const google = require("./google-signin");
 
 test("Manual patch releases use the same validated build number for preflight and upload", () => {
@@ -16,6 +16,21 @@ test("Manual patch releases use the same validated build number for preflight an
   assert.equal(buildLines.length, 2);
   assert.equal(buildLines[0], buildLines[1]);
   assert.ok(buildLines[0].includes("inputs.build_number || format('{0}.{1}', github.run_number, github.run_attempt)"));
+});
+
+test("Source and staged apps declare exempt encryption exactly once as a boolean", () => {
+  for (const file of [path.resolve(__dirname, "../../ios/App/App/Info.plist"), path.join(project, "ios/App/App/Info.plist")]) {
+    const plist = fs.readFileSync(file, "utf8");
+    assert.equal((plist.match(/<key>ITSAppUsesNonExemptEncryption<\/key>/g) || []).length, 1);
+    assert.match(plist, /<key>ITSAppUsesNonExemptEncryption<\/key>\s*<false\s*\/>/);
+  }
+  assert.doesNotThrow(() => validateEncryptionDeclaration({ ITSAppUsesNonExemptEncryption: false }));
+  for (const value of [undefined, true, "false", "NO", 0, null]) {
+    assert.throws(() => validateEncryptionDeclaration({ ITSAppUsesNonExemptEncryption: value }));
+  }
+  const build = fs.readFileSync(path.join(__dirname, "build.js"), "utf8");
+  assert.match(build, /validateEncryptionDeclaration\(stagedPlist\)/);
+  assert.match(build, /validateEncryptionDeclaration\(JSON\.parse\(run\("plutil"[^\n]+path\.join\(app, "Info.plist"\)/);
 });
 
 test("Only an unexpired distribution profile for this app is accepted", () => {
@@ -80,6 +95,18 @@ test("Native TLS uses system validation only for the configured host", () => {
   const plist = fs.readFileSync(path.join(project, "ios/App/App/Info.plist"), "utf8");
   assert.match(plist, /NSLocalNetworkUsageDescription/);
   assert.doesNotMatch(plist, /NSAllowsArbitraryLoads|NSExceptionAllowsInsecureHTTPLoads/);
+});
+
+test("Build 15 bundles Jingle routing and plain T.140 without server gateway code", () => {
+  const html = fs.readFileSync(path.join(project, "www/chat.html"), "utf8");
+  for (const file of ["jingle-session.js", "jingle-t140.js", "jingle-webrtc-audio.js", "jingle-call-router.js"]) {
+    assert.ok(assetFiles().includes(file));
+    assert.ok(html.indexOf('src="' + file) >= 0);
+    assert.ok(html.indexOf('src="' + file) < html.indexOf('src="chat-client.js'));
+    assert.deepEqual(fs.readFileSync(path.join(project, "www", file)),
+      fs.readFileSync(path.resolve(__dirname, "../../php/public", file)));
+  }
+  assert.ok(!assetFiles().some(file => /asterisk|media-gateway|sip-call|werift/i.test(file)));
 });
 
 test("The bundled startup file contains the real Messenger, not a server redirect", () => {

@@ -1,5 +1,5 @@
-const CACHE_NAME = "teletyptel-webclient-v477";
-const BUILD_VERSION = "20261102-all-call-layout";
+const CACHE_NAME = "teletyptel-webclient-v483";
+const BUILD_VERSION = "20261103-gateway-hangup";
 const ASSETS = [
   "chat.html",
   "chat-tablet.css?v=20261102-all-call-layout",
@@ -15,6 +15,10 @@ const ASSETS = [
   "mobile-navigation.js?v=20261102-all-call-layout",
   "chat-interpreter.js?v=20261027-inline-interpreter",
   `chat-client.js?v=${BUILD_VERSION}`,
+  `jingle-session.js?v=${BUILD_VERSION}`,
+  `jingle-t140.js?v=${BUILD_VERSION}`,
+  `jingle-webrtc-audio.js?v=${BUILD_VERSION}`,
+  `jingle-call-router.js?v=${BUILD_VERSION}`,
   "native-google.js?v=20261031-bundled-interface",
   "native-facebook.js?v=20261101-native-facebook",
   `vendor/qrcode.js?v=${BUILD_VERSION}`,

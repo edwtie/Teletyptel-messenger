@@ -5,7 +5,7 @@ const { execFileSync } = require("node:child_process");
 
 const root = path.resolve(__dirname, "../..");
 const entryFiles = ["chat.html", "chat-client.css", "chat-client.js", "chat-dialer.css", "chat-dialer.js",
-  "jingle-history.js", "chat-xmpp-translation.js", "chat-translation.js", "native-google.js", "native-facebook.js",
+  "jingle-history.js", "jingle-session.js", "jingle-t140.js", "jingle-webrtc-audio.js", "jingle-call-router.js", "chat-xmpp-translation.js", "chat-translation.js", "native-google.js", "native-facebook.js",
   "xmpp-availability.js", "xmpp-availability.css",
   "native-biometric.js",
   "chat-tablet.css",

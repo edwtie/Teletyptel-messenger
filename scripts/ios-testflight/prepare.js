@@ -54,7 +54,15 @@ function prepare() {
   if (!originalStoryboard.includes(marker)) throw new Error("Review changed native storyboard");
   write(storyboard, originalStoryboard.replace(marker, 'customClass="LanViewController" customModule="App" customModuleProvider="target"'));
   const plist = "ios/App/App/Info.plist";
-  const originalPlist = fs.readFileSync(path.join(project, plist), "utf8");
+  let originalPlist = fs.readFileSync(path.join(project, plist), "utf8");
+  const encryptionKeys = originalPlist.match(/<key>ITSAppUsesNonExemptEncryption<\/key>/g) || [];
+  if (encryptionKeys.length > 1 || (encryptionKeys.length === 1
+      && !/<key>ITSAppUsesNonExemptEncryption<\/key>\s*<false\s*\/>/.test(originalPlist))) {
+    throw new Error("Review changed encryption export declaration before building.");
+  }
+  if (!encryptionKeys.length) {
+    originalPlist = originalPlist.replace("<dict>", "<dict>\n<key>ITSAppUsesNonExemptEncryption</key><false/>\n");
+  }
   if (!originalPlist.includes("<dict>") || /<key>(?:CFBundleURLTypes|Facebook[^<]*|TeleTypTelFacebookEnabled|NSUserTrackingUsageDescription)<\/key>/.test(originalPlist)) {
     throw new Error("Review existing native URL schemes or Facebook privacy configuration");
   }

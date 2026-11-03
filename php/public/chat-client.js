@@ -93,6 +93,7 @@
   const jingleRttSyncNamespace = "urn:xmpp:jingle:apps:rtt-sync:0";
   const jingleGroupingNamespace = "urn:xmpp:jingle:apps:grouping:0";
   const jingleRttSyncDataChannelLabel = "rtt";
+  const teletyptelRttDataChannelProtocol = "teletyptel-rtt-json-v1";
   const jingleRttSyncMaxSkewMs = 700;
   const t140Backspace = "\b";
   const t140Delete = "\u007f";
@@ -889,6 +890,17 @@
   let callViewportTimer = null;
   const displayedMessageAcknowledgements = new WeakMap();
   let displayedMessageFrame = null;
+  const jingleSessions = window.TeleTypTelJingleCalls?.create({
+    localJid: () => state.xmppSession?.boundJid || "",
+    send: xml => sendXmppStanza(xml, '<iq jingle="standard"/>'),
+    allowPeer: peer => isXmppRttConnected() && state.conversations.some(conversation => conversation.kind === "contact"
+      && addressMatches(conversation.peer, peer) && !isOwnContact(conversation)
+      && !isBlockedConversation(conversation) && !isArchivedConversation(conversation)),
+    busy: () => Boolean(state.call || state.doNotDisturb),
+    rtcConfig: rtcPeerConnectionConfig,
+    onEvent: handleStandardJingleEvent,
+    onTrack: handleStandardJingleTrack
+  });
   const xmppTranslation = window.TeleTypTelXmppTranslation.create({
     send: (xml) => sendXmppStanza(xml, '<iq translation="private"/>'),
     connected: () => isXmppRttConnected()
@@ -5803,12 +5815,12 @@
       [true, "Web UI", t("checklist.web_ui", "Browser chat UI with light/dark mode, contacts, groups and smileys")],
       [true, "Accounts", t("checklist.accounts", "Server account profile, MySQL account API and language preference")],
       [true, "XEP-0363", t("checklist.file_upload", "Local file upload plus XMPP HTTP upload slot helpers")],
-      [true, "Jingle", t("checklist.calls", "Audio, audio+video and Total Conversation calls with camera, microphone, sound, volume, RTT sync and live device switching")],
+      [true, "WebRTC", t("checklist.calls", "Audio, audio+video and Total Conversation calls with camera, microphone, sound, volume, RTT sync and live device switching")],
       [true, "XEP-0084/0486", t("checklist.avatars", "Account avatar, contact avatar cache, group avatars and avatar presence")],
       [true, "XEP-0191", t("checklist.blocking", "Block and unblock contacts, with blocked chat, RTT and calls filtered")],
       [true, "XEP-0080", t("checklist.location", "Opt-in browser location sharing with XEP-0080 and PIDF-LO export")],
       [true, "XEP-0060", t("checklist.pubsub_news", "Provider news and announcements through PubSub")],
-      [true, "XEP-0517", t("checklist.jingle_rtt_sync", "Jingle co-session real-time text datachannel with XEP-0301 fallback")],
+      [false, "XEP-0517", t("checklist.jingle_rtt_sync", "Standard Jingle RTT negotiation and gateway interoperability still in development")],
       [false, "Roster", t("checklist.roster", "Replace demo contact list with real XMPP roster-backed contacts")],
       [false, "OMEMO", t("checklist.omemo", "Finish encryption sessions, trust model and interoperability smoke")],
       [false, "Mobile", t("checklist.mobile", "Android and iOS WebView packaging smoke tests")]
@@ -6428,6 +6440,7 @@
 
   function retireXmppSocket(socket, reason) {
     if (state.xmppSocket !== socket) return;
+    jingleSessions?.reset();
     stopXmppHeartbeat();
     window.clearTimeout(state.xmppRecovery.connectionTimer);
     state.xmppRecovery.connectionTimer = null;
@@ -8771,6 +8784,7 @@
     state.xmppRecovery.connectionTimer = null;
     stopXmppHeartbeat();
     xmppTranslation.disconnect();
+    jingleSessions?.reset();
     xmppRttStates = new WeakMap();
     for (const conversation of state.conversations) {
       conversation.remoteText = "";
@@ -9633,7 +9647,15 @@
       joinXmppGroupConversation(conversation);
       const messageType = conversation?.kind === "group" ? "groupchat" : "chat";
       const xml = createMessageStanza(text, outgoingId, edit?.replaceId ?? null, false, currentToJid(), "", messageType);
-      sendXmppStanza(xml);
+      const standardCall = state.call?.standardJingle && addressMatches(conversation.peer, state.call.peer) ? state.call : null;
+      const sent = sendXmppStanza(xml);
+      if (standardCall) {
+        if (sent === false) {
+          showNotConnectedStatus();
+          return;
+        }
+        standardCall.standardJingle.setRttText("");
+      }
       interpreter?.final(text);
       if (edit) {
         applyMessageCorrection(edit.conversation, edit.replaceId, text, "self", outgoingId);
@@ -11425,6 +11447,62 @@
     };
   }
 
+  function handleStandardJingleEvent(event) {
+    appendDebug("jingle-iq", event.event === "ended" ? `ended: ${event.reason}` : event.event);
+    if (event.event === "incoming") {
+      const call = createCallState(event.session.sid, event.session.peer, "receiver",
+        ["video", "total"].includes(event.profile) ? "video" : "audio", ["total", "audio-rtt"].includes(event.profile));
+      call.standardJingle = event.adapter;
+      call.incomingOffer = "standard-jingle";
+      state.call = call;
+      const conversation = ensureConversationForPeer(bareJid(call.peer), "contact", displayNameForJid(call.peer));
+      if (conversation) {
+        selectConversation(conversation);
+        el.peerInput.value = conversation.peer;
+      }
+      setCallStatus(`${t("call.incoming", "Incoming call from")} ${displayNameForJid(call.peer)}`);
+      addCallNotificationMessage(call, "started", incomingCallTitle(call), conversation);
+      renderConversations();
+      renderActiveConversation();
+      updateCallUi();
+      return;
+    }
+    const call = state.call;
+    if (!call || call.standardJingle !== event.adapter || call.cleaningUp) return;
+    call.pc = event.adapter.connection();
+    if (event.event === "ended") {
+      if (call.standardEnding) return;
+      cleanupCall(false, call.incomingOffer ? "missed" : "ended");
+      setCallStatus(["success", "remote-terminate"].includes(event.reason)
+        ? t("call.ended", "Call ended") : t("call.failed", "Call failed"));
+    } else if (event.event === "connection") {
+      if (event.state === "connected") {
+        setCallStatus(jingleRttSyncStatusText(call));
+        scheduleTotalConversationRecorder(call);
+      } else if (event.state === "disconnected") setCallStatus(t("call.disconnected", "Call disconnected"));
+      updateCallUi();
+    } else if (event.event === "rtt-state") {
+      call.standardRttState = event.state;
+      if (call.rttSync) call.rttSync.state = event.state === "open" ? "connected" : "fallback";
+      setCallStatus(jingleRttSyncStatusText(call));
+    } else if (event.event === "rtt") {
+      applyJingleRttSyncDraft(call, { text: event.text, event: "reset", from: call.peer });
+    }
+  }
+
+  function handleStandardJingleTrack(adapter, track) {
+    const call = state.call;
+    if (!call || call.standardJingle !== adapter || call.cleaningUp) return;
+    call.pc = adapter.connection();
+    call.remoteStream ??= new MediaStream();
+    call.remoteStream.addTrack(track);
+    watchCallVideoTrack(call, track);
+    updateVideoElementSource(el.remoteVideo, call.remoteStream);
+    el.callPanel.hidden = false;
+    scheduleTotalConversationRecorder(call);
+    updateCallUi();
+  }
+
   async function startCall(mediaKind) {
     if (!hasActiveConversation()) {
       setCallStatus(t("call.select_contact_first", "Select a contact first."));
@@ -11455,7 +11533,28 @@
 
     try {
       await ensureXmppCallSignalingReady();
+      if (state.call !== call) return;
+      if (state.mode === "xmpp" && activeConversation()?.kind === "contact" && jingleSessions) {
+        const profile = call.mediaKind === "video" ? (call.rttEnabled ? "total" : "video") : (call.rttEnabled ? "audio-rtt" : "audio");
+        const peer = await jingleSessions.select(call.peer, profile);
+        if (state.call !== call) return;
+        if (peer) {
+          call.peer = peer;
+          call.standardJingle = jingleSessions.prepare(peer, profile);
+          await openLocalMedia(call);
+          if (state.call !== call) return;
+          await call.standardJingle.start(peer, call.localStream, call.sid);
+          if (state.call !== call) return;
+          call.pc = call.standardJingle.connection();
+          setCallStatus(t("call.ringing", "Ringing..."));
+          addCallNotificationMessage(call, "started", callStartedText(call));
+          updateCallUi();
+          return;
+        }
+        appendDebug("jingle-route", "Compatible full resource not found; using existing TeleTypTel call route");
+      }
       await openLocalMedia(call);
+      if (state.call !== call) return;
       createPeerConnection(call);
       const offer = await call.pc.createOffer();
       appendSdpDebug("offer-created", offer.sdp);
@@ -11472,6 +11571,7 @@
       setCallStatus(t("call.ringing", "Ringing..."));
       addCallNotificationMessage(call, "started", callStartedText(call));
     } catch (error) {
+      if (state.call !== call) return;
       setCallStatus(`${t("call.failed", "Call failed")}: ${error.message}`);
       cleanupCall(false, "failed");
     }
@@ -11486,6 +11586,17 @@
     setCallStatus(t("call.answering", "Answering..."));
     try {
       await openLocalMedia(call);
+      if (state.call !== call) return;
+      if (call.standardJingle) {
+        await call.standardJingle.accept(call.localStream);
+        if (state.call !== call) return;
+        call.pc = call.standardJingle.connection();
+        call.incomingOffer = null;
+        closeIncomingCallBrowserNotification();
+        setCallStatus(jingleRttSyncStatusText(call));
+        updateCallUi();
+        return;
+      }
       createPeerConnection(call);
       await call.pc.setRemoteDescription({ type: "offer", sdp: call.incomingOffer });
       appendSdpDebug("offer-remote", call.incomingOffer);
@@ -11508,6 +11619,7 @@
       setCallStatus(jingleRttSyncStatusText(call));
       updateCallUi();
     } catch (error) {
+      if (state.call !== call) return;
       setCallStatus(`${t("call.failed", "Call failed")}: ${error.message}`);
       sendJingleEnvelope("session-terminate", {
         sid: call.sid,
@@ -11559,6 +11671,7 @@
     for (const track of tracks) {
       track.enabled = !shouldMute;
     }
+    state.call?.standardJingle?.setTrackEnabled("audio", !shouldMute);
 
     updateCallUi();
   }
@@ -11574,6 +11687,7 @@
     for (const track of tracks) {
       track.enabled = !shouldTurnOff;
     }
+    call.standardJingle?.setTrackEnabled("video", !shouldTurnOff);
 
     sendJingleEnvelope("session-info", {
       sid: call.sid,
@@ -11605,6 +11719,7 @@
   }
 
   function handleJingleEnvelope(envelope) {
+    if (state.call?.standardJingle) return;
     if (!isAddressedToMe(envelope)) {
       appendDebug("jingle-skip", `Ignored ${envelope.action || "jingle"} for ${envelope.to || "unknown"}; this client is ${currentFromJid()}`);
       return;
@@ -11973,7 +12088,7 @@
   function createJingleRttSyncDescriptor(sid, stateName = "offered") {
     return {
       namespace: jingleRttSyncNamespace,
-      profile: "datachannel-t140",
+      profile: teletyptelRttDataChannelProtocol,
       label: jingleRttSyncDataChannelLabel,
       role: "conversation",
       source: "human",
@@ -12021,7 +12136,7 @@
         call,
         pc.createDataChannel(jingleRttSyncDataChannelLabel, {
           ordered: true,
-          protocol: "t140"
+          protocol: teletyptelRttDataChannelProtocol
         }));
     }
 
@@ -12264,53 +12379,80 @@
       return;
     }
 
-    if (channel.teletyptelRttConfigured) {
-      call.rttChannel = channel;
+    const supportedProtocol = [teletyptelRttDataChannelProtocol, "t140", ""].includes(channel.protocol || "");
+    const legacyProfile = !call.rttSync?.profile
+      || ["datachannel-t140", teletyptelRttDataChannelProtocol].includes(call.rttSync.profile);
+    if (state.call !== call || channel.label !== jingleRttSyncDataChannelLabel
+      || !supportedProtocol || channel.ordered === false
+      || (channel.protocol !== teletyptelRttDataChannelProtocol && !legacyProfile)
+      || channel.maxRetransmits != null || channel.maxPacketLifeTime != null) {
+      appendDebug("jingle-rtt-skip", "Rejected unsupported or unreliable RTT channel");
+      channel.close();
+      if (state.call === call && !call.rttChannel) {
+        call.rttSync = normalizeJingleRttSyncDescriptor(call.rttSync, call.sid, "fallback");
+        call.rttSync.state = "fallback";
+        call.rttNeedsReset = true;
+        setCallStatus(jingleRttSyncStatusText(call));
+        updateCallUi();
+      }
       return;
     }
 
+    if (channel.teletyptelRttConfigured) {
+      return;
+    }
+
+    const previousChannel = call.rttChannel;
     channel.teletyptelRttConfigured = true;
     call.rttNeedsReset = true;
+    call.rttTextDecoderState = {};
     channel.binaryType = "arraybuffer";
     call.rttEnabled = true;
     call.callMode = callModeName(call.mediaKind, true);
     call.rttChannel = channel;
     call.rttSync = normalizeJingleRttSyncDescriptor(call.rttSync, call.sid, "negotiating");
     call.rttSync.label = channel.label || jingleRttSyncDataChannelLabel;
+    call.rttSync.profile = channel.protocol === teletyptelRttDataChannelProtocol
+      ? teletyptelRttDataChannelProtocol : "datachannel-t140";
     call.rttSync.state = channel.readyState === "open" ? "connected" : "negotiating";
+    if (previousChannel && previousChannel !== channel) previousChannel.close();
     appendDebug("jingle-rtt", `Datachannel configured ${dataChannelDebugSummary(call, channel)}`);
 
     channel.addEventListener("open", () => {
-      if (!state.call || state.call.sid !== call.sid) {
+      if (state.call !== call || call.rttChannel !== channel) {
         return;
       }
 
       call.rttSync.state = "connected";
-      setCallStatus(t("call.connected_total", "Total conversation connected - live text synchronized"));
+      setCallStatus(jingleRttSyncStatusText(call));
       appendDebug("jingle-rtt", `Datachannel open ${dataChannelDebugSummary(call, channel)}`);
       updateCallUi();
     });
 
     channel.addEventListener("close", () => {
-      if (!state.call || state.call.sid !== call.sid) {
+      if (state.call !== call || call.rttChannel !== channel) {
         return;
       }
 
       call.rttSync.state = "fallback";
       call.rttNeedsReset = true;
-      setCallStatus(t("call.connected_total", "Total conversation connected - live text synchronized"));
+      setCallStatus(jingleRttSyncStatusText(call));
       appendDebug("jingle-rtt", `Datachannel closed ${dataChannelDebugSummary(call, channel)}`);
       updateCallUi();
     });
 
     channel.addEventListener("error", (event) => {
+      if (state.call !== call || call.rttChannel !== channel) return;
       call.rttSync.state = "fallback";
       call.rttNeedsReset = true;
+      setCallStatus(jingleRttSyncStatusText(call));
       appendDebug("jingle-rtt-error", `Datachannel error ${dataChannelDebugSummary(call, channel)} ${event?.error?.message || ""}`.trim());
     });
 
+    let receiveQueue = Promise.resolve();
     channel.addEventListener("message", (event) => {
-      void handleJingleRttSyncPacket(call, event.data);
+      receiveQueue = receiveQueue.then(() => handleJingleRttSyncPacket(call, event.data, channel))
+        .catch(() => appendDebug("jingle-rtt-error", "Could not decode RTT packet"));
     });
   }
 
@@ -12321,7 +12463,7 @@
       return null;
     }
 
-    if (call.rttChannel?.readyState !== "open") {
+    if (call.standardJingle ? call.standardRttState !== "open" : call.rttChannel?.readyState !== "open") {
       call.rttNeedsReset = true;
       return null;
     }
@@ -12334,8 +12476,23 @@
       return false;
     }
 
+    if (call.standardJingle) {
+      if (eventName === "message") {
+        call.standardJingle.setRttText("");
+        return false;
+      }
+      const sent = call.standardJingle.setRttText(String(text ?? ""));
+      call.rttSync.state = sent ? "connected" : "fallback";
+      if (sent) recordTotalConversationText(call, "self", text, currentFromJid());
+      setCallStatus(jingleRttSyncStatusText(call));
+      return sent;
+    }
+
     call.rttSync = normalizeJingleRttSyncDescriptor(call.rttSync, call.sid, "connected");
-    if (eventName === "edit" && !call.rttNeedsReset) {
+    call.rttSync.profile = call.rttChannel.protocol === teletyptelRttDataChannelProtocol
+      ? teletyptelRttDataChannelProtocol : "datachannel-t140";
+    if (eventName === "edit" && !call.rttNeedsReset
+      && call.rttChannel.protocol !== teletyptelRttDataChannelProtocol) {
       const t140Delta = createT140LinearDelta(options.previousText ?? "", String(text ?? ""));
       if (t140Delta !== null && !isJsonRttText(t140Delta)) {
         try {
@@ -12344,10 +12501,13 @@
             appendDebug("jingle-rtt-t140-out", `<t140 sid="${escapeXml(call.sid)}">${escapeXml(t140Delta)}</t140>`);
           }
           recordTotalConversationText(call, "self", text, currentFromJid());
+          call.rttSync.state = "connected";
+          setCallStatus(jingleRttSyncStatusText(call));
           return true;
         } catch (error) {
           call.rttSync.state = "fallback";
           call.rttNeedsReset = true;
+          setCallStatus(jingleRttSyncStatusText(call));
           appendDebug("jingle-rtt-error", error.message);
           return false;
         }
@@ -12377,6 +12537,8 @@
     try {
       call.rttChannel.send(JSON.stringify(packet));
       call.rttNeedsReset = false;
+      call.rttSync.state = "connected";
+      setCallStatus(jingleRttSyncStatusText(call));
       appendDebug("jingle-rtt-out", createJingleRttPacketDebugXml(packet));
       recordTotalConversationText(call, "self", text, currentFromJid(), {
         timestamp: packet.timestamp,
@@ -12386,15 +12548,16 @@
     } catch (error) {
       call.rttSync.state = "fallback";
       call.rttNeedsReset = true;
+      setCallStatus(jingleRttSyncStatusText(call));
       appendDebug("jingle-rtt-error", error.message);
       return false;
     }
   }
 
-  async function handleJingleRttSyncPacket(call, data) {
-    if (state.call !== call) return;
+  async function handleJingleRttSyncPacket(call, data, channel = null) {
+    if (state.call !== call || (channel && call.rttChannel !== channel)) return;
     const text = await decodeRttDataChannelText(data);
-    if (state.call !== call) return;
+    if (state.call !== call || (channel && call.rttChannel !== channel)) return;
     if (text === null || text === "") {
       appendDebug("jingle-rtt-skip", "Ignored empty RTT datachannel packet");
       return;
@@ -12418,6 +12581,7 @@
       return;
     }
 
+    call.rttTextDecoderState = {};
     appendDebug("jingle-rtt-in", createJingleRttPacketDebugXml(packet));
     if (packet.event === "message") {
       applyJingleRttSyncFinal(call, packet);
@@ -12462,7 +12626,8 @@
       return;
     }
 
-    conversation.remoteText = applyT140Delta(conversation.remoteText || "", payload);
+    call.rttTextDecoderState ||= {};
+    conversation.remoteText = applyT140Delta(conversation.remoteText || "", payload, call.rttTextDecoderState);
     conversation.remoteFrom = call.peer;
     conversation.remoteDraftUpdatedAt = new Date();
     recordTotalConversationText(call, "peer", conversation.remoteText, conversation.remoteFrom);
@@ -12488,9 +12653,9 @@
     return null;
   }
 
-  function applyT140Delta(previous, payload) {
+  function applyT140Delta(previous, payload, streamState = {}) {
     let result = String(previous ?? "");
-    let previousWasCarriageReturn = false;
+    let previousWasCarriageReturn = streamState.previousWasCarriageReturn === true;
 
     for (const char of Array.from(String(payload ?? ""))) {
       if (char === t140Backspace || char === t140Delete) {
@@ -12521,6 +12686,7 @@
       result += char;
     }
 
+    streamState.previousWasCarriageReturn = previousWasCarriageReturn;
     return result;
   }
 
@@ -12571,7 +12737,7 @@
     }
 
     const code = char.codePointAt(0);
-    return code < 0x20 || (code >= 0x80 && code <= 0x9f);
+    return code < 0x20 || (code >= 0x80 && code <= 0x9f) || code === 0xfeff;
   }
 
   function applyJingleRttSyncDraft(call, packet) {
@@ -12646,17 +12812,27 @@
       throw new Error(mediaAccessUnavailableMessage());
     }
 
+    async function capture(constraints) {
+      if (state.call !== call) throw new Error("Call cancelled");
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      if (state.call !== call) {
+        stopStream(stream);
+        throw new Error("Call cancelled");
+      }
+      return stream;
+    }
+
     const wantsVideo = call.mediaKind === "video";
     stopMediaPreview();
     saveMediaSettingsFromControls();
     markMediaCaptureTransition("get-user-media-start", 20000);
     try {
-      call.localStream = await navigator.mediaDevices.getUserMedia(createMediaConstraints(call.mediaKind));
+      call.localStream = await capture(createMediaConstraints(call.mediaKind));
       markMediaCaptureTransition("get-user-media-ready", 8000);
       await refreshMediaDevices(false);
       scheduleTotalConversationRecorder(call);
     } catch (error) {
-      if (!wantsVideo) {
+      if (!wantsVideo || state.call !== call) {
         throw error;
       }
 
@@ -12664,7 +12840,7 @@
         try {
           appendDebug("media", `Selected device unavailable, trying defaults: ${error.message}`);
           markMediaCaptureTransition("get-user-media-defaults", 12000);
-          call.localStream = await navigator.mediaDevices.getUserMedia(createDefaultMediaConstraints("video"));
+          call.localStream = await capture(createDefaultMediaConstraints("video"));
           markMediaCaptureTransition("get-user-media-ready", 8000);
           setMediaStatus(t("media.default_fallback", "Selected device was unavailable; using browser defaults."));
           await refreshMediaDevices(false);
@@ -12674,6 +12850,7 @@
         }
       }
 
+      if (state.call !== call) throw new Error("Call cancelled");
       if (call.localStream) {
         watchCallVideoTracks(call, call.localStream);
         updateVideoElementSource(el.localVideo, call.localStream);
@@ -12682,14 +12859,16 @@
         return call.localStream;
       }
 
+      if (call.standardJingle) throw error;
       appendDebug("media", `Video unavailable, falling back to audio: ${error.message}`);
       call.mediaKind = "audio";
       markMediaCaptureTransition("get-user-media-audio-fallback", 12000);
-      call.localStream = await navigator.mediaDevices.getUserMedia(createMediaConstraints("audio"));
+      call.localStream = await capture(createMediaConstraints("audio"));
       markMediaCaptureTransition("get-user-media-ready", 8000);
       scheduleTotalConversationRecorder(call);
     }
 
+    if (state.call !== call) throw new Error("Call cancelled");
     updateVideoElementSource(el.localVideo, call.localStream);
     watchCallVideoTracks(call, call.localStream);
     el.callPanel.hidden = false;
@@ -12853,7 +13032,8 @@
           ? t("media.no_microphone_sender", "No active microphone sender was found.")
           : t("media.no_camera_sender", "No active camera sender was found."));
       }
-      await sender.replaceTrack(replacementTrack);
+      if (call.standardJingle) await call.standardJingle.replaceTrack(replacementTrack);
+      else await sender.replaceTrack(replacementTrack);
       if (!isCurrent()) {
         return false;
       }
@@ -13243,6 +13423,8 @@
 
   function cleanupCall(notifyRemote, historyStatus = "ended") {
     const call = state.call;
+    if (call?.cleaningUp) return;
+    if (call) call.cleaningUp = true;
     if (call) interpreter?.endCall(call.sid);
     if (!call) {
       closeIncomingCallBrowserNotification();
@@ -13269,6 +13451,7 @@
       });
     }
 
+    if (call.standardJingle) jingleSessions?.release(call.standardJingle, historyStatus === "failed" ? "failed-application" : "success");
     call.rttChannel?.close();
     call.rttChannel = null;
     call.pc?.close();
@@ -13287,6 +13470,13 @@
   }
 
   function sendJingleEnvelope(action, payload = {}) {
+    if (state.call?.standardJingle) {
+      if (action === "session-terminate") {
+        state.call.standardEnding = true;
+        jingleSessions?.release(state.call.standardJingle, payload.reason || "success");
+      }
+      return;
+    }
     const active = activeConversation();
     const roomJid = state.call?.roomJid || (active?.kind === "group" ? active.peer : "");
     const envelope = {
@@ -13923,15 +14113,17 @@
       return t("call.connected", "Call connected");
     }
 
-    if (call?.rttChannel?.readyState === "open" || call?.rttSync?.state === "connected") {
-      return t("call.connected_total", "Total conversation connected - live text synchronized");
-    }
-
     if (call?.rttSync?.state === "fallback") {
-      return t("call.connected_total", "Total conversation connected - live text synchronized");
+      return isXmppRttConnected() || isRelayConnected()
+        ? t("call.rtt_fallback", "Call connected - live text via chat fallback")
+        : t("call.rtt_unavailable", "Call connected - live text unavailable");
     }
 
-    return t("call.connected", "Call connected");
+    if (call?.standardRttState === "open" || call?.rttChannel?.readyState === "open") {
+      return t("call.rtt_co_session", "Call connected - live text in this call");
+    }
+
+    return t("call.rtt_connecting", "Call connected - connecting live text");
   }
 
   function redactJingleForLog(envelope) {
@@ -14385,6 +14577,7 @@
       return;
     }
 
+    jingleSessions?.observePresence(presenceElement);
     conversation.presence = presence;
     if (presence === "offline") {
       conversation.clientState = null;
@@ -14400,6 +14593,7 @@
 
   function handleXmppIqElement(iqElement) {
     if (handleXmppPing(iqElement)) return true;
+    if (isXmppRttConnected() && state.xmppSession?.boundJid && jingleSessions?.handleIq(iqElement)) return true;
     if (xmppTranslation.handleIq(iqElement)) return true;
     const rosterQuery = iqElement.getElementsByTagNameNS(xmppRosterNamespace, "query")[0];
     if (!rosterQuery) {

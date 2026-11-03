@@ -20,6 +20,10 @@ on:
       - php/public/chat-tablet.css
       - php/public/mobile-navigation.js
       - php/public/jingle-history.js
+      - php/public/jingle-session.js
+      - php/public/jingle-t140.js
+      - php/public/jingle-webrtc-audio.js
+      - php/public/jingle-call-router.js
       - php/public/lang/**
       - php/public/smileys/**
       - php/public/assets/brand/**
@@ -81,7 +85,7 @@ jobs:
           npm ci --ignore-scripts
           npm run prepare:app
           npm test
-          node --test ../../tests/native-google.test.js
+          node --test ../../tests/native-google.test.js ../../tests/jingle-t140.test.js
           npm run build:check
       - name: Save non-secret preflight report
         if: always()

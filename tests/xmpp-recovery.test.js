@@ -14,6 +14,7 @@ function fixture() {
   const sent = [];
   const statuses = [];
   const availability = [];
+  let jingleResets = 0;
   class Socket {
     static CONNECTING = 0;
     static OPEN = 1;
@@ -59,6 +60,7 @@ function fixture() {
     sendXmppStanza: value => { sent.push(value); return true; },
     sendXmppRaw: value => { sent.push(value); return true; },
     xmppTranslation: { disconnect() {} }, messageTranslation: { clearLive() {} },
+    jingleSessions: { reset() { jingleResets++; } },
     WeakMap,
     returnToLoginScreenAfterDisconnect() { state.intentionalDisconnect = true; state.accountReady = false; },
     setAllContactPresence() {}, updateComposerAvailability() {}, updateConnectButtonAvailability() {},
@@ -82,7 +84,8 @@ function fixture() {
     run("finishXmppReady()");
     return socket;
   };
-  return { state, context, timers, sockets, sent, statuses, availability, elements, run, fire, ready };
+  return { state, context, timers, sockets, sent, statuses, availability, elements, run, fire, ready,
+    jingleResets: () => jingleResets };
 }
 
 test("Chat stays gated until actual XMPP readiness and returns to offline screen on transport loss", () => {
@@ -97,6 +100,7 @@ test("Chat stays gated until actual XMPP readiness and returns to offline screen
   app.run("finishXmppReady()");
   assert.equal(app.availability.at(-1), "ready");
   socket.emit("close", { code: 1006 });
+  assert.equal(app.jingleResets(), 1);
   assert.equal(app.availability.at(-1), "offline");
   assert.match(app.statuses.at(-1), /offline or unreachable/);
   assert.equal(app.elements.messageInput.value, "Unsent draft");

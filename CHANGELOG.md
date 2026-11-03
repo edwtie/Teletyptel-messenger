@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### iOS internal build 15.1 — 2026-11-03
+
+- Bundle direct Jingle audio/video/TC routing, reliable T.140 edits and safe hangup.
+- Preserve legacy/group routing, native login and strict certificate validation.
+- Validate native helper packaging and the existing exempt-encryption declaration.
+- Exclude private-label/admin/PostNL changes and the local experimental Asterisk gateway.
+- Physical-device tests and production SIP activation remain pending; see docs/IOS_BUILD_15.md.
+
 ### Audio and audio/video call layout — 2026-11-02
 
 - Keep the call panel available for audio-only calls even without video or RTT,

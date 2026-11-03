@@ -1,0 +1,35 @@
+# iOS internal build 15.1
+
+Requested on 2026-11-03 for iPhone and iPad. This is an internal TestFlight build,
+not a public App Store release or live SIP/provider activation.
+
+## Included
+
+- Resource-bound Jingle discovery and direct audio, video and Total Conversation
+  calls between compatible Messenger clients; existing group/legacy routing remains.
+- Plain reliable T.140 for the negotiated project profile, Unicode edits, bounded
+  queues, session cleanup and explicit live-text status. Legacy JSON RTT remains
+  separately identified; these are not claims of full XEP-0517/RFC interoperability.
+- Correct simultaneous hangup and termination-before-media-release ordering.
+- Existing iPhone/iPad layout, native Google/Facebook authentication and system TLS
+  validation remain in place. The existing exempt-encryption declaration is checked
+  during preparation and archive export; no server-side cryptography is bundled.
+
+## Excluded
+
+No PostNL demo, private-label/admin changes, local credentials, user data, Docker
+containers, Asterisk patch or Node media gateway. The separately tested gateway
+is still a local lab. Installing this client does not enable telephone numbers.
+
+## Release checks
+
+The native bundle has explicit tests for all four Jingle helper files, their load
+order and exact source contents, and excludes server gateway code. GitHub must
+pass preparation/unit tests, Xcode compilation and simulator startup before the
+protected `ios-testflight` upload job is approved. Simulator startup does not prove
+working calls or authentication on a physical device.
+
+After installation, test on two real accounts/devices: Google/Facebook login,
+audio, video, TC with Unicode/backspace, both-direction hangup, rotation, camera
+switching, lock/unlock and Wi-Fi loss. Keep WAMP/ejabberd reachable on the configured
+local HTTPS address and keep the test certificate trusted on each device.
