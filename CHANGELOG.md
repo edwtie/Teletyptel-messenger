@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### Separate TC live text from chat — 2026-11-03
+
+- Type directly in the own TC text box; committed edits travel over the call's
+  negotiated live-text channel without creating or sending a chat message.
+- Keep ordinary chat drafts, messages and translation separate from TC text.
+  New calls start empty instead of showing old messages or call notifications.
+- Preserve the current TC draft during a text-channel interruption and send a
+  fresh snapshot when available; do not silently fall back to ordinary chat.
+- Scope translation results and delayed input/channel events to their call.
+  The keyboard button focuses TC input only after a user action.
+- Local tests pass; these changes still require a new native build and real
+  iPhone/iPad verification. No SIP-provider or interpreter service is activated.
+
 ### XMPP heartbeat recovery hardening — 2026-11-03
 
 - Send one bounded confirmation probe before retiring an unresponsive connection;

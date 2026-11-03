@@ -371,6 +371,7 @@ option.session_timeout=Automatisch uitloggen bij inactiviteit
 option.remember_password=Account bewaren
 tc.remote_label=Gesprekspartner
 tc.local_label=Ik
+tc.type_live=Typ live in dit gesprek…
 label.browser_session=Browsersessie
 label.email=E-mail
 label.xmpp_jid=XMPP JID

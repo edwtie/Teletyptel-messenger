@@ -60,6 +60,7 @@ window.TeleTypTelTranslation = {
     let lastLiveRequestAt = 0;
 
     const clearLive = (direction = null) => {
+      if (direction && !Object.prototype.hasOwnProperty.call(liveDrafts, direction)) return;
       clearTimeout(liveTimer);
       liveTimer = null;
       if (!direction || liveDirection === direction) {
@@ -69,6 +70,7 @@ window.TeleTypTelTranslation = {
       }
       for (const side of direction ? [direction] : Object.keys(liveDrafts)) delete liveDrafts[side];
       refreshLive();
+      if (direction) scheduleLive();
     };
 
     const showStatus = (key) => {
@@ -217,7 +219,7 @@ window.TeleTypTelTranslation = {
     };
 
     const liveAllowed = (direction = "peer") => loaded && !paused && available && preferences.mode !== "off"
-      && preferences[direction === "self" ? "ownLiveRttConsent" : "liveRttConsent"] === true && !document.hidden;
+      && preferences[["self", "tc-self"].includes(direction) ? "ownLiveRttConsent" : "liveRttConsent"] === true && !document.hidden;
     const renderOwnStatus = (container) => {
       if (liveAllowed("self") || document.hidden) return;
       const reason = !loaded ? statusKey : paused ? "preferences_unsaved" : !available ? "unavailable"
@@ -262,7 +264,7 @@ window.TeleTypTelTranslation = {
       refreshLive();
       try {
         const data = await request({ action: "translate", text: original, targetLanguage: preferences.targetLanguage,
-          consent: true, automatic: false, liveRtt: true, ...(direction === "self" ? { liveDirection: "self" } : {}) }, controller);
+          consent: true, automatic: false, liveRtt: true, ...(["self", "tc-self"].includes(direction) ? { liveDirection: "self" } : {}) }, controller);
         if (current !== generation || draft !== liveDrafts[direction] || !draft.text.startsWith(original) || !liveAllowed(direction)) return;
         draft.result = { original, text: data.translation.text };
       } catch (error) {
@@ -300,12 +302,12 @@ window.TeleTypTelTranslation = {
       const selected = drafts.slice(0, 50);
       const keys = new Set(selected.map((draft) => "peer:" + draft.sender));
       for (const key of Object.keys(liveDrafts)) {
-        if (key !== "self" && !keys.has(key)) clearLive(key);
+        if ((key === "peer" || key.startsWith("peer:")) && !keys.has(key)) clearLive(key);
       }
       for (const draft of selected) setLiveDraft(conversationId, draft.text, draft.sender, "peer", "peer:" + draft.sender);
       scheduleLive();
     };
-    const findLiveDraft = (direction, sender = "") => direction === "self" ? liveDrafts.self
+    const findLiveDraft = (direction, sender = "") => ["self", "tc-self", "tc-peer"].includes(direction) ? liveDrafts[direction]
       : liveDrafts["peer:" + sender] || liveDrafts.peer;
     const translationInfo = (info, targetLanguage, provisional = false) => {
       const details = document.createElement("details");

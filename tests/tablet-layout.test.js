@@ -107,7 +107,10 @@ for (const engine of [chromium, webkit]) {
         document.getElementById("hangupCallButton").hidden = false;
         document.getElementById("totalConversationTextPanel").hidden = false;
         document.getElementById("totalConversationRemoteText").textContent = "Ik kan je tekst goed lezen.";
-        document.getElementById("totalConversationLocalText").textContent = "Video, geluid en realtime tekst.";
+        document.getElementById("totalConversationLocalText").value = "Video, geluid en realtime tekst.";
+        document.getElementById("totalConversationLocalText").disabled = false;
+        document.getElementById("totalConversationLocalPreviousText").hidden = true;
+        document.getElementById("totalConversationRemotePreviousText").hidden = true;
       });
       await page.screenshot({ path: path.join(output, `${engine.name()}-tc-keyboard.png`) });
       for (const selector of ["#composerForm", ".call-media-controls", "#totalConversationTextPanel"]) {

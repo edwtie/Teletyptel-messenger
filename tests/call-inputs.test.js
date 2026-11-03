@@ -14,6 +14,8 @@ function fixture() {
   const state = { call, callKeypadSession: null, totalConversationTextVisible: false };
   const buttons = Array.from({ length: 12 }, () => ({ disabled: false }));
   const el = { callKeypadButton: {}, callKeyboardButton: {}, callKeypadStatus: {},
+    totalConversationLocalText: { value: "Live TC text", disabled: false, focused: false,
+      focus() { this.focused = true; }, blur() { this.focused = false; } },
     callKeypadKeys: { querySelectorAll: () => buttons },
     callKeypadDialog: { open: false, showModal() { this.open = true; }, close() { this.open = false; } },
     messageInput: { value: "Original RTT text", disabled: false, focused: false,
@@ -69,7 +71,9 @@ test("Keyboard button opens RTT from a user action and preserves the typed draft
   app.run("openCallKeypad(); focusCallTextKeyboard();");
   assert.equal(app.el.callKeypadDialog.open, false);
   assert.equal(app.state.totalConversationTextVisible, true);
-  assert.equal(app.el.messageInput.focused, true);
+  assert.equal(app.el.totalConversationLocalText.focused, true);
+  assert.equal(app.el.totalConversationLocalText.value, "Live TC text");
+  assert.equal(app.el.messageInput.focused, false);
   assert.equal(app.el.messageInput.value, "Original RTT text");
   app.state.call = null;
   app.el.messageInput.focused = false;

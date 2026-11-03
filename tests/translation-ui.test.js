@@ -347,6 +347,7 @@ async function checkBrowser(engine, device) {
     await page.getByText(language["translation.ready"], { exact: true }).waitFor();
     const ownDraft = (text) => page.evaluate((text) => window.translator.setLiveDraft("noor", text, "me@example.test", "self"), text);
     await ownDraft("No permission for own drafts");
+    await page.evaluate(() => window.translator.setLiveDraft("call-1", "No permission for own TC text", "me@example.test", "self", "tc-self"));
     await tick(5000);
     assert.equal(liveRequests().length, afterFailure, "Incoming RTT consent does not authorize unsent own text");
     await page.locator("#translationOwnLiveConsent").check();
@@ -365,6 +366,34 @@ async function checkBrowser(engine, device) {
     await ownDraft("");
     assert.equal(await page.locator("#fixtureOwnLive .live-rtt-translation").count(), 0, "Clearing own draft removes its preview");
     await page.locator("#fixtureLive").getByText("Live: Peer text", { exact: true }).waitFor();
+    await page.evaluate(() => {
+      window.translator.setLiveDraft("call-1", "TC peer only", "peer@example.test", "peer", "tc-peer");
+      window.translator.setLiveDraft("call-1", "TC self only", "me@example.test", "self", "tc-self");
+      window.translator.setPeerDrafts("noor", [{ sender: "noor@example.test", text: "Separate chat draft" }]);
+    });
+    await tick(3000);
+    await tick(3000);
+    await tick(3000);
+    await tick(3000);
+    const tcTranslations = await page.evaluate(() => {
+      const peer = document.createElement("div"), own = document.createElement("div"), chat = document.createElement("div");
+      window.translator.renderLive(peer, "tc-peer");
+      window.translator.renderLive(own, "tc-self");
+      window.translator.renderLive(chat, "peer", "noor@example.test");
+      return [peer.textContent, own.textContent, chat.textContent];
+    });
+    assert.match(tcTranslations[0], /Live: TC peer only/);
+    assert.match(tcTranslations[1], /Live: TC self only/);
+    assert.match(tcTranslations[2], /Live: Separate chat draft/);
+    assert.equal(liveRequests().find(request => request.text === "TC self only").liveDirection, "self");
+    await page.evaluate(() => {
+      window.translator.setLiveDraft("call-2", "New call text", "peer@example.test", "peer", "tc-peer");
+      const preview = document.createElement("div");
+      window.translator.renderLive(preview, "tc-peer");
+      if (preview.textContent.includes("TC peer only")) throw new Error("Previous call translation leaked");
+      window.translator.clearLive("tc-peer");
+      window.translator.clearLive("tc-self");
+    });
     const afterOwn = liveRequests().length;
     await ownDraft("Logout also cancels own text");
     await draft("Logout cancels this");

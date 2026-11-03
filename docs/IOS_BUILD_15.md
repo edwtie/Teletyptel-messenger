@@ -51,7 +51,7 @@ retesting and the protected TestFlight build/upload are still required.
 
 The exclusions below also apply to patch 15.2.
 
-## Pending connection-stability changes
+## Patch 15.3: connection-stability changes
 
 The user reports disconnects during active iPhone chat/calls. The exact device-side
 trigger has not been captured. The client previously retired the XMPP socket after
@@ -65,8 +65,34 @@ bounded retry, lifecycle events, failed sends, logout and preservation of drafts
 Additional health diagnostics record elapsed time, queued bytes and close status.
 There is no change to TLS, authentication or cleanup after a real signalling loss.
 
-Not yet included in a TestFlight build. On a real iPhone, test active chat and TC
+GitHub run 41689859363 completed preflight and internal upload successfully.
+Apple processing and physical-device validation are separate checks.
+On a real iPhone, test active chat and TC
 for several minutes, rotate the device and briefly interrupt Wi-Fi. Record the
 time of any remaining outage and the `xmpp-health` / WebSocket close diagnostics.
 Confirm automatic reconnect, draft preservation and normal hangup. Successful
 unit tests do not establish stable physical-device calls or media recovery.
+
+## Pending: isolated TC text input
+
+TC now has its own editable live-text box and per-call local/remote text. The
+ordinary message composer continues to send chat messages, independently of the
+call. Previous chat messages and call notifications are not copied into TC.
+Each new call starts empty; ending a call does not erase an ordinary chat draft.
+
+Committed edits, including backspace, whitespace, emoji and multiline text, use
+the negotiated Jingle text channel. Input-method composition waits for commit.
+An unavailable text channel retains the TC draft and reports unavailable text,
+without routing it through chat. Reopening the channel resends the current text.
+TC translations use separate call-scoped drafts with existing consent/throttling.
+
+Local validation: 52 focused unit tests passed, plus Chromium/WebKit phone and
+tablet layout checks and translation isolation/consent tests. Actual Chromium
+WebRTC channels passed both legacy and versioned profile cases. The installed
+WebKit test engine lacks RTCPeerConnection, so it cannot validate iOS transport.
+
+Not included in 15.3 and not yet published. On two updated physical devices:
+start TC, type in the black own-text box without Send, verify live peer edits,
+then send a separate normal chat message. Check that neither draft overwrites
+the other. End and start a second call: both TC boxes must be empty. Repeat with
+camera off, portrait/landscape and the on-screen keyboard. No 112/provider calls.

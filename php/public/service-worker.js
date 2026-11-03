@@ -1,5 +1,5 @@
-const CACHE_NAME = "teletyptel-webclient-v485";
-const BUILD_VERSION = "20261103-xmpp-health-retry";
+const CACHE_NAME = "teletyptel-webclient-v486";
+const BUILD_VERSION = "20261103-tc-text-isolation";
 const ASSETS = [
   "chat.html",
   "chat-tablet.css?v=20261103-camera-off-rtt",
@@ -9,9 +9,9 @@ const ASSETS = [
   "chat-dialer.css?v=20261031-keypad-letters",
   "chat-dialer.js?v=20261031-iphone-contacts",
   "dev.html",
-  "chat-client.css?v=20261102-all-call-layout",
+  "chat-client.css?v=20261103-tc-text-isolation",
   "chat-xmpp-translation.js?v=20261103-translation-status",
-  "chat-translation.js?v=20261103-translation-status",
+  "chat-translation.js?v=20261103-tc-text-isolation",
   "mobile-navigation.js?v=20261102-all-call-layout",
   "chat-interpreter.js?v=20261027-inline-interpreter",
   `chat-client.js?v=${BUILD_VERSION}`,

@@ -40,7 +40,10 @@ for (const engine of [chromium, webkit]) {
           document.getElementById("remoteVideo").hidden = true;
           document.getElementById("totalConversationTextPanel").hidden = false;
           document.getElementById("totalConversationRemoteText").textContent = "Live tekst zonder camera. ".repeat(50);
-          document.getElementById("totalConversationLocalText").textContent = "Mijn antwoord";
+          document.getElementById("totalConversationLocalText").value = "Mijn antwoord";
+          document.getElementById("totalConversationLocalText").disabled = false;
+          document.getElementById("totalConversationLocalPreviousText").hidden = true;
+          document.getElementById("totalConversationRemotePreviousText").hidden = true;
           document.getElementById("hangupCallPanelButton").hidden = false;
           document.querySelector(".call-mode-buttons").hidden = true;
         }, { width, height, keyboard });
@@ -55,6 +58,9 @@ for (const engine of [chromium, webkit]) {
         const composer = await page.locator("#composerForm").boundingBox();
         assert.ok(composer.y + composer.height <= height + 2, "Composer must remain on screen");
         if (!keyboard && width === 390) {
+          await page.locator("#totalConversationLocalText").fill("Live RTT\nMijn antwoord 👋");
+          assert.equal(await page.locator("#totalConversationLocalText").inputValue(), "Live RTT\nMijn antwoord 👋");
+          assert.equal(await page.locator("#messageInput").inputValue(), "");
           const output = path.resolve(__dirname, "../artifacts/mobile-chat");
           fs.mkdirSync(output, { recursive: true });
           await page.screenshot({ path: path.join(output, `${engine.name()}-camera-off-rtt.png`) });

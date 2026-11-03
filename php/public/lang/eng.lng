@@ -371,6 +371,7 @@ option.session_timeout=Sign out after inactivity
 option.remember_password=Save account
 tc.remote_label=Other person
 tc.local_label=Me
+tc.type_live=Type live in this call…
 label.browser_session=Browser session
 label.email=Email
 label.xmpp_jid=XMPP JID

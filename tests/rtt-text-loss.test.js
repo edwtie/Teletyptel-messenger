@@ -12,9 +12,9 @@ function fixture() {
   const sent = [], finals = [], fallback = [];
   const conversation = { id: "fixture", peer: "peer@example.test", remoteText: "" };
   const call = { sid: "fixture-call", peer: conversation.peer, rttEnabled: true, rttNeedsReset: false,
-    rttSync: { sequence: 0 }, rttChannel: { readyState: "open", send: text => sent.push(text) } };
+    tcRemoteText: "", tcLocalText: "", tcSentText: "", rttSync: { sequence: 0 }, rttChannel: { readyState: "open", send: text => sent.push(text) } };
   const state = { call, previousText: "", mode: "relay" };
-  const el = { messageInput: { value: "" }, rttToggle: { checked: true } };
+  const el = { totalConversationLocalText: { value: "", tcCall: call }, messageInput: { value: "" }, rttToggle: { checked: true } };
   const context = vm.createContext({ state, el, ArrayBuffer, TextDecoder, Blob,
     t140Backspace: "\b", t140Delete: "\u007f", jingleRttSyncNamespace: namespace,
     teletyptelRttDataChannelProtocol: protocol, jingleRttSyncDataChannelLabel: "rtt",
@@ -22,34 +22,35 @@ function fixture() {
     addressMatches: (left, right) => left === right,
     normalizeJingleRttSyncDescriptor: value => value, currentFromJid: () => "self@example.test",
     setCallStatus() {}, jingleRttSyncStatusText: () => "status", updateCallUi() {},
-    callModeName: () => "total", dataChannelDebugSummary: () => "fixture",
+    flushTotalConversationInput() {}, callModeName: () => "total", dataChannelDebugSummary: () => "fixture",
     appendDebug() {}, escapeXml: value => value, recordTotalConversationText() {},
     createJingleRttPacketDebugXml: () => "", ensureConversationForPeer: () => conversation,
     displayNameForJid: value => value, setPeerPresence() {}, updateRemoteDraftMessage() {}, updateTotalConversationTextPanel() {},
-    applyJingleRttSyncDraft: (call, packet) => { conversation.remoteText = packet.text; },
-    applyJingleRttSyncFinal: (call, packet) => { finals.push(packet.text); conversation.remoteText = ""; },
+    applyJingleRttSyncDraft: (call, packet) => { call.tcRemoteText = packet.text; },
+    applyJingleRttSyncFinal: (call, packet) => { finals.push(packet.text); call.tcRemoteText = ""; },
     hasActiveConversation: () => true, isXmppRttConnected: () => false, createDeltaActions: () => "fixture-delta",
     sendXmppRttPacket: () => false, sendRttPacket: (event, text) => fallback.push({ event, text })
   });
   vm.runInContext(section("function configureJingleRttSyncChannel(", "function applyXmppRttElement(")
     + section("function isIgnoredT140Control(", "function applyJingleRttSyncDraft(")
-    + section("function sendRttEdit()", "function isXmppRttConnected()"), context);
+    + section("function sendRttEdit()", "function isXmppRttConnected()")
+    + section("function handleTotalConversationInput()", "function updateTotalConversationTextPanel("), context);
   return { call, state, el, sent, finals, fallback, conversation,
     receive: (text, channel) => context.handleJingleRttSyncPacket(call, text, channel),
     configure: channel => context.configureJingleRttSyncChannel(call, channel),
     send: (event, text, options) => context.sendJingleRttSyncPacket(event, text, options),
-    edit: () => context.sendRttEdit() };
+    edit: () => context.handleTotalConversationInput(), chatEdit: () => context.sendRttEdit() };
 }
 
 test("Raw RTT preserves digits, JSON-looking text, whitespace, emoji and erasure", async () => {
   const app = fixture();
   for (const text of ["0", "123", "true", "false", "null", '"Hallo"', "{}", "[]", '{"value":42}', " 123 ", "Hoi 👋", " "]) {
-    app.conversation.remoteText = "";
+    app.call.tcRemoteText = "";
     await app.receive(text);
-    assert.equal(app.conversation.remoteText, text);
+    assert.equal(app.call.tcRemoteText, text);
   }
   await app.receive("👋\b!");
-  assert.equal(app.conversation.remoteText, " !");
+  assert.equal(app.call.tcRemoteText, " !");
 });
 
 test("Versioned private channels send JSON snapshots for all edits, not mislabeled T.140", async () => {
@@ -63,7 +64,7 @@ test("Versioned private channels send JSON snapshots for all edits, not mislabel
       assert.equal(packet.text, text);
       assert.equal(packet.event, event);
       await app.receive(app.sent[0]);
-      assert.equal(event === "message" ? app.finals.at(-1) : app.conversation.remoteText, text);
+      assert.equal(event === "message" ? app.finals.at(-1) : app.call.tcRemoteText, text);
     }
   }
 });
@@ -72,14 +73,14 @@ test("Split CR/LF stays one newline and the T.140 BOM is not displayed", async (
   const app = fixture();
   await app.receive("\ufeffHallo\r");
   await app.receive("\n👋");
-  assert.equal(app.conversation.remoteText, "Hallo\n👋");
+  assert.equal(app.call.tcRemoteText, "Hallo\n👋");
   await app.receive("\b!");
-  assert.equal(app.conversation.remoteText, "Hallo\n!");
+  assert.equal(app.call.tcRemoteText, "Hallo\n!");
   await app.receive("\r");
   await app.receive(JSON.stringify({ type: "jingle-rtt-sync", namespace,
     sid: app.call.sid, event: "reset", text: "nieuw" }));
   await app.receive("\n");
-  assert.equal(app.conversation.remoteText, "nieuw\n", "A snapshot resets the raw-stream decoder");
+  assert.equal(app.call.tcRemoteText, "nieuw\n", "A snapshot resets the raw-stream decoder");
 });
 
 function channel(overrides = {}) {
@@ -134,7 +135,7 @@ test("Closed/replaced channels cannot change current call state or deliver late 
   previous.emit("error");
   previous.emit("open");
   assert.equal(app.call.rttSync.state, "connected");
-  assert.equal(app.conversation.remoteText, "");
+  assert.equal(app.call.tcRemoteText, "");
   app.state.call = { sid: app.call.sid };
   current.emit("close");
   assert.equal(app.call.rttSync.state, "connected", "Even a reused SID cannot revive an ended call");
@@ -151,13 +152,13 @@ test("Asynchronous RTT decoding retains transport order", async () => {
   incoming.emit("message", { data: blob });
   incoming.emit("message", { data: " second" });
   await new Promise(resolve => setImmediate(resolve));
-  assert.equal(app.conversation.remoteText, "");
+  assert.equal(app.call.tcRemoteText, "");
   finish("first");
   await new Promise(resolve => setImmediate(resolve));
-  assert.equal(app.conversation.remoteText, "first second");
+  assert.equal(app.call.tcRemoteText, "first second");
 });
 
-test("RTT status distinguishes co-session text, chat fallback and unavailable text", () => {
+test("RTT status distinguishes co-session text and unavailable text without claiming chat fallback", () => {
   let available = true;
   const context = vm.createContext({ state: {}, t: (key, fallback) => fallback,
     isXmppRttConnected: () => available, isRelayConnected: () => false });
@@ -165,7 +166,7 @@ test("RTT status distinguishes co-session text, chat fallback and unavailable te
   const call = { rttEnabled: true, rttChannel: { readyState: "open" }, rttSync: { state: "connected" } };
   assert.match(context.jingleRttSyncStatusText(call), /live text in this call/);
   call.rttSync.state = "fallback";
-  assert.match(context.jingleRttSyncStatusText(call), /via chat fallback/);
+  assert.match(context.jingleRttSyncStatusText(call), /unavailable/);
   available = false;
   assert.match(context.jingleRttSyncStatusText(call), /unavailable/);
   call.rttSync.state = "negotiating";
@@ -177,7 +178,7 @@ test("UTF-8 buffers and blobs take the same non-lossy receiving path", async () 
   for (const data of [new TextEncoder().encode("123"), new TextEncoder().encode("123").buffer, new Blob(["123"])]) {
     const app = fixture();
     await app.receive(data);
-    assert.equal(app.conversation.remoteText, "123");
+    assert.equal(app.call.tcRemoteText, "123");
   }
 });
 
@@ -185,14 +186,14 @@ test("Legacy reset and final envelopes still work; wrong sessions and ended call
   const app = fixture();
   const packet = { type: "jingle-rtt-sync", namespace, sid: app.call.sid, event: "reset", text: "123" };
   await app.receive(JSON.stringify(packet));
-  assert.equal(app.conversation.remoteText, "123");
+  assert.equal(app.call.tcRemoteText, "123");
   await app.receive(JSON.stringify({ ...packet, sid: "other", text: "wrong" }));
-  assert.equal(app.conversation.remoteText, "123");
+  assert.equal(app.call.tcRemoteText, "123");
   await app.receive(JSON.stringify({ ...packet, event: "message" }));
   assert.deepEqual(app.finals, ["123"]);
   app.state.call = null;
   await app.receive("late text");
-  assert.equal(app.conversation.remoteText, "");
+  assert.equal(app.call.tcRemoteText, "");
 });
 
 test("Late asynchronous decoding cannot update a replacement call", async () => {
@@ -204,7 +205,7 @@ test("Late asynchronous decoding cannot update a replacement call", async () => 
   app.state.call = { sid: "replacement" };
   finish("late");
   await pending;
-  assert.equal(app.conversation.remoteText, "");
+  assert.equal(app.call.tcRemoteText, "");
 });
 
 test("JSON-looking outgoing deltas use legacy snapshots so installed clients do not drop them", async () => {
@@ -216,38 +217,40 @@ test("JSON-looking outgoing deltas use legacy snapshots so installed clients do 
     assert.equal(packet.type, "jingle-rtt-sync");
     assert.equal(packet.text, text);
     await app.receive(app.sent[0]);
-    assert.equal(app.conversation.remoteText, text);
+    assert.equal(app.call.tcRemoteText, text);
     assert.equal(app.finals.length, 0);
   }
 });
 
-test("Failed raw send falls back to a complete snapshot and recovery resets the remote baseline", async () => {
+test("Failed TC sends preserve the separate draft and recover without sending a chat message", async () => {
   const app = fixture();
-  app.state.previousText = "Hello";
-  app.el.messageInput.value = "Hello world";
+  app.call.tcSentText = "Hello";
+  app.el.totalConversationLocalText.value = "Hello world";
   app.call.rttChannel.send = () => { throw new Error("Channel closed"); };
   assert.doesNotThrow(() => app.edit());
-  assert.deepEqual(app.fallback, [{ event: "reset", text: "Hello world" }]);
+  assert.deepEqual(app.fallback, []);
+  assert.equal(app.call.tcLocalText, "Hello world");
   assert.equal(app.call.rttNeedsReset, true);
   app.call.rttChannel.send = text => app.sent.push(text);
-  app.el.messageInput.value = "Hello world!";
+  app.el.totalConversationLocalText.value = "Hello world!";
   app.edit();
   const packet = JSON.parse(app.sent[0]);
   assert.equal(packet.event, "reset");
   assert.equal(packet.text, "Hello world!");
-  app.conversation.remoteText = "stale";
+  app.call.tcRemoteText = "stale";
   await app.receive(app.sent[0]);
-  assert.equal(app.conversation.remoteText, "Hello world!");
+  assert.equal(app.call.tcRemoteText, "Hello world!");
   assert.equal(app.call.rttNeedsReset, false);
 });
 
 test("Closed channels and failed JSON sends also preserve a reset baseline", () => {
   for (const text of ["Plain text", "123"]) {
     const app = fixture();
-    app.el.messageInput.value = text;
+    app.el.totalConversationLocalText.value = text;
     app.call.rttChannel.readyState = "closed";
     app.edit();
-    assert.deepEqual(app.fallback, [{ event: "reset", text }]);
+    assert.deepEqual(app.fallback, []);
+    assert.equal(app.call.tcLocalText, text);
     assert.equal(app.call.rttNeedsReset, true);
   }
   const app = fixture();

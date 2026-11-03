@@ -18,7 +18,7 @@ const harness = `(() => {
   const jingleRttSyncMaxSkewMs = 700;
   const t140Backspace = "\\b", t140Delete = "\\u007f";
   const conversation = { peer: "fixture@example.test", remoteText: "" };
-  const call = { sid: "fixture", peer: conversation.peer, rttEnabled: true, localStream: null };
+  const call = { sid: "fixture", peer: conversation.peer, rttEnabled: true, localStream: null, tcRemoteText: "" };
   const state = { call }, finals = [];
   const activeConversation = () => conversation, ensureConversationForPeer = () => conversation;
   const addressMatches = (left, right) => left === right;
@@ -29,13 +29,14 @@ const harness = `(() => {
   const appendDebug = () => {}, setPeerPresence = () => {}, recordTotalConversationText = () => {};
   const updateRemoteDraftMessage = () => {}, updateTotalConversationTextPanel = () => {};
   const setCallStatus = text => { window.statusText = text; }, updateCallUi = () => {};
+  const flushTotalConversationInput = () => {};
   const updateCallInputUi = () => {}, appendWebRtcStateDebug = () => {};
   const scheduleTotalConversationRecorder = () => {}, sendJingleEnvelope = () => {};
   const rtcPeerConnectionConfig = () => ({ iceServers: [] }), rtcConfigDebugSummary = () => "fixture";
   const candidateDebugSummary = () => "fixture", dataChannelDebugSummary = () => "fixture";
   const callModeName = () => "total", createJingleRttPacketDebugXml = () => "fixture";
-  const applyJingleRttSyncDraft = (call, packet) => { conversation.remoteText = packet.text; };
-  const applyJingleRttSyncFinal = (call, packet) => { finals.push(packet.text); conversation.remoteText = ""; };
+  const applyJingleRttSyncDraft = (call, packet) => { call.tcRemoteText = packet.text; };
+  const applyJingleRttSyncFinal = (call, packet) => { finals.push(packet.text); call.tcRemoteText = ""; };
   ${section("function createJingleRttSyncDescriptor(", "function rtcPeerConnectionConfig(")}
   ${section("function configureJingleRttSyncChannel(", "function applyXmppRttElement(")}
   ${section("function isIgnoredT140Control(", "function applyJingleRttSyncDraft(")}
@@ -67,7 +68,7 @@ const harness = `(() => {
       return sent;
     },
     raw: text => call.rttChannel.send(text),
-    text: () => conversation.remoteText,
+    text: () => call.tcRemoteText,
     finals: () => finals,
     close: () => call.rttChannel.close()
   };

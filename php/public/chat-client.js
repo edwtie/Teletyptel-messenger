@@ -1221,6 +1221,18 @@
     }
     el.composerForm.addEventListener("submit", sendComposerMessage);
     el.messageInput.addEventListener("input", handleComposerInput);
+    el.totalConversationLocalText.addEventListener("input", handleTotalConversationInput);
+    el.totalConversationLocalText.addEventListener("compositionstart", () => {
+      el.totalConversationLocalText.tcCompositionCall = state.call;
+      if (state.call) state.call.tcComposing = true;
+    });
+    el.totalConversationLocalText.addEventListener("compositionend", () => {
+      if (state.call && el.totalConversationLocalText.tcCompositionCall === state.call) {
+        state.call.tcComposing = false;
+        handleTotalConversationInput();
+      }
+      el.totalConversationLocalText.tcCompositionCall = null;
+    });
     el.messageInput.addEventListener("focus", scrollMessageTimelineToLatest);
     el.messageInput.addEventListener("keydown", handleComposerKeydown);
     el.switchSessionButton.addEventListener("click", switchBrowserSession);
@@ -8388,7 +8400,7 @@
     state.previousText = "";
     syncRttToolbarState();
     updateComposerAvailability();
-    if (hasActiveConversation() && (activeJingleRttSyncCall() || isRelayConnected())) {
+    if (hasActiveConversation() && (isXmppRttConnected() || isRelayConnected())) {
       sendRttReset();
     }
   }
@@ -9037,7 +9049,6 @@
     conversation.clientState = "active";
     conversation.clientStateUpdatedAt = new Date();
     appendDebug("xmpp-rtt-in", `<rtt from="${escapeXml(from)}" seq="${escapeXml(rttElement.getAttribute("seq") || "")}"/>`);
-    recordTotalConversationTextForConversation(conversation, "peer", conversation.remoteText, conversation.remoteFrom);
     updateRemoteDraftMessage(conversation.id);
     updateTotalConversationTextPanel(conversation);
   }
@@ -9664,14 +9675,10 @@
       joinXmppGroupConversation(conversation);
       const messageType = conversation?.kind === "group" ? "groupchat" : "chat";
       const xml = createMessageStanza(text, outgoingId, edit?.replaceId ?? null, false, currentToJid(), "", messageType);
-      const standardCall = state.call?.standardJingle && addressMatches(conversation.peer, state.call.peer) ? state.call : null;
       const sent = sendXmppStanza(xml);
-      if (standardCall) {
-        if (sent === false) {
-          showNotConnectedStatus();
-          return;
-        }
-        standardCall.standardJingle.setRttText("");
+      if (sent === false) {
+        showNotConnectedStatus();
+        return;
       }
       interpreter?.final(text);
       if (edit) {
@@ -9730,27 +9737,6 @@
       return;
     }
 
-    if (sendJingleRttSyncPacket("message", text, {
-      messageId: outgoingId,
-      replaceId: edit?.replaceId ?? null
-    })) {
-      interpreter?.final(text);
-      if (edit) {
-        applyMessageCorrection(edit.conversation, edit.replaceId, text, "self", outgoingId);
-        clearMessageEdit();
-      } else {
-        clearLocalRttDraftMessage();
-        addMessage("self", text, "jingle-rtt", null, null, null, null, outgoingId);
-      }
-      el.messageInput.value = "";
-      syncComposerActionButtons();
-      state.previousText = "";
-      state.sequence = 0;
-      clearLocalRttDraftMessage();
-      updateTotalConversationTextPanel();
-      return;
-    }
-
     if (!state.relaySocket || state.relaySocket.readyState !== WebSocket.OPEN) {
       showNotConnectedStatus();
       return;
@@ -9763,9 +9749,6 @@
     }
     state.relaySocket.send(JSON.stringify(envelope));
     appendDebug("relay-out", JSON.stringify(redactEnvelopeForLog(envelope)));
-    recordTotalConversationTextForConversation(activeConversation(), "self", text, currentFromJid(), {
-      final: true
-    });
     interpreter?.final(text);
     if (edit) {
       applyMessageCorrection(edit.conversation, edit.replaceId, text, "self", outgoingId);
@@ -9787,7 +9770,7 @@
       return;
     }
 
-    if (!activeJingleRttSyncCall() && !isRelayConnected() && !isXmppRttConnected()) {
+    if (!isRelayConnected() && !isXmppRttConnected()) {
       showNotConnectedStatus();
       return;
     }
@@ -9796,9 +9779,6 @@
     state.previousText = el.messageInput.value;
     updateLocalRttDraftMessage();
     updateTotalConversationTextPanel();
-    if (sendJingleRttSyncPacket("reset", el.messageInput.value)) {
-      return;
-    }
     if (sendXmppRttPacket("reset", el.messageInput.value)) {
       return;
     }
@@ -9810,8 +9790,7 @@
       return;
     }
 
-    const hasJingleRtt = Boolean(activeJingleRttSyncCall());
-    if (!hasJingleRtt && state.mode !== "relay" && !isXmppRttConnected()) {
+    if (state.mode !== "relay" && !isXmppRttConnected()) {
       return;
     }
 
@@ -9819,13 +9798,10 @@
     const previousText = state.previousText;
     const actions = createDeltaActions(previousText, text);
     state.previousText = text;
-    if (sendJingleRttSyncPacket("edit", text, { actions, previousText })) {
-      return;
-    }
     if (sendXmppRttPacket("edit", text)) {
       return;
     }
-    sendRttPacket(hasJingleRtt || state.call?.rttNeedsReset ? "reset" : "edit", text, actions);
+    sendRttPacket("edit", text, actions);
   }
 
   function isXmppRttConnected() {
@@ -9856,7 +9832,6 @@
     const sent = sendXmppStanza(xml, `<message type="${messageType}" rtt="${escapeXml(eventName)}"/>`);
     if (sent) {
       rememberOutgoingXmppRttId(outgoingId);
-      recordTotalConversationTextForConversation(conversation, "self", text, currentFromJid());
     }
     return sent;
   }
@@ -9879,7 +9854,6 @@
     }
     state.relaySocket.send(JSON.stringify(envelope));
     appendDebug("rtt-out", xml);
-    recordTotalConversationTextForConversation(activeConversation(), "self", text, currentFromJid());
   }
 
   function createRelayEnvelope(type, text, xml, to = null) {
@@ -10488,9 +10462,6 @@
       conversation.clientStateUpdatedAt = new Date();
       setPeerPresence(conversation.peer, "online");
       sendRelayMessageAcknowledgements(conversation, envelope);
-      recordTotalConversationTextForConversation(conversation, "peer", envelope.text ?? "", conversation.remoteFrom, {
-        final: true
-      });
       if (envelope.replaceId) {
         applyMessageCorrection(
           conversation,
@@ -10530,7 +10501,6 @@
     conversation.clientState = "active";
     conversation.clientStateUpdatedAt = new Date();
     setPeerPresence(conversation.peer, "online");
-    recordTotalConversationTextForConversation(conversation, "peer", conversation.remoteText, conversation.remoteFrom);
     updateRemoteDraftMessage(conversation.id);
   }
 
@@ -11502,6 +11472,7 @@
       call.standardRttState = event.state;
       if (call.rttSync) call.rttSync.state = event.state === "open" ? "connected" : "fallback";
       setCallStatus(jingleRttSyncStatusText(call));
+      if (event.state === "open") flushTotalConversationInput(call);
     } else if (event.event === "rtt") {
       applyJingleRttSyncDraft(call, { text: event.text, event: "reset", from: call.peer });
     }
@@ -11903,6 +11874,10 @@
       remoteVideoMuted: false,
       rttChannel: null,
       rttNeedsReset: true,
+      tcLocalText: "",
+      tcSentText: "",
+      tcRemoteText: "",
+      tcComposing: false,
       rttSync: rttEnabled ? createJingleRttSyncDescriptor(sid, "offered") : null,
       notificationMessageId: "",
       transcript: [],
@@ -12441,6 +12416,7 @@
       call.rttSync.state = "connected";
       setCallStatus(jingleRttSyncStatusText(call));
       appendDebug("jingle-rtt", `Datachannel open ${dataChannelDebugSummary(call, channel)}`);
+      flushTotalConversationInput(call);
       updateCallUi();
     });
 
@@ -12469,6 +12445,7 @@
       receiveQueue = receiveQueue.then(() => handleJingleRttSyncPacket(call, event.data, channel))
         .catch(() => appendDebug("jingle-rtt-error", "Could not decode RTT packet"));
     });
+    if (channel.readyState === "open" && call.tcLocalText) flushTotalConversationInput(call);
   }
 
   function activeJingleRttSyncCall() {
@@ -12636,22 +12613,13 @@
   }
 
   function applyT140DataChannelText(call, payload) {
-    const conversation = ensureConversationForPeer(call.peer, "contact", displayNameForJid(call.peer));
-    if (!conversation) {
-      return;
-    }
-
+    if (state.call !== call || call.cleaningUp) return;
     call.rttTextDecoderState ||= {};
-    conversation.remoteText = applyT140Delta(conversation.remoteText || "", payload, call.rttTextDecoderState);
-    conversation.remoteFrom = call.peer;
-    conversation.remoteDraftUpdatedAt = new Date();
-    recordTotalConversationText(call, "peer", conversation.remoteText, conversation.remoteFrom);
-    conversation.clientState = "active";
-    conversation.clientStateUpdatedAt = new Date();
-    setPeerPresence(conversation.peer, "online");
+    call.tcRemoteText = applyT140Delta(call.tcRemoteText || "", payload, call.rttTextDecoderState);
+    recordTotalConversationText(call, "peer", call.tcRemoteText, call.peer);
+    setPeerPresence(call.peer, "online");
     appendDebug("jingle-rtt-t140-in", `<t140 sid="${escapeXml(call.sid)}">${escapeXml(payload)}</t140>`);
-    updateRemoteDraftMessage(conversation.id);
-    updateTotalConversationTextPanel(conversation);
+    updateTotalConversationTextPanel();
   }
 
   function createT140LinearDelta(previous, next) {
@@ -12756,26 +12724,18 @@
   }
 
   function applyJingleRttSyncDraft(call, packet) {
-    const conversation = ensureConversationForPeer(call.peer, "contact", displayNameForJid(call.peer));
-    if (!conversation) {
-      return;
-    }
-
-    const text = String(packet.text ?? "");
-    conversation.remoteText = packet.event === "reset" ? text : text;
-    conversation.remoteFrom = packet.from || call.peer;
-    conversation.remoteDraftUpdatedAt = new Date(packet.timestamp || Date.now());
-    recordTotalConversationText(call, "peer", conversation.remoteText, conversation.remoteFrom, {
-      timestamp: conversation.remoteDraftUpdatedAt.toISOString()
+    if (state.call !== call || call.cleaningUp) return;
+    call.tcRemoteText = String(packet.text ?? "");
+    recordTotalConversationText(call, "peer", call.tcRemoteText, call.peer, {
+      timestamp: packet.timestamp || new Date().toISOString()
     });
-    conversation.clientState = "active";
-    conversation.clientStateUpdatedAt = new Date();
-    setPeerPresence(conversation.peer, "online");
-    updateRemoteDraftMessage(conversation.id);
-    updateTotalConversationTextPanel(conversation);
+    setPeerPresence(call.peer, "online");
+    updateTotalConversationTextPanel();
   }
 
   function applyJingleRttSyncFinal(call, packet) {
+    if (state.call !== call || call.cleaningUp) return;
+    call.tcRemoteText = "";
     const conversation = ensureConversationForPeer(call.peer, "contact", displayNameForJid(call.peer));
     if (!conversation) {
       return;
@@ -13138,15 +13098,6 @@
     call.transcriptDrafts[key] = line.text.trim() ? line : null;
   }
 
-  function recordTotalConversationTextForConversation(conversation, direction, text, from = "", options = {}) {
-    const call = state.call;
-    if (!conversation || !isTotalConversationCall(call) || !addressMatches(conversation.peer, call.peer)) {
-      return;
-    }
-
-    recordTotalConversationText(call, direction, text, from, options);
-  }
-
   function persistConversationHistoryCall(call, status = "ended") {
     if (!state.historySettings.saveTotalConversation || !state.account?.accountId || !isTotalConversationCall(call)) {
       return;
@@ -13448,7 +13399,8 @@
     }
 
     closeIncomingCallBrowserNotification();
-    messageTranslation.clearLive();
+    messageTranslation.clearLive("tc-peer");
+    messageTranslation.clearLive("tc-self");
     persistConversationHistoryCall(call, historyStatus);
     stopTotalConversationRecorder(call);
     const updatedNotification = updateCallNotificationMessage(call, historyStatus);
@@ -13995,6 +13947,7 @@
   function openCallKeypad() {
     if (!state.call || state.call.incomingOffer || el.callKeypadDialog.open) return;
     el.messageInput.blur();
+    el.totalConversationLocalText.blur();
     state.callKeypadSession = state.call;
     el.callKeypadDialog.showModal();
     updateCallInputUi();
@@ -14006,7 +13959,7 @@
     state.callKeypadSession = null;
     state.totalConversationTextVisible = true;
     updateCallUi();
-    if (!el.messageInput.disabled) el.messageInput.focus({ preventScroll: true });
+    if (!el.totalConversationLocalText.disabled) el.totalConversationLocalText.focus({ preventScroll: true });
   }
 
   function sendCallDigit(digit) {
@@ -14051,10 +14004,6 @@
   }
 
   function hasActiveMessageTransport() {
-    if (activeJingleRttSyncCall()) {
-      return true;
-    }
-
     return state.mode === "xmpp"
       ? state.xmppSocket?.readyState === WebSocket.OPEN
       : isRelayConnected();
@@ -14129,9 +14078,7 @@
     }
 
     if (call?.rttSync?.state === "fallback") {
-      return isXmppRttConnected() || isRelayConnected()
-        ? t("call.rtt_fallback", "Call connected - live text via chat fallback")
-        : t("call.rtt_unavailable", "Call connected - live text unavailable");
+      return t("call.rtt_unavailable", "Call connected - live text unavailable");
     }
 
     if (call?.standardRttState === "open" || call?.rttChannel?.readyState === "open") {
@@ -15087,15 +15034,41 @@
         hasDraft = true;
       }
     }
-    for (const [id, direction] of [["remoteDraftTranslation", "peer"], ["totalConversationRemoteTranslation", "peer"], ["totalConversationLocalTranslation", "self"]]) {
+    for (const [id, direction] of [["remoteDraftTranslation", "peer"], ["totalConversationRemoteTranslation", "tc-peer"], ["totalConversationLocalTranslation", "tc-self"]]) {
       const container = byId(id);
       container.replaceChildren();
       messageTranslation.renderLive(container, direction, activeConversation()?.remoteFrom || "");
-      if (direction === "self" && activeConversation() && el.messageInput.value.trim()) messageTranslation.renderOwnStatus(container);
+      if (direction === "tc-self" && state.call?.tcLocalText?.trim()) messageTranslation.renderOwnStatus(container);
       container.closest(".tc-text-line")?.classList.toggle("has-live-translation", container.childElementCount > 0);
     }
     if (hasDraft && followLatest) el.messageTimeline.scrollTop = el.messageTimeline.scrollHeight;
     updateScrollToLatestButton();
+  }
+
+  function handleTotalConversationInput() {
+    const call = state.call;
+    if (!call?.rttEnabled || call.incomingOffer || call.cleaningUp
+      || el.totalConversationLocalText.tcCall !== call || isActiveConversationBlocked()) return;
+    call.tcLocalText = el.totalConversationLocalText.value;
+    if (call.tcComposing) return;
+    recordTotalConversationText(call, "self", call.tcLocalText, currentFromJid());
+    flushTotalConversationInput(call);
+    updateTotalConversationTextPanel();
+  }
+
+  function flushTotalConversationInput(call) {
+    if (state.call !== call || !call?.rttEnabled || call.incomingOffer || call.cleaningUp || call.tcComposing) return;
+    const text = call.tcLocalText || "";
+    const previousText = call.tcSentText || "";
+    if (text === previousText && !call.rttNeedsReset) return;
+    if (!activeJingleRttSyncCall()) {
+      setCallStatus(jingleRttSyncStatusText(call));
+      return;
+    }
+    if (sendJingleRttSyncPacket(call.rttNeedsReset ? "reset" : "edit", text, { previousText })) {
+      call.tcSentText = text;
+      call.rttNeedsReset = false;
+    }
   }
 
   function updateTotalConversationTextPanel(conversation = activeConversation()) {
@@ -15106,6 +15079,7 @@
       && conversation
       && addressMatches(conversation.peer, call.peer)
       && !call.incomingOffer
+      && !call.cleaningUp
       && state.totalConversationTextVisible
     );
     const fullTextMode = visible && shouldUseFullTotalConversationText(call);
@@ -15115,30 +15089,27 @@
     document.body.classList.toggle("tc-text-full-active", fullTextMode);
     updatePhoneLandscapeCallMode(visible);
     el.totalConversationTextPanel.hidden = !visible;
+    el.totalConversationLocalText.disabled = !visible || isActiveConversationBlocked();
+    el.totalConversationLocalText.tcCall = visible ? call : null;
+    el.totalConversationRemotePreviousText.hidden = true;
+    el.totalConversationLocalPreviousText.hidden = true;
+    el.totalConversationRemotePreviousText.textContent = "";
+    el.totalConversationLocalPreviousText.textContent = "";
     if (!visible) {
-      el.totalConversationRemotePreviousText.textContent = "";
       el.totalConversationRemoteText.textContent = "";
-      el.totalConversationLocalPreviousText.textContent = "";
-      el.totalConversationLocalText.textContent = "";
+      el.totalConversationLocalText.value = "";
+      messageTranslation.clearLive("tc-peer");
+      messageTranslation.clearLive("tc-self");
       return;
     }
 
-    el.totalConversationRemoteName.textContent = displayNameForJid(conversation.remoteFrom || call.peer);
-    el.totalConversationRemotePreviousText.textContent = lastPeerConversationText(conversation);
-    el.totalConversationRemoteText.textContent = conversation.remoteText || "";
-    el.totalConversationLocalPreviousText.textContent = lastLocalConversationText(conversation);
-    el.totalConversationLocalText.textContent = el.messageInput.value || "";
-  }
-
-  function lastLocalConversationText(conversation) {
-    for (let index = conversation.messages.length - 1; index >= 0; index--) {
-      const message = conversation.messages[index];
-      if (message.direction === "self" && !message.draft && !message.attachment && !message.location && message.text) {
-        return message.text;
-      }
+    el.totalConversationRemoteName.textContent = displayNameForJid(call.peer);
+    el.totalConversationRemoteText.textContent = call.tcRemoteText || "";
+    if (el.totalConversationLocalText.value !== (call.tcLocalText || "")) {
+      el.totalConversationLocalText.value = call.tcLocalText || "";
     }
-
-    return "";
+    messageTranslation.setLiveDraft(call.sid, call.tcRemoteText || "", call.peer, "peer", "tc-peer");
+    messageTranslation.setLiveDraft(call.sid, call.tcLocalText || "", currentFromJid(), "self", "tc-self");
   }
 
   function lastPeerConversationText(conversation) {
@@ -15148,7 +15119,6 @@
         return message.text;
       }
     }
-
     return "";
   }
 

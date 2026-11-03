@@ -11,7 +11,7 @@ const source = section("updateCallUi()", "savedCallVideoHeight()")
   + section("isLocalCameraOff(", "isVideoMissingForTotalConversation(")
   + section("activeVideoTracks(", "updateVideoElementSource(")
   + section("setCallModeButtonsHidden(", "updateMicrophoneMuteUi()")
-  + section("updateTotalConversationTextPanel(", "lastLocalConversationText(");
+  + section("updateTotalConversationTextPanel(", "lastPeerConversationText(");
 const markup = fs.readFileSync(path.join(root, "chat.html"), "utf8")
   .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "").replace(/<link\b[^>]*>/gi, "");
 
@@ -41,6 +41,8 @@ for (const [name, engine] of Object.entries({ chromium, webkit })) {
           const updateTotalConversationTextToggleUi = () => {}, applyRemoteVolume = () => {}, refreshLiveTranslation = () => {};
           const shouldUseFullTotalConversationText = () => false, updatePhoneLandscapeCallMode = () => {};
           const displayNameForJid = () => 'Edward', lastPeerConversationText = () => '', lastLocalConversationText = () => '';
+          const messageTranslation = { clearLive() {}, setLiveDraft() {} };
+          const isActiveConversationBlocked = () => false, currentFromJid = () => 'self@example.test';
           return { state, update: updateCallUi };
         `)();
         callFixture.update();
