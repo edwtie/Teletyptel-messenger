@@ -57,10 +57,19 @@ for (const engine of [chromium, webkit]) {
         assert.ok(line.height >= text.height / 2 - 16, "RTT must expand rather than stay capped at 120px");
         assert.equal(await page.locator("#composerForm").isVisible(), false, "Ordinary chat is hidden during TC");
         assert.ok(controls.y + controls.height <= height + 2, "Call controls remain on screen");
-        for (const selector of [".tc-text-local", ".tc-text-remote", "#totalConversationLocalText", ".call-media-controls"]) {
+        for (const selector of [".tc-text-local", ".tc-text-remote"]) {
+          assert.equal(await page.locator(selector).evaluate(element => getComputedStyle(element).borderTopColor),
+            "rgb(36, 82, 138)", "Dark-blue frames separate the two TC speakers");
+        }
+        for (const selector of ["#totalConversationLocalText", ".call-media-controls"]) {
           assert.equal(await page.locator(selector).evaluate(element => getComputedStyle(element).borderTopColor),
             "rgba(0, 0, 0, 0)", "No light-blue TC frames");
         }
+        await page.locator("#totalConversationLocalText").focus();
+        assert.deepEqual(await page.locator("#totalConversationLocalText").evaluate(element => ({
+          outline: getComputedStyle(element).outlineStyle,
+          shadow: getComputedStyle(element).boxShadow
+        })), { outline: "none", shadow: "none" }, "Typing adds no separate focus frame");
         if (!keyboard && width === 390) {
           await page.locator("#totalConversationLocalText").fill("Live RTT\nMijn antwoord 👋");
           assert.equal(await page.locator("#totalConversationLocalText").inputValue(), "Live RTT\nMijn antwoord 👋");

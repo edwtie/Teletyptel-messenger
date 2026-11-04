@@ -47,3 +47,15 @@ Release scope and exclusions remain unchanged. Local phone/tablet layout,
 startup, keyboard and call regression checks passed. Native compilation and
 simulator startup run in GitHub before the protected upload is approved.
 Real-device verification is still needed, especially TC with the keyboard open.
+
+## Patch 16.3 — 2026-11-04
+
+- Restore dark-blue borders around the own and peer RTT areas.
+- Remove the separate white focus outline and shadow while typing in TC.
+- Preserve the hidden ordinary chat composer during TC and restore it afterward.
+
+Only this visual correction, cache updates and regression coverage are included.
+The same release exclusions apply. Internal TestFlight uploads now proceed after
+successful preflight without a manual reviewer; the environment remains limited
+to the release branch and keeps its signing/upload credentials protected. This
+does not authorize public App Store publication.

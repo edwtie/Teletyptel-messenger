@@ -1,4 +1,4 @@
-const CACHE_NAME = "teletyptel-webclient-v487";
+const CACHE_NAME = "teletyptel-webclient-v488";
 const BUILD_VERSION = "20261103-tc-clean-view";
 const ASSETS = [
   "chat.html",
@@ -9,7 +9,7 @@ const ASSETS = [
   "chat-dialer.css?v=20261031-keypad-letters",
   "chat-dialer.js?v=20261031-iphone-contacts",
   "dev.html",
-  "chat-client.css?v=20261103-tc-clean-view",
+  "chat-client.css?v=20261104-tc-rtt-frames",
   "chat-xmpp-translation.js?v=20261103-translation-status",
   "chat-translation.js?v=20261103-tc-clean-view",
   "mobile-navigation.js?v=20261102-all-call-layout",

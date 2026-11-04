@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### TC speaker frames — 2026-11-04
+
+- Restore dark-blue boundaries around the own and peer RTT areas, without a
+  separate focus outline or shadow while typing in the own TC field.
+- Prepared for internal build 16.3; not included in build 16.2.
+
 ### Cleaner TC view and native startup progress — 2026-11-03
 
 - Hide ordinary chat and its composer while the TC view is active; restore the

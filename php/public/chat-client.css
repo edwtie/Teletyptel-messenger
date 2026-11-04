@@ -3193,9 +3193,10 @@ body.device-ios .account-dialog-grid label.ios-facing-control {
   opacity: 1;
 }
 
+#totalConversationLocalText:focus,
 #totalConversationLocalText:focus-visible {
-  outline: 1px solid #fff;
-  outline-offset: -2px;
+  outline: none;
+  box-shadow: none;
 }
 
 html body.call-active.tc-call-active #composerForm,
@@ -3205,10 +3206,14 @@ html body.call-active.tc-call-active #remoteDraft {
 }
 
 html body.call-active.tc-call-active #callPanel,
-html body.call-active.tc-call-active #callPanel .tc-text-line,
 html body.call-active.tc-call-active #callPanel .call-media-controls,
 html body.call-active.tc-call-active #callPanel .live-rtt-translation {
   border-color: transparent;
+  box-shadow: none;
+}
+
+html body.call-active.tc-call-active #callPanel .tc-text-line {
+  border-color: #24528a;
   box-shadow: none;
 }
 
