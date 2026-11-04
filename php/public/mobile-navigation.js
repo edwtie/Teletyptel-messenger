@@ -152,10 +152,10 @@
     if (restoreFocus) moreToggle.focus();
     if (open) setOpen(false);
   };
-  const syncLayout = () => {
+  const syncLayout = (force = false) => {
     const nextCompact = mobile.matches && !document.body.classList.contains("call-active")
       && callStateControls.every((element) => element.hidden);
-    if (nextCompact === compact) return;
+    if (nextCompact === compact && force !== true) return;
     const focusedControl = controls.find(({ element }) => element === document.activeElement);
     setMoreOpen(false);
     setOpen(false);
@@ -186,6 +186,7 @@
     }
   });
   mobile.addEventListener("change", syncLayout);
+  window.addEventListener("teletyptel:call-controls-restored", () => syncLayout(true));
   window.addEventListener("pagehide", () => setMoreOpen(false));
   new MutationObserver(syncLayout).observe(document.body, { attributes: true, attributeFilter: ["class"] });
   const callStateObserver = new MutationObserver(syncLayout);

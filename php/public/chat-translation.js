@@ -220,12 +220,14 @@ window.TeleTypTelTranslation = {
 
     const liveAllowed = (direction = "peer") => loaded && !paused && available && preferences.mode !== "off"
       && preferences[["self", "tc-self"].includes(direction) ? "ownLiveRttConsent" : "liveRttConsent"] === true && !document.hidden;
-    const renderOwnStatus = (container) => {
-      if (liveAllowed("self") || document.hidden) return;
+    const renderLiveStatus = (container, direction = "self") => {
+      if (liveAllowed(direction) || document.hidden) return;
       const reason = !loaded ? statusKey : paused ? "preferences_unsaved" : !available ? "unavailable"
-        : preferences.mode === "off" ? "disabled" : "own_live_disabled";
-      const wrapper = document.createElement("div");
+        : preferences.mode === "off" ? "disabled" : ["self", "tc-self"].includes(direction) ? "own_live_disabled" : "peer_live_disabled";
+      const wrapper = document.createElement("details");
       wrapper.className = "translation-notice";
+      const summary = document.createElement("summary");
+      summary.textContent = label("settings_action");
       const explanation = document.createElement("div");
       explanation.setAttribute("role", "status");
       explanation.textContent = label(reason);
@@ -234,9 +236,10 @@ window.TeleTypTelTranslation = {
       button.textContent = label(["sign_in", "session_expired"].includes(reason) ? "sign_in_action" : "settings_action");
       button.disabled = ["loading", "saving"].includes(reason);
       button.addEventListener("click", () => openSettings(reason));
-      wrapper.append(explanation, button);
+      wrapper.append(summary, explanation, button);
       container.append(wrapper);
     };
+    const renderOwnStatus = (container) => renderLiveStatus(container, "self");
     const scheduleLive = () => {
       clearTimeout(liveTimer);
       liveTimer = null;
@@ -316,7 +319,8 @@ window.TeleTypTelTranslation = {
       const summary = document.createElement("summary");
       summary.textContent = label("heading");
       const explanation = document.createElement("small");
-      explanation.textContent = label("warning") + (provisional ? " " + label("live_provisional") + "." : "") + " · Google · " + targetLanguage;
+      explanation.textContent = label("warning") + " " + label("private_view")
+        + (provisional ? " " + label("live_provisional") + "." : "") + " · Google · " + targetLanguage;
       details.append(summary, explanation);
       details.addEventListener("toggle", () => { info.detailsOpen = details.open; });
       return details;
@@ -393,12 +397,13 @@ window.TeleTypTelTranslation = {
     const incoming = (message) => {
       if (loaded && !paused && available && preferences.mode === "automatic" && preferences.automaticConsent
           && message.direction === "peer" && eligible(message)) {
+        if (currentResult(message) || queue.includes(message)) return;
         if (queue.length >= 30) {
           results.set(message, { original: message.text, target: preferences.targetLanguage, error: "limit_reached" });
           return;
         }
         queue.push(message);
-        void drain();
+        queueMicrotask(() => { void drain(); });
       }
     };
     const menuAction = (message) => {
@@ -421,8 +426,8 @@ window.TeleTypTelTranslation = {
       }
     };
     const render = (message, container) => {
-      if (message?.draft && message.direction === "self" && message.text?.trim() && !message.retracted && !liveAllowed("self")) {
-        renderOwnStatus(container);
+      if (message?.draft && ["self", "peer"].includes(message.direction) && message.text?.trim() && !message.retracted && !liveAllowed(message.direction)) {
+        renderLiveStatus(container, message.direction);
         return;
       }
       const liveDraft = findLiveDraft(message?.direction, message?.from || "");
@@ -432,6 +437,7 @@ window.TeleTypTelTranslation = {
         return;
       }
       if (!loaded || paused || !available || preferences.mode === "off" || !eligible(message)) return;
+      incoming(message);
       const result = currentResult(message);
       if (!result || result.hidden) return;
       const wrapper = document.createElement("div");
@@ -455,7 +461,7 @@ window.TeleTypTelTranslation = {
       container.append(wrapper);
     };
     updateControls();
-    return { setAccount, validatePreferences, savePreferences, render, menuAction, activate, incoming, setLiveDraft, setPeerDrafts, renderLive, renderOwnStatus, clearLive,
+    return { setAccount, validatePreferences, savePreferences, render, menuAction, activate, incoming, setLiveDraft, setPeerDrafts, renderLive, renderLiveStatus, renderOwnStatus, clearLive,
       refreshLabels: () => { showStatus(statusKey); refreshLive(); } };
   }
 };

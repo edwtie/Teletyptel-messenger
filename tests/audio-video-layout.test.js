@@ -30,6 +30,7 @@ for (const engine of [chromium, webkit]) {
           const state = { call: null, totalConversationTextVisible: false };
           const activeConversation = () => ({ peer: 'fixture@example.test' });
           const hasVideoTrack = stream => Boolean(stream?.video);
+          const isLocalCameraOff = () => false, isRemoteCameraOff = () => false;
           const addressMatches = (left, right) => left === right;
           const interpreter = { hasMedia: () => false };
           const incomingCallTitle = () => 'Incoming call', incomingCallText = () => 'Fixture';
@@ -87,7 +88,7 @@ for (const engine of [chromium, webkit]) {
               const video = page.locator(mode === "video" ? "#remoteVideo" : "#localVideo");
               const bounds = await video.boundingBox();
               assert.ok(bounds.height > 0 && bounds.y + bounds.height <= boxes[".call-media-controls"].y + 1, JSON.stringify({ boxes, bounds }));
-              assert.equal(await video.evaluate(element => getComputedStyle(element).objectFit), "cover");
+              assert.equal(await video.evaluate(element => getComputedStyle(element).objectFit), "contain", "The entire camera frame remains visible without cropping");
             }
             if (device === "tablet") {
               await page.locator("#callContactsToggle").click();

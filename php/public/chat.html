@@ -15,10 +15,11 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="favicon.ico" sizes="any">
   <link rel="apple-touch-icon" href="assets/brand/teletyptel-icon-192.png">
-  <link rel="stylesheet" href="chat-client.css?v=20261104-accessibility-fixes">
+  <link rel="stylesheet" href="chat-client.css?v=20261104-compact-translation">
   <link rel="stylesheet" href="xmpp-availability.css?v=20261103-startup-progress">
   <link rel="stylesheet" href="chat-dialer.css?v=20261031-keypad-letters">
-  <link rel="stylesheet" href="chat-tablet.css?v=20261103-camera-off-rtt">
+  <link rel="stylesheet" href="chat-tablet.css?v=20261104-video-fit">
+  <link rel="stylesheet" href="call-controls-menu.css?v=20261104-call-menu">
 </head>
 <body class="account-booting">
   <a class="skip-link" href="#messageInput" data-i18n="button.skip_to_message">Skip to message</a>
@@ -203,6 +204,20 @@
             <a href="tolk/" target="_blank" rel="noopener" data-i18n="interpreter.workspace">Tolkwerkplek</a>
             <span id="mobileCallStatus" class="chat-more-status"></span>
           </div>
+          <div id="callCompactToolbar" class="call-compact-toolbar" hidden>
+            <div id="callCameraSwitchSlot"></div>
+            <div class="call-menu-toggle-wrap">
+              <button id="callControlsToggle" class="icon-button" type="button" aria-expanded="false" aria-haspopup="dialog" aria-controls="callControlsMenu" aria-label="Call settings" title="Call settings" data-i18n-aria-label="call.settings" data-i18n-title="call.settings">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="8" cy="6" r="2" fill="currentColor"/><circle cx="16" cy="12" r="2" fill="currentColor"/><circle cx="10" cy="18" r="2" fill="currentColor"/></svg>
+              </button>
+              <span class="call-muted-indicators">
+                <span id="callCameraOffIndicator" role="img" aria-label="Camera off" title="Camera off" data-i18n-aria-label="call.camera_off_state" data-i18n-title="call.camera_off_state" hidden><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="6" width="12" height="12" rx="2"/><path d="m15 10 6-4v12l-6-4M2 2l20 20"/></svg></span>
+                <span id="callMicrophoneOffIndicator" role="img" aria-label="Microphone off" title="Microphone off" data-i18n-aria-label="call.microphone_off_state" data-i18n-title="call.microphone_off_state" hidden><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3M2 2l20 20"/></svg></span>
+              </span>
+            </div>
+            <div id="callHangupSlot"></div>
+          </div>
+          <div id="callControlsMenu" class="call-controls-menu" role="dialog" aria-labelledby="callControlsToggle" hidden></div>
         </div>
 
         <section id="incomingCallBanner" class="incoming-call" hidden role="alert" aria-live="assertive">
@@ -1431,14 +1446,15 @@
   <script src="jingle-webrtc-audio.js?v=20261103-tc-clean-view"></script>
   <script src="jingle-call-router.js?v=20261103-tc-clean-view"></script>
   <script src="chat-xmpp-translation.js?v=20261103-translation-status"></script>
-  <script src="chat-translation.js?v=20261103-tc-clean-view"></script>
+  <script src="chat-translation.js?v=20261104-compact-translation"></script>
   <script src="native-google.js?v=20261031-bundled-interface"></script>
   <script src="native-facebook.js?v=20261101-native-facebook"></script>
   <script src="native-biometric.js?v=20261102-faceid"></script>
   <script src="xmpp-availability.js?v=20261103-startup-progress"></script>
   <script src="chat-modal.js?v=20261104-accessibility-fixes"></script>
-  <script src="chat-client.js?v=20261104-accessibility-fixes"></script>
+  <script src="chat-client.js?v=20261104-compact-translation"></script>
   <script src="chat-interpreter.js?v=20261104-accessibility-fixes"></script>
-  <script src="mobile-navigation.js?v=20261102-all-call-layout"></script>
+  <script src="mobile-navigation.js?v=20261104-call-menu"></script>
+  <script src="call-controls-menu.js?v=20261104-call-menu"></script>
 </body>
 </html>

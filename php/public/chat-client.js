@@ -916,7 +916,8 @@
       }
       openAccountDialog({ mode: "settings" });
       setAccountSettingsPanel("privacy", { focus: false });
-      const control = byId(reason === "manual_consent_required" ? "translationManualConsent" : "translationOwnLiveConsent");
+      const control = byId(reason === "manual_consent_required" ? "translationManualConsent"
+        : reason === "peer_live_disabled" ? "translationLiveConsent" : "translationOwnLiveConsent");
       control.scrollIntoView({ block: "center" });
       control.focus({ preventScroll: true });
     } });
@@ -13787,13 +13788,13 @@
       }
     };
 
-    if (video.readyState >= HTMLMediaElement.HAVE_METADATA && video.videoWidth && video.videoHeight) {
-      apply();
-      return;
+    if (!video.teletyptelOrientationWatcherAttached) {
+      video.addEventListener("loadedmetadata", apply);
+      video.addEventListener("resize", apply);
+      video.teletyptelOrientationWatcherAttached = true;
     }
 
-    video.addEventListener("loadedmetadata", apply, { once: true });
-    video.addEventListener("resize", apply);
+    apply();
   }
 
   function startVideoPlayback(video) {
@@ -15044,7 +15045,7 @@
         draftBody.querySelector(".live-rtt-translation")?.remove();
         draftBody.querySelector(".translation-notice")?.remove();
         messageTranslation.renderLive(draftBody, direction, draftBody.closest('[data-draft-sender]')?.dataset.draftSender || "");
-        if (direction === "self") messageTranslation.renderOwnStatus(draftBody);
+        messageTranslation.renderLiveStatus(draftBody, direction);
         hasDraft = true;
       }
     }
@@ -15053,6 +15054,7 @@
       container.replaceChildren();
       messageTranslation.renderLive(container, direction, activeConversation()?.remoteFrom || "");
       if (direction === "tc-self" && state.call?.tcLocalText?.trim()) messageTranslation.renderOwnStatus(container);
+      if (direction === "tc-peer" && state.call?.tcRemoteText?.trim()) messageTranslation.renderLiveStatus(container, direction);
       container.closest(".tc-text-line")?.classList.toggle("has-live-translation", container.childElementCount > 0);
     }
     if (hasDraft && followLatest) el.messageTimeline.scrollTop = el.messageTimeline.scrollHeight;

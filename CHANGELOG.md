@@ -2,6 +2,33 @@
 
 ## Unreleased
 
+### Compact private translation views — 2026-11-04
+
+- Show the translation link beside short translated text instead of a padded
+  card, keeping readable text size and expandable privacy/error explanations.
+- Automatically translate displayed incoming messages when automatic mode and
+  its consent are enabled, including history loaded before preferences are ready.
+  Deduplicate queued requests across rerenders. Never send translated text back
+  to the other participant or replace the original message.
+- Explain missing incoming live-RTT permission in chat and TC, with a shortcut
+  to the incoming-text consent control. Keep own and incoming draft permissions
+  separate; do not silently enable either permission.
+- Verify both translation directions and compact phone/tablet layouts with
+  Chromium and WebKit fixtures, without real provider calls or device claims.
+
+### Compact call menu and full video frames — 2026-11-04
+
+- Move existing audio, camera, RTT, keypad and interpreter controls into a top
+  call-settings disclosure. Keep camera switching and hangup directly accessible,
+  with persistent camera-off/microphone-off indicators. Preserve the existing
+  controls and their listeners; restore normal chat navigation when a call ends.
+- Support Escape, outside dismissal, focus restoration and scrollable controls
+  on short viewports, including portrait/landscape phone and tablet layouts.
+- Fit the complete camera frame without cropping and follow subsequent video
+  dimension changes without accumulating orientation listeners.
+- Local browser fixtures cover Chromium/WebKit. Native assets are prepared;
+  publication and real-device TestFlight acceptance are still pending.
+
 ### Translation IQ routing — 2026-11-04
 
 - Fix the Jingle handler consuming discovery replies intended for the XMPP

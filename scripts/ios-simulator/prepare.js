@@ -9,7 +9,7 @@ const project = path.join(output, "project");
 const assets = [
   "chat.html", "chat-client.js", "chat-client.css", "chat-dialer.js", "chat-dialer.css",
   "jingle-history.js", "chat-xmpp-translation.js", "chat-translation.js", "chat-interpreter.js", "chat-modal.js",
-  "mobile-navigation.js", "vendor/qrcode.js", "lang/ned.lng", "lang/eng.lng",
+  "mobile-navigation.js", "call-controls-menu.css", "call-controls-menu.js", "vendor/qrcode.js", "lang/ned.lng", "lang/eng.lng",
   "assets/brand/teletyptel-logo-header.png", "assets/brand/teletyptel-logo-header@2x.png",
   "assets/brand/teletyptel-icon-192.png", "assets/icons/chevron-down-icon.svg",
   "assets/backgrounds/teletyptel-bg-wide-1.png", "assets/backgrounds/teletyptel-bg-wide-2.png",

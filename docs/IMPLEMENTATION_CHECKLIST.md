@@ -3,6 +3,22 @@
 This checklist tracks protocol and product progress. Use `[x]` only when the
 item is implemented, tested and documented.
 
+## Local call controls and video layout — 2026-11-04
+
+- [x] Keep camera switching and hangup outside a compact top call-settings menu;
+  move existing controls without replacing video elements or RTT input.
+- [x] Preserve visible camera/microphone-off indicators, translated control labels,
+  keyboard focus, Escape and normal chat navigation after a call ends.
+- [x] Test full-frame video fitting and repeated iPad portrait/landscape transitions
+  in Chromium/WebKit with synthetic fixtures (`tests/call-video-fit.test.js` and
+  `tests/call-controls-menu.test.js`). These are not physical-device media tests.
+- [ ] Publish a separately approved native build and verify menu, camera switching,
+  real RTT, assistive technology and rotation on physical iPhone/iPad devices.
+
+The existing `ios-bundled-ui.test.js` sign-in `inert` assertion also fails with
+the call-menu module disabled and the previous navigation code. It remains a
+separate startup-test issue, not a passing native acceptance check.
+
 ## Accessibility remediation — 2026-11-04
 
 - [x] Correct incoming-answer text contrast and interpreter keyboard-focus contrast.

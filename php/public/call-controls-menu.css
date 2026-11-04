@@ -1,0 +1,188 @@
+.call-control-caption {
+  display: none;
+}
+
+body.call-menu-active .chat-header {
+  position: relative;
+  z-index: 10;
+}
+
+body.call-menu-active .chat-header-actions,
+body.call-menu-active #hangupCallPanelButton {
+  display: none !important;
+}
+
+body.call-menu-active .call-compact-toolbar {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+}
+
+body.call-menu-active .call-compact-toolbar button,
+body.call-menu-active .call-compact-toolbar .ios-facing-control {
+  width: 44px !important;
+  min-width: 44px !important;
+  height: 44px !important;
+  min-height: 44px !important;
+  margin: 0;
+}
+
+body.call-menu-active .call-compact-toolbar .ios-facing-control {
+  display: flex !important;
+}
+
+.call-compact-toolbar .ios-facing-control select,
+.call-compact-toolbar .ios-facing-control::after {
+  display: none !important;
+}
+
+.call-menu-toggle-wrap {
+  position: relative;
+}
+
+.call-muted-indicators {
+  position: absolute;
+  display: flex;
+  justify-content: center;
+  gap: 2px;
+  bottom: -5px;
+  inset-inline: 0;
+  pointer-events: none;
+}
+
+.call-muted-indicators > span:not([hidden]) {
+  display: inline-flex;
+  padding: 2px;
+  border-radius: 4px;
+  background: #a51d2d;
+  color: #fff;
+}
+
+body.call-menu-active .call-controls-menu:not([hidden]) {
+  display: block;
+  position: absolute;
+  top: 100%;
+  right: 8px;
+  z-index: 20;
+  width: min(380px, calc(100vw - 16px));
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 12px;
+  border: 1px solid #42618a;
+  border-radius: 12px;
+  background: #0b1628;
+  color: #fff;
+  box-shadow: 0 8px 24px #0006;
+}
+
+body.call-menu-active #callControlsMenu .call-media-controls {
+  position: static !important;
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0;
+  padding: 0 !important;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+body.call-menu-active #callControlsMenu .call-media-controls > button:not([hidden]) {
+  display: flex !important;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  width: 100% !important;
+  height: auto !important;
+  min-width: 0 !important;
+  min-height: 68px !important;
+  padding: 8px 4px;
+  white-space: normal;
+}
+
+#callControlsMenu .call-control-caption {
+  display: block;
+  font-size: 12px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+  color: inherit;
+}
+
+#callControlsMenu .material-icon,
+#callControlsMenu .volume-control > span {
+  color: inherit;
+}
+
+body.device-ios.call-menu-active #callControlsMenu .call-device-controls {
+  display: none;
+}
+
+body.call-menu-active #callControlsMenu .call-media-controls > button {
+  background: #17385d !important;
+  border-color: #7196c4 !important;
+  color: #fff !important;
+}
+
+body.call-menu-active #callControlsMenu .call-media-controls > button.selected {
+  background: #9e2338 !important;
+}
+
+body.call-menu-active #callControlsMenu .call-media-controls > button:disabled {
+  background: #253244 !important;
+  opacity: .65;
+}
+
+body.call-menu-active #callControlsMenu [hidden],
+body.call-menu-active #callControlsMenu #hangupCallPanelButton {
+  display: none !important;
+}
+
+body.call-menu-active #callControlsMenu .call-device-controls,
+body.call-menu-active #callControlsMenu .volume-control {
+  grid-column: 1 / -1;
+  width: 100%;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+body.call-menu-active #callControlsMenu .volume-control input {
+  flex: 1;
+  min-width: 0;
+  width: 80px;
+  min-height: 44px;
+}
+
+body.call-menu-active #callControlsMenu .volume-control {
+  display: flex !important;
+}
+
+body.call-menu-active #callControlsMenu button:focus-visible,
+body.call-menu-active .call-compact-toolbar button:focus-visible {
+  outline: 3px solid #ffc34d !important;
+  outline-offset: 2px;
+}
+
+@media (max-width: 640px) {
+  body.call-menu-active .chat-header {
+    gap: 6px !important;
+    padding-inline: max(8px, env(safe-area-inset-left)) max(8px, env(safe-area-inset-right)) !important;
+  }
+
+  body.call-menu-active .chat-title {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  body.call-menu-active .avatar-header {
+    display: none;
+  }
+
+  body.call-menu-active .call-compact-toolbar {
+    gap: 6px;
+  }
+}

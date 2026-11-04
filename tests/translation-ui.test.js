@@ -163,14 +163,17 @@ async function checkBrowser(engine, device) {
     await page.locator("#translationConsent").check();
     await page.locator("#dialogSaveAccountButton").click();
     await page.getByText(language["translation.saved"], { exact: true }).waitFor();
-    assert.equal(requests.filter((request) => request.action === "translate").length, 1, "Saving auto mode does not translate history");
+    await page.locator(".message-translation-result").getByText("Vertaling <img src=x onerror=alert(1)>", { exact: true }).waitFor();
+    assert.equal(requests.filter((request) => request.action === "translate").length, 2, "Automatic mode translates displayed incoming history after consent");
+    await page.evaluate(() => { window.refresh(); window.refresh(); });
+    assert.equal(requests.filter((request) => request.action === "translate").length, 2, "Rerendering never resends a completed translation");
     await page.evaluate(() => {
       const message = { direction: "peer", text: "New message" };
       window.messages.push(message);
       window.translator.incoming(message);
       window.refresh();
     });
-    await page.locator(".message-translation-result").filter({ hasText: "Vertaling" }).waitFor();
+    await page.locator("#fixtureMessages article").last().locator(".message-translation-result").filter({ hasText: "Vertaling <img" }).waitFor();
     assert.equal(requests.at(-1).automatic, true);
     assert.equal(requests.at(-1).targetLanguage, "en");
     const count = requests.length;
@@ -424,6 +427,7 @@ async function checkBrowser(engine, device) {
       window.messages.push({ direction: "self", draft: true, text: "v" });
       window.refresh();
     });
+    await page.locator(".translation-notice summary").click();
     await page.locator(".translation-notice button").filter({ hasText: language["translation.sign_in_action"] }).waitFor();
     assert.equal(await page.locator(".translation-notice [role=status]").textContent(), language["translation.sign_in"]);
     assert.equal(requests.length, beforeLoginFailure, "Missing PHP session is explained without sending any message text");

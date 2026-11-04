@@ -221,7 +221,7 @@ body.device-tablet .message-body {
     height: 100% !important;
     min-height: 0 !important;
     max-height: none !important;
-    object-fit: cover !important;
+    object-fit: contain !important;
     aspect-ratio: auto !important;
   }
 
@@ -453,7 +453,7 @@ body.viewport-phone.call-active:not(.tc-call-active):not(.tc-text-visible-active
   min-height: 0 !important;
   max-height: none !important;
   aspect-ratio: auto !important;
-  object-fit: cover !important;
+  object-fit: contain !important;
 }
 
 body.viewport-phone.call-active:not(.tc-call-active):not(.tc-text-visible-active) #callPanel:not(.has-interpreter):not(.local-video-main) #localVideo {
