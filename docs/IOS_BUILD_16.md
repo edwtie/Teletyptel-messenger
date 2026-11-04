@@ -59,3 +59,16 @@ The same release exclusions apply. Internal TestFlight uploads now proceed after
 successful preflight without a manual reviewer; the environment remains limited
 to the release branch and keeps its signing/upload credentials protected. This
 does not authorize public App Store publication.
+
+## Patch 16.4 — 2026-11-04
+
+- Fix Jingle consuming unrelated XMPP discovery replies, which prevented the
+  translation client from reaching its service in ordinary chat and live RTT.
+- Only pending Jingle requests may consume result/error replies in the call
+  handler. Sender validation and translation consent remain unchanged.
+- Add combined Jingle/translation regression coverage on Chromium and WebKit;
+  verify the failure before the fix and successful translations afterward.
+
+This internal release includes only the routing fix, cache update, tests and
+release notes. The exclusions and automatic preflight/upload policy of 16.3
+remain unchanged. Verify ordinary chat and TC translation on the updated iPhone.

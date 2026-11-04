@@ -231,6 +231,7 @@
       if (iq.localName !== "iq" || iq.namespaceURI !== CLIENT) return false;
       const type = iq.getAttribute("type");
       const id = iq.getAttribute("id");
+      if ((type === "result" || type === "error") && !pending.has(id)) return false;
       const from = iq.getAttribute("from");
       const to = iq.getAttribute("to");
       const jingles = children(iq, "jingle");

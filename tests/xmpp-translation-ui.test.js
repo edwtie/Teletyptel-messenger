@@ -11,11 +11,23 @@ const { chromium, webkit, devices } = require("playwright");
       await context.route("**/*", (route) => route.fulfill({ contentType: "text/html", body: "<!doctype html><title>Fixture</title>" }));
       const page = await context.newPage();
       await page.goto("https://fixture.test/");
+      await page.addScriptTag({ content: fs.readFileSync(path.join(__dirname, "../php/public/jingle-session.js"), "utf8") });
       await page.addScriptTag({ content: fs.readFileSync(path.join(__dirname, "../php/public/chat-xmpp-translation.js"), "utf8") });
+      const claimed = await page.evaluate(() => {
+        const agent = TeleTypTelJingleSession.create({ localJid: () => "user@example.test/phone",
+          features: ["urn:xmpp:jingle:apps:rtp:1"], send: () => true });
+        return ["result", "error"].map(type => agent.handleIq(new DOMParser().parseFromString(
+          `<iq xmlns="jabber:client" type="${type}" from="translation@example.test/service" id="translation-discovery"><query xmlns="http://jabber.org/protocol/disco#info"/></iq>`,
+          "application/xml").documentElement));
+      });
+      assert.deepEqual(claimed, [false, false], "Jingle must leave unrelated discovery replies for translation");
       const result = await page.evaluate(async () => {
         const sent = [];
         const service = "translation@example.test/service";
-        const parse = (xml) => new DOMParser().parseFromString(xml, "application/xml").documentElement;
+        const parse = (xml) => new DOMParser().parseFromString(xml.replace(/^<iq(?![^>]*\bxmlns=)/, '<iq xmlns="jabber:client"'), "application/xml").documentElement;
+        const agent = TeleTypTelJingleSession.create({ localJid: () => "user@example.test/phone",
+          features: ["urn:xmpp:jingle:apps:rtp:1"], send: () => true });
+        const deliver = element => agent.handleIq(element) || client.handleIq(element);
         let forgedAccepted = null;
         let behavior = "normal";
         const client = window.TeleTypTelXmppTranslation.create({ connected: () => true, send: (xml) => {
@@ -27,19 +39,19 @@ const { chromium, webkit, devices } = require("playwright");
             if (behavior === "silent") return;
             if (behavior === "offline" || behavior === "unconfigured") {
               const failure = behavior === "unconfigured" ? '<failure xmlns="urn:teletyptel:translation:0" code="unavailable"/>' : "";
-              client.handleIq(parse(`<iq type="error" from="${service}" id="${id}"><error type="cancel"><service-unavailable xmlns="urn:ietf:params:xml:ns:xmpp-stanzas"/>${failure}</error></iq>`));
+              deliver(parse(`<iq type="error" from="${service}" id="${id}"><error type="cancel"><service-unavailable xmlns="urn:ietf:params:xml:ns:xmpp-stanzas"/>${failure}</error></iq>`));
               return;
             }
             if (!target) {
               const payload = request.getElementsByTagNameNS("urn:xmpp:langtrans:items", "query").length
                 ? '<query xmlns="urn:xmpp:langtrans:items"><item source_lang="nl" destination_lang="en"/><item source_lang="nl" destination_lang="tr"/></query>'
                 : '<query xmlns="http://jabber.org/protocol/disco#info"><feature var="urn:xmpp:langtrans"/></query>';
-              client.handleIq(parse(`<iq type="result" from="${service}" id="${id}">${payload}</iq>`));
+              deliver(parse(`<iq type="result" from="${service}" id="${id}">${payload}</iq>`));
               return;
             }
             const reply = `<iq type="result" from="${service}" id="${id}"><x xmlns="urn:xmpp:langtrans"><translation source_lang="nl" destination_lang="${target}" engine="Google">Private ${target} &amp; &lt;safe&gt;</translation></x></iq>`;
-            forgedAccepted = client.handleIq(parse(reply.replace(service, "attacker@example.test")));
-            client.handleIq(parse(reply));
+            forgedAccepted = deliver(parse(reply.replace(service, "attacker@example.test")));
+            deliver(parse(reply));
           });
           return true;
         } });

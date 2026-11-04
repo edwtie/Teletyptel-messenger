@@ -1,4 +1,4 @@
-const CACHE_NAME = "teletyptel-webclient-v488";
+const CACHE_NAME = "teletyptel-webclient-v489";
 const BUILD_VERSION = "20261103-tc-clean-view";
 const ASSETS = [
   "chat.html",
@@ -15,7 +15,7 @@ const ASSETS = [
   "mobile-navigation.js?v=20261102-all-call-layout",
   "chat-interpreter.js?v=20261027-inline-interpreter",
   `chat-client.js?v=${BUILD_VERSION}`,
-  `jingle-session.js?v=${BUILD_VERSION}`,
+  "jingle-session.js?v=20261104-translation-routing",
   `jingle-t140.js?v=${BUILD_VERSION}`,
   `jingle-webrtc-audio.js?v=${BUILD_VERSION}`,
   `jingle-call-router.js?v=${BUILD_VERSION}`,

@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Translation IQ routing — 2026-11-04
+
+- Fix the Jingle handler consuming discovery replies intended for the XMPP
+  translation service, causing chat and live RTT translation to time out.
+- Route only replies to pending Jingle requests through the call handler.
+  Add combined Jingle/translation regression coverage on Chromium and WebKit.
+- Prepared for internal TestFlight build 16.4.
+
 ### TC speaker frames — 2026-11-04
 
 - Restore dark-blue boundaries around the own and peer RTT areas, without a
