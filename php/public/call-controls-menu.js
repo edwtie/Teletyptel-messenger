@@ -42,19 +42,9 @@
     byId("callVideoFacingToggle").disabled = camera.disabled;
   };
 
-  const captions = new Map();
-  const syncCaptions = () => {
-    for (const [button, caption] of captions) caption.textContent = button.getAttribute("aria-label") || button.title;
-    syncIndicators();
-  };
-  for (const button of [...controls.querySelectorAll(":scope > button"), ...extraButtons]) {
-    if (button.id === "hangupCallPanelButton") continue;
-    const caption = document.createElement("span");
-    caption.className = "call-control-caption";
-    button.append(caption);
-    captions.set(button, caption);
-    new MutationObserver(syncCaptions).observe(button, {
-      attributes: true, attributeFilter: ["aria-label", "title", "class", "disabled"]
+  for (const button of [camera, microphone]) {
+    new MutationObserver(syncIndicators).observe(button, {
+      attributes: true, attributeFilter: ["class", "disabled"]
     });
   }
 
@@ -76,7 +66,7 @@
     toolbar.hidden = !active;
     document.body.classList.toggle("call-menu-active", active);
     if (!active) window.dispatchEvent(new Event("teletyptel:call-controls-restored"));
-    syncCaptions();
+    syncIndicators();
   };
 
   toggle.addEventListener("click", () => setOpen(menu.hidden, !menu.hidden));

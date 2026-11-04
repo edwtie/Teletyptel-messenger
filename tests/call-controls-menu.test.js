@@ -98,6 +98,14 @@ for (const engine of [chromium, webkit]) {
         const before = await page.locator("#remoteVideo").boundingBox();
         await page.locator("#callControlsToggle").click();
         assert.equal(await page.locator("#callControlsToggle").getAttribute("aria-expanded"), "true");
+        assert.equal(await page.locator(".call-control-caption").count(), 0, "Call buttons have symbols without visible captions");
+        for (const button of await page.locator("#callControlsMenu .call-media-controls > button").all()) {
+          if (!await button.isVisible()) continue;
+          assert.ok((await button.getAttribute("aria-label"))?.trim(), "Symbol buttons retain their screen reader names");
+          assert.ok((await button.getAttribute("title"))?.trim(), "Symbol buttons retain their tooltips");
+          const bounds = await button.boundingBox();
+          assert.ok(bounds.width >= 44 && bounds.height >= 44, "Symbol controls remain touch-friendly");
+        }
         assert.equal(await page.locator("#enableRttButton").isVisible(), false);
         assert.equal(await page.locator("#hangupCallPanelButton").isVisible(), false);
         assert.equal(await page.locator("#toggleCameraButton .material-icon").evaluate(element => getComputedStyle(element).color), "rgb(255, 255, 255)");
@@ -107,6 +115,9 @@ for (const engine of [chromium, webkit]) {
         assert.deepEqual(await page.locator("#remoteVideo").boundingBox(), before, "Opening controls never resizes the video");
         await page.locator("#toggleCameraButton").click();
         await page.locator("#muteMicrophoneButton").click();
+        for (const selector of ["#toggleCameraButton", "#muteMicrophoneButton"]) {
+          assert.equal(await page.locator(selector).evaluate(element => getComputedStyle(element).backgroundColor), "rgb(220, 38, 38)", "Camera/microphone off is red");
+        }
         await page.keyboard.press("Escape");
         assert.equal(await page.evaluate(() => document.activeElement.id), "callControlsToggle");
         assert.equal(await page.locator("#callControlsMenu").isVisible(), false);
@@ -116,6 +127,9 @@ for (const engine of [chromium, webkit]) {
         await page.locator("#callControlsToggle").click();
         await page.locator("#toggleCameraButton").click();
         await page.locator("#muteMicrophoneButton").click();
+        for (const selector of ["#toggleCameraButton", "#muteMicrophoneButton"]) {
+          assert.equal(await page.locator(selector).evaluate(element => getComputedStyle(element).backgroundColor), "rgb(22, 163, 74)", "Camera/microphone on is green");
+        }
         await page.locator("#callKeypadButton").click();
         assert.equal(await page.locator("#callKeypadDialog").evaluate(element => element.open), true);
         assert.equal(await page.locator("#callControlsMenu").isVisible(), false);

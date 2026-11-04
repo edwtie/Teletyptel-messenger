@@ -1,17 +1,17 @@
-const CACHE_NAME = "teletyptel-webclient-v494";
+const CACHE_NAME = "teletyptel-webclient-v497";
 const BUILD_VERSION = "20261103-tc-clean-view";
 const ASSETS = [
   "chat.html",
   "chat-tablet.css?v=20261104-video-fit",
-  "call-controls-menu.css?v=20261104-call-menu",
-  "call-controls-menu.js?v=20261104-call-menu",
+  "call-controls-menu.css?v=20261104-symbol-colors",
+  "call-controls-menu.js?v=20261104-symbols-only",
   "native-biometric.js?v=20261102-faceid",
   "xmpp-availability.css?v=20261103-startup-progress",
   "xmpp-availability.js?v=20261103-startup-progress",
   "chat-dialer.css?v=20261031-keypad-letters",
   "chat-dialer.js?v=20261031-iphone-contacts",
   "dev.html",
-  "chat-client.css?v=20261104-compact-translation",
+  "chat-client.css?v=20261104-main-menu-symbols",
   "chat-xmpp-translation.js?v=20261103-translation-status",
   "chat-translation.js?v=20261104-compact-translation",
   "mobile-navigation.js?v=20261104-call-menu",

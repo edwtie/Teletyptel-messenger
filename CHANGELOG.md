@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Symbol menus for iOS build 16.7 — 2026-11-04
+
+- Use compact symbol-only main and call menus while retaining accessible names,
+  tooltips and touch targets of at least 44 pixels on phone and tablet layouts.
+- Restore green enabled and red disabled camera/microphone controls, with
+  off-state symbols so their state does not depend on color alone.
+- Cover portrait/landscape layouts, menu dismissal, focus restoration and
+  existing control actions with Chromium and WebKit regression tests.
+
 ### Compact private translation views — 2026-11-04
 
 - Show the translation link beside short translated text instead of a padded

@@ -6772,28 +6772,18 @@ body[data-theme="dark"] .attachment-menu-panel button:hover:not(:disabled) {
 
   body.mobile-navigation-ready .top-actions .top-icon-button {
     display: flex;
-    flex-direction: column;
-    gap: 6px;
+    position: relative;
     width: 100%;
     min-width: 0;
-    height: 66px;
+    height: 48px;
     margin: 0;
   }
 
-  body.mobile-navigation-ready .top-actions .top-icon-button > .sr-only {
-    position: static;
-    width: auto;
-    height: auto;
-    margin: 0;
-    padding: 0 2px;
-    clip: auto;
-    clip-path: none;
-    overflow: visible;
-    white-space: normal;
-    font-size: 11px;
-    line-height: 1.2;
-    color: inherit;
-    text-align: center;
+  body.mobile-navigation-ready .top-actions .top-icon-button > svg,
+  body.mobile-navigation-ready .top-actions .top-icon-button > .material-icon,
+  body.mobile-navigation-ready .top-actions .top-icon-button > .contrast-symbol {
+    width: 24px;
+    height: 24px;
   }
 
   body.mobile-navigation-ready .top-actions .top-menu[open] {
