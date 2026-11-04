@@ -13663,6 +13663,9 @@
     el.callPanel.classList.toggle("no-remote-video", !hasRemoteVideo);
     document.body.classList.toggle("call-active", showCallPanel);
     document.body.classList.toggle("tc-call-active", totalConversationCallActive && showCallPanel);
+    if (totalConversationCallActive && showCallPanel && document.activeElement === el.messageInput) {
+      el.messageInput.blur();
+    }
     applyCallVideoHeight();
     updateCameraToggleUi();
     updateMicrophoneMuteUi();

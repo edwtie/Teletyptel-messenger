@@ -55,8 +55,12 @@ for (const engine of [chromium, webkit]) {
         assert.ok(text.y + text.height <= controls.y + 2, "Text cannot cover call controls");
         const line = await page.locator(".tc-text-line").first().boundingBox();
         assert.ok(line.height >= text.height / 2 - 16, "RTT must expand rather than stay capped at 120px");
-        const composer = await page.locator("#composerForm").boundingBox();
-        assert.ok(composer.y + composer.height <= height + 2, "Composer must remain on screen");
+        assert.equal(await page.locator("#composerForm").isVisible(), false, "Ordinary chat is hidden during TC");
+        assert.ok(controls.y + controls.height <= height + 2, "Call controls remain on screen");
+        for (const selector of [".tc-text-local", ".tc-text-remote", "#totalConversationLocalText", ".call-media-controls"]) {
+          assert.equal(await page.locator(selector).evaluate(element => getComputedStyle(element).borderTopColor),
+            "rgba(0, 0, 0, 0)", "No light-blue TC frames");
+        }
         if (!keyboard && width === 390) {
           await page.locator("#totalConversationLocalText").fill("Live RTT\nMijn antwoord 👋");
           assert.equal(await page.locator("#totalConversationLocalText").inputValue(), "Live RTT\nMijn antwoord 👋");
@@ -77,6 +81,7 @@ for (const engine of [chromium, webkit]) {
       });
       assert.equal(await page.locator("#remoteDraft").isVisible(), false, "The existing RTT bubble must not be duplicated above the composer");
       assert.equal(await page.locator('[data-remote-draft="true"]').isVisible(), true);
+      assert.equal(await page.locator("#composerForm").isVisible(), true, "Normal chat returns after TC");
     } finally {
       await browser.close();
     }

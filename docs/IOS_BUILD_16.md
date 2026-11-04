@@ -33,3 +33,17 @@ checks do not establish working iPhone/iPad media transport. On two updated
 physical devices, test TC typing, newline/backspace/emoji, separate chat sending,
 camera on/off, keyboard, rotation and a second call with empty TC text. Verify
 that a brief interruption preserves the draft and that normal hangup works.
+
+## Patch 16.2 — 2026-11-04
+
+- Hide the ordinary chat composer during TC and restore its existing draft after
+  the call. Dedicated TC input remains available; incoming-call and normal chat
+  behavior are unchanged.
+- Remove light-blue TC frames, retaining a neutral keyboard-focus indicator.
+- Add an indeterminate blue native startup bar that stops on errors and respects
+  reduced motion. Do not add a separate startup logo to ordinary browsers.
+
+Release scope and exclusions remain unchanged. Local phone/tablet layout,
+startup, keyboard and call regression checks passed. Native compilation and
+simulator startup run in GitHub before the protected upload is approved.
+Real-device verification is still needed, especially TC with the keyboard open.

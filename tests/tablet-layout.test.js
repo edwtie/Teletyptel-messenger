@@ -102,7 +102,7 @@ for (const engine of [chromium, webkit]) {
       await page.evaluate(() => {
         document.documentElement.style.setProperty("--visual-viewport-height", "550px");
         document.body.classList.remove("viewport-phone");
-        document.body.classList.add("viewport-tablet", "call-active", "tc-text-visible-active");
+        document.body.classList.add("viewport-tablet", "call-active", "tc-call-active", "tc-text-visible-active");
         document.getElementById("callPanel").hidden = false;
         document.getElementById("hangupCallButton").hidden = false;
         document.getElementById("totalConversationTextPanel").hidden = false;
@@ -113,7 +113,8 @@ for (const engine of [chromium, webkit]) {
         document.getElementById("totalConversationRemotePreviousText").hidden = true;
       });
       await page.screenshot({ path: path.join(output, `${engine.name()}-tc-keyboard.png`) });
-      for (const selector of ["#composerForm", ".call-media-controls", "#totalConversationTextPanel"]) {
+      assert.equal(await page.locator("#composerForm").isVisible(), false);
+      for (const selector of [".call-media-controls", "#totalConversationTextPanel"]) {
         const bounds = await page.locator(selector).boundingBox();
         assert.ok(bounds && bounds.y >= 0 && bounds.y + bounds.height <= 551, `${selector} outside viewport: ${JSON.stringify(bounds)}`);
       }
@@ -151,8 +152,8 @@ for (const engine of [chromium, webkit]) {
             const style = getComputedStyle(element);
             return { selector, height: element.getBoundingClientRect().height, rows: style.gridTemplateRows, row: style.gridRow };
           })) }));
-        const composer = await page.locator("#composerForm").boundingBox();
-        assert.ok(composer.y >= toolbar.y + toolbar.height - 1 && composer.y + composer.height <= viewport.height + 1);
+        assert.equal(await page.locator("#composerForm").isVisible(), false);
+        assert.equal(await page.locator("#messageInput").inputValue(), "Mijn concept blijft behouden");
         for (const camera of ["has-local-video remote-video-main", "has-local-video local-video-main no-remote-video"]) {
           await page.evaluate(camera => {
             document.body.classList.add("tc-call-active");
@@ -167,9 +168,9 @@ for (const engine of [chromium, webkit]) {
           }, camera);
           assert.equal(await page.locator("#totalConversationTextPanel").isVisible(), false);
           const controls = await page.locator(".call-media-controls").boundingBox();
-          const input = await page.locator("#composerForm").boundingBox();
-          assert.ok(controls.y >= 0 && controls.y + controls.height <= input.y + 1
-            && input.y + input.height <= viewport.height + 1, "TC without RTT still fits the screen");
+          assert.equal(await page.locator("#composerForm").isVisible(), false);
+          assert.ok(controls.y >= 0 && controls.y + controls.height <= viewport.height + 1,
+            "TC with its text panels hidden still fits the screen");
           const main = await page.locator(camera.includes("no-remote-video") ? "#localVideo" : "#remoteVideo").boundingBox();
           const canvas = await page.locator("#callPanel").boundingBox();
           assert.ok(Math.abs(main.x - canvas.x) <= 1 && Math.abs(main.width - canvas.width) <= 1
@@ -261,6 +262,8 @@ for (const engine of [chromium, webkit]) {
       await assertDrawer(false);
       await page.evaluate(() => document.body.classList.remove("call-active", "tc-call-active", "tc-text-visible-active"));
       assert.equal(await page.locator("#conversationSidebar").isVisible(), true, "ending the call restores contacts");
+      assert.equal(await page.locator("#composerForm").isVisible(), true, "ending TC restores normal chat");
+      assert.equal(await page.locator("#messageInput").inputValue(), "Mijn concept blijft behouden");
       assert.equal(await page.locator("#conversationSidebar").evaluate(element => element.inert), false);
       assert.equal(await page.locator("#callContactsToggle").isVisible(), false);
     } finally { await browser.close(); }

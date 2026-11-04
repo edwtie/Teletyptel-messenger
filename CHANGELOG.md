@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Cleaner TC view and native startup progress — 2026-11-03
+
+- Hide ordinary chat and its composer while the TC view is active; restore the
+  existing draft after the call. Keep the dedicated live TC input available.
+- Remove light-blue TC frames, retaining a neutral keyboard-focus indicator.
+- Show an indeterminate blue loading bar on native startup, stop it on errors
+  and respect reduced-motion preferences. No percentage or extra browser logo.
+- Prepared for internal build 16.2; not part of the uploaded build 16.1.
+
 ### Separate TC live text from chat — 2026-11-03
 
 - Type directly in the own TC text box; committed edits travel over the call's

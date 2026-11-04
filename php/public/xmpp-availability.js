@@ -102,6 +102,7 @@
   function create({ translate, WebSocket = root.WebSocket } = {}) {
     let overlay;
     let status;
+    let progress;
     let retryButton;
     let observer;
     let pending;
@@ -166,6 +167,12 @@
         status.setAttribute("aria-live", "polite");
         status.setAttribute("aria-atomic", "true");
         status.tabIndex = -1;
+        if (isNativeApp()) {
+          progress = panel.querySelector(".xmpp-availability__progress") || document.createElement("div");
+          progress.className = "xmpp-availability__progress";
+          progress.setAttribute("role", "progressbar");
+          panel.append(progress);
+        }
         retryButton = document.createElement("button");
         retryButton.type = "button";
         retryButton.addEventListener("click", async () => {
@@ -187,6 +194,10 @@
       overlay.dataset.state = state;
       overlay.dataset.reason = failureReason;
       overlay.dataset.phase = phase;
+      if (progress) {
+        progress.hidden = state !== "checking";
+        progress.setAttribute("aria-label", text("status.xmpp_server_checking", "Verbinding controleren…"));
+      }
       status.textContent = state === "offline"
         ? failureReason === "certificate"
           ? text("status.server_certificate_error", "Certificaatfout: het servercertificaat is ongeldig of wordt niet vertrouwd op dit apparaat. Controleer datum/tijd en het bekende TeleTypTel-certificaat in Instellingen. Vertrouw geen onbekende certificaten.")

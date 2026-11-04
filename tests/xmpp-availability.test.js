@@ -174,17 +174,41 @@ for (const [engineName, engine] of Object.entries({ chromium, webkit })) {
             const overlay = document.querySelector(".xmpp-availability[open]");
             const brand = overlay.querySelector("img");
             const checking = overlay.dataset.state === "checking" && !!overlay.querySelector('[role="status"]').textContent;
+            const progress = overlay.querySelector('[role="progressbar"]');
+            const loading = !!progress && !progress.hidden && !progress.hasAttribute("aria-valuenow");
             controller.unavailable(() => {});
             const offline = overlay.dataset.state === "offline" && !overlay.querySelector("button").hidden;
-            const result = { platform, branded: !!brand, checking, offline };
+            const stopped = !progress || progress.hidden;
+            controller.connecting();
+            const resumed = !progress || !progress.hidden;
+            const result = { platform, branded: !!brand, checking, offline, loading, stopped, resumed };
             controller.hide();
             overlay.remove();
             return result;
           });
         });
         assert.deepEqual(results, ["browser", "chrome", "capacitor-web", "ios", "android", "webview2", "broken-bridge"].map(platform => ({
-          platform, branded: ["ios", "android", "webview2"].includes(platform), checking: true, offline: true
+          platform, branded: ["ios", "android", "webview2"].includes(platform), checking: true, offline: true,
+          loading: ["ios", "android", "webview2"].includes(platform), stopped: true, resumed: true
         })));
+      });
+      await check("Native progress stops on errors and respects reduced motion", async page => {
+        await page.evaluate(() => {
+          window.fixture.environment.Capacitor = { getPlatform: () => "ios" };
+          window.progressController = window.fixture.api.create();
+          window.progressController.connecting();
+        });
+        const progress = page.locator('[role="progressbar"]');
+        assert.equal(await progress.isVisible(), true);
+        assert.equal(await progress.evaluate(element => getComputedStyle(element, "::before").backgroundColor), "rgb(37, 99, 235)");
+        await page.emulateMedia({ reducedMotion: "reduce" });
+        assert.equal(await progress.evaluate(element => getComputedStyle(element, "::before").animationName), "none");
+        await page.evaluate(() => window.progressController.unavailable(() => {}, "certificate"));
+        assert.equal(await progress.isVisible(), false);
+        await page.evaluate(() => window.progressController.connecting());
+        assert.equal(await progress.isVisible(), true);
+        await page.evaluate(() => window.progressController.ready());
+        assert.equal(await progress.isVisible(), false);
       });
       await check("Requires framing open and SASL features; sends no authentication", async page => {
         for (const combined of [false, true]) {

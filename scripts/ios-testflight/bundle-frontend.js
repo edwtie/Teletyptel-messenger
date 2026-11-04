@@ -28,7 +28,7 @@ function bundleFrontend(write, serverUrl) {
     if (file === "chat.html") {
       const html = content.toString().replace(/\s*<link rel="manifest"[^>]+>/, "")
         .replace("<head>", '<head>\n  <script src="connection.js"></script>\n  <script src="native-server.js"></script>\n  <script src="native-keyboard.js"></script>\n  <link rel="stylesheet" href="native-startup.css">')
-        .replace('<body class="account-booting">', '<body class="account-booting">\n  <dialog class="native-startup xmpp-availability" open aria-label="TeleTypTel"><div class="xmpp-availability__panel"><img class="xmpp-availability__brand" src="assets/brand/teletyptel-logo-header@2x.png" width="599" height="128" alt="TeleTypTel"><p role="status" aria-live="polite" aria-atomic="true" data-i18n="status.xmpp_server_checking">Verbinding controleren…</p><div class="xmpp-availability__actions"></div></div></dialog>')
+        .replace('<body class="account-booting">', '<body class="account-booting">\n  <dialog class="native-startup xmpp-availability" open aria-label="TeleTypTel"><div class="xmpp-availability__panel"><img class="xmpp-availability__brand" src="assets/brand/teletyptel-logo-header@2x.png" width="599" height="128" alt="TeleTypTel"><div class="xmpp-availability__progress" role="progressbar" aria-label="Verbinding controleren…"></div><p role="status" aria-live="polite" aria-atomic="true" data-i18n="status.xmpp_server_checking">Verbinding controleren…</p><div class="xmpp-availability__actions"></div></div></dialog>')
         .replace(/href="(tolk\/|admin\/#[^"]*|aanmelden\/)"/g,
           (_, target) => 'href="' + new URL(target, serverUrl).href + '"');
       content = Buffer.from(html);
