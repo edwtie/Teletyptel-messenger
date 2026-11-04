@@ -14664,7 +14664,10 @@
 
   function renderConversations() {
     window.dispatchEvent(new Event("teletyptel:dialer-contacts-changed"));
-    el.conversationItems.replaceChildren();
+    const focusedRow = el.conversationItems.contains(document.activeElement) ? document.activeElement : null;
+    const rows = new Map([...el.conversationItems.querySelectorAll(".conversation-item")]
+      .map(row => [row.dataset.conversationId, row]));
+    el.conversationItems.querySelector(".conversation-empty")?.remove();
     const query = normalizeConversationSearchText(el.conversationSearchInput.value);
     let visibleCount = 0;
     for (const conversation of state.conversations) {
@@ -14676,7 +14679,9 @@
       }
       ensurePublicProfileForConversation(conversation);
 
-      const button = document.createElement("button");
+      const button = rows.get(String(conversation.id)) || document.createElement("button");
+      rows.delete(String(conversation.id));
+      button.dataset.conversationId = String(conversation.id);
       button.type = "button";
       button.className = "conversation-item"
         + (conversation.id === state.activeConversationId ? " selected" : "");
@@ -14700,8 +14705,8 @@
       const rowMeta = document.createElement("span");
       rowMeta.className = "conversation-row-meta";
       rowMeta.append(time, unread, presence);
-      button.append(avatar, text, rowMeta);
-      button.addEventListener("click", () => {
+      button.replaceChildren(avatar, text, rowMeta);
+      button.onclick = () => {
         selectConversation(conversation);
         ensurePublicProfileForConversation(conversation);
         el.peerInput.value = conversation.peer;
@@ -14715,15 +14720,21 @@
         renderActiveConversation();
         syncConversationMessageState(conversation, "select");
         focusConversationComposer();
-      });
-      button.addEventListener("contextmenu", (event) => showConversationContextMenu(event, conversation, button));
-      button.addEventListener("keydown", (event) => {
+      };
+      button.oncontextmenu = (event) => showConversationContextMenu(event, conversation, button);
+      button.onkeydown = (event) => {
         if (event.key === "ContextMenu" || (event.key === "F10" && event.shiftKey)) {
           showConversationContextMenu(event, conversation, button);
         }
-      });
-      el.conversationItems.appendChild(button);
+      };
+      if (el.conversationItems.children[visibleCount] !== button) {
+        el.conversationItems.insertBefore(button, el.conversationItems.children[visibleCount] || null);
+      }
       visibleCount += 1;
+    }
+    for (const row of rows.values()) row.remove();
+    if (focusedRow) {
+      (focusedRow.isConnected ? focusedRow : el.conversationSearchInput).focus({ preventScroll: true });
     }
 
     if (!visibleCount && query) {
@@ -15055,6 +15066,7 @@
     call.tcLocalText = el.totalConversationLocalText.value;
     if (call.tcComposing) return;
     recordTotalConversationText(call, "self", call.tcLocalText, currentFromJid());
+    interpreter?.liveText?.(call.sid, call.tcLocalText);
     flushTotalConversationInput(call);
     updateTotalConversationTextPanel();
   }

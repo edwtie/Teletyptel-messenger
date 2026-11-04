@@ -141,7 +141,11 @@ async function main() {
           await receiver.waitForFunction(text => receivedText() === text, text);
         }
         assert.equal(await caller.evaluate(() => endpoint.setRttText("\ud800")), false);
-        assert.equal(await caller.evaluate(() => endpoint.setRttText("x".repeat(5000))), false);
+        assert.equal(await caller.evaluate(() => endpoint.setRttText("x".repeat(5000))), true);
+        await receiver.waitForFunction(() => receivedText() === "x".repeat(5000));
+        await caller.evaluate(() => endpoint.setRttText("漢".repeat(20000)));
+        await receiver.waitForFunction(() => receivedText() === "漢".repeat(20000));
+        assert.equal(await caller.evaluate(() => endpoint.setRttText("x".repeat(32769))), false);
         assert.equal(await caller.evaluate(() => endpoint.setRttText("na fout")), true);
         await receiver.waitForFunction(() => receivedText() === "na fout");
         assert.equal(await receiver.evaluate(() => endpoint.sendRtt("regel\r")), true);

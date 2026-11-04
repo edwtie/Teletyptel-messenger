@@ -9,7 +9,7 @@ const entryFiles = ["chat.html", "chat-client.css", "chat-client.js", "chat-dial
   "xmpp-availability.js", "xmpp-availability.css",
   "native-biometric.js",
   "chat-tablet.css",
-  "chat-interpreter.js", "mobile-navigation.js", "vendor/qrcode.js", "favicon.ico"];
+  "chat-interpreter.js", "chat-modal.js", "mobile-navigation.js", "vendor/qrcode.js", "favicon.ico"];
 
 function assetFiles() {
   const tracked = execFileSync("git", ["ls-files", "php/public"], { cwd: root, encoding: "utf8" }).trim().split(/\r?\n/);

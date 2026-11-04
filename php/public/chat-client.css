@@ -2390,7 +2390,7 @@ body.conversation-open .chat-panel {
 
 .call-answer-button {
   border-color: #22c55e !important;
-  background: #16a34a !important;
+  background: #15803d !important;
   color: #ffffff !important;
 }
 
@@ -2401,7 +2401,7 @@ body.conversation-open .chat-panel {
 }
 
 .call-answer-button:hover:not(:disabled) {
-  background: #15803d !important;
+  background: #166534 !important;
   color: #ffffff !important;
 }
 

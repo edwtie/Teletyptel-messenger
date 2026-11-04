@@ -5,6 +5,9 @@ const path = require("node:path");
 const net = require("node:net");
 const { spawn } = require("node:child_process");
 const { chromium, devices } = require("playwright");
+const clientSource = fs.readFileSync(path.join(__dirname, "../php/public/chat-client.js"), "utf8");
+const tcHandler = clientSource.slice(clientSource.indexOf("  function handleTotalConversationInput()"),
+  clientSource.indexOf("  function flushTotalConversationInput("));
 
 (async () => {
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "teletyptel-interpreter-inline-"));
@@ -26,7 +29,10 @@ const { chromium, devices } = require("playwright");
     for (const account of ["alice", "bob", "tolk", "admin"]) {
       const context = await browser.newContext({ ...devices["Pixel 7"], serviceWorkers: "block" });
       const page = await context.newPage();
-      page.on("pageerror", (error) => failures.push(error.message));
+      page.on("pageerror", (error) => {
+        const detail = account + ": " + error.stack;
+        if (!failures.includes(detail)) failures.push(detail);
+      });
       await page.goto(origin + "/fixture/login?account=" + account);
       pages[account] = page;
     }
@@ -148,6 +154,49 @@ const { chromium, devices } = require("playwright");
     await pages.alice.waitForTimeout(350);
     assert.ok(!(await pages.tolk.locator("#drafts").innerText()).includes("Other private conversation"), "Unrelated chat text is not shared");
     await pages.alice.evaluate(() => { window.currentPeer = "bob@example.test"; });
+    for (const page of [pages.alice, pages.bob]) {
+      await page.evaluate(source => {
+        const input = document.getElementById("totalConversationLocalText");
+        document.getElementById("totalConversationTextPanel").hidden = false;
+        input.disabled = false;
+        window.nativeCall.rttEnabled = true;
+        window.nativeCall.tcLocalText = "";
+        input.tcCall = window.nativeCall;
+        window.tcType = new Function(source + `
+          const state = { get call() { return window.nativeCall; } };
+          const el = { totalConversationLocalText: document.getElementById("totalConversationLocalText") };
+          const interpreter = window.inlineInterpreter;
+          const isActiveConversationBlocked = () => false, recordTotalConversationText = () => {}, currentFromJid = () => window.nativeJid;
+          const flushTotalConversationInput = () => {};
+          const updateTotalConversationTextPanel = () => {};
+          return handleTotalConversationInput;
+        `)();
+        input.addEventListener("input", window.tcType);
+      }, tcHandler);
+    }
+    const tcText = "TC: 👋漢é مرحبا\n".repeat(1000);
+    await pages.alice.evaluate(text => {
+      const input = document.getElementById("totalConversationLocalText");
+      input.value = text; input.dispatchEvent(new InputEvent("input", { inputType: "insertFromPaste" }));
+    }, tcText);
+    await pages.tolk.waitForFunction(text => document.getElementById("drafts").textContent.includes(text), tcText);
+    await pages.bob.locator("#totalConversationLocalText").fill("Tweede deelnemer via TC");
+    await pages.tolk.locator("#drafts").filter({ hasText: "Tweede deelnemer via TC" }).waitFor();
+    await pages.alice.evaluate(() => { window.nativeCall.tcComposing = true; });
+    await pages.alice.locator("#totalConversationLocalText").fill("未確定");
+    await pages.alice.waitForTimeout(150);
+    assert.ok(!(await pages.tolk.locator("#drafts").innerText()).includes("未確定"));
+    await pages.alice.evaluate(() => { window.nativeCall.tcComposing = false; window.tcType(); });
+    await pages.tolk.locator("#drafts").filter({ hasText: "未確定" }).waitFor();
+    await pages.alice.evaluate(() => {
+      const input = document.getElementById("messageInput");
+      input.value = "Private ordinary chat during TC"; input.dispatchEvent(new Event("input"));
+      window.inlineInterpreter.final(input.value);
+    });
+    await pages.alice.waitForTimeout(150);
+    assert.ok(!(await pages.tolk.locator("#drafts").innerText()).includes("Private ordinary chat during TC"));
+    await pages.alice.locator("#totalConversationLocalText").fill("");
+    await pages.tolk.waitForFunction(() => !document.getElementById("drafts").textContent.includes("未確定"));
     await pages.alice.screenshot({ path: path.join(os.tmpdir(), "teletyptel-inline-interpreter.png") });
     await pages.alice.locator("#interpreterRemove").click();
     await pages.bob.locator("#interpreterTile").waitFor({ state: "hidden" });
@@ -164,7 +213,7 @@ const { chromium, devices } = require("playwright");
     await pages.bob.locator("#interpreterStatus").filter({ hasText: "verlopen" }).waitFor();
     await originalIntact();
     assert.deepEqual(failures, []);
-    console.log("Inline interpreter passed: real original WebRTC call preserved, one-click request/start adapter, cancel, consent gate, automatic interpreter join, two extra media legs, live RTT, no unrelated text sharing, removal without dropping original call.");
+    console.log("Inline interpreter passed: real three-peer WebRTC, consent gate, production TC input handler, large Unicode text, corrections/erasure, IME, private chat isolation and removal without dropping original call.");
   } finally {
     await browser?.close(); server.kill();
     await new Promise((resolve) => { if (server.exitCode !== null) resolve(); else { server.once("exit", resolve); setTimeout(resolve, 3000).unref(); } });

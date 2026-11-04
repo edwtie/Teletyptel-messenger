@@ -15,7 +15,7 @@ function fixture() {
     tcRemoteText: "", tcLocalText: "", tcSentText: "", rttSync: { sequence: 0 }, rttChannel: { readyState: "open", send: text => sent.push(text) } };
   const state = { call, previousText: "", mode: "relay" };
   const el = { totalConversationLocalText: { value: "", tcCall: call }, messageInput: { value: "" }, rttToggle: { checked: true } };
-  const context = vm.createContext({ state, el, ArrayBuffer, TextDecoder, Blob,
+  const context = vm.createContext({ state, el, ArrayBuffer, TextDecoder, Blob, interpreter: null,
     t140Backspace: "\b", t140Delete: "\u007f", jingleRttSyncNamespace: namespace,
     teletyptelRttDataChannelProtocol: protocol, jingleRttSyncDataChannelLabel: "rtt",
     isActiveConversationBlocked: () => false, activeConversation: () => conversation,

@@ -1,4 +1,4 @@
-const CACHE_NAME = "teletyptel-webclient-v489";
+const CACHE_NAME = "teletyptel-webclient-v490";
 const BUILD_VERSION = "20261103-tc-clean-view";
 const ASSETS = [
   "chat.html",
@@ -9,14 +9,15 @@ const ASSETS = [
   "chat-dialer.css?v=20261031-keypad-letters",
   "chat-dialer.js?v=20261031-iphone-contacts",
   "dev.html",
-  "chat-client.css?v=20261104-tc-rtt-frames",
+  "chat-client.css?v=20261104-accessibility-fixes",
   "chat-xmpp-translation.js?v=20261103-translation-status",
   "chat-translation.js?v=20261103-tc-clean-view",
   "mobile-navigation.js?v=20261102-all-call-layout",
-  "chat-interpreter.js?v=20261027-inline-interpreter",
-  `chat-client.js?v=${BUILD_VERSION}`,
+  "chat-interpreter.js?v=20261104-accessibility-fixes",
+  "chat-modal.js?v=20261104-accessibility-fixes",
+  "chat-client.js?v=20261104-accessibility-fixes",
   "jingle-session.js?v=20261104-translation-routing",
-  `jingle-t140.js?v=${BUILD_VERSION}`,
+  "jingle-t140.js?v=20261104-accessibility-fixes",
   `jingle-webrtc-audio.js?v=${BUILD_VERSION}`,
   `jingle-call-router.js?v=${BUILD_VERSION}`,
   "native-google.js?v=20261031-bundled-interface",

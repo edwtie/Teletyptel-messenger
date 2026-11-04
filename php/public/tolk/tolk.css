@@ -10,7 +10,7 @@ p { line-height: 1.6; overflow-wrap: anywhere; }
 button, input, textarea { font: inherit; }
 button, .button { display: inline-block; padding: 11px 15px; background: #0869cd; color: white; border: 1px solid #0869cd; border-radius: 8px; margin: 6px 8px 6px 0; text-decoration: none; min-height: 44px; cursor: pointer; }
 button:disabled { background: #e7edf5; border-color: #b9c6d7; color: #526070; cursor: default; }
-button:focus-visible, a:focus-visible, summary:focus-visible, input:focus-visible, textarea:focus-visible { outline: 3px solid #ffb000; outline-offset: 3px; }
+button:focus-visible, a:focus-visible, summary:focus-visible, input:focus-visible, textarea:focus-visible { outline: 3px solid #172b4d; outline-offset: 3px; }
 label { display: block; margin: 12px 0; line-height: 1.6; }
 input:not([type=checkbox]), textarea { display: block; width: 100%; padding: 10px; border: 1px solid #8cabc9; border-radius: 7px; }
 input[type=checkbox] { width: 20px; height: 20px; vertical-align: middle; }

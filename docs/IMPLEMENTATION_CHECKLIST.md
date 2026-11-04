@@ -3,6 +3,19 @@
 This checklist tracks protocol and product progress. Use `[x]` only when the
 item is implemented, tested and documented.
 
+## Accessibility remediation — 2026-11-04
+
+- [x] Correct incoming-answer text contrast and interpreter keyboard-focus contrast.
+- [x] Add shared custom-modal focus containment/restoration, including native-modal handoff.
+- [x] Preserve conversation-row and interpreter-queue focus during polling and reordering.
+- [x] Forward committed TC textarea input to the consented interpreter leg; isolate normal chat, IME and ended sessions.
+- [x] Segment standard T.140 snapshot edits and automatically drain bounded pending text without another keystroke.
+- [x] Verify 112 focused regressions, a synthetic three-peer interpreter test and four negotiated media profiles.
+- [ ] Complete remaining staff/support accessibility, network recovery, independent interoperability and physical-device/assistive-technology acceptance.
+- [ ] Build and distribute a separately approved native release containing these fixes.
+
+Scope, reproduction and limitations: [accessibility fixes](ACCESSIBILITY_FIXES_2026-11-04.md). This is not a full-conformity claim.
+
 ## Audio and audio/video layout — 2026-11-02
 
 - [x] Keep controls visible for calls without video/RTT. Hide the call panel for

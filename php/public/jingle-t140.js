@@ -40,10 +40,15 @@
     let closed = false;
     let received = { text: "", carriageReturn: false };
     let sent = { text: "", carriageReturn: false };
+    let pendingText = null;
     const active = () => !closed && options.isCurrent?.() !== false;
     const status = state => { if (active()) options.onStatus?.(state); };
     channel.binaryType = "arraybuffer";
-    const opened = () => status("open");
+    const opened = () => { flushPending(); status("open"); };
+    const drained = () => {
+      if (pendingText !== null && flushPending()) status("open");
+    };
+    channel.bufferedAmountLowThreshold = maxBufferedBytes / 2;
     const ended = () => { status("unavailable"); close(); };
     const message = event => {
       if (!active()) return;
@@ -64,6 +69,7 @@
     channel.addEventListener("close", ended);
     channel.addEventListener("error", ended);
     channel.addEventListener("message", message);
+    channel.addEventListener("bufferedamountlow", drained);
 
     function sendBlock(block) {
       if (!active() || channel.readyState !== "open" || !validUnicode(block)) return false;
@@ -75,15 +81,36 @@
       return true;
     }
 
-    function setText(text) {
-      if (!validUnicode(text) || /[\x00-\x09\x0b\x0c\x0e-\x1f\x7f-\x9f\ufeff]/.test(text)) return false;
-      const normalized = text.replace(/\r\n?/g, "\n").replace(/\u2028/g, "\n");
-      const next = Array.from(normalized), previous = Array.from(sent.text);
-      if (next.length > maxTextPoints) return false;
+    function flushPending() {
+      if (!active()) { pendingText = null; return false; }
+      if (channel.readyState !== "open") return false;
+      if (pendingText === null) return true;
+      const next = Array.from(pendingText), previous = Array.from(sent.text);
       let common = 0;
       while (common < previous.length && common < next.length && previous[common] === next[common]) common += 1;
-      const block = "\b".repeat(previous.length - common) + next.slice(common).join("").replace(/\n/g, "\r\n");
-      return block ? sendBlock(block) : active() && channel.readyState === "open";
+      const operations = [...Array(previous.length - common).fill("\b"),
+        ...next.slice(common).map(point => point === "\n" ? "\r\n" : point)];
+      let block = "", length = 0;
+      for (const operation of operations) {
+        const size = encoder.encode(operation).length;
+        if (length + size > maxBlockBytes) {
+          if (!sendBlock(block)) return false;
+          block = ""; length = 0;
+        }
+        block += operation; length += size;
+      }
+      if (block && !sendBlock(block)) return false;
+      pendingText = null;
+      return true;
+    }
+
+    function setText(text) {
+      if (!active() || channel.readyState !== "open") return false;
+      if (!validUnicode(text) || /[\x00-\x09\x0b\x0c\x0e-\x1f\x7f-\x9f\ufeff]/.test(text)) return false;
+      const normalized = text.replace(/\r\n?/g, "\n").replace(/\u2028/g, "\n");
+      if (Array.from(normalized).length > maxTextPoints) return false;
+      pendingText = normalized;
+      return flushPending();
     }
 
     function close() {
@@ -93,6 +120,8 @@
       channel.removeEventListener("close", ended);
       channel.removeEventListener("error", ended);
       channel.removeEventListener("message", message);
+      channel.removeEventListener("bufferedamountlow", drained);
+      pendingText = null;
       channel.close();
       received = { text: "", carriageReturn: false };
       sent = { text: "", carriageReturn: false };

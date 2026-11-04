@@ -68,9 +68,67 @@ test("Backpressure and send errors cannot advance the outgoing edit baseline", (
   channel.fail = false;
   assert.equal(sender.setText("nu"), true);
   assert.equal(new TextDecoder().decode(channel.sent.at(-1)), "\b\b\bnu");
-  assert.equal(sender.setText("x".repeat(5000)), false);
+  assert.equal(sender.setText("x".repeat(5000)), true);
+  assert.equal(sender.sendBlock("x".repeat(4097)), false);
   assert.equal(sender.setText("\ud800"), false);
   assert.equal(sender.sendBlock("\udc00"), false);
+});
+
+test("Large Unicode snapshots and middle edits are segmented without splitting UTF-8 or CRLF", () => {
+  const channel = new Channel(), receiver = new Channel();
+  const sender = api.create(channel);
+  let received = "", consumed = 0;
+  api.create(receiver, { onText: event => { received = event.text; } });
+  const text = "漢👋é\nمرحبا".repeat(1500);
+  for (const value of [text, "変更\n" + text.slice(2000), "", "x".repeat(32768)]) {
+    assert.equal(sender.setText(value), true);
+    for (const bytes of channel.sent.slice(consumed)) {
+      assert.ok(bytes.length <= 4096);
+      assert.doesNotThrow(() => new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+      receiver.receive(bytes.buffer);
+    }
+    consumed = channel.sent.length;
+    assert.equal(received, value);
+  }
+  assert.equal(sender.setText("x".repeat(32769)), false);
+});
+
+test("Buffer drain retries the latest bounded snapshot without another keystroke", () => {
+  const channel = new Channel(), states = [];
+  const sender = api.create(channel, { onStatus: state => states.push(state) });
+  sender.setText("Original");
+  channel.bufferedAmount = 65536;
+  assert.equal(sender.setText("Intermediate"), false);
+  assert.equal(sender.setText("Latest 👋"), false);
+  assert.equal(channel.sent.length, 1);
+  channel.bufferedAmount = 0;
+  channel.dispatchEvent(new Event("bufferedamountlow"));
+  let received = { text: "", carriageReturn: false };
+  for (const bytes of channel.sent) received = api.apply(received, new TextDecoder().decode(bytes));
+  assert.equal(received.text, "Latest 👋");
+  assert.deepEqual(states, ["open"]);
+});
+
+test("Partially queued large edits resume and ended calls discard pending text", () => {
+  const channel = new Channel();
+  const send = channel.send.bind(channel);
+  channel.send = bytes => { send(bytes); channel.bufferedAmount += bytes.length; };
+  const sender = api.create(channel);
+  const text = "漢".repeat(25000);
+  assert.equal(sender.setText(text), false);
+  assert.ok(channel.sent.length > 1);
+  channel.bufferedAmount = 0;
+  channel.dispatchEvent(new Event("bufferedamountlow"));
+  let received = { text: "", carriageReturn: false };
+  for (const bytes of channel.sent) received = api.apply(received, new TextDecoder().decode(bytes));
+  assert.equal(received.text, text);
+  channel.bufferedAmount = 65536;
+  assert.equal(sender.setText("Never send after hangup"), false);
+  const count = channel.sent.length;
+  sender.close();
+  channel.bufferedAmount = 0;
+  channel.dispatchEvent(new Event("bufferedamountlow"));
+  assert.equal(channel.sent.length, count);
 });
 
 test("Malformed UTF-8, oversized blocks and binary type mismatches close only RTT", () => {

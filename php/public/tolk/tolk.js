@@ -37,7 +37,10 @@
       return data;
     } finally { clearTimeout(timeout); }
   };
-  const status = (message) => { byId("status").textContent = lastError || message; };
+  const status = (message) => {
+    const text = lastError || message;
+    if (byId("status").textContent !== text) byId("status").textContent = text;
+  };
   const stopMedia = () => {
     joined = false;
     document.body.classList.remove("in-session");
@@ -68,6 +71,36 @@
     element.addEventListener("click", () => { void perform(callback); });
     return element;
   };
+  const renderCards = (id, items, render) => {
+    const container = byId(id);
+    const focused = container.contains(document.activeElement) ? document.activeElement : null;
+    const oldCards = new Map([...container.children].map(card => [card.dataset.roomId, card]));
+    let replacementFocus = null;
+    items.forEach((item, index) => {
+      const signature = JSON.stringify(item);
+      let card = oldCards.get(item.room_id);
+      oldCards.delete(item.room_id);
+      if (!card || card.dataset.signature !== signature) {
+        const previous = card;
+        card = render(item);
+        card.dataset.roomId = item.room_id;
+        card.dataset.signature = signature;
+        if (previous?.contains(focused)) {
+          replacementFocus = [...card.querySelectorAll("button, a")]
+            .find(control => control.tagName === focused.tagName && control.textContent === focused.textContent) || card;
+          if (replacementFocus === card) card.tabIndex = -1;
+        }
+        previous?.replaceWith(card);
+      }
+      if (container.children[index] !== card) container.insertBefore(card, container.children[index] || null);
+    });
+    for (const card of oldCards.values()) card.remove();
+    if (focused) {
+      const target = replacementFocus || (focused.isConnected ? focused : container);
+      if (target === container) container.tabIndex = -1;
+      if (document.activeElement !== target) target.focus({ preventScroll: true });
+    }
+  };
   const nameFor = (identifier) => members.find((member) => member.account_id === identifier)?.display_name || "Deelnemer";
   const signal = (recipient, payload) => action("signal", { recipient, payload });
   const broadcast = (payload) => {
@@ -76,10 +109,10 @@
     for (const peer of peers.values()) if (peer.channel?.readyState === "open" && peer.channel.bufferedAmount < 65536) peer.channel.send(encoded);
   };
   const receiveText = (identifier, raw) => {
-    if (typeof raw !== "string" || raw.length > 30000) return;
+    if (typeof raw !== "string" || raw.length > 131072) return;
     let data;
     try { data = JSON.parse(raw); } catch { return; }
-    if (!["rtt", "final"].includes(data.type) || typeof data.text !== "string" || data.text.length > 5000) return;
+    if (!["rtt", "final"].includes(data.type) || typeof data.text !== "string" || data.text.length > 20000) return;
     const peer = peers.get(identifier);
     if (!peer) return;
     peer.draft.textContent = data.text ? nameFor(identifier) + ": " + data.text : "";
@@ -214,12 +247,13 @@
     byId("workspace").hidden = false;
     const profile = data.profile;
     byId("register").hidden = Boolean(profile);
-    byId("profileStatus").textContent = profile ? ({ pending: "Je aanmelding wacht op goedkeuring door een beheerder.", enabled: "Je bent goedgekeurd als tolk.", blocked: "Je tolktoegang is geblokkeerd. Neem contact op met de beheerder." }[profile.status]) : "Je hebt nog geen tolkrol.";
+    const profileText = profile ? ({ pending: "Je aanmelding wacht op goedkeuring door een beheerder.", enabled: "Je bent goedgekeurd als tolk.", blocked: "Je tolktoegang is geblokkeerd. Neem contact op met de beheerder." }[profile.status]) : "Je hebt nog geen tolkrol.";
+    if (byId("profileStatus").textContent !== profileText) byId("profileStatus").textContent = profileText;
     byId("availabilityLabel").hidden = profile?.status !== "enabled";
     byId("available").checked = profile?.status === "enabled" && Number(profile.available) === 1;
     if (byId("available").checked) await action("available", { available: true });
-    byId("rooms").replaceChildren();
-    for (const room of data.rooms) {
+    renderCards("rooms", data.rooms.map(room => ({ room_id: room.room_id, status: room.status,
+      call_id: room.call_id, interpreter_id: room.interpreter_id })), room => {
       const card = document.createElement("article");
       card.append(node("h3", room.status === "waiting" ? "Tolk zoeken…" : "Tolk gevonden"));
       if (room.status !== "waiting") {
@@ -230,11 +264,11 @@
         card.append(link);
       }
       card.append(button("Annuleren / beëindigen", async () => { await action("leave", { roomId: room.room_id }); await refreshDashboard(); }));
-      byId("rooms").append(card);
-    }
+      return card;
+    });
     if (!data.rooms.length) byId("rooms").append(node("p", "Geen open tolksessies."));
-    byId("queue").replaceChildren();
-    for (const request of data.queue) {
+    renderCards("queue", data.queue.map(request => ({ room_id: request.room_id, created: request.created,
+      inline_call: request.inline_call })), request => {
       const card = document.createElement("article");
       card.append(node("h3", "Nieuwe tolkaanvraag"), node("p", new Date(Number(request.created) * 1000).toLocaleTimeString("nl-NL")));
       if (Number(request.inline_call)) card.append(node("p", "Accepteren start je camera en microfoon en voegt je toe aan hun lopende gesprek, zodra beide deelnemers instemmen. Live tekst wordt gedeeld, niet opgeslagen."));
@@ -247,8 +281,8 @@
         }
         await refreshDashboard();
       }));
-      byId("queue").append(card);
-    }
+      return card;
+    });
     status("Werkplek bijgewerkt. Tolkcontact is nog niet gekoppeld.");
   };
   const poll = async () => {

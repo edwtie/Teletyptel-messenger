@@ -7,7 +7,7 @@ const source = fs.readFileSync(path.join(__dirname, "../php/public/chat-client.j
 const section = (start, end) => source.slice(source.indexOf(`  function ${start}(`), source.indexOf(`  function ${end}(`));
 
 function fixture() {
-  const sent = [];
+  const sent = [], interpreterText = [];
   const translations = new Map();
   const conversation = { peer: "peer@test", remoteText: "Ordinary chat draft", messages: [
     { direction: "self", text: "Previous call ended" }, { direction: "peer", text: "Old chat" }
@@ -18,6 +18,7 @@ function fixture() {
   });
   let open = true;
   const context = vm.createContext({ state, el, document: { body: { classList: { toggle() {} } } },
+    interpreter: { liveText: (sid, text) => interpreterText.push({ sid, text }) },
     activeConversation: () => conversation, addressMatches: (left, right) => left === right,
     displayNameForJid: value => value, currentFromJid: () => "self@test", isActiveConversationBlocked: () => false,
     callModeName: () => "total", createJingleRttSyncDescriptor: () => ({}),
@@ -38,7 +39,7 @@ function fixture() {
     return state.call;
   };
   const type = text => { el.totalConversationLocalText.value = text; context.handleTotalConversationInput(); };
-  return { state, el, conversation, sent, translations, context, start, type, closeTransport: () => { open = false; } };
+  return { state, el, conversation, sent, interpreterText, translations, context, start, type, closeTransport: () => { open = false; } };
 }
 
 test("Each TC call starts empty without importing chat or previous-call text", () => {
@@ -78,9 +79,11 @@ test("IME composition waits until committed and never switches to chat on transp
   call.tcComposing = true;
   app.type("に");
   assert.equal(app.sent.length, 0);
+  assert.equal(app.interpreterText.length, 0);
   call.tcComposing = false;
   app.type("日本");
   assert.equal(app.sent.at(-1).text, "日本");
+  assert.deepEqual(app.interpreterText, [{ sid: "call", text: "日本" }]);
   app.closeTransport();
   app.type("日本語");
   assert.equal(call.tcLocalText, "日本語");

@@ -16,6 +16,10 @@ window.TeleTypTelInterpreter = {
     let room = null, pc = null, channel = null, sharedStream = null, extraCamera = null, timer = null;
     let joined = false, busy = false, polling = false;
     let generation = 0;
+    let pendingText = null;
+    const maxTextLength = 20000;
+    const maxPacketBytes = 131072;
+    const maxBufferedBytes = 262144;
     let candidates = [], seen = new Set();
     const label = (key, fallback) => translate("interpreter." + key, fallback);
     const show = (message) => { banner.hidden = false; status.textContent = message; };
@@ -41,6 +45,7 @@ window.TeleTypTelInterpreter = {
     };
     const dispose = () => {
       generation += 1;
+      pendingText = null;
       clearTimeout(timer); timer = null;
       channel?.close(); pc?.close();
       channel = pc = sharedStream = null;
@@ -64,18 +69,48 @@ window.TeleTypTelInterpreter = {
     };
     const fail = (error) => stop(error.message || label("failed", "Tolkverbinding mislukt. Het oorspronkelijke gesprek blijft behouden."));
     const sendText = (text, final = false) => {
-      if (!room || !matches(room) || bare(conversationPeer()) !== bare(getCall()?.peer) || channel?.readyState !== "open") return;
-      if (typeof text !== "string" || text.length > 5000 || channel.bufferedAmount > 65536) return;
-      channel.send(JSON.stringify({ type: final ? "final" : "rtt", text }));
+      if (!joined || agreed !== room?.room_id || room?.status !== "active" || !matches(room)
+        || getCall()?.cleaningUp || bare(conversationPeer()) !== bare(getCall()?.peer) || channel?.readyState !== "open") return false;
+      if (typeof text !== "string" || text.length > maxTextLength) return false;
+      const encoded = JSON.stringify({ type: final ? "final" : "rtt", text });
+      const size = new TextEncoder().encode(encoded).length;
+      if (size > maxPacketBytes || size + channel.bufferedAmount > maxBufferedBytes) return false;
+      try { channel.send(encoded); return true; }
+      catch { show(label("reconnecting", "Tolkverbinding onderbroken…")); return false; }
+    };
+    const flushText = () => {
+      const call = getCall();
+      if (!pendingText) return;
+      if (!room || !joined || !matches(room) || call?.sid !== pendingText.sid || call.cleaningUp) {
+        pendingText = null; return;
+      }
+      if (sendText(pendingText.text)) pendingText = null;
+    };
+    const liveText = (sid, text) => {
+      const call = getCall();
+      if (!call?.rttEnabled || call.sid !== sid || call.tcComposing || call.cleaningUp
+        || !joined || !room || agreed !== room.room_id || !matches(room)
+        || typeof text !== "string" || text.length > maxTextLength) return;
+      pendingText = { sid, text };
+      flushText();
     };
     const attachChannel = (connection) => {
       if (connection.label !== "teletyptel-rtt") { connection.close(); return; }
       channel = connection;
+      const current = generation;
+      connection.bufferedAmountLowThreshold = maxBufferedBytes / 2;
+      connection.onbufferedamountlow = () => { if (current === generation && channel === connection) flushText(); };
+      connection.onopen = () => {
+        if (current !== generation || channel !== connection) return;
+        const call = getCall();
+        if (call?.rttEnabled) liveText(call.sid, call.tcLocalText || "");
+      };
       connection.onmessage = (event) => {
-        if (typeof event.data !== "string" || event.data.length > 30000) return;
+        if (current !== generation || channel !== connection || !joined || !room || !matches(room)) return;
+        if (typeof event.data !== "string" || event.data.length > maxPacketBytes) return;
         let data;
         try { data = JSON.parse(event.data); } catch { return; }
-        if (!["rtt", "final"].includes(data.type) || typeof data.text !== "string" || data.text.length > 5000) return;
+        if (!["rtt", "final"].includes(data.type) || typeof data.text !== "string" || data.text.length > maxTextLength) return;
         if (data.type === "final") { previous.textContent = data.text; draft.textContent = ""; }
         else draft.textContent = data.text;
       };
@@ -229,8 +264,12 @@ window.TeleTypTelInterpreter = {
       byId("interpreterCameraToggle").setAttribute("aria-pressed", String(enabled));
     });
     byId("messageInput").addEventListener("input", () => {
-      if (timer !== null) return;
-      timer = setTimeout(() => { timer = null; sendText(byId("messageInput").value); }, 120);
+      if (timer !== null || getCall()?.rttEnabled) return;
+      const sid = getCall()?.sid, current = generation;
+      timer = setTimeout(() => {
+        timer = null;
+        if (current === generation && getCall()?.sid === sid && !getCall()?.rttEnabled) sendText(byId("messageInput").value);
+      }, 120);
     });
     window.addEventListener("pagehide", () => {
       const identifier = room?.room_id;
@@ -241,7 +280,8 @@ window.TeleTypTelInterpreter = {
     return {
       hasMedia: () => !tile.hidden,
       endCall: (sid) => { if (room?.call_id === sid || startingSid === sid) stop(label("call_ended", "Tolkaanvraag beëindigd met het gesprek.")); },
-      final: (text) => { clearTimeout(timer); timer = null; sendText(text, true); },
+      liveText,
+      final: (text) => { clearTimeout(timer); timer = null; if (!getCall()?.rttEnabled) sendText(text, true); },
       volume: (volume, muted) => { video.volume = volume; video.muted = muted; }
     };
   }
