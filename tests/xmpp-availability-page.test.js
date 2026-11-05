@@ -97,7 +97,8 @@ for (const engine of [chromium, webkit]) {
       await gate.getByRole("button", { name: "Opnieuw proberen" }).click();
       await page.locator("#accountDialog:not([hidden])").waitFor();
       assert.equal(await page.locator(".xmpp-availability").evaluate(element => element.open), false);
-      assert.equal(await page.locator(".app-shell").evaluate(element => element.inert), false);
+      assert.equal(await page.locator(".app-shell").evaluate(element => element.inert), true, "Sign-in still protects its background");
+      assert.equal(await page.locator("#accountDialog").evaluate(element => element.inert), false);
       assert.ok(accountRequests.some(url => !url.includes("lookupJid=")));
       assert.deepEqual(errors, []);
     } finally {

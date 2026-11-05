@@ -18,6 +18,18 @@
   let returnFocus = trigger;
   let selectionStart = 0;
   let selectionEnd = 0;
+  const letterGroups = { 2: "ABC", 3: "DEF", 4: "GHI", 5: "JKL", 6: "MNO", 7: "PQRS", 8: "TUV", 9: "WXYZ" };
+  let heldKey = null;
+  let suppressedClick = null;
+
+  const cancelHold = () => {
+    if (!heldKey) return;
+    suppressedClick = heldKey.button;
+    clearTimeout(heldKey.timer);
+    heldKey.label.textContent = heldKey.digit;
+    heldKey.button.classList.remove("is-holding");
+    heldKey = null;
+  };
 
   const rememberSelection = () => {
     selectionStart = number.selectionStart ?? number.value.length;
@@ -69,6 +81,7 @@
     document.getElementById("phoneDialerContactsEmpty").hidden = detail.contacts.length > 0;
   };
   const showContacts = (visible) => {
+    cancelHold();
     keypadPanel.hidden = visible;
     contactsPanel.hidden = !visible;
     keypadView.setAttribute("aria-pressed", String(!visible));
@@ -78,12 +91,15 @@
 
   const validate = () => {
     const value = number.value.trim();
-    const normalized = value.replace(/[ ()-]/g, "");
-    const valid = !value || (/^[+0-9 ()-]+$/.test(value) && /^\+[1-9][0-9]{1,14}$/.test(normalized));
+    const normalized = value.toUpperCase().replace(/[A-Z]/g, letter =>
+      Object.keys(letterGroups).find(digit => letterGroups[digit].includes(letter))).replace(/[ ()-]/g, "");
+    const valid = !value || (/^[+0-9A-Za-z ()-]+$/.test(value) && /^\+[1-9][0-9]{1,14}$/.test(normalized));
     invalid.hidden = valid;
     number.setAttribute("aria-invalid", String(!valid));
   };
   const reset = () => {
+    cancelHold();
+    suppressedClick = null;
     viewGeneration++;
     deviceError.hidden = true;
     form.reset();
@@ -106,8 +122,8 @@
     validate();
   };
   trigger.addEventListener("click", () => {
-    returnFocus = window.matchMedia("(max-width: 520px)").matches
-      ? document.getElementById("mobileActionsToggle") : trigger;
+    const menuToggle = document.getElementById("mobileActionsToggle");
+    returnFocus = menuToggle?.getClientRects().length ? menuToggle : trigger;
     queueMicrotask(() => {
       if (dialog.open) return;
       reset();
@@ -177,11 +193,56 @@
   });
   number.addEventListener("blur", rememberSelection);
   keys.addEventListener("pointerdown", (event) => {
-    if (event.target.closest("button")) event.preventDefault();
+    const button = event.target.closest("button");
+    if (!button || button.disabled || !dialog.open || keypadPanel.hidden) return;
+    event.preventDefault();
+    if (event.isPrimary === false || event.button !== 0) return;
+    cancelHold();
+    suppressedClick = null;
+    const digit = button.dataset.digit;
+    if (!letterGroups[digit]) return;
+    if (document.activeElement === number) rememberSelection();
+    heldKey = { button, digit, label: button.firstElementChild, pointerId: event.pointerId, index: 0,
+      characters: digit + letterGroups[digit], generation: viewGeneration, timer: null };
+    button.setPointerCapture(event.pointerId);
+    const advance = () => {
+      if (!heldKey || !dialog.open || keypadPanel.hidden || heldKey.generation !== viewGeneration) return cancelHold();
+      heldKey.index = (heldKey.index + 1) % heldKey.characters.length;
+      heldKey.label.textContent = heldKey.characters[heldKey.index];
+      heldKey.button.classList.add("is-holding");
+      heldKey.timer = setTimeout(advance, 650);
+    };
+    heldKey.timer = setTimeout(advance, 500);
+  });
+  keys.addEventListener("pointerup", (event) => {
+    if (!heldKey || event.pointerId !== heldKey.pointerId) return;
+    const current = heldKey;
+    const bounds = current.button.getBoundingClientRect();
+    const inside = event.clientX >= bounds.left && event.clientX <= bounds.right
+      && event.clientY >= bounds.top && event.clientY <= bounds.bottom;
+    cancelHold();
+    suppressedClick = current.button;
+    if (inside) insertDigit(current.characters[current.index]);
+  });
+  for (const type of ["pointercancel", "lostpointercapture"]) {
+    keys.addEventListener(type, event => {
+      if (heldKey?.pointerId !== event.pointerId) return;
+      cancelHold();
+    });
+  }
+  keys.addEventListener("contextmenu", event => event.preventDefault());
+  window.addEventListener("blur", cancelHold);
+  window.addEventListener("resize", cancelHold);
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) cancelHold();
   });
   keys.addEventListener("click", (event) => {
     const button = event.target.closest("button");
-    if (!button) return;
+    if (!button || button.disabled || !dialog.open || keypadPanel.hidden) return;
+    if (event.detail > 0 && suppressedClick === button) {
+      suppressedClick = null;
+      return;
+    }
     insertDigit(button.dataset.digit ?? "");
   });
   form.addEventListener("submit", (event) => {

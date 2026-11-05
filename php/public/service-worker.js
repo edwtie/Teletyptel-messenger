@@ -1,4 +1,4 @@
-const CACHE_NAME = "teletyptel-webclient-v497";
+const CACHE_NAME = "teletyptel-webclient-v500";
 const BUILD_VERSION = "20261103-tc-clean-view";
 const ASSETS = [
   "chat.html",
@@ -6,18 +6,18 @@ const ASSETS = [
   "call-controls-menu.css?v=20261104-symbol-colors",
   "call-controls-menu.js?v=20261104-symbols-only",
   "native-biometric.js?v=20261102-faceid",
-  "xmpp-availability.css?v=20261103-startup-progress",
-  "xmpp-availability.js?v=20261103-startup-progress",
-  "chat-dialer.css?v=20261031-keypad-letters",
-  "chat-dialer.js?v=20261031-iphone-contacts",
+  "xmpp-availability.css?v=20261105-stable-startup",
+  "xmpp-availability.js?v=20261105-stable-startup",
+  "chat-dialer.css?v=20261104-hold-letters",
+  "chat-dialer.js?v=20261104-hold-letters",
   "dev.html",
-  "chat-client.css?v=20261104-main-menu-symbols",
+  "chat-client.css?v=20261104-call-keypad-letters",
   "chat-xmpp-translation.js?v=20261103-translation-status",
-  "chat-translation.js?v=20261104-compact-translation",
+  "chat-translation.js?v=20261105-off-is-silent",
   "mobile-navigation.js?v=20261104-call-menu",
   "chat-interpreter.js?v=20261104-accessibility-fixes",
   "chat-modal.js?v=20261104-accessibility-fixes",
-  "chat-client.js?v=20261104-compact-translation",
+  "chat-client.js?v=20261105-stable-startup",
   "jingle-session.js?v=20261104-translation-routing",
   "jingle-t140.js?v=20261104-accessibility-fixes",
   `jingle-webrtc-audio.js?v=${BUILD_VERSION}`,

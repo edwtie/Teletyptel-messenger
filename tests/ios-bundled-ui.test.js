@@ -2,7 +2,7 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const { webkit } = require("playwright");
+const { webkit, chromium } = require("playwright");
 const { bundleFrontend } = require("../scripts/ios-testflight/bundle-frontend");
 
 test("Startup logo stays consistent during server checking on phone and tablet", { timeout: 45000 }, async () => {
@@ -28,6 +28,8 @@ test("Startup logo stays consistent during server checking on phone and tablet",
       assert.ok(logo.x >= 24 && logo.x + logo.width <= viewport.width - 24);
       assert.ok(logo.y >= 0 && logo.y + logo.height < viewport.height);
       assert.ok(Math.abs(logo.width / logo.height - 599 / 128) < 0.01);
+      assert.ok(Math.abs(logo.y + logo.height / 2 - viewport.height / 2) < 2,
+        "Web startup must match the native launch screen's centered logo");
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
       if (viewport.width === 390) {
         const screenshot = path.resolve(__dirname, "../artifacts/mobile-chat/ios-startup-logo.png");
@@ -70,6 +72,8 @@ test("Startup logo stays consistent during server checking on phone and tablet",
           && document.querySelector(".xmpp-availability img") === window.initialLogo), true,
         "checking, offline and certificate failures reuse the original screen, logo and status");
         assert.equal(await page.locator(".xmpp-availability").evaluate(element => element.matches(":modal")), true);
+        const errorLogo = await gateLogo.boundingBox();
+        assert.ok(Math.abs(errorLogo.y - logo.y) < 2, "Status and error text must not move the startup logo");
         assert.match(await page.locator('.xmpp-availability [role="status"]').textContent(),
           reason === "certificate" ? /Certificaatfout/ : /niet online/);
         if (viewport.width === 390 || viewport.width === 834) {
@@ -87,20 +91,29 @@ test("Startup logo stays consistent during server checking on phone and tablet",
   } finally { await browser.close(); }
 });
 
-test("Bundled Messenger keeps offline status on its startup screen and retries into sign-in", { timeout: 45000 }, async () => {
+for (const scenario of [
+  { name: "iphone", engine: webkit, viewport: { width: 390, height: 844 }, touch: true },
+  { name: "ipad", engine: webkit, viewport: { width: 834, height: 1194 }, touch: true },
+  { name: "desktop", engine: chromium, viewport: { width: 1100, height: 760 }, touch: false }
+]) {
+test(`Bundled Messenger retries into sign-in and stays stable after login (${scenario.name})`, { timeout: 45000 }, async () => {
   const files = new Map();
   bundleFrontend((name, data) => files.set("/" + name.replace(/^www\//, ""), Buffer.from(data)), "https://server.test/chat.html");
-  const browser = await webkit.launch({ headless: true });
+  const browser = await scenario.engine.launch({ headless: true });
   try {
-    const page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    const page = await browser.newPage({ viewport: scenario.viewport, isMobile: scenario.touch, hasTouch: scenario.touch });
     const errors = [], missing = [];
     page.on("pageerror", error => errors.push(error.message));
     await page.addInitScript(() => {
       window.fixtureNativeRequests = [];
       window.fixtureNativeCalls = [];
+      window.fixtureFrames = [];
       window.fixtureNativeOffline = true;
       class FixtureSocket extends EventTarget {
+        static CONNECTING = 0;
         static OPEN = 1;
+        static CLOSING = 2;
+        static CLOSED = 3;
         constructor() {
           super();
           this.protocol = "xmpp";
@@ -111,7 +124,28 @@ test("Bundled Messenger keeps offline status on its startup screen and retries i
           }, 10);
         }
         send(data) {
+          window.fixtureFrames.push(data);
+          const reply = data => setTimeout(() => this.dispatchEvent(new MessageEvent("message", { data })), 10);
+          if (data.includes('<query xmlns="jabber:iq:roster"')) {
+            const stanza = new DOMParser().parseFromString(data, "application/xml").documentElement;
+            window.releaseFixtureRoster = () => reply(`<iq xmlns="jabber:client" type="result" id="${stanza.getAttribute("id")}"><query xmlns="jabber:iq:roster"><item jid="peer@localhost" name="Fixture peer" subscription="both"/></query></iq>`);
+            return;
+          }
+          if (data.startsWith("<auth")) {
+            this.authenticated = true;
+            reply('<success xmlns="urn:ietf:params:xml:ns:xmpp-sasl"/>');
+            return;
+          }
+          if (data.includes('<bind xmlns="urn:ietf:params:xml:ns:xmpp-bind"')) {
+            const stanza = new DOMParser().parseFromString(data, "application/xml").documentElement;
+            reply(`<iq xmlns="jabber:client" type="result" id="${stanza.getAttribute("id")}"><bind xmlns="urn:ietf:params:xml:ns:xmpp-bind"><jid>fixture@localhost/test</jid></bind></iq>`);
+            return;
+          }
           if (!data.startsWith("<open")) return;
+          if (this.authenticated) {
+            reply('<open xmlns="urn:ietf:params:xml:ns:xmpp-framing"/><stream:features xmlns:stream="http://etherx.jabber.org/streams"><bind xmlns="urn:ietf:params:xml:ns:xmpp-bind"/></stream:features>');
+            return;
+          }
           setTimeout(() => this.dispatchEvent(new MessageEvent("message", {
             data: '<open xmlns="urn:ietf:params:xml:ns:xmpp-framing" from="localhost" version="1.0"/>'
               + '<stream:features xmlns:stream="http://etherx.jabber.org/streams">'
@@ -139,6 +173,14 @@ test("Bundled Messenger keeps offline status on its startup screen and retries i
             providerId: "fixture", name: "Fixture", version: "1", capabilities: [], tabs: []
           };
           if (options.path.startsWith("/api/account.php") && options.method !== "POST") { status = 404; payload = { ok: false }; }
+          if (options.path === "/api/account.php" && options.method === "POST") {
+            const input = JSON.parse(atob(options.body));
+            if (input.action === "login") {
+              window.fixtureLoginStarted = true;
+              await new Promise(resolve => { window.finishFixtureLogin = resolve; });
+              payload = { ok: true, account: { ...input, accountId: "fixture-account", savedInDatabase: true } };
+            }
+          }
           return { status, headers: { "content-type": "application/json" }, body: btoa(JSON.stringify(payload)) };
         }, cancel: async () => {} }
       } };
@@ -187,10 +229,11 @@ test("Bundled Messenger keeps offline status on its startup screen and retries i
     await gate.getByRole("button").click();
     await page.locator("#accountDialogTitle").waitFor({ state: "visible" });
     assert.equal(await page.locator(".native-startup").isVisible(), false);
-    assert.equal(await page.locator(".app-shell").evaluate(element => element.inert), false);
+    assert.equal(await page.locator(".app-shell").evaluate(element => element.inert), true, "Sign-in still protects its background");
+    assert.equal(await page.locator("#accountDialog").evaluate(element => element.inert), false, "Startup releases the sign-in dialog");
     assert.equal(await page.locator("#dialogGoogleLoginFallbackButton").isVisible(), true);
     assert.equal(await page.locator("#dialogJidInput").isVisible(), true);
-    assert.equal(await page.evaluate(() => document.activeElement.matches("input,textarea")), false);
+    if (scenario.touch) assert.equal(await page.evaluate(() => document.activeElement.matches("input,textarea")), false);
     await page.locator("#accountDialogTitle").focus();
     assert.deepEqual(await page.locator("#accountDialogTitle").evaluate(element => ({
       focused: document.activeElement === element,
@@ -231,5 +274,60 @@ test("Bundled Messenger keeps offline status on its startup screen and retries i
     assert.equal(logout.body.action, "logout");
     assert.equal(logout.omitCookies, false);
     await page.screenshot({ path: path.resolve(__dirname, "../artifacts/mobile-chat/ios-bundled-recovered.png") });
+    await page.evaluate(() => {
+      window.loginPhases = [];
+      window.postLoginFrames = [];
+      const sample = () => {
+        const gate = document.querySelector(".xmpp-availability");
+        if (!document.body.classList.contains("account-gate") && !gate.open) {
+          const bounds = selector => {
+            const rect = document.querySelector(selector).getBoundingClientRect();
+            return [rect.x, rect.y, rect.width, rect.height].map(value => Math.round(value));
+          };
+          window.postLoginFrames.push({ shell: bounds(".app-shell"), header: bounds(".topbar"),
+            logo: bounds(".brand-logo"), scroll: [scrollX, scrollY],
+            editableFocus: document.activeElement.matches('input, textarea, [contenteditable="true"]') });
+        }
+        window.postLoginAnimation = requestAnimationFrame(sample);
+      };
+      window.postLoginAnimation = requestAnimationFrame(sample);
+      new MutationObserver(() => {
+        const gate = document.querySelector(".xmpp-availability");
+        if (gate.open) window.loginPhases.push(gate.dataset.phase);
+      }).observe(document.querySelector(".xmpp-availability"), { attributes: true });
+    });
+    await page.locator("#dialogJidInput").fill("fixture@localhost");
+    await page.locator("#dialogPasswordInput").fill("Fixture-only-password1!");
+    await page.locator("#dialogConnectButton").click();
+    await page.waitForFunction(() => window.fixtureLoginStarted);
+    assert.equal(await page.locator(".native-startup").isVisible(), false, "No startup flash while submitting credentials");
+    assert.equal(await page.locator("#accountDialog").isVisible(), true);
+    await page.evaluate(() => window.finishFixtureLogin());
+    await page.waitForFunction(() => /XMPP connected/.test(document.getElementById("connectionSummary").textContent), null, { timeout: 5000 })
+      .catch(async error => { throw new Error(error.message + JSON.stringify(await page.evaluate(() => ({
+        status: document.getElementById("connectionSummary").textContent,
+        dialog: document.getElementById("dialogAccountStatus").textContent, frames: window.fixtureFrames
+      })))); });
+    assert.equal(await page.locator("#accountDialog").isVisible(), false);
+    assert.equal(await page.locator(".native-startup").isVisible(), false);
+    assert.equal(await page.evaluate(() => window.loginPhases.includes("checking")), false, "No checking/login/checking flicker");
+    assert.ok(await page.evaluate(() => window.loginPhases.includes("connecting")), "Authenticated connection retains its progress screen");
+    await page.waitForFunction(() => typeof window.releaseFixtureRoster === "function" && window.postLoginFrames.length >= 3);
+    const phaseCount = await page.evaluate(() => window.loginPhases.length);
+    await page.evaluate(() => window.releaseFixtureRoster());
+    await page.getByRole("button", { name: /Fixture peer/ }).waitFor();
+    await page.waitForFunction(() => window.postLoginFrames.length >= 30);
+    const frames = await page.evaluate(() => {
+      cancelAnimationFrame(window.postLoginAnimation);
+      return window.postLoginFrames;
+    });
+    assert.equal(await page.locator(".app-shell").evaluate(element => element.inert), false, "Contacts are interactive after login");
+    assert.equal(await page.evaluate(() => window.loginPhases.length), phaseCount, "Startup must not reopen after login");
+    assert.equal(frames[0].editableFocus, false, "No automatic keyboard after login");
+    assert.deepEqual(frames[0].scroll, [0, 0]);
+    for (const frame of frames) assert.deepEqual(frame, frames[0], "Header and shell stay fixed while contacts load");
+    assert.deepEqual(errors, []);
+    await page.screenshot({ path: path.resolve(__dirname, `../artifacts/mobile-chat/${scenario.name}-signed-in-stable.png`) });
   } finally { await browser.close(); }
 });
+}

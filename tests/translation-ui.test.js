@@ -427,10 +427,9 @@ async function checkBrowser(engine, device) {
       window.messages.push({ direction: "self", draft: true, text: "v" });
       window.refresh();
     });
-    await page.locator(".translation-notice summary").click();
-    await page.locator(".translation-notice button").filter({ hasText: language["translation.sign_in_action"] }).waitFor();
-    assert.equal(await page.locator(".translation-notice [role=status]").textContent(), language["translation.sign_in"]);
-    assert.equal(requests.length, beforeLoginFailure, "Missing PHP session is explained without sending any message text");
+    assert.equal(await page.locator(".translation-notice").count(), 0, "Unknown preferences never display translation notices in messages");
+    assert.equal(await page.locator("#translationSettingsStatus").textContent(), language["translation.sign_in"]);
+    assert.equal(requests.length, beforeLoginFailure, "Missing PHP session is explained in settings without sending any message text");
     await page.evaluate(() => window.translator.savePreferences());
     assert.equal(requests.length, beforeLoginFailure, "Unloaded preferences never overwrite saved settings with defaults");
     await page.clock.resume();

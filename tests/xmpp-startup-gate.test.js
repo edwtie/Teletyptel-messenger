@@ -6,6 +6,24 @@ const vm = require("node:vm");
 const source = fs.readFileSync(path.join(__dirname, "../php/public/chat-client.js"), "utf8");
 const startup = source.slice(source.indexOf("  async function loadPlatformConfig()"), source.indexOf("  async function loadGoogleMapsConfig()"));
 
+test("Auto-login keeps the startup overlay until the deferred socket connection begins", () => {
+  const calls = [];
+  let connect;
+  const context = {
+    state: { accountReady: true, accountGateRequired: false, xmppRecovery: { attempts: 0 } },
+    WebSocket: { CONNECTING: 0, OPEN: 1 },
+    xmppAvailability: { connecting: () => calls.push("progress") },
+    window: { setTimeout: callback => { connect = callback; } },
+    connectXmppWebSocket: () => calls.push("socket")
+  };
+  vm.runInNewContext(source.slice(source.indexOf("  function autoConnectIfReady()"),
+    source.indexOf("  function updateConnectButtonAvailability()")), context);
+  context.autoConnectIfReady();
+  assert.deepEqual(calls, ["progress"]);
+  connect();
+  assert.deepEqual(calls, ["progress", "socket"]);
+});
+
 function fixture({ reachable = true, configFailure = false, errorCode } = {}) {
   const calls = [], gates = [];
   const saved = { accountId: "fixture", jid: "fixture@localhost", password: "fixture-only", preferredLanguage: "eng" };

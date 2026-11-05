@@ -2798,6 +2798,17 @@ body.viewport-phone.viewport-portrait.tc-text-visible-active.call-active .call-p
 .call-keypad-keys button {
   min-height: 48px;
   font-size: 22px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+
+.call-keypad-letters {
+  font-size: 12px;
+  line-height: 1.2;
+  letter-spacing: .1em;
 }
 
 #callKeypadTextButton {

@@ -50,7 +50,7 @@ async function check(engine, device, name) {
     const input = page.locator("#phoneDialerNumber");
     const mobile = device.viewport.width <= 520;
     const open = async () => {
-      if (mobile) await page.locator("#mobileActionsToggle").click();
+      if (await page.locator("#mobileActionsToggle").isVisible()) await page.locator("#mobileActionsToggle").click();
       await page.locator("#phoneDialerButton").click();
       assert.equal(await dialog.evaluate((element) => element.open), true);
       assert.equal(await page.evaluate(() => document.activeElement.id), "phoneDialerClose");
@@ -154,7 +154,7 @@ async function check(engine, device, name) {
       await page.keyboard.press("Escape");
       assert.equal(await dialog.evaluate((element) => element.open), false);
       await page.waitForFunction(() => document.getElementById("phoneDialerNumber").value === "");
-      const focusId = mobile ? "mobileActionsToggle" : "phoneDialerButton";
+      const focusId = await page.locator("#mobileActionsToggle").isVisible() ? "mobileActionsToggle" : "phoneDialerButton";
       await page.waitForFunction((id) => document.activeElement.id === id, focusId);
       await open();
       assert.equal(await input.inputValue(), "");

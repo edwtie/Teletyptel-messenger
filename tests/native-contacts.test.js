@@ -18,6 +18,7 @@ function fixture({ native = true, pick } = {}) {
         setAttribute(name, value) { this.attributes[name] = value; },
         removeAttribute(name) { delete this.attributes[name]; },
         replaceChildren() {},
+        getClientRects() { return this.hidden || this.id === "mobileActionsToggle" ? [] : [{}]; },
         focus() { document.activeElement = this; },
         blur() { document.activeElement = null; },
         setSelectionRange(start, end) { this.selectionStart = start; this.selectionEnd = end; },

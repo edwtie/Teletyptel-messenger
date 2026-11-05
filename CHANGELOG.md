@@ -2,6 +2,37 @@
 
 ## Unreleased
 
+### Stable application startup and sign-in — 2026-11-05
+
+- Align native iOS launch logos with the app's connection screen and
+  anchor the logo independently of changing status or error text.
+- Check XMPP inline while the sign-in dialog is open, rather than briefly
+  reopening the splash screen. Failed checks still block access and offer retry.
+- Keep connection progress visible while auto-login schedules its socket.
+- Add launch-position and sign-in transition regressions, including a complete
+  bundled sign-in with fictitious account and XMPP responses. Check stable
+  header and logo positions after delayed contacts arrive on phone, tablet
+  and Chromium desktop layouts; real-device acceptance remains pending.
+
+### Translation off stays silent — 2026-11-05
+
+- Hide translation results, notices and menu actions in ordinary chat and live
+  RTT/TC whenever translation is off or account preferences have not loaded.
+- Apply the off selection immediately, including before saving, and refresh
+  live views after saving. Keep preference/session errors in settings.
+- Cover saved off preferences, stale consent flags, cancellation, queued work
+  and late responses with Chromium and WebKit tests using fictitious text only.
+
+### Phone keypad letter selection — 2026-11-04
+
+- Show ABC–WXYZ on the in-call keypad as well as the phone-number keypad.
+- In the phone-number keypad, hold 2–9 to cycle through the digit and its
+  letters; release to insert one character. Short taps still insert digits.
+  Cancel pending selection on release outside the key, view changes or closing.
+- Validate letter numbers using the standard keypad digit mapping. Leave
+  in-call DTMF and chat/TC RTT input unchanged; do not enable number calling.
+
+
 ### Symbol menus for iOS build 16.7 — 2026-11-04
 
 - Use compact symbol-only main and call menus while retaining accessible names,

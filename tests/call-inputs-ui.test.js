@@ -35,6 +35,7 @@ for (const [name, engine] of Object.entries({ chromium, webkit })) {
           const state = { call: { rttEnabled: true, pc: { connectionState: 'connected', getSenders: () => [{ track: { kind: 'audio', readyState: 'live' }, dtmf }] } } };
           const updateCallUi = () => {};
           el.messageInput.disabled = false;
+          el.totalConversationLocalText.disabled = false;
           ${bindings}
           updateCallInputUi();
           return { tones, dtmf, state, update: updateCallInputUi };
@@ -45,6 +46,16 @@ for (const [name, engine] of Object.entries({ chromium, webkit })) {
         await page.locator("#callKeypadButton").click();
         assert.equal(await page.locator("#callKeypadDialog").evaluate(element => element.open), true);
         assert.equal(await page.locator("#callKeypadKeys button").count(), 12);
+        for (const [digit, letters] of Object.entries({ 2: "ABC", 3: "DEF", 4: "GHI", 5: "JKL", 6: "MNO", 7: "PQRS", 8: "TUV", 9: "WXYZ" })) {
+          const label = page.locator(`[data-call-digit="${digit}"] .call-keypad-letters`);
+          assert.equal(await label.textContent(), letters);
+          assert.equal(await label.isVisible(), true);
+          const labelBounds = await label.boundingBox();
+          const keyBounds = await page.locator(`[data-call-digit="${digit}"]`).boundingBox();
+          assert.ok(labelBounds.x >= keyBounds.x && labelBounds.x + labelBounds.width <= keyBounds.x + keyBounds.width);
+          assert.ok(labelBounds.y >= keyBounds.y && labelBounds.y + labelBounds.height <= keyBounds.y + keyBounds.height);
+        }
+        assert.equal(await page.locator('[data-call-digit="1"]').textContent(), "1");
         const bounds = await page.locator("#callKeypadDialog").boundingBox();
         assert.ok(bounds.y >= 0 && bounds.y + bounds.height <= height + 1);
         if (width === 390) {
@@ -54,7 +65,7 @@ for (const [name, engine] of Object.entries({ chromium, webkit })) {
         }
         await page.locator('[data-call-digit="2"]').click();
         await page.locator("#callKeypadTextButton").click();
-        assert.equal(await page.evaluate(() => document.activeElement.id), "messageInput");
+        assert.equal(await page.evaluate(() => document.activeElement.id), "totalConversationLocalText");
         assert.equal(await page.locator("#callKeypadDialog").evaluate(element => element.open), false);
       }
       assert.deepEqual(await page.evaluate(() => callInputFixture.tones), ["2", "22", "222"]);
@@ -64,6 +75,7 @@ for (const [name, engine] of Object.entries({ chromium, webkit })) {
       await page.keyboard.press("3");
       assert.equal(await page.evaluate(() => callInputFixture.tones.length), 3);
       await page.keyboard.press("Escape");
+      await page.waitForFunction(() => !document.getElementById("callKeypadDialog").open);
       assert.equal(await page.locator("#callKeypadDialog").evaluate(element => element.open), false);
     } finally { await browser.close(); }
   });

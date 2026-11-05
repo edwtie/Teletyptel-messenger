@@ -109,6 +109,10 @@
 }
 
 .phone-dialer-keys button {
+  touch-action: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
   min-height: 46px;
   display: flex;
   flex-direction: column;
@@ -132,6 +136,11 @@
   border-radius: 10px;
   font-size: .9rem;
   line-height: 1.5;
+}
+
+.phone-dialer-keys button.is-holding {
+  background: var(--accent-strong, #2563eb);
+  color: #fff;
 }
 
 #phoneDialerCall {

@@ -50,6 +50,25 @@
   object-fit: contain;
 }
 
+.native-startup,
+.xmpp-availability--native {
+  --startup-logo-width: min(280px, calc(100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - 48px));
+  padding: env(safe-area-inset-top, 0px) calc(24px + env(safe-area-inset-right, 0px))
+    env(safe-area-inset-bottom, 0px) calc(24px + env(safe-area-inset-left, 0px));
+}
+
+.native-startup .xmpp-availability__panel,
+.xmpp-availability--native .xmpp-availability__panel {
+  box-sizing: border-box;
+  margin: 0 auto;
+  padding-top: max(0px, calc((100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - var(--startup-logo-width) * 128 / 599) / 2));
+}
+
+.native-startup .xmpp-availability__brand,
+.xmpp-availability--native .xmpp-availability__brand {
+  width: var(--startup-logo-width);
+}
+
 .xmpp-availability [role="status"] {
   margin: 0;
 }

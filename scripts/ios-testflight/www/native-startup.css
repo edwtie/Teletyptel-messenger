@@ -3,11 +3,6 @@ body:not(.account-booting) .native-startup:not([data-state]),
   display: none !important;
 }
 
-.native-startup .xmpp-availability__panel {
-  min-height: 240px;
-}
-
 .native-startup .xmpp-availability__actions {
-  min-height: 64px;
   padding-top: 16px;
 }

@@ -15,9 +15,9 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="favicon.ico" sizes="any">
   <link rel="apple-touch-icon" href="assets/brand/teletyptel-icon-192.png">
-  <link rel="stylesheet" href="chat-client.css?v=20261104-main-menu-symbols">
-  <link rel="stylesheet" href="xmpp-availability.css?v=20261103-startup-progress">
-  <link rel="stylesheet" href="chat-dialer.css?v=20261031-keypad-letters">
+  <link rel="stylesheet" href="chat-client.css?v=20261104-call-keypad-letters">
+  <link rel="stylesheet" href="xmpp-availability.css?v=20261105-stable-startup">
+  <link rel="stylesheet" href="chat-dialer.css?v=20261104-hold-letters">
   <link rel="stylesheet" href="chat-tablet.css?v=20261104-video-fit">
   <link rel="stylesheet" href="call-controls-menu.css?v=20261104-symbol-colors">
 </head>
@@ -1381,8 +1381,8 @@
       <p class="phone-dialer-mode" data-i18n="dialer.mode">TC (Total Conversation), where supported</p>
       <label for="phoneDialerNumber" data-i18n="dialer.number">Phone number</label>
       <input id="phoneDialerNumber" type="tel" inputmode="none" autocomplete="off" spellcheck="false" maxlength="40" placeholder="+31 …" aria-describedby="phoneDialerHint phoneDialerInvalid">
-      <p id="phoneDialerHint" class="phone-dialer-hint" data-i18n="dialer.hint">Include the country code, for example +31.</p>
-      <p id="phoneDialerInvalid" class="phone-dialer-error" role="status" hidden data-i18n="dialer.invalid">Use + and digits, with a country code (at most 15 digits). No extensions or SIP addresses.</p>
+      <p id="phoneDialerHint" class="phone-dialer-hint" data-i18n="dialer.hint">Include the country code, for example +31. Hold 2–9 to choose a letter; release to insert. Letters correspond to their keypad digits.</p>
+      <p id="phoneDialerInvalid" class="phone-dialer-error" role="status" hidden data-i18n="dialer.invalid">Use + and a country code, followed by digits or A–Z (at most 15 digits after conversion). No extensions or SIP addresses.</p>
       <div id="phoneDialerKeys" class="phone-dialer-keys" role="group" aria-label="Keypad" data-i18n-aria-label="dialer.keypad">
         <button type="button" data-digit="1">1</button>
         <button type="button" data-digit="2"><span>2</span><span class="phone-dialer-letters">ABC</span></button>
@@ -1431,14 +1431,20 @@
     </div>
     <p id="callKeypadStatus" role="status"></p>
     <div id="callKeypadKeys" class="call-keypad-keys">
-      <button type="button" data-call-digit="1">1</button><button type="button" data-call-digit="2">2</button><button type="button" data-call-digit="3">3</button>
-      <button type="button" data-call-digit="4">4</button><button type="button" data-call-digit="5">5</button><button type="button" data-call-digit="6">6</button>
-      <button type="button" data-call-digit="7">7</button><button type="button" data-call-digit="8">8</button><button type="button" data-call-digit="9">9</button>
+      <button type="button" data-call-digit="1">1</button>
+      <button type="button" data-call-digit="2"><span>2</span><span class="call-keypad-letters">ABC</span></button>
+      <button type="button" data-call-digit="3"><span>3</span><span class="call-keypad-letters">DEF</span></button>
+      <button type="button" data-call-digit="4"><span>4</span><span class="call-keypad-letters">GHI</span></button>
+      <button type="button" data-call-digit="5"><span>5</span><span class="call-keypad-letters">JKL</span></button>
+      <button type="button" data-call-digit="6"><span>6</span><span class="call-keypad-letters">MNO</span></button>
+      <button type="button" data-call-digit="7"><span>7</span><span class="call-keypad-letters">PQRS</span></button>
+      <button type="button" data-call-digit="8"><span>8</span><span class="call-keypad-letters">TUV</span></button>
+      <button type="button" data-call-digit="9"><span>9</span><span class="call-keypad-letters">WXYZ</span></button>
       <button type="button" data-call-digit="*">*</button><button type="button" data-call-digit="0">0</button><button type="button" data-call-digit="#">#</button>
     </div>
     <button id="callKeypadTextButton" type="button" data-i18n="call.keyboard">Type real-time text</button>
   </dialog>
-  <script src="chat-dialer.js?v=20261031-iphone-contacts"></script>
+  <script src="chat-dialer.js?v=20261104-hold-letters"></script>
   <script src="vendor/qrcode.js?v=20260623-history-privacy-copy"></script>
   <script src="jingle-history.js?v=20260615-jingle-history"></script>
   <script src="jingle-session.js?v=20261104-translation-routing"></script>
@@ -1446,13 +1452,13 @@
   <script src="jingle-webrtc-audio.js?v=20261103-tc-clean-view"></script>
   <script src="jingle-call-router.js?v=20261103-tc-clean-view"></script>
   <script src="chat-xmpp-translation.js?v=20261103-translation-status"></script>
-  <script src="chat-translation.js?v=20261104-compact-translation"></script>
+  <script src="chat-translation.js?v=20261105-off-is-silent"></script>
   <script src="native-google.js?v=20261031-bundled-interface"></script>
   <script src="native-facebook.js?v=20261101-native-facebook"></script>
   <script src="native-biometric.js?v=20261102-faceid"></script>
-  <script src="xmpp-availability.js?v=20261103-startup-progress"></script>
+  <script src="xmpp-availability.js?v=20261105-stable-startup"></script>
   <script src="chat-modal.js?v=20261104-accessibility-fixes"></script>
-  <script src="chat-client.js?v=20261104-compact-translation"></script>
+  <script src="chat-client.js?v=20261105-stable-startup"></script>
   <script src="chat-interpreter.js?v=20261104-accessibility-fixes"></script>
   <script src="mobile-navigation.js?v=20261104-call-menu"></script>
   <script src="call-controls-menu.js?v=20261104-symbols-only"></script>

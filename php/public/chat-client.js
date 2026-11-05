@@ -2109,7 +2109,9 @@
       requestLoginRequired(t("status.xmpp_server_offline", "The chat server is offline or unreachable. Please try again later."), { forceLogin: true });
       return false;
     }
-    return xmppAvailability.check({ url, domain, retry });
+    const background = !state.accountBooting && !el.accountDialog.hidden;
+    if (background) el.dialogAccountStatus.textContent = t("status.xmpp_server_checking", "Checking the chat server…");
+    return xmppAvailability.check({ url, domain, retry, background });
   }
 
   function showXmppServerUnavailable(reason = "offline") {
@@ -16813,6 +16815,7 @@
       return;
     }
 
+    if (!state.call && state.xmppRecovery.attempts === 0) xmppAvailability?.connecting();
     window.setTimeout(() => {
       if (!state.accountReady || state.accountGateRequired) {
         return;

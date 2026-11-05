@@ -24,6 +24,7 @@ window.TeleTypTelTranslation = {
     let queue = [];
     let working = false;
     let paused = false;
+    const translationDisabled = () => !loaded || preferences.mode === "off" || mode.value === "off";
     const manualConsentKey = () => "teletyptel_translation_google_v1_" + encodeURIComponent(accountId);
     const hasManualConsent = () => {
       if (window.TeleTypTelApp) {
@@ -214,16 +215,17 @@ window.TeleTypTelTranslation = {
           target.disabled = mode.disabled = consent.disabled = reload.disabled = false;
           syncConsent();
           refreshMessage();
+          refreshLive();
         }
       }
     };
 
-    const liveAllowed = (direction = "peer") => loaded && !paused && available && preferences.mode !== "off"
+    const liveAllowed = (direction = "peer") => !translationDisabled() && !paused && available
       && preferences[["self", "tc-self"].includes(direction) ? "ownLiveRttConsent" : "liveRttConsent"] === true && !document.hidden;
     const renderLiveStatus = (container, direction = "self") => {
-      if (liveAllowed(direction) || document.hidden) return;
-      const reason = !loaded ? statusKey : paused ? "preferences_unsaved" : !available ? "unavailable"
-        : preferences.mode === "off" ? "disabled" : ["self", "tc-self"].includes(direction) ? "own_live_disabled" : "peer_live_disabled";
+      if (translationDisabled() || liveAllowed(direction) || document.hidden) return;
+      const reason = paused ? "preferences_unsaved" : !available ? "unavailable"
+        : ["self", "tc-self"].includes(direction) ? "own_live_disabled" : "peer_live_disabled";
       const wrapper = document.createElement("details");
       wrapper.className = "translation-notice";
       const summary = document.createElement("summary");
@@ -360,7 +362,7 @@ window.TeleTypTelTranslation = {
       return result && result.original === message.text && result.target === preferences.targetLanguage ? result : null;
     };
     const translateMessage = async (message, automatic = false) => {
-      if (!loaded || paused || !available || preferences.mode === "off" || !eligible(message)) return;
+      if (translationDisabled() || paused || !available || !eligible(message)) return;
       if (automatic && (preferences.mode !== "automatic" || !preferences.automaticConsent)) return;
       const previous = currentResult(message);
       if (previous?.pending || previous?.text || (automatic && previous?.error)) return;
@@ -395,7 +397,7 @@ window.TeleTypTelTranslation = {
       if (current === generation) working = false;
     };
     const incoming = (message) => {
-      if (loaded && !paused && available && preferences.mode === "automatic" && preferences.automaticConsent
+      if (!translationDisabled() && !paused && available && preferences.mode === "automatic" && preferences.automaticConsent
           && message.direction === "peer" && eligible(message)) {
         if (currentResult(message) || queue.includes(message)) return;
         if (queue.length >= 30) {
@@ -409,7 +411,7 @@ window.TeleTypTelTranslation = {
     const menuAction = (message) => {
       const result = currentResult(message);
       return {
-        visible: loaded && !paused && available && preferences.mode !== "off" && Boolean(eligible(message)),
+        visible: !translationDisabled() && !paused && available && Boolean(eligible(message)),
         disabled: result?.pending === true,
         label: label(result?.pending ? "translating" : result?.text ? (result.hidden ? "show" : "hide") : "translate")
       };
@@ -426,6 +428,7 @@ window.TeleTypTelTranslation = {
       }
     };
     const render = (message, container) => {
+      if (translationDisabled()) return;
       if (message?.draft && ["self", "peer"].includes(message.direction) && message.text?.trim() && !message.retracted && !liveAllowed(message.direction)) {
         renderLiveStatus(container, message.direction);
         return;
@@ -436,7 +439,7 @@ window.TeleTypTelTranslation = {
         renderLive(container, message.direction, message.from || "");
         return;
       }
-      if (!loaded || paused || !available || preferences.mode === "off" || !eligible(message)) return;
+      if (paused || !available || !eligible(message)) return;
       incoming(message);
       const result = currentResult(message);
       if (!result || result.hidden) return;

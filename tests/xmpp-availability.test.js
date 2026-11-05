@@ -132,6 +132,27 @@ for (const [engineName, engine] of Object.entries({ chromium, webkit })) {
       });
     }
     try {
+      await check("Sign-in preflight stays inline, but offline failures still block access", async page => {
+        const result = await page.evaluate(async ({ options, open, features }) => {
+          const harness = window.fixture;
+          const controller = harness.api.create();
+          const pending = controller.check({ ...options, background: true });
+          const flashed = !!document.querySelector(".xmpp-availability[open]");
+          const socket = harness.sockets.at(-1);
+          socket.emit("open");
+          socket.emit("message", open + features);
+          const available = await pending;
+          const hidden = !document.querySelector(".xmpp-availability[open]");
+          const failure = controller.check({ ...options, background: true });
+          harness.sockets.at(-1).emit("error");
+          const unavailable = await failure;
+          const blocked = !!document.querySelector('.xmpp-availability[open][data-state="offline"]')
+            && document.querySelector(".app-shell").inert;
+          controller.hide();
+          return { flashed, available, hidden, unavailable, blocked, clean: harness.clean() };
+        }, { options, open, features });
+        assert.deepEqual(result, { flashed: false, available: true, hidden: true, unavailable: false, blocked: true, clean: true });
+      });
       await check("Confirmed certificate errors show actionable text; opaque socket failures remain offline", async page => {
         const result = await page.evaluate(async options => {
           const harness = window.fixture;

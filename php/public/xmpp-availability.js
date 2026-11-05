@@ -140,6 +140,7 @@
         overlay = isNativeApp() ? document.querySelector("dialog.native-startup") : null;
         overlay ||= document.createElement("dialog");
         overlay.classList.add("xmpp-availability");
+        overlay.classList.toggle("xmpp-availability--native", isNativeApp());
         overlay.setAttribute("aria-label", "TeleTypTel");
         overlay.setAttribute("aria-modal", "true");
         overlay.setAttribute("closedby", "none");
@@ -259,11 +260,11 @@
       previous?.cancel();
     }
     const controller = {
-      check({ url, domain, retry: onRetry } = {}) {
+      check({ url, domain, retry: onRetry, background = false } = {}) {
         if (pending && pending.url === url && pending.domain === domain) return pending.promise;
         cancelPending();
         const retryCheck = onRetry || (() => controller.check({ url, domain }));
-        show("checking", retryCheck);
+        if (!background) show("checking", retryCheck);
         const request = { ...startProbe({ url, domain, WebSocket }), url, domain };
         pending = request;
         request.promise = request.promise.then(available => {
