@@ -47,7 +47,14 @@ enum NativeWebRTCTests {
         return value!
     }
 
-    static func main() {
+    private static func jingleDescription(_ description: RTCSessionDescription) throws -> RTCSessionDescription {
+        let action = description.type == .offer ? "session-initiate" : "session-accept"
+        let xml = try MessengerJingleRtt.fromSdp(description.sdp, sid: "native-loopback", action: action)
+        let restored = try MessengerJingleRtt.toSdp(xml, sid: "native-loopback", action: action, expectedMid: "0")
+        return RTCSessionDescription(type: description.type, sdp: restored)
+    }
+
+    static func main() throws {
         RTCInitializeSSL()
         let factory = RTCPeerConnectionFactory()
         let firstEvents = PeerEvents()
@@ -69,10 +76,10 @@ enum NativeWebRTCTests {
         precondition(!sender.setText("not connected"))
         set(description(for: first, offer: true), on: first, local: true)
         wait("first gathering", until: { first.iceGatheringState == .complete })
-        set(first.localDescription!, on: second, local: false)
+        set(try jingleDescription(first.localDescription!), on: second, local: false)
         set(description(for: second, offer: false), on: second, local: true)
         wait("second gathering", until: { second.iceGatheringState == .complete })
-        set(second.localDescription!, on: first, local: false)
+        set(try jingleDescription(second.localDescription!), on: first, local: false)
         wait("native ordered T.140 channel open", until: { sender.isReady && receiver.isReady })
         precondition(first.senders.isEmpty && second.senders.isEmpty)
         for text in ["Hallo 👋", "Hall🌍", "e\u{301}\nVolgende", "e", "", "{\"type\":\"literal text\"}"] {

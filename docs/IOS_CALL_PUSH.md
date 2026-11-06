@@ -439,6 +439,38 @@ cleanup. Neither issue was bypassed by disabling a transport or cleanup check.
 The actual Jingle wakeup/answer and ICE adapter, CallKit-managed audio, video
 capture/rendering and physical-device background tests remain unfinished.
 
+## Native Jingle RTT codec follow-up — 2026-11-06
+
+The next preview-only step adds a Foundation Swift codec for the existing web
+client's single RTT content: `dc-t140`, reliable ordered channel 0, conversation /
+human / co-session metadata, SHA-256 DTLS and complete UDP ICE candidates. It
+converts gathered SDP to Jingle XML and back. The two-real-peer test now passes
+both offer and answer through this codec before applying the remote description.
+
+Parsing requires the expected SID, action and (when known) content MID. XML is
+namespace-aware and bounded to 64 KiB, 80 nodes, six levels and 64 candidates.
+DTD/entity declarations, CDATA, unknown content, duplicate fields/candidates,
+partial reliability, unsupported roles, invalid addresses and malformed SDP are
+rejected. The codec generates only its supported SDP fields; it does not pass
+untrusted raw SDP through. It rejects additional audio/video contents rather than
+silently dropping them. This is deliberately a narrow experimental binding, not
+full XEP-0517 or RFC 8865 SDP-negotiation conformance.
+
+This codec does **not** authenticate a caller or implement the XMPP IQ/session
+state machine. SID/MID checks are correlation checks, not authorization. A future
+native signaling adapter must verify the authenticated full peer JID, account,
+call UUID, current session phase and offered profile before applying any decoded
+description. Push payloads must never supply or authorize media descriptions.
+No new JavaScript plugin entry, server endpoint or active push/media path is
+enabled by this change. Native audio/video, CallKit audio activation and an actual
+ejabberd-backed background call remain separate unfinished integration steps.
+
+The shared fictitious offer fixture is tested locally against the existing
+browser encoder and decoder. Swift malformed-input checks and real native-peer
+round-trips are wired into the separately approved unsigned cloud test. These
+native checks are not yet recorded as passed until that run completes. There is
+no TestFlight upload or server modification in this step.
+
 ## Sources
 
 - [Apple: responding to VoIP notifications](https://developer.apple.com/documentation/pushkit/responding-to-voip-notifications-from-pushkit)

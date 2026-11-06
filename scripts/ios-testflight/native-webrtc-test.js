@@ -29,6 +29,7 @@ function runLoopback({ output, reports, run, logged }) {
     logged("xcrun", ["swiftc", "-swift-version", "5", "-F", framework, "-framework", "WebRTC",
       "-Xlinker", "-rpath", "-Xlinker", framework,
       path.join(__dirname, "NativeT140Session.swift"), path.join(__dirname, "NativeWebRTCChannel.swift"),
+      path.join(__dirname, "NativeJingleRtt.swift"),
       path.join(__dirname, "tests/NativeWebRTCTests.swift"), "-o", executable], "native-webrtc-compile.log");
     const runtimeLog = "native-webrtc-runtime.log";
     try {

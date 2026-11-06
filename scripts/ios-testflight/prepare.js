@@ -53,6 +53,7 @@ function prepare() {
     + fs.readFileSync(path.join(__dirname, "CallMediaProfile.swift"), "utf8") + "\n"
     + fs.readFileSync(path.join(__dirname, "NativeT140Session.swift"), "utf8") + "\n"
     + (config.callPushPreview ? fs.readFileSync(path.join(__dirname, "NativeWebRTCChannel.swift"), "utf8") + "\n" : "")
+    + (config.callPushPreview ? fs.readFileSync(path.join(__dirname, "NativeJingleRtt.swift"), "utf8") + "\n" : "")
     + fs.readFileSync(path.join(__dirname, "VoipCallPlugin.swift"), "utf8") + "\n"
     + fs.readFileSync(path.join(__dirname, "ServerBridge.swift"), "utf8") + "\n"
     + fs.readFileSync(path.join(__dirname, "BiometricSession.swift"), "utf8"));
