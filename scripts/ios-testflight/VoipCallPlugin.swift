@@ -347,6 +347,18 @@ final class MessengerVoipCalls: NSObject, PKPushRegistryDelegate, CXProviderDele
         return true
     }
 
+    #if canImport(WebRTC)
+    func attachNativeRtt(id: UUID, sid: String, negotiatedProfile: String, peer: RTCPeerConnection) -> Bool {
+        precondition(Thread.isMainThread)
+        guard let call = calls[id], call.sid == sid, call.phase == "answerRequested",
+              call.mediaProfile.rawValue == negotiatedProfile, let rtt = call.rtt else { return false }
+        return MessengerWebRTCChannel.attach(to: peer, session: rtt) { [weak self, weak call] in
+            guard let self = self, let call = call, self.calls[id] === call else { return }
+            self.changed?()
+        } != nil
+    }
+    #endif
+
     func attachRtt(id: UUID, sid: String, channel: MessengerT140Channel) -> Bool {
         precondition(Thread.isMainThread)
         guard let call = calls[id], call.sid == sid, call.phase == "answerRequested",

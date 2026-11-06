@@ -384,6 +384,44 @@ Jingle offer/answer and ICE, pass its negotiated reliable/ordered T.140 channel 
 this session, and connect the TC renderer to the protected RTT bridge. Then test
 actual iPhone/iPad media, including CallKit audio activation and camera restoration.
 
+## Native WebRTC channel follow-up — 2026-11-06
+
+The preview now includes a real `RTCDataChannel` adapter for the existing native
+RTT session. It creates the project's reliable, ordered, negotiated `rtt` / `t140`
+channel with ID 0 on a peer supplied by native signaling. The native-only
+`attachNativeRtt` entry requires the matching call UUID, SID and media profile
+after an answer request. It is not exposed to JavaScript and is not called by a
+push payload. No native signaling adapter invokes this entry yet.
+
+WebRTC delegates are marshalled onto the main thread. Pending receive callbacks
+are bounded to 64 messages / 256 KiB, each at most 4096 bytes; state/drain callbacks
+are coalesced. Overflow closes the RTT transport rather than growing memory
+without bounds. Closing removes delegates, invalidates queued callbacks and lets
+the call-bound session clear its text. No chat history or translated text is sent.
+
+Only preview builds link the third-party precompiled `stasel/WebRTC` M157 package:
+
+- Version: `157.0.0`; revision: `c6cde72c7638acf8dc2b070aaecca054e9e20720`.
+- Binary SHA-256: `ffb1221be2138ecc6bc92300ae4f0157e18694d652db9921e4251992ea91a328`.
+- The downloaded archive hash was checked against the pinned package manifest.
+  SwiftPM also verifies the binary checksum. This establishes pinning, not an
+  independent security audit or reproducible build of that third-party binary.
+- The existing preview upload guard remains in place. Review dependency licensing,
+  security maintenance and encryption/export declarations before any release.
+
+The unsigned build runs `NativeWebRTCTests.swift` after device compilation using
+the pinned framework's macOS slice. Two actual peers exchange SDP in memory,
+with no STUN/TURN servers, accounts, Apple push or media capture. The test exercises
+bidirectional UTF-8 text, edits, segmented large text, draining, rejected invalid
+outgoing buffers, remote closure and empty replacement-call state. This is a
+same-machine native datachannel test, not browser/native interoperability or TC.
+
+Local source/build-wiring checks pass (49 checks; two macOS-only skips in the
+focused existing suites). Native compile and transport execution still require
+the separately authorized GitHub compile-only run; no success is assumed here.
+The actual Jingle wakeup/answer and ICE adapter, CallKit-managed audio, video
+capture/rendering and physical-device background tests remain unfinished.
+
 ## Sources
 
 - [Apple: responding to VoIP notifications](https://developer.apple.com/documentation/pushkit/responding-to-voip-notifications-from-pushkit)
@@ -394,3 +432,5 @@ actual iPhone/iPad media, including CallKit audio activation and camera restorat
 - [Apple: making and receiving VoIP calls](https://developer.apple.com/documentation/callkit/making-and-receiving-voip-calls)
 - [XEP-0517: Jingle Synchronized Real-Time Text](https://xmpp.org/extensions/xep-0517.html)
 - [RFC 8865: T.140 conversation over WebRTC data channels](https://www.rfc-editor.org/rfc/rfc8865.html)
+- [WebRTC native datachannel API](https://webrtc.googlesource.com/src/+/refs/heads/main/sdk/objc/api/peerconnection/RTCDataChannel.h)
+- [Pinned third-party WebRTC package](https://github.com/stasel/WebRTC/blob/c6cde72c7638acf8dc2b070aaecca054e9e20720/Package.swift)

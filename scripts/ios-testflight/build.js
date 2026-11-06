@@ -81,6 +81,7 @@ async function build() {
     logged(process.execPath, [path.join(__dirname, "node_modules/@capacitor/cli/bin/capacitor"), "sync", "ios"], "capacitor-sync.log");
     require("./google-signin").configureGooglePackage(project);
     if (facebookConfig) facebook.configureFacebookPackage(project);
+    require("./native-webrtc").configurePackage(project, config.callPushPreview === true);
     const bundledStart = path.join(project, "ios/App/App/public", config.capacitor.server.appStartPath.replace(/^\/+/, ""));
     if (!fs.existsSync(bundledStart)) throw new Error("Missing native startup asset; Capacitor would exit before connecting");
     run("swift", [path.join(__dirname, "opaque-icon.swift"), path.join(project, "ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png")]);
@@ -120,6 +121,7 @@ async function build() {
     fs.writeFileSync(projectFile, projectText);
     if (!upload) {
       logged("xcodebuild", [...buildArgs, "CODE_SIGNING_ALLOWED=NO", "build"], "xcode-build.log");
+      if (config.callPushPreview) require("./native-webrtc-test").runLoopback({ output, reports, run, logged });
       await require("./launch-smoke").launchSmoke({ run, logged, config, reports });
       result.passed = true;
       result.scope = "unsigned device compilation and Release Simulator startup regression; no physical iPhone network or media verification";
