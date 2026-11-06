@@ -203,7 +203,7 @@ test. No application or production TLS handling is changed by this addition.
 
 The separate `ios-native-ejabberd.yml` workflow installs Homebrew ejabberd on an
 ephemeral GitHub-hosted macOS runner. It starts its own named instance with a
-temporary database, random fictional account, two loopback-only WSS listeners,
+temporary database, random fictional account, one loopback-only WSS listener,
 and no federation, HTTP administration or public account registration. It records
 the installed ejabberd version rather than claiming an exact match to the local
 Docker server. Homebrew dependency versions are not pinned in this initial test.
@@ -216,8 +216,11 @@ cancellation. The harness also checks that ejabberd has no remaining connected
 users after the tests. No test message is sent to an existing user.
 
 Only on that disposable runner, a generated two-day test CA is temporarily
-trusted by macOS. The second listener uses a certificate that is deliberately
-not trusted. Cleanup stops the owned instance, removes the CA's trust and
+trusted by macOS. A separate loopback Node TLS listener uses a certificate that
+is deliberately not trusted; it does not simulate XMPP or account acceptance.
+Keeping this listener separate prevents ejabberd's global certificate selection
+from sharing the trusted localhost certificate with the negative test.
+Cleanup stops the owned listeners, removes the CA's trust and
 certificate, and deletes the temporary database, credentials and private keys.
 Cleanup errors fail the run. Forced runner termination relies on disposal of
 the hosted VM. The harness refuses Windows, local Macs and self-hosted runners;

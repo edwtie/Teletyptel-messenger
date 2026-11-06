@@ -16,9 +16,10 @@ test("Real-server harness refuses local machines and self-hosted runners", () =>
 test("Isolated ejabberd exposes only loopback WSS and no federation or public registration", () => {
   const directory = path.resolve("artifacts", "fake-only");
   const configuration = serverConfiguration(directory, 15280, 15281);
-  assert.equal(configuration.match(/ip: "127.0.0.1"/g).length, 2);
-  assert.equal(configuration.match(/tls: true/g).length, 2);
-  assert.equal(configuration.match(/\/xmpp-websocket: ejabberd_http_ws/g).length, 2);
+  assert.equal(configuration.match(/ip: "127.0.0.1"/g).length, 1);
+  assert.equal(configuration.match(/tls: true/g).length, 1);
+  assert.equal(configuration.match(/\/xmpp-websocket: ejabberd_http_ws/g).length, 1);
+  assert.doesNotMatch(configuration, /untrusted\.pem|certfile:/);
   assert.match(configuration, /s2s_access: none/);
   assert.match(configuration, /auth_password_format: scram/);
   assert.doesNotMatch(configuration, /mod_register|mod_http_api|ejabberd_c2s|0\.0\.0\.0|5269/);

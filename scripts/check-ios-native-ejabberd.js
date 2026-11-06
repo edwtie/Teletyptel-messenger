@@ -2,6 +2,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const net = require("node:net");
+const https = require("node:https");
 const { execFileSync, spawn } = require("node:child_process");
 const { randomBytes } = require("node:crypto");
 
@@ -17,11 +18,10 @@ function serverConfiguration(directory, trustedPort, untrustedPort) {
     Number.isInteger(port) && port >= 1024 && port <= 65535) || trustedPort === untrustedPort) {
     throw new Error("Invalid isolated ejabberd configuration");
   }
-  const listener = (port, certificate) => `  - port: ${port}
+  const listener = port => `  - port: ${port}
     ip: "127.0.0.1"
     module: ejabberd_http
     tls: true
-    certfile: ${JSON.stringify(path.join(directory, certificate))}
     request_handlers:
       /xmpp-websocket: ejabberd_http_ws`;
   return `hosts: ["localhost"]
@@ -32,8 +32,7 @@ s2s_access: none
 certfiles:
   - ${JSON.stringify(path.join(directory, "trusted.pem"))}
 listen:
-${listener(trustedPort, "trusted.pem")}
-${listener(untrustedPort, "untrusted.pem")}
+${listener(trustedPort)}
 modules:
   mod_ping: {}
 `;
@@ -74,6 +73,8 @@ async function run() {
     accountAPITested: false, physicalDevicesTested: false, passed: false,
     cleanupCompleted: false, swiftTests: 7 };
   let server;
+  let untrustedServer;
+  const untrustedSockets = new Set();
   let control;
   let certificateFingerprint;
   let trustAttempted = false;
@@ -112,7 +113,19 @@ async function run() {
     execute(openssl, ["req", "-x509", "-newkey", "rsa:2048", "-nodes", "-sha256", "-days", "2",
       "-subj", "/CN=localhost", "-addext", "subjectAltName=DNS:localhost", "-addext", "extendedKeyUsage=serverAuth",
       "-keyout", certificate("untrusted.key"), "-out", certificate("untrusted.crt")]);
-    write("untrusted.pem", fs.readFileSync(certificate("untrusted.key")) + "\n" + fs.readFileSync(certificate("untrusted.crt")));
+    untrustedServer = https.createServer({ key: fs.readFileSync(certificate("untrusted.key")),
+      cert: fs.readFileSync(certificate("untrusted.crt")) }, (_, response) => {
+      response.writeHead(426);
+      response.end();
+    });
+    untrustedServer.on("connection", socket => {
+      untrustedSockets.add(socket);
+      socket.once("close", () => untrustedSockets.delete(socket));
+    });
+    await new Promise((resolve, reject) => {
+      untrustedServer.once("error", reject);
+      untrustedServer.listen(untrustedPort, "127.0.0.1", resolve);
+    });
     certificateFingerprint = execute(openssl, ["x509", "-in", certificate("ca.crt"), "-noout", "-fingerprint", "-sha1"])
       .trim().split("=").at(-1).replaceAll(":", "");
     if (!/^[0-9A-F]{40}$/i.test(certificateFingerprint)) throw new Error("Invalid temporary CA fingerprint");
@@ -141,9 +154,30 @@ async function run() {
     if (!ready) throw new Error("Isolated ejabberd did not start");
     control("register", username, "localhost", password);
     write("fixture.json", JSON.stringify({ trustedPort, untrustedPort, username, password }));
-    const swiftOutput = execute("swift", ["test", "--package-path", path.join(root, "mobile/ios-native"),
-      "--scratch-path", certificate("SwiftBuild"), "--filter", "EjabberdIntegrationTests"], 240000,
-    { TELETYPTEL_EJABBERD_FIXTURE: certificate("fixture.json") });
+    const swiftOutput = await new Promise((resolve, reject) => {
+      let output = "";
+      let overflow = false;
+      const child = spawn("swift", ["test", "--package-path", path.join(root, "mobile/ios-native"),
+        "--scratch-path", certificate("SwiftBuild"), "--filter", "EjabberdIntegrationTests"], {
+        cwd: root, detached: true, stdio: ["ignore", "pipe", "pipe"],
+        env: { ...environment, NSUnbufferedIO: "YES", TELETYPTEL_EJABBERD_FIXTURE: certificate("fixture.json") }
+      });
+      const stop = () => { if (child.pid) { try { process.kill(-child.pid, "SIGKILL"); } catch {} } };
+      const timeout = setTimeout(stop, 240000);
+      const collect = chunk => {
+        if (output.length + chunk.length > 8 * 1024 * 1024) { overflow = true; stop(); return; }
+        output += chunk.toString();
+        save("swift-progress.txt", output);
+      };
+      child.stdout.on("data", collect);
+      child.stderr.on("data", collect);
+      child.once("error", error => { clearTimeout(timeout); reject(error); });
+      child.once("close", (code, signal) => {
+        clearTimeout(timeout);
+        if (code === 0 && !overflow) resolve(output);
+        else reject(new Error(`Swift integration failed (${signal || code}); see swift-progress.txt`));
+      });
+    });
     save("swift-tests.txt", swiftOutput);
     if (!/Executed 7 tests, with 0 failures/.test(swiftOutput) || /[1-9][0-9]* tests? skipped/i.test(swiftOutput)) {
       throw new Error("Expected all seven real-server tests to execute without skips or failures");
@@ -164,6 +198,10 @@ async function run() {
     if (fs.existsSync(serverLog)) save("server-failure.txt", fs.readFileSync(serverLog, "utf8").slice(-16000));
   } finally {
     const cleanupErrors = [];
+    if (untrustedServer) {
+      for (const socket of untrustedSockets) socket.destroy();
+      await new Promise(resolve => untrustedServer.close(resolve));
+    }
     if (server?.pid) {
       try { control("stop"); } catch {}
       for (let attempt = 0; attempt < 30 && server.exitCode === null && server.signalCode === null; attempt++) await delay(100);
@@ -176,10 +214,8 @@ async function run() {
       }
     }
     if (trustAttempted) {
-      try { execute("sudo", ["security", "remove-trusted-cert", "-d", path.join(temporary, "ca.crt")]); }
-      catch { cleanupErrors.push("temporary CA trust removal"); }
-      try { execute("sudo", ["security", "delete-certificate", "-Z", certificateFingerprint, "/Library/Keychains/System.keychain"]); }
-      catch { cleanupErrors.push("temporary CA certificate removal"); }
+      try { execute("sudo", ["security", "delete-certificate", "-t", "-Z", certificateFingerprint, "/Library/Keychains/System.keychain"]); }
+      catch (error) { cleanupErrors.push("temporary CA trust/certificate removal"); save("trust-cleanup-error.txt", error.stderr || error.message); }
     }
     try { fs.rmSync(temporary, { recursive: true, force: true }); }
     catch { cleanupErrors.push("temporary fixture removal"); }
