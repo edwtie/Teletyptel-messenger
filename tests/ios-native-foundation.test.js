@@ -4,10 +4,66 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { execFileSync } = require("node:child_process");
 const { prepare, projectText } = require("../scripts/prepare-ios-native");
+const { executeLogged, collectTestResults } = require("../scripts/check-ios-native");
 
 const root = path.resolve(__dirname, "..");
 const native = path.join(root, "mobile/ios-native");
 const read = file => fs.readFileSync(path.join(native, file), "utf8");
+
+function diagnosticDirectory() {
+  const artifacts = path.join(root, "artifacts");
+  fs.mkdirSync(artifacts, { recursive: true });
+  return fs.mkdtempSync(path.join(artifacts, "ios-native-diagnostics-test-"));
+}
+
+test("Native runner retains successful command output", () => {
+  const reports = diagnosticDirectory();
+  assert.equal(executeLogged("fixture", [], { root, reports, name: "unit", execute: () => "passed\n" }), "passed\n");
+  assert.equal(fs.readFileSync(path.join(reports, "unit.txt"), "utf8"), "passed\n");
+});
+
+test("Native runner retains assertion output and propagates the original failure", () => {
+  const reports = diagnosticDirectory();
+  const failure = Object.assign(new Error("xcodebuild failed"), {
+    stdout: "XCTAssert failed at fixture.swift:10", stderr: "TEST FAILED", status: 65, signal: null
+  });
+  assert.throws(() => executeLogged("xcodebuild", [], {
+    root, reports, name: "iPhone-tests", execute: () => { throw failure; }
+  }), error => error === failure);
+  assert.equal(fs.readFileSync(path.join(reports, "iPhone-tests.txt"), "utf8"), failure.stdout);
+  assert.equal(fs.readFileSync(path.join(reports, "iPhone-tests-stderr.txt"), "utf8"), failure.stderr);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(reports, "iPhone-tests-failure.json"))).status, 65);
+});
+
+test("Native runner preserves timeout cause even if stderr contains only a warning", () => {
+  const reports = diagnosticDirectory();
+  const failure = Object.assign(new Error("spawnSync xcodebuild ETIMEDOUT"), {
+    stdout: "Testing started", stderr: "destination warning", code: "ETIMEDOUT", signal: "SIGTERM"
+  });
+  assert.throws(() => executeLogged("xcodebuild", [], {
+    root, reports, name: "iPhone-tests", execute: () => { throw failure; }
+  }), error => error === failure);
+  const report = JSON.parse(fs.readFileSync(path.join(reports, "iPhone-tests-failure.json")));
+  assert.equal(report.code, "ETIMEDOUT");
+  assert.equal(report.signal, "SIGTERM");
+});
+
+test("Native runner exports structured result evidence without hiding export failures", () => {
+  const reports = diagnosticDirectory();
+  const bundle = path.join(reports, "iPhone.xcresult");
+  fs.mkdirSync(bundle);
+  collectTestResults(bundle, { root, reports, family: "iPhone", execute: (command, args) => {
+    assert.equal(command, "xcrun");
+    assert.deepEqual(args.slice(0, 3), ["xcresulttool", "get", "test-results"]);
+    if (args[3] === "summary") return JSON.stringify({ failedTests: 1 });
+    throw new Error("Incomplete result bundle");
+  } });
+  assert.equal(JSON.parse(fs.readFileSync(path.join(reports, "iPhone-summary.json"))).failedTests, 1);
+  assert.match(fs.readFileSync(path.join(reports, "iPhone-tests-export-error.txt"), "utf8"), /Incomplete result bundle/);
+  collectTestResults(path.join(reports, "missing.xcresult"), {
+    root, reports, family: "iPad", execute: () => assert.fail("Missing bundle must not be read")
+  });
+});
 
 test("Native preview has separate identity, no web runtime, upload or signing configuration", () => {
   const { project, scheme } = projectText();

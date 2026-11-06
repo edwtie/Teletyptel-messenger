@@ -3,6 +3,39 @@ const path = require("node:path");
 const { execFileSync } = require("node:child_process");
 const { prepare } = require("./prepare-ios-native");
 
+function executeLogged(command, args, { root, reports, name, timeout = 600000, execute = execFileSync }) {
+  try {
+    const output = execute(command, args, {
+      cwd: root, timeout, maxBuffer: 40 * 1024 * 1024, encoding: "utf8", stdio: "pipe"
+    });
+    fs.writeFileSync(path.join(reports, name + ".txt"), output);
+    return output;
+  } catch (error) {
+    fs.writeFileSync(path.join(reports, name + ".txt"), String(error.stdout || ""));
+    fs.writeFileSync(path.join(reports, name + "-stderr.txt"), String(error.stderr || ""));
+    fs.writeFileSync(path.join(reports, name + "-failure.json"), JSON.stringify({
+      command, code: error.code ?? null, status: error.status ?? null,
+      signal: error.signal ?? null, message: error.message
+    }, null, 2));
+    throw error;
+  }
+}
+
+function collectTestResults(bundle, { root, reports, family, execute = execFileSync }) {
+  if (!fs.existsSync(bundle)) return;
+  for (const section of ["summary", "tests"]) {
+    try {
+      const output = execute("xcrun", ["xcresulttool", "get", "test-results", section, "--path", bundle], {
+        cwd: root, timeout: 60000, maxBuffer: 8 * 1024 * 1024, encoding: "utf8", stdio: "pipe"
+      });
+      fs.writeFileSync(path.join(reports, family + "-" + section + ".json"), JSON.stringify(JSON.parse(output), null, 2));
+    } catch (error) {
+      fs.writeFileSync(path.join(reports, family + "-" + section + "-export-error.txt"),
+        String(error.message) + "\n" + String(error.stderr || ""));
+    }
+  }
+}
+
 function run() {
   if (process.platform !== "darwin") throw new Error("Native iOS compilation and UI tests require macOS/Xcode");
   const root = path.resolve(__dirname, "..");
@@ -13,14 +46,15 @@ function run() {
   const execute = (command, args, timeout = 600000) => execFileSync(command, args, {
     cwd: root, timeout, maxBuffer: 40 * 1024 * 1024, encoding: "utf8", stdio: "pipe"
   });
+  const logged = (name, command, args, timeout) => executeLogged(command, args, { root, reports, name, timeout });
   try {
-    fs.writeFileSync(path.join(reports, "swift-tests.txt"), execute("swift", ["test", "--package-path",
-      path.join(root, "mobile/ios-native"), "--scratch-path", path.join(directory, "SwiftBuild")]));
+    logged("swift-tests", "swift", ["test", "--package-path",
+      path.join(root, "mobile/ios-native"), "--scratch-path", path.join(directory, "SwiftBuild")]);
     report.swiftUnitTests = true;
     const common = ["-project", path.join(directory, "TeleTypTelNative.xcodeproj"), "-scheme", "TeleTypTelNative",
       "-derivedDataPath", path.join(directory, "DerivedData"), "CODE_SIGNING_ALLOWED=NO"];
-    fs.writeFileSync(path.join(reports, "device-build.txt"), execute("xcodebuild", [...common,
-      "-destination", "generic/platform=iOS", "-configuration", "Release", "build"]));
+    logged("device-build", "xcodebuild", [...common,
+      "-destination", "generic/platform=iOS", "-configuration", "Release", "build"]);
     report.deviceCompiled = true;
     const executable = fs.readFileSync(path.join(directory, "DerivedData/Build/Products/Release-iphoneos/TeleTypTelNative.app/TeleTypTelNative"));
     for (const marker of ["TELETYPTEL_NATIVE_UI_FIXTURE", "fixture-password"]) {
@@ -34,13 +68,17 @@ function run() {
       const device = devices.find(device => device.name.startsWith(family));
       if (!device) throw new Error("Missing " + family + " simulator; do not silently skip device coverage");
       const resultBundle = path.join(reports, family + ".xcresult");
-      fs.writeFileSync(path.join(reports, family + "-tests.txt"), execute("xcodebuild", [...common,
-        "-destination", "platform=iOS Simulator,id=" + device.udid, "-configuration", "Debug",
-        "-parallel-testing-enabled", "NO", "-resultBundlePath", resultBundle, "test"], 900000));
+      try {
+        logged(family + "-tests", "xcodebuild", [...common,
+          "-destination", "platform=iOS Simulator,id=" + device.udid, "-configuration", "Debug",
+          "-parallel-testing-enabled", "NO", "-resultBundlePath", resultBundle, "test"], 900000);
+      } finally {
+        collectTestResults(resultBundle, { root, reports, family });
+      }
       report.uiTests.push({ family, name: device.name, passed: true, orientations: ["portrait", "landscapeLeft"] });
     }
   } catch (error) {
-    fs.writeFileSync(path.join(reports, "failure.txt"), String(error.stderr || error.message).slice(-32000));
+    fs.writeFileSync(path.join(reports, "failure.txt"), String(error.message) + "\n" + String(error.stderr || "").slice(-32000));
     throw error;
   } finally {
     fs.writeFileSync(path.join(reports, "result.json"), JSON.stringify(report, null, 2));
@@ -49,4 +87,4 @@ function run() {
 }
 
 if (require.main === module) run();
-module.exports = { run };
+module.exports = { run, executeLogged, collectTestResults };
