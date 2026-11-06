@@ -18,6 +18,11 @@ test("Preview WebRTC is revision-pinned and rejects unexpected or duplicate pack
   assert.throws(() => sdk.addPackage(updated));
   assert.throws(() => sdk.addPackage("unknown package"));
   assert.doesNotThrow(() => sdk.configurePackage("not-a-real-directory", false));
+  const nested = '    dependencies: [\n        .package(url: "https://example.test/capacitor", exact: "8.4.3")\n    ],\n    targets: [\n        .target(name: "CapApp-SPM",\n            dependencies: [\n                .product(name: "Capacitor", package: "capacitor-swift-pm")\n            ])\n    ]';
+  const nestedUpdated = sdk.addPackage(nested);
+  assert.equal((nestedUpdated.match(/\.package\(url: "https:\/\/github.com\/stasel\/WebRTC.git"/g) || []).length, 1);
+  assert.ok(nestedUpdated.includes('            dependencies: [\n                .product(name: "WebRTC"'));
+  assert.throws(() => sdk.addPackage(source + '\n    dependencies: ['));
 });
 
 test("Native WebRTC source is preview-only; upload remains blocked", () => {
