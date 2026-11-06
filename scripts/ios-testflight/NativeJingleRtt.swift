@@ -76,15 +76,19 @@ struct MessengerJingleRtt {
         value.range(of: pattern, options: .regularExpression) != nil
     }
 
-    private static func token(_ value: String) -> Bool { matches(value, "^[A-Za-z0-9_.+-]{1,64}$") }
+    private static func full(_ value: String, _ pattern: String) -> Bool {
+        matches(value, "\\A(?:" + pattern + ")\\z")
+    }
+
+    private static func token(_ value: String) -> Bool { full(value, "[A-Za-z0-9_.+-]{1,64}") }
 
     private static func number(_ value: String, _ minimum: UInt64, _ maximum: UInt64) -> Bool {
-        guard matches(value, "^[0-9]{1,10}$"), let parsed = UInt64(value) else { return false }
+        guard full(value, "[0-9]{1,10}"), let parsed = UInt64(value) else { return false }
         return parsed >= minimum && parsed <= maximum
     }
 
     private static func address(_ value: String, host: Bool = false) -> Bool {
-        if host && matches(value, "^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\\.local$") { return true }
+        if host && full(value, "[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\\.local") { return true }
         guard value.utf8.count <= 45 else { return false }
         var ipv4 = in_addr()
         var ipv6 = in6_addr()
@@ -120,7 +124,7 @@ struct MessengerJingleRtt {
             case "rport": values["rel-port"] = parts[offset + 1]
             case "generation": values["generation"] = parts[offset + 1]
             case "network-id", "network-cost": try require(number(parts[offset + 1], 0, 65535))
-            case "ufrag": try require(matches(parts[offset + 1], "^[A-Za-z0-9+/]{4,256}$"))
+            case "ufrag": try require(full(parts[offset + 1], "[A-Za-z0-9+/]{4,256}"))
             default: throw MessengerJingleRttError.unsupported
             }
         }
@@ -155,12 +159,12 @@ struct MessengerJingleRtt {
         let transport = try content.one("transport", ice)
         try transport.require("transport", ice, attributes: ["ufrag", "pwd"])
         let ufrag = transport.attributes["ufrag"] ?? "", password = transport.attributes["pwd"] ?? ""
-        try require(matches(ufrag, "^[A-Za-z0-9+/]{4,256}$") && matches(password, "^[A-Za-z0-9+/]{22,256}$"))
+        try require(full(ufrag, "[A-Za-z0-9+/]{4,256}") && full(password, "[A-Za-z0-9+/]{22,256}"))
         let fingerprint = try transport.one("fingerprint", dtls)
         try fingerprint.require("fingerprint", dtls, attributes: ["hash", "setup"])
         let hash = fingerprint.text.trimmingCharacters(in: .whitespacesAndNewlines), setup = fingerprint.attributes["setup"] ?? ""
         try require(fingerprint.children.isEmpty && fingerprint.attributes["hash"] == "sha-256"
-            && matches(hash, "^(?:[0-9A-Fa-f]{2}:){31}[0-9A-Fa-f]{2}$")
+            && full(hash, "(?:[0-9A-Fa-f]{2}:){31}[0-9A-Fa-f]{2}")
             && (action == "session-initiate" ? setup == "actpass" : ["active", "passive"].contains(setup)))
         let mapping = try transport.one("sctpmap", sctp), binding = try transport.one("channel", channel)
         try mapping.require("sctpmap", sctp, attributes: ["number", "protocol"])
@@ -185,7 +189,7 @@ struct MessengerJingleRtt {
         let lines = sdpText.components(separatedBy: "\n").map { $0.hasSuffix("\r") ? String($0.dropLast()) : $0 }.filter { !$0.isEmpty }
         try require(lines.allSatisfy { !matches($0, "[\\x00-\\x1f\\x7f]") })
         let media = lines.filter { $0.hasPrefix("m=") }
-        try require(media.count == 1 && matches(media[0], "^m=application [1-9][0-9]* UDP/DTLS/SCTP webrtc-datachannel$")
+        try require(media.count == 1 && full(media[0], "m=application [1-9][0-9]* UDP/DTLS/SCTP webrtc-datachannel")
             && !lines.contains { matches($0, "^a=(sendonly|recvonly|inactive|crypto:|ice-lite|dcmap:|dcsa:)") })
         func once(_ prefix: String) throws -> String {
             let found = lines.filter { $0.hasPrefix(prefix) }

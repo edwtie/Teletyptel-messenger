@@ -29,6 +29,8 @@ enum NativeJingleRttTests {
             ("port=\"50000\"", "port=\"70000\""), ("generation=\"0\"", "generation=\"1\""),
             ("</transport>", "<unknown/></transport>"), ("</content>", "<content/></content>"),
             ("<content ", "<content disposition=\"session\" "),
+            ("foundation=\"test\"", "foundation=\"test&#10;\""),
+            ("ufrag=\"abcd\"", "ufrag=\"abcd&#10;\""),
             ("<description ", "unexpected text<description "),
             ("<jingle ", "<!DOCTYPE jingle [<!ENTITY attack SYSTEM 'file:///private/test'>]><jingle "),
             ("<datachannel ", "<![CDATA[not allowed]]><datachannel ")
