@@ -1,6 +1,6 @@
 # iPhone incoming calls: PushKit / CallKit preparation
 
-Status: 2026-11-06. Implemented locally as a disabled, non-releasable preview.
+Status: 2026-11-06. Published and compiled as a disabled, non-releasable preview.
 **Locked-screen calling is not yet fixed end to end.** The existing foreground
 haptic implementation remains unchanged. Server-side registry/worker source code
 has been added, but no live database, server configuration or GitHub secrets
@@ -348,8 +348,36 @@ Local results: 34 focused tests passed with two native-runtime skips. Isolated
 preview staging with dummy sign-in configuration passed 26 checks with the same
 two skips. These source/browser/staging checks do not prove Swift compilation,
 WebRTC media flow, locked-screen behavior or Apple push delivery. No live worker,
-database migration, APNs request, GitHub publication or TestFlight release was
-performed for this follow-up; a compile-only publication was requested separately.
+database migration or APNs request was performed for this follow-up. The user
+subsequently authorized the compile-only publication recorded below; no TestFlight
+release was performed.
+
+### Compile-only publication evidence — 2026-11-06
+
+Commit `fc937e4bb8e226eac093018c4a8ebf87c687b4ea` contains only the selected
+native TC/background-call implementation, server contracts, tests and documentation.
+PostNL, private-label/admin changes, private keys and signing configuration were
+excluded. The workflow and repository settings were not changed.
+
+[GitHub run 42225286684](https://github.com/edwtie/Teletyptel-messenger/actions/runs/42225286684)
+passed unsigned iOS device compilation with the call-push preview enabled. The
+three test commands passed 135, 21 and 45 checks respectively, with zero failures
+or skips. This includes actual macOS Swift execution of both the media-profile
+guard and the native T.140 Unicode/edit/backpressure/call-isolation tests.
+
+The Release startup smoke test passed twice on the iPhone 17 Pro simulator with
+iOS 26.2 and an unreachable loopback server. The artifact records `passed: true`
+and `uploaded: false`; the protected `internal-upload` job was skipped. The
+workflow's internal build identifier `31.1` is not a TestFlight release.
+
+An isolated snapshot of the exact staged tree also passed 75 Node tests on Windows
+(two Swift-only skips), PHP control (28), reconciliation (33), media-profile (38),
+eight endpoint rejection scenarios and the disabled/invalid-key transport tests.
+These checks used fictitious data and isolated databases, without Apple requests.
+
+This proves compilation, bounded model behavior and simulator startup only. It
+does not prove APNs delivery, native WebRTC/Jingle integration, a connected TC
+renderer or real-device background calling. Those release gates remain open.
 
 Next integration: instantiate the native WebRTC transport, connect verified
 Jingle offer/answer and ICE, pass its negotiated reliable/ordered T.140 channel to
