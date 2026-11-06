@@ -465,11 +465,28 @@ No new JavaScript plugin entry, server endpoint or active push/media path is
 enabled by this change. Native audio/video, CallKit audio activation and an actual
 ejabberd-backed background call remain separate unfinished integration steps.
 
-The shared fictitious offer fixture is tested locally against the existing
-browser encoder and decoder. Swift malformed-input checks and real native-peer
-round-trips are wired into the separately approved unsigned cloud test. These
-native checks are not yet recorded as passed until that run completes. There is
-no TestFlight upload or server modification in this step.
+The shared fictitious offer fixture passed the local Chromium test against the
+existing browser encoder and decoder in both directions. This verifies a shared
+wire-format fixture, not a live browser-to-native network call.
+
+[GitHub run 42283749630](https://github.com/edwtie/Teletyptel-messenger/actions/runs/42283749630)
+passed on commit `a0bc10f313cc9081044020d566aa02a9c75ed236`:
+
+- 209 checks passed (143 + 21 + 45), zero failures or skips, including actual
+  Swift execution of the valid offer/answer and malformed-input tests.
+- The strict attribute tests also reject numeric XML newline escapes; full-token
+  validation uses absolute string boundaries, not a permissive end-of-line match.
+- Unsigned iOS compilation passed. Two real native peers completed offer and
+  answer conversion through Jingle XML, then the existing bidirectional Unicode,
+  segmented-text, draining and call-cleanup transport tests passed.
+- The iPhone 17 Pro / iOS 26.2 Release simulator started successfully twice in
+  the isolated offline startup test.
+- Reports record `passed: true` and `uploaded: false`; `internal-upload` was
+  skipped. The workflow's internal identifier `37.1` is not a TestFlight release.
+
+No server, repository settings, secrets, admin/templates or PostNL assets were
+changed or published in this step. Full authenticated native XMPP signaling and
+physical-device background TC remain untested and unfinished as described above.
 
 ## Sources
 
