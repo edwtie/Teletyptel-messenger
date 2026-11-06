@@ -129,6 +129,7 @@ async function run() {
     certificateFingerprint = execute(openssl, ["x509", "-in", certificate("ca.crt"), "-noout", "-fingerprint", "-sha1"])
       .trim().split("=").at(-1).replaceAll(":", "");
     if (!/^[0-9A-F]{40}$/i.test(certificateFingerprint)) throw new Error("Invalid temporary CA fingerprint");
+    execute("sudo", ["security", "trust-settings-export", "-d", certificate("trust-before.plist")]);
     trustAttempted = true;
     execute("sudo", ["security", "add-trusted-cert", "-d", "-r", "trustRoot", "-k",
       "/Library/Keychains/System.keychain", certificate("ca.crt")]);
@@ -214,8 +215,20 @@ async function run() {
       }
     }
     if (trustAttempted) {
-      try { execute("sudo", ["security", "delete-certificate", "-t", "-Z", certificateFingerprint, "/Library/Keychains/System.keychain"]); }
-      catch (error) { cleanupErrors.push("temporary CA trust/certificate removal"); save("trust-cleanup-error.txt", error.stderr || error.message); }
+      try {
+        execute("sudo", ["security", "trust-settings-import", "-d", path.join(temporary, "trust-before.plist")]);
+        report.trustSettingsRestored = true;
+      } catch (error) {
+        cleanupErrors.push("temporary CA trust restoration");
+        save("trust-cleanup-error.txt", error.stderr || error.message);
+      }
+      try {
+        execute("sudo", ["security", "delete-certificate", "-Z", certificateFingerprint, "/Library/Keychains/System.keychain"]);
+        report.caCertificateRemoved = true;
+      } catch (error) {
+        cleanupErrors.push("temporary CA certificate removal");
+        save("certificate-cleanup-error.txt", error.stderr || error.message);
+      }
     }
     try { fs.rmSync(temporary, { recursive: true, force: true }); }
     catch { cleanupErrors.push("temporary fixture removal"); }
