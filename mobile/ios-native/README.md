@@ -59,10 +59,24 @@ The separate `ios-native-preview.yml` workflow runs on scoped native changes on
 the development branch, or by manual dispatch. It has no secrets, signing,
 TestFlight job or production deployment. Publishing/running it needs permission.
 
-Local validation on Windows: three Node checks passed; Swift runtime check skipped
-because Swift/Xcode is unavailable. **Swift compilation, UI tests, live TLS/XMPP
-probe behavior and physical-device accessibility are not yet verified.** Source
-checks are guardrails, not proof of runtime correctness.
+Verified on 2026-11-06 for code revision
+`12358ea96ed7c363f6425f057be77c2016ed92db` in
+[unsigned native run 42287643817](https://github.com/edwtie/Teletyptel-messenger/actions/runs/42287643817):
+
+- Three Node project/source guardrails passed, locally and on macOS.
+- Twelve Swift unit tests passed on macOS, with zero failures.
+- Standalone native iOS device Release compilation passed without signing.
+- Two UI tests passed on iPhone 16 Pro simulator and the same two passed on
+  iPad Pro 11-inch (M4) simulator, with zero failures. They cover initial keyboard
+  absence, configuration retained through portrait/landscape rotation and an
+  inline invalid-address error rather than a separate alert.
+- Report explicitly records `unsigned: true` and `uploaded: false`.
+
+Evidence was downloaded to
+`artifacts/ios-native-evidence-42287643817/ios-native-check-1793996530363/reports/`.
+**Live TLS/XMPP probe interoperability, physical-device accessibility and the
+remaining native app features are not yet verified.** Unit/source checks are not
+proof of complete protocol interoperability or accessibility conformance.
 
 ## Migration inventory and acceptance gates
 
