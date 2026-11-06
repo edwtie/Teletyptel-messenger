@@ -297,7 +297,7 @@ is constructed inside the test target only; the application continues to require
 its HTTP account gate. Next gates are end-to-end account authentication and
 device testing, followed by native messaging parity.
 
-### Native HTTPS account-contract to XMPP chain (prepared, not yet hosted-tested)
+### Native HTTPS account-contract to XMPP chain (hosted-tested)
 
 `NativeLoginIntegrationTests` adds seven opt-in tests using the actual
 `NativeLoginModel`, `NativeAccountClient`, reachability probe and XMPP transport,
@@ -323,10 +323,37 @@ pass. It does not verify backend session cookies, access control, 2FA completion
 OAuth, biometric login or any physical device. Ordinary Swift unit runs skip all
 fourteen opt-in integration tests unless explicitly enabled by the hosted harness.
 
-Local Node tests validate fixture scenarios, isolation and request checks. Swift
-compilation and these seven new runtime tests still require the separately
-authorized unsigned macOS run. No production application code was changed for
-this step; the additional fixture is not bundled in the native app.
+Local Node tests validate fixture scenarios, isolation and request checks.
+[Isolated run 42308604385](https://github.com/edwtie/Teletyptel-messenger/actions/runs/42308604385)
+at revision `0996458` passed all seven native login-chain tests and all seven
+existing transport tests against ejabberd 26.09. Each account scenario ran once;
+the fixture recorded nine WebSocket upgrades, zero unexpected requests and zero
+proxy errors. All authenticated sessions were released. The additional fresh
+process certificate-revocation test passed, with temporary CA denial and
+certificate removal verified. The deny-only trust record remains until the
+disposable VM is discarded, as described above.
+
+Sanitized evidence is under `artifacts/ios-native-evidence-42308604385/`.
+The result records `accountHTTPContractTested: true`, `accountAPITested: false`,
+`physicalDevicesTested: false`, `unsigned: true` and `uploaded: false`.
+No production application code was changed for this step; the additional fixture
+is not bundled in the native app. No local/production server was contacted and
+no TestFlight upload occurred.
+
+The companion [unsigned preview run 42308604255](https://github.com/edwtie/Teletyptel-messenger/actions/runs/42308604255)
+at the same revision is **not green**. Both attempts passed 32 Swift unit tests
+(46 total, with 14 opt-in integration tests skipped), unsigned device Release
+compilation and the check excluding UI fixture markers from the Release binary.
+The first attempt failed the iPhone simulator test command; the second reached
+its 900-second limit (`xcodebuild ETIMEDOUT`, `SIGTERM`). Neither produced a
+completed iPhone UI suite, and iPad UI testing was not reached. This does not
+establish whether the cause is simulator infrastructure or an application/UI-test
+defect; the saved failure output does not identify the failing assertion.
+Do not carry forward the earlier revision's green UI results as current evidence.
+Downloaded artifacts are in `artifacts/ios-native-evidence-42308604255/` and
+`artifacts/ios-native-evidence-42308604255-attempt2/`. The remaining regression
+gate is to diagnose the simulator run (including its result bundle and full
+test output), then pass both iPhone and iPad UI suites before release approval.
 
 Setup references: [ejabberd Homebrew installation](https://docs.ejabberd.im/admin/install/homebrew/)
 and [ejabberd listener options](https://docs.ejabberd.im/admin/configuration/listen-options/).
