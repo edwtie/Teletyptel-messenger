@@ -30,7 +30,16 @@ function runLoopback({ output, reports, run, logged }) {
       "-Xlinker", "-rpath", "-Xlinker", framework,
       path.join(__dirname, "NativeT140Session.swift"), path.join(__dirname, "NativeWebRTCChannel.swift"),
       path.join(__dirname, "tests/NativeWebRTCTests.swift"), "-o", executable], "native-webrtc-compile.log");
-    const outputText = run(executable, [], { timeout: 60000 });
+    const runtimeLog = "native-webrtc-runtime.log";
+    try {
+      logged(executable, [], runtimeLog, { timeout: 60000 });
+    } catch (error) {
+      const detail = fs.readFileSync(path.join(output, runtimeLog), "utf8").split(/\r?\n/)
+        .filter(line => /Precondition failed|Fatal error|dyld\[|Library not loaded|Reason:/.test(line)).slice(-8).join("\n");
+      console.error(detail.slice(-2000));
+      throw error;
+    }
+    const outputText = fs.readFileSync(path.join(output, runtimeLog), "utf8");
     if (!outputText.includes("Native WebRTC RTT loopback passed")) throw new Error("Native WebRTC RTT test did not finish");
     result.passed = true;
   } finally {
