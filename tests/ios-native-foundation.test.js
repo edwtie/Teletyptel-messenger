@@ -50,3 +50,24 @@ test("Swift unit suite for native configuration, lifecycle, parser and cancellat
   execFileSync("swift", ["test", "--package-path", native, "--scratch-path",
     path.join(root, "artifacts", "ios-native-swift-tests-" + Date.now())], { timeout: 180000, stdio: "pipe" });
 });
+
+test("Native authenticated connection is isolated, gated and does not persist credentials", () => {
+  const account = read("Sources/TeleTypTelCore/NativeAccountClient.swift");
+  const session = read("Sources/TeleTypTelCore/NativeXMPPConnection.swift");
+  const stream = read("Sources/TeleTypTelCore/XMPPSessionStream.swift");
+  for (const required of ['"api/account.php"', '"action": "login"', '"rememberPassword": false',
+    'reply.twoFactorRequired != true', 'NativeAccountFailure.twoFactorRequired', 'data.count < 1048576',
+    'URLSessionConfiguration.ephemeral', 'settings.httpCookieStorage = nil', 'completionHandler(nil)', 'Task.checkCancellation()'])
+    assert.ok(account.includes(required), required);
+  for (const required of ['protocols: ["xmpp"]', 'protocol` == "xmpp"', 'socket.maximumMessageSize = 65536',
+    'withTaskCancellationHandler', 'stream.close()', 'session?.invalidateAndCancel()', '.now() + 10', '.now() + 25'])
+    assert.ok(session.includes(required), required);
+  for (const required of ['root.attributes["id"] == bindID', 'parts[0] == expectedJID', 'phase = .reopening',
+    'handshakeBytes <= 65536', 'self.account = nil', 'trustedSender', 'ProbeXML.parse(message)'])
+    assert.ok(stream.includes(required), required);
+  assert.doesNotMatch(account + session + stream, /UserDefaults|print\(|NSLog|SecTrust|URLCredential\(/);
+  const { project } = projectText();
+  for (const file of ['NativeAccountClient.swift', 'XMPPSessionStream.swift', 'NativeXMPPConnection.swift'])
+    assert.ok(project.includes('Core/' + file), file);
+  assert.ok(fs.existsSync(path.join(native, 'Tests/TeleTypTelCoreTests/XMPPSessionTests.swift')));
+});

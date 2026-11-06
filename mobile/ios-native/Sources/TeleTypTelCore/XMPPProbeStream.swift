@@ -1,6 +1,6 @@
 import Foundation
 
-private final class ProbeElement {
+final class ProbeElement {
     let name: String
     let namespace: String
     let attributes: [String: String]
@@ -14,11 +14,26 @@ private final class ProbeElement {
     }
 }
 
-private final class ProbeXML: NSObject, XMLParserDelegate {
+final class ProbeXML: NSObject, XMLParserDelegate {
     var root: ProbeElement?
     var stack: [ProbeElement] = []
     var count = 0
     var rejected = false
+
+    static func parse(_ message: String) throws -> ProbeElement {
+        guard message.utf8.count <= 65536, !message.contains("<!"), !message.contains("<?") else {
+            throw ConnectionFailure.invalidResponse
+        }
+        let delegate = ProbeXML()
+        let parser = XMLParser(data: Data(message.utf8))
+        parser.shouldProcessNamespaces = true
+        parser.shouldResolveExternalEntities = false
+        parser.delegate = delegate
+        guard parser.parse(), !delegate.rejected, delegate.stack.isEmpty, let root = delegate.root else {
+            throw ConnectionFailure.invalidResponse
+        }
+        return root
+    }
 
     func reject(_ parser: XMLParser) {
         rejected = true
@@ -81,14 +96,7 @@ public struct XMPPProbeStream {
         guard bytes <= 65536, !message.contains("<!"), !message.contains("<?") else {
             throw ConnectionFailure.invalidResponse
         }
-        let delegate = ProbeXML()
-        let parser = XMLParser(data: Data(message.utf8))
-        parser.shouldProcessNamespaces = true
-        parser.shouldResolveExternalEntities = false
-        parser.delegate = delegate
-        guard parser.parse(), !delegate.rejected, delegate.stack.isEmpty, let root = delegate.root else {
-            throw ConnectionFailure.invalidResponse
-        }
+        let root = try ProbeXML.parse(message)
         if !receivedOpen {
             guard root.name == "open", root.namespace == Self.framing,
                   root.attributes["version"] == "1.0", !(root.attributes["id"] ?? "").isEmpty,

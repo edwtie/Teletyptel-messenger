@@ -4,7 +4,8 @@ const crypto = require("node:crypto");
 
 const root = path.resolve(__dirname, "..");
 const source = path.join(root, "mobile/ios-native");
-const coreFiles = ["Startup.swift", "XMPPProbeStream.swift", "XMPPAvailabilityClient.swift"];
+const coreFiles = ["Startup.swift", "XMPPProbeStream.swift", "XMPPAvailabilityClient.swift",
+  "NativeAccountClient.swift", "XMPPSessionStream.swift", "NativeXMPPConnection.swift"];
 
 function projectText() {
   const objects = new Map();

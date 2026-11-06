@@ -24,11 +24,62 @@ claim that those features already work in this target.
   endpoints are embedded. No server is contacted automatically.
 
 The probe closes its connection after checking. **Reachable is not authenticated
-or continuously connected.** It is not a native XMPP session implementation.
+or continuously connected.** The startup UI still runs only this probe; it does
+not yet invoke the authenticated connection foundation described below.
 The configured domain is the XMPP virtual host, not necessarily the HTTPS host.
 For local testing it may still be `localhost`. The placeholder public hostname is
 not evidence of a deployed service. This initial UI is Dutch; other languages are
 part of migration parity, not implemented here.
+
+## Next stage: authenticated XMPP foundation (not connected to UI yet)
+
+Added locally after the first-stage validation above:
+
+- `NativeAccountClient` performs a bounded HTTPS POST to the configured origin's
+  existing `/api/account.php` login action, using normal system TLS and refusing
+  redirects. It does not contact a production endpoint automatically.
+- Only a successful account response with credentials for the configured XMPP
+  domain produces the account value used by `NativeXMPPConnection`. An account
+  rejection or `twoFactorRequired` never falls through to direct XMPP login.
+  **The 2FA entry/verification flow is still pending**; accounts requiring it
+  currently stop with a typed error. Google/Facebook/Apple login is also pending.
+- Native RFC 7395 WebSocket framing, TLS-only SASL PLAIN (matching the current web
+  client), stream restart and RFC 6120 resource binding. No custom cryptography,
+  unencrypted fallback or implicit SASL mechanism downgrade. Servers without
+  PLAIN stop with `unsupportedAuthentication`; SCRAM support is not implemented.
+- The session reports connected only after a matching bind response, validation
+  of the returned full JID and successful sending of initial presence. A reachable
+  endpoint or HTTP login alone is never reported as an authenticated XMPP session.
+- Foreground XEP-0199 heartbeat every 25 seconds with a ten-second response
+  deadline. Matching IQ results or errors from the server count as responses;
+  unrelated traffic and responses from other contacts do not keep it alive.
+- Serialized connection state, bounded XML/messages, ten-second handshake
+  deadline, cancellation and terminal cleanup. No credential persistence or
+  authentication-frame logging; account debug descriptions are redacted.
+- Account HTTP requests deliberately retain no cookies. This is not persistent
+  backend session support and does not enable authenticated profile/history APIs.
+  Backend login can create its usual expiring server session; this target does not
+  retain that session cookie. Persistent sessions and explicit server logout must
+  be implemented together with native login UI, without bypassing 2FA.
+
+The connection currently supplies readiness/loss detection only, not a chat API.
+Roster, message handling, receipts, MUC, XEP-0198 resume, automatic reconnection,
+background operation and native login UI are **not delivered by this stage**.
+No existing TestFlight screen or server has been changed. Any future UI adapter
+must cancel the old task and reject old-generation callbacks on logout/account
+switching before it starts a new connection.
+
+New Swift fixtures cover authentication order/encoding, failed authentication,
+binding identity/correlation, ping correlation/spoofed responses, XML bounds,
+2FA fail-closed behavior and pre-start cancellation. These are protocol fixtures,
+not live ejabberd evidence. The recorded first-stage CI result below predates
+these files; a new unsigned macOS/iPhone/iPad run is required before claiming
+they compile or pass at runtime.
+
+References: [RFC 7395](https://www.rfc-editor.org/rfc/rfc7395),
+[RFC 6120](https://www.rfc-editor.org/rfc/rfc6120),
+[SASL PLAIN / RFC 4616](https://www.rfc-editor.org/rfc/rfc4616),
+[XEP-0199](https://xmpp.org/extensions/xep-0199.html).
 
 ## Build and tests
 
