@@ -88,8 +88,9 @@ not live ejabberd evidence. This stage was validated on 2026-11-06 at revision
 
 Local evidence:
 `artifacts/ios-native-evidence-42291914885/ios-native-check-1793998355272/reports/`.
-Real-server login/TLS/heartbeat interoperability and 2FA completion remain
-unverified or unimplemented as described above. This run predates the UI adapter.
+At that revision, real-server login/TLS/heartbeat interoperability and 2FA
+completion remained unverified or unimplemented. This run predates the UI adapter
+and the isolated transport evidence below.
 
 ## Native login UI adapter (published and unsigned-tested)
 
@@ -133,10 +134,10 @@ Verified on 2026-11-06 at revision
 
 Evidence is stored locally under
 `artifacts/ios-native-evidence-42296708099/ios-native-check-1794000412641/reports/`.
-These login UI tests use injected fixtures; **no real account or ejabberd login
-has been tested**. An authorized manual interoperability test against a trusted
-server remains necessary, as do real-device accessibility checks and the
-remaining migration stages.
+These login UI tests use injected fixtures, not real accounts. The isolated
+transport evidence below separately exercises ejabberd authentication. End-to-end
+account API login, real-device accessibility checks and the remaining migration
+stages still require verification.
 
 References: [RFC 7395](https://www.rfc-editor.org/rfc/rfc7395),
 [RFC 6120](https://www.rfc-editor.org/rfc/rfc6120),
@@ -187,13 +188,14 @@ Verified on 2026-11-06 for code revision
 
 Evidence was downloaded to
 `artifacts/ios-native-evidence-42287643817/ios-native-check-1793996530363/reports/`.
-**Live TLS/XMPP probe interoperability, physical-device accessibility and the
-remaining native app features are not yet verified.** Unit/source checks are not
+That initial run did not verify live TLS/XMPP probe interoperability. See the
+later isolated transport evidence below. Physical-device accessibility and the
+remaining native app features are still unverified. Unit/source checks are not
 proof of complete protocol interoperability or accessibility conformance.
 
 ## Migration inventory and acceptance gates
 
-### Prepared real-ejabberd transport test (not yet executed)
+### Real-ejabberd transport tests (passed; CI cleanup gate unresolved)
 
 The next interoperability gate is now implemented separately in
 `scripts/check-ios-native-ejabberd.js` and `NativeXMPPIntegrationTests`.
@@ -233,12 +235,42 @@ the temporary server directory is never uploaded. The existing unsigned iOS
 preview workflow separately compiles the new Swift test target and retains its
 iPhone/iPad UI regression checks.
 
-**Current evidence: preparation only.** Windows source/harness checks do not
-establish a successful native connection to ejabberd. Permission to publish/run
-this next gate is requested separately. Even a successful macOS transport run
-does not test the PHP account API, production WAMP routing/certificates, a physical
-iPhone/iPad, messaging or TC. The test account is constructed inside the test
-target only; the application continues to require its HTTP account gate.
+Published and executed with explicit permission on 2026-11-06:
+
+- [Run 42302927918](https://github.com/edwtie/Teletyptel-messenger/actions/runs/42302927918),
+  revision `0d9aa6d`, ran all seven integration tests against ejabberd 26.09 with
+  zero failures and no skips. Trusted WSS availability, SASL authentication,
+  resource binding, heartbeat and cancellation passed; wrong passwords,
+  untrusted certificates and hostname mismatches were rejected as expected.
+- The heartbeat session remained connected for 40 seconds and ejabberd reported
+  no connected users after cancellation. This is short-run transport evidence,
+  not a stability soak test or complete XMPP interoperability certification.
+- **The workflow conclusion is failure, not success:** restoring the runner's
+  previous administrator trust settings times out. The temporary certificate
+  itself was removed successfully, but `cleanupCompleted` remains false. The
+  workflow deliberately fails rather than hiding this unresolved cleanup gate.
+  Trust restoration must be fixed before calling the entire harness successful.
+  Only the disposable GitHub-hosted VM was affected; no local trust store or
+  production server was accessed. VM disposal is the remaining cleanup boundary.
+- Earlier run 42301960672 also passed all seven networking tests but failed
+  certificate cleanup. The first run 42300479410 timed out before providing
+  passing test evidence; its negative TLS fixture was subsequently separated
+  from ejabberd's global certificate selection.
+- [Unsigned preview run 42300479292](https://github.com/edwtie/Teletyptel-messenger/actions/runs/42300479292)
+  at revision `0749a96` passed 32 Swift unit tests, unsigned device Release
+  compilation and ten simulator UI tests (five on iPhone and five on iPad,
+  including rotation). Its seven opt-in network tests were skipped as intended,
+  not counted as passes. Later commits changed only the test harness and docs.
+
+Downloaded evidence is under `artifacts/ios-native-evidence-42302927918/` and
+`artifacts/ios-native-evidence-42300479292/`. Reports contain no signing keys or
+fictional account passwords. No TestFlight upload occurred.
+
+These macOS transport tests do not test the PHP account API, production WAMP
+routing/certificates, a physical iPhone/iPad, messaging or TC. The test account
+is constructed inside the test target only; the application continues to require
+its HTTP account gate. Next gates are reliable isolated cleanup, end-to-end
+account authentication and device testing, followed by native messaging parity.
 
 Setup references: [ejabberd Homebrew installation](https://docs.ejabberd.im/admin/install/homebrew/)
 and [ejabberd listener options](https://docs.ejabberd.im/admin/configuration/listen-options/).
