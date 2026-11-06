@@ -33,7 +33,7 @@ part of migration parity, not implemented here.
 
 ## Next stage: authenticated XMPP foundation (not connected to UI yet)
 
-Added locally after the first-stage validation above:
+Added and published after the first-stage validation:
 
 - `NativeAccountClient` performs a bounded HTTPS POST to the configured origin's
   existing `/api/account.php` login action, using normal system TLS and refusing
@@ -72,9 +72,23 @@ switching before it starts a new connection.
 New Swift fixtures cover authentication order/encoding, failed authentication,
 binding identity/correlation, ping correlation/spoofed responses, XML bounds,
 2FA fail-closed behavior and pre-start cancellation. These are protocol fixtures,
-not live ejabberd evidence. The recorded first-stage CI result below predates
-these files; a new unsigned macOS/iPhone/iPad run is required before claiming
-they compile or pass at runtime.
+not live ejabberd evidence. This stage was validated on 2026-11-06 at revision
+`ca4c250517c52c7796ef27b2be9b19420ff6ee51` in
+[unsigned native run 42291914885](https://github.com/edwtie/Teletyptel-messenger/actions/runs/42291914885):
+
+- Four Node source/project guardrails passed locally and on macOS.
+- All 23 Swift unit tests passed, including the 11 new account/session fixtures.
+- Unsigned iOS device Release compilation passed with Xcode 26.3.
+- Two startup UI tests passed on iPhone 16 Pro simulator and two on iPad Pro
+  11-inch (M4), covering portrait and landscapeLeft. These tests exercise the
+  existing startup form, not authenticated login UI or a real ejabberd session.
+- Evidence reports `unsigned: true`, `uploaded: false`; no TestFlight upload,
+  signing keys or server changes were involved.
+
+Local evidence:
+`artifacts/ios-native-evidence-42291914885/ios-native-check-1793998355272/reports/`.
+Real-server login/TLS/heartbeat interoperability, native login UI and 2FA
+completion remain unverified or unimplemented as described above.
 
 References: [RFC 7395](https://www.rfc-editor.org/rfc/rfc7395),
 [RFC 6120](https://www.rfc-editor.org/rfc/rfc6120),
