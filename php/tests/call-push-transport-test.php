@@ -12,7 +12,7 @@ putenv('TELETYPTEL_APNS_TEAM_ID=KLMNOPQRST');
 putenv('TELETYPTEL_CALL_PUSH_ENVIRONMENT=production');
 if (!is_file($argv[1] ?? '')) throw new RuntimeException('Pass absolute Node executable path');
 $start = microtime(true);
-$result = CallPushTransport::send(str_repeat('a', 64), ['callId' => 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'sid' => 'test', 'hasVideo' => true, 'expiresAt' => time() + 30]);
+$result = CallPushTransport::send(str_repeat('a', 64), ['callId' => 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'sid' => 'test', 'hasVideo' => true, 'mediaProfile' => 'total', 'expiresAt' => time() + 30]);
 if ($result['accepted'] !== false || $result['reason'] !== 'TransportUnavailable' || microtime(true) - $start > 5) {
     throw new RuntimeException('Subprocess did not fail safely');
 }

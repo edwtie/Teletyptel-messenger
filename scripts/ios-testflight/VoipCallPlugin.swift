@@ -9,16 +9,18 @@ final class MessengerVoipCalls: NSObject, PKPushRegistryDelegate, CXProviderDele
         let id: UUID
         let sid: String
         let expiresAt: TimeInterval
-        let hasVideo: Bool
+        let mediaProfile: MessengerCallMediaProfile
+        let rtt: MessengerNativeRttSession?
         var phase = "ringing"
         var answer: CXAnswerCallAction?
         var timeout: DispatchWorkItem?
 
-        init(id: UUID, sid: String, expiresAt: TimeInterval, hasVideo: Bool) {
+        init(id: UUID, sid: String, expiresAt: TimeInterval, mediaProfile: MessengerCallMediaProfile) {
             self.id = id
             self.sid = sid
             self.expiresAt = expiresAt
-            self.hasVideo = hasVideo
+            self.mediaProfile = mediaProfile
+            self.rtt = mediaProfile.contents.contains("rtt") ? MessengerNativeRttSession(callId: id, sid: sid) : nil
         }
     }
 
@@ -27,6 +29,12 @@ final class MessengerVoipCalls: NSObject, PKPushRegistryDelegate, CXProviderDele
     private var calls: [UUID: Incoming] = [:]
     private var ended: [[String: String]] = []
     private var token: String?
+    private var control: MessengerCallControlCredential?
+    private var controlRequest: MessengerCallControlRequest?
+    private var controlTimer: DispatchWorkItem?
+    private var controlRevision = 0
+    private var controlStorageReady = false
+    private var foregroundObserver: NSObjectProtocol?
     private var consentKey: String {
         "teletyptel.voip.registrationRequested." + (Bundle.main.object(forInfoDictionaryKey: "TeleTypTelServerOrigin") as? String ?? "")
     }
@@ -46,6 +54,16 @@ final class MessengerVoipCalls: NSObject, PKPushRegistryDelegate, CXProviderDele
 
     func start() {
         guard enabled else { return }
+        if foregroundObserver == nil {
+            foregroundObserver = NotificationCenter.default.addObserver(forName: UIApplication.didBecomeActiveNotification,
+                object: nil, queue: .main) { [weak self] _ in self?.scheduleControl() }
+        }
+        if control == nil && UserDefaults.standard.bool(forKey: consentKey) && !accountId.isEmpty && pendingAccountId.isEmpty,
+           let stored = MessengerCallControlVault.read(account: accountId, device: deviceId) {
+            control = stored
+            ended = stored.ended
+            controlStorageReady = true
+        }
         if provider == nil {
             let configuration = CXProviderConfiguration(localizedName: "TeleTypTel")
             configuration.supportsVideo = true
@@ -75,6 +93,14 @@ final class MessengerVoipCalls: NSObject, PKPushRegistryDelegate, CXProviderDele
     }
 
     func disable() {
+        controlRevision += 1
+        controlTimer?.cancel()
+        controlTimer = nil
+        controlRequest?.cancel()
+        controlRequest = nil
+        control = nil
+        controlStorageReady = false
+        MessengerCallControlVault.clear()
         if !accountId.isEmpty { UserDefaults.standard.set(accountId, forKey: pendingKey) }
         UserDefaults.standard.removeObject(forKey: consentKey)
         UserDefaults.standard.removeObject(forKey: accountKey)
@@ -98,12 +124,104 @@ final class MessengerVoipCalls: NSObject, PKPushRegistryDelegate, CXProviderDele
             "registered": registry != nil, "ended": ended, "deviceId": deviceId,
             "consented": UserDefaults.standard.bool(forKey: consentKey), "accountId": accountId,
             "pendingAccountId": pendingAccountId,
+            "nativeControlReady": control != nil && control!.expiresAt > Date().timeIntervalSince1970,
+            "controlStorageReady": controlStorageReady,
             "calls": calls.values.map { call -> [String: Any] in
                 ["callId": call.id.uuidString.lowercased(), "sid": call.sid,
-                 "hasVideo": call.hasVideo, "expiresAt": call.expiresAt, "phase": call.phase]
+                 "hasVideo": call.mediaProfile.hasVideo, "mediaProfile": call.mediaProfile.rawValue,
+                 "rttReady": call.rtt?.isReady ?? false, "rttStatus": call.rtt?.status ?? "not-requested",
+                 "requiredContents": call.mediaProfile.contents.sorted(), "expiresAt": call.expiresAt, "phase": call.phase]
             }]
         if let token = token { result["token"] = token }
         return result
+    }
+
+    func configureControl(account: String, device: String, credential: String, expiresAt: TimeInterval) -> Bool {
+        guard enabled, account == accountId, device == deviceId, pendingAccountId.isEmpty,
+              UserDefaults.standard.bool(forKey: consentKey),
+              credential.range(of: "^[0-9a-f]{2,960}\\.[0-9a-f]{64}$", options: .regularExpression) != nil,
+              expiresAt > Date().timeIntervalSince1970, expiresAt <= Date().timeIntervalSince1970 + 86500 else { return false }
+        let stored = MessengerCallControlCredential(account: account, device: device, token: credential, expiresAt: expiresAt, ended: ended)
+        guard MessengerCallControlVault.write(stored) else { controlStorageReady = false; return false }
+        controlRevision += 1
+        controlRequest?.cancel()
+        controlRequest = nil
+        control = stored
+        controlStorageReady = true
+        scheduleControl()
+        return true
+    }
+
+    private func persistControl() {
+        guard var stored = control, stored.account == accountId else { return }
+        stored.ended = ended
+        control = stored
+        controlStorageReady = MessengerCallControlVault.write(stored)
+    }
+
+    private func scheduleControl(delay: TimeInterval = 0) {
+        controlTimer?.cancel()
+        guard enabled, control != nil, UserDefaults.standard.bool(forKey: consentKey), pendingAccountId.isEmpty else { return }
+        let work = DispatchWorkItem { [weak self] in self?.reconcileNative() }
+        controlTimer = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
+    }
+
+    private func reconcileNative() {
+        guard enabled, controlRequest == nil, let credential = control, credential.account == accountId,
+              credential.expiresAt > Date().timeIntervalSince1970,
+              UserDefaults.standard.bool(forKey: consentKey), pendingAccountId.isEmpty else { return }
+        var pending: [String: [String: Any]] = [:]
+        for call in calls.values where call.phase == "ringing" || call.phase == "answerRequested" {
+            pending[call.id.uuidString.lowercased()] = ["callId": call.id.uuidString.lowercased(), "sid": call.sid, "end": false]
+        }
+        let events = ended
+        for event in events {
+            if let id = event["callId"], let sid = event["sid"] {
+                pending[id] = ["callId": id, "sid": sid, "end": true]
+            }
+        }
+        guard !pending.isEmpty else { return }
+        let revision = controlRevision
+        let request = MessengerCallControlRequest()
+        controlRequest = request
+        var backgroundTask = UIBackgroundTaskIdentifier.invalid
+        backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "TeleTypTel call control") { [weak request] in request?.cancel() }
+        request.start(token: credential.token, calls: Array(pending.values)) { [weak self, weak request] result in
+            if backgroundTask != .invalid {
+                UIApplication.shared.endBackgroundTask(backgroundTask)
+                backgroundTask = .invalid
+            }
+            guard let self = self, self.controlRevision == revision, self.controlRequest === request else { return }
+            self.controlRequest = nil
+            if case .failure(let error) = result, (error as? URLError)?.code == .userAuthenticationRequired {
+                self.control = nil
+                self.controlStorageReady = false
+                MessengerCallControlVault.clear()
+                for id in Array(self.calls.keys) where self.calls[id]?.phase != "connected" { self.finish(id, reason: .failed) }
+                self.changed?()
+                return
+            }
+            if case .success(let results) = result {
+                for item in results {
+                    guard let id = item["callId"], let sid = item["sid"],
+                          ["ended", "expired", "unavailable", "answered-elsewhere"].contains(item["state"] ?? "") else { continue }
+                    if let uuid = UUID(uuidString: id), let call = self.calls[uuid], call.sid == sid,
+                       call.phase == "ringing" || call.phase == "answerRequested" {
+                        self.finish(uuid, reason: item["state"] == "answered-elsewhere" ? .answeredElsewhere : .remoteEnded)
+                    }
+                    let acknowledged = Set(events.filter { $0["callId"] == id && $0["sid"] == sid }.compactMap { $0["eventId"] })
+                    self.ended.removeAll { acknowledged.contains($0["eventId"] ?? "") }
+                }
+                self.persistControl()
+                self.changed?()
+            }
+            if self.calls.values.contains(where: { $0.phase == "ringing" || $0.phase == "answerRequested" }) {
+                self.scheduleControl(delay: 2)
+            } else if self.ended.contains(where: { event in !events.contains(where: { $0["eventId"] == event["eventId"] }) }) {
+                self.scheduleControl()
+            }
+        }
     }
 
     func pushRegistry(_ registry: PKPushRegistry, didUpdate pushCredentials: PKPushCredentials, for type: PKPushType) {
@@ -133,14 +251,16 @@ final class MessengerVoipCalls: NSObject, PKPushRegistryDelegate, CXProviderDele
         let sid = payload["sid"] as? String ?? ""
         let expiresAt = (payload["expiresAt"] as? NSNumber)?.doubleValue ?? 0
         let hasVideo = payload["hasVideo"] as? Bool ?? false
+        let mediaProfile = (payload["mediaProfile"] as? String).flatMap(MessengerCallMediaProfile.init(rawValue:))
         let now = Date().timeIntervalSince1970
         let valid = payload["type"] as? String == "incoming-call" && parsedId != nil
             && sid.range(of: "^[A-Za-z0-9_-]{1,128}$", options: .regularExpression) != nil
             && expiresAt > now && expiresAt <= now + 60 && expiresAt.rounded() == expiresAt
-            && payload["hasVideo"] is Bool && UserDefaults.standard.bool(forKey: consentKey)
+            && payload["hasVideo"] is Bool && mediaProfile?.hasVideo == hasVideo
+            && UserDefaults.standard.bool(forKey: consentKey)
         let existing = calls[id]
         let admitted = valid && existing == nil && calls.isEmpty
-        let incoming = admitted ? Incoming(id: id, sid: sid, expiresAt: expiresAt, hasVideo: hasVideo) : nil
+        let incoming = admitted ? mediaProfile.map { Incoming(id: id, sid: sid, expiresAt: expiresAt, mediaProfile: $0) } : nil
         if let incoming = incoming { calls[id] = incoming }
         let update = CXCallUpdate()
         update.remoteHandle = CXHandle(type: .generic, value: "TeleTypTel")
@@ -152,10 +272,12 @@ final class MessengerVoipCalls: NSObject, PKPushRegistryDelegate, CXProviderDele
         update.supportsUngrouping = false
         provider.reportNewIncomingCall(with: id, update: update) { error in
             DispatchQueue.main.async {
-                defer { completion() }
+                defer { completion(); self.scheduleControl() }
                 if existing != nil { return }
                 if error != nil {
-                    if let incoming = incoming, self.calls[id] === incoming { self.calls.removeValue(forKey: id) }
+                    if let incoming = incoming, self.calls[id] === incoming {
+                        self.finish(id, reason: .failed, report: false)
+                    }
                     self.changed?()
                     return
                 }
@@ -195,6 +317,7 @@ final class MessengerVoipCalls: NSObject, PKPushRegistryDelegate, CXProviderDele
         call.phase = "answerRequested"
         call.answer = action
         scheduleTimeout(call, seconds: min(15, call.expiresAt - Date().timeIntervalSince1970))
+        scheduleControl()
         changed?()
     }
 
@@ -210,8 +333,10 @@ final class MessengerVoipCalls: NSObject, PKPushRegistryDelegate, CXProviderDele
     func provider(_ provider: CXProvider, didActivate audioSession: AVAudioSession) { changed?() }
     func provider(_ provider: CXProvider, didDeactivate audioSession: AVAudioSession) { changed?() }
 
-    func mediaConnected(id: UUID, sid: String) -> Bool {
+    func mediaConnected(id: UUID, sid: String, negotiatedProfile: String, readyContents: [String]) -> Bool {
         guard let call = calls[id], call.sid == sid, call.phase == "answerRequested",
+              call.mediaProfile.accepts(negotiated: negotiatedProfile, ready: readyContents),
+              !call.mediaProfile.contents.contains("rtt") || call.rtt?.isReady == true,
               let answer = call.answer, call.expiresAt > Date().timeIntervalSince1970 else { return false }
         call.timeout?.cancel()
         call.timeout = nil
@@ -222,6 +347,43 @@ final class MessengerVoipCalls: NSObject, PKPushRegistryDelegate, CXProviderDele
         return true
     }
 
+    func attachRtt(id: UUID, sid: String, channel: MessengerT140Channel) -> Bool {
+        precondition(Thread.isMainThread)
+        guard let call = calls[id], call.sid == sid, call.phase == "answerRequested",
+              let rtt = call.rtt, rtt.attach(channel, callId: id, sid: sid) else { return false }
+        changed?()
+        return true
+    }
+
+    func receiveRtt(id: UUID, sid: String, channel: MessengerT140Channel, data: Data) {
+        precondition(Thread.isMainThread)
+        guard let call = calls[id], call.sid == sid, let rtt = call.rtt else { return }
+        _ = rtt.receive(data, from: channel, callId: id, sid: sid)
+        changed?()
+    }
+
+    func rttTransportChanged(id: UUID, sid: String, channel: MessengerT140Channel, ended: Bool = false) {
+        precondition(Thread.isMainThread)
+        guard let call = calls[id], call.sid == sid, let rtt = call.rtt else { return }
+        _ = rtt.transportChanged(channel, callId: id, sid: sid, ended: ended)
+        changed?()
+    }
+
+    func rttState(id: UUID, sid: String) -> [String: Any]? {
+        precondition(Thread.isMainThread)
+        guard let call = calls[id], call.sid == sid, let rtt = call.rtt else { return nil }
+        return ["callId": id.uuidString.lowercased(), "sid": sid, "status": rtt.status,
+            "ready": rtt.isReady, "pending": rtt.hasPendingText, "ownText": rtt.ownText, "remoteText": rtt.remoteText]
+    }
+
+    func setRttText(id: UUID, sid: String, text: String) -> Bool {
+        precondition(Thread.isMainThread)
+        guard let call = calls[id], call.sid == sid, call.phase == "connected", let rtt = call.rtt else { return false }
+        let sent = rtt.setText(text)
+        changed?()
+        return sent
+    }
+
     func end(id: UUID, sid: String) -> Bool {
         guard calls[id]?.sid == sid else { return false }
         finish(id, reason: .remoteEnded)
@@ -230,16 +392,20 @@ final class MessengerVoipCalls: NSObject, PKPushRegistryDelegate, CXProviderDele
 
     func acknowledge(eventId: String) {
         ended.removeAll { $0["eventId"] == eventId }
+        persistControl()
     }
 
     private func finish(_ id: UUID, reason: CXCallEndedReason, report: Bool = true) {
         guard let call = calls.removeValue(forKey: id) else { return }
+        call.rtt?.close()
         call.timeout?.cancel()
         call.answer?.fail()
         ended.append(["eventId": UUID().uuidString.lowercased(), "callId": id.uuidString.lowercased(),
                       "sid": call.sid, "reason": String(reason.rawValue)])
         if ended.count > 32 { ended.removeFirst(ended.count - 32) }
+        persistControl()
         if report { provider?.reportCall(with: id, endedAt: Date(), reason: reason) }
+        scheduleControl()
         changed?()
     }
 }
@@ -250,11 +416,14 @@ final class TeleTypTelVoipCallPlugin: CAPPlugin, CAPBridgedPlugin {
     let jsName = "TeleTypTelVoipCalls"
     let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "register", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "configureControl", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "disable", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "revocationConfirmed", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "state", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "acknowledge", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "mediaConnected", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "rttState", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setRttText", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "end", returnType: CAPPluginReturnPromise)
     ]
 
@@ -294,6 +463,17 @@ final class TeleTypTelVoipCallPlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
+    @objc func configureControl(_ call: CAPPluginCall) {
+        perform(call) {
+            guard let account = call.getString("accountId"), let device = call.getString("deviceId"),
+                  let credential = call.getString("token"), let expiresAt = call.getDouble("expiresAt"),
+                  MessengerVoipCalls.shared.configureControl(account: account, device: device, credential: credential, expiresAt: expiresAt) else {
+                call.reject("Call control could not be stored securely.", "CONTROL_UNAVAILABLE"); return
+            }
+            call.resolve()
+        }
+    }
+
     @objc func state(_ call: CAPPluginCall) {
         perform(call) { call.resolve(MessengerVoipCalls.shared.snapshot()) }
     }
@@ -310,10 +490,35 @@ final class TeleTypTelVoipCallPlugin: CAPPlugin, CAPBridgedPlugin {
     @objc func mediaConnected(_ call: CAPPluginCall) {
         perform(call) {
             guard let id = call.getString("callId").flatMap(UUID.init(uuidString:)), let sid = call.getString("sid"),
-                  MessengerVoipCalls.shared.mediaConnected(id: id, sid: sid) else {
-                call.reject("Call is no longer awaiting media.", "STALE_CALL"); return
+                  let profile = call.getString("negotiatedProfile"), let contents = call.getArray("readyContents", String.self),
+                  MessengerVoipCalls.shared.mediaConnected(id: id, sid: sid, negotiatedProfile: profile, readyContents: contents) else {
+                call.reject("Call is stale or negotiated media is incomplete.", "MEDIA_NOT_READY"); return
             }
             call.resolve()
+        }
+    }
+
+    @objc func rttState(_ call: CAPPluginCall) {
+        perform(call) {
+            guard let id = call.getString("callId").flatMap(UUID.init(uuidString:)), let sid = call.getString("sid"),
+                  let state = MessengerVoipCalls.shared.rttState(id: id, sid: sid) else {
+                call.reject("RTT session is no longer available.", "STALE_CALL"); return
+            }
+            call.resolve(state)
+        }
+    }
+
+    @objc func setRttText(_ call: CAPPluginCall) {
+        perform(call) {
+            guard let id = call.getString("callId").flatMap(UUID.init(uuidString:)), let sid = call.getString("sid"),
+                  let text = call.getString("text"), text.utf8.count <= 131072 else {
+                call.reject("Invalid RTT request.", "INVALID_TEXT"); return
+            }
+            let queued = MessengerVoipCalls.shared.setRttText(id: id, sid: sid, text: text)
+            guard let state = MessengerVoipCalls.shared.rttState(id: id, sid: sid) else {
+                call.reject("RTT session is no longer available.", "STALE_CALL"); return
+            }
+            call.resolve(["queued": queued, "state": state])
         }
     }
 

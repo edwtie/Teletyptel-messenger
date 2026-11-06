@@ -2,7 +2,8 @@
 
 This directory contains the APNs VoIP transport and an opt-in, one-job CLI worker.
 `php/lib/CallPushService.php` provides a durable encrypted device/invitation/outbox
-registry; `api/call-push.php` exposes only authenticated registration/revocation.
+registry; `api/call-push.php` exposes authenticated registration/revocation and
+device-bound invitation reconciliation, not arbitrary invitation creation/sending.
 This is **not yet a complete incoming-call integration**. The preview client is
 wired for account-bound consent, registration, renewal and revocation; no ejabberd
 adapter, real devices or running worker have been connected. No notification is
@@ -61,6 +62,24 @@ Transport timeouts have an unknown delivery outcome; deduplicate by call UUID.
   It requires the same HTTPS/CSRF guards and cannot revoke another account's row.
   Successful responses include the authenticated account ID so a stale native
   account cannot register its token under a different cookie session.
+- `reconcile` accepts at most 64 UUID/SID pairs in a 16 KiB JSON request, with
+  HTTPS, CSRF, account, session and current installation checks. It returns only
+  invitation state, never caller identities, device tokens or media descriptions.
+  Native declines cancel queued jobs; cancellation is never another VoIP push.
+  A device that lost an answer race cannot end the winning device's reservation.
+  `CallPushPolicy` is shared with the worker and fails closed when not configured.
+  The client retries pending reconciliation only while visible/authenticated.
+  This is not a background keepalive or a native media/signaling implementation.
+- The separately opted-in `call-control.php` endpoint accepts a signed,
+  generation-bound `call-control-v1` bearer capability instead of a chat cookie.
+  It exposes only the same minimal UUID/SID invitation checks and declines. It
+  rechecks registration expiry, environment, revocation and account access under
+  the registry lock. No accepting, media negotiation, arbitrary push or chat API
+  is exposed. Capabilities cannot exceed the 24-hour device lease; background
+  renewal is not implemented. Clients must return to authenticated foreground
+  registration to renew. Never log the Authorization header or token response.
+  The Swift preview keeps this capability in a separate device-only Keychain item
+  and uses bounded native HTTPS requests. This is not complete native calling.
 - `inviteVerified` is a server-only interface, **not an HTTP action**. The required
   policy closure receives the call and operation (`invite`, `dispatch`, `read`,
   `accept`). It must consult authoritative signaling, recipient blocking/DND/mute
@@ -93,6 +112,9 @@ Keep the normal app preview flag off. Before activating anything, complete the
 release blockers below. New server environment variables are intentionally unset:
 
 - `TELETYPTEL_CALL_PUSH_REGISTRY=1`: opt-in to the registration API only.
+- `TELETYPTEL_CALL_PUSH_NATIVE_CONTROL=1`: additionally issue scoped capabilities
+  and allow native invitation status/decline requests. Requires the registry flag
+  and real policy adapter; keep disabled until native compilation/tests pass.
 - `TELETYPTEL_CALL_PUSH_WORKER=1`: opt-in to the CLI worker/transport only.
 - `TELETYPTEL_CALL_PUSH_STORAGE_KEY`: base64 of a securely generated 32-byte
   storage key, kept in protected server configuration, never public or in Git.
@@ -133,9 +155,27 @@ Do not enable the registration API before the migration is ready. The API return
 
 ## Checks
 
+TC invitations must use the explicit sixth `inviteVerified` argument `total`
+(`audio-rtt` for audio with RTT). `hasVideo` alone only describes audio/video and
+does not imply RTT. The durable `media_profile` is passed unchanged to APNs and
+native state, checked for consistency and immutable for a caller/SID. The explicit
+`--migrate` operation adds this column to old schemas; unknown historical profiles
+are not sent. No migration is performed by HTTP endpoints. The native answer bridge
+requires the negotiated profile and all its ready contents; the actual native
+Jingle/media adapter is still required before background TC can work.
+
+Run `php php/tests/call-push-media-test.php` for isolated media-profile checks and
+`node --test tests/native-call-media.test.js` for source guards and the macOS-only
+Swift contract runtime test. The latter is explicitly skipped on Windows, not
+counted as proof of physical iOS behavior.
+
 Run `php php/tests/call-push-smoke.php`, `php php/tests/call-push-endpoint-test.php`
+`php php/tests/call-push-reconcile-test.php`, `php php/tests/call-push-control-test.php`
+and `php php/tests/call-control-endpoint-test.php`,
 and `node --test tests/apns-call-push.test.js tests/call-push-transport.test.js
-tests/ios-call-push.test.js` from the repository root. Tests use generated fake keys,
+tests/ios-call-push.test.js tests/native-call-control.test.js tests/native-call-push.test.js`
+from the repository root. Native source-wiring assertions are not Swift compilation
+or Keychain/URLSession runtime tests. Tests use generated fake keys,
 an isolated disposable SQLite database (including two competing PHP processes),
 and mock APNs responses, not real signing keys/device tokens. They do not establish
 Apple delivery, native vibration or real ejabberd interoperability.

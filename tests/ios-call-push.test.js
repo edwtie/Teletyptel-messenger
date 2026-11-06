@@ -60,7 +60,7 @@ test("Entitlements are generated only inside an explicitly opted-in staging proj
 
 test("Native source guards: report CallKit before completing push, never fetch first", () => {
   const callback = swift.slice(swift.indexOf("private func report("), swift.indexOf("private func scheduleTimeout("));
-  assert.ok(callback.indexOf("provider.reportNewIncomingCall") < callback.indexOf("defer { completion() }"));
+  assert.ok(callback.indexOf("provider.reportNewIncomingCall") < callback.indexOf("defer { completion(); self.scheduleControl() }"));
   assert.doesNotMatch(callback, /URLSession|fetch|evaluateJavaScript|AudioServicesPlaySystemSound/);
   assert.match(callback, /expiresAt > now && expiresAt <= now \+ 60/);
   assert.match(callback, /existing == nil && calls.isEmpty/);

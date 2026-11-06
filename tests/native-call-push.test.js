@@ -23,11 +23,27 @@ function fixture({ platform = "ios", enabled = true } = {}) {
   let confirms = 0;
   let nextRequest;
   let now = Date.now();
+  let callStates = [];
+  let devices = [{ device_id: deviceId }];
+  let controlToken;
   const timers = new Set();
   const button = { hidden: true, dataset: {}, setAttribute() {}, addEventListener(name, listener) { this[name] = listener; } };
   const output = { hidden: true, textContent: "" };
   const plugin = {
     state: async () => ({ ...native }),
+    end: async ({ callId, sid }) => {
+      operations.push("end:" + callId);
+      const call = native.calls?.find(call => call.callId === callId && call.sid === sid);
+      assert.ok(call);
+      native.calls = native.calls.filter(item => item !== call);
+      native.ended = [...(native.ended || []), { callId, sid, eventId: "event-" + callId }];
+      changed?.();
+    },
+    acknowledge: async ({ eventId }) => {
+      operations.push("acknowledge:" + eventId);
+      native.ended = (native.ended || []).filter(event => event.eventId !== eventId);
+      changed?.();
+    },
     addListener: async (name, listener) => { changed = listener; return { remove() {} }; },
     register: async ({ accountId }) => {
       operations.push("register");
@@ -54,7 +70,7 @@ function fixture({ platform = "ios", enabled = true } = {}) {
     document: { hidden: false, addEventListener: (name, callback) => { events[name] = callback; } },
     addEventListener: (name, callback) => { events[name] = callback; },
     confirm: () => { confirms++; return confirmed; },
-    setTimeout: (callback, delay) => { const timer = setTimeout(callback, delay); timer.unref(); timers.add(timer); return timer; },
+    setTimeout: (callback, delay) => { const timer = setTimeout(callback, delay); timer.unref(); timer.testDelay = delay; timers.add(timer); return timer; },
     clearTimeout: timer => { clearTimeout(timer); timers.delete(timer); },
     fetch: async (url, options) => {
       assert.equal(url, "api/call-push.php");
@@ -65,10 +81,11 @@ function fixture({ platform = "ios", enabled = true } = {}) {
       requests.push({ method: options.method, body });
       if (body) assert.equal(options.headers["X-CSRF-Token"], "a".repeat(64));
       if (nextRequest) { const handler = nextRequest; nextRequest = null; await handler(body); }
+      if (body?.action === "register" && status === 200) devices = [{ device_id: deviceId }];
       return {
         ok: status === 200, status,
         json: async () => ({ ok: true, accountId: serverAccount, csrfToken: "a".repeat(64),
-          deviceId, expiresAt: Math.floor(now / 1000) + 86400, revoked: true })
+          deviceId, expiresAt: Math.floor(now / 1000) + 86400, revoked: true, calls: callStates, devices, controlToken })
       };
     }
   };
@@ -83,12 +100,65 @@ function fixture({ platform = "ios", enabled = true } = {}) {
     loggedIn: value => { loggedIn = value; },
     defer: handler => { nextRequest = handler; },
     advance: milliseconds => { now += milliseconds; },
+    callStates: value => { callStates = value; },
+    devices: value => { devices = value; },
+    nativeControl: (value, configure) => { controlToken = value; plugin.configureControl = configure; },
+    timerDelays: () => [...timers].map(timer => timer.testDelay),
     get confirms() { return confirms; },
     ready: () => client.ready({ accountId: "alice" }),
     posts: () => requests.filter(request => request.method === "POST"),
     close: () => { for (const timer of timers) clearTimeout(timer); }
   };
 }
+
+test("Native call capability is handed only to the opted-in account's native secure store", async () => {
+  const setup = fixture();
+  const credential = "ab".repeat(100) + "." + "c".repeat(64);
+  const configured = [];
+  setup.nativeControl(credential, async options => configured.push(options));
+  try {
+    await setup.ready();
+    assert.equal(configured.length, 0);
+    await setup.client.enable();
+    await settle();
+    assert.equal(configured.length, 1);
+    assert.equal(configured[0].accountId, "alice");
+    assert.equal(configured[0].deviceId, deviceId);
+    assert.equal(configured[0].token, credential);
+    assert.ok(!setup.output.textContent.includes(credential));
+  } finally { setup.close(); }
+});
+
+test("Missing call-control capability cannot be reported as native registration success", async () => {
+  const setup = fixture();
+  let configured = false;
+  setup.nativeControl(undefined, async () => { configured = true; });
+  try {
+    await setup.ready();
+    await assert.rejects(setup.client.enable(), /NATIVE_CONTROL_UNAVAILABLE/);
+    assert.equal(configured, false);
+    assert.ok(!setup.output.textContent.includes("Device registered for testing"));
+  } finally { setup.close(); }
+});
+
+test("Logout while installing a native capability disables it and revokes the device", async () => {
+  const setup = fixture();
+  let release;
+  let started;
+  const configured = new Promise(resolve => { started = resolve; });
+  setup.nativeControl("ab".repeat(100) + "." + "c".repeat(64), () => new Promise(resolve => { release = resolve; started(); }));
+  try {
+    await setup.ready();
+    const enabling = setup.client.enable();
+    await configured;
+    const logout = setup.client.logout();
+    release();
+    await enabling;
+    await logout;
+    assert.equal(setup.native.consented, false);
+    assert.ok(setup.posts().some(request => request.body.action === "revoke-device"));
+  } finally { setup.close(); }
+});
 
 test("Browser and default non-preview builds do not register or ask permission", async () => {
   for (const options of [{ platform: "web" }, { enabled: false }]) {
@@ -295,4 +365,202 @@ test("Client is bundled, cached and wired to XMPP login, biometric recovery and 
   assert.ok(logout.indexOf("callPush?.logout()") < logout.indexOf("TeleTypTelFaceID.revoke()"));
   assert.ok(logout.indexOf("callPush?.logout()") < logout.indexOf("sendLogoutAccountSession()"));
   assert.doesNotMatch(source, /localStorage|sessionStorage|console\.|appendDebug/);
+});
+
+const invitation = {
+  callId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc", sid: "verified-sid", phase: "ringing"
+};
+
+test("Canceled, expired and other-device calls close only the matching native invitation", async () => {
+  for (const state of ["ended", "expired", "unavailable", "answered-elsewhere"]) {
+    const setup = fixture();
+    try {
+      await setup.ready();
+      await setup.client.enable();
+      await settle();
+      setup.native.calls = [{ ...invitation }];
+      setup.callStates([{ callId: invitation.callId, sid: invitation.sid, state }]);
+      await setup.client.refresh();
+      await settle();
+      assert.ok(setup.operations.includes("end:" + invitation.callId));
+      assert.ok(setup.operations.includes("acknowledge:event-" + invitation.callId));
+      assert.equal(setup.native.calls.length, 0);
+      assert.equal(setup.native.ended.length, 0);
+      assert.equal(setup.posts().filter(item => item.body.action === "register").length, 1);
+    } finally { setup.close(); }
+  }
+});
+
+test("Live invitations neither auto-answer nor rotate their device registration", async () => {
+  for (const state of ["ringing", "accepted"]) {
+    const setup = fixture();
+    try {
+      await setup.ready();
+      await setup.client.enable();
+      await settle();
+      setup.advance(13 * 3600000);
+      setup.native.calls = [{ ...invitation, phase: "answerRequested" }];
+      setup.callStates([{ callId: invitation.callId, sid: invitation.sid, state }]);
+      await setup.client.refresh();
+      await settle();
+      assert.equal(setup.native.calls.length, 1);
+      assert.equal(setup.operations.some(operation => operation.startsWith("end:")), false);
+      assert.equal(setup.posts().filter(item => item.body.action === "register").length, 1);
+      assert.doesNotMatch(source, /bridge\.(mediaConnected|answer)\(/);
+    } finally { setup.close(); }
+  }
+});
+
+test("Offline native declines stay pending until authenticated confirmation", async () => {
+  const setup = fixture();
+  try {
+    await setup.ready();
+    await setup.client.enable();
+    await settle();
+    setup.native.ended = [{ ...invitation, eventId: "decline-one" }];
+    setup.status(503);
+    await setup.client.refresh();
+    assert.equal(setup.native.ended.length, 1);
+    assert.equal(setup.operations.includes("acknowledge:decline-one"), false);
+    setup.status(200);
+    setup.callStates([{ callId: invitation.callId, sid: invitation.sid, state: "ended" }]);
+    await setup.client.refresh();
+    await settle();
+    assert.ok(setup.operations.includes("acknowledge:decline-one"));
+    assert.equal(setup.native.ended.length, 0);
+    const sent = setup.posts().find(item => item.body.action === "reconcile");
+    assert.deepEqual(sent.body.calls, [{ callId: invitation.callId, sid: invitation.sid, end: true }]);
+  } finally { setup.close(); }
+});
+
+test("Malformed, wrong-SID and wrong-account replies never mutate native calls", async () => {
+  for (const fault of ["sid", "duplicate", "missing", "account"]) {
+    const setup = fixture();
+    try {
+      await setup.ready();
+      await setup.client.enable();
+      await settle();
+      setup.native.calls = [{ ...invitation }];
+      const reply = { callId: invitation.callId, sid: invitation.sid, state: "ended" };
+      if (fault === "sid") reply.sid = "another-call";
+      setup.callStates(fault === "missing" ? [] : fault === "duplicate" ? [reply, reply] : [reply]);
+      if (fault === "account") setup.server("bob");
+      await setup.client.refresh();
+      assert.equal(setup.native.calls.length, 1);
+      assert.equal(setup.operations.some(operation => operation.startsWith("end:")), false);
+    } finally { setup.close(); }
+  }
+});
+
+test("A completed media connection is not expired by the invitation deadline", async () => {
+  const setup = fixture();
+  try {
+    await setup.ready();
+    await setup.client.enable();
+    await settle();
+    setup.native.calls = [{ ...invitation, phase: "connected" }];
+    setup.callStates([{ callId: invitation.callId, sid: invitation.sid, state: "expired" }]);
+    await setup.client.refresh();
+    assert.equal(setup.posts().filter(item => item.body.action === "reconcile").length, 0);
+    assert.equal(setup.native.calls.length, 1);
+  } finally { setup.close(); }
+});
+
+test("An incoming call during renewal preflight postpones generation rotation", async () => {
+  const setup = fixture();
+  try {
+    await setup.ready();
+    await setup.client.enable();
+    await settle();
+    setup.advance(13 * 3600000);
+    setup.callStates([{ callId: invitation.callId, sid: invitation.sid, state: "ringing" }]);
+    setup.defer(async () => { setup.native.calls = [{ ...invitation }]; });
+    await setup.client.refresh();
+    await settle();
+    assert.equal(setup.posts().filter(item => item.body.action === "register").length, 1);
+    assert.equal(setup.native.calls.length, 1);
+    assert.ok(setup.posts().some(item => item.body.action === "reconcile"));
+  } finally { setup.close(); }
+});
+
+test("A nonterminal response cannot acknowledge a native decline", async () => {
+  const setup = fixture();
+  try {
+    await setup.ready();
+    await setup.client.enable();
+    await settle();
+    setup.native.ended = [{ ...invitation, eventId: "pending-decline" }];
+    setup.callStates([{ callId: invitation.callId, sid: invitation.sid, state: "ringing" }]);
+    await setup.client.refresh();
+    assert.equal(setup.native.ended.length, 1);
+    assert.equal(setup.operations.includes("acknowledge:pending-decline"), false);
+  } finally { setup.close(); }
+});
+
+test("Recovery restores a missing current-session registration instead of retrying 403 forever", async () => {
+  const setup = fixture();
+  try {
+    await setup.ready();
+    await setup.client.enable();
+    await settle();
+    setup.devices([]);
+    setup.native.calls = [{ ...invitation }];
+    setup.callStates([{ callId: invitation.callId, sid: invitation.sid, state: "ringing" }]);
+    await setup.client.refresh();
+    await settle();
+    assert.deepEqual(setup.posts().map(item => item.body.action), ["register", "register", "reconcile"]);
+    assert.equal(setup.native.calls.length, 1);
+    assert.equal(setup.confirms, 1);
+  } finally { setup.close(); }
+});
+
+test("Reconciliation backs off on failure and never schedules a hidden-page keepalive", async () => {
+  const setup = fixture();
+  try {
+    await setup.ready();
+    await setup.client.enable();
+    await settle();
+    setup.native.ended = [{ ...invitation, eventId: "pending-offline" }];
+    setup.status(503);
+    for (const delay of [4000, 8000, 16000, 30000, 30000]) {
+      await setup.client.refresh();
+      assert.ok(setup.timerDelays().includes(delay));
+    }
+    setup.window.document.hidden = true;
+    await setup.client.refresh();
+    assert.equal(setup.timerDelays().some(delay => delay <= 30000), false);
+    setup.window.document.hidden = false;
+    setup.window.navigator = { onLine: false };
+    await setup.client.refresh();
+    assert.equal(setup.timerDelays().some(delay => delay <= 30000), false);
+  } finally { setup.close(); }
+});
+
+test("Logout invalidates an in-flight recovery response before native mutation", async () => {
+  const setup = fixture();
+  try {
+    await setup.ready();
+    await setup.client.enable();
+    await settle();
+    setup.native.calls = [{ ...invitation }];
+    setup.callStates([{ callId: invitation.callId, sid: invitation.sid, state: "ended" }]);
+    let release;
+    let started;
+    const pending = new Promise(resolve => { started = resolve; });
+    const fetch = setup.window.fetch;
+    setup.window.fetch = async (url, options) => {
+      if (options.body && JSON.parse(options.body).action === "reconcile") {
+        started();
+        await new Promise(resolve => { release = resolve; });
+      }
+      return fetch(url, options);
+    };
+    const refreshing = setup.client.refresh();
+    await pending;
+    const logout = setup.client.logout();
+    release();
+    await Promise.all([refreshing, logout]);
+    await settle();
+    assert.equal(setup.operations.some(operation => operation.startsWith("end:")), false);
+  } finally { setup.close(); }
 });

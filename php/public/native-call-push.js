@@ -9,6 +9,8 @@
     let revision = 0;
     let sequence = Promise.resolve();
     let renewal;
+    let recoveryTimer;
+    let recoveryDelay = 2000;
     let lastToken = "";
     let expiresAt = 0;
     let consented = false;
@@ -57,11 +59,11 @@
     const preflight = async owner => {
       const result = await request(owner, "GET");
       if (!/^[a-f0-9]{64}$/.test(result.csrfToken || "")) throw new Error("INVALID_SESSION");
-      return result.csrfToken;
+      return result;
     };
     const revoke = async (owner, state) => {
       if (state.pendingAccountId && state.pendingAccountId !== owner.accountId) throw new Error("PREVIOUS_ACCOUNT");
-      const csrf = await preflight(owner);
+      const { csrfToken: csrf } = await preflight(owner);
       const result = await request(owner, "POST", { action: "revoke-device", deviceId: state.deviceId }, csrf);
       if (result.revoked !== true) throw new Error("REQUEST_FAILED");
       if (state.pendingAccountId) await bridge.revocationConfirmed({ accountId: owner.accountId });
@@ -72,10 +74,56 @@
       if (error.message === "STALE_SESSION") return;
       if (error.message === "PREVIOUS_ACCOUNT") {
         show("previous_account", "Sign in to the previous account to finish disabling this device's call notifications.");
-      } else if (error.message === "UNAVAILABLE") {
+      } else if (["UNAVAILABLE", "NATIVE_CONTROL_UNAVAILABLE"].includes(error.message)) {
         show("unavailable", "Call notifications are not yet enabled on this server.");
       } else {
         show("failed", "Call notification changes could not be confirmed. Check your connection and try again.");
+      }
+    };
+    const reconcile = async (owner, state) => {
+      const calls = Array.isArray(state.calls)
+        ? state.calls.filter(call => ["ringing", "answerRequested"].includes(call.phase)) : [];
+      const ended = Array.isArray(state.ended) ? state.ended : [];
+      if (!calls.length && !ended.length) return true;
+      const pending = new Map();
+      for (const call of calls) pending.set(call.callId, { callId: call.callId, sid: call.sid, end: false });
+      for (const event of ended) pending.set(event.callId, { callId: event.callId, sid: event.sid, end: true });
+      const { csrfToken: csrf, devices } = await preflight(owner);
+      check(owner);
+      if (!Array.isArray(devices)) throw new Error("INVALID_REGISTRATION");
+      if (!devices.some(device => device.device_id === state.deviceId)) return false;
+      const result = await request(owner, "POST", {
+        action: "reconcile", deviceId: state.deviceId, calls: [...pending.values()]
+      }, csrf);
+      check(owner);
+      const terminal = ["ended", "expired", "unavailable", "answered-elsewhere"];
+      const seen = new Set();
+      if (!Array.isArray(result.calls) || result.calls.length !== pending.size) throw new Error("INVALID_CALL_STATE");
+      for (const call of result.calls) {
+        const expected = pending.get(call.callId);
+        if (!expected || seen.has(call.callId) || call.sid !== expected.sid
+            || ![...terminal, "ringing", "accepted"].includes(call.state)
+            || (expected.end && !terminal.includes(call.state))) throw new Error("INVALID_CALL_STATE");
+        seen.add(call.callId);
+      }
+      for (const call of result.calls) {
+        check(owner);
+        if (!terminal.includes(call.state)) continue;
+        if (pending.get(call.callId).end) {
+          for (const event of ended.filter(event => event.callId === call.callId && event.sid === call.sid)) {
+            check(owner);
+            await bridge.acknowledge({ eventId: event.eventId });
+          }
+        } else {
+          await bridge.end({ callId: call.callId, sid: call.sid });
+        }
+      }
+      return true;
+    };
+    const scheduleRecovery = () => {
+      root.clearTimeout(recoveryTimer);
+      if (!root.document.hidden && root.navigator?.onLine !== false) {
+        recoveryTimer = root.setTimeout(() => void refresh(), recoveryDelay);
       }
     };
     const sync = async owner => {
@@ -97,15 +145,31 @@
         return;
       }
       if (!consented) return;
+      let restoreRegistration = false;
+      if (state.calls?.some(call => ["ringing", "answerRequested"].includes(call.phase)) || state.ended?.length) {
+        try { restoreRegistration = !await reconcile(owner, state); recoveryDelay = 2000; }
+        catch (error) { recoveryDelay = Math.min(recoveryDelay * 2, 30000); throw error; }
+        finally { if (current(owner)) scheduleRecovery(); }
+        check(owner);
+        if (state.calls?.length && !restoreRegistration) return;
+      }
       if (!state.token) {
         await revoke(owner, state);
         check(owner);
         show("waiting", "Waiting for Apple's device registration…");
         return;
       }
-      if (lastToken === state.token && expiresAt - Date.now() / 1000 > 43200) return;
-      const csrf = await preflight(owner);
+      if (!restoreRegistration && lastToken === state.token && expiresAt - Date.now() / 1000 > 43200
+          && state.nativeControlReady !== false) return;
+      const { csrfToken: csrf } = await preflight(owner);
       check(owner);
+      const latest = await bridge.state();
+      check(owner);
+      if (latest.accountId !== owner.accountId || !latest.consented || latest.token !== state.token
+          || (!restoreRegistration && latest.calls?.some(call => ["ringing", "answerRequested"].includes(call.phase)))) {
+        refreshAgain = true;
+        return;
+      }
       const result = await request(owner, "POST", {
         action: "register", consent: true, deviceId: state.deviceId, token: state.token
       }, csrf);
@@ -117,8 +181,17 @@
           || result.expiresAt <= Date.now() / 1000 || result.expiresAt > Date.now() / 1000 + 86500) {
         throw new Error("INVALID_REGISTRATION");
       }
+      if (typeof bridge.configureControl === "function") {
+        if (typeof result.controlToken !== "string" || !/^[0-9a-f]{2,960}\.[0-9a-f]{64}$/.test(result.controlToken)) {
+          throw new Error("NATIVE_CONTROL_UNAVAILABLE");
+        }
+        await bridge.configureControl({ accountId: owner.accountId, deviceId: state.deviceId,
+          token: result.controlToken, expiresAt: result.expiresAt });
+        if (!current(owner)) { await bridge.disable(); await revoke(owner, state); return; }
+      }
       lastToken = state.token;
       expiresAt = result.expiresAt;
+      if (restoreRegistration) refreshAgain = true;
       root.clearTimeout(renewal);
       renewal = root.setTimeout(() => { if (!root.document.hidden) void refresh(); }, 43200000);
       show("registered", "Device registered for testing. Background calls still require an end-to-end test.");
@@ -140,7 +213,9 @@
         accountId = account.accountId;
         lastToken = "";
         expiresAt = 0;
+        recoveryDelay = 2000;
         root.clearTimeout(renewal);
+        root.clearTimeout(recoveryTimer);
       }
       return refresh();
     };
@@ -170,9 +245,11 @@
       revision++;
       if (logout) accountId = "";
       root.clearTimeout(renewal);
+      root.clearTimeout(recoveryTimer);
       lastToken = "";
       expiresAt = 0;
       consented = false;
+      recoveryDelay = 2000;
       if (!bridge) return;
       await bridge.disable();
       return enqueue(async () => {
@@ -196,7 +273,10 @@
     });
     if (bridge) {
       Promise.resolve(bridge.addListener("changed", () => void refresh())).catch(() => {});
-      root.document.addEventListener("visibilitychange", () => { if (!root.document.hidden) void refresh(); });
+      root.document.addEventListener("visibilitychange", () => {
+        root.clearTimeout(recoveryTimer);
+        if (!root.document.hidden) void refresh();
+      });
       root.addEventListener("online", () => void refresh());
     }
     return { ready, refresh, enable, disable, logout: () => disable({ logout: true }) };

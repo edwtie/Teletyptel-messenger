@@ -6,7 +6,7 @@ const { createApnsSender, incomingPayload } = require("../services/call-push/apn
 const keys = crypto.generateKeyPairSync("ec", { namedCurve: "prime256v1" });
 const privateKey = keys.privateKey.export({ type: "pkcs8", format: "pem" });
 const base = { keyId: "TESTKEY123", teamId: "TESTTEAM12", bundleId: "com.example.messenger", environment: "production", privateKey };
-const invitation = { callId: "7d2d10f6-00ab-40fb-9d6f-0d46c833080e", sid: "session-123", hasVideo: true, expiresAt: 1050 };
+const invitation = { callId: "7d2d10f6-00ab-40fb-9d6f-0d46c833080e", sid: "session-123", hasVideo: true, mediaProfile: "total", expiresAt: 1050 };
 const deviceToken = "ab".repeat(32);
 
 test("Incoming-call payload contains no identity, conversation, credentials or SDP", () => {
@@ -34,6 +34,18 @@ test("VoIP uses production HTTP/2 headers, zero storage lifetime and verifiable 
   } });
   assert.deepEqual(await sender.sendIncoming(deviceToken, invitation),
     { accepted: true, reason: "Accepted", retryable: false, invalidateDevice: false });
+});
+
+test("Push preserves TC and audio-RTT instead of inferring text from video", () => {
+  for (const [mediaProfile, hasVideo] of [["audio", false], ["video", true], ["audio-rtt", false], ["total", true]]) {
+    const payload = JSON.parse(incomingPayload({ ...invitation, mediaProfile, hasVideo }, 1000));
+    assert.equal(payload.mediaProfile, mediaProfile);
+    assert.equal(payload.hasVideo, hasVideo);
+    assert.throws(() => incomingPayload({ ...invitation, mediaProfile, hasVideo: !hasVideo }, 1000));
+  }
+  for (const mediaProfile of [undefined, null, "rtt", "unknown", "toString", "__proto__", ["total"]]) {
+    assert.throws(() => incomingPayload({ ...invitation, mediaProfile }, 1000));
+  }
 });
 
 test("Keys are cached, refreshed before expiration and invalidated after clock rollback", async () => {

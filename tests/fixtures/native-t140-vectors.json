@@ -1,0 +1,17 @@
+{
+  "receive": [
+    { "name": "literal-json-and-unicode", "blocks": ["{\"event\":\"reset\"} 👋", "\b🌍\r", "﻿\nمرحبا Café"], "text": "{\"event\":\"reset\"} 🌍\nمرحبا\nCafé" },
+    { "name": "scalar-not-grapheme-erase", "blocks": ["Café", "\b"], "text": "Cafe" },
+    { "name": "empty-and-erase", "blocks": ["\b\b", "x", "\b\b"], "text": "" },
+    { "name": "cr-lf-across-blocks", "blocks": ["a\r", "\n", "b\rc\n", "\r", "﻿", "\n"], "text": "a\nb\nc\n\n" },
+    { "name": "ignored-controls", "blocks": ["\u0000\t\u007f\u0085", "abc"], "text": "abc" },
+    { "name": "zwj-sequence", "blocks": ["👩‍💻", "\b"], "text": "👩‍" }
+  ],
+  "edits": [
+    { "input": "abc 👋", "text": "abc 👋", "bytes": "abc 👋" },
+    { "input": "ab🌍", "text": "ab🌍", "bytes": "\b\b\b🌍" },
+    { "input": "ab🌍\r\nvolgende", "text": "ab🌍\nvolgende", "bytes": "\r\nvolgende" },
+    { "input": "", "text": "", "bytes": "\b\b\b\b\b\b\b\b\b\b\b\b" },
+    { "input": "{\"text\":\"geen reset\"}", "text": "{\"text\":\"geen reset\"}", "bytes": "{\"text\":\"geen reset\"}" }
+  ]
+}

@@ -14,7 +14,7 @@ const { createApnsSender } = require("../services/call-push/apns");
 const root = path.resolve(__dirname, "..");
 const key = crypto.generateKeyPairSync("ec", { namedCurve: "prime256v1" }).privateKey.export({ type: "pkcs8", format: "pem" });
 const now = 1800000000;
-const invitation = { callId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", sid: "real-sid", hasVideo: true, expiresAt: now + 30 };
+const invitation = { callId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", sid: "real-sid", hasVideo: true, mediaProfile: "total", expiresAt: now + 30 };
 
 async function invoke(source, sender) {
   let output = "";
@@ -32,6 +32,7 @@ test("Stdin dispatch uses minimal APNs payload and never echoes device token", a
       assert.equal(headers["apns-topic"], "com.tiedragon.teletyptel.voip");
       const payload = JSON.parse(body);
       assert.equal(payload.sid, invitation.sid);
+      assert.equal(payload.mediaProfile, "total");
       assert.equal(payload.caller, undefined);
       return { status: 200 };
     } });
@@ -91,7 +92,10 @@ test("Registration endpoint has no arbitrary invite/send action, no automatic sc
   assert.match(endpoint, /TELETYPTEL_CALL_PUSH_REGISTRY.*!== '1'/);
   assert.match(endpoint, /CallPushService::authorize/);
   assert.match(endpoint, /HTTP_X_CSRF_TOKEN/);
-  assert.match(endpoint, /4097/);
+  assert.match(endpoint, /16385/);
+  assert.match(endpoint, /strlen\(\$raw\) > 16384/);
+  assert.match(endpoint, /CallPushPolicy::load\(\$pdo\)/);
+  assert.match(endpoint, /reconcileDevice\(\$account, \$binding/);
   assert.match(endpoint, /\['consent'\] \?\? null\) !== true/);
   assert.doesNotMatch(endpoint, /ensureSchema|inviteVerified|acceptVerified|dispatchOne|sendIncoming/);
   const account = fs.readFileSync(path.join(root, "php/public/api/account.php"), "utf8");

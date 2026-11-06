@@ -33,7 +33,7 @@ final class CallPushService
                 registered_ms BIGINT NOT NULL, expires BIGINT NOT NULL',
             'call_push_calls' => 'call_id VARCHAR(36) PRIMARY KEY, caller VARCHAR(96) NOT NULL, recipient VARCHAR(96) NOT NULL,
                 caller_version INTEGER NOT NULL, recipient_version INTEGER NOT NULL, sid VARCHAR(128) NOT NULL,
-                has_video INTEGER NOT NULL, state VARCHAR(16) NOT NULL, created BIGINT NOT NULL, expires BIGINT NOT NULL,
+                has_video INTEGER NOT NULL, media_profile VARCHAR(16) NULL, state VARCHAR(16) NOT NULL, created BIGINT NOT NULL, expires BIGINT NOT NULL,
                 accepted_device VARCHAR(36) NULL, accepted_generation VARCHAR(32) NULL, recipient_jid VARCHAR(512) NULL,
                 UNIQUE(caller, sid)',
             'call_push_jobs' => 'job_id VARCHAR(32) PRIMARY KEY, call_id VARCHAR(36) NOT NULL, device_id VARCHAR(36) NOT NULL,
@@ -41,6 +41,10 @@ final class CallPushService
                 UNIQUE(call_id, device_id, generation)'
         ] as $table => $columns) {
             $this->pdo->exec('CREATE TABLE IF NOT EXISTS ' . $table . ' (' . $columns . ')' . $suffix);
+        }
+        $columns = $suffix === '' ? $this->rows('PRAGMA table_info(call_push_calls)') : $this->rows('SHOW COLUMNS FROM call_push_calls');
+        if (!in_array('media_profile', array_column($columns, $suffix === '' ? 'name' : 'Field'), true)) {
+            $this->pdo->exec('ALTER TABLE call_push_calls ADD COLUMN media_profile VARCHAR(16) NULL');
         }
         try { $this->write('INSERT INTO call_push_lock VALUES (1, 0)'); }
         catch (PDOException $error) { if (!in_array((string)$error->getCode(), ['23000', '23505'], true)) throw $error; }
@@ -228,22 +232,26 @@ final class CallPushService
         } catch (Throwable $error) { return false; }
     }
 
-    public function inviteVerified(string $caller, string $recipient, string $sid, bool $hasVideo, int $ttl = 45): array
+    public function inviteVerified(string $caller, string $recipient, string $sid, bool $hasVideo, int $ttl = 45, ?string $mediaProfile = null): array
     {
+        $mediaProfile ??= $hasVideo ? 'video' : 'audio';
+        self::validateMediaProfile($mediaProfile, $hasVideo);
         if ($caller === $recipient || !preg_match('/\A[A-Za-z0-9_-]{1,128}\z/', $sid) || $ttl < 1 || $ttl > 60) {
             throw new CallPushFailure('Ongeldige oproep.');
         }
-        return $this->atomic(function () use ($caller, $recipient, $sid, $hasVideo, $ttl) {
+        return $this->atomic(function () use ($caller, $recipient, $sid, $hasVideo, $ttl, $mediaProfile) {
             $this->cleanupInside();
             $now = ($this->clock)();
             $call = ['call_id' => self::newUuid(), 'caller' => $caller, 'recipient' => $recipient,
                 'caller_version' => (int)AccountAccess::state($this->pdo, $caller)['version'],
                 'recipient_version' => (int)AccountAccess::state($this->pdo, $recipient)['version'],
-                'sid' => $sid, 'has_video' => (int)$hasVideo, 'state' => 'ringing', 'created' => $now, 'expires' => $now + $ttl];
+                'sid' => $sid, 'has_video' => (int)$hasVideo, 'media_profile' => $mediaProfile,
+                'state' => 'ringing', 'created' => $now, 'expires' => $now + $ttl];
             if (!$this->permitted($call, 'invite')) throw new CallPushFailure('Oproep niet toegestaan.', 403);
             $existing = $this->rows('SELECT * FROM call_push_calls WHERE caller = ? AND sid = ?', [$caller, $sid])[0] ?? null;
             if ($existing) {
-                if ($existing['recipient'] !== $recipient || (int)$existing['has_video'] !== (int)$hasVideo) throw new CallPushFailure('Oproepconflict.', 409);
+                if ($existing['recipient'] !== $recipient || (int)$existing['has_video'] !== (int)$hasVideo
+                    || $existing['media_profile'] !== $mediaProfile) throw new CallPushFailure('Oproepconflict.', 409);
                 return $this->publicCall($existing);
             }
             if (count($this->rows('SELECT call_id FROM call_push_calls WHERE caller = ? AND created > ?', [$caller, $now - 60])) >= 5) {
@@ -252,8 +260,8 @@ final class CallPushService
             if ($this->rows("SELECT call_id FROM call_push_calls WHERE recipient = ? AND state IN ('ringing', 'accepted')", [$recipient])) {
                 throw new CallPushFailure('Ontvanger is bezet.', 409);
             }
-            $this->write('INSERT INTO call_push_calls (call_id, caller, recipient, caller_version, recipient_version, sid, has_video, state, created, expires)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', array_values($call));
+            $this->write('INSERT INTO call_push_calls (call_id, caller, recipient, caller_version, recipient_version, sid, has_video, media_profile, state, created, expires)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', array_values($call));
             foreach ($this->rows('SELECT * FROM call_push_devices WHERE account_id = ? AND environment = ?', [$recipient, $this->environment]) as $device) {
                 if (!$this->deviceAllowed($device, $call)) continue;
                 $this->write('INSERT INTO call_push_jobs VALUES (?, ?, ?, ?, ?, ?)',
@@ -263,10 +271,19 @@ final class CallPushService
         });
     }
 
+    private static function validateMediaProfile(?string $profile, bool $hasVideo): void
+    {
+        if (!in_array($profile, ['audio', 'video', 'audio-rtt', 'total'], true)
+            || $hasVideo !== in_array($profile, ['video', 'total'], true)) {
+            throw new CallPushFailure('Oproepmedia niet beschikbaar.');
+        }
+    }
+
     private function publicCall(array $call): array
     {
+        self::validateMediaProfile($call['media_profile'] ?? null, (bool)$call['has_video']);
         return ['callId' => $call['call_id'], 'sid' => $call['sid'], 'hasVideo' => (bool)$call['has_video'],
-            'expiresAt' => (int)$call['expires'], 'state' => $call['state']];
+            'mediaProfile' => $call['media_profile'], 'expiresAt' => (int)$call['expires'], 'state' => $call['state']];
     }
 
     public function callFor(string $account, string $callId): array
@@ -278,6 +295,91 @@ final class CallPushService
             if (!$call || !in_array($account, [$call['caller'], $call['recipient']], true)) throw new CallPushFailure('Oproep niet beschikbaar.', 404);
             if (!$this->permitted($call, 'read')) throw new CallPushFailure('Oproep niet beschikbaar.', 404);
             return $this->publicCall($call);
+        });
+    }
+
+    public function reconcileDevice(string $account, string $binding, string $deviceId, array $requests): array
+    {
+        return $this->reconcile($account, $this->binding($binding), self::uuid($deviceId), $requests);
+    }
+
+    public function controlCredential(string $account, string $binding, string $deviceId): string
+    {
+        $deviceId = self::uuid($deviceId);
+        foreach ($this->devices($account, $binding) as $device) {
+            if ($device['device_id'] !== $deviceId) continue;
+            $payload = bin2hex(json_encode(['scope' => 'call-control-v1', 'deviceId' => $deviceId,
+                'generation' => $device['generation'], 'expiresAt' => (int)$device['expires'],
+                'environment' => $this->environment], JSON_THROW_ON_ERROR));
+            return $payload . '.' . hash_hmac('sha256', 'call-control-v1:' . $payload, $this->key);
+        }
+        throw new CallPushFailure('Toestelregistratie niet beschikbaar.', 403);
+    }
+
+    public function reconcileControl(string $credential, array $requests): array
+    {
+        if (strlen($credential) > 1024 || !preg_match('/\A([0-9a-f]+)\.([0-9a-f]{64})\z/', $credential, $parts)
+            || strlen($parts[1]) % 2 || !hash_equals(hash_hmac('sha256', 'call-control-v1:' . $parts[1], $this->key), $parts[2])) {
+            throw new CallPushFailure('Oproeptoegang verlopen.', 401);
+        }
+        $claims = json_decode(hex2bin($parts[1]), true);
+        if (!is_array($claims) || ($claims['scope'] ?? '') !== 'call-control-v1'
+            || ($claims['environment'] ?? '') !== $this->environment || !is_string($claims['deviceId'] ?? null)
+            || !is_string($claims['generation'] ?? null) || !is_int($claims['expiresAt'] ?? null)
+            || $claims['expiresAt'] <= ($this->clock)()) {
+            throw new CallPushFailure('Oproeptoegang verlopen.', 401);
+        }
+        return $this->reconcile(null, null, self::uuid($claims['deviceId']), $requests, $claims);
+    }
+
+    private function reconcile(?string $account, ?string $binding, string $deviceId, array $requests, ?array $claims = null): array
+    {
+        if (!array_is_list($requests) || count($requests) > 64) throw new CallPushFailure('Ongeldige oproeplijst.');
+        $seen = [];
+        foreach ($requests as $request) {
+            if (!is_array($request) || !is_string($request['callId'] ?? null) || !is_string($request['sid'] ?? null)
+                || !preg_match('/\A[A-Za-z0-9_-]{1,128}\z/', $request['sid']) || !is_bool($request['end'] ?? null)) {
+                throw new CallPushFailure('Ongeldige oproep.');
+            }
+            $id = self::uuid($request['callId']);
+            if (isset($seen[$id])) throw new CallPushFailure('Dubbele oproep.');
+            $seen[$id] = true;
+        }
+        return $this->atomic(function () use ($account, $binding, $deviceId, $requests, $claims) {
+            $this->cleanupInside();
+            $device = $this->rows('SELECT * FROM call_push_devices WHERE device_id = ?', [$deviceId])[0] ?? null;
+            if (!$device || !$this->deviceAllowed($device, ['recipient' => $device['account_id']])) {
+                throw new CallPushFailure('Toestelregistratie niet beschikbaar.', 403);
+            }
+            if ($claims !== null) {
+                if (!hash_equals($device['generation'], $claims['generation']) || (int)$device['expires'] !== $claims['expiresAt']) {
+                    throw new CallPushFailure('Oproeptoegang verlopen.', 401);
+                }
+                $account = $device['account_id'];
+            } elseif ($device['account_id'] !== $account || !hash_equals($device['session_binding'], $binding ?? '')) {
+                throw new CallPushFailure('Toestelregistratie niet beschikbaar.', 403);
+            }
+            $this->profile($account);
+            $result = [];
+            foreach ($requests as $request) {
+                $id = self::uuid($request['callId']);
+                $call = $this->rows('SELECT * FROM call_push_calls WHERE call_id = ?', [$id])[0] ?? null;
+                $state = 'unavailable';
+                if ($call && $call['recipient'] === $account && hash_equals($call['sid'], $request['sid'])) {
+                    if ($call['state'] === 'accepted' && ($call['accepted_device'] !== $deviceId
+                        || $call['accepted_generation'] !== $device['generation'])) {
+                        $state = 'answered-elsewhere';
+                    } elseif ($request['end']) {
+                        $this->write("UPDATE call_push_calls SET state = 'ended' WHERE call_id = ?", [$id]);
+                        $this->write("UPDATE call_push_jobs SET state = 'skipped' WHERE call_id = ? AND state = 'pending'", [$id]);
+                        $state = 'ended';
+                    } elseif (in_array($call['state'], ['ended', 'expired'], true) || $this->permitted($call, 'read')) {
+                        $state = $call['state'];
+                    }
+                }
+                $result[] = ['callId' => $id, 'sid' => $request['sid'], 'state' => $state];
+            }
+            return $result;
         });
     }
 
@@ -314,6 +416,10 @@ final class CallPushService
                 || strlen($fullJid) <= strlen($profile['jid']) + 1 || preg_match('/[\x00-\x20\x7f]/', $fullJid)) {
                 throw new CallPushFailure('Ongeldige XMPP-verbinding.');
             }
+            if ($call['state'] === 'accepted' && $call['accepted_device'] === $deviceId
+                && $call['accepted_generation'] === $generation && $call['recipient_jid'] !== $fullJid) {
+                throw new CallPushFailure('Oproep is al aan een andere XMPP-verbinding gekoppeld.', 409);
+            }
             $call['recipient_jid'] = $fullJid;
             if (!$this->permitted($call, 'accept')) throw new CallPushFailure('XMPP-verbinding niet bevestigd.', 403);
             if ($call['state'] === 'accepted' && $call['accepted_device'] === $deviceId && $call['accepted_generation'] === $generation) {
@@ -335,6 +441,11 @@ final class CallPushService
             foreach ($this->rows("SELECT * FROM call_push_jobs WHERE state = 'pending' ORDER BY created, job_id LIMIT 32") as $job) {
                 $call = $this->rows('SELECT * FROM call_push_calls WHERE call_id = ?', [$job['call_id']])[0] ?? null;
                 $device = $this->rows('SELECT * FROM call_push_devices WHERE device_id = ?', [$job['device_id']])[0] ?? null;
+                try { self::validateMediaProfile($call['media_profile'] ?? null, (bool)($call['has_video'] ?? false)); }
+                catch (CallPushFailure $error) {
+                    $this->write("UPDATE call_push_jobs SET state = 'skipped' WHERE job_id = ?", [$job['job_id']]);
+                    continue;
+                }
                 if (!$call || !$device || $call['state'] !== 'ringing' || (int)$call['expires'] <= ($this->clock)()
                     || !hash_equals($device['generation'], $job['generation']) || !$this->deviceAllowed($device, $call)
                     || !$this->permitted($call, 'dispatch')) {

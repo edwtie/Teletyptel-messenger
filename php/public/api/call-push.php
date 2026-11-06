@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 require_once dirname(__DIR__, 2) . '/lib/Database.php';
 require_once dirname(__DIR__, 2) . '/lib/CallPushService.php';
+require_once dirname(__DIR__, 2) . '/lib/CallPushPolicy.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
@@ -26,8 +27,8 @@ try {
         if (strtolower(trim(explode(';', $_SERVER['CONTENT_TYPE'] ?? '')[0])) !== 'application/json') {
             throw new CallPushFailure('JSON is vereist.', 415);
         }
-        $raw = file_get_contents('php://input', false, null, 0, 4097);
-        if ($raw === false || strlen($raw) > 4096) throw new CallPushFailure('Aanvraag te groot.', 413);
+        $raw = file_get_contents('php://input', false, null, 0, 16385);
+        if ($raw === false || strlen($raw) > 16384) throw new CallPushFailure('Aanvraag te groot.', 413);
         $input = json_decode($raw, true);
         if (!is_array($input)) throw new CallPushFailure('Ongeldige aanvraag.');
         if (($input['action'] ?? '') === 'register') {
@@ -35,6 +36,16 @@ try {
                 throw new CallPushFailure('Toestemming en toestelregistratie zijn vereist.');
             }
             $result = $service->register($account, $binding, $input['deviceId'], $input['token'], true);
+            if (getenv('TELETYPTEL_CALL_PUSH_NATIVE_CONTROL') === '1') {
+                $result['controlToken'] = $service->controlCredential($account, $binding, $input['deviceId']);
+            }
+        } elseif (($input['action'] ?? '') === 'reconcile') {
+            if (!is_string($input['deviceId'] ?? null) || !is_array($input['calls'] ?? null)) {
+                throw new CallPushFailure('Toestelregistratie en oproepen zijn vereist.');
+            }
+            $service = new CallPushService($pdo, $key === false ? '' : $key,
+                (string)getenv('TELETYPTEL_CALL_PUSH_ENVIRONMENT'), CallPushPolicy::load($pdo));
+            $result = ['calls' => $service->reconcileDevice($account, $binding, $input['deviceId'], $input['calls'])];
         } elseif (($input['action'] ?? '') === 'revoke-device') {
             if (!is_string($input['deviceId'] ?? null)) throw new CallPushFailure('Toestelregistratie is vereist.');
             $service->revokeDevice($account, $input['deviceId']);

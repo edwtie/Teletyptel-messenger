@@ -5,6 +5,7 @@ const http2 = require("node:http2");
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const identifierPattern = /^[A-Za-z0-9_-]{1,128}$/;
+const mediaProfiles = Object.freeze({ audio: false, video: true, "audio-rtt": false, total: true });
 const hosts = Object.freeze({ production: "https://api.push.apple.com", sandbox: "https://api.sandbox.push.apple.com" });
 const appleReasons = new Set(["BadDeviceToken", "DeviceTokenNotForTopic", "Unregistered", "TopicDisallowed",
   "InvalidProviderToken", "ExpiredProviderToken", "BadEnvironmentKeyInToken", "TooManyRequests",
@@ -14,12 +15,14 @@ function incomingPayload(invitation, now) {
   if (!Number.isSafeInteger(now) || now < 0 || !invitation
       || typeof invitation.callId !== "string" || !uuidPattern.test(invitation.callId)
       || typeof invitation.sid !== "string" || !identifierPattern.test(invitation.sid)
-      || typeof invitation.hasVideo !== "boolean" || !Number.isSafeInteger(invitation.expiresAt)
+      || typeof invitation.hasVideo !== "boolean" || typeof invitation.mediaProfile !== "string"
+      || !Object.hasOwn(mediaProfiles, invitation.mediaProfile)
+      || mediaProfiles[invitation.mediaProfile] !== invitation.hasVideo || !Number.isSafeInteger(invitation.expiresAt)
       || invitation.expiresAt <= now || invitation.expiresAt > now + 60) {
     throw new Error("Invalid or expired incoming-call invitation");
   }
   return JSON.stringify({ aps: {}, type: "incoming-call", callId: invitation.callId.toLowerCase(),
-    sid: invitation.sid, hasVideo: invitation.hasVideo, expiresAt: invitation.expiresAt });
+    sid: invitation.sid, hasVideo: invitation.hasVideo, mediaProfile: invitation.mediaProfile, expiresAt: invitation.expiresAt });
 }
 
 function post(host, headers, body) {

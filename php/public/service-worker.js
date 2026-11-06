@@ -1,4 +1,4 @@
-const CACHE_NAME = "teletyptel-webclient-v503";
+const CACHE_NAME = "teletyptel-webclient-v506";
 const BUILD_VERSION = "20261103-tc-clean-view";
 const ASSETS = [
   "chat.html",
@@ -6,7 +6,7 @@ const ASSETS = [
   "call-controls-menu.css?v=20261104-symbol-colors",
   "call-controls-menu.js?v=20261104-symbols-only",
   "native-biometric.js?v=20261102-faceid",
-  "native-call-push.js?v=20261106-registration",
+  "native-call-push.js?v=20261106-native-control",
   "xmpp-availability.css?v=20261105-stable-startup",
   "xmpp-availability.js?v=20261105-stable-startup",
   "chat-dialer.css?v=20261104-hold-letters",

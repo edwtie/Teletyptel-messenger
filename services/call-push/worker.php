@@ -4,6 +4,7 @@ declare(strict_types=1);
 if (PHP_SAPI !== 'cli') { http_response_code(404); exit; }
 require_once dirname(__DIR__, 2) . '/php/lib/Database.php';
 require_once dirname(__DIR__, 2) . '/php/lib/CallPushService.php';
+require_once dirname(__DIR__, 2) . '/php/lib/CallPushPolicy.php';
 require_once dirname(__DIR__, 2) . '/php/lib/CallPushTransport.php';
 
 try {
@@ -15,15 +16,7 @@ try {
     $pdo = Database::connect();
     $policy = null;
     if ($mode === '--once') {
-        $policyFile = realpath((string)getenv('TELETYPTEL_CALL_PUSH_POLICY_FILE'));
-        $repository = realpath(dirname(__DIR__, 2));
-        $normalize = static fn(string $path): string => PHP_OS_FAMILY === 'Windows' ? strtolower(str_replace('\\', '/', $path)) : $path;
-        if ($policyFile === false || !is_file($policyFile) || str_starts_with($normalize($policyFile), $normalize($repository) . '/')) {
-            throw new RuntimeException('Verified signaling policy required outside web root');
-        }
-        $factory = require $policyFile;
-        $policy = $factory instanceof Closure ? $factory($pdo) : null;
-        if (!$policy instanceof Closure) throw new RuntimeException('Verified signaling policy required');
+        $policy = CallPushPolicy::load($pdo);
     }
     $service = new CallPushService($pdo, $key === false ? '' : $key, $environment, $policy);
     if ($mode === '--migrate') {

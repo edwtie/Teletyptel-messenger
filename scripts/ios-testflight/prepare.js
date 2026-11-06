@@ -49,6 +49,9 @@ function prepare() {
     + fs.readFileSync(path.join(__dirname, "FacebookSignInPlugin.swift"), "utf8") + "\n"
     + fs.readFileSync(path.join(__dirname, "ContactsPlugin.swift"), "utf8") + "\n"
     + fs.readFileSync(path.join(__dirname, "IncomingCallPlugin.swift"), "utf8") + "\n"
+    + fs.readFileSync(path.join(__dirname, "NativeCallControl.swift"), "utf8") + "\n"
+    + fs.readFileSync(path.join(__dirname, "CallMediaProfile.swift"), "utf8") + "\n"
+    + fs.readFileSync(path.join(__dirname, "NativeT140Session.swift"), "utf8") + "\n"
     + fs.readFileSync(path.join(__dirname, "VoipCallPlugin.swift"), "utf8") + "\n"
     + fs.readFileSync(path.join(__dirname, "ServerBridge.swift"), "utf8") + "\n"
     + fs.readFileSync(path.join(__dirname, "BiometricSession.swift"), "utf8"));
