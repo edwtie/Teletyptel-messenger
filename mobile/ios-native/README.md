@@ -195,7 +195,7 @@ proof of complete protocol interoperability or accessibility conformance.
 
 ## Migration inventory and acceptance gates
 
-### Real-ejabberd transport tests (passed; CI cleanup gate unresolved)
+### Real-ejabberd transport tests (passed, including cleanup verification)
 
 The next interoperability gate is now implemented separately in
 `scripts/check-ios-native-ejabberd.js` and `NativeXMPPIntegrationTests`.
@@ -229,8 +229,8 @@ stops the owned listeners and deletes the temporary database, credentials and
 private keys. This replaces the hanging full administrator trust-settings import.
 It does not change authorization policies or other certificates. A deny-only
 record remains until disposal of the hosted VM; this is reported explicitly and
-is not restoration of the original trust settings. Validation of this revised
-cleanup is pending the next hosted run.
+is not restoration of the original trust settings. This lifecycle is validated
+by the successful hosted run below, not intended for persistent machines.
 Cleanup errors fail the run. Forced runner termination relies on disposal of
 the hosted VM. The harness refuses Windows, local Macs and self-hosted runners;
 it must not be adapted to bypass application certificate checks.
@@ -244,6 +244,23 @@ iPhone/iPad UI regression checks.
 
 Published and executed with explicit permission on 2026-11-06:
 
+- [Run 42304267061](https://github.com/edwtie/Teletyptel-messenger/actions/runs/42304267061),
+  revision `d2b50b5`, is **successful**. All seven transport tests passed against
+  ejabberd 26.09, with zero failures and no skips. After CA trust was explicitly
+  denied and its certificate removed, a fresh Swift process repeated the probe
+  against the still-running endpoint and correctly rejected its certificate.
+  The additional one-test revocation phase passed. The report records
+  `passed`, `sessionsReleased`, `caTrustDenied`, `caCertificateRemoved`,
+  `caTrustRevocationVerified` and `cleanupCompleted` as true. The residual deny
+  record and reliance on disposable VM teardown remain explicitly reported.
+  Downloaded evidence: `artifacts/ios-native-evidence-42304267061/`.
+- [Unsigned preview run 42304266979](https://github.com/edwtie/Teletyptel-messenger/actions/runs/42304266979)
+  at the same revision `d2b50b5` also succeeded: 32 Swift unit tests passed,
+  seven opt-in network tests were skipped in this separate suite, unsigned iOS
+  Release compilation passed, and all ten simulator UI tests passed (five each
+  on iPhone 16 Pro and iPad Pro 11-inch M4, portrait and landscapeLeft). The
+  Release fixture-exclusion check passed. Reports record `unsigned: true` and
+  `uploaded: false`. Evidence: `artifacts/ios-native-evidence-42304266979/`.
 - [Run 42302927918](https://github.com/edwtie/Teletyptel-messenger/actions/runs/42302927918),
   revision `0d9aa6d`, ran all seven integration tests against ejabberd 26.09 with
   zero failures and no skips. Trusted WSS availability, SASL authentication,
@@ -252,11 +269,12 @@ Published and executed with explicit permission on 2026-11-06:
 - The heartbeat session remained connected for 40 seconds and ejabberd reported
   no connected users after cancellation. This is short-run transport evidence,
   not a stability soak test or complete XMPP interoperability certification.
-- **The workflow conclusion is failure, not success:** restoring the runner's
+- **That earlier workflow failed:** restoring the runner's
   previous administrator trust settings times out. The temporary certificate
   itself was removed successfully, but `cleanupCompleted` remains false. The
-  workflow deliberately fails rather than hiding this unresolved cleanup gate.
-  Trust restoration must be fixed before calling the entire harness successful.
+  workflow deliberately failed rather than hiding the cleanup error. The newer
+  run replaces full trust restoration with targeted, verified CA denial as
+  described above; it does not claim full restoration of the runner trust store.
   Only the disposable GitHub-hosted VM was affected; no local trust store or
   production server was accessed. VM disposal is the remaining cleanup boundary.
 - Earlier run 42301960672 also passed all seven networking tests but failed
@@ -276,11 +294,14 @@ fictional account passwords. No TestFlight upload occurred.
 These macOS transport tests do not test the PHP account API, production WAMP
 routing/certificates, a physical iPhone/iPad, messaging or TC. The test account
 is constructed inside the test target only; the application continues to require
-its HTTP account gate. Next gates are reliable isolated cleanup, end-to-end
-account authentication and device testing, followed by native messaging parity.
+its HTTP account gate. Next gates are end-to-end account authentication and
+device testing, followed by native messaging parity.
 
 Setup references: [ejabberd Homebrew installation](https://docs.ejabberd.im/admin/install/homebrew/)
 and [ejabberd listener options](https://docs.ejabberd.im/admin/configuration/listen-options/).
+Certificate lifecycle uses Apple's documented `add-trusted-cert -r deny` and
+`delete-certificate -Z` commands, without changing authorization policies:
+[Apple security tool manual](https://github.com/apple-oss-distributions/Security/blob/main/SecurityTool/macOS/security.1).
 
 | Stage | Existing behavior/source to preserve | Native work and acceptance gate |
 | --- | --- | --- |
