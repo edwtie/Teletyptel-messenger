@@ -78,6 +78,7 @@ async function run() {
   let control;
   let certificateFingerprint;
   let trustAttempted = false;
+  let fixtureReady = false;
   let failure;
   const environment = { ...process.env, ERL_EPMD_ADDRESS: "127.0.0.1" };
   const execute = (command, args, timeout = 60000, extraEnvironment = {}) => execFileSync(command, args, {
@@ -86,6 +87,31 @@ async function run() {
   });
   const write = (name, value) => fs.writeFileSync(path.join(temporary, name), value, { mode: 0o600 });
   const save = (name, value) => fs.writeFileSync(path.join(reports, name), redact(String(value), secrets));
+  const runSwift = (filter, reportName, extraEnvironment = {}) => new Promise((resolve, reject) => {
+    let output = "";
+    let overflow = false;
+    const child = spawn("swift", ["test", "--package-path", path.join(root, "mobile/ios-native"),
+      "--scratch-path", path.join(temporary, "SwiftBuild"), "--filter", filter], {
+      cwd: root, detached: true, stdio: ["ignore", "pipe", "pipe"],
+      env: { ...environment, NSUnbufferedIO: "YES", TELETYPTEL_EJABBERD_FIXTURE: path.join(temporary, "fixture.json"),
+        TELETYPTEL_EJABBERD_TRUST_PHASE: "trusted", ...extraEnvironment }
+    });
+    const stop = () => { if (child.pid) { try { process.kill(-child.pid, "SIGKILL"); } catch {} } };
+    const timeout = setTimeout(stop, 240000);
+    const collect = chunk => {
+      if (output.length + chunk.length > 8 * 1024 * 1024) { overflow = true; stop(); return; }
+      output += chunk.toString();
+      save(reportName, output);
+    };
+    child.stdout.on("data", collect);
+    child.stderr.on("data", collect);
+    child.once("error", error => { clearTimeout(timeout); reject(error); });
+    child.once("close", (code, signal) => {
+      clearTimeout(timeout);
+      if (code === 0 && !overflow) resolve(output);
+      else reject(new Error(`Swift integration failed (${signal || code}); see ${reportName}`));
+    });
+  });
   try {
     const prefix = execute("brew", ["--prefix", "ejabberd"]).trim();
     const openssl = path.join(execute("brew", ["--prefix", "openssl@3"]).trim(), "bin", "openssl");
@@ -129,7 +155,6 @@ async function run() {
     certificateFingerprint = execute(openssl, ["x509", "-in", certificate("ca.crt"), "-noout", "-fingerprint", "-sha1"])
       .trim().split("=").at(-1).replaceAll(":", "");
     if (!/^[0-9A-F]{40}$/i.test(certificateFingerprint)) throw new Error("Invalid temporary CA fingerprint");
-    execute("sudo", ["security", "trust-settings-export", "-d", certificate("trust-before.plist")]);
     trustAttempted = true;
     execute("sudo", ["security", "add-trusted-cert", "-d", "-r", "trustRoot", "-k",
       "/Library/Keychains/System.keychain", certificate("ca.crt")]);
@@ -155,30 +180,8 @@ async function run() {
     if (!ready) throw new Error("Isolated ejabberd did not start");
     control("register", username, "localhost", password);
     write("fixture.json", JSON.stringify({ trustedPort, untrustedPort, username, password }));
-    const swiftOutput = await new Promise((resolve, reject) => {
-      let output = "";
-      let overflow = false;
-      const child = spawn("swift", ["test", "--package-path", path.join(root, "mobile/ios-native"),
-        "--scratch-path", certificate("SwiftBuild"), "--filter", "EjabberdIntegrationTests"], {
-        cwd: root, detached: true, stdio: ["ignore", "pipe", "pipe"],
-        env: { ...environment, NSUnbufferedIO: "YES", TELETYPTEL_EJABBERD_FIXTURE: certificate("fixture.json") }
-      });
-      const stop = () => { if (child.pid) { try { process.kill(-child.pid, "SIGKILL"); } catch {} } };
-      const timeout = setTimeout(stop, 240000);
-      const collect = chunk => {
-        if (output.length + chunk.length > 8 * 1024 * 1024) { overflow = true; stop(); return; }
-        output += chunk.toString();
-        save("swift-progress.txt", output);
-      };
-      child.stdout.on("data", collect);
-      child.stderr.on("data", collect);
-      child.once("error", error => { clearTimeout(timeout); reject(error); });
-      child.once("close", (code, signal) => {
-        clearTimeout(timeout);
-        if (code === 0 && !overflow) resolve(output);
-        else reject(new Error(`Swift integration failed (${signal || code}); see swift-progress.txt`));
-      });
-    });
+    fixtureReady = true;
+    const swiftOutput = await runSwift("EjabberdIntegrationTests", "swift-progress.txt");
     save("swift-tests.txt", swiftOutput);
     if (!/Executed 7 tests, with 0 failures/.test(swiftOutput) || /[1-9][0-9]* tests? skipped/i.test(swiftOutput)) {
       throw new Error("Expected all seven real-server tests to execute without skips or failures");
@@ -199,6 +202,39 @@ async function run() {
     if (fs.existsSync(serverLog)) save("server-failure.txt", fs.readFileSync(serverLog, "utf8").slice(-16000));
   } finally {
     const cleanupErrors = [];
+    if (trustAttempted) {
+      try {
+        execute("sudo", ["security", "add-trusted-cert", "-d", "-r", "deny", "-k",
+          "/Library/Keychains/System.keychain", path.join(temporary, "ca.crt")]);
+        report.caTrustDenied = true;
+        report.residualDenyRecord = "Removed with disposable hosted VM; original trust settings are not restored";
+      } catch (error) {
+        cleanupErrors.push("temporary CA trust revocation");
+        save("trust-cleanup-error.txt", error.stderr || error.message);
+      }
+      try {
+        execute("sudo", ["security", "delete-certificate", "-Z", certificateFingerprint, "/Library/Keychains/System.keychain"]);
+        report.caCertificateRemoved = true;
+      } catch (error) {
+        cleanupErrors.push("temporary CA certificate removal");
+        save("certificate-cleanup-error.txt", error.stderr || error.message);
+      }
+      if (fixtureReady && report.caTrustDenied && report.caCertificateRemoved) {
+        try {
+          const rejectionOutput = await runSwift("EjabberdIntegrationTests.testRealAvailabilityOverTrustedWebSocket",
+            "trust-revocation-test.txt", { TELETYPTEL_EJABBERD_TRUST_PHASE: "revoked" });
+          if (!/Executed 1 test, with 0 failures/.test(rejectionOutput) || /[1-9][0-9]* tests? skipped/i.test(rejectionOutput)) {
+            throw new Error("Expected one non-skipped certificate rejection check");
+          }
+          report.caTrustRevocationVerified = true;
+        } catch (error) {
+          cleanupErrors.push("temporary CA revocation verification");
+          save("trust-verification-error.txt", error.message);
+        }
+      } else {
+        cleanupErrors.push("temporary CA revocation verification unavailable");
+      }
+    }
     if (untrustedServer) {
       for (const socket of untrustedSockets) socket.destroy();
       await new Promise(resolve => untrustedServer.close(resolve));
@@ -212,22 +248,6 @@ async function run() {
         if (server.exitCode === null && server.signalCode === null) {
           try { process.kill(-server.pid, "SIGKILL"); } catch (error) { if (error.code !== "ESRCH") cleanupErrors.push("server termination"); }
         }
-      }
-    }
-    if (trustAttempted) {
-      try {
-        execute("sudo", ["security", "trust-settings-import", "-d", path.join(temporary, "trust-before.plist")]);
-        report.trustSettingsRestored = true;
-      } catch (error) {
-        cleanupErrors.push("temporary CA trust restoration");
-        save("trust-cleanup-error.txt", error.stderr || error.message);
-      }
-      try {
-        execute("sudo", ["security", "delete-certificate", "-Z", certificateFingerprint, "/Library/Keychains/System.keychain"]);
-        report.caCertificateRemoved = true;
-      } catch (error) {
-        cleanupErrors.push("temporary CA certificate removal");
-        save("certificate-cleanup-error.txt", error.stderr || error.message);
       }
     }
     try { fs.rmSync(temporary, { recursive: true, force: true }); }

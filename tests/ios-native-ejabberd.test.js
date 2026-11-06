@@ -43,10 +43,14 @@ test("Network tests are opt-in, use actual transports and leave application trus
     "NativeXMPPConnection().run", "40_000_000_000", "authenticationRejected", 'host: "127.0.0.1"']) assert.ok(swift.includes(text), text);
   assert.doesNotMatch(swift, /URLCredential|SecTrust|URLProtocol|NativeLoginUIFixture/);
   const harness = fs.readFileSync(path.join(root, "scripts/check-ios-native-ejabberd.js"), "utf8");
-  assert.ok(harness.indexOf('"trust-settings-export"') < harness.indexOf('"add-trusted-cert"'));
-  assert.match(harness, /"trust-settings-import", "-d"/);
+  assert.match(harness, /"add-trusted-cert", "-d", "-r", "deny"/);
   assert.match(harness, /"delete-certificate", "-Z", certificateFingerprint/);
-  assert.doesNotMatch(harness, /authorizationdb|remove-trusted-cert/);
+  assert.doesNotMatch(harness, /authorizationdb|remove-trusted-cert|trust-settings-import/);
+  assert.match(harness, /TELETYPTEL_EJABBERD_TRUST_PHASE: "revoked"/);
+  assert.match(harness, /caTrustRevocationVerified = true/);
+  assert.match(harness, /residualDenyRecord/);
+  assert.match(swift, /TELETYPTEL_EJABBERD_TRUST_PHASE/);
+  assert.match(swift, /previously trusted fixture must fail after CA revocation/);
   const workflow = fs.readFileSync(path.join(root, ".github/workflows/ios-native-ejabberd.yml"), "utf8");
   assert.match(workflow, /workflow_dispatch:/);
   assert.match(workflow, /branches: \[codex\/teletyptel-beta-polish\]/);

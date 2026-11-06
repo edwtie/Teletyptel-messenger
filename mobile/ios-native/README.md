@@ -222,8 +222,15 @@ trusted by macOS. A separate loopback Node TLS listener uses a certificate that
 is deliberately not trusted; it does not simulate XMPP or account acceptance.
 Keeping this listener separate prevents ejabberd's global certificate selection
 from sharing the trusted localhost certificate with the negative test.
-Cleanup stops the owned listeners, removes the CA's trust and
-certificate, and deletes the temporary database, credentials and private keys.
+Cleanup explicitly denies trust for this generated CA, removes its certificate,
+and starts a fresh Swift process to verify that the formerly trusted WSS endpoint
+now fails with a certificate error (not merely a stopped-server error). It then
+stops the owned listeners and deletes the temporary database, credentials and
+private keys. This replaces the hanging full administrator trust-settings import.
+It does not change authorization policies or other certificates. A deny-only
+record remains until disposal of the hosted VM; this is reported explicitly and
+is not restoration of the original trust settings. Validation of this revised
+cleanup is pending the next hosted run.
 Cleanup errors fail the run. Forced runner termination relies on disposal of
 the hosted VM. The harness refuses Windows, local Macs and self-hosted runners;
 it must not be adapted to bypass application certificate checks.

@@ -39,6 +39,15 @@ final class EjabberdIntegrationTests: XCTestCase {
 
     func testRealAvailabilityOverTrustedWebSocket() async throws {
         let configuration = try fixture().configuration()
+        if ProcessInfo.processInfo.environment["TELETYPTEL_EJABBERD_TRUST_PHASE"] == "revoked" {
+            do {
+                _ = try await XMPPAvailabilityClient().check(configuration)
+                XCTFail("The previously trusted fixture must fail after CA revocation")
+            } catch {
+                XCTAssertEqual(ConnectionFailure.classify(error), .certificate)
+            }
+            return
+        }
         let report = try await XMPPAvailabilityClient().check(configuration)
         XCTAssertTrue(report.mechanisms.contains("PLAIN"))
     }
