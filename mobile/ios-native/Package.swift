@@ -7,6 +7,7 @@ let package = Package(
     products: [.library(name: "TeleTypTelCore", targets: ["TeleTypTelCore"])],
     targets: [
         .target(name: "TeleTypTelCore"),
-        .testTarget(name: "TeleTypTelCoreTests", dependencies: ["TeleTypTelCore"])
+        .testTarget(name: "TeleTypTelCoreTests", dependencies: ["TeleTypTelCore"]),
+        .testTarget(name: "NativeXMPPIntegrationTests", dependencies: ["TeleTypTelCore"])
     ]
 )

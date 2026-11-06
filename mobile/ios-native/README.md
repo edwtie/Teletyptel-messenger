@@ -193,6 +193,53 @@ proof of complete protocol interoperability or accessibility conformance.
 
 ## Migration inventory and acceptance gates
 
+### Prepared real-ejabberd transport test (not yet executed)
+
+The next interoperability gate is now implemented separately in
+`scripts/check-ios-native-ejabberd.js` and `NativeXMPPIntegrationTests`.
+The ordinary Swift suite skips these seven network tests unless the isolated
+fixture explicitly enables them. A skipped network test is not a passed network
+test. No application or production TLS handling is changed by this addition.
+
+The separate `ios-native-ejabberd.yml` workflow installs Homebrew ejabberd on an
+ephemeral GitHub-hosted macOS runner. It starts its own named instance with a
+temporary database, random fictional account, two loopback-only WSS listeners,
+and no federation, HTTP administration or public account registration. It records
+the installed ejabberd version rather than claiming an exact match to the local
+Docker server. Homebrew dependency versions are not pinned in this initial test.
+
+Seven tests exercise the actual Apple networking implementation, not injected
+XMPP responses: reachability; SASL/bind and a session surviving the heartbeat
+deadline before cancellation; wrong-password rejection; untrusted TLS rejection
+by the probe and authenticated transport; hostname mismatch; pre-start
+cancellation. The harness also checks that ejabberd has no remaining connected
+users after the tests. No test message is sent to an existing user.
+
+Only on that disposable runner, a generated two-day test CA is temporarily
+trusted by macOS. The second listener uses a certificate that is deliberately
+not trusted. Cleanup stops the owned instance, removes the CA's trust and
+certificate, and deletes the temporary database, credentials and private keys.
+Cleanup errors fail the run. Forced runner termination relies on disposal of
+the hosted VM. The harness refuses Windows, local Macs and self-hosted runners;
+it must not be adapted to bypass application certificate checks.
+
+Scoped publication starts this unsigned test workflow; manual dispatch is also
+available. It has no deployment/signing secrets or upload-to-store step. Only
+sanitized reports under `artifacts/ios-native-ejabberd-*/reports/` are collected;
+the temporary server directory is never uploaded. The existing unsigned iOS
+preview workflow separately compiles the new Swift test target and retains its
+iPhone/iPad UI regression checks.
+
+**Current evidence: preparation only.** Windows source/harness checks do not
+establish a successful native connection to ejabberd. Permission to publish/run
+this next gate is requested separately. Even a successful macOS transport run
+does not test the PHP account API, production WAMP routing/certificates, a physical
+iPhone/iPad, messaging or TC. The test account is constructed inside the test
+target only; the application continues to require its HTTP account gate.
+
+Setup references: [ejabberd Homebrew installation](https://docs.ejabberd.im/admin/install/homebrew/)
+and [ejabberd listener options](https://docs.ejabberd.im/admin/configuration/listen-options/).
+
 | Stage | Existing behavior/source to preserve | Native work and acceptance gate |
 | --- | --- | --- |
 | 1. Startup | `scripts/ios-testflight/LanViewController.swift`, `ServerBridge.swift`, `php/public/xmpp-availability.js` | This isolated foundation; pass Swift and iPhone/iPad UI tests, verify real trusted/untrusted TLS and offline cancellation. |

@@ -1,0 +1,44 @@
+name: Native XMPP real ejabberd (isolated unsigned test)
+
+on:
+  push:
+    branches: [codex/teletyptel-beta-polish]
+    paths:
+      - .github/workflows/ios-native-ejabberd.yml
+      - scripts/check-ios-native-ejabberd.js
+      - tests/ios-native-ejabberd.test.js
+      - mobile/ios-native/Tests/NativeXMPPIntegrationTests/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  interoperability:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+      - name: Check test isolation
+        run: node --test tests/ios-native-ejabberd.test.js
+      - name: Select Xcode 26
+        run: |
+          XCODE_PATH=$(find /Applications -maxdepth 1 -name 'Xcode_26*.app' -type d | sort -r | head -n 1)
+          test -n "$XCODE_PATH"
+          echo "DEVELOPER_DIR=$XCODE_PATH/Contents/Developer" >> "$GITHUB_ENV"
+      - name: Install test-only ejabberd and certificate tools
+        run: brew install ejabberd openssl@3
+      - name: Test actual Apple transport against disposable ejabberd
+        run: node scripts/check-ios-native-ejabberd.js
+      - name: Save sanitized test evidence only
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ios-native-ejabberd-${{ github.run_id }}
+          path: artifacts/ios-native-ejabberd-*/reports/
+          retention-days: 3
