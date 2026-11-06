@@ -297,6 +297,37 @@ is constructed inside the test target only; the application continues to require
 its HTTP account gate. Next gates are end-to-end account authentication and
 device testing, followed by native messaging parity.
 
+### Native HTTPS account-contract to XMPP chain (prepared, not yet hosted-tested)
+
+`NativeLoginIntegrationTests` adds seven opt-in tests using the actual
+`NativeLoginModel`, `NativeAccountClient`, reachability probe and XMPP transport,
+without injected Swift network doubles. A separate loopback HTTPS fixture exposes
+the account JSON contract and proxies WebSocket upgrades to the disposable real
+ejabberd. Both TLS legs validate certificates; the native client retains normal
+system trust. Only the generated successful test account exists in ejabberd.
+
+The new tests cover account HTTP acceptance followed by actual XMPP binding and
+disconnect, HTTP credential rejection, a two-factor challenge even with account
+fields present, an unexpected returned identity, a refused HTTP redirect, an
+HTTP-accepted identity rejected by ejabberd, and cancellation during a delayed
+HTTP response. Server-side counters require exactly one request for each case
+and nine WebSocket upgrades: seven availability probes, one successful login and
+one rejected XMPP login. Additional connections, followed redirects, unexpected
+HTTP requests or proxy errors fail the harness.
+
+**This is a client integration/HTTP contract test, not a real PHP/MySQL backend
+test.** The fixture supplies controlled API responses and does not run
+`php/public/api/account.php`. Evidence therefore keeps `accountAPITested: false`
+and separately records `accountHTTPContractTested` only after the new assertions
+pass. It does not verify backend session cookies, access control, 2FA completion,
+OAuth, biometric login or any physical device. Ordinary Swift unit runs skip all
+fourteen opt-in integration tests unless explicitly enabled by the hosted harness.
+
+Local Node tests validate fixture scenarios, isolation and request checks. Swift
+compilation and these seven new runtime tests still require the separately
+authorized unsigned macOS run. No production application code was changed for
+this step; the additional fixture is not bundled in the native app.
+
 Setup references: [ejabberd Homebrew installation](https://docs.ejabberd.im/admin/install/homebrew/)
 and [ejabberd listener options](https://docs.ejabberd.im/admin/configuration/listen-options/).
 Certificate lifecycle uses Apple's documented `add-trusted-cert -r deny` and

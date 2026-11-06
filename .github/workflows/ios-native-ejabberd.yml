@@ -6,7 +6,9 @@ on:
     paths:
       - .github/workflows/ios-native-ejabberd.yml
       - scripts/check-ios-native-ejabberd.js
+      - scripts/native-login-http-fixture.js
       - tests/ios-native-ejabberd.test.js
+      - tests/native-login-http-fixture.test.js
       - mobile/ios-native/Tests/NativeXMPPIntegrationTests/**
   workflow_dispatch:
 
@@ -25,7 +27,7 @@ jobs:
         with:
           node-version: 22
       - name: Check test isolation
-        run: node --test tests/ios-native-ejabberd.test.js
+        run: node --test tests/ios-native-ejabberd.test.js tests/native-login-http-fixture.test.js
       - name: Select Xcode 26
         run: |
           XCODE_PATH=$(find /Applications -maxdepth 1 -name 'Xcode_26*.app' -type d | sort -r | head -n 1)

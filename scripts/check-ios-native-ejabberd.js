@@ -5,6 +5,7 @@ const net = require("node:net");
 const https = require("node:https");
 const { execFileSync, spawn } = require("node:child_process");
 const { randomBytes } = require("node:crypto");
+const { startLoginFixture } = require("./native-login-http-fixture");
 
 function requireHostedMac(platform, environment) {
   if (platform !== "darwin" || environment.GITHUB_ACTIONS !== "true" ||
@@ -71,8 +72,10 @@ async function run() {
   const report = { unsigned: true, uploaded: false, productionServerContacted: false,
     transport: "Apple URLSessionWebSocketTask to loopback ejabberd over WSS",
     accountAPITested: false, physicalDevicesTested: false, passed: false,
-    cleanupCompleted: false, swiftTests: 7 };
+    cleanupCompleted: false, swiftTests: 7, nativeLoginContractTests: 7,
+    accountHTTPContractTested: false };
   let server;
+  let loginFixture;
   let untrustedServer;
   const untrustedSockets = new Set();
   let control;
@@ -179,13 +182,27 @@ async function run() {
     }
     if (!ready) throw new Error("Isolated ejabberd did not start");
     control("register", username, "localhost", password);
-    write("fixture.json", JSON.stringify({ trustedPort, untrustedPort, username, password }));
+    loginFixture = await startLoginFixture({ key: fs.readFileSync(certificate("server.key")),
+      cert: fs.readFileSync(certificate("server.crt")), ca: fs.readFileSync(certificate("ca.crt")),
+      trustedPort, username, password });
+    write("fixture.json", JSON.stringify({ trustedPort, untrustedPort, accountPort: loginFixture.port, username, password }));
     fixtureReady = true;
     const swiftOutput = await runSwift("EjabberdIntegrationTests", "swift-progress.txt");
     save("swift-tests.txt", swiftOutput);
     if (!/Executed 7 tests, with 0 failures/.test(swiftOutput) || /[1-9][0-9]* tests? skipped/i.test(swiftOutput)) {
       throw new Error("Expected all seven real-server tests to execute without skips or failures");
     }
+    const loginOutput = await runSwift("NativeLoginIntegrationTests", "native-login-tests.txt");
+    if (!/Executed 7 tests, with 0 failures/.test(loginOutput) || /[1-9][0-9]* tests? skipped/i.test(loginOutput)) {
+      throw new Error("Expected all seven native HTTPS/XMPP login contract tests to execute");
+    }
+    save("account-contract-statistics.json", JSON.stringify(loginFixture.statistics, null, 2));
+    const { scenarios, upgrades, unexpectedRequests, proxyErrors } = loginFixture.statistics;
+    if (["success", "rejected", "twofactor", "mismatch", "redirect", "xmpp-rejected", "delayed"]
+      .some(name => scenarios[name] !== 1) || upgrades !== 9 || unexpectedRequests !== 0 || proxyErrors !== 0) {
+      throw new Error("Unexpected account requests, redirects or XMPP connections in native login tests");
+    }
+    report.accountHTTPContractTested = true;
     let remaining = "";
     for (let attempt = 0; attempt < 10; attempt++) {
       remaining = control("connected_users").trim();
@@ -238,6 +255,9 @@ async function run() {
     if (untrustedServer) {
       for (const socket of untrustedSockets) socket.destroy();
       await new Promise(resolve => untrustedServer.close(resolve));
+    }
+    if (loginFixture) {
+      try { await loginFixture.close(); } catch { cleanupErrors.push("login fixture closure"); }
     }
     if (server?.pid) {
       try { control("stop"); } catch {}
