@@ -60,6 +60,7 @@ test("Native runtime fixture uses actual peer connections with no external signa
   assert.match(fixture, /receiver.setText\("Antwoord/);
   assert.match(fixture, /receiver.remoteText == large && !sender.hasPendingText/);
   assert.match(fixture, /receiver.ownText.isEmpty && receiver.remoteText.isEmpty/);
+  assert.match(fixture, /wait\("remote channel closure callback", until: \{ receiver.status == "unavailable" \}\)/);
   assert.doesNotMatch(fixture, /audioTrack\(|videoTrack\(|stun:|turn:|https:|URLSession/);
 });
 
