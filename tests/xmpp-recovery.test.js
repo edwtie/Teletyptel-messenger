@@ -60,6 +60,7 @@ function fixture() {
     sendXmppStanza: value => { sent.push(value); return true; },
     sendXmppRaw: value => { sent.push(value); return true; },
     xmppTranslation: { disconnect() {} }, messageTranslation: { clearLive() {} },
+    callPush: { ready: async () => {} },
     jingleSessions: { reset() { jingleResets++; } },
     WeakMap,
     returnToLoginScreenAfterDisconnect() { state.intentionalDisconnect = true; state.accountReady = false; },

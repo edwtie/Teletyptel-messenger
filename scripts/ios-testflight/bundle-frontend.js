@@ -7,7 +7,7 @@ const root = path.resolve(__dirname, "../..");
 const entryFiles = ["chat.html", "chat-client.css", "chat-client.js", "chat-dialer.css", "chat-dialer.js",
   "jingle-history.js", "jingle-session.js", "jingle-t140.js", "jingle-webrtc-audio.js", "jingle-call-router.js", "chat-xmpp-translation.js", "chat-translation.js", "native-google.js", "native-facebook.js",
   "xmpp-availability.js", "xmpp-availability.css",
-  "native-biometric.js",
+  "native-biometric.js", "native-call-push.js",
   "chat-tablet.css", "call-controls-menu.css", "call-controls-menu.js",
   "chat-interpreter.js", "chat-modal.js", "mobile-navigation.js", "vendor/qrcode.js", "favicon.ico"];
 

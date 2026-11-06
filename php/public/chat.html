@@ -872,8 +872,10 @@
             <div class="button-row">
               <button type="button" id="settingsLogoutButton" data-i18n="button.logout">Sign out</button>
               <button type="button" id="faceIdButton" hidden>Face ID</button>
+              <button type="button" id="callPushButton" aria-describedby="callPushStatus" hidden>Call notifications</button>
             </div>
           </div>
+          <p id="callPushStatus" role="status" aria-live="polite" hidden></p>
           <div class="identity-link-panel">
             <div>
               <strong data-i18n="settings.security_local_title">Local data</strong>
@@ -1456,6 +1458,7 @@
   <script src="native-google.js?v=20261031-bundled-interface"></script>
   <script src="native-facebook.js?v=20261101-native-facebook"></script>
   <script src="native-biometric.js?v=20261102-faceid"></script>
+  <script src="native-call-push.js?v=20261106-registration"></script>
   <script src="xmpp-availability.js?v=20261105-stable-startup"></script>
   <script src="chat-modal.js?v=20261104-accessibility-fixes"></script>
   <script src="chat-client.js?v=20261105-stable-startup"></script>

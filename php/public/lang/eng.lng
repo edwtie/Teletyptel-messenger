@@ -2,6 +2,15 @@
 # Format: key=value
 
 app.title=TeleTypTel Messenger
+call_push.enable=Enable call notifications (test)
+call_push.disable=Disable call notifications
+call_push.disabled=Call notifications are disabled on this device.
+call_push.unavailable=Call notifications are not yet enabled on this server.
+call_push.waiting=Waiting for Apple's device registration…
+call_push.registered=Device registered for testing. Background calls still require an end-to-end test.
+call_push.failed=Call notification changes could not be confirmed. Check your connection and try again.
+call_push.previous_account=Sign in to the previous account to finish disabling this device's call notifications.
+call_push.consent=Allow this device to receive call notifications through Apple? Its device token will be stored securely on the TeleTypTel server. This test version does not yet provide working background calls.
 button.add_contact_or_group=Add contact or group
 call.keypad=Call keypad
 call.keyboard=Type real-time text

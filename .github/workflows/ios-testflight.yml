@@ -16,6 +16,7 @@ on:
       - php/public/native-google.js
       - php/public/native-facebook.js
       - php/public/native-biometric.js
+      - php/public/native-call-push.js
       - php/public/xmpp-availability.*
       - php/public/chat-tablet.css
       - php/public/mobile-navigation.js
@@ -35,6 +36,9 @@ on:
       - tests/native-google.test.js
       - tests/native-facebook.test.js
       - tests/native-biometric.test.js
+      - tests/native-call-push.test.js
+      - tests/ios-call-push.test.js
+      - tests/ios-incoming-call-haptics.test.js
       - tests/call-camera-switch.test.js
       - tests/native-keyboard.test.js
       - tests/call-inputs.test.js
@@ -63,6 +67,7 @@ jobs:
     timeout-minutes: 30
     env:
       IOS_SERVER_URL: https://192.168.0.105/chat.html
+      IOS_CALL_PUSH_PREVIEW: ${{ contains(github.event.head_commit.message, '[ios-compile-only]') && '1' || '0' }}
       IOS_BUILD_NUMBER: ${{ inputs.build_number || format('{0}.{1}', github.run_number, github.run_attempt) }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -86,6 +91,7 @@ jobs:
           npm run prepare:app
           npm test
           node --test ../../tests/native-google.test.js ../../tests/jingle-t140.test.js ../../tests/upload-status.test.js
+          node --test ../../tests/native-call-push.test.js ../../tests/ios-call-push.test.js ../../tests/ios-incoming-call-haptics.test.js
           npm run build:check
       - name: Save non-secret preflight report
         if: always()
@@ -96,7 +102,7 @@ jobs:
           retention-days: 7
   internal-upload:
     needs: preflight
-    if: github.ref == 'refs/heads/codex/teletyptel-beta-polish'
+    if: github.ref == 'refs/heads/codex/teletyptel-beta-polish' && !contains(github.event.head_commit.message, '[ios-compile-only]')
     environment: ios-testflight
     runs-on: macos-15
     timeout-minutes: 40

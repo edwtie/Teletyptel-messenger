@@ -2,6 +2,47 @@
 
 ## Unreleased
 
+### iOS call-push registration lifecycle (preview) — 2026-11-06
+
+- Connect the gated native preview to Messenger login, explicit settings consent,
+  token renewal/invalidation and logout; normal builds/browser UI remain unchanged.
+- Keep consent account-bound and retain pending offline revocation natively.
+  Serialize late registrations with logout and add an authenticated own-device
+  revoke endpoint. Never inherit consent on account switches or log device tokens.
+- Add lifecycle/race tests and a compile-only CI marker that skips TestFlight.
+  Real ejabberd wakeup, native locked-screen media and device tests are still required.
+
+### Disabled call-push registry and worker — 2026-11-06
+
+- Add AES-GCM encrypted device registrations, session/generation binding and
+  revocation on logout/new login, with CSRF/HTTPS/account guards and short leases.
+- Add durable bounded invitations/outbox, a fail-closed signaling-policy interface,
+  cancellation/expiry, single-device answer arbitration and sanitized CLI dispatch.
+- Test isolated persistence, parallel answer races, revoked accounts, stale APNs
+  invalidation and transport failures. No live database migration, push activation,
+  Apple-key publication or TestFlight release; native media/Jingle wiring remains.
+
+### Disabled iOS call-push preparation — 2026-11-06
+
+- Add a gated native PushKit/CallKit preview with immediate incoming-call reports,
+  bounded ringing/answer deadlines, exact call matching and guarded bridge access.
+- Add a standalone HTTP/2 APNs VoIP transport with ES256 signing, minimal payloads,
+  expiration checks and sanitized failure results. No live sending is configured.
+- Guard production profiles and block preview TestFlight uploads. Ignore private
+  APNs keys/profiles in Git. End-to-end device registration, Jingle wakeup and
+  locked-screen media remain release blockers; see `docs/IOS_CALL_PUSH.md`.
+
+### iPhone foreground incoming-call vibration — 2026-11-06
+
+- Add a scoped native system-vibration bridge for incoming calls in the active
+  bundled iPhone app, with bounded pulses and native rate limiting.
+- Stop repetition on answer/end/logout and suppress it for DND, blocked or muted
+  peers, hidden pages and unsupported devices. Retain visual call alerts.
+- Add isolated lifecycle regression tests. Xcode compilation, TestFlight release
+  and physical vibration tests remain pending; locked-screen calling still needs
+  a complete PushKit/APNs/CallKit integration.
+
+
 ### Stable application startup and sign-in — 2026-11-05
 
 - Align native iOS launch logos with the app's connection screen and

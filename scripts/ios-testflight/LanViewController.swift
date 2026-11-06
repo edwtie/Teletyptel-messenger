@@ -20,6 +20,8 @@ final class LanViewController: CAPBridgeViewController {
         bridge?.registerPluginInstance(TeleTypTelGooglePlugin())
         bridge?.registerPluginInstance(TeleTypTelFacebookPlugin())
         bridge?.registerPluginInstance(TeleTypTelContactsPlugin())
+        bridge?.registerPluginInstance(TeleTypTelIncomingCallPlugin())
+        bridge?.registerPluginInstance(TeleTypTelVoipCallPlugin())
         bridge?.registerPluginInstance(TeleTypTelServerPlugin())
         bridge?.registerPluginInstance(TeleTypTelBiometricsPlugin())
     }

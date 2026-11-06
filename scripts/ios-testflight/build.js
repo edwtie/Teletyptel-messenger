@@ -5,6 +5,7 @@ const crypto = require("node:crypto");
 const { spawnSync } = require("node:child_process");
 const { output, project } = require("./prepare");
 const facebook = require("./facebook-signin");
+const callPush = require("./call-push");
 
 const reports = path.join(output, "reports");
 const secretNames = ["IOS_DISTRIBUTION_P12_BASE64", "IOS_DISTRIBUTION_P12_PASSWORD", "IOS_PROVISION_PROFILE_BASE64", "IOS_ASC_KEY_P8", "IOS_ASC_KEY_ID", "IOS_ASC_ISSUER_ID"];
@@ -36,6 +37,7 @@ function parseProfile(xml) {
 }
 
 function validateProfile(profile, config) {
+  callPush.validateProfile(profile, config.callPushPreview === true);
   if (!profile.TeamIdentifier?.includes(config.teamId)
       || profile.Entitlements?.["application-identifier"] !== config.teamId + "." + config.bundleId
       || profile.Entitlements?.["com.apple.developer.team-identifier"] !== config.teamId
@@ -62,6 +64,7 @@ async function build() {
   if (expectedFacebook) diagnosticSecrets.push(expectedFacebook.clientToken);
   const stagedPlist = JSON.parse(run("plutil", ["-convert", "json", "-o", "-", path.join(project, "ios/App/App/Info.plist")]));
   validateEncryptionDeclaration(stagedPlist);
+  callPush.validateRelease(stagedPlist, upload);
   if (typeof stagedPlist.FacebookClientToken === "string") diagnosticSecrets.push(stagedPlist.FacebookClientToken);
   const facebookConfig = facebook.validateStagedConfig(stagedPlist, { required: upload, expected: expectedFacebook });
   process.umask(0o077);

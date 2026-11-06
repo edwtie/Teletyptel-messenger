@@ -150,6 +150,10 @@ function readAccount(): void
 
 function logoutAccountSession(): void
 {
+    if (isset($_SESSION['teletyptel_call_push_binding'])) {
+        require_once dirname(__DIR__, 2) . '/lib/CallPushService.php';
+        CallPushService::revokeWebSession(Database::connect(), $_SESSION);
+    }
     unset(
         $_SESSION['teletyptel_account_id'],
         $_SESSION['teletyptel_authenticated_at'],

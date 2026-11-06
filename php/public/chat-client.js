@@ -407,6 +407,8 @@
     mediaPreviewStream: null,
     incomingCallNotification: null,
     incomingCallNotificationSid: "",
+    incomingCallHapticTimer: null,
+    incomingCallHapticCall: null,
     voiceRecorder: {
       recorder: null,
       stream: null,
@@ -923,6 +925,12 @@
     } });
 
   const xmppAvailability = window.TeleTypTelXmppAvailability?.create({ translate: t });
+  const callPush = window.TeleTypTelCallPush?.create({
+    translate: t,
+    signedIn: () => state.accountReady && !state.logoutInProgress,
+    settingsButton: byId("callPushButton"),
+    statusElement: byId("callPushStatus")
+  });
   window.TeleTypTelFaceID = window.TeleTypTelBiometric?.create({
     translate: t,
     settingsButton: byId("faceIdButton"),
@@ -937,6 +945,7 @@
       const verified = await loadDatabaseAccount(state.account?.accountId, accountLoginToken());
       const valid = await window.TeleTypTelFaceID.validate(state.account, verified, !state.accountReadStatus || state.accountReadStatus >= 500);
       if (valid === null) showXmppServerUnavailable();
+      if (valid === true) void callPush?.ready(state.account);
       return valid;
     },
     restoreProfile: profile => sessionStorage.setItem(accountStorageKeyFor(state.sessionProfile), JSON.stringify(profile)),
@@ -1213,6 +1222,7 @@
     window.addEventListener("blur", handleWindowLifecycleBlur);
     window.addEventListener("pageshow", () => setClientLifecycleState("active", "pageshow"));
     window.addEventListener("pagehide", () => setClientLifecycleState("inactive", "pagehide", { force: true }));
+    window.addEventListener("pagehide", stopIncomingCallHaptics);
     document.addEventListener("freeze", () => setClientLifecycleState("inactive", "freeze", { force: true }));
     document.addEventListener("pause", () => setClientLifecycleState("inactive", "app-pause", { force: true }));
     document.addEventListener("resume", () => setClientLifecycleState("active", "app-resume"));
@@ -1418,6 +1428,7 @@
 
   function handleVisibilityLifecycleChange() {
     setClientLifecycleState(browserLifecycleState(), "visibilitychange");
+    updateIncomingCallHaptics();
   }
 
   function handleWindowLifecycleBlur() {
@@ -4644,6 +4655,10 @@
   async function logoutAccount(options = {}) {
     if (state.logoutInProgress) return;
     state.logoutInProgress = true;
+    stopIncomingCallHaptics();
+    const revokeCallPush = Promise.resolve(callPush?.logout()).catch(() => {
+      appendDebug("call-push", "Device notification revocation could not be confirmed; continuing server sign-out.");
+    });
     state.suppressAutoLoginDialog = false;
     window.clearTimeout(state.sessionIdleTimerId);
     state.sessionIdleTimerId = null;
@@ -4666,6 +4681,7 @@
     });
     setAccountDialogBusy(true, t("account.signing_out", "Signing out…"));
     try {
+      await revokeCallPush;
       if (window.TeleTypTelFaceID) await window.TeleTypTelFaceID.revoke();
       await sendLogoutAccountSession();
       appendDebug("account", "Server account session cleared");
@@ -8702,6 +8718,7 @@
     state.xmppSession.phase = "ready";
     xmppAvailability?.ready();
     void window.TeleTypTelFaceID?.ready(state.account).catch(() => {});
+    void callPush?.ready(state.account);
     state.xmppPresenceSubscriptionRequests.clear();
     setAllContactPresence("offline");
     sendPresence("online");
@@ -11570,10 +11587,12 @@
 
   async function answerIncomingCall() {
     const call = state.call;
-    if (!call?.incomingOffer) {
+    if (!call?.incomingOffer || call.answerInProgress) {
       return;
     }
 
+    call.answerInProgress = true;
+    stopIncomingCallHaptics();
     setCallStatus(t("call.answering", "Answering..."));
     try {
       await openLocalMedia(call);
@@ -11948,6 +11967,70 @@
       .catch((error) => appendDebug("notification-error", error.message || String(error)));
   }
 
+  function stopIncomingCallHaptics() {
+    if (state.incomingCallHapticTimer !== null) {
+      window.clearInterval(state.incomingCallHapticTimer);
+    }
+    state.incomingCallHapticTimer = null;
+    state.incomingCallHapticCall = null;
+  }
+
+  function shouldPulseIncomingCall(call) {
+    return Boolean(call?.incomingOffer)
+      && state.call === call
+      && !call.answerInProgress
+      && !call.cleaningUp
+      && !call.hapticsUnavailable
+      && !state.logoutInProgress
+      && !state.doNotDisturb
+      && document.visibilityState === "visible"
+      && !isBlockedPeer(call.peer)
+      && !isNotificationMutedPeer(call.peer)
+      && !(call.roomJid && isNotificationMutedPeer(call.roomJid));
+  }
+
+  function updateIncomingCallHaptics() {
+    const call = state.call;
+    const plugin = window.Capacitor?.Plugins?.TeleTypTelIncomingCall;
+    if (window.location.protocol !== "capacitor:" || window.location.hostname !== "localhost"
+        || window.location.pathname !== "/chat.html" || typeof plugin?.pulse !== "function"
+        || !shouldPulseIncomingCall(call)) {
+      stopIncomingCallHaptics();
+      return;
+    }
+    call.hapticStartedAt ??= Date.now();
+    if (Date.now() - call.hapticStartedAt >= 60000) {
+      stopIncomingCallHaptics();
+      return;
+    }
+    if (state.incomingCallHapticCall === call) return;
+    stopIncomingCallHaptics();
+    state.incomingCallHapticCall = call;
+    const pulse = () => {
+      if (state.incomingCallHapticCall !== call) return;
+      if (!shouldPulseIncomingCall(call) || Date.now() - call.hapticStartedAt >= 60000) {
+        stopIncomingCallHaptics();
+        return;
+      }
+      if (call.hapticPending) return;
+      call.hapticPending = true;
+      const unavailable = () => {
+        call.hapticsUnavailable = true;
+        if (state.incomingCallHapticCall === call) stopIncomingCallHaptics();
+      };
+      try {
+        Promise.resolve(plugin.pulse({ sid: call.sid })).then(result => {
+          if (result?.reason === "UNSUPPORTED_DEVICE") unavailable();
+        }, unavailable).finally(() => { call.hapticPending = false; });
+      } catch {
+        call.hapticPending = false;
+        unavailable();
+      }
+    };
+    state.incomingCallHapticTimer = window.setInterval(pulse, 3000);
+    pulse();
+  }
+
   function showIncomingCallBrowserNotification(call) {
     if (!call?.incomingOffer || !("Notification" in window) || Notification.permission !== "granted") {
       return;
@@ -12073,6 +12156,7 @@
   }
 
   function closeIncomingCallBrowserNotification() {
+    stopIncomingCallHaptics();
     if (state.incomingCallNotification) {
       state.incomingCallNotification.close();
     }
@@ -13637,6 +13721,7 @@
       closeIncomingCallBrowserNotification();
     }
 
+    updateIncomingCallHaptics();
     el.answerCallButton.hidden = true;
     el.rejectCallButton.hidden = true;
     setCallButtonsDisabled(Boolean(call));

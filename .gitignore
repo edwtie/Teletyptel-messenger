@@ -30,6 +30,8 @@ php/data/*
 *.pem
 *.pfx
 *.p12
+*.p8
+*.mobileprovision
 php/public/ejabberd-localhost-dev.cer
 php/public/ejabberd-localhost-dev.crt
 php/public/config/google-maps.json

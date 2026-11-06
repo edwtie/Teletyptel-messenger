@@ -17,6 +17,8 @@ function fixture(fetch) {
     clearTimeout, accountApiPath: "api/account.php", navigator: { sendBeacon() { throw new Error("Beacon must not be used for logout"); } },
     document: { createElement: () => ({ addEventListener(name, callback) { this[name] = callback; } }) },
     clearAccountSessionForCurrentProfile() { calls.push("clear-local"); },
+    stopIncomingCallHaptics() { calls.push("stop-haptics"); },
+    callPush: { logout: async () => { calls.push("revoke-push"); } },
     setAccountReady(value) { calls.push(["ready", value]); }, appendDebug() {},
     disconnectAll(message, options) { disconnects.push({ message, options }); },
     setAccountDialogBusy(value, text) { busy.push(value); if (text) status.textContent = text; },
@@ -38,6 +40,7 @@ test("Logout closes the UI immediately but waits for the actual server response"
   assert.equal(disconnects[0].options.forceLogin, true);
   assert.deepEqual(busy, [true]);
   await context.logoutAccount();
+  await new Promise(resolve => setImmediate(resolve));
   const requests = calls.filter(call => Array.isArray(call) && call[0] === "api/account.php");
   assert.equal(requests.length, 1);
   assert.equal(JSON.parse(requests[0][1].body).action, "logout");
@@ -47,6 +50,20 @@ test("Logout closes the UI immediately but waits for the actual server response"
   await pending;
   assert.equal(context.state.logoutInProgress, false);
   assert.deepEqual(busy, [true, false]);
+  assert.match(status.textContent, /^Signed out/);
+});
+
+test("Slow push revocation cannot keep private UI visible, and failure still signs out on the server", async () => {
+  const { context, status, calls } = fixture(async () => ({ ok: true, json: async () => ({ ok: true }) }));
+  let rejectPush;
+  context.callPush.logout = () => new Promise((resolve, reject) => { rejectPush = reject; });
+  const result = context.logoutAccount();
+  assert.equal(context.state.account.password, "");
+  assert.equal(context.state.account.loginToken, "");
+  assert.equal(calls.some(call => Array.isArray(call) && call[0] === "api/account.php"), false);
+  rejectPush(new Error("Offline"));
+  await result;
+  assert.equal(calls.some(call => Array.isArray(call) && call[0] === "api/account.php"), true);
   assert.match(status.textContent, /^Signed out/);
 });
 

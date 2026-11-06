@@ -2,6 +2,15 @@
 # Format: key=value
 
 app.title=TeleTypTel Messenger
+call_push.enable=Oproepmeldingen inschakelen (test)
+call_push.disable=Oproepmeldingen uitschakelen
+call_push.disabled=Oproepmeldingen zijn uitgeschakeld op dit toestel.
+call_push.unavailable=Oproepmeldingen zijn nog niet ingeschakeld op deze server.
+call_push.waiting=Wachten op de toestelregistratie van Apple…
+call_push.registered=Toestel geregistreerd voor tests. Achtergrondoproepen moeten nog volledig worden getest.
+call_push.failed=De wijziging van oproepmeldingen kon niet worden bevestigd. Controleer je verbinding en probeer opnieuw.
+call_push.previous_account=Meld je aan bij het vorige account om de oproepmeldingen van dit toestel volledig uit te schakelen.
+call_push.consent=Mag dit toestel oproepmeldingen ontvangen via Apple? Het toestel-token wordt beveiligd opgeslagen op de TeleTypTel-server. Deze testversie biedt nog geen werkende achtergrondoproepen.
 button.add_contact_or_group=Contact of groep toevoegen
 call.keypad=Cijfertoetsen tijdens gesprek
 call.keyboard=Realtime tekst typen

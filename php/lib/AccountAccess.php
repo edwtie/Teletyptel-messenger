@@ -50,6 +50,10 @@ final class AccountAccess
     public static function bind(PDO $pdo, string $accountId, array &$session): void
     {
         self::assertAllowed($pdo, $accountId);
+        if (isset($session['teletyptel_call_push_binding'])) {
+            require_once __DIR__ . '/CallPushService.php';
+            CallPushService::revokeWebSession($pdo, $session);
+        }
         $session['teletyptel_access_version'] = (int)self::state($pdo, $accountId)['version'];
     }
 
