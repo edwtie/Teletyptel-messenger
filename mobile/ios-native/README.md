@@ -351,9 +351,35 @@ establish whether the cause is simulator infrastructure or an application/UI-tes
 defect; the saved failure output does not identify the failing assertion.
 Do not carry forward the earlier revision's green UI results as current evidence.
 Downloaded artifacts are in `artifacts/ios-native-evidence-42308604255/` and
-`artifacts/ios-native-evidence-42308604255-attempt2/`. The remaining regression
-gate is to diagnose the simulator run (including its result bundle and full
-test output), then pass both iPhone and iPad UI suites before release approval.
+`artifacts/ios-native-evidence-42308604255-attempt2/`.
+
+### Simulator diagnostics and subsequent passing run (2026-11-07)
+
+Revision `1650777` changes only the test runner and its Node regression tests.
+The runner now retains command stdout, stderr and exit/timeout metadata on
+failure instead of losing XCTest assertion output. It also exports structured
+test summaries and test trees from each available `.xcresult`, including after a
+failed test command. Export errors are recorded separately and never replace
+the original command failure. This uses Apple's
+[xcresulttool test-results commands](https://developer.apple.com/documentation/xcode-release-notes/xcode-16_3-release-notes).
+Four new local Node tests cover successful output, assertion failure, timeout
+diagnostics and incomplete result-bundle exports.
+
+[Unsigned preview run 42313158516](https://github.com/edwtie/Teletyptel-messenger/actions/runs/42313158516)
+passed 32 Swift unit tests (14 opt-in network tests skipped), unsigned device
+Release compilation, Release fixture-exclusion checks, and all ten UI tests:
+five on iPhone 16 Pro and five on iPad Pro 11-inch (M4), both with iOS 18.5.
+Portrait and landscape-left scenarios passed; both exported summaries report
+zero failures and zero UI-test skips. Evidence is downloaded under
+`artifacts/ios-native-evidence-42313158516/`.
+
+The earlier simulator failure was not reproduced in this run. Neither app code,
+UI-test assertions nor command timeouts were changed, so this is **not proof of
+a root-cause fix** or of consistently reliable simulator runs. Preserve the
+earlier failed evidence; use the new diagnostics if it recurs. This run confirms
+the current unsigned preview regression suite, not real-device or complete app
+feature parity. No TestFlight upload, signing credentials or production server
+changes were involved.
 
 Setup references: [ejabberd Homebrew installation](https://docs.ejabberd.im/admin/install/homebrew/)
 and [ejabberd listener options](https://docs.ejabberd.im/admin/configuration/listen-options/).
