@@ -417,8 +417,25 @@ outgoing buffers, remote closure and empty replacement-call state. This is a
 same-machine native datachannel test, not browser/native interoperability or TC.
 
 Local source/build-wiring checks pass (49 checks; two macOS-only skips in the
-focused existing suites). Native compile and transport execution still require
-the separately authorized GitHub compile-only run; no success is assumed here.
+focused existing suites). The separately authorized compile-only run
+[42229750648](https://github.com/edwtie/Teletyptel-messenger/actions/runs/42229750648)
+passed on commit `dea23369d6c66a114245e58239ba8de1a2b193e6`:
+
+- 206 automated checks passed (140 + 21 + 45), zero failures or skips on macOS.
+- Unsigned iOS device compilation succeeded with the pinned WebRTC framework.
+- The real native macOS-peer RTT transport test passed, including bidirectional
+  Unicode edits, an 88 KB segmented update, buffer draining and close cleanup.
+- The Release iPhone 17 Pro / iOS 26.2 simulator started successfully twice in the
+  existing offline startup regression. This is not a physical-device call test.
+- `native-webrtc-smoke.json`, `startup-smoke.json` and `result.json` record these
+  bounded results; `uploaded` is false and the internal-upload job was skipped.
+
+Earlier runs exposed a package-manifest matcher that also counted the target's
+dependency list, and a test race that checked cleared text before the native
+close callback reached the main queue. The matcher now selects the top-level
+list, and the transport test awaits the terminal session status before checking
+cleanup. Neither issue was bypassed by disabling a transport or cleanup check.
+
 The actual Jingle wakeup/answer and ICE adapter, CallKit-managed audio, video
 capture/rendering and physical-device background tests remain unfinished.
 
