@@ -91,7 +91,7 @@ Local evidence:
 Real-server login/TLS/heartbeat interoperability and 2FA completion remain
 unverified or unimplemented as described above. This run predates the UI adapter.
 
-## Native login UI adapter (local, pending new macOS validation)
+## Native login UI adapter (published and unsigned-tested)
 
 - After checking the entered HTTPS origin/domain, the form offers an explicitly
   labelled XMPP account field and a native `SecureField`. No autofocus, credential
@@ -117,10 +117,26 @@ unverified or unimplemented as described above. This run predates the UI adapter
   the fixture implementation; the check script also rejects its environment
   marker or fixture password in the Release executable.
 
-Five local Node source/project checks passed. Swift/model tests, the changed UI
-and the Release fixture-exclusion assertion require a **new** macOS/Xcode run;
-the earlier successful run is not evidence for these changes. No real account
-has been used. An authorized manual test against trusted ejabberd is still needed.
+Verified on 2026-11-06 at revision
+`972473ebf0a2a222abce11dc063577467ac1934d` in
+[unsigned native run 42296708099](https://github.com/edwtie/Teletyptel-messenger/actions/runs/42296708099):
+
+- Five Node source/project checks passed locally and on macOS.
+- All 32 Swift tests passed, including nine native login lifecycle tests.
+- Unsigned iOS device Release compilation passed with Xcode 26.3. The Release
+  binary check found neither the fixture launch marker nor the fixture password.
+- All five UI tests passed on iPhone 16 Pro and all five passed on iPad Pro
+  11-inch (M4), including login/disconnect with rotation, fail-closed 2FA and
+  visible connection loss without automatic re-login. No failures were recorded.
+- Report records `unsigned: true`, `uploaded: false` and
+  `releaseFixtureExcluded: true`. No TestFlight or server changes were made.
+
+Evidence is stored locally under
+`artifacts/ios-native-evidence-42296708099/ios-native-check-1794000412641/reports/`.
+These login UI tests use injected fixtures; **no real account or ejabberd login
+has been tested**. An authorized manual interoperability test against a trusted
+server remains necessary, as do real-device accessibility checks and the
+remaining migration stages.
 
 References: [RFC 7395](https://www.rfc-editor.org/rfc/rfc7395),
 [RFC 6120](https://www.rfc-editor.org/rfc/rfc6120),
