@@ -71,3 +71,23 @@ test("Native authenticated connection is isolated, gated and does not persist cr
     assert.ok(project.includes('Core/' + file), file);
   assert.ok(fs.existsSync(path.join(native, 'Tests/TeleTypTelCoreTests/XMPPSessionTests.swift')));
 });
+
+test("Native login UI has cancellation, private input and Debug-only offline fixtures", () => {
+  const app = read("App/TeleTypTelNativeApp.swift");
+  const model = read("Sources/TeleTypTelCore/NativeLoginModel.swift");
+  for (const required of ['SecureField("Wachtwoord"', 'loginModel.login(', 'password = ""',
+    'loginModel.disconnect()', 'loginModel.suspend()', 'fixture-banner', 'geen echte serververbinding'])
+    assert.ok(app.includes(required), required);
+  assert.match(app, /#if DEBUG\s+if let scenario = ProcessInfo/);
+  assert.match(app, /#if DEBUG\s+private struct NativeLoginUIFixture/);
+  for (const required of ['self.generation == attempt', 'self.phase == .connecting', 'task?.cancel()',
+    'account.jid == jid', 'account.configuration == configuration', 'parts[0] == jid', 'Task.isCancelled'])
+    assert.ok(model.includes(required), required);
+  assert.doesNotMatch(model, /UserDefaults|print\(|NSLog|SecTrust/);
+  assert.ok(projectText().project.includes('Core/NativeLoginModel.swift'));
+  assert.match(projectText().project, /name = Debug; buildSettings = \{[^}]*SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG"/);
+  assert.match(projectText().project, /name = Release; buildSettings = \{[^}]*SWIFT_ACTIVE_COMPILATION_CONDITIONS = ""/);
+  const check = fs.readFileSync(path.join(root, 'scripts/check-ios-native.js'), 'utf8');
+  assert.match(check, /releaseFixtureExcluded = true/);
+  assert.match(check, /executable\.includes\(Buffer\.from\(marker\)\)/);
+});

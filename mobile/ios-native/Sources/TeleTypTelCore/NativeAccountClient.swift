@@ -53,7 +53,11 @@ public struct NativeAuthenticatedAccount: CustomStringConvertible, CustomDebugSt
     }
 }
 
-public struct NativeAccountClient {
+public protocol NativeAccountAuthenticating {
+    func login(configuration: ServerConfiguration, jid: String, password: String) async throws -> NativeAuthenticatedAccount
+}
+
+public struct NativeAccountClient: NativeAccountAuthenticating {
     public init() {}
 
     public func login(configuration: ServerConfiguration, jid: String, password: String) async throws -> NativeAuthenticatedAccount {

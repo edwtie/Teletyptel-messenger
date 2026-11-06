@@ -1,6 +1,10 @@
 import Foundation
 
-public struct NativeXMPPConnection {
+public protocol NativeXMPPConnecting {
+    func run(account: NativeAuthenticatedAccount, onConnected: @escaping @Sendable (String) -> Void) async throws
+}
+
+public struct NativeXMPPConnection: NativeXMPPConnecting {
     public init() {}
 
     public func run(account: NativeAuthenticatedAccount, onConnected: @escaping @Sendable (String) -> Void) async throws {

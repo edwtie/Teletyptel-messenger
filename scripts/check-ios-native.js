@@ -9,7 +9,7 @@ function run() {
   const directory = prepare("ios-native-check-" + Date.now());
   const reports = path.join(directory, "reports");
   fs.mkdirSync(reports);
-  const report = { unsigned: true, uploaded: false, swiftUnitTests: false, deviceCompiled: false, uiTests: [] };
+  const report = { unsigned: true, uploaded: false, swiftUnitTests: false, deviceCompiled: false, releaseFixtureExcluded: false, uiTests: [] };
   const execute = (command, args, timeout = 600000) => execFileSync(command, args, {
     cwd: root, timeout, maxBuffer: 40 * 1024 * 1024, encoding: "utf8", stdio: "pipe"
   });
@@ -22,6 +22,11 @@ function run() {
     fs.writeFileSync(path.join(reports, "device-build.txt"), execute("xcodebuild", [...common,
       "-destination", "generic/platform=iOS", "-configuration", "Release", "build"]));
     report.deviceCompiled = true;
+    const executable = fs.readFileSync(path.join(directory, "DerivedData/Build/Products/Release-iphoneos/TeleTypTelNative.app/TeleTypTelNative"));
+    for (const marker of ["TELETYPTEL_NATIVE_UI_FIXTURE", "fixture-password"]) {
+      if (executable.includes(Buffer.from(marker))) throw new Error("Test-only login fixture found in Release executable");
+    }
+    report.releaseFixtureExcluded = true;
     const inventory = JSON.parse(execute("xcrun", ["simctl", "list", "devices", "available", "--json"]));
     const devices = Object.entries(inventory.devices).filter(([runtime]) => runtime.includes("iOS"))
       .flatMap(([, values]) => values).filter(device => device.isAvailable);

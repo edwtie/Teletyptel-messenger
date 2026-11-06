@@ -52,10 +52,32 @@ final class NativeStartupModel: ObservableObject {
 }
 
 struct NativeStartupView: View {
-    @StateObject private var model = NativeStartupModel()
+    @StateObject private var model: NativeStartupModel
+    @StateObject private var loginModel: NativeLoginModel
     @Environment(\.scenePhase) private var scenePhase
     @State private var address = ""
     @State private var domain = ""
+    @State private var jid = ""
+    @State private var password = ""
+    private let fixtureName: String?
+
+    init() {
+        #if DEBUG
+        if let scenario = ProcessInfo.processInfo.environment["TELETYPTEL_NATIVE_UI_FIXTURE"],
+           ["connected", "two-factor", "disconnect"].contains(scenario) {
+            let fixture = NativeLoginUIFixture(scenario: scenario)
+            _model = StateObject(wrappedValue: NativeStartupModel(checker: fixture))
+            _loginModel = StateObject(wrappedValue: NativeLoginModel(checker: fixture, authenticator: fixture, connection: fixture))
+            _address = State(initialValue: "https://example.invalid")
+            _domain = State(initialValue: "localhost")
+            fixtureName = scenario
+            return
+        }
+        #endif
+        _model = StateObject(wrappedValue: NativeStartupModel())
+        _loginModel = StateObject(wrappedValue: NativeLoginModel())
+        fixtureName = nil
+    }
 
     var body: some View {
         NavigationStack {
@@ -70,8 +92,13 @@ struct NativeStartupView: View {
                     Text("Native iPhone- en iPad-app")
                         .font(.title2.bold())
                         .accessibilityAddTraits(.isHeader)
-                    Text("Ontwikkelversie: de servercontrole werkt los van de bestaande app. Aanmelden, chat en bellen worden stapsgewijs aangesloten.")
+                    Text("Ontwikkelversie: aanmelden met een XMPP-account en de verbinding controleren. Contacten, chat en bellen zijn hier nog niet beschikbaar.")
                         .foregroundStyle(.secondary)
+                    if fixtureName != nil {
+                        Text("TESTSCENARIO — geen echte serververbinding")
+                            .font(.headline)
+                            .accessibilityIdentifier("fixture-banner")
+                    }
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Serveradres (HTTPS)")
                         TextField("https://chat.teletyptel.nl", text: $address)
@@ -82,6 +109,7 @@ struct NativeStartupView: View {
                             .textFieldStyle(.roundedBorder)
                             .accessibilityLabel("Serveradres, HTTPS")
                             .accessibilityIdentifier("server-address")
+                            .disabled(loginModel.isWorking || loginModel.isConnected)
                     }
                     VStack(alignment: .leading, spacing: 8) {
                         Text("XMPP-domein")
@@ -91,20 +119,32 @@ struct NativeStartupView: View {
                             .textFieldStyle(.roundedBorder)
                             .accessibilityLabel("XMPP-domein")
                             .accessibilityIdentifier("xmpp-domain")
+                            .disabled(loginModel.isWorking || loginModel.isConnected)
                     }
                     VStack(alignment: .leading, spacing: 12) {
-                        if model.state.phase == .checking {
-                            ProgressView("Chatserver controleren…")
+                        if model.state.phase == .checking || loginModel.isWorking {
+                            ProgressView("Verbinding voorbereiden…")
                                 .tint(.blue)
                         }
                         Text(statusText)
                             .fixedSize(horizontal: false, vertical: true)
                             .accessibilityIdentifier("startup-status")
-                        if model.state.phase == .checking {
+                        if loginModel.isWorking || loginModel.isConnected {
+                            Button(loginModel.isConnected ? "Verbinding verbreken" : "Aanmelding annuleren") {
+                                password = ""
+                                loginModel.disconnect()
+                            }
+                            .buttonStyle(.bordered)
+                            .frame(minHeight: 44)
+                            .accessibilityIdentifier("disconnect-session")
+                        } else if model.state.phase == .checking {
                             Button("Annuleren", action: model.cancel)
                                 .frame(minHeight: 44)
                         } else {
-                            Button("Verbinding controleren") { model.check(address: address, domain: domain) }
+                            Button("Verbinding controleren") {
+                                loginModel.reset()
+                                model.check(address: address, domain: domain)
+                            }
                                 .buttonStyle(.borderedProminent)
                                 .controlSize(.large)
                                 .accessibilityIdentifier("check-connection")
@@ -114,7 +154,41 @@ struct NativeStartupView: View {
                     .padding()
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
-                    Text("Deze controle meldt niemand aan, verstuurt geen berichten en start geen oproep. Er worden geen wachtwoorden gevraagd of opgeslagen.")
+                    if model.state.phase == .available {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Aanmelden")
+                                .font(.headline)
+                                .accessibilityAddTraits(.isHeader)
+                            Text("XMPP-account (naam@domein)")
+                            TextField("naam@localhost", text: $jid)
+                                .textContentType(.username)
+                                .keyboardType(.emailAddress)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                                .textFieldStyle(.roundedBorder)
+                                .accessibilityLabel("XMPP-account")
+                                .accessibilityIdentifier("login-jid")
+                                .disabled(loginModel.isWorking || loginModel.isConnected)
+                            Text("Wachtwoord")
+                            SecureField("Wachtwoord", text: $password)
+                                .textContentType(.password)
+                                .textFieldStyle(.roundedBorder)
+                                .accessibilityLabel("Wachtwoord")
+                                .accessibilityIdentifier("login-password")
+                                .disabled(loginModel.isWorking || loginModel.isConnected)
+                            Button("Aanmelden") {
+                                let submittedPassword = password
+                                password = ""
+                                loginModel.login(address: address, domain: domain,
+                                                 jid: jid.trimmingCharacters(in: .whitespacesAndNewlines), password: submittedPassword)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .controlSize(.large)
+                            .accessibilityIdentifier("login-account")
+                            .disabled(loginModel.isWorking || loginModel.isConnected || jid.isEmpty || password.isEmpty)
+                        }
+                    }
+                    Text("Alleen ‘Aanmelden’ verstuurt je inloggegevens naar het ingevulde HTTPS-adres. Je wachtwoord wordt niet bewaard. Bij verbinden wordt je XMPP-aanwezigheid gedeeld; er worden geen berichten of oproepen verstuurd. Google/Facebook en tweestapsverificatie zijn in deze preview nog niet aangesloten.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -126,26 +200,68 @@ struct NativeStartupView: View {
             .navigationBarTitleDisplayMode(.inline)
             .scrollDismissesKeyboard(.interactively)
         }
-        .onChange(of: address) { _ in model.reset() }
-        .onChange(of: domain) { _ in model.reset() }
+        .onChange(of: address) { _ in resetConfiguration() }
+        .onChange(of: domain) { _ in resetConfiguration() }
+        .onChange(of: jid) { _ in loginModel.reset() }
         .onChange(of: scenePhase) { phase in
-            if phase == .background { model.cancel() }
+            if phase == .background {
+                password = ""
+                model.cancel()
+                loginModel.suspend()
+            }
         }
-        .onDisappear { model.cancel() }
+        .onDisappear {
+            password = ""
+            model.cancel()
+            loginModel.suspend()
+        }
+    }
+
+    private func resetConfiguration() {
+        password = ""
+        model.reset()
+        loginModel.reset()
     }
 
     private var statusText: String {
+        switch loginModel.phase {
+        case .idle: break
+        case .checking: return "Chatserver opnieuw controleren voordat je inloggegevens worden verstuurd…"
+        case .authenticating: return "Account controleren… Je bent nog niet verbonden met XMPP."
+        case .connecting: return "Account goedgekeurd. Beveiligde XMPP-aanmelding voltooien…"
+        case .connected(let account): return "XMPP verbonden als \(account). Contacten, chat en bellen volgen in een volgende stap."
+        case .signedOut: return "De XMPP-verbinding is verbroken. Je kunt opnieuw aanmelden."
+        case .suspended: return "De previewverbinding is gestopt op de achtergrond. Meld opnieuw aan; achtergrondoproepen zijn hier nog niet aangesloten."
+        case .failed(let failure):
+            switch failure {
+            case .account(.invalidCredentials): return "Aanmelden mislukt. Controleer je XMPP-account en wachtwoord."
+            case .account(.twoFactorRequired): return "Tweestapsverificatie vereist. Deze native preview ondersteunt de verificatiestap nog niet. Gebruik voorlopig de bestaande app; schakel tweestapsverificatie niet uit."
+            case .account(.rejected): return "De server heeft de aanmelding geweigerd. Controleer je accounttoegang."
+            case .account(.invalidResponse): return "De accountserver geeft geen geldige aanmeldreactie. Er is geen XMPP-verbinding gestart."
+            case .connection(let error): return connectionError(error)
+            case .xmpp(.unsupportedAuthentication): return "Deze XMPP-server biedt geen ondersteunde aanmeldmethode voor deze preview."
+            case .xmpp(.authenticationRejected): return "De XMPP-server heeft je aanmelding geweigerd."
+            case .xmpp(.bindingRejected): return "De XMPP-server kon deze accountsessie niet bevestigen."
+            case .xmpp(.streamClosed): return "De XMPP-server heeft de verbinding gesloten. Meld opnieuw aan."
+            case .xmpp(.heartbeatTimeout): return "De XMPP-server reageert niet meer. De verbinding is gestopt; meld opnieuw aan."
+            }
+        }
         switch model.state.phase {
         case .idle:
             return "Vul het bekende serveradres en XMPP-domein in. De controle start alleen wanneer je op de knop drukt."
         case .checking:
             return "Beveiligde XMPP-verbinding controleren. Dit duurt maximaal acht seconden."
         case .available:
-            return "De XMPP-server is bereikbaar en biedt aanmelden aan. Je bent nog niet ingelogd; de native aanmeldfunctie volgt in de volgende stap."
+            return "De XMPP-server is bereikbaar. Je bent nog niet ingelogd. Vul je XMPP-account in om aan te melden."
         case .cancelled:
             return "De controle is gestopt. Je kunt deze opnieuw starten."
         case .failed(let failure):
-            switch failure {
+            return connectionError(failure)
+        }
+    }
+
+    private func connectionError(_ failure: ConnectionFailure) -> String {
+        switch failure {
             case .configuration:
                 return "Gebruik een HTTPS-serveradres zonder pad, gebruikersnaam of parameters en een geldig XMPP-domein."
             case .certificate:
@@ -158,7 +274,40 @@ struct NativeStartupView: View {
                 return "De server geeft geen geldige XMPP-aanmeldreactie. Laat de serverconfiguratie controleren."
             case .redirectRejected:
                 return "De server verwijst naar een ander adres. Deze omleiding is geblokkeerd; controleer het serveradres."
-            }
         }
     }
 }
+
+#if DEBUG
+private struct NativeLoginUIFixture: ServerChecking, NativeAccountAuthenticating, NativeXMPPConnecting {
+    let scenario: String
+
+    func check(_ configuration: ServerConfiguration) async throws -> ProbeReport {
+        guard configuration.origin.host == "example.invalid", configuration.domain == "localhost" else {
+            throw ConnectionFailure.configuration
+        }
+        try await Task.sleep(nanoseconds: 150_000_000)
+        return ProbeReport(mechanisms: ["PLAIN"])
+    }
+
+    func login(configuration: ServerConfiguration, jid: String, password: String) async throws -> NativeAuthenticatedAccount {
+        try await Task.sleep(nanoseconds: 150_000_000)
+        guard jid == "fixture@localhost", password == "fixture-password" else {
+            throw NativeAccountFailure.invalidCredentials
+        }
+        if scenario == "two-factor" { throw NativeAccountFailure.twoFactorRequired }
+        return NativeAuthenticatedAccount(configuration: configuration, jid: jid, password: password)
+    }
+
+    func run(account: NativeAuthenticatedAccount, onConnected: @escaping @Sendable (String) -> Void) async throws {
+        try await Task.sleep(nanoseconds: 150_000_000)
+        onConnected(account.jid + "/ui-fixture")
+        if scenario == "disconnect" {
+            try await Task.sleep(nanoseconds: 3_000_000_000)
+            throw XMPPSessionFailure.heartbeatTimeout
+        }
+        while !Task.isCancelled { try await Task.sleep(nanoseconds: 60_000_000_000) }
+        throw CancellationError()
+    }
+}
+#endif

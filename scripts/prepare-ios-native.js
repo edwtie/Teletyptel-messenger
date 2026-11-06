@@ -5,7 +5,7 @@ const crypto = require("node:crypto");
 const root = path.resolve(__dirname, "..");
 const source = path.join(root, "mobile/ios-native");
 const coreFiles = ["Startup.swift", "XMPPProbeStream.swift", "XMPPAvailabilityClient.swift",
-  "NativeAccountClient.swift", "XMPPSessionStream.swift", "NativeXMPPConnection.swift"];
+  "NativeAccountClient.swift", "XMPPSessionStream.swift", "NativeXMPPConnection.swift", "NativeLoginModel.swift"];
 
 function projectText() {
   const objects = new Map();
@@ -40,7 +40,7 @@ function projectText() {
   const testPhases = [phase("test-sources", "PBXSourcesBuildPhase", [testBuild]), phase("test-frameworks", "PBXFrameworksBuildPhase", []), phase("test-resources", "PBXResourcesBuildPhase", [])];
   const configurations = (name, settings) => {
     const configs = ["Debug", "Release"].map(mode => object(name + mode,
-      `{isa = XCBuildConfiguration; name = ${mode}; buildSettings = {${settings} SWIFT_OPTIMIZATION_LEVEL = ${quote(mode === "Debug" ? "-Onone" : "-O")};};}`));
+      `{isa = XCBuildConfiguration; name = ${mode}; buildSettings = {${settings} SWIFT_OPTIMIZATION_LEVEL = ${quote(mode === "Debug" ? "-Onone" : "-O")}; SWIFT_ACTIVE_COMPILATION_CONDITIONS = ${quote(mode === "Debug" ? "DEBUG" : "")};};}`));
     return object(name + "-configs", `{isa = XCConfigurationList; buildConfigurations = ${list(configs)}; defaultConfigurationIsVisible = 0; defaultConfigurationName = Release;}`);
   };
   const common = 'IPHONEOS_DEPLOYMENT_TARGET = 16.0; SDKROOT = iphoneos; SWIFT_VERSION = 5.0; CLANG_ENABLE_MODULES = YES; TARGETED_DEVICE_FAMILY = "1,2"; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; CODE_SIGNING_ALLOWED = NO;';

@@ -24,14 +24,15 @@ claim that those features already work in this target.
   endpoints are embedded. No server is contacted automatically.
 
 The probe closes its connection after checking. **Reachable is not authenticated
-or continuously connected.** The startup UI still runs only this probe; it does
-not yet invoke the authenticated connection foundation described below.
+or continuously connected.** After a successful probe, the native UI now offers
+an explicit account/password login using the connection foundation below. It
+never logs in automatically or treats a successful probe as a logged-in session.
 The configured domain is the XMPP virtual host, not necessarily the HTTPS host.
 For local testing it may still be `localhost`. The placeholder public hostname is
 not evidence of a deployed service. This initial UI is Dutch; other languages are
 part of migration parity, not implemented here.
 
-## Next stage: authenticated XMPP foundation (not connected to UI yet)
+## Authenticated XMPP foundation
 
 Added and published after the first-stage validation:
 
@@ -59,15 +60,15 @@ Added and published after the first-stage validation:
 - Account HTTP requests deliberately retain no cookies. This is not persistent
   backend session support and does not enable authenticated profile/history APIs.
   Backend login can create its usual expiring server session; this target does not
-  retain that session cookie. Persistent sessions and explicit server logout must
-  be implemented together with native login UI, without bypassing 2FA.
+  retain that session cookie. Persistent backend sessions and explicit server
+  logout remain pending, without bypassing 2FA. The preview button deliberately
+  says "Verbinding verbreken": it closes native XMPP, not other backend sessions.
 
 The connection currently supplies readiness/loss detection only, not a chat API.
 Roster, message handling, receipts, MUC, XEP-0198 resume, automatic reconnection,
-background operation and native login UI are **not delivered by this stage**.
-No existing TestFlight screen or server has been changed. Any future UI adapter
-must cancel the old task and reject old-generation callbacks on logout/account
-switching before it starts a new connection.
+background operation are **not delivered by this stage**. No existing TestFlight
+screen or server has been changed. The native UI adapter added next cancels old
+tasks and rejects old-generation callbacks before starting a new connection.
 
 New Swift fixtures cover authentication order/encoding, failed authentication,
 binding identity/correlation, ping correlation/spoofed responses, XML bounds,
@@ -87,8 +88,39 @@ not live ejabberd evidence. This stage was validated on 2026-11-06 at revision
 
 Local evidence:
 `artifacts/ios-native-evidence-42291914885/ios-native-check-1793998355272/reports/`.
-Real-server login/TLS/heartbeat interoperability, native login UI and 2FA
-completion remain unverified or unimplemented as described above.
+Real-server login/TLS/heartbeat interoperability and 2FA completion remain
+unverified or unimplemented as described above. This run predates the UI adapter.
+
+## Native login UI adapter (local, pending new macOS validation)
+
+- After checking the entered HTTPS origin/domain, the form offers an explicitly
+  labelled XMPP account field and a native `SecureField`. No autofocus, credential
+  persistence, automatic login or production server defaults are introduced.
+- Pressing login clears the password field, rechecks server availability, invokes
+  the account API and only then starts XMPP. The existing single status panel
+  distinguishes checking, account verification, XMPP negotiation and connected.
+- The API account must match the requested JID and configuration; the connected
+  callback must match that same account. Cancellation, account/server edits and
+  connection loss invalidate the generation so stale callbacks cannot restore
+  an online status or start the next step of an obsolete login.
+- The connection can be explicitly cancelled or disconnected. Backgrounding the
+  preview clears the password and stops the connection, with a clear explanation
+  and manual re-login on return. This is **not** background-call support.
+- A 2FA challenge remains fail-closed and explains how to use the existing app;
+  it never suggests disabling 2FA. Contacts/chat/calls remain explicitly pending.
+- Nine new model tests use injected probe/account/connection actors. Three new
+  UI scenarios cover simulated login/disconnect across rotation, a 2FA challenge
+  and connection loss, in addition to the two original startup UI tests.
+- UI simulations require an explicit Debug-only launch environment and show
+  `TESTSCENARIO — geen echte serververbinding`. They use only `.invalid` and
+  fictitious credentials, never a network service. Release compilation excludes
+  the fixture implementation; the check script also rejects its environment
+  marker or fixture password in the Release executable.
+
+Five local Node source/project checks passed. Swift/model tests, the changed UI
+and the Release fixture-exclusion assertion require a **new** macOS/Xcode run;
+the earlier successful run is not evidence for these changes. No real account
+has been used. An authorized manual test against trusted ejabberd is still needed.
 
 References: [RFC 7395](https://www.rfc-editor.org/rfc/rfc7395),
 [RFC 6120](https://www.rfc-editor.org/rfc/rfc6120),
@@ -117,8 +149,8 @@ node scripts/check-ios-native.js
 ```
 
 This runs Swift unit tests, unsigned iOS device compilation and simulator UI tests
-for both device families. UI tests use invalid configuration only, never real
-accounts or a server. Test results are written under the generated `reports`
+for both device families. UI tests use invalid configuration and Debug-only
+injected fixtures, never real accounts or a server. Test results are written under the generated `reports`
 directory; missing device families fail instead of being silently skipped.
 The separate `ios-native-preview.yml` workflow runs on scoped native changes on
 the development branch, or by manual dispatch. It has no secrets, signing,
