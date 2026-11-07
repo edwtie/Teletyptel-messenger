@@ -11,6 +11,7 @@ struct NativePreparedPeer {
 
 @MainActor
 protocol NativePeerNegotiating: AnyObject {
+    var remoteEnded: Bool { get }
     func prepare(handle: NativeCallHandle, media: NativeCallMedia,
                  changed: @escaping () -> Void) throws -> NativePreparedPeer
     func accept(handle: NativeCallHandle, peer: RTCPeerConnection,

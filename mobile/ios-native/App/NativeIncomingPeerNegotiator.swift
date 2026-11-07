@@ -4,13 +4,14 @@ import WebRTC
 @MainActor
 private final class NativeDeferredIncomingMedia: NativeMediaNegotiating {
     var engine: NativeMediaPeer?
+    var onClose: (() -> Void)?
     func createOffer() async throws -> NativeJingleMedia { throw NativeMediaPeerFailure.state }
     func applyAnswer(_ xml: String) async throws { throw NativeMediaPeerFailure.state }
     func acceptOffer(_ xml: String) async throws -> NativeJingleMedia {
         guard let engine = engine else { throw NativeMediaPeerFailure.state }
         return try await engine.acceptOffer(xml)
     }
-    func close() { engine?.close(); engine = nil }
+    func close() { engine?.close(); engine = nil; onClose?() }
 }
 
 @MainActor
@@ -27,6 +28,9 @@ final class NativeIncomingPeerNegotiator: NativePeerNegotiating {
     private var session: NativeJingleSession?
     private var task: Task<Void, Never>?
     private var used = false
+    private var captureActive = false
+    private var changed: (() -> Void)?
+    private(set) var remoteEnded = false
     private let deferred = NativeDeferredIncomingMedia()
 
     init(request: NativeJingleRequest, profile: NativeCallMedia, signalling: any NativeJingleSending,
@@ -44,6 +48,7 @@ final class NativeIncomingPeerNegotiator: NativePeerNegotiating {
         let session = try NativeJingleSession(role: .responder, binding: request.binding, peer: request.peer,
             sid: request.sid, profile: profile, signalling: signalling, media: deferred)
         self.session = session
+        deferred.onClose = { [weak self] in self?.finishCapture() }
         await session.receive(request)
         guard session.phase == .ringing, !Task.isCancelled else {
             await session.stop()
@@ -56,6 +61,8 @@ final class NativeIncomingPeerNegotiator: NativePeerNegotiating {
               handle.sid == request.sid, media == profile else { throw NativeMediaPeerFailure.state }
         used = true
         self.handle = handle
+        self.changed = changed
+        captureActive = true
         do {
             let (microphone, camera) = try tracks()
             let engine = try NativeMediaPeer(factory: factory, microphone: microphone, camera: camera,
@@ -93,17 +100,35 @@ final class NativeIncomingPeerNegotiator: NativePeerNegotiating {
 
     func close(handle: NativeCallHandle) {
         guard self.handle == handle else { return }
-        cancel()
+        cancel(notifyPeer: true)
     }
 
-    func cancel() {
+    func receive(_ request: NativeJingleRequest) async {
+        guard let session = session else {
+            try? await signalling.replyJingle(request, rejection: .unexpectedRequest)
+            return
+        }
+        await session.receive(request)
+        guard self.session === session, session.phase == .ended else { return }
+        remoteEnded = request.action == "session-terminate"
+        finishCapture()
+        changed?()
+    }
+
+    private func finishCapture() {
+        guard captureActive else { return }
+        captureActive = false
+        stopCapture()
+    }
+
+    func cancel(notifyPeer: Bool = false) {
         guard session != nil else { return }
         used = true
-        let hadPreparation = handle != nil
         self.handle = nil
+        changed = nil
         task?.cancel()
         task = nil
-        if hadPreparation { stopCapture() }
+        finishCapture()
         engine?.close()
         engine = nil
         deferred.close()
@@ -111,7 +136,7 @@ final class NativeIncomingPeerNegotiator: NativePeerNegotiating {
         session = nil
         let signalling = signalling, binding = request.binding
         Task {
-            if let previous = previous { await previous.stop() }
+            if let previous = previous { await previous.stop(notifyPeer: notifyPeer) }
             else { await signalling.unbindCall(binding) }
         }
     }

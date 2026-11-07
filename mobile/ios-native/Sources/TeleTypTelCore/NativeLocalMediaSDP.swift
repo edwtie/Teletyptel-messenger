@@ -12,9 +12,12 @@ enum NativeLocalMediaSDP {
         guard !mids.isEmpty, Set(mids).count == mids.count,
               groups.isEmpty || groups == ["a=group:BUNDLE " + mids.joined(separator: " ")],
               !lines.contains("a=bundle-only") else { throw NativeJingleMediaFailure.unsupported }
+        var audio = false
         let narrowed = lines.filter { line in
+            if line.hasPrefix("m=") { audio = line.hasPrefix("m=audio ") }
             if line.hasPrefix("a=group:") || line.hasPrefix("a=extmap:") || line == "a=extmap-allow-mixed" { return false }
-            if line.hasPrefix("a=rtcp-fb:") && line.hasSuffix(" transport-cc") { return false }
+            if line.hasPrefix("a=rtcp-xr:") { return false }
+            if line.hasPrefix("a=rtcp-fb:") && (audio || line.hasSuffix(" transport-cc")) { return false }
             return true
         }
         return (narrowed + [""]).joined(separator: "\r\n")

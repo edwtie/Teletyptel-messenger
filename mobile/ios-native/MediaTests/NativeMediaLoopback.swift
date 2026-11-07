@@ -132,9 +132,9 @@ enum NativeMediaLoopback {
         firstWire.received = { [weak firstSession] request in await firstSession?.receive(request) }
         secondWire.received = { [weak secondSession] request in await secondSession?.receive(request) }
         try await firstSession.start()
-        precondition(firstSession.phase == .waiting && secondSession.phase == .ringing)
+        try await wait("offer acknowledged and responder ringing") { firstSession.phase == .waiting && secondSession.phase == .ringing }
         try await secondSession.accept()
-        precondition(firstSession.phase == .negotiated && secondSession.phase == .negotiated)
+        try await wait("both descriptions negotiated") { firstSession.phase == .negotiated && secondSession.phase == .negotiated }
         try await wait("both peer transports connected") {
             first.engine.prepared.peer.connectionState == .connected && second.engine.prepared.peer.connectionState == .connected
         }
@@ -174,7 +174,8 @@ enum NativeMediaLoopback {
         RTCInitializeSSL()
         let factory = RTCPeerConnectionFactory(encoderFactory: RTCDefaultVideoEncoderFactory(), decoderFactory: RTCDefaultVideoDecoderFactory())
         for mode in NativeCallMedia.allCases { try await profile(mode, factory: factory) }
-        try await incomingProvider(factory: factory)
+        try await incomingProvider(factory: factory, remoteHangup: false)
+        try await incomingProvider(factory: factory, remoteHangup: true)
         let cancelled = try FixturePeer(factory: factory, profile: .total)
         let task = Task { try await cancelled.engine.createOffer() }
         task.cancel()
@@ -184,7 +185,7 @@ enum NativeMediaLoopback {
         print("Native audio/video/RTT negotiation loopback passed")
     }
 
-    private static func incomingProvider(factory: RTCPeerConnectionFactory) async throws {
+    private static func incomingProvider(factory: RTCPeerConnectionFactory, remoteHangup: Bool) async throws {
         let caller = try FixturePeer(factory: factory, profile: .audioRtt)
         let firstWire = MediaTestWire(owner: "caller@localhost/phone"), secondWire = MediaTestWire(owner: "callee@localhost/tablet")
         firstWire.remote = secondWire; secondWire.remote = firstWire
@@ -196,6 +197,7 @@ enum NativeMediaLoopback {
         var provider: NativeIncomingPeerNegotiator?
         var created = 0, stopped = 0
         secondWire.received = { request in
+            if let existing = provider { await existing.receive(request); return }
             do {
                 provider = try await NativeIncomingPeerNegotiator(request: request, profile: .audioRtt,
                     signalling: secondWire, factory: factory, tracks: {
@@ -230,8 +232,13 @@ enum NativeMediaLoopback {
         try await wait("provider receives conversational text") { rtt.remoteText == "Native provider test" }
         provider!.close(handle: NativeCallHandle(id: UUID(), sid: handle.sid, generation: handle.generation))
         precondition(stopped == 0)
+        if remoteHangup {
+            await session.stop(notifyPeer: true)
+            try await wait("provider handles remote hangup") { provider!.remoteEnded && stopped == 1 }
+        }
         provider!.close(handle: handle)
         precondition(stopped == 1 && prepared.peer.connectionState == .closed)
+        try await wait("provider local hangup terminates caller") { session.phase == .ended }
         provider!.cancel()
         precondition(stopped == 1)
         print("Native incoming peer provider passed")

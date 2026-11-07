@@ -111,6 +111,7 @@ final class NativeWebRTCCallMedia: NativeCallMediaDriver {
 
     private func refresh() {
         guard let prepared = prepared, let profile = profile else { return }
+        if negotiation.remoteEnded { event?(.ended); return }
         if prepared.peer.connectionState == .disconnected {
             if connected && reconnectDeadline == nil, let currentHandle = handle {
                 reconnectDeadline = Task { [weak self] in

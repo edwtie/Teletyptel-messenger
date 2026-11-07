@@ -21,6 +21,16 @@ final class NativeLocalMediaSDPTests: XCTestCase {
         XCTAssertThrowsError(try NativeLocalMediaSDP.restrict("v=0\na=mid:0\na=bundle-only\n"))
     }
 
+    func testLocalExtendedReportsAndAudioFeedbackAreNotOffered() throws {
+        let text = "v=0\nm=audio 9 UDP/TLS/RTP/SAVPF 0\na=mid:0\na=rtcp-xr:rcvr-rtt=all\na=rtcp-fb:0 nack\na=rtcp-mux\nm=video 9 UDP/TLS/RTP/SAVPF 96\na=mid:1\na=rtcp-fb:96 nack pli\na=rtcp-xr:rcvr-rtt=all\n"
+        let result = try NativeLocalMediaSDP.restrict(text)
+        XCTAssertFalse(result.contains("rtcp-xr"))
+        XCTAssertFalse(result.contains("rtcp-fb:0"))
+        XCTAssertTrue(result.contains("a=rtcp-mux"))
+        XCTAssertTrue(result.contains("a=rtcp-fb:96 nack pli"))
+        XCTAssertEqual(try NativeLocalMediaSDP.restrict(result), result)
+    }
+
     func testBoundsDuplicateMidsAndControlsAreRefused() {
         for text in ["", "a=mid:0\na=mid:0", "a=mid:0\u{0}", "a=mid:0\n" + String(repeating: "x", count: 65536)] {
             XCTAssertThrowsError(try NativeLocalMediaSDP.restrict(text))
