@@ -11,7 +11,7 @@ final class NativeStartupUITests: XCTestCase {
     }
 
     override func tearDownWithError() throws {
-        if let run = testRun, !run.hasSucceeded {
+        if let run = testRun, run.failureCount > 0 {
             print("NATIVE_UI_FAILURE_HIERARCHY\n" + application.debugDescription)
         }
         application.terminate()
@@ -111,9 +111,11 @@ final class NativeStartupUITests: XCTestCase {
     private func reveal(_ element: XCUIElement, upward: Bool = true) {
         for _ in 0..<8 {
             if element.isHittable { return }
-            if upward { application.swipeUp() } else { application.swipeDown() }
+            let scrollUp = element.exists && !element.frame.isEmpty
+                ? element.frame.midY > application.frame.midY : upward
+            if scrollUp { application.swipeUp() } else { application.swipeDown() }
         }
-        XCTAssertTrue(element.isHittable)
+        XCTAssertTrue(element.isHittable, "Element remains outside the usable viewport: \(element.identifier), \(element.frame)")
     }
 
     private func waitForStatus(_ text: String) {
