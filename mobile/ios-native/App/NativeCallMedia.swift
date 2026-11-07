@@ -121,8 +121,7 @@ final class NativeWebRTCCallMedia: NativeCallMediaDriver {
     private func configureAudio(_ audio: RTCAudioSession) throws {
         audio.lockForConfiguration()
         defer { audio.unlockForConfiguration() }
-        try audio.setCategory(AVAudioSession.Category.playAndRecord.rawValue,
-                              mode: AVAudioSession.Mode.voiceChat.rawValue, options: [.allowBluetooth])
+        try audio.setCategory(.playAndRecord, mode: .voiceChat, options: [.allowBluetooth])
     }
 
     private func refresh() {
