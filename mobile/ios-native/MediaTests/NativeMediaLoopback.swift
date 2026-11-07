@@ -117,6 +117,7 @@ enum NativeMediaLoopback {
     }
 
     private static func profile(_ profile: NativeCallMedia, factory: RTCPeerConnectionFactory) async throws {
+        FileHandle.standardError.write(Data("Testing native media profile: \(profile.rawValue)\n".utf8))
         let first = try FixturePeer(factory: factory, profile: profile)
         let second = try FixturePeer(factory: factory, profile: profile)
         defer { first.close(); second.close() }
@@ -173,6 +174,7 @@ enum NativeMediaLoopback {
         RTCInitializeSSL()
         let factory = RTCPeerConnectionFactory(encoderFactory: RTCDefaultVideoEncoderFactory(), decoderFactory: RTCDefaultVideoDecoderFactory())
         for mode in NativeCallMedia.allCases { try await profile(mode, factory: factory) }
+        try await incomingProvider(factory: factory)
         let cancelled = try FixturePeer(factory: factory, profile: .total)
         let task = Task { try await cancelled.engine.createOffer() }
         task.cancel()
@@ -180,5 +182,58 @@ enum NativeMediaLoopback {
         cancelled.close()
         precondition(cancelled.engine.prepared.peer.connectionState == .closed)
         print("Native audio/video/RTT negotiation loopback passed")
+    }
+
+    private static func incomingProvider(factory: RTCPeerConnectionFactory) async throws {
+        let caller = try FixturePeer(factory: factory, profile: .audioRtt)
+        let firstWire = MediaTestWire(owner: "caller@localhost/phone"), secondWire = MediaTestWire(owner: "callee@localhost/tablet")
+        firstWire.remote = secondWire; secondWire.remote = firstWire
+        let binding = try await firstWire.bindCall(peer: secondWire.owner, sid: "media-loopback")
+        _ = try await secondWire.bindCall(peer: firstWire.owner, sid: "media-loopback")
+        let session = try NativeJingleSession(role: .initiator, binding: binding, peer: secondWire.owner,
+            sid: "media-loopback", profile: .audioRtt, signalling: firstWire, media: caller.engine)
+        firstWire.received = { [weak session] request in await session?.receive(request) }
+        var provider: NativeIncomingPeerNegotiator?
+        var created = 0, stopped = 0
+        secondWire.received = { request in
+            do {
+                provider = try await NativeIncomingPeerNegotiator(request: request, profile: .audioRtt,
+                    signalling: secondWire, factory: factory, tracks: {
+                        created += 1
+                        let microphone = factory.audioTrack(withTrackId: "callee-audio")
+                        microphone.isEnabled = false
+                        return (microphone, nil)
+                    }, stopCapture: { stopped += 1 })
+            } catch { preconditionFailure("incoming provider refused valid offer") }
+        }
+        defer { provider?.cancel(); caller.close(); secondWire.received = nil }
+        try await session.start()
+        try await wait("provider acknowledged without capture") { provider != nil }
+        precondition(created == 0)
+        let handle = NativeCallHandle(id: UUID(), sid: "media-loopback", generation: UUID())
+        let prepared = try provider!.prepare(handle: handle, media: .audioRtt, changed: {})
+        precondition(created == 1)
+        let rtt = MessengerNativeRttSession(callId: handle.id, sid: handle.sid)
+        let channel = MessengerWebRTCChannel.attach(to: prepared.peer, session: rtt, changed: {})!
+        defer { rtt.close(); channel.close() }
+        var accepted = false, failed = false
+        provider!.accept(handle: handle, peer: prepared.peer) { result in
+            switch result {
+            case .success(let profile): accepted = profile == .audioRtt
+            case .failure: failed = true
+            }
+        }
+        try await wait("provider negotiation completion") { accepted || failed }
+        precondition(accepted && !failed)
+        try await wait("provider native RTT ready") { rtt.isReady && caller.rtt!.isReady }
+        precondition(caller.rtt!.setText("Native provider test"))
+        try await wait("provider receives conversational text") { rtt.remoteText == "Native provider test" }
+        provider!.close(handle: NativeCallHandle(id: UUID(), sid: handle.sid, generation: handle.generation))
+        precondition(stopped == 0)
+        provider!.close(handle: handle)
+        precondition(stopped == 1 && prepared.peer.connectionState == .closed)
+        provider!.cancel()
+        precondition(stopped == 1)
+        print("Native incoming peer provider passed")
     }
 }

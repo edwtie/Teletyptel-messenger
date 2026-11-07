@@ -5,7 +5,7 @@ import Darwin
 import Glibc
 #endif
 
-enum NativeJingleMediaFailure: Error { case unsupported }
+enum NativeJingleMediaFailure: Error { case unsupported, invalidDescription(line: UInt) }
 
 struct NativeJingleMedia: CustomStringConvertible, CustomDebugStringConvertible {
     static let jingle = "urn:xmpp:jingle:1"
@@ -268,7 +268,9 @@ struct NativeJingleMedia: CustomStringConvertible, CustomDebugStringConvertible 
     }
 
     private static func kinds(_ profile: NativeCallMedia) -> [String] { ["audio", "video", "rtt"].filter { profile.contents.contains($0) } }
-    private static func require(_ value: Bool) throws { if !value { throw NativeJingleMediaFailure.unsupported } }
+    private static func require(_ value: Bool, line: UInt = #line) throws {
+        if !value { throw NativeJingleMediaFailure.invalidDescription(line: line) }
+    }
     private static func matches(_ value: String, _ pattern: String) -> Bool { value.range(of: "\\A(?:" + pattern + ")\\z", options: .regularExpression) != nil }
     private static func token(_ value: String) -> Bool { matches(value, "[A-Za-z0-9_.+-]{1,64}") }
     private static func number(_ value: String, _ minimum: UInt64, _ maximum: UInt64) -> Bool {

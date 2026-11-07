@@ -5,6 +5,7 @@ const path = require("node:path");
 const { execFileSync } = require("node:child_process");
 const { prepare, projectText } = require("../scripts/prepare-ios-native");
 const { executeLogged, collectTestResults } = require("../scripts/check-ios-native");
+const { checkMedia } = require("../scripts/check-ios-native-media");
 
 const root = path.resolve(__dirname, "..");
 const native = path.join(root, "mobile/ios-native");
@@ -15,6 +16,22 @@ function diagnosticDirectory() {
   fs.mkdirSync(artifacts, { recursive: true });
   return fs.mkdtempSync(path.join(artifacts, "ios-native-diagnostics-test-"));
 }
+
+test("Native media runner requires runtime results for every profile and keeps failed evidence", () => {
+  const directory = diagnosticDirectory();
+  const reports = path.join(directory, "reports");
+  fs.mkdirSync(reports);
+  fs.mkdirSync(path.join(directory, "DerivedData/SourcePackages/artifacts/sdk/WebRTC.xcframework/macos-x86_64_arm64/WebRTC.framework"), { recursive: true });
+  const complete = ["audio", "video", "audio-rtt", "total"].map(profile => "Native media profile passed: " + profile + "\n").join("") +
+    "Native incoming peer provider passed\nNative audio/video/RTT negotiation loopback passed\n";
+  const result = checkMedia({ root, directory, reports, logged: name => name === "media-runtime" ? complete : "compiled" });
+  assert.equal(result.passed, true);
+  assert.equal(result.profiles.length, 4);
+  assert.throws(() => checkMedia({ root, directory, reports, logged: () => "compiled" }), /Missing native media result/);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(reports, "native-media-result.json"))).passed, false);
+  assert.throws(() => checkMedia({ root, directory, reports, logged: () => { throw new Error("compile failed"); } }), /compile failed/);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(reports, "native-media-result.json"))).passed, false);
+});
 
 test("Native runner retains successful command output", () => {
   const reports = diagnosticDirectory();
