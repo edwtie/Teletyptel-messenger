@@ -12,14 +12,21 @@ enum NativeLocalMediaSDP {
         guard !mids.isEmpty, Set(mids).count == mids.count,
               groups.isEmpty || groups == ["a=group:BUNDLE " + mids.joined(separator: " ")],
               !lines.contains("a=bundle-only") else { throw NativeJingleMediaFailure.unsupported }
-        var audio = false
         let narrowed = lines.filter { line in
-            if line.hasPrefix("m=") { audio = line.hasPrefix("m=audio ") }
             if line.hasPrefix("a=group:") || line.hasPrefix("a=extmap:") || line == "a=extmap-allow-mixed" { return false }
-            if line.hasPrefix("a=rtcp-xr:") { return false }
-            if line.hasPrefix("a=rtcp-fb:") && (audio || line.hasSuffix(" transport-cc")) { return false }
+            if line.hasPrefix("a=rtcp-fb:") && line.hasSuffix(" transport-cc") { return false }
             return true
         }
         return (narrowed + [""]).joined(separator: "\r\n")
+    }
+
+    static func jingleProjection(_ local: String) throws -> String {
+        let lines = try restrict(local).components(separatedBy: "\r\n")
+        for line in lines where line.hasPrefix("a=rtcp-xr:") {
+            guard line.range(of: "\\Aa=rtcp-xr:rcvr-rtt=(all|sender)(:[1-9][0-9]{0,8})?\\z", options: .regularExpression) != nil else {
+                throw NativeJingleMediaFailure.unsupported
+            }
+        }
+        return lines.filter { !$0.hasPrefix("a=rtcp-xr:") }.joined(separator: "\r\n")
     }
 }

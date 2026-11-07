@@ -49,14 +49,33 @@ private final class SessionMediaFixture: NativeMediaNegotiating {
     }
 }
 
+@MainActor
+private final class JingleClockFixture: NativeCallScheduling {
+    final class Deadline: NativeCallDeadline {
+        let action: () -> Void
+        var cancelled = false
+        init(_ action: @escaping () -> Void) { self.action = action }
+        func cancel() { cancelled = true }
+    }
+    var now: TimeInterval = 0
+    var timers: [Deadline] = []
+    var delays: [TimeInterval] = []
+    func schedule(after seconds: TimeInterval, perform: @escaping () -> Void) -> any NativeCallDeadline {
+        let timer = Deadline(perform)
+        timers.append(timer)
+        delays.append(seconds)
+        return timer
+    }
+}
+
 final class NativeJingleSessionTests: XCTestCase {
     private let binding = UUID()
     private let peer = "other@localhost/phone"
     @MainActor
-    private func fixture(_ role: NativeJingleSession.Role = .responder) throws -> (NativeJingleSession, SessionMediaFixture, SessionSignallingFixture) {
+    private func fixture(_ role: NativeJingleSession.Role = .responder, clock: JingleClockFixture? = nil) throws -> (NativeJingleSession, SessionMediaFixture, SessionSignallingFixture) {
         let media = SessionMediaFixture(), signalling = SessionSignallingFixture()
         return (try NativeJingleSession(role: role, binding: binding, peer: peer, sid: "call-1", profile: .audio,
-            signalling: signalling, media: media), media, signalling)
+            signalling: signalling, media: media, clock: clock), media, signalling)
     }
     private func request(_ action: String, _ xml: String, wrongPeer: Bool = false, wrongBinding: Bool = false) -> NativeJingleRequest {
         let identifier = UUID().uuidString
@@ -185,5 +204,44 @@ final class NativeJingleSessionTests: XCTestCase {
         let sent = await signalling.sent
         XCTAssertEqual(sent, [termination])
         XCTAssertEqual(media.closed, 1)
+    }
+
+    @MainActor func testUnansweredOutgoingCallExpiresAndReleases() async throws {
+        let clock = JingleClockFixture()
+        let (session, media, signalling) = try fixture(.initiator, clock: clock)
+        try await session.start()
+        XCTAssertEqual(clock.delays, [20, 45])
+        XCTAssertTrue(clock.timers[0].cancelled)
+        clock.timers.last!.action()
+        for _ in 0..<100 where session.phase != .ended { await Task.yield() }
+        XCTAssertEqual(session.phase, .ended)
+        XCTAssertEqual(media.closed, 1)
+        await session.stop()
+        for _ in 0..<100 { if await signalling.released.count == 1 { break }; await Task.yield() }
+        let released = await signalling.released
+        XCTAssertEqual(released, [binding])
+    }
+
+    @MainActor func testRingingDeadlineDoesNotCaptureAndCannotRevive() async throws {
+        let clock = JingleClockFixture()
+        let (session, media, _) = try fixture(clock: clock)
+        await session.receive(request("session-initiate", try media.description(answer: false).xml))
+        clock.timers.last!.action()
+        for _ in 0..<100 where session.phase != .ended { await Task.yield() }
+        XCTAssertEqual(session.phase, .ended)
+        XCTAssertEqual(media.accepted, 0)
+        do { try await session.accept(); XCTFail("expired invitation accepted") } catch {}
+    }
+
+    @MainActor func testOldTimersCannotEndNegotiatedCall() async throws {
+        let clock = JingleClockFixture()
+        let (session, media, _) = try fixture(clock: clock)
+        await session.receive(request("session-initiate", try media.description(answer: false).xml))
+        try await session.accept()
+        for timer in clock.timers { XCTAssertTrue(timer.cancelled); timer.action() }
+        for _ in 0..<20 { await Task.yield() }
+        XCTAssertEqual(session.phase, .negotiated)
+        XCTAssertEqual(media.closed, 0)
+        await session.stop()
     }
 }

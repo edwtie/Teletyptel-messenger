@@ -21,13 +21,17 @@ final class NativeJingleSession {
     private let signalling: any NativeJingleSending
     private let media: any NativeMediaNegotiating
     private let changed: (Phase) -> Void
+    private let clock: any NativeCallScheduling
+    private var deadline: (any NativeCallDeadline)?
+    private var deadlineID = UUID()
     private var incoming: NativeJingleMedia?
     private var offered: NativeJingleMedia?
     private var generation = UUID()
     private var released = false
 
     init(role: Role, binding: UUID, peer: String, sid: String, profile: NativeCallMedia,
-         signalling: any NativeJingleSending, media: any NativeMediaNegotiating, changed: @escaping (Phase) -> Void = { _ in }) throws {
+         signalling: any NativeJingleSending, media: any NativeMediaNegotiating,
+         clock: (any NativeCallScheduling)? = nil, changed: @escaping (Phase) -> Void = { _ in }) throws {
         guard NativeJingleTransport.fullJID(peer), NativeJingleTransport.validSID(sid) else { throw NativeJingleFailure.invalidRequest }
         self.role = role
         self.binding = binding
@@ -37,6 +41,7 @@ final class NativeJingleSession {
         self.signalling = signalling
         self.media = media
         self.changed = changed
+        self.clock = clock ?? NativeCallScheduler()
     }
 
     func start() async throws {
@@ -141,6 +146,9 @@ final class NativeJingleSession {
     }
 
     private func endMedia() {
+        deadlineID = UUID()
+        deadline?.cancel()
+        deadline = nil
         generation = UUID()
         incoming = nil
         offered = nil
@@ -160,7 +168,23 @@ final class NativeJingleSession {
         guard generation == attempt, phase != .ended else { throw NativeJingleFailure.staleBinding }
     }
 
-    private func transition(_ phase: Phase) { self.phase = phase; changed(phase) }
+    private func transition(_ phase: Phase) {
+        deadline?.cancel()
+        deadline = nil
+        let id = UUID()
+        deadlineID = id
+        self.phase = phase
+        if [.preparing, .waiting, .ringing, .accepting].contains(phase) {
+            let seconds: TimeInterval = phase == .waiting || phase == .ringing ? 45 : 20
+            deadline = clock.schedule(after: seconds) { [weak self] in
+                Task { @MainActor in
+                    guard let self = self, self.deadlineID == id, self.phase == phase else { return }
+                    await self.stop(notifyPeer: true)
+                }
+            }
+        }
+        changed(phase)
+    }
 
     private static func validTermination(_ root: ProbeElement, sid: String) -> Bool {
         guard root.name == "jingle", root.namespace == NativeJingleMedia.jingle,

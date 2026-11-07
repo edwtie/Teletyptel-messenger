@@ -253,7 +253,8 @@ struct NativeJingleMedia: CustomStringConvertible, CustomDebugStringConvertible 
                 (action == "session-initiate" ? item.setup == "actpass" : ["active", "passive"].contains(item.setup)))
             try Self.require(item.kind == "rtt" ? Self.number(item.port, 1, 65535) :
                 (item.kind == "audio" ? item.payload == "0" : Self.number(item.payload, 96, 127)))
-            try Self.require(item.kind == "video" ? Set(item.feedback).isSubset(of: Self.feedbackValues) && Set(item.feedback).count == item.feedback.count : item.feedback.isEmpty)
+            let permittedFeedback: Set<String> = item.kind == "video" ? Self.feedbackValues : (item.kind == "audio" ? ["nack"] : [])
+            try Self.require(Set(item.feedback).isSubset(of: permittedFeedback) && Set(item.feedback).count == item.feedback.count)
             try Self.require(!item.candidates.isEmpty && item.candidates.count <= 24)
             var ids = Set<String>()
             for candidate in item.candidates {

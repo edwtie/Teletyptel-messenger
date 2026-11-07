@@ -169,7 +169,7 @@ final class NativeMediaPeer: NativeMediaNegotiating {
         }
         try Task.checkCancellation()
         guard phase != .closed, let gathered = peer.localDescription else { throw NativeMediaPeerFailure.closed }
-        return RTCSessionDescription(type: gathered.type, sdp: try NativeLocalMediaSDP.restrict(gathered.sdp))
+        return RTCSessionDescription(type: gathered.type, sdp: try NativeLocalMediaSDP.jingleProjection(gathered.sdp))
     }
 
     private func set(_ description: RTCSessionDescription, local: Bool) async throws {

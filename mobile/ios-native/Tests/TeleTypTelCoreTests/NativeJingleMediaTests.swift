@@ -63,6 +63,16 @@ final class NativeJingleMediaTests: XCTestCase {
         XCTAssertThrowsError(try accepted.validateAnswer(to: offer()))
     }
 
+    func testAudioNackIsMappedButExtendedReportsAreNotAcceptedFromRemoteSDP() throws {
+        let source = fixture(.audio).replacingOccurrences(of: "a=rtcp-mux", with: "a=rtcp-fb:0 nack\r\na=rtcp-mux")
+        let media = try NativeJingleMedia.fromSDP(source, sid: "call-1", action: "session-initiate", profile: .audio)
+        XCTAssertTrue(media.xml.contains("type='nack'"))
+        XCTAssertTrue(try decode(media.xml, profile: .audio).sdp.contains("a=rtcp-fb:0 nack"))
+        for extra in ["a=rtcp-xr:rcvr-rtt=all", "a=rtcp-fb:0 nack pli"] {
+            XCTAssertThrowsError(try NativeJingleMedia.fromSDP(source + extra + "\r\n", sid: "call-1", action: "session-initiate", profile: .audio))
+        }
+    }
+
     func testWholeDescriptionCanPassBoundedAuthenticatedTransport() throws {
         let media = try NativeJingleMedia.fromSDP(fixture(count: 24), sid: "call-1", action: "session-initiate", profile: .total)
         var transport = NativeJingleTransport(owner: "local@localhost/phone")

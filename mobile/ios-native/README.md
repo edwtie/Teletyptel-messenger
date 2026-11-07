@@ -7,11 +7,60 @@ claim that those features already work in this target.
 
 ## Implemented in this first stage
 
+### Concrete native media engine and call lifecycle
+
+The isolated target now includes `NativeMediaPeer`, `NativeJingleSession` and
+`NativeIncomingPeerNegotiator`. These connect the earlier strict description
+converter to actual native WebRTC peers and the authenticated Jingle transport.
+This does **not** yet connect calls to the login UI or enable background push.
+
+- Offers use explicitly selected PCMU/VP8 codecs and independent UDP ICE/DTLS
+  transports. Optional local BUNDLE, RTP header extensions and transport-wide
+  congestion feedback are removed before setting the local description. Remote
+  bundled offers remain unsupported; arbitrary browser interoperability is not
+  claimed. ICE gathering and asynchronous operations have bounded deadlines.
+- Native RTCP extended round-trip reports remain unchanged in the SDK's local
+  description. The Jingle projection does not advertise this optional, unmapped
+  capability; unsupported XR forms fail closed. This avoids overriding the SDK's
+  SDP-munging guard. Audio NACK is mapped using XEP-0293. RTCP round-trip reporting
+  is unrelated to the T.140 real-time text channel.
+- The session state machine binds each call to the authorized full JID, SID and
+  connection binding. IQ acknowledgement is distinct from negotiated media and
+  from an actually connected peer. Invalid profiles, foreign calls, duplicate
+  session transitions and late results after cancellation cannot open media.
+  Preparation/answering expire after 20 seconds and unanswered calls after 45
+  seconds; stale timers cannot terminate an established call.
+- Incoming offers are validated and acknowledged without creating capture
+  tracks. Only preparation after answering obtains the injected tracks. Local
+  and remote hangup close the peer, stop prepared capture and release signalling.
+  The CallKit media driver still waits for the required tracks and, when used,
+  the reliable T.140 channel before reporting readiness.
+- The new macOS loopback test exercises four profiles using two actual WebRTC
+  peers and the real Jingle IQ parser/state machine over an in-memory wire.
+  Synthetic VP8 frames must be decoded in both directions; RTT must carry
+  Unicode, edits and deletion. Microphones remain disabled: negotiated audio
+  tracks are not evidence of audible audio. The incoming provider is also tested
+  for deferred capture and hangup cleanup.
+
+The unsigned workflow now fails when this media test fails, rather than relying
+only on successful compilation or description round-tripping. Initial runs
+exposed a mismatch between native SDP and the constrained converter; runtime
+validation is being completed. Do not treat a compiled app as an operational
+calling app. The results and remaining gates below must be updated with actual
+successful run evidence before declaring this stage validated.
+
+Still required: native capture/rendering and call controls, authenticated call
+discovery and login-lifecycle wiring, push registration/revocation, APNs delivery,
+TURN/public-network and physical-device tests, native group/translation/history
+and OAuth feature parity. No TestFlight, live APNs or server configuration was
+changed by this stage.
+
 ### Native media description conversion (unsigned validation completed)
 
 `NativeJingleMedia` adds native SDP/Jingle description conversion for audio,
 audio/video, audio/RTT and Total Conversation. This is a **restricted negotiation
-format**, not an operational call engine. It uses PCMU audio, VP8 video, mandatory
+format**; the historical validation below tested the converter, not an operational
+call engine. It uses PCMU audio, VP8 video, mandatory
 SHA-256 DTLS fingerprints, complete UDP ICE candidates and negotiated, reliable,
 ordered T.140 datachannel 0. RTT remains conversational media, not a chat message.
 Answers must preserve the offered SID, profile, ordered media IDs and payloads;
