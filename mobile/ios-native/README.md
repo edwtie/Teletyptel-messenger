@@ -34,11 +34,11 @@ For local testing it may still be `localhost`. The placeholder public hostname i
 not evidence of a deployed service. This initial UI is Dutch; other languages are
 part of migration parity, not implemented here.
 
-## Direct chat and bounded background lifecycle (unsigned validation pending)
+## Direct chat and bounded background lifecycle (unsigned tests passed)
 
-Prepared on 2026-11-07 in the isolated native preview only. GitHub publication
-and unsigned iPhone/iPad compilation and tests are approved. **Runtime validation
-is pending; no physical-device validation or TestFlight upload is claimed.**
+Published and tested on 2026-11-07 in the isolated native preview only.
+Unsigned compilation, unit tests and iPhone/iPad simulator tests passed.
+**No physical-device validation or TestFlight upload is claimed.**
 The working Capacitor app and server configuration are unchanged.
 
 - Selecting a roster contact opens a native one-to-one chat sheet with incoming
@@ -87,19 +87,50 @@ flow; VoIP pushes are not a generic background-chat transport. This step does
 not promise ringing, vibration, message reception or continued calls while the
 app is suspended or terminated.
 
-Prepared tests: ten chat codec/store tests, four model chat/lifecycle tests, one
+Added tests: ten chat codec/store tests, four model chat/lifecycle tests, one
 session-routing test and one iPhone/iPad UI scenario covering receive/send,
 rotation, draft retention, sheet reopening and foreground return. Existing
 isolated ejabberd tests still cover the earlier login/roster chain; two-account
 chat interoperability and background timing/expiration are not yet validated.
 The Debug UI fixture is explicitly fictional and never reaches a server.
 
-Local validation: 18 Node harness/source/fixture checks passed; the macOS Swift
-suite was skipped on Windows. Project generation includes all three new sources
-byte-for-byte. Scoped whitespace checks pass. These results do **not** establish
-Swift compilation, simulator success or background execution on actual hardware.
+Validation evidence:
 
-Acceptance gates before release: unsigned Swift and iPhone/iPad simulator tests;
+- Feature commit `a77e9fc4e1e1ad6d08d2f519a41e8dec23f23d7d`; test-helper fixes
+  `abd7594` and `6c8a58598011b47ee53b0fc442b6da40edf3f4b9`. Only scoped native
+  preview sources, tests, generator and this documentation were published.
+- [Unsigned simulator run 42343322052](https://github.com/edwtie/Teletyptel-messenger/actions/runs/42343322052)
+  passed on `6c8a585`: 67 Swift tests passed, 14 opt-in network tests skipped in
+  that suite; unsigned device Release compilation passed and Debug fixtures
+  were absent from the Release binary. Six UI tests passed without skips on
+  each of iPhone 16 Pro and iPad Pro 11-inch (M4), both iOS 18.5 simulators.
+  These include portrait/landscape, fictional send/receive, draft/history
+  retention, background/foreground return and explicit disconnect.
+- [Isolated ejabberd run 42341137558](https://github.com/edwtie/Teletyptel-messenger/actions/runs/42341137558)
+  passed on `a77e9fc`: seven WSS tests and seven native login HTTP-contract
+  tests against disposable loopback ejabberd 26.09 and a fictional account API.
+  Session cleanup, temporary CA removal and trust revocation were verified.
+  This is regression evidence for authentication/roster, not two-peer chat
+  interoperability or validation of the production PHP API.
+- Earlier runs `42340983130` and `42342207540` failed UI automation. The first
+  queried an offscreen label's tap point after rotation. The second exposed
+  ineffective full-window scroll gestures and a failed termination during an
+  unnecessary launch/terminate/relaunch sequence. The helper now checks visible
+  geometry before hittability, uses bounded drags and launches each fixture
+  once. Assertions remain enabled; these failures were not ignored or retried
+  automatically into a green result. Application code was unchanged by these
+  test-helper fixes.
+- Local validation: 19 Node harness/source/fixture checks passed, with the Swift
+  runner skipped on Windows. Project generation includes all three new sources
+  byte-for-byte; scoped whitespace checks passed.
+- Downloaded reports are retained locally under
+  `artifacts/ios-native-evidence-42343322052/` and
+  `artifacts/ios-native-evidence-42341137558/`; the two failed runs have separate
+  evidence directories. GitHub artifacts have limited retention. The reports
+  record `unsigned: true` and `uploaded: false`; no production/local server,
+  signing key or TestFlight deployment was used.
+
+Remaining acceptance gates before release:
 isolated two-account ejabberd send/receive including offline and rejection cases;
 real-device Home/lock/rapid-return/network-loss tests while writes are in flight;
 VoiceOver, Dynamic Type and rotation/keyboard checks. Verify that return preserves
@@ -110,6 +141,10 @@ References: [RFC 6121 direct messaging](https://www.rfc-editor.org/rfc/rfc6121.h
 and [Apple VoIP notification handling](https://developer.apple.com/documentation/pushkit/responding-to-voip-notifications-from-pushkit).
 
 ## Contact presence step (runtime validation pending)
+
+Historical preparation notes below predate the chat validation above. The
+current unsigned run now also passes the presence unit tests and fictional UI
+status checks. Real-device and multi-resource interoperability remain untested.
 
 The next step adds XMPP contact availability to the read-only native list.
 Initially prepared locally only, this step was subsequently approved for GitHub
