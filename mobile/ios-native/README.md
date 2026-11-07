@@ -7,7 +7,7 @@ claim that those features already work in this target.
 
 ## Implemented in this first stage
 
-### Native Jingle signalling transport (prepared, validation pending)
+### Native Jingle signalling transport (unsigned validation completed)
 
 The authenticated WSS connection now exposes a separate Jingle channel after
 SASL authentication and resource binding. A caller must explicitly bind an
@@ -40,11 +40,30 @@ Neither this transport nor the earlier CallKit adapter makes background calls
 operational yet. Push remains disabled; no TestFlight or live server changes.
 
 Protocol reference: [XEP-0166 Jingle](https://xmpp.org/extensions/xep-0166.html).
-Local source/generator checks cannot establish Swift runtime correctness; record
-the separate macOS and isolated-ejabberd results before claiming this step tested.
-Local validation: 22 Node source/generator/fixture checks passed, one macOS-only
-Swift invocation skipped. Fourteen additional Swift unit tests and one isolated
-network test have been added but have not yet been executed in this stage.
+Validation of revision `b86cc09` on 2026-11-07:
+
+- Local validation: 22 Node source/generator/fixture checks passed; the macOS-only
+  Swift invocation was skipped on Windows, not counted as runtime proof.
+- [Unsigned iOS run 42362990199](https://github.com/edwtie/Teletyptel-messenger/actions/runs/42362990199)
+  passed 103 Swift tests, including fourteen new Jingle/routing tests. Fifteen
+  opt-in network tests were skipped in this run. Unsigned device Release
+  compilation and Release fixture-exclusion checks passed. All twelve UI tests
+  passed: six on iPhone 16 Pro and six on iPad Pro 11-inch (M4), covering portrait
+  and landscape-left. No UI failures or skips were reported.
+- [Isolated ejabberd run 42362992332](https://github.com/edwtie/Teletyptel-messenger/actions/runs/42362992332)
+  executed those fifteen network tests: seven WSS/server checks, seven native
+  HTTPS/XMPP login-contract checks and one new bidirectional Jingle test. All
+  passed against temporary ejabberd 26.09. Jingle acknowledgement, rejection,
+  cancellation, timeout, unbinding and disconnect were exercised over actual
+  Apple WebSocket transport. Sessions were released, temporary certificate trust
+  was revoked and checked, and test-environment cleanup completed.
+
+Evidence is downloaded under `artifacts/ios-native-evidence-42362990199/` and
+`artifacts/ios-native-evidence-42362992332/`. These results do not cover physical
+devices, actual PHP account authentication, complete audio/video/RTT negotiation
+or APNs delivery. The UI tests exercise the existing native interface, not a
+complete CallKit call. No signing, TestFlight upload, production secrets or live
+server changes were involved.
 
 - Independent SwiftUI entry point; no HTML, JavaScript, Capacitor or WKWebView.
 - Native scrollable startup form, bounded width on iPad, portrait/landscape support,
