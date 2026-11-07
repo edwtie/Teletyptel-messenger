@@ -7,6 +7,40 @@ claim that those features already work in this target.
 
 ## Implemented in this first stage
 
+### Native media description conversion (validation pending)
+
+`NativeJingleMedia` adds native SDP/Jingle description conversion for audio,
+audio/video, audio/RTT and Total Conversation. This is a **restricted negotiation
+format**, not an operational call engine. It uses PCMU audio, VP8 video, mandatory
+SHA-256 DTLS fingerprints, complete UDP ICE candidates and negotiated, reliable,
+ordered T.140 datachannel 0. RTT remains conversational media, not a chat message.
+Answers must preserve the offered SID, profile, ordered media IDs and payloads;
+they cannot silently remove RTT/video or add unoffered feedback.
+
+The XML parser's existing 64 KiB, 128-node and depth limits are unchanged. Each
+content accepts up to 24 candidates so a full TC description, including its IQ
+envelope, fits that parser. Malformed candidates, duplicate IDs, unsupported
+codecs, insecure transport, partial-reliability RTT and XML/SDP injection are
+rejected. Debug descriptions redact ICE credentials and addresses.
+
+This first profile deliberately rejects BUNDLE and session-level security
+attributes rather than silently losing them. It is **not yet compatible with
+arbitrary default WebRTC offers**, which commonly advertise bundled media and
+multiple codecs. Native peer configuration/codec selection or explicit grouping
+support must be implemented and tested before connecting it to live calls.
+It does not implement RTP/T.140 (RFC 4103), SIP interworking, trickle ICE, ICE
+restart, media capture/rendering or a full Jingle session state machine.
+
+Fourteen new Swift tests cover all four profiles in both directions, answer
+matching, parser/transport bounds and negative security cases. Their runtime
+results will be recorded after the unsigned Apple build; Windows source checks
+alone are not runtime proof. No TestFlight, APNs or server changes are included.
+
+References: [Jingle RTP (XEP-0167)](https://xmpp.org/extensions/xep-0167.html),
+[DTLS-SRTP (XEP-0320)](https://xmpp.org/extensions/xep-0320.html), and
+[experimental synchronized RTT (XEP-0517)](https://xmpp.org/extensions/xep-0517.html).
+The constrained implementation is not a claim of complete XEP conformance.
+
 ### Native Jingle signalling transport (unsigned validation completed)
 
 The authenticated WSS connection now exposes a separate Jingle channel after
