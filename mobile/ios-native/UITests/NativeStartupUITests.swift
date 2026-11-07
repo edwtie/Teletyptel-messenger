@@ -7,7 +7,6 @@ final class NativeStartupUITests: XCTestCase {
         continueAfterFailure = false
         XCUIDevice.shared.orientation = .portrait
         application = XCUIApplication()
-        application.launch()
     }
 
     override func tearDownWithError() throws {
@@ -19,6 +18,7 @@ final class NativeStartupUITests: XCTestCase {
     }
 
     func testStartupDoesNotOpenKeyboardOrShowAuthenticatedState() {
+        application.launch()
         XCTAssertTrue(application.textFields["server-address"].waitForExistence(timeout: 10))
         XCTAssertFalse(application.keyboards.firstMatch.exists)
         XCTAssertFalse(application.buttons["check-connection"].isEnabled)
@@ -26,6 +26,7 @@ final class NativeStartupUITests: XCTestCase {
     }
 
     func testRotationPreservesConfigurationAndInvalidAddressShowsInlineError() {
+        application.launch()
         let server = application.textFields["server-address"]
         XCTAssertTrue(server.waitForExistence(timeout: 10))
         server.tap()
@@ -122,7 +123,6 @@ final class NativeStartupUITests: XCTestCase {
     }
 
     private func signInFixture(_ scenario: String) {
-        application.terminate()
         application.launchEnvironment["TELETYPTEL_NATIVE_UI_FIXTURE"] = scenario
         application.launch()
         XCTAssertTrue(application.staticTexts["fixture-banner"].waitForExistence(timeout: 10))
@@ -146,26 +146,36 @@ final class NativeStartupUITests: XCTestCase {
     }
 
     private func reveal(_ element: XCUIElement, upward: Bool = true) {
-        for _ in 0..<8 {
+        for _ in 0..<16 {
             if isUsable(element) { return }
+            let viewport = usableViewport()
             let scrollUp = element.exists && !element.frame.isEmpty
-                ? element.frame.midY > application.frame.midY : upward
-            if scrollUp { application.swipeUp() } else { application.swipeDown() }
+                ? element.frame.midY > viewport.midY : upward
+            let distance = min(120, max(40, viewport.height * 0.35))
+            let origin = application.coordinate(withNormalizedOffset: .zero)
+            let horizontal = viewport.minX + viewport.width * 0.15
+            let start = origin.withOffset(CGVector(dx: horizontal, dy: viewport.midY))
+            let end = origin.withOffset(CGVector(dx: horizontal,
+                                                 dy: viewport.midY + (scrollUp ? -distance : distance)))
+            start.press(forDuration: 0.05, thenDragTo: end)
         }
         XCTAssertTrue(isUsable(element), "Element remains outside the usable viewport: \(element.identifier), \(element.frame)")
     }
 
     private func isUsable(_ element: XCUIElement) -> Bool {
         guard element.exists, !element.frame.isEmpty else { return false }
+        let viewport = usableViewport()
+        guard viewport.contains(element.frame) else { return false }
+        return element.elementType == .staticText || element.isHittable
+    }
+
+    private func usableViewport() -> CGRect {
         let window = application.frame
         let navigation = application.navigationBars.firstMatch
         let top = navigation.exists ? max(window.minY + 12, navigation.frame.maxY + 8) : window.minY + 12
         let keyboard = application.keyboards.firstMatch
         let bottom = keyboard.exists ? min(window.maxY - 24, keyboard.frame.minY - 8) : window.maxY - 24
-        guard bottom > top else { return false }
-        let viewport = CGRect(x: window.minX + 12, y: top, width: window.width - 24, height: bottom - top)
-        guard viewport.contains(element.frame) else { return false }
-        return element.elementType == .staticText || element.isHittable
+        return CGRect(x: window.minX + 12, y: top, width: max(0, window.width - 24), height: max(0, bottom - top))
     }
 
     private func waitForStatus(_ text: String) {

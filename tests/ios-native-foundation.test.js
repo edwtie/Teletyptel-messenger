@@ -187,4 +187,8 @@ test("Native rotation tests check visible geometry before requesting a tap point
     assert.ok(helper.includes(required), required);
   assert.ok(helper.indexOf("viewport.contains(element.frame)") < helper.indexOf("element.isHittable"));
   assert.match(ui, /XCTAssertTrue\(isUsable\(element\)/);
+  assert.match(ui, /start\.press\(forDuration: 0\.05, thenDragTo: end\)/);
+  assert.doesNotMatch(ui, /application\.swipe(?:Up|Down)\(\)/);
+  const fixture = ui.slice(ui.indexOf("private func signInFixture("), ui.indexOf("private func reveal("));
+  assert.doesNotMatch(fixture, /application\.terminate\(\)/);
 });
