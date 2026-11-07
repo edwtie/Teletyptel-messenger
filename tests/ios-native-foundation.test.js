@@ -92,6 +92,8 @@ test("Project generation is isolated, repeatable and refuses overwriting an exis
     ["Core/NativeCallCoordinator.swift", "Sources/TeleTypTelCore/NativeCallCoordinator.swift"],
     ["Core/NativeJingleTransport.swift", "Sources/TeleTypTelCore/NativeJingleTransport.swift"],
     ["Core/NativeJingleMedia.swift", "Sources/TeleTypTelCore/NativeJingleMedia.swift"],
+    ["Core/NativeLocalMediaSDP.swift", "Sources/TeleTypTelCore/NativeLocalMediaSDP.swift"],
+    ["App/NativeMediaPeer.swift", "App/NativeMediaPeer.swift"],
     ["App/NativeCallPlatform.swift", "App/NativeCallPlatform.swift"],
     ["App/NativeCallMedia.swift", "App/NativeCallMedia.swift"],
     ["App/NativeChatView.swift", "App/NativeChatView.swift"],

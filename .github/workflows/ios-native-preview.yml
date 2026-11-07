@@ -9,6 +9,7 @@ on:
       - '!mobile/ios-native/README.md'
       - scripts/prepare-ios-native.js
       - scripts/check-ios-native.js
+      - scripts/check-ios-native-media.js
       - tests/ios-native-foundation.test.js
   workflow_dispatch:
 

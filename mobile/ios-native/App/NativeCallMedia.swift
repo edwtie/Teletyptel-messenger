@@ -1,12 +1,6 @@
 import AVFAudio
 import WebRTC
 
-struct NativePreparedPeer {
-    let peer: RTCPeerConnection
-    let microphone: RTCAudioTrack
-    let camera: RTCVideoTrack?
-}
-
 @MainActor
 protocol NativePeerNegotiating: AnyObject {
     func prepare(handle: NativeCallHandle, media: NativeCallMedia,

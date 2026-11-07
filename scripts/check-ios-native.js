@@ -2,6 +2,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { execFileSync } = require("node:child_process");
 const { prepare } = require("./prepare-ios-native");
+const { checkMedia } = require("./check-ios-native-media");
 
 function executeLogged(command, args, { root, reports, name, timeout = 600000, execute = execFileSync }) {
   try {
@@ -61,6 +62,7 @@ function run() {
       if (executable.includes(Buffer.from(marker))) throw new Error("Test-only login fixture found in Release executable");
     }
     report.releaseFixtureExcluded = true;
+    report.media = checkMedia({ root, directory, reports, logged });
     const inventory = JSON.parse(execute("xcrun", ["simctl", "list", "devices", "available", "--json"]));
     const devices = Object.entries(inventory.devices).filter(([runtime]) => runtime.includes("iOS"))
       .flatMap(([, values]) => values).filter(device => device.isAvailable);
