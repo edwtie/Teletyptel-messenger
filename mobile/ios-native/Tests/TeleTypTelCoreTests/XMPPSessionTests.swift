@@ -59,6 +59,25 @@ final class XMPPSessionTests: XCTestCase {
         XCTAssertThrowsError(try stream.receive(xml))
     }
 
+    func testJingleIQRoutesOnlyAfterBindingAndDoesNotAcknowledgeHeartbeat() throws {
+        var stream = try online()
+        let ping = try ProbeXML.parse(stream.heartbeat())
+        let xml = "<iq xmlns='jabber:client' from='peer@localhost/tablet' type='set' id='call'><jingle xmlns='urn:xmpp:jingle:1' action='session-initiate' sid='call-1'/></iq>"
+        let output = try stream.receive(xml)
+        XCTAssertEqual(output.unhandledIQ, xml)
+        XCTAssertFalse(output.heartbeatAcknowledged)
+        XCTAssertNil(output.chat)
+        XCTAssertTrue(output.frames.isEmpty)
+        let identifier = try XCTUnwrap(ping.attributes["id"])
+        let acknowledged = try stream.receive("<iq xmlns='jabber:client' type='result' id='\(identifier)'/>")
+        XCTAssertTrue(acknowledged.heartbeatAcknowledged)
+        XCTAssertNil(acknowledged.unhandledIQ)
+        stream.close()
+        XCTAssertThrowsError(try stream.receive(xml))
+        var unauthenticated = XMPPSessionStream(account: try account())
+        XCTAssertThrowsError(try unauthenticated.receive(xml))
+    }
+
     func testRosterIsRequestedOnlyAfterBindingAndTimeoutDoesNotBreakSession() throws {
         var stream = XMPPSessionStream(account: try account(), loadRoster: true)
         let identifier = try reachBinding(&stream)

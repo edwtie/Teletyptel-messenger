@@ -14,6 +14,7 @@ struct XMPPSessionOutput {
     var heartbeatAcknowledged = false
     var roster: NativeRosterState?
     var chat: NativeChatEvent?
+    var unhandledIQ: String?
 }
 
 struct XMPPSessionStream {
@@ -158,6 +159,7 @@ struct XMPPSessionStream {
                     let destination = sender.map { " to='\(Self.escape($0))'" } ?? ""
                     return XMPPSessionOutput(frames: ["<iq xmlns='jabber:client' type='result' id='\(Self.escape(identifier))'\(destination)/>"])
                 }
+                return XMPPSessionOutput(unhandledIQ: message)
             }
         case .closed:
             throw XMPPSessionFailure.streamClosed

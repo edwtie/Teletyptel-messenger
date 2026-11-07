@@ -199,6 +199,12 @@ async function run() {
     if (!/Executed 7 tests, with 0 failures/.test(loginOutput) || /[1-9][0-9]* tests? skipped/i.test(loginOutput)) {
       throw new Error("Expected all seven native HTTPS/XMPP login contract tests to execute");
     }
+    const jingleOutput = await runSwift("NativeJingleIntegrationTests", "native-jingle-tests.txt");
+    if (!/Executed 1 test, with 0 failures/.test(jingleOutput) || /[1-9][0-9]* tests? skipped/i.test(jingleOutput)) {
+      throw new Error("Expected the real two-resource Jingle transport test to execute without skips or failures");
+    }
+    report.nativeJingleTransportTested = true;
+    report.nativeJingleTransportTests = 1;
     save("account-contract-statistics.json", JSON.stringify(loginFixture.statistics, null, 2));
     const { scenarios, upgrades, unexpectedRequests, proxyErrors } = loginFixture.statistics;
     if (["success", "rejected", "twofactor", "mismatch", "redirect", "xmpp-rejected", "delayed"]

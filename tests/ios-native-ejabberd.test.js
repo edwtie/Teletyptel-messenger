@@ -60,3 +60,17 @@ test("Network tests are opt-in, use actual transports and leave application trus
   assert.doesNotMatch(workflow, /pull_request|secrets\.|testflight|app-store-connect/i);
   assert.match(workflow, /path: artifacts\/ios-native-ejabberd-\*\/reports\//);
 });
+
+test("Jingle harness exercises real resource-bound IQ exchange without media or push activation", () => {
+  const root = path.resolve(__dirname, "..");
+  const source = fs.readFileSync(path.join(root, "mobile/ios-native/Tests/NativeXMPPIntegrationTests/NativeJingleIntegrationTests.swift"), "utf8");
+  assert.equal((source.match(/func test/g) || []).length, 1);
+  for (const required of ["XCTSkip", "TELETYPTEL_EJABBERD_FIXTURE", '"github-hosted"',
+    "https://localhost:", "NativeXMPPConnection().run", "exchangeJingle", "replyJingle", "unbindCall",
+    "CancellationError", ".timedOut", ".staleBinding", ".disconnected"])
+    assert.ok(source.includes(required), required);
+  assert.doesNotMatch(source, /URLCredential|SecTrust|URLProtocol|PKPushRegistry|RTCPeerConnection/);
+  const harness = fs.readFileSync(path.join(root, "scripts/check-ios-native-ejabberd.js"), "utf8");
+  assert.match(harness, /runSwift\("NativeJingleIntegrationTests", "native-jingle-tests.txt"\)/);
+  assert.match(harness, /nativeJingleTransportTested = true/);
+});

@@ -31,6 +31,20 @@ public struct NativeXMPPConnection: NativeXMPPConnecting {
     public func run(account: NativeAuthenticatedAccount, onConnected: @escaping @Sendable (String) -> Void,
                     onRoster: @escaping @Sendable (NativeRosterState) -> Void,
                     onChat: @escaping @Sendable (NativeChatEvent) -> Void,
+                    onSender: @escaping @Sendable (any NativeChatSending) -> Void,
+                    onJingle: @escaping @Sendable (NativeJingleRequest) -> Void,
+                    onJingleSender: @escaping @Sendable (any NativeJingleSending) -> Void) async throws {
+        let operation = SessionOperation(account: account, onConnected: onConnected, onRoster: onRoster,
+                                         onChat: onChat, onSender: onSender, onJingle: onJingle,
+                                         onJingleSender: onJingleSender)
+        try await withTaskCancellationHandler(operation: {
+            try await operation.run()
+        }, onCancel: { operation.cancel() })
+    }
+
+    public func run(account: NativeAuthenticatedAccount, onConnected: @escaping @Sendable (String) -> Void,
+                    onRoster: @escaping @Sendable (NativeRosterState) -> Void,
+                    onChat: @escaping @Sendable (NativeChatEvent) -> Void,
                     onSender: @escaping @Sendable (any NativeChatSending) -> Void) async throws {
         let operation = SessionOperation(account: account, onConnected: onConnected, onRoster: onRoster,
                                          onChat: onChat, onSender: onSender)
@@ -55,7 +69,7 @@ public struct NativeXMPPConnection: NativeXMPPConnecting {
     }
 }
 
-private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, NativeChatSending, @unchecked Sendable {
+private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, NativeChatSending, NativeJingleSending, @unchecked Sendable {
     private let configuration: ServerConfiguration
     private let queue = DispatchQueue(label: "nl.teletyptel.native.session")
     private var onConnected: (@Sendable (String) -> Void)?
@@ -70,6 +84,12 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
     private var onSender: (@Sendable (any NativeChatSending) -> Void)?
     private var pendingMessages: [UUID: CheckedContinuation<Void, Error>] = [:]
     private var messageDeadlines: [UUID: DispatchWorkItem] = [:]
+    private var onJingle: (@Sendable (NativeJingleRequest) -> Void)?
+    private var onJingleSender: (@Sendable (any NativeJingleSending) -> Void)?
+    private var jingle: NativeJingleTransport?
+    private var jingleDeadline: DispatchWorkItem?
+    private var pendingJingle: [String: CheckedContinuation<Void, Error>] = [:]
+    private var jingleDeadlines: [String: DispatchWorkItem] = [:]
     private var stream: XMPPSessionStream
     private var cancelled = false
     private var completed = false
@@ -77,37 +97,145 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
     init(account: NativeAuthenticatedAccount, onConnected: @escaping @Sendable (String) -> Void,
          onRoster: (@Sendable (NativeRosterState) -> Void)? = nil,
          onChat: (@Sendable (NativeChatEvent) -> Void)? = nil,
-         onSender: (@Sendable (any NativeChatSending) -> Void)? = nil) {
+         onSender: (@Sendable (any NativeChatSending) -> Void)? = nil,
+         onJingle: (@Sendable (NativeJingleRequest) -> Void)? = nil,
+         onJingleSender: (@Sendable (any NativeJingleSending) -> Void)? = nil) {
         configuration = account.configuration
         stream = XMPPSessionStream(account: account, loadRoster: onRoster != nil)
         self.onConnected = onConnected
         self.onRoster = onRoster
         self.onChat = onChat
         self.onSender = onSender
+        self.onJingle = onJingle
+        self.onJingleSender = onJingleSender
+    }
+
+    func bindCall(peer: String, sid: String) async throws -> UUID {
+        try Task.checkCancellation()
+        let binding: UUID = try await withCheckedThrowingContinuation { continuation in
+            queue.async {
+                guard !self.completed, self.stream.phase == .online, self.onJingle != nil else {
+                    continuation.resume(throwing: NativeJingleFailure.disconnected)
+                    return
+                }
+                do {
+                    guard let id = try self.jingle?.bind(peer: peer, sid: sid) else { throw NativeJingleFailure.disconnected }
+                    continuation.resume(returning: id)
+                } catch { continuation.resume(throwing: error) }
+            }
+        }
+        if Task.isCancelled {
+            await unbindCall(binding)
+            throw CancellationError()
+        }
+        return binding
+    }
+
+    func exchangeJingle(binding: UUID, xml: String) async throws {
+        try Task.checkCancellation()
+        let identifier = "jingle-" + UUID().uuidString
+        let cancellation = JingleCancellation()
+        try await withTaskCancellationHandler(operation: {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                queue.async {
+                    guard !cancellation.isCancelled else { continuation.resume(throwing: CancellationError()); return }
+                    guard !self.completed, self.stream.phase == .online, let socket = self.socket else {
+                        continuation.resume(throwing: NativeJingleFailure.disconnected)
+                        return
+                    }
+                    do {
+                        guard let request = try self.jingle?.prepare(binding: binding, xml: xml, identifier: identifier) else {
+                            throw NativeJingleFailure.disconnected
+                        }
+                        self.pendingJingle[identifier] = continuation
+                        let deadline = DispatchWorkItem { [weak self] in
+                            self?.completeJingle(identifier, error: NativeJingleFailure.timedOut)
+                        }
+                        self.jingleDeadlines[identifier] = deadline
+                        self.queue.asyncAfter(deadline: .now() + 8, execute: deadline)
+                        socket.send(.string(request.frame)) { error in
+                            if let error = error { self.queue.async { self.completeJingle(identifier, error: error) } }
+                        }
+                    } catch { continuation.resume(throwing: error) }
+                }
+            }
+        }, onCancel: {
+            cancellation.cancel()
+            self.queue.async { self.completeJingle(identifier, error: CancellationError()) }
+        })
+    }
+
+    func replyJingle(_ request: NativeJingleRequest, rejection: NativeJingleRejection?) async throws {
+        try Task.checkCancellation()
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            queue.async {
+                do {
+                    guard !self.completed, self.stream.phase == .online else { throw NativeJingleFailure.disconnected }
+                    guard self.pendingMessages.count < 8 else { throw NativeJingleFailure.busy }
+                    guard let frame = try self.jingle?.reply(request, rejection: rejection, now: ProcessInfo.processInfo.systemUptime) else {
+                        throw NativeJingleFailure.disconnected
+                    }
+                    self.enqueueMessage(frame, continuation: continuation)
+                } catch { continuation.resume(throwing: error) }
+            }
+        }
+    }
+
+    func unbindCall(_ binding: UUID) async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            queue.async {
+                let identifiers = self.jingle?.unbind(binding) ?? []
+                for identifier in identifiers { self.completeJingle(identifier, error: NativeJingleFailure.staleBinding) }
+                continuation.resume()
+            }
+        }
+    }
+
+    private func completeJingle(_ identifier: String, error: Error?) {
+        jingle?.cancel(identifier)
+        jingleDeadlines.removeValue(forKey: identifier)?.cancel()
+        guard let continuation = pendingJingle.removeValue(forKey: identifier) else { return }
+        if let error = error { continuation.resume(throwing: error) }
+        else { continuation.resume() }
+    }
+
+    private func scheduleJingleDeadline() {
+        jingleDeadline?.cancel()
+        jingleDeadline = nil
+        guard jingle?.hasIncoming == true else { return }
+        let deadline = DispatchWorkItem { [weak self] in
+            guard let self = self, !self.completed else { return }
+            let frames = self.jingle?.expire(now: ProcessInfo.processInfo.systemUptime) ?? []
+            self.send(frames) { self.scheduleJingleDeadline() }
+        }
+        jingleDeadline = deadline
+        queue.asyncAfter(deadline: .now() + 1, execute: deadline)
     }
 
     func sendMessage(to jid: String, body: String, identifier: String) async throws {
         try Task.checkCancellation()
         let frame = try NativeChatCodec.encode(to: jid, body: body, identifier: identifier)
-        let token = UUID()
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            queue.async {
-                guard !self.completed, self.stream.phase == .online, let socket = self.socket else {
-                    continuation.resume(throwing: NativeChatFailure.disconnected)
-                    return
-                }
-                guard self.pendingMessages.count < 8 else {
-                    continuation.resume(throwing: NativeChatFailure.busy)
-                    return
-                }
-                self.pendingMessages[token] = continuation
-                let deadline = DispatchWorkItem { [weak self] in self?.completeMessage(token, error: ConnectionFailure.timeout) }
-                self.messageDeadlines[token] = deadline
-                self.queue.asyncAfter(deadline: .now() + 8, execute: deadline)
-                socket.send(.string(frame)) { error in
-                    self.queue.async { self.completeMessage(token, error: error) }
-                }
-            }
+            queue.async { self.enqueueMessage(frame, continuation: continuation) }
+        }
+    }
+
+    private func enqueueMessage(_ frame: String, continuation: CheckedContinuation<Void, Error>) {
+        let token = UUID()
+        guard !completed, stream.phase == .online, let socket = socket else {
+            continuation.resume(throwing: NativeChatFailure.disconnected)
+            return
+        }
+        guard pendingMessages.count < 8 else {
+            continuation.resume(throwing: NativeChatFailure.busy)
+            return
+        }
+        pendingMessages[token] = continuation
+        let deadline = DispatchWorkItem { [weak self] in self?.completeMessage(token, error: ConnectionFailure.timeout) }
+        messageDeadlines[token] = deadline
+        queue.asyncAfter(deadline: .now() + 8, execute: deadline)
+        socket.send(.string(frame)) { error in
+            self.queue.async { self.completeMessage(token, error: error) }
         }
     }
 
@@ -176,6 +304,12 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
         onRoster = nil
         onChat = nil
         onSender = nil
+        onJingle = nil
+        onJingleSender = nil
+        for identifier in Array(pendingJingle.keys) { completeJingle(identifier, error: error) }
+        jingleDeadline?.cancel()
+        jingleDeadline = nil
+        jingle = nil
         for token in Array(pendingMessages.keys) { completeMessage(token, error: error) }
         rosterDeadline?.cancel()
         rosterDeadline = nil
@@ -213,12 +347,15 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
                     let output = try self.stream.receive(frame)
                     self.send(output.frames) {
                         if let jid = output.connectedJID {
+                            self.jingle = NativeJingleTransport(owner: jid)
                             self.deadline?.cancel()
                             self.deadline = nil
                             self.onConnected?(jid)
                             self.onConnected = nil
                             self.onSender?(self)
                             self.onSender = nil
+                            self.onJingleSender?(self)
+                            self.onJingleSender = nil
                             self.scheduleHeartbeat()
                         }
                         if output.heartbeatAcknowledged {
@@ -241,7 +378,14 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
                             }
                         }
                         if let chat = output.chat { self.onChat?(chat) }
-                        self.receive()
+                        if let xml = output.unhandledIQ, let update = self.jingle?.receive(xml, now: ProcessInfo.processInfo.systemUptime) {
+                            if let identifier = update.completed { self.completeJingle(identifier, error: update.failure) }
+                            if let request = update.request {
+                                self.onJingle?(request)
+                                self.scheduleJingleDeadline()
+                            }
+                            self.send(update.frames) { self.receive() }
+                        } else { self.receive() }
                     }
                 } catch { self.finish(error) }
             }
@@ -269,5 +413,22 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
                     newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
         completionHandler(nil)
         queue.async { self.finish(ConnectionFailure.redirectRejected) }
+    }
+}
+
+private final class JingleCancellation: @unchecked Sendable {
+    private let lock = NSLock()
+    private var cancelled = false
+
+    var isCancelled: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return cancelled
+    }
+
+    func cancel() {
+        lock.lock()
+        cancelled = true
+        lock.unlock()
     }
 }

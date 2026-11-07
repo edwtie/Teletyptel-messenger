@@ -7,6 +7,45 @@ claim that those features already work in this target.
 
 ## Implemented in this first stage
 
+### Native Jingle signalling transport (prepared, validation pending)
+
+The authenticated WSS connection now exposes a separate Jingle channel after
+SASL authentication and resource binding. A caller must explicitly bind an
+authorized **full peer JID and call SID** before sending or receiving requests.
+Each binding belongs to one connection; replacing/closing it invalidates pending
+exchanges and response capabilities. Nothing in a push payload alone authorizes
+that peer. The normal chat API remains separate.
+
+Outgoing IQs finish on a matching peer response, not on WebSocket write success.
+Incoming IQs require an explicit handler decision; an IQ result acknowledges
+signalling only and never marks media connected or enables a microphone/camera.
+Unknown calls are rejected, not automatically accepted. Eight concurrent inbound
+and outbound requests, eight-second monotonic deadlines, and 256 retained inbound
+IQ results per binding bound resource usage. Duplicate requests reuse their
+reply without re-delivery. Once the replay cache is full, new requests are refused
+until the binding is released. Cancellation does not retry an uncertain request.
+
+Tests cover routing after authenticated resource binding, exact peer/resource,
+recipient and SID validation, rejection, cancellation, duplicate/late responses,
+logout/replacement, XML limits and bounded replay memory. An opt-in integration
+test connects two resources of one fictional account to the disposable ejabberd,
+checks actual bidirectional IQ exchange and rejection, then cancellation,
+timeout, unbinding and disconnection. This is **not** a two-person media test.
+
+This stage validates Jingle envelopes, **not complete RTP/ICE/DTLS/SDP content or
+the Jingle session state machine**. The native `NativePeerNegotiating` provider,
+verified incoming-call/peer resolution, native capture/rendering, login lifecycle
+integration and authenticated push registration still need implementation.
+Neither this transport nor the earlier CallKit adapter makes background calls
+operational yet. Push remains disabled; no TestFlight or live server changes.
+
+Protocol reference: [XEP-0166 Jingle](https://xmpp.org/extensions/xep-0166.html).
+Local source/generator checks cannot establish Swift runtime correctness; record
+the separate macOS and isolated-ejabberd results before claiming this step tested.
+Local validation: 22 Node source/generator/fixture checks passed, one macOS-only
+Swift invocation skipped. Fourteen additional Swift unit tests and one isolated
+network test have been added but have not yet been executed in this stage.
+
 - Independent SwiftUI entry point; no HTML, JavaScript, Capacitor or WKWebView.
 - Native scrollable startup form, bounded width on iPad, portrait/landscape support,
   system fonts, native keyboard dismissal and no automatic text-field focus.

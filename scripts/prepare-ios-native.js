@@ -6,7 +6,7 @@ const webRTC = require("./ios-testflight/native-webrtc");
 const root = path.resolve(__dirname, "..");
 const source = path.join(root, "mobile/ios-native");
 const coreFiles = ["Startup.swift", "XMPPProbeStream.swift", "XMPPAvailabilityClient.swift",
-  "NativeAccountClient.swift", "XMPPSessionStream.swift", "NativeXMPPConnection.swift", "NativeLoginModel.swift", "NativeRoster.swift", "NativeChat.swift", "NativeIncomingCall.swift", "NativeCallCoordinator.swift"];
+  "NativeAccountClient.swift", "XMPPSessionStream.swift", "NativeXMPPConnection.swift", "NativeLoginModel.swift", "NativeRoster.swift", "NativeChat.swift", "NativeIncomingCall.swift", "NativeCallCoordinator.swift", "NativeJingleTransport.swift"];
 const appFiles = ["App/TeleTypTelNativeApp.swift", "App/NativeChatView.swift", "App/NativeBackgroundController.swift", "App/NativeCallPlatform.swift", "App/NativeCallMedia.swift"];
 const mediaFiles = ["NativeT140Session.swift", "NativeWebRTCChannel.swift"];
 
