@@ -47,15 +47,18 @@ final class NativeMediaPeer: NativeMediaNegotiating {
     private var pendingID: UUID?
     private var pendingFailure: ((Error) -> Void)?
     private var deadline: Task<Void, Never>?
+    private let diagnostic: ((String, Error) -> Void)?
 
     init(factory: RTCPeerConnectionFactory, microphone: RTCAudioTrack, camera: RTCVideoTrack?,
-         profile: NativeCallMedia, sid: String, iceServers: [RTCIceServer] = [], changed: @escaping () -> Void) throws {
+         profile: NativeCallMedia, sid: String, iceServers: [RTCIceServer] = [],
+         diagnostic: ((String, Error) -> Void)? = nil, changed: @escaping () -> Void) throws {
         guard profile.hasVideo == (camera != nil), microphone.readyState == .live,
               sid.range(of: "\\A[A-Za-z0-9_-]{1,128}\\z", options: .regularExpression) != nil else {
             throw NativeMediaPeerFailure.configuration
         }
         self.profile = profile
         self.sid = sid
+        self.diagnostic = diagnostic
         let events = NativePeerEvents { Task { @MainActor in changed() } }
         self.events = events
         let configuration = RTCConfiguration()
@@ -142,10 +145,14 @@ final class NativeMediaPeer: NativeMediaNegotiating {
 
     private func local(offer: Bool) async throws -> RTCSessionDescription {
         let peer = prepared.peer
+        let diagnostic = diagnostic
         let description: RTCSessionDescription = try await operation { complete in
             let done: (RTCSessionDescription?, Error?) -> Void = { result, error in
                 if let result = result, error == nil { complete(.success(result)) }
-                else { complete(.failure(NativeMediaPeerFailure.transport)) }
+                else {
+                    if let error = error { diagnostic?(offer ? "create-offer" : "create-answer", error) }
+                    complete(.failure(NativeMediaPeerFailure.transport))
+                }
             }
             let constraints = RTCMediaConstraints(mandatoryConstraints: nil, optionalConstraints: nil)
             if offer { peer.offer(for: constraints, completionHandler: done) }
@@ -167,8 +174,10 @@ final class NativeMediaPeer: NativeMediaNegotiating {
 
     private func set(_ description: RTCSessionDescription, local: Bool) async throws {
         let peer = prepared.peer
+        let diagnostic = diagnostic
         let _: Bool = try await operation { complete in
             let done: (Error?) -> Void = { error in
+                if let error = error { diagnostic?(local ? "set-local" : "set-remote", error) }
                 complete(error == nil ? .success(true) : .failure(NativeMediaPeerFailure.transport))
             }
             if local { peer.setLocalDescription(description, completionHandler: done) }

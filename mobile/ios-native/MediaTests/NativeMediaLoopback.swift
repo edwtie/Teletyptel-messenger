@@ -75,7 +75,9 @@ private final class FixturePeer {
         capturer = source.map { RTCVideoCapturer(delegate: $0) }
         let camera = source.map { factory.videoTrack(with: $0, trackId: "fixture-video") }
         engine = try NativeMediaPeer(factory: factory, microphone: microphone, camera: camera,
-            profile: profile, sid: "media-loopback", changed: {})
+            profile: profile, sid: "media-loopback", diagnostic: { operation, error in
+                FileHandle.standardError.write(Data("Synthetic peer \(operation): \(error.localizedDescription)\n".utf8))
+            }, changed: {})
         if profile.contents.contains("rtt") {
             let session = MessengerNativeRttSession(callId: UUID(), sid: "media-loopback")
             rtt = session
