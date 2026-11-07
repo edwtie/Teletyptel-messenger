@@ -198,7 +198,7 @@ Then validate real APNs delivery and calls on locked physical devices.
 
 Reference: [Apple's VoIP push handling requirements](https://developer.apple.com/documentation/pushkit/responding-to-voip-notifications-from-pushkit).
 
-## CallKit, PushKit and media adapters (validation pending)
+## CallKit, PushKit and media adapters (unsigned validation passed)
 
 The next isolated step connects the lifecycle to actual Apple framework adapters
 and the existing pinned WebRTC/T.140 implementation. It does **not** turn on live
@@ -245,14 +245,30 @@ token registration/revocation, persist a revocation-safe account/control context
 in Keychain, restore it during cold launch before registering PushKit, and attach
 the runtime to the native app login/logout lifecycle. Add microphone/camera usage
 descriptions, signed APNs entitlement and appropriate background capabilities only
-for an explicitly authorized signed build. Current Info.plist has none of these
+for an explicitly authorized signed build. The APNs topic/key scope must match
+that build's bundle identity; the separate `.nativepreview` identifier is not the
+existing production topic. Current Info.plist has none of these
 and no `TeleTypTelNativeCallPushEnabled` flag, so `enable` refuses activation.
 No APNs key, server setting, existing TestFlight target or production UI is changed.
 
-Validation: local Node/source/fixture checks pass (21 passed, one macOS Swift
-runner skipped on Windows). Unsigned Apple-framework compilation and the expanded
-Swift suite still require a new GitHub run. Existing test evidence above predates
-these adapters and must not be presented as their validation.
+Validation on 2026-11-07:
+
+- Local Node/source/fixture checks: 21 passed, one macOS Swift runner skipped on
+  Windows. Source checks are not Apple-framework runtime tests.
+- [Unsigned run 42360587888](https://github.com/edwtie/Teletyptel-messenger/actions/runs/42360587888)
+  passed at revision `c8de38fa31c75ae58ca11f4d0605d48a8415669e`.
+  Swift: 89 passed, including all twelve coordinator tests; 14 opt-in network
+  tests skipped; no failures. Device Release compilation with Apple frameworks
+  and pinned WebRTC passed, and the Debug fixture was excluded.
+- Existing UI/chat regression tests: six passed on iPhone 16 Pro and six on iPad
+  Pro 11-inch (M4), both Simulator 18.5, with no skips or failures. These are not
+  real CallKit UI, camera, APNs delivery or background-call acceptance tests.
+- The initial run `42360391265` passed the Swift tests but failed device compilation
+  on two WebRTC audio category/mode argument types. The API takes typed Apple
+  values, not raw strings; the correction is included in the successful revision.
+- Evidence is retained locally under
+  `artifacts/ios-native-evidence-42360587888/ios-native-check-1794044365489/reports/`.
+  No TestFlight upload, live push registration, keys or server changes were used.
 
 References: [Apple CallKit lifecycle](https://developer.apple.com/documentation/callkit/making-and-receiving-voip-calls),
 [Apple PushKit reporting](https://developer.apple.com/documentation/pushkit/responding-to-voip-notifications-from-pushkit),
