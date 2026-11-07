@@ -61,15 +61,56 @@ Unit tests cover correlation, spoofed senders, updates/removals, malformed data,
 limits, timeout and stale account callbacks. The existing isolated HTTPS/XMPP
 integration scenario now also checks a seeded fictional roster contact and
 clearing on logout. The five-case UI suite now verifies a fictional contact in
-portrait and landscape-left, and its disappearance on logout. Runtime results
-for this step must be recorded after the macOS runs; earlier green results do
-not prove this revision.
+portrait and landscape-left, and its disappearance on logout. The runtime
+results for this step are recorded below, separately from earlier-stage evidence.
 
 Protocol reference: [RFC 6121, roster management](https://www.rfc-editor.org/rfc/rfc6121.html#section-2).
 The disposable loopback-only ejabberd fixture enables `mod_roster` and
 `mod_admin_extra` and seeds a fictional entry through
 [add_rosteritem](https://docs.ejabberd.im/developer/ejabberd-api/admin-api/#add_rosteritem).
 No live server, user contacts, signing keys or TestFlight uploads are involved.
+
+#### Roster validation evidence
+
+[Isolated ejabberd run 42316644793](https://github.com/edwtie/Teletyptel-messenger/actions/runs/42316644793)
+passed on revision `53940c9`: seven real-transport tests and seven native
+HTTPS-account-contract/XMPP tests, including the fictional roster entry and
+clearing it on disconnect. A separate post-cleanup certificate rejection test
+also passed. All sessions were released, the temporary CA was denied and removed,
+and cleanup completed. This is ejabberd 26.09 plus a controlled HTTPS fixture,
+**not the production PHP account API or a physical iPhone/iPad test**.
+
+The first preview run
+[42316644486](https://github.com/edwtie/Teletyptel-messenger/actions/runs/42316644486)
+passed 43 Swift unit tests and unsigned Release compilation, but failed two of
+five iPhone UI tests: contact identification and locating the failure status.
+The parent contact-container identifier was removed so it does not interfere
+with per-contact identifiers; the UI helper now reveals status before checking
+its text. The next run
+[42317874080](https://github.com/edwtie/Teletyptel-messenger/actions/runs/42317874080)
+passed four of five iPhone UI tests. Its saved accessibility hierarchy confirms
+the contact and connected status were present, but the helper scrolled downward
+while the status was below the landscape viewport. Revision `09ef2c3` chooses
+scroll direction from element and viewport geometry instead of a fixed direction.
+Neither failed run reached the iPad suite; their failures must not be described
+as a successful iPhone/iPad regression. The protocol/model code is unchanged
+since the passing ejabberd run.
+
+The final [preview run 42319989504](https://github.com/edwtie/Teletyptel-messenger/actions/runs/42319989504)
+passed on revision `09ef2c3`: 43 Swift unit tests, unsigned device Release
+compilation and release-fixture exclusion. All five UI tests passed on iPhone
+16 Pro and all five on iPad Pro 11-inch (M4), both with iOS 18.5 simulators,
+including portrait and landscape-left. There were no UI failures or skips.
+The 14 opt-in network tests were skipped in this preview run; their separate
+passing ejabberd evidence is recorded above. Reports confirm `unsigned: true`
+and `uploaded: false`. Physical-device validation remains pending; the working
+TestFlight application and existing servers are unchanged.
+
+Evidence is saved locally under `artifacts/ios-native-evidence-42316644793/`,
+`artifacts/ios-native-evidence-42316644486/` and
+`artifacts/ios-native-evidence-42317874080/`, with the final passing preview under
+`artifacts/ios-native-evidence-42319989504/`. No test timeout was increased and no
+assertion was removed to address these UI failures.
 
 Added and published after the first-stage validation:
 
