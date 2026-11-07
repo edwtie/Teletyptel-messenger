@@ -32,6 +32,50 @@ For local testing it may still be `localhost`. The placeholder public hostname i
 not evidence of a deployed service. This initial UI is Dutch; other languages are
 part of migration parity, not implemented here.
 
+## Contact presence step (runtime validation pending)
+
+The next step adds XMPP contact availability to the read-only native list.
+Initially prepared locally only, this step was subsequently approved for GitHub
+publication on 2026-11-07. The publication commit skips automatic CI; no GitHub
+tests, TestFlight upload or live server changes are part of this publication.
+
+- Each contact starts with "Status onbekend", not an assumed offline status.
+  Available, away, extended-away, do-not-disturb and explicit unavailable presence
+  are displayed as text, not color alone. These are server-reported indications,
+  not delivery/read receipts or a guarantee that a person can answer.
+- Only contacts in a loaded roster with subscription `to` or `both` are updated.
+  Unknown contacts, subscription requests, errors, malformed show values and
+  presence addressed to another account/resource do not update availability.
+- Resource availability is tracked separately: one device disconnecting does not
+  hide another connected device. Bare-JID unavailable clears all resources.
+  Aggregation prefers online, then away, extended-away and busy; this is a UI
+  policy, not message routing. Presence priority is not used for routing here.
+- Renaming preserves availability. Subscription revocation, removal, account
+  switch, disconnect and background suspension discard it. Existing generation
+  checks reject late callbacks from old sessions.
+- Up to 64 resources per contact are retained. Overflow reports unknown until
+  bare-JID unavailable, subscription reset, removal or a new session; it never
+  converts incomplete resource knowledge into an offline claim. Presence before
+  the first roster snapshot is ignored, not buffered. Directed presence from
+  non-subscribed contacts, status messages and presence publishing controls are
+  outside this step. JID normalization remains subject to the roster limitations.
+
+Reference: [RFC 6121, presence](https://www.rfc-editor.org/rfc/rfc6121.html#section-4).
+Eight new presence unit tests and a session-routing test are prepared; existing
+model tests now include online contacts when checking lifecycle cleanup. The UI
+fixture checks the textual online status before and after rotation. The existing
+real-server roster test permits asynchronous presence changes but does **not**
+test resource availability transitions. macOS Swift compilation, simulator tests,
+real-server presence transitions and physical iPhone/iPad tests remain pending.
+Earlier passing runs below do not validate this presence implementation.
+
+Local validation on 2026-11-07: the three Node suites
+`ios-native-foundation.test.js`, `ios-native-ejabberd.test.js` and
+`native-login-http-fixture.test.js` passed 17 checks, with the macOS Swift test
+skipped on Windows. Project generation includes the updated roster source
+unchanged; scoped `git diff --check` also passed. These are harness/source and
+fixture checks, not execution of the new Swift presence tests or live ejabberd.
+
 ## Authenticated XMPP foundation
 
 ### Read-only native contacts (2026-11-07)
@@ -39,8 +83,8 @@ part of migration parity, not implemented here.
 The isolated native target now requests the XMPP roster after resource binding.
 It shows contact names, bare JIDs and roster categories, with distinct loading,
 empty and unavailable states. Categories are **not MUC chat rooms**. Contact
-editing, phone address-book access, avatars, presence display and opening chats
-are not implemented in this step.
+editing, phone address-book access, avatars and opening chats are not implemented
+in this step. Presence display is a subsequent change described above.
 
 Roster results are correlated with the pending request. Pushes accept only an
 absent sender or the authenticated account's bare JID, require one valid item,

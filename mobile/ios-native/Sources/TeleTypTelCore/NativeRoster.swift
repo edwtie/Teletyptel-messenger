@@ -1,10 +1,26 @@
 import Foundation
 
+public enum NativeContactPresence: String, Equatable, Sendable {
+    case unknown, offline, online, away, extendedAway, busy
+
+    public var label: String {
+        switch self {
+        case .unknown: return "Status onbekend"
+        case .offline: return "Offline"
+        case .online: return "Online"
+        case .away: return "Afwezig"
+        case .extendedAway: return "Langdurig afwezig"
+        case .busy: return "Niet storen"
+        }
+    }
+}
+
 public struct NativeContact: Identifiable, Equatable, Sendable {
     public let jid: String
     public let name: String
     public let groups: [String]
     public let subscription: String
+    public var presence: NativeContactPresence = .unknown
     public var id: String { jid }
     public var displayName: String { name.isEmpty ? jid : name }
 }
@@ -28,6 +44,8 @@ struct NativeRosterStream {
     private var pending = true
     private var loaded = false
     private var contacts: [String: NativeContact] = [:]
+    private var resources: [String: [String: NativeContactPresence]] = [:]
+    private var overflowed: Set<String> = []
 
     init(owner: String) { self.owner = owner }
 
@@ -42,6 +60,7 @@ struct NativeRosterStream {
     }
 
     mutating func receive(_ root: ProbeElement) -> NativeRosterOutput {
+        if root.name == "presence" { return receivePresence(root) }
         guard root.name == "iq", root.namespace == "jabber:client",
               root.attributes["from"] == nil || root.attributes["from"] == owner else { return NativeRosterOutput() }
         let type = root.attributes["type"]
@@ -70,14 +89,73 @@ struct NativeRosterStream {
         guard loaded else {
             return NativeRosterOutput(frames: [reply(pushID, sender: root.attributes["from"], error: "service-unavailable")])
         }
-        if contact.subscription == "remove" { contacts.removeValue(forKey: contact.jid) }
+        if contact.subscription == "remove" {
+            contacts.removeValue(forKey: contact.jid)
+            resources.removeValue(forKey: contact.jid)
+            overflowed.remove(contact.jid)
+        }
         else {
             guard contacts[contact.jid] != nil || contacts.count < 100 else {
                 return NativeRosterOutput(frames: [reply(pushID, sender: root.attributes["from"], error: "resource-constraint")])
             }
-            contacts[contact.jid] = contact
+            var updated = contact
+            if receivesPresence(contact), let previous = contacts[contact.jid], receivesPresence(previous) {
+                updated.presence = previous.presence
+            } else {
+                resources.removeValue(forKey: contact.jid)
+                overflowed.remove(contact.jid)
+            }
+            contacts[contact.jid] = updated
         }
         return NativeRosterOutput(frames: [reply(pushID, sender: root.attributes["from"])], state: state)
+    }
+
+    private func receivesPresence(_ contact: NativeContact) -> Bool {
+        ["to", "both"].contains(contact.subscription)
+    }
+
+    private mutating func receivePresence(_ root: ProbeElement) -> NativeRosterOutput {
+        guard loaded, root.namespace == "jabber:client",
+              let sender = root.attributes["from"], !sender.isEmpty, sender.utf8.count <= 3071,
+              !sender.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) else {
+            return NativeRosterOutput()
+        }
+        let parts = sender.split(separator: "/", maxSplits: 1, omittingEmptySubsequences: false)
+        let jid = String(parts[0])
+        guard var contact = contacts[jid], receivesPresence(contact),
+              parts.count == 1 || !parts[1].isEmpty else { return NativeRosterOutput() }
+        let resource = parts.count == 2 ? String(parts[1]) : ""
+        let type = root.attributes["type"]
+        guard type == nil || type == "unavailable" else { return NativeRosterOutput() }
+        var active = resources[jid] ?? [:]
+        if type == "unavailable" {
+            if parts.count == 1 {
+                active.removeAll()
+                overflowed.remove(jid)
+            } else { active.removeValue(forKey: resource) }
+        } else {
+            let shows = root.children.filter { $0.name == "show" && $0.namespace == "jabber:client" }
+            guard shows.count <= 1, shows.allSatisfy({ $0.children.isEmpty }) else { return NativeRosterOutput() }
+            let presence: NativeContactPresence
+            switch shows.first?.text {
+            case nil, "chat": presence = .online
+            case "away": presence = .away
+            case "xa": presence = .extendedAway
+            case "dnd": presence = .busy
+            default: return NativeRosterOutput()
+            }
+            if active[resource] == nil && active.count >= 64 {
+                overflowed.insert(jid)
+            } else { active[resource] = presence }
+        }
+        resources[jid] = active.isEmpty ? nil : active
+        if overflowed.contains(jid) { contact.presence = .unknown }
+        else {
+            contact.presence = [.online, .away, .extendedAway, .busy].first(where: { active.values.contains($0) }) ?? .offline
+        }
+        guard contacts[jid] != contact else { return NativeRosterOutput() }
+        contacts[jid] = contact
+        return NativeRosterOutput(state: state)
     }
 
     private var state: NativeRosterState {

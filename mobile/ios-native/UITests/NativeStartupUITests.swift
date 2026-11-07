@@ -55,9 +55,11 @@ final class NativeStartupUITests: XCTestCase {
         let contact = application.descendants(matching: .any)["contact-demo-contact@localhost"].firstMatch
         XCTAssertTrue(contact.waitForExistence(timeout: 5))
         reveal(contact)
+        XCTAssertTrue(contact.label.contains("Online"))
         XCUIDevice.shared.orientation = .landscapeLeft
         waitForStatus("XMPP verbonden als fixture@localhost")
         reveal(contact)
+        XCTAssertTrue(contact.label.contains("Online"))
         XCUIDevice.shared.orientation = .portrait
         let disconnect = application.buttons["disconnect-session"]
         reveal(disconnect, upward: false)

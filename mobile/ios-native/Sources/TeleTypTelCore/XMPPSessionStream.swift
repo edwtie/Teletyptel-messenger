@@ -132,6 +132,11 @@ struct XMPPSessionStream {
             guard root.namespace == "jabber:client", ["message", "presence", "iq"].contains(root.name) else {
                 throw ConnectionFailure.invalidResponse
             }
+            if root.name == "presence",
+               root.attributes["to"] == nil || root.attributes["to"] == expectedJID || root.attributes["to"] == boundJID,
+               let update = roster?.receive(root), update.state != nil {
+                return XMPPSessionOutput(roster: update.state)
+            }
             if root.name == "iq" {
                 if let update = roster?.receive(root), update.state != nil || !update.frames.isEmpty {
                     return XMPPSessionOutput(frames: update.frames, roster: update.state)

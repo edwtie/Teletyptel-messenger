@@ -105,7 +105,7 @@ private actor LoginFixture: ServerChecking, NativeAccountAuthenticating, NativeX
 
 final class NativeLoginModelTests: XCTestCase {
     private let contacts: NativeRosterState = .ready([
-        NativeContact(jid: "peer@localhost", name: "Testcontact", groups: [], subscription: "both")
+        NativeContact(jid: "peer@localhost", name: "Testcontact", groups: [], subscription: "both", presence: .online)
     ])
 
     @MainActor

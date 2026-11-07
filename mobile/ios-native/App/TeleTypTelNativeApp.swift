@@ -231,7 +231,7 @@ struct NativeStartupView: View {
             Text("Contacten")
                 .font(.title2.bold())
                 .accessibilityAddTraits(.isHeader)
-            Text("Alleen bekijken. Aanwezigheidsstatus, chat en groepsgesprekken volgen later.")
+            Text("Alleen bekijken. De status komt van XMPP; onbekend betekent niet offline. Chat en groepsgesprekken volgen later.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
             switch loginModel.roster {
@@ -253,6 +253,9 @@ struct NativeStartupView: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(contact.displayName).font(.headline)
                             Text(contact.jid).font(.subheadline)
+                            Text(contact.presence.label)
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
                             if !contact.groups.isEmpty {
                                 Text(contact.groups.joined(separator: ", "))
                                     .font(.footnote)
@@ -332,7 +335,7 @@ private struct NativeLoginUIFixture: ServerChecking, NativeAccountAuthenticating
     func run(account: NativeAuthenticatedAccount, onConnected: @escaping @Sendable (String) -> Void,
              onRoster: @escaping @Sendable (NativeRosterState) -> Void) async throws {
         onRoster(.ready([NativeContact(jid: "demo-contact@localhost", name: "Fictief testcontact",
-                                       groups: ["Testcontacten"], subscription: "both")]))
+                                       groups: ["Testcontacten"], subscription: "both", presence: .online)]))
         try await run(account: account, onConnected: onConnected)
     }
 

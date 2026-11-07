@@ -84,6 +84,8 @@ test("Project generation is isolated, repeatable and refuses overwriting an exis
   assert.equal(path.dirname(directory), path.join(root, "artifacts"));
   assert.equal(fs.readFileSync(path.join(directory, "TeleTypTelNative.xcodeproj/project.pbxproj"), "utf8"), projectText().project);
   assert.ok(fs.existsSync(path.join(directory, "Assets.xcassets/TeleTypTelLogo.imageset/logo.png")));
+  assert.equal(fs.readFileSync(path.join(directory, "Core/NativeRoster.swift"), "utf8"),
+    read("Sources/TeleTypTelCore/NativeRoster.swift"));
   assert.throws(() => prepare(name), /already exists/);
 });
 

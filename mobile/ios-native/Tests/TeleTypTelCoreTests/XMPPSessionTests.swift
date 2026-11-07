@@ -61,6 +61,25 @@ final class XMPPSessionTests: XCTestCase {
         XCTAssertThrowsError(try stream.receive(output.frames[0]))
     }
 
+    func testPresenceUpdatesRosterWithoutAcknowledgingHeartbeat() throws {
+        var stream = XMPPSessionStream(account: try account(), loadRoster: true)
+        let identifier = try reachBinding(&stream)
+        let output = try stream.receive(bound(identifier))
+        let request = try ProbeXML.parse(output.frames[0])
+        let rosterID = try XCTUnwrap(request.attributes["id"])
+        _ = try stream.receive("<iq xmlns='jabber:client' type='result' id='\(rosterID)'><query xmlns='jabber:iq:roster'><item jid='peer@localhost' subscription='both'/></query></iq>")
+        let ping = try ProbeXML.parse(stream.heartbeat())
+        XCTAssertNil(try stream.receive("<presence xmlns='jabber:client' from='peer@localhost/phone' to='other@localhost'/>").roster)
+        let update = try stream.receive("<presence xmlns='jabber:client' from='peer@localhost/phone' to='fixture@localhost/device'/>")
+        XCTAssertEqual(update.roster, .ready([NativeContact(jid: "peer@localhost", name: "", groups: [], subscription: "both", presence: .online)]))
+        XCTAssertFalse(update.heartbeatAcknowledged)
+        XCTAssertTrue(update.frames.isEmpty)
+        let pingID = try XCTUnwrap(ping.attributes["id"])
+        XCTAssertTrue(try stream.receive("<iq xmlns='jabber:client' type='result' id='\(pingID)'/>").heartbeatAcknowledged)
+        stream.close()
+        XCTAssertThrowsError(try stream.receive("<presence xmlns='jabber:client' from='peer@localhost/phone'/>"))
+    }
+
     func testAccountRejectsMalformedForeignAndUnsuccessfulResponses() throws {
         for reply in ["{}", "<html/>", #"{"ok":false}"#, #"{"ok":true,"account":{"jid":"fixture@other","password":"fake"}}"#,
                       #"{"ok":true,"account":{"jid":"fixture@localhost","password":""}}"#,
