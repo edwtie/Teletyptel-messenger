@@ -123,8 +123,16 @@ test("Native probe has transport, privacy and response limits", () => {
 test("Swift unit suite for native configuration, lifecycle, parser and cancellation", {
   skip: process.platform !== "darwin" && "Requires macOS Swift; source checks are not runtime proof"
 }, () => {
-  execFileSync("swift", ["test", "--package-path", native, "--scratch-path",
-    path.join(root, "artifacts", "ios-native-swift-tests-" + Date.now())], { timeout: 180000, stdio: "pipe" });
+  const scratch = path.join(root, "artifacts", "ios-native-check-unit-" + Date.now());
+  const reports = path.join(scratch, "reports");
+  fs.mkdirSync(reports, { recursive: true });
+  try {
+    executeLogged("swift", ["test", "--package-path", native, "--scratch-path", path.join(scratch, "build")],
+      { root, reports, name: "swift-tests", timeout: 180000 });
+  } catch (error) {
+    process.stderr.write(String(error.stdout || ""));
+    throw error;
+  }
 });
 
 test("Native authenticated connection is isolated, gated and does not persist credentials", () => {
