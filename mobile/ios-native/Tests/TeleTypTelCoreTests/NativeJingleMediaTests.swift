@@ -2,7 +2,7 @@ import XCTest
 @testable import TeleTypTelCore
 
 final class NativeJingleMediaTests: XCTestCase {
-    private let hash = Array(repeating: "AB", count: 32).joined(separator: ":")
+    private let certificateFingerprint = Array(repeating: "AB", count: 32).joined(separator: ":")
 
     private func fixture(_ profile: NativeCallMedia = .total, answer: Bool = false, count: Int = 1) -> String {
         var lines = ["v=0", "o=- 1 1 IN IP4 0.0.0.0", "s=-", "t=0 0"]
@@ -14,7 +14,7 @@ final class NativeJingleMediaTests: XCTestCase {
                 lines += ["a=sendrecv", "a=rtcp-mux", kind == "audio" ? "a=rtpmap:0 PCMU/8000" : "a=rtpmap:96 VP8/90000"]
                 if kind == "video" { lines += ["a=rtcp-fb:96 nack", "a=rtcp-fb:96 nack pli"] }
             }
-            lines += ["a=ice-ufrag:abcd", "a=ice-pwd:abcdefghijklmnopqrstuv", "a=fingerprint:sha-256 \(hash)", "a=setup:\(answer ? "active" : "actpass")"]
+            lines += ["a=ice-ufrag:abcd", "a=ice-pwd:abcdefghijklmnopqrstuv", "a=fingerprint:sha-256 \(certificateFingerprint)", "a=setup:\(answer ? "active" : "actpass")"]
             for index in 0..<count { lines += ["a=candidate:\(index + 1) 1 udp 2122260223 127.0.0.1 \(50000 + index) typ host generation 0"] }
             lines += ["a=end-of-candidates"]
         }
@@ -95,7 +95,7 @@ final class NativeJingleMediaTests: XCTestCase {
     }
 
     func testUnsupportedBundlingAndSessionWideSecurityAreNotSilentlyDiscarded() throws {
-        for attribute in ["a=group:BUNDLE audio video rtt", "a=fingerprint:sha-256 \(hash)", "a=ice-lite"] {
+        for attribute in ["a=group:BUNDLE audio video rtt", "a=fingerprint:sha-256 \(certificateFingerprint)", "a=ice-lite"] {
             let text = fixture().replacingOccurrences(of: "t=0 0\r\n", with: "t=0 0\r\n\(attribute)\r\n")
             XCTAssertThrowsError(try NativeJingleMedia.fromSDP(text, sid: "call-1", action: "session-initiate", profile: .total))
         }
@@ -129,7 +129,7 @@ final class NativeJingleMediaTests: XCTestCase {
         for replacement in ["short", "abcd&#10;a=inactive", "abcd&apos;attack", String(repeating: "a", count: 257)] {
             XCTAssertThrowsError(try decode(source.replacingOccurrences(of: "ufrag='abcd'", with: "ufrag='\(replacement)'")))
         }
-        XCTAssertThrowsError(try decode(source.replacingOccurrences(of: hash, with: "AB:CD")))
+        XCTAssertThrowsError(try decode(source.replacingOccurrences(of: certificateFingerprint, with: "AB:CD")))
         XCTAssertThrowsError(try decode(source.replacingOccurrences(of: "abcdefghijklmnopqrstuv", with: "short")))
         XCTAssertThrowsError(try decode(source.replacingOccurrences(of: "name='video'", with: "name='v&#13;evil'")))
     }
