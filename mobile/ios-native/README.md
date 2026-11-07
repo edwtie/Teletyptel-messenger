@@ -7,7 +7,7 @@ claim that those features already work in this target.
 
 ## Implemented in this first stage
 
-### Native media description conversion (validation pending)
+### Native media description conversion (unsigned validation completed)
 
 `NativeJingleMedia` adds native SDP/Jingle description conversion for audio,
 audio/video, audio/RTT and Total Conversation. This is a **restricted negotiation
@@ -32,9 +32,28 @@ It does not implement RTP/T.140 (RFC 4103), SIP interworking, trickle ICE, ICE
 restart, media capture/rendering or a full Jingle session state machine.
 
 Fourteen new Swift tests cover all four profiles in both directions, answer
-matching, parser/transport bounds and negative security cases. Their runtime
-results will be recorded after the unsigned Apple build; Windows source checks
-alone are not runtime proof. No TestFlight, APNs or server changes are included.
+matching, parser/transport bounds and negative security cases. Validation of
+revision `9e50fb4` on 2026-11-07:
+
+- Local Node source/generator/fixture checks: 22 passed, one macOS-only Swift
+  invocation skipped on Windows.
+- [Unsigned run 42366475598](https://github.com/edwtie/Teletyptel-messenger/actions/runs/42366475598):
+  117 Swift tests passed, including all fourteen new media description tests;
+  fifteen opt-in network tests skipped, zero failures. This run did not repeat
+  the earlier isolated ejabberd integration test.
+- Unsigned iOS device Release compilation and test-fixture exclusion passed.
+  All twelve UI tests passed: six on iPhone 16 Pro and six on iPad Pro 11-inch
+  (M4), in portrait and landscape-left, with no failures or skips.
+- Evidence is retained under `artifacts/ios-native-evidence-42366475598/`.
+  Initial test runs exposed an XCTest property-name collision and an incorrect
+  ICE-fragment boundary fixture; both were corrected before the successful run.
+  The test harness now retains Swift assertion output even when the initial
+  generator check fails.
+
+These tests exercise description conversion and existing UI, **not actual
+audio/video media exchange, camera capture, background calls or APNs delivery**.
+Physical-device tests and the concrete native peer-negotiation provider are
+still required. No TestFlight, APNs or server changes are included.
 
 References: [Jingle RTP (XEP-0167)](https://xmpp.org/extensions/xep-0167.html),
 [DTLS-SRTP (XEP-0320)](https://xmpp.org/extensions/xep-0320.html), and
