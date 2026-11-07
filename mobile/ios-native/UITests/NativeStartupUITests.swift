@@ -37,10 +37,8 @@ final class NativeStartupUITests: XCTestCase {
         XCTAssertEqual(server.value as? String, "http://example.invalid")
         XCTAssertEqual(domain.value as? String, "localhost")
         XCUIDevice.shared.orientation = .portrait
-        application.swipeUp()
         let check = application.buttons["check-connection"]
-        if !check.isHittable { application.swipeUp() }
-        XCTAssertTrue(check.isHittable)
+        reveal(check)
         check.tap()
         let error = application.staticTexts["startup-status"]
         let displayed = NSPredicate(format: "label CONTAINS %@", "zonder pad")
@@ -149,12 +147,25 @@ final class NativeStartupUITests: XCTestCase {
 
     private func reveal(_ element: XCUIElement, upward: Bool = true) {
         for _ in 0..<8 {
-            if element.isHittable { return }
+            if isUsable(element) { return }
             let scrollUp = element.exists && !element.frame.isEmpty
                 ? element.frame.midY > application.frame.midY : upward
             if scrollUp { application.swipeUp() } else { application.swipeDown() }
         }
-        XCTAssertTrue(element.isHittable, "Element remains outside the usable viewport: \(element.identifier), \(element.frame)")
+        XCTAssertTrue(isUsable(element), "Element remains outside the usable viewport: \(element.identifier), \(element.frame)")
+    }
+
+    private func isUsable(_ element: XCUIElement) -> Bool {
+        guard element.exists, !element.frame.isEmpty else { return false }
+        let window = application.frame
+        let navigation = application.navigationBars.firstMatch
+        let top = navigation.exists ? max(window.minY + 12, navigation.frame.maxY + 8) : window.minY + 12
+        let keyboard = application.keyboards.firstMatch
+        let bottom = keyboard.exists ? min(window.maxY - 24, keyboard.frame.minY - 8) : window.maxY - 24
+        guard bottom > top else { return false }
+        let viewport = CGRect(x: window.minX + 12, y: top, width: window.width - 24, height: bottom - top)
+        guard viewport.contains(element.frame) else { return false }
+        return element.elementType == .staticText || element.isHittable
     }
 
     private func waitForStatus(_ text: String) {

@@ -178,3 +178,13 @@ test("Native chat and background source guards retain bounded data and honest se
   assert.doesNotMatch(read("App/Info.plist"), /UIBackgroundModes/);
   assert.ok(fs.existsSync(path.join(native, "Tests/TeleTypTelCoreTests/NativeChatTests.swift")));
 });
+
+test("Native rotation tests check visible geometry before requesting a tap point", () => {
+  const ui = read("UITests/NativeStartupUITests.swift");
+  const helper = ui.slice(ui.indexOf("private func isUsable("), ui.indexOf("private func waitForStatus("));
+  for (const required of ["navigation.frame.maxY", "keyboard.frame.minY", "viewport.contains(element.frame)",
+    "element.elementType == .staticText || element.isHittable"])
+    assert.ok(helper.includes(required), required);
+  assert.ok(helper.indexOf("viewport.contains(element.frame)") < helper.indexOf("element.isHittable"));
+  assert.match(ui, /XCTAssertTrue\(isUsable\(element\)/);
+});
