@@ -92,7 +92,7 @@ struct NativeStartupView: View {
                     Text("Native iPhone- en iPad-app")
                         .font(.title2.bold())
                         .accessibilityAddTraits(.isHeader)
-                    Text("Ontwikkelversie: aanmelden met een XMPP-account en de verbinding controleren. Contacten, chat en bellen zijn hier nog niet beschikbaar.")
+                    Text("Ontwikkelversie: aanmelden met een XMPP-account, de verbinding controleren en contacten bekijken. Chat en bellen zijn hier nog niet beschikbaar.")
                         .foregroundStyle(.secondary)
                     if fixtureName != nil {
                         Text("TESTSCENARIO — geen echte serververbinding")
@@ -154,7 +154,10 @@ struct NativeStartupView: View {
                     .padding()
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
-                    if model.state.phase == .available {
+                    if loginModel.isConnected {
+                        contactsView
+                    }
+                    if model.state.phase == .available && !loginModel.isConnected {
                         VStack(alignment: .leading, spacing: 12) {
                             Text("Aanmelden")
                                 .font(.headline)
@@ -223,13 +226,58 @@ struct NativeStartupView: View {
         loginModel.reset()
     }
 
+    private var contactsView: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Contacten")
+                .font(.title2.bold())
+                .accessibilityAddTraits(.isHeader)
+            Text("Alleen bekijken. Aanwezigheidsstatus, chat en groepsgesprekken volgen later.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            switch loginModel.roster {
+            case .idle, .loading:
+                ProgressView("Contacten ophalen…")
+            case .unavailable:
+                Text("Contacten konden niet worden opgehaald. Je XMPP-verbinding kan nog actief zijn. Verbreek de verbinding en meld opnieuw aan om het opnieuw te proberen.")
+                    .accessibilityIdentifier("contacts-error")
+            case .ready(let contacts):
+                if contacts.isEmpty {
+                    Text("Nog geen contacten in je XMPP-contactenlijst.")
+                        .accessibilityIdentifier("contacts-empty")
+                }
+                ForEach(contacts) { contact in
+                    HStack(alignment: .top, spacing: 12) {
+                        Image(systemName: "person.crop.circle")
+                            .font(.title2)
+                            .accessibilityHidden(true)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(contact.displayName).font(.headline)
+                            Text(contact.jid).font(.subheadline)
+                            if !contact.groups.isEmpty {
+                                Text(contact.groups.joined(separator: ", "))
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding()
+                    .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
+                    .accessibilityElement(children: .combine)
+                    .accessibilityIdentifier("contact-" + contact.jid)
+                }
+            }
+        }
+        .accessibilityIdentifier("native-contacts")
+    }
+
     private var statusText: String {
         switch loginModel.phase {
         case .idle: break
         case .checking: return "Chatserver opnieuw controleren voordat je inloggegevens worden verstuurd…"
         case .authenticating: return "Account controleren… Je bent nog niet verbonden met XMPP."
         case .connecting: return "Account goedgekeurd. Beveiligde XMPP-aanmelding voltooien…"
-        case .connected(let account): return "XMPP verbonden als \(account). Contacten, chat en bellen volgen in een volgende stap."
+        case .connected(let account): return "XMPP verbonden als \(account). Je kunt je contacten bekijken; chat en bellen volgen later."
         case .signedOut: return "De XMPP-verbinding is verbroken. Je kunt opnieuw aanmelden."
         case .suspended: return "De previewverbinding is gestopt op de achtergrond. Meld opnieuw aan; achtergrondoproepen zijn hier nog niet aangesloten."
         case .failed(let failure):
@@ -281,6 +329,13 @@ struct NativeStartupView: View {
 #if DEBUG
 private struct NativeLoginUIFixture: ServerChecking, NativeAccountAuthenticating, NativeXMPPConnecting {
     let scenario: String
+
+    func run(account: NativeAuthenticatedAccount, onConnected: @escaping @Sendable (String) -> Void,
+             onRoster: @escaping @Sendable (NativeRosterState) -> Void) async throws {
+        onRoster(.ready([NativeContact(jid: "demo-contact@localhost", name: "Fictief testcontact",
+                                       groups: ["Testcontacten"], subscription: "both")]))
+        try await run(account: account, onConnected: onConnected)
+    }
 
     func check(_ configuration: ServerConfiguration) async throws -> ProbeReport {
         guard configuration.origin.host == "example.invalid", configuration.domain == "localhost" else {

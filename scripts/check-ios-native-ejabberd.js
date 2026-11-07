@@ -36,6 +36,8 @@ listen:
 ${listener(trustedPort)}
 modules:
   mod_ping: {}
+  mod_roster: {}
+  mod_admin_extra: {}
 `;
 }
 
@@ -182,6 +184,7 @@ async function run() {
     }
     if (!ready) throw new Error("Isolated ejabberd did not start");
     control("register", username, "localhost", password);
+    control("add_rosteritem", username, "localhost", "fixture-peer", "localhost", "Fictief testcontact", "Testcontacten", "both");
     loginFixture = await startLoginFixture({ key: fs.readFileSync(certificate("server.key")),
       cert: fs.readFileSync(certificate("server.crt")), ca: fs.readFileSync(certificate("ca.crt")),
       trustedPort, username, password });

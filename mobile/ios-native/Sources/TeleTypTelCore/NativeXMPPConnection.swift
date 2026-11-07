@@ -2,6 +2,16 @@ import Foundation
 
 public protocol NativeXMPPConnecting {
     func run(account: NativeAuthenticatedAccount, onConnected: @escaping @Sendable (String) -> Void) async throws
+    func run(account: NativeAuthenticatedAccount, onConnected: @escaping @Sendable (String) -> Void,
+             onRoster: @escaping @Sendable (NativeRosterState) -> Void) async throws
+}
+
+public extension NativeXMPPConnecting {
+    func run(account: NativeAuthenticatedAccount, onConnected: @escaping @Sendable (String) -> Void,
+             onRoster: @escaping @Sendable (NativeRosterState) -> Void) async throws {
+        onRoster(.unavailable)
+        try await run(account: account, onConnected: onConnected)
+    }
 }
 
 public struct NativeXMPPConnection: NativeXMPPConnecting {
@@ -9,6 +19,14 @@ public struct NativeXMPPConnection: NativeXMPPConnecting {
 
     public func run(account: NativeAuthenticatedAccount, onConnected: @escaping @Sendable (String) -> Void) async throws {
         let operation = SessionOperation(account: account, onConnected: onConnected)
+        try await withTaskCancellationHandler(operation: {
+            try await operation.run()
+        }, onCancel: { operation.cancel() })
+    }
+
+    public func run(account: NativeAuthenticatedAccount, onConnected: @escaping @Sendable (String) -> Void,
+                    onRoster: @escaping @Sendable (NativeRosterState) -> Void) async throws {
+        let operation = SessionOperation(account: account, onConnected: onConnected, onRoster: onRoster)
         try await withTaskCancellationHandler(operation: {
             try await operation.run()
         }, onCancel: { operation.cancel() })
@@ -24,14 +42,18 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, @un
     private var continuation: CheckedContinuation<Void, Error>?
     private var deadline: DispatchWorkItem?
     private var heartbeat: DispatchWorkItem?
+    private var rosterDeadline: DispatchWorkItem?
+    private var onRoster: (@Sendable (NativeRosterState) -> Void)?
     private var stream: XMPPSessionStream
     private var cancelled = false
     private var completed = false
 
-    init(account: NativeAuthenticatedAccount, onConnected: @escaping @Sendable (String) -> Void) {
+    init(account: NativeAuthenticatedAccount, onConnected: @escaping @Sendable (String) -> Void,
+         onRoster: (@Sendable (NativeRosterState) -> Void)? = nil) {
         configuration = account.configuration
-        stream = XMPPSessionStream(account: account)
+        stream = XMPPSessionStream(account: account, loadRoster: onRoster != nil)
         self.onConnected = onConnected
+        self.onRoster = onRoster
     }
 
     func run() async throws {
@@ -89,6 +111,9 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, @un
         completed = true
         self.continuation = nil
         onConnected = nil
+        onRoster = nil
+        rosterDeadline?.cancel()
+        rosterDeadline = nil
         deadline?.cancel()
         deadline = nil
         heartbeat?.cancel()
@@ -133,6 +158,20 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, @un
                             self.deadline?.cancel()
                             self.deadline = nil
                             self.scheduleHeartbeat()
+                        }
+                        if let roster = output.roster {
+                            self.rosterDeadline?.cancel()
+                            self.rosterDeadline = nil
+                            self.onRoster?(roster)
+                            if roster == .loading {
+                                let deadline = DispatchWorkItem { [weak self] in
+                                    guard let self = self, !self.completed,
+                                          let state = self.stream.rosterTimedOut() else { return }
+                                    self.onRoster?(state)
+                                }
+                                self.rosterDeadline = deadline
+                                self.queue.asyncAfter(deadline: .now() + 10, execute: deadline)
+                            }
                         }
                         self.receive()
                     }

@@ -12,6 +12,7 @@ struct XMPPSessionOutput {
     var frames: [String] = []
     var connectedJID: String?
     var heartbeatAcknowledged = false
+    var roster: NativeRosterState?
 }
 
 struct XMPPSessionStream {
@@ -29,11 +30,13 @@ struct XMPPSessionStream {
     private var boundJID: String?
     private var pingID: String?
     private var handshakeBytes = 0
+    private var roster: NativeRosterStream?
 
-    init(account: NativeAuthenticatedAccount) {
+    init(account: NativeAuthenticatedAccount, loadRoster: Bool = false) {
         self.account = account
         configuration = account.configuration
         expectedJID = account.jid
+        if loadRoster { roster = NativeRosterStream(owner: account.jid) }
     }
 
     var opening: String { XMPPProbeStream.opening(for: configuration) }
@@ -42,8 +45,11 @@ struct XMPPSessionStream {
         account = nil
         boundJID = nil
         pingID = nil
+        roster = nil
         phase = .closed
     }
+
+    mutating func rosterTimedOut() -> NativeRosterState? { roster?.timeout() }
 
     mutating func heartbeat() throws -> String {
         guard phase == .online else { throw ConnectionFailure.invalidResponse }
@@ -120,12 +126,16 @@ struct XMPPSessionStream {
             }
             boundJID = jid.text
             phase = .online
-            return XMPPSessionOutput(frames: ["<presence xmlns='jabber:client'/>"], connectedJID: jid.text)
+            return XMPPSessionOutput(frames: (roster.map { [$0.request] } ?? []) + ["<presence xmlns='jabber:client'/>"],
+                                     connectedJID: jid.text, roster: roster == nil ? nil : .loading)
         case .online:
             guard root.namespace == "jabber:client", ["message", "presence", "iq"].contains(root.name) else {
                 throw ConnectionFailure.invalidResponse
             }
             if root.name == "iq" {
+                if let update = roster?.receive(root), update.state != nil || !update.frames.isEmpty {
+                    return XMPPSessionOutput(frames: update.frames, roster: update.state)
+                }
                 let sender = root.attributes["from"]
                 let trustedSender = sender == nil || sender == configuration.domain || sender == boundJID || sender == expectedJID
                 if let pingID = pingID, root.attributes["id"] == pingID,

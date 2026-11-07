@@ -21,6 +21,7 @@ public final class NativeLoginModel: ObservableObject {
     }
 
     @Published public private(set) var phase: Phase = .idle
+    @Published public private(set) var roster: NativeRosterState = .idle
     private var generation = UUID()
     private var task: Task<Void, Never>?
     private let checker: any ServerChecking
@@ -69,7 +70,8 @@ public final class NativeLoginModel: ObservableObject {
                     throw NativeAccountFailure.invalidResponse
                 }
                 guard self?.advance(attempt, to: .connecting) == true else { return }
-                try await connection.run(account: account) { [weak self] fullJID in
+                self?.roster = .loading
+                try await connection.run(account: account, onConnected: { [weak self] fullJID in
                     Task { @MainActor [weak self] in
                         guard let self = self, self.generation == attempt, self.phase == .connecting else { return }
                         let parts = fullJID.split(separator: "/", maxSplits: 1, omittingEmptySubsequences: false)
@@ -80,7 +82,13 @@ public final class NativeLoginModel: ObservableObject {
                         }
                         self.phase = .connected(jid)
                     }
-                }
+                }, onRoster: { [weak self] roster in
+                    Task { @MainActor [weak self] in
+                        guard let self = self, self.generation == attempt,
+                              self.phase == .connecting || self.isConnected else { return }
+                        self.roster = roster
+                    }
+                })
                 throw ConnectionFailure.offline
             } catch {
                 guard !Task.isCancelled, let self = self, self.generation == attempt else { return }
@@ -116,6 +124,7 @@ public final class NativeLoginModel: ObservableObject {
 
     private func invalidate() {
         generation = UUID()
+        roster = .idle
         task?.cancel()
         task = nil
     }

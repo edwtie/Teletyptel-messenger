@@ -22,6 +22,8 @@ test("Isolated ejabberd exposes only loopback WSS and no federation or public re
   assert.doesNotMatch(configuration, /untrusted\.pem|certfile:/);
   assert.match(configuration, /s2s_access: none/);
   assert.match(configuration, /auth_password_format: scram/);
+  assert.match(configuration, /mod_roster: \{\}/);
+  assert.match(configuration, /mod_admin_extra: \{\}/);
   assert.doesNotMatch(configuration, /mod_register|mod_http_api|ejabberd_c2s|0\.0\.0\.0|5269/);
   for (const ports of [[80, 15281], [15280, 15280], [15280, 65536], [15280, "15281"]]) {
     assert.throws(() => serverConfiguration(directory, ...ports));

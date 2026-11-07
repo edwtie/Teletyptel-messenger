@@ -5,6 +5,7 @@ private actor LoginFixture: ServerChecking, NativeAccountAuthenticating, NativeX
     private struct Run {
         let account: NativeAuthenticatedAccount
         let ready: @Sendable (String) -> Void
+        let roster: @Sendable (NativeRosterState) -> Void
         var continuation: CheckedContinuation<Void, Error>?
     }
 
@@ -57,12 +58,17 @@ private actor LoginFixture: ServerChecking, NativeAccountAuthenticating, NativeX
     }
 
     func run(account: NativeAuthenticatedAccount, onConnected: @escaping @Sendable (String) -> Void) async throws {
+        try await run(account: account, onConnected: onConnected, onRoster: { _ in })
+    }
+
+    func run(account: NativeAuthenticatedAccount, onConnected: @escaping @Sendable (String) -> Void,
+             onRoster: @escaping @Sendable (NativeRosterState) -> Void) async throws {
         let identifier = UUID()
         try await withTaskCancellationHandler(operation: {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
                 events.append("xmpp")
                 identifiers.append(identifier)
-                runs[identifier] = Run(account: account, ready: onConnected, continuation: continuation)
+                runs[identifier] = Run(account: account, ready: onConnected, roster: onRoster, continuation: continuation)
                 if cancelled.contains(identifier) { finish(identifier, error: CancellationError()) }
             }
         }, onCancel: {
@@ -80,6 +86,11 @@ private actor LoginFixture: ServerChecking, NativeAccountAuthenticating, NativeX
         finish(identifiers[index], error: error)
     }
 
+    func roster(_ index: Int, state: NativeRosterState) {
+        guard identifiers.indices.contains(index), let run = runs[identifiers[index]] else { return }
+        run.roster(state)
+    }
+
     private func cancel(_ identifier: UUID) {
         cancelled.insert(identifier)
         finish(identifier, error: CancellationError())
@@ -93,6 +104,54 @@ private actor LoginFixture: ServerChecking, NativeAccountAuthenticating, NativeX
 }
 
 final class NativeLoginModelTests: XCTestCase {
+    private let contacts: NativeRosterState = .ready([
+        NativeContact(jid: "peer@localhost", name: "Testcontact", groups: [], subscription: "both")
+    ])
+
+    @MainActor
+    func testRosterClearsOnLogoutSuspendAndFailureAndRejectsLateUpdates() async {
+        for action in ["logout", "suspend", "failure"] {
+            let fixture = LoginFixture()
+            let model = model(fixture)
+            start(model)
+            await eventually { await fixture.runCount() == 1 }
+            await fixture.ready(0)
+            await fixture.roster(0, state: contacts)
+            await eventually { model.isConnected && model.roster == self.contacts }
+            if action == "logout" { model.disconnect() }
+            else if action == "suspend" { model.suspend() }
+            else {
+                await fixture.fail(0, error: XMPPSessionFailure.heartbeatTimeout)
+                await eventually { !model.isConnected }
+            }
+            XCTAssertEqual(model.roster, .idle)
+            await fixture.roster(0, state: contacts)
+            try? await Task.sleep(nanoseconds: 20_000_000)
+            XCTAssertEqual(model.roster, .idle)
+        }
+    }
+
+    @MainActor
+    func testRosterOfPreviousAccountCannotReplaceNewAccount() async {
+        let fixture = LoginFixture()
+        let model = model(fixture)
+        start(model)
+        await eventually { await fixture.runCount() == 1 }
+        await fixture.ready(0)
+        await fixture.roster(0, state: contacts)
+        await eventually { model.roster == self.contacts }
+        start(model, jid: "second@localhost")
+        XCTAssertEqual(model.roster, .idle)
+        await eventually { await fixture.runCount() == 2 }
+        await fixture.ready(1)
+        await fixture.roster(1, state: .ready([]))
+        await eventually { model.roster == .ready([]) }
+        await fixture.roster(0, state: contacts)
+        try? await Task.sleep(nanoseconds: 20_000_000)
+        XCTAssertEqual(model.roster, .ready([]))
+        model.disconnect()
+    }
+
     @MainActor
     private func model(_ fixture: LoginFixture) -> NativeLoginModel {
         NativeLoginModel(checker: fixture, authenticator: fixture, connection: fixture)

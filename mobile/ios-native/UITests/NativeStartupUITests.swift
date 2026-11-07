@@ -49,13 +49,18 @@ final class NativeStartupUITests: XCTestCase {
     func testNativeLoginAndDisconnectPreserveStateAcrossRotation() {
         signInFixture("connected")
         waitForStatus("XMPP verbonden als fixture@localhost")
+        let contact = application.descendants(matching: .any)["contact-demo-contact@localhost"].firstMatch
+        XCTAssertTrue(contact.waitForExistence(timeout: 5))
+        reveal(contact)
         XCUIDevice.shared.orientation = .landscapeLeft
         waitForStatus("XMPP verbonden als fixture@localhost")
+        reveal(contact)
         XCUIDevice.shared.orientation = .portrait
         let disconnect = application.buttons["disconnect-session"]
         reveal(disconnect, upward: false)
         disconnect.tap()
         waitForStatus("De XMPP-verbinding is verbroken")
+        XCTAssertFalse(contact.exists)
         let password = application.secureTextFields["login-password"]
         XCTAssertTrue(["", "Wachtwoord"].contains(password.value as? String ?? "missing"))
         XCTAssertFalse(application.buttons["login-account"].isEnabled)

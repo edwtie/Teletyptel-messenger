@@ -45,6 +45,22 @@ final class XMPPSessionTests: XCTestCase {
         }
     }
 
+    func testRosterIsRequestedOnlyAfterBindingAndTimeoutDoesNotBreakSession() throws {
+        var stream = XMPPSessionStream(account: try account(), loadRoster: true)
+        let identifier = try reachBinding(&stream)
+        let output = try stream.receive(bound(identifier))
+        XCTAssertEqual(output.roster, .loading)
+        XCTAssertEqual(output.frames.count, 2)
+        let request = try ProbeXML.parse(output.frames[0])
+        XCTAssertEqual(request.children.first?.namespace, "jabber:iq:roster")
+        XCTAssertEqual(stream.rosterTimedOut(), .unavailable)
+        XCTAssertEqual(stream.phase, .online)
+        XCTAssertNoThrow(try stream.heartbeat())
+        stream.close()
+        XCTAssertNil(stream.rosterTimedOut())
+        XCTAssertThrowsError(try stream.receive(output.frames[0]))
+    }
+
     func testAccountRejectsMalformedForeignAndUnsuccessfulResponses() throws {
         for reply in ["{}", "<html/>", #"{"ok":false}"#, #"{"ok":true,"account":{"jid":"fixture@other","password":"fake"}}"#,
                       #"{"ok":true,"account":{"jid":"fixture@localhost","password":""}}"#,

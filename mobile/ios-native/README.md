@@ -34,6 +34,43 @@ part of migration parity, not implemented here.
 
 ## Authenticated XMPP foundation
 
+### Read-only native contacts (2026-11-07)
+
+The isolated native target now requests the XMPP roster after resource binding.
+It shows contact names, bare JIDs and roster categories, with distinct loading,
+empty and unavailable states. Categories are **not MUC chat rooms**. Contact
+editing, phone address-book access, avatars, presence display and opening chats
+are not implemented in this step.
+
+Roster results are correlated with the pending request. Pushes accept only an
+absent sender or the authenticated account's bare JID, require one valid item,
+and acknowledge accepted updates. Logout, account change, background suspension
+and connection failure clear the list and invalidate previous callbacks. A
+ten-second roster timeout shows unavailable without declaring XMPP disconnected.
+Retry currently requires disconnecting and signing in again.
+
+This bounded preview supports up to 100 contacts and 16 categories per contact;
+the existing 64-KiB / 128-element XML-frame limits also apply. Oversize or invalid
+data is rejected, never silently truncated. Exceeding the shared XML-frame limit
+closes the session; exceeding roster-specific limits reports unavailable or an
+IQ error. Pushes before a valid initial snapshot are rejected, not buffered.
+Roster versioning, full JID normalization and extension-element interoperability
+remain future work; this is not a full RFC 6121 conformance claim.
+
+Unit tests cover correlation, spoofed senders, updates/removals, malformed data,
+limits, timeout and stale account callbacks. The existing isolated HTTPS/XMPP
+integration scenario now also checks a seeded fictional roster contact and
+clearing on logout. The five-case UI suite now verifies a fictional contact in
+portrait and landscape-left, and its disappearance on logout. Runtime results
+for this step must be recorded after the macOS runs; earlier green results do
+not prove this revision.
+
+Protocol reference: [RFC 6121, roster management](https://www.rfc-editor.org/rfc/rfc6121.html#section-2).
+The disposable loopback-only ejabberd fixture enables `mod_roster` and
+`mod_admin_extra` and seeds a fictional entry through
+[add_rosteritem](https://docs.ejabberd.im/developer/ejabberd-api/admin-api/#add_rosteritem).
+No live server, user contacts, signing keys or TestFlight uploads are involved.
+
 Added and published after the first-stage validation:
 
 - `NativeAccountClient` performs a bounded HTTPS POST to the configured origin's
