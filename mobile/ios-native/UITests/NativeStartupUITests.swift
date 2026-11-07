@@ -11,6 +11,9 @@ final class NativeStartupUITests: XCTestCase {
     }
 
     override func tearDownWithError() throws {
+        if let run = testRun, !run.hasSucceeded {
+            print("NATIVE_UI_FAILURE_HIERARCHY\n" + application.debugDescription)
+        }
         application.terminate()
         XCUIDevice.shared.orientation = .portrait
     }
@@ -114,6 +117,7 @@ final class NativeStartupUITests: XCTestCase {
     }
 
     private func waitForStatus(_ text: String) {
+        reveal(application.staticTexts["startup-status"], upward: false)
         let displayed = NSPredicate(format: "label CONTAINS %@", text)
         expectation(for: displayed, evaluatedWith: application.staticTexts["startup-status"])
         waitForExpectations(timeout: 10)

@@ -102,8 +102,9 @@ Added and published after the first-stage validation:
   says "Verbinding verbreken": it closes native XMPP, not other backend sessions.
 
 The connection currently supplies readiness/loss detection only, not a chat API.
-Roster, message handling, receipts, MUC, XEP-0198 resume, automatic reconnection,
-background operation are **not delivered by this stage**. No existing TestFlight
+Message handling, receipts, MUC, XEP-0198 resume, automatic reconnection and
+background operation are **not delivered by this stage**. Read-only roster
+support was added subsequently as described above. No existing TestFlight
 screen or server has been changed. The native UI adapter added next cancels old
 tasks and rejects old-generation callbacks before starting a new connection.
 
@@ -145,7 +146,8 @@ and the isolated transport evidence below.
   preview clears the password and stops the connection, with a clear explanation
   and manual re-login on return. This is **not** background-call support.
 - A 2FA challenge remains fail-closed and explains how to use the existing app;
-  it never suggests disabling 2FA. Contacts/chat/calls remain explicitly pending.
+  it never suggests disabling 2FA. Chat/calls remain explicitly pending; the
+  later read-only contact list is documented above.
 - Nine new model tests use injected probe/account/connection actors. Three new
   UI scenarios cover simulated login/disconnect across rotation, a 2FA challenge
   and connection loss, in addition to the two original startup UI tests.

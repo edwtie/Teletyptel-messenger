@@ -268,7 +268,6 @@ struct NativeStartupView: View {
                 }
             }
         }
-        .accessibilityIdentifier("native-contacts")
     }
 
     private var statusText: String {
