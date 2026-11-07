@@ -141,6 +141,8 @@ enum NativeMediaLoopback {
             first.engine.prepared.peer.connectionState == .connected && second.engine.prepared.peer.connectionState == .connected
         }
         for fixture in [first, second] {
+            precondition(fixture.engine.prepared.peer.transceivers.count == (profile.hasVideo ? 2 : 1))
+            precondition(fixture.engine.prepared.peer.transceivers.allSatisfy { $0.direction == .sendRecv && $0.sender.track != nil })
             precondition(fixture.engine.prepared.peer.receivers.contains { $0.track is RTCAudioTrack })
         }
         if profile.hasVideo {
