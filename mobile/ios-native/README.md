@@ -140,17 +140,33 @@ References: [RFC 6121 direct messaging](https://www.rfc-editor.org/rfc/rfc6121.h
 [Apple finite background tasks](https://developer.apple.com/documentation/uikit/extending-your-app-s-background-execution-time),
 and [Apple VoIP notification handling](https://developer.apple.com/documentation/pushkit/responding-to-voip-notifications-from-pushkit).
 
-## Incoming-call lifecycle foundation (local preparation)
+## Incoming-call lifecycle foundation (unsigned validation passed)
 
-The next isolated step adds `NativeIncomingCall.swift` and ten Swift unit tests.
+This isolated step adds `NativeIncomingCall.swift` and ten Swift unit tests.
 It does **not** yet connect PushKit, CallKit, media, registration or the UI. The
-successful chat runs above predate this change; they are not validation of this
-new source. No APNs entitlement, secret, backend change or TestFlight upload is
-part of this preparation.
+successful chat runs above predate this change; the separate run below validates
+this new source. No APNs entitlement, secret, backend change or TestFlight upload
+is part of this step.
 
 Local validation on 2026-11-07: 20 Node/source/fixture checks passed; one Swift
 runner check was skipped because Windows has no macOS Swift test environment.
-The ten new Swift behavioral tests and unsigned iOS compilation remain pending.
+
+Unsigned GitHub validation on 2026-11-07:
+[run 42358499938](https://github.com/edwtie/Teletyptel-messenger/actions/runs/42358499938)
+passed at revision `a827872212d98303521bc19a527e2dc34fc14e2f`.
+
+- Swift: 77 passed, including all ten new incoming-call lifecycle tests; 14
+  opt-in network integration tests skipped; no failures. This run does not
+  establish live call or server interoperability.
+- UI regression tests: six passed on iPhone 16 Pro and six on iPad Pro 11-inch
+  (M4), both iOS Simulator 18.5, including portrait/landscape checks; no failures
+  or skips. These exercise the existing native UI/chat, not a new call UI.
+- Unsigned device Release compilation passed and the Debug login fixture was
+  confirmed excluded. No signing, push activation or TestFlight upload occurred.
+- Downloaded evidence is retained locally under
+  `artifacts/ios-native-evidence-42358499938/ios-native-check-1794042602646/reports/`.
+  The lifecycle remains unit-tested groundwork; physical-device background
+  calls and APNs/CallKit/media integration still require the gates below.
 
 - Decode the existing incoming-call JSON contract with typed booleans, UUID,
   bounded session identifier, four media profiles and a maximum 60-second
