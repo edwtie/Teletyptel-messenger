@@ -40,8 +40,11 @@ struct NativeJingleMedia: CustomStringConvertible, CustomDebugStringConvertible 
     var debugDescription: String { description }
 
     static func decode(_ xml: String, sid: String, action: String, profile: NativeCallMedia) throws -> Self {
+        try decode(ProbeXML.parse(xml), sid: sid, action: action, profile: profile)
+    }
+
+    static func decode(_ root: ProbeElement, sid: String, action: String, profile: NativeCallMedia) throws -> Self {
         try identity(sid: sid, action: action)
-        let root = try ProbeXML.parse(xml)
         try node(root, "jingle", jingle, attributes: ["sid", "action", "initiator", "responder"])
         try require(root.attributes["sid"] == sid && root.attributes["action"] == action)
         let kinds = kinds(profile)

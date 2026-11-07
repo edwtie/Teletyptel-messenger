@@ -24,6 +24,16 @@ public struct NativeJingleRequest: Sendable, CustomStringConvertible, CustomDebu
 
     public var description: String { "NativeJingleRequest(redacted)" }
     public var debugDescription: String { description }
+
+    func jingleElement() throws -> ProbeElement {
+        let root = try ProbeXML.parse(xml)
+        guard root.name == "iq", root.namespace == "jabber:client", root.attributes["type"] == "set",
+              root.attributes["from"] == peer, root.attributes["id"] == identifier, root.children.count == 1,
+              root.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              let element = root.children.first, element.name == "jingle", element.namespace == "urn:xmpp:jingle:1",
+              element.attributes["sid"] == sid, element.attributes["action"] == action else { throw NativeJingleFailure.invalidRequest }
+        return element
+    }
 }
 
 public protocol NativeJingleSending: Sendable {
@@ -176,12 +186,12 @@ struct NativeJingleTransport {
         return true
     }
 
-    private static func fullJID(_ jid: String) -> Bool {
+    static func fullJID(_ jid: String) -> Bool {
         let parts = jid.split(separator: "/", maxSplits: 1, omittingEmptySubsequences: false)
         return parts.count == 2 && !parts[1].isEmpty && NativeChatCodec.bareJID(jid) != nil
     }
 
-    private static func validSID(_ sid: String) -> Bool {
+    static func validSID(_ sid: String) -> Bool {
         sid.range(of: #"\A[A-Za-z0-9_-]{1,128}\z"#, options: .regularExpression) != nil
     }
 

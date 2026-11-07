@@ -2,6 +2,51 @@ import Foundation
 import CoreVideo
 import WebRTC
 
+@MainActor
+private final class MediaTestWire: NativeJingleSending {
+    let owner: String
+    private var transport: NativeJingleTransport
+    weak var remote: MediaTestWire?
+    var received: ((NativeJingleRequest) async -> Void)?
+    private var pending: [String: CheckedContinuation<Void, Error>] = [:]
+    init(owner: String) { self.owner = owner; transport = NativeJingleTransport(owner: owner) }
+    func bindCall(peer: String, sid: String) async throws -> UUID { try transport.bind(peer: peer, sid: sid) }
+    func exchangeJingle(binding: UUID, xml: String) async throws {
+        let output = try transport.prepare(binding: binding, xml: xml)
+        try await withCheckedThrowingContinuation { continuation in
+            pending[output.identifier] = continuation
+            Task {
+                await send(output.frame)
+            }
+            Task {
+                try? await Task.sleep(nanoseconds: 8_000_000_000)
+                transport.cancel(output.identifier)
+                pending.removeValue(forKey: output.identifier)?.resume(throwing: NativeJingleFailure.timedOut)
+            }
+        }
+    }
+    func replyJingle(_ request: NativeJingleRequest, rejection: NativeJingleRejection?) async throws {
+        let frame = try transport.reply(request, rejection: rejection, now: ProcessInfo.processInfo.systemUptime)
+        await send(frame)
+    }
+    func unbindCall(_ binding: UUID) async {
+        for identifier in transport.unbind(binding) { pending.removeValue(forKey: identifier)?.resume(throwing: NativeJingleFailure.disconnected) }
+    }
+    private func send(_ frame: String) async {
+        guard let remote = remote else { return }
+        await remote.receive(frame.replacingOccurrences(of: "<iq ", with: "<iq from='\(owner)' "))
+    }
+    private func receive(_ frame: String) async {
+        let output = transport.receive(frame, now: ProcessInfo.processInfo.systemUptime)
+        if let identifier = output.completed, let continuation = pending.removeValue(forKey: identifier) {
+            if let failure = output.failure { continuation.resume(throwing: failure) }
+            else { continuation.resume() }
+        }
+        for reply in output.frames { await send(reply) }
+        if let request = output.request { await received?(request) }
+    }
+}
+
 private final class FrameCounter: NSObject, RTCVideoRenderer {
     private let lock = NSLock()
     private var frames = 0
@@ -75,10 +120,20 @@ enum NativeMediaLoopback {
         let first = try FixturePeer(factory: factory, profile: profile)
         let second = try FixturePeer(factory: factory, profile: profile)
         defer { first.close(); second.close() }
-        let offer = try await first.engine.createOffer()
-        precondition(!offer.sdp.contains("BUNDLE"))
-        let answer = try await second.engine.acceptOffer(offer.xml)
-        try await first.engine.applyAnswer(answer.xml)
+        let firstWire = MediaTestWire(owner: "first@localhost/phone"), secondWire = MediaTestWire(owner: "second@localhost/tablet")
+        firstWire.remote = secondWire; secondWire.remote = firstWire
+        let firstBinding = try await firstWire.bindCall(peer: secondWire.owner, sid: "media-loopback")
+        let secondBinding = try await secondWire.bindCall(peer: firstWire.owner, sid: "media-loopback")
+        let firstSession = try NativeJingleSession(role: .initiator, binding: firstBinding, peer: secondWire.owner,
+            sid: "media-loopback", profile: profile, signalling: firstWire, media: first.engine)
+        let secondSession = try NativeJingleSession(role: .responder, binding: secondBinding, peer: firstWire.owner,
+            sid: "media-loopback", profile: profile, signalling: secondWire, media: second.engine)
+        firstWire.received = { [weak firstSession] request in await firstSession?.receive(request) }
+        secondWire.received = { [weak secondSession] request in await secondSession?.receive(request) }
+        try await firstSession.start()
+        precondition(firstSession.phase == .waiting && secondSession.phase == .ringing)
+        try await secondSession.accept()
+        precondition(firstSession.phase == .negotiated && secondSession.phase == .negotiated)
         try await wait("both peer transports connected") {
             first.engine.prepared.peer.connectionState == .connected && second.engine.prepared.peer.connectionState == .connected
         }
@@ -102,9 +157,11 @@ enum NativeMediaLoopback {
             }
             precondition(receiver.setText("Fictief antwoord"))
             try await wait("T140 response reaches first peer") { sender.remoteText == "Fictief antwoord" }
-            first.close()
+            await firstSession.stop(notifyPeer: true)
             try await wait("RTT closes and clears remote text") { !receiver.isReady && receiver.remoteText.isEmpty }
         }
+        await firstSession.stop(notifyPeer: true)
+        precondition(secondSession.phase == .ended)
         first.close(); second.close()
         precondition(first.engine.prepared.peer.connectionState == .closed)
         do { _ = try await first.engine.createOffer(); preconditionFailure("closed peer reopened") }

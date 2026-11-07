@@ -9,6 +9,15 @@ struct NativePreparedPeer {
     let camera: RTCVideoTrack?
 }
 
+@MainActor
+protocol NativePeerNegotiating: AnyObject {
+    func prepare(handle: NativeCallHandle, media: NativeCallMedia,
+                 changed: @escaping () -> Void) throws -> NativePreparedPeer
+    func accept(handle: NativeCallHandle, peer: RTCPeerConnection,
+                completion: @escaping (Result<NativeCallMedia, Error>) -> Void)
+    func close(handle: NativeCallHandle)
+}
+
 private final class NativePeerEvents: NSObject, RTCPeerConnectionDelegate {
     let changed: () -> Void
     init(changed: @escaping () -> Void) { self.changed = changed }
@@ -26,7 +35,7 @@ private final class NativePeerEvents: NSObject, RTCPeerConnectionDelegate {
 }
 
 @MainActor
-final class NativeMediaPeer {
+final class NativeMediaPeer: NativeMediaNegotiating {
     private enum Phase { case fresh, offering, offered, answering, negotiated, closed }
     let prepared: NativePreparedPeer
     let profile: NativeCallMedia

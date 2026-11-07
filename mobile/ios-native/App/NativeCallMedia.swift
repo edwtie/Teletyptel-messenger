@@ -2,15 +2,6 @@ import AVFAudio
 import WebRTC
 
 @MainActor
-protocol NativePeerNegotiating: AnyObject {
-    func prepare(handle: NativeCallHandle, media: NativeCallMedia,
-                 changed: @escaping () -> Void) throws -> NativePreparedPeer
-    func accept(handle: NativeCallHandle, peer: RTCPeerConnection,
-                completion: @escaping (Result<NativeCallMedia, Error>) -> Void)
-    func close(handle: NativeCallHandle)
-}
-
-@MainActor
 final class NativeWebRTCCallMedia: NativeCallMediaDriver {
     private let negotiation: any NativePeerNegotiating
     private var handle: NativeCallHandle?
