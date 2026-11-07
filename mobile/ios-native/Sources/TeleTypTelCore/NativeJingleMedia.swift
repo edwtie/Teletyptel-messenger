@@ -5,7 +5,7 @@ import Darwin
 import Glibc
 #endif
 
-enum NativeJingleMediaFailure: Error { case unsupported, invalidDescription(line: UInt) }
+enum NativeJingleMediaFailure: Error { case unsupported, invalidDescription(line: UInt), unsupportedField(String) }
 
 struct NativeJingleMedia: CustomStringConvertible, CustomDebugStringConvertible {
     static let jingle = "urn:xmpp:jingle:1"
@@ -127,7 +127,10 @@ struct NativeJingleMedia: CustomStringConvertible, CustomDebugStringConvertible 
                 "a=setup:", "a=candidate:", "a=rtpmap:", "a=rtcp-fb:", "a=sctp-port:", "a=max-message-size:",
                 "a=rtcp:", "a=extmap:", "a=msid:", "a=ssrc:", "a=ssrc-group:"]
             let flags: Set<String> = ["a=sendrecv", "a=rtcp-mux", "a=rtcp-rsize", "a=end-of-candidates", "a=extmap-allow-mixed"]
-            try require(section.allSatisfy { line in flags.contains(line) || prefixes.contains(where: { line.hasPrefix($0) }) })
+            if let unknown = section.first(where: { line in !flags.contains(line) && !prefixes.contains(where: { line.hasPrefix($0) }) }) {
+                let field = String(unknown.prefix(64).prefix { $0.isASCII && ($0.isLowercase || $0 == "=" || $0 == "-") })
+                throw NativeJingleMediaFailure.unsupportedField(field)
+            }
             let media = section[0].components(separatedBy: " ")
             try require(media.count == 4 && number(media[1], 1, 65535))
             try require(media[0] == "m=\(kind == "rtt" ? "application" : kind)" &&
