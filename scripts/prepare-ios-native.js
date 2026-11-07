@@ -5,7 +5,7 @@ const crypto = require("node:crypto");
 const root = path.resolve(__dirname, "..");
 const source = path.join(root, "mobile/ios-native");
 const coreFiles = ["Startup.swift", "XMPPProbeStream.swift", "XMPPAvailabilityClient.swift",
-  "NativeAccountClient.swift", "XMPPSessionStream.swift", "NativeXMPPConnection.swift", "NativeLoginModel.swift", "NativeRoster.swift", "NativeChat.swift"];
+  "NativeAccountClient.swift", "XMPPSessionStream.swift", "NativeXMPPConnection.swift", "NativeLoginModel.swift", "NativeRoster.swift", "NativeChat.swift", "NativeIncomingCall.swift"];
 const appFiles = ["App/TeleTypTelNativeApp.swift", "App/NativeChatView.swift", "App/NativeBackgroundController.swift"];
 
 function projectText() {

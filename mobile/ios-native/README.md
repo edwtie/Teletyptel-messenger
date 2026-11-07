@@ -140,6 +140,48 @@ References: [RFC 6121 direct messaging](https://www.rfc-editor.org/rfc/rfc6121.h
 [Apple finite background tasks](https://developer.apple.com/documentation/uikit/extending-your-app-s-background-execution-time),
 and [Apple VoIP notification handling](https://developer.apple.com/documentation/pushkit/responding-to-voip-notifications-from-pushkit).
 
+## Incoming-call lifecycle foundation (local preparation)
+
+The next isolated step adds `NativeIncomingCall.swift` and ten Swift unit tests.
+It does **not** yet connect PushKit, CallKit, media, registration or the UI. The
+successful chat runs above predate this change; they are not validation of this
+new source. No APNs entitlement, secret, backend change or TestFlight upload is
+part of this preparation.
+
+Local validation on 2026-11-07: 20 Node/source/fixture checks passed; one Swift
+runner check was skipped because Windows has no macOS Swift test environment.
+The ten new Swift behavioral tests and unsigned iOS compilation remain pending.
+
+- Decode the existing incoming-call JSON contract with typed booleans, UUID,
+  bounded session identifier, four media profiles and a maximum 60-second
+  invitation lifetime; payloads are limited to 4 KiB.
+- Consent/account context and a per-registration generation are required before
+  admitting an invitation. Reconfiguration/logout invalidate previous handles.
+  The future authenticated registration layer must establish that context;
+  this local state machine is not push authentication or token storage.
+- One admitted call at a time, explicit reporting/ringing/answering/connected
+  phases, a maximum 15-second answer deadline and bounded replay suppression.
+  Old completion callbacks cannot end or revive another call. Expiry processing
+  must be scheduled by the future adapter; this value type starts no timer.
+- Total Conversation cannot be marked connected with audio alone or without a
+  ready RTT channel. Negotiated profile and the full unique set of ready media
+  must match the invitation. Audio-only calls remain supported.
+- New Swift tests cover malformed/expired payloads, consent, registration/account
+  changes, report failure, duplicate calls, exact media readiness and deadlines.
+  Node checks verify project inclusion and compatibility with the existing media
+  profile definitions, but do not execute Swift behavior on Windows.
+
+Integration gates: implement a CallKit adapter that reports incoming VoIP pushes
+promptly, maps lifecycle endings to system calls, and completes each pending
+answer once; wire authenticated registration/revocation and secure call-control
+credentials; connect native Jingle/WebRTC/RTT before fulfilling an answer. A
+rejected payload here does **not** authorize silently dropping a PushKit callback:
+the adapter must follow Apple's CallKit reporting requirements, including stale
+or invalid incoming-call handling. No arbitrary chat messages may use VoIP pushes.
+Then validate real APNs delivery and calls on locked physical devices.
+
+Reference: [Apple's VoIP push handling requirements](https://developer.apple.com/documentation/pushkit/responding-to-voip-notifications-from-pushkit).
+
 ## Contact presence step (runtime validation pending)
 
 Historical preparation notes below predate the chat validation above. The

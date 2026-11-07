@@ -88,6 +88,7 @@ test("Project generation is isolated, repeatable and refuses overwriting an exis
     read("Sources/TeleTypTelCore/NativeRoster.swift"));
   for (const [target, source] of [
     ["Core/NativeChat.swift", "Sources/TeleTypTelCore/NativeChat.swift"],
+    ["Core/NativeIncomingCall.swift", "Sources/TeleTypTelCore/NativeIncomingCall.swift"],
     ["App/NativeChatView.swift", "App/NativeChatView.swift"],
     ["App/NativeBackgroundController.swift", "App/NativeBackgroundController.swift"]
   ]) {
@@ -191,4 +192,22 @@ test("Native rotation tests check visible geometry before requesting a tap point
   assert.doesNotMatch(ui, /application\.swipe(?:Up|Down)\(\)/);
   const fixture = ui.slice(ui.indexOf("private func signInFixture("), ui.indexOf("private func reveal("));
   assert.doesNotMatch(fixture, /application\.terminate\(\)/);
+});
+
+test("Incoming-call foundation stays bounded and does not enable push or silently downgrade TC", () => {
+  const calls = read("Sources/TeleTypTelCore/NativeIncomingCall.swift");
+  for (const required of ["data.count <= 4096", "registration == generation", "retired.count < 32",
+    "payload.expiresAt <= now + 60", "payload.hasVideo == payload.mediaProfile.hasVideo",
+    "requested == negotiated", "Set(readyContents).count == readyContents.count",
+    "Set(readyContents) == requested.contents", '!requested.contents.contains("rtt") || rttReady',
+    "now + 15", "current?.deadline = nil"])
+    assert.ok(calls.includes(required), required);
+  assert.doesNotMatch(calls, /URLSession|UserDefaults|Keychain|PKPushRegistry|print\(|NSLog/);
+  assert.doesNotMatch(read("App/Info.plist"), /UIBackgroundModes|aps-environment/);
+  assert.ok(fs.existsSync(path.join(native, "Tests/TeleTypTelCoreTests/NativeIncomingCallTests.swift")));
+  const previous = fs.readFileSync(path.join(root, "scripts/ios-testflight/CallMediaProfile.swift"), "utf8");
+  const mediaCases = source => [...source.matchAll(/case \.(audio|video|audioRtt|total): return \[([^\]]+)\]/g)]
+    .map(match => [match[1], match[2]]);
+  assert.equal(mediaCases(calls).length, 4);
+  assert.deepEqual(mediaCases(calls), mediaCases(previous));
 });
