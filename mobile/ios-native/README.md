@@ -187,7 +187,7 @@ passed at revision `a827872212d98303521bc19a527e2dc34fc14e2f`.
   Node checks verify project inclusion and compatibility with the existing media
   profile definitions, but do not execute Swift behavior on Windows.
 
-Integration gates: implement a CallKit adapter that reports incoming VoIP pushes
+Historical integration gates for the lifecycle-only step: implement a CallKit adapter that reports incoming VoIP pushes
 promptly, maps lifecycle endings to system calls, and completes each pending
 answer once; wire authenticated registration/revocation and secure call-control
 credentials; connect native Jingle/WebRTC/RTT before fulfilling an answer. A
@@ -197,6 +197,66 @@ or invalid incoming-call handling. No arbitrary chat messages may use VoIP pushe
 Then validate real APNs delivery and calls on locked physical devices.
 
 Reference: [Apple's VoIP push handling requirements](https://developer.apple.com/documentation/pushkit/responding-to-voip-notifications-from-pushkit).
+
+## CallKit, PushKit and media adapters (validation pending)
+
+The next isolated step connects the lifecycle to actual Apple framework adapters
+and the existing pinned WebRTC/T.140 implementation. It does **not** turn on live
+background calls. The SwiftUI login screen does not construct this runtime yet;
+`NativeCallRuntime(negotiation:)` requires an authenticated Jingle/media provider.
+There is deliberately no fake provider that declares a call connected.
+
+- `NativeCallCoordinator` reports pushes before starting media, handles exactly-once
+  push/answer completions, expires ringing/answering calls, and cancels stale work
+  after logout or a new registration. Rejected or duplicate pushes are reported
+  with a separate UUID and ended, never ending an existing call by mistake.
+- `NativeCallPlatform` forwards PushKit callbacks to CallKit, including invalid
+  invitations; routes answer/end/mute/reset and audio activation to the coordinator;
+  and gates registration on consent and an explicit build flag. Tokens are handed
+  to a supplied registration callback, never printed or stored in defaults.
+  Disable/logout requires authenticated server revocation confirmation before
+  another account can register within this runtime.
+- `NativeWebRTCCallMedia` creates the existing negotiated T.140 channel before
+  accepting the peer negotiation. It waits for connected ICE/DTLS peer state,
+  live negotiated audio/video tracks and an open RTT channel as requested. It
+  keeps WebRTC audio manual until CallKit activation, supports system mute, and
+  closes peer/channel and the signaling/capture owner on end. A disconnected
+  connected peer gets a bounded ten-second recovery window.
+- The generated unsigned project includes WebRTC at the same fixed revision as
+  the existing native media experiments, plus unchanged copies of
+  `NativeT140Session.swift` and `NativeWebRTCChannel.swift`. No new vendor or
+  floating dependency is introduced. SwiftPM verifies the binary package checksum.
+- Twelve coordinator tests use fake system/media ports and a controllable clock.
+  These test ordering, invalid/duplicate pushes, delayed completion, TC readiness,
+  timeouts, logout, mute and stale callbacks. They do not prove APNs delivery,
+  CallKit system UI or live audio/video on physical devices.
+
+The `NativePeerNegotiating` contract must be implemented by the native authenticated
+Jingle layer: bind the verified remote peer, SID and call ID to the handle; obtain
+microphone/camera permission before capture; create and retain the peer/delegate
+and capture owner in `prepare`; forward peer/track changes on the main actor;
+negotiate only after the RTT channel is attached; return the exact negotiated
+profile from `accept`; and stop capture/signaling in `close`. Readiness does not
+wait for CallKit audio activation, which follows successful answer fulfillment.
+Remote termination must be routed using the matching current call handle.
+
+Remaining release gates: implement that live Jingle provider and authenticated
+token registration/revocation, persist a revocation-safe account/control context
+in Keychain, restore it during cold launch before registering PushKit, and attach
+the runtime to the native app login/logout lifecycle. Add microphone/camera usage
+descriptions, signed APNs entitlement and appropriate background capabilities only
+for an explicitly authorized signed build. Current Info.plist has none of these
+and no `TeleTypTelNativeCallPushEnabled` flag, so `enable` refuses activation.
+No APNs key, server setting, existing TestFlight target or production UI is changed.
+
+Validation: local Node/source/fixture checks pass (21 passed, one macOS Swift
+runner skipped on Windows). Unsigned Apple-framework compilation and the expanded
+Swift suite still require a new GitHub run. Existing test evidence above predates
+these adapters and must not be presented as their validation.
+
+References: [Apple CallKit lifecycle](https://developer.apple.com/documentation/callkit/making-and-receiving-voip-calls),
+[Apple PushKit reporting](https://developer.apple.com/documentation/pushkit/responding-to-voip-notifications-from-pushkit),
+[WebRTC audio activation API](https://webrtc.googlesource.com/src/+/refs/heads/main/sdk/objc/components/audio/RTCAudioSession.h).
 
 ## Contact presence step (runtime validation pending)
 

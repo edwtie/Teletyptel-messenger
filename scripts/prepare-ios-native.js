@@ -1,12 +1,14 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
+const webRTC = require("./ios-testflight/native-webrtc");
 
 const root = path.resolve(__dirname, "..");
 const source = path.join(root, "mobile/ios-native");
 const coreFiles = ["Startup.swift", "XMPPProbeStream.swift", "XMPPAvailabilityClient.swift",
-  "NativeAccountClient.swift", "XMPPSessionStream.swift", "NativeXMPPConnection.swift", "NativeLoginModel.swift", "NativeRoster.swift", "NativeChat.swift", "NativeIncomingCall.swift"];
-const appFiles = ["App/TeleTypTelNativeApp.swift", "App/NativeChatView.swift", "App/NativeBackgroundController.swift"];
+  "NativeAccountClient.swift", "XMPPSessionStream.swift", "NativeXMPPConnection.swift", "NativeLoginModel.swift", "NativeRoster.swift", "NativeChat.swift", "NativeIncomingCall.swift", "NativeCallCoordinator.swift"];
+const appFiles = ["App/TeleTypTelNativeApp.swift", "App/NativeChatView.swift", "App/NativeBackgroundController.swift", "App/NativeCallPlatform.swift", "App/NativeCallMedia.swift"];
+const mediaFiles = ["NativeT140Session.swift", "NativeWebRTCChannel.swift"];
 
 function projectText() {
   const objects = new Map();
@@ -21,7 +23,7 @@ function projectText() {
   };
   const refs = [];
   const buildFiles = [];
-  for (const file of [...appFiles, ...coreFiles.map(file => "Core/" + file)]) {
+  for (const file of [...appFiles, ...coreFiles.map(file => "Core/" + file), ...mediaFiles.map(file => "Media/" + file)]) {
     const ref = object(file, `{isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ${quote(file)}; sourceTree = "<group>";}`);
     refs.push(ref);
     buildFiles.push(object(file + "-build", `{isa = PBXBuildFile; fileRef = ${ref};}`));
@@ -37,7 +39,10 @@ function projectText() {
   const products = object("products", `{isa = PBXGroup; name = Products; children = ${list([app, tests])}; sourceTree = "<group>";}`);
   const main = object("main", `{isa = PBXGroup; children = ${list([...refs, products])}; sourceTree = "<group>";}`);
   const phase = (name, type, files) => object(name, `{isa = ${type}; buildActionMask = 2147483647; files = ${list(files)}; runOnlyForDeploymentPostprocessing = 0;}`);
-  const appPhases = [phase("sources", "PBXSourcesBuildPhase", buildFiles), phase("frameworks", "PBXFrameworksBuildPhase", []), phase("resources", "PBXResourcesBuildPhase", [assetBuild])];
+  const rtcPackage = object("webrtc-package", `{isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/stasel/WebRTC.git"; requirement = {kind = revision; revision = ${quote(webRTC.revision)};};}`);
+  const rtcProduct = object("webrtc-product", `{isa = XCSwiftPackageProductDependency; package = ${rtcPackage}; productName = WebRTC;}`);
+  const rtcBuild = object("webrtc-build", `{isa = PBXBuildFile; productRef = ${rtcProduct};}`);
+  const appPhases = [phase("sources", "PBXSourcesBuildPhase", buildFiles), phase("frameworks", "PBXFrameworksBuildPhase", [rtcBuild]), phase("resources", "PBXResourcesBuildPhase", [assetBuild])];
   const testPhases = [phase("test-sources", "PBXSourcesBuildPhase", [testBuild]), phase("test-frameworks", "PBXFrameworksBuildPhase", []), phase("test-resources", "PBXResourcesBuildPhase", [])];
   const configurations = (name, settings) => {
     const configs = ["Debug", "Release"].map(mode => object(name + mode,
@@ -50,9 +55,9 @@ function projectText() {
   const testConfigs = configurations("test", 'PRODUCT_NAME = NativeStartupUITests; PRODUCT_BUNDLE_IDENTIFIER = com.tiedragon.teletyptel.nativepreview.uitests; GENERATE_INFOPLIST_FILE = YES; TEST_TARGET_NAME = TeleTypTelNative;');
   const proxy = object("proxy", `{isa = PBXContainerItemProxy; containerPortal = ${identifier("project")}; proxyType = 1; remoteGlobalIDString = ${identifier("target")}; remoteInfo = TeleTypTelNative;}`);
   const dependency = object("test-dependency", `{isa = PBXTargetDependency; target = ${identifier("target")}; targetProxy = ${proxy};}`);
-  const target = object("target", `{isa = PBXNativeTarget; name = TeleTypTelNative; productName = TeleTypTelNative; productType = "com.apple.product-type.application"; productReference = ${app}; buildConfigurationList = ${appConfigs}; buildPhases = ${list(appPhases)}; dependencies = (); buildRules = ();}`);
+  const target = object("target", `{isa = PBXNativeTarget; name = TeleTypTelNative; productName = TeleTypTelNative; productType = "com.apple.product-type.application"; productReference = ${app}; buildConfigurationList = ${appConfigs}; buildPhases = ${list(appPhases)}; packageProductDependencies = ${list([rtcProduct])}; dependencies = (); buildRules = ();}`);
   const testTarget = object("test-target", `{isa = PBXNativeTarget; name = NativeStartupUITests; productName = NativeStartupUITests; productType = "com.apple.product-type.bundle.ui-testing"; productReference = ${tests}; buildConfigurationList = ${testConfigs}; buildPhases = ${list(testPhases)}; dependencies = ${list([dependency])}; buildRules = ();}`);
-  object("project", `{isa = PBXProject; attributes = {LastUpgradeCheck = 1600;}; buildConfigurationList = ${projectConfigs}; compatibilityVersion = "Xcode 14.0"; developmentRegion = nl; knownRegions = (nl, en, Base); mainGroup = ${main}; productRefGroup = ${products}; projectDirPath = ""; projectRoot = ""; targets = ${list([target, testTarget])};}`);
+  object("project", `{isa = PBXProject; attributes = {LastUpgradeCheck = 1600;}; buildConfigurationList = ${projectConfigs}; compatibilityVersion = "Xcode 14.0"; developmentRegion = nl; knownRegions = (nl, en, Base); mainGroup = ${main}; productRefGroup = ${products}; projectDirPath = ""; projectRoot = ""; packageReferences = ${list([rtcPackage])}; targets = ${list([target, testTarget])};}`);
   const project = `// !$*UTF8*$!\n{archiveVersion = 1; classes = {}; objectVersion = 56; objects = {\n${[...objects].map(([key, value]) => `${key} = ${value};`).join("\n")}\n}; rootObject = ${identifier("project")};}\n`;
   const reference = (id, file, name) => `<BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="${id}" BuildableName="${file}" BlueprintName="${name}" ReferencedContainer="container:TeleTypTelNative.xcodeproj"/>`;
   const appReference = reference(target, "TeleTypTelNative.app", "TeleTypTelNative");
@@ -79,6 +84,7 @@ function prepare(name) {
     fs.writeFileSync(target, content);
   };
   for (const file of coreFiles) write("Core/" + file, fs.readFileSync(path.join(source, "Sources/TeleTypTelCore", file)));
+  for (const file of mediaFiles) write("Media/" + file, fs.readFileSync(path.join(root, "scripts/ios-testflight", file)));
   for (const file of [...appFiles, "App/Info.plist", "UITests/NativeStartupUITests.swift"]) {
     write(file, fs.readFileSync(path.join(source, file)));
   }

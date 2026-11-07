@@ -89,6 +89,9 @@ test("Project generation is isolated, repeatable and refuses overwriting an exis
   for (const [target, source] of [
     ["Core/NativeChat.swift", "Sources/TeleTypTelCore/NativeChat.swift"],
     ["Core/NativeIncomingCall.swift", "Sources/TeleTypTelCore/NativeIncomingCall.swift"],
+    ["Core/NativeCallCoordinator.swift", "Sources/TeleTypTelCore/NativeCallCoordinator.swift"],
+    ["App/NativeCallPlatform.swift", "App/NativeCallPlatform.swift"],
+    ["App/NativeCallMedia.swift", "App/NativeCallMedia.swift"],
     ["App/NativeChatView.swift", "App/NativeChatView.swift"],
     ["App/NativeBackgroundController.swift", "App/NativeBackgroundController.swift"]
   ]) {
@@ -96,6 +99,10 @@ test("Project generation is isolated, repeatable and refuses overwriting an exis
     assert.ok(projectText().project.includes(target), target);
   }
   assert.throws(() => prepare(name), /already exists/);
+  for (const file of ["NativeT140Session.swift", "NativeWebRTCChannel.swift"]) {
+    assert.equal(fs.readFileSync(path.join(directory, "Media", file), "utf8"),
+      fs.readFileSync(path.join(root, "scripts/ios-testflight", file), "utf8"));
+  }
 });
 
 test("Native probe has transport, privacy and response limits", () => {
@@ -210,4 +217,29 @@ test("Incoming-call foundation stays bounded and does not enable push or silentl
     .map(match => [match[1], match[2]]);
   assert.equal(mediaCases(calls).length, 4);
   assert.deepEqual(mediaCases(calls), mediaCases(previous));
+});
+
+test("CallKit/PushKit sources are included in preview but live registration stays disabled", () => {
+  const platform = read("App/NativeCallPlatform.swift");
+  const media = read("App/NativeCallMedia.swift");
+  const coordinator = read("Sources/TeleTypTelCore/NativeCallCoordinator.swift");
+  assert.match(platform, /reportNewIncomingCall/);
+  assert.match(platform, /MainActor\.assumeIsolated/);
+  assert.match(platform, /consented, !revocationRequired/);
+  assert.match(platform, /registry === self\.registry/);
+  assert.match(platform, /TeleTypTelNativeCallPushEnabled/);
+  assert.doesNotMatch(read("App/Info.plist"), /TeleTypTelNativeCallPushEnabled|UIBackgroundModes|aps-environment/);
+  assert.match(coordinator, /let rejected = UUID\(\)/);
+  assert.match(coordinator, /let callback = self\.answerCompletion\s+self\.answerCompletion = nil\s+callback\?\(true\)/);
+  assert.match(media, /audio\.useManualAudio = true/);
+  assert.match(media, /audioSessionDidActivate/);
+  assert.match(media, /MessengerWebRTCChannel\.attach/);
+  assert.match(media, /prepared\.peer\.connectionState == \.connected/);
+  assert.match(media, /Set\(contents\) == profile\.contents/);
+  assert.match(media, /self\.handle == handle/);
+  assert.doesNotMatch(platform + media, /print\(|NSLog|UserDefaults|setActive\(true/);
+  const { revision } = require("../scripts/ios-testflight/native-webrtc");
+  assert.match(revision, /^[a-f0-9]{40}$/);
+  assert.ok(projectText().project.includes(revision));
+  assert.match(projectText().project, /XCSwiftPackageProductDependency/);
 });
