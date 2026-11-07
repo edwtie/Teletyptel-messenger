@@ -126,7 +126,10 @@ final class NativeJingleMediaTests: XCTestCase {
 
     func testFingerprintsAndCredentialsCannotInjectXMLOrSDP() throws {
         let source = try offer().xml
-        for replacement in ["short", "abcd&#10;a=inactive", "abcd&apos;attack", String(repeating: "a", count: 257)] {
+        for valid in ["abcd", "short"] {
+            XCTAssertNoThrow(try decode(source.replacingOccurrences(of: "ufrag='abcd'", with: "ufrag='\(valid)'")))
+        }
+        for replacement in ["abc", "abcd&#10;a=inactive", "abcd&apos;attack", String(repeating: "a", count: 257)] {
             XCTAssertThrowsError(try decode(source.replacingOccurrences(of: "ufrag='abcd'", with: "ufrag='\(replacement)'")))
         }
         XCTAssertThrowsError(try decode(source.replacingOccurrences(of: certificateFingerprint, with: "AB:CD")))
