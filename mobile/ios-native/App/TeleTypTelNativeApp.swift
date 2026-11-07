@@ -54,6 +54,8 @@ final class NativeStartupModel: ObservableObject {
 struct NativeStartupView: View {
     @StateObject private var model: NativeStartupModel
     @StateObject private var loginModel: NativeLoginModel
+    @StateObject private var background = NativeBackgroundController()
+    @State private var selectedContact: NativeContact?
     @Environment(\.scenePhase) private var scenePhase
     @State private var address = ""
     @State private var domain = ""
@@ -92,7 +94,7 @@ struct NativeStartupView: View {
                     Text("Native iPhone- en iPad-app")
                         .font(.title2.bold())
                         .accessibilityAddTraits(.isHeader)
-                    Text("Ontwikkelversie: aanmelden met een XMPP-account, de verbinding controleren en contacten bekijken. Chat en bellen zijn hier nog niet beschikbaar.")
+                    Text("Ontwikkelversie: XMPP-aanmelding, contacten en één-op-één tekstchat. Bellen, pushmeldingen en opgeslagen geschiedenis zijn hier nog niet aangesloten.")
                         .foregroundStyle(.secondary)
                     if fixtureName != nil {
                         Text("TESTSCENARIO — geen echte serververbinding")
@@ -191,7 +193,7 @@ struct NativeStartupView: View {
                             .disabled(loginModel.isWorking || loginModel.isConnected || jid.isEmpty || password.isEmpty)
                         }
                     }
-                    Text("Alleen ‘Aanmelden’ verstuurt je inloggegevens naar het ingevulde HTTPS-adres. Je wachtwoord wordt niet bewaard. Bij verbinden wordt je XMPP-aanwezigheid gedeeld; er worden geen berichten of oproepen verstuurd. Google/Facebook en tweestapsverificatie zijn in deze preview nog niet aangesloten.")
+                    Text("Aanmelden gebruikt het ingevulde HTTPS-adres. XMPP-inloggegevens blijven alleen in het werkgeheugen om na appwisselen opnieuw te verbinden; uitloggen wist ze. Alleen ‘Bericht verzenden’ stuurt jouw tekst. Pushmeldingen, Google/Facebook en tweestapsverificatie zijn hier nog niet aangesloten.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -203,6 +205,7 @@ struct NativeStartupView: View {
             .navigationBarTitleDisplayMode(.inline)
             .scrollDismissesKeyboard(.interactively)
         }
+        .sheet(item: $selectedContact) { contact in NativeChatView(model: loginModel, contact: contact) }
         .onChange(of: address) { _ in resetConfiguration() }
         .onChange(of: domain) { _ in resetConfiguration() }
         .onChange(of: jid) { _ in loginModel.reset() }
@@ -210,12 +213,15 @@ struct NativeStartupView: View {
             if phase == .background {
                 password = ""
                 model.cancel()
-                loginModel.suspend()
+                background.enter(loginModel)
+            } else if phase == .active {
+                background.returnToForeground(loginModel)
             }
         }
         .onDisappear {
             password = ""
             model.cancel()
+            background.stop()
             loginModel.suspend()
         }
     }
@@ -231,7 +237,7 @@ struct NativeStartupView: View {
             Text("Contacten")
                 .font(.title2.bold())
                 .accessibilityAddTraits(.isHeader)
-            Text("Alleen bekijken. De status komt van XMPP; onbekend betekent niet offline. Chat en groepsgesprekken volgen later.")
+            Text("Kies een contact om te chatten. De status komt van XMPP; onbekend betekent niet offline. Groepsgesprekken volgen later.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
             switch loginModel.roster {
@@ -246,28 +252,31 @@ struct NativeStartupView: View {
                         .accessibilityIdentifier("contacts-empty")
                 }
                 ForEach(contacts) { contact in
-                    HStack(alignment: .top, spacing: 12) {
-                        Image(systemName: "person.crop.circle")
-                            .font(.title2)
-                            .accessibilityHidden(true)
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(contact.displayName).font(.headline)
-                            Text(contact.jid).font(.subheadline)
-                            Text(contact.presence.label)
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                            if !contact.groups.isEmpty {
-                                Text(contact.groups.joined(separator: ", "))
-                                    .font(.footnote)
+                    Button { selectedContact = contact } label: {
+                        HStack(alignment: .top, spacing: 12) {
+                            Image(systemName: "person.crop.circle")
+                                .font(.title2)
+                                .accessibilityHidden(true)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(contact.displayName).font(.headline)
+                                Text(contact.jid).font(.subheadline)
+                                Text(contact.presence.label)
+                                    .font(.subheadline)
                                     .foregroundStyle(.secondary)
+                                if !contact.groups.isEmpty {
+                                    Text(contact.groups.joined(separator: ", "))
+                                        .font(.footnote)
+                                        .foregroundStyle(.secondary)
+                                }
                             }
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding()
+                        .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
+                        .accessibilityElement(children: .combine)
+                        .accessibilityIdentifier("contact-" + contact.jid)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding()
-                    .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
-                    .accessibilityElement(children: .combine)
-                    .accessibilityIdentifier("contact-" + contact.jid)
+                    .buttonStyle(.plain)
                 }
             }
         }
@@ -279,9 +288,9 @@ struct NativeStartupView: View {
         case .checking: return "Chatserver opnieuw controleren voordat je inloggegevens worden verstuurd…"
         case .authenticating: return "Account controleren… Je bent nog niet verbonden met XMPP."
         case .connecting: return "Account goedgekeurd. Beveiligde XMPP-aanmelding voltooien…"
-        case .connected(let account): return "XMPP verbonden als \(account). Je kunt je contacten bekijken; chat en bellen volgen later."
+        case .connected(let account): return "XMPP verbonden als \(account). Kies een contact om te chatten."
         case .signedOut: return "De XMPP-verbinding is verbroken. Je kunt opnieuw aanmelden."
-        case .suspended: return "De previewverbinding is gestopt op de achtergrond. Meld opnieuw aan; achtergrondoproepen zijn hier nog niet aangesloten."
+        case .suspended: return "De verbinding is gepauzeerd op de achtergrond. Een aangemelde sessie verbindt opnieuw zodra je terugkeert. Pushoproepen zijn hier nog niet aangesloten."
         case .failed(let failure):
             switch failure {
             case .account(.invalidCredentials): return "Aanmelden mislukt. Controleer je XMPP-account en wachtwoord."
@@ -333,6 +342,15 @@ private struct NativeLoginUIFixture: ServerChecking, NativeAccountAuthenticating
     let scenario: String
 
     func run(account: NativeAuthenticatedAccount, onConnected: @escaping @Sendable (String) -> Void,
+             onRoster: @escaping @Sendable (NativeRosterState) -> Void,
+             onChat: @escaping @Sendable (NativeChatEvent) -> Void,
+             onSender: @escaping @Sendable (any NativeChatSending) -> Void) async throws {
+        onSender(NativeChatUIFixture())
+        onChat(.message(peer: "demo-contact@localhost", identifier: "fixture-greeting", body: "Fictief ontvangen bericht"))
+        try await run(account: account, onConnected: onConnected, onRoster: onRoster)
+    }
+
+    func run(account: NativeAuthenticatedAccount, onConnected: @escaping @Sendable (String) -> Void,
              onRoster: @escaping @Sendable (NativeRosterState) -> Void) async throws {
         onRoster(.ready([NativeContact(jid: "demo-contact@localhost", name: "Fictief testcontact",
                                        groups: ["Testcontacten"], subscription: "both", presence: .online)]))
@@ -365,6 +383,13 @@ private struct NativeLoginUIFixture: ServerChecking, NativeAccountAuthenticating
         }
         while !Task.isCancelled { try await Task.sleep(nanoseconds: 60_000_000_000) }
         throw CancellationError()
+    }
+}
+
+private struct NativeChatUIFixture: NativeChatSending {
+    func sendMessage(to jid: String, body: String, identifier: String) async throws {
+        guard jid == "demo-contact@localhost", !body.isEmpty else { throw NativeChatFailure.invalidMessage }
+        try await Task.sleep(nanoseconds: 100_000_000)
     }
 }
 #endif

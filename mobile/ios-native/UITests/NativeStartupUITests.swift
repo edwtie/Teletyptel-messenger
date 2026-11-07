@@ -79,6 +79,43 @@ final class NativeStartupUITests: XCTestCase {
         XCTAssertFalse(application.buttons["disconnect-session"].exists)
     }
 
+    func testChatDraftAndHistorySurviveRotationAndBackgroundReturn() {
+        signInFixture("connected")
+        waitForStatus("XMPP verbonden als fixture@localhost")
+        let contact = application.descendants(matching: .any)["contact-demo-contact@localhost"].firstMatch
+        XCTAssertTrue(contact.waitForExistence(timeout: 5))
+        reveal(contact)
+        contact.tap()
+        let draft = application.descendants(matching: .any)["chat-draft"].firstMatch
+        XCTAssertTrue(draft.waitForExistence(timeout: 5))
+        XCTAssertFalse(application.keyboards.firstMatch.exists)
+        let greeting = application.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "chat-message-", "Fictief ontvangen bericht")).firstMatch
+        XCTAssertTrue(greeting.waitForExistence(timeout: 5))
+        draft.tap()
+        draft.typeText("Fictieve uitgaande tekst")
+        application.buttons["chat-send"].tap()
+        let outgoing = application.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@ AND label CONTAINS %@", "chat-message-", "Fictieve uitgaande tekst", "ontvangst niet bevestigd")).firstMatch
+        XCTAssertTrue(outgoing.waitForExistence(timeout: 5))
+        draft.tap()
+        draft.typeText("Bewaar mijn concept")
+        XCUIDevice.shared.orientation = .landscapeLeft
+        XCTAssertEqual(draft.value as? String, "Bewaar mijn concept")
+        XCUIDevice.shared.orientation = .portrait
+        XCUIDevice.shared.press(.home)
+        XCTAssertTrue(application.wait(for: .runningBackground, timeout: 5) || application.wait(for: .runningBackgroundSuspended, timeout: 5))
+        application.activate()
+        let restored = NSPredicate(format: "label BEGINSWITH %@", "Verbonden")
+        expectation(for: restored, evaluatedWith: application.staticTexts["chat-connection"])
+        waitForExpectations(timeout: 10)
+        XCTAssertEqual(draft.value as? String, "Bewaar mijn concept")
+        XCTAssertTrue(outgoing.exists)
+        application.buttons["Gereed"].tap()
+        reveal(contact)
+        contact.tap()
+        XCTAssertTrue(draft.waitForExistence(timeout: 5))
+        XCTAssertEqual(draft.value as? String, "Bewaar mijn concept")
+    }
+
     func testConnectionLossIsVisibleWithoutAutomaticRelogin() {
         signInFixture("disconnect")
         waitForStatus("De XMPP-server reageert niet meer")

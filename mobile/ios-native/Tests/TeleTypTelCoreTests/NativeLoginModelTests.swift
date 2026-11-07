@@ -1,11 +1,12 @@
 import XCTest
 @testable import TeleTypTelCore
 
-private actor LoginFixture: ServerChecking, NativeAccountAuthenticating, NativeXMPPConnecting {
+private actor LoginFixture: ServerChecking, NativeAccountAuthenticating, NativeXMPPConnecting, NativeChatSending {
     private struct Run {
         let account: NativeAuthenticatedAccount
         let ready: @Sendable (String) -> Void
         let roster: @Sendable (NativeRosterState) -> Void
+        let chat: @Sendable (NativeChatEvent) -> Void
         var continuation: CheckedContinuation<Void, Error>?
     }
 
@@ -19,19 +20,33 @@ private actor LoginFixture: ServerChecking, NativeAccountAuthenticating, NativeX
     let probeError: ConnectionFailure?
     let holdAuthentication: Bool
     let wrongAccount: Bool
+    let holdSends: Bool
+    private var sentBodies: [String] = []
 
     init(accountError: NativeAccountFailure? = nil, probeError: ConnectionFailure? = nil,
-         holdAuthentication: Bool = false, wrongAccount: Bool = false) {
+         holdAuthentication: Bool = false, wrongAccount: Bool = false, holdSends: Bool = false) {
         self.accountError = accountError
         self.probeError = probeError
         self.holdAuthentication = holdAuthentication
         self.wrongAccount = wrongAccount
+        self.holdSends = holdSends
     }
 
     func history() -> [String] { events }
     func runCount() -> Int { identifiers.count }
     func cancellationCount() -> Int { cancelled.count }
     func hasPendingAuthentication() -> Bool { pendingAuthentication != nil }
+    func sentMessages() -> [String] { sentBodies }
+
+    func sendMessage(to jid: String, body: String, identifier: String) async throws {
+        sentBodies.append(body)
+        if holdSends { try await Task.sleep(nanoseconds: 60_000_000_000) }
+    }
+
+    func message(_ index: Int, event: NativeChatEvent) {
+        guard identifiers.indices.contains(index), let run = runs[identifiers[index]] else { return }
+        run.chat(event)
+    }
 
     func check(_ configuration: ServerConfiguration) async throws -> ProbeReport {
         events.append("probe")
@@ -63,12 +78,20 @@ private actor LoginFixture: ServerChecking, NativeAccountAuthenticating, NativeX
 
     func run(account: NativeAuthenticatedAccount, onConnected: @escaping @Sendable (String) -> Void,
              onRoster: @escaping @Sendable (NativeRosterState) -> Void) async throws {
+        try await run(account: account, onConnected: onConnected, onRoster: onRoster, onChat: { _ in }, onSender: { _ in })
+    }
+
+    func run(account: NativeAuthenticatedAccount, onConnected: @escaping @Sendable (String) -> Void,
+             onRoster: @escaping @Sendable (NativeRosterState) -> Void,
+             onChat: @escaping @Sendable (NativeChatEvent) -> Void,
+             onSender: @escaping @Sendable (any NativeChatSending) -> Void) async throws {
         let identifier = UUID()
         try await withTaskCancellationHandler(operation: {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
                 events.append("xmpp")
                 identifiers.append(identifier)
-                runs[identifier] = Run(account: account, ready: onConnected, roster: onRoster, continuation: continuation)
+                runs[identifier] = Run(account: account, ready: onConnected, roster: onRoster, chat: onChat, continuation: continuation)
+                onSender(self)
                 if cancelled.contains(identifier) { finish(identifier, error: CancellationError()) }
             }
         }, onCancel: {
@@ -107,6 +130,106 @@ final class NativeLoginModelTests: XCTestCase {
     private let contacts: NativeRosterState = .ready([
         NativeContact(jid: "peer@localhost", name: "Testcontact", groups: [], subscription: "both", presence: .online)
     ])
+
+    @MainActor
+    func testChatSendReceiveAndResumePreserveDraftWithoutResending() async {
+        let fixture = LoginFixture()
+        let model = model(fixture)
+        start(model)
+        await eventually { await fixture.runCount() == 1 }
+        await fixture.ready(0)
+        await fixture.message(0, event: .message(peer: "peer@localhost", identifier: "early", body: "Hoi"))
+        await fixture.roster(0, state: contacts)
+        await eventually { model.canSend && model.chat.messages.count == 1 }
+        model.setDraft("Hallo 👋", peer: "peer@localhost")
+        model.sendDraft(to: "peer@localhost")
+        await eventually { model.chat.messages.last?.state == .submitted }
+        XCTAssertNil(model.chat.drafts["peer@localhost"])
+        model.setDraft("Nog niet verzonden", peer: "peer@localhost")
+        model.beginBackground()
+        XCTAssertFalse(model.canSend)
+        model.sendDraft(to: "peer@localhost")
+        XCTAssertEqual(model.chat.drafts["peer@localhost"], "Nog niet verzonden")
+        model.suspend()
+        model.resume()
+        await eventually { await fixture.runCount() == 2 }
+        await fixture.ready(1)
+        await fixture.roster(1, state: contacts)
+        await eventually { model.canSend }
+        XCTAssertEqual(model.chat.messages.count, 2)
+        XCTAssertEqual(model.chat.drafts["peer@localhost"], "Nog niet verzonden")
+        let events = await fixture.history()
+        XCTAssertEqual(events, ["probe", "account", "xmpp", "probe", "xmpp"])
+        let sent = await fixture.sentMessages()
+        XCTAssertEqual(sent, ["Hallo 👋"])
+        model.disconnect()
+        model.resume()
+        XCTAssertEqual(model.phase, .signedOut)
+        XCTAssertTrue(model.chat.messages.isEmpty)
+        XCTAssertTrue(model.chat.drafts.isEmpty)
+    }
+
+    @MainActor
+    func testInterruptedSendIsUncertainAndLateMessagesAreIgnored() async {
+        let fixture = LoginFixture(holdSends: true)
+        let model = model(fixture)
+        start(model)
+        await eventually { await fixture.runCount() == 1 }
+        await fixture.ready(0)
+        await fixture.roster(0, state: contacts)
+        await eventually { model.canSend && model.roster == self.contacts }
+        model.setDraft("Behoud deze tekst", peer: "peer@localhost")
+        model.sendDraft(to: "peer@localhost")
+        await eventually { await fixture.sentMessages().count == 1 }
+        model.suspend()
+        XCTAssertEqual(model.chat.messages.first?.state, .uncertain)
+        XCTAssertEqual(model.chat.messages.first?.body, "Behoud deze tekst")
+        await fixture.message(0, event: .message(peer: "peer@localhost", identifier: "late", body: "Oude sessie"))
+        try? await Task.sleep(nanoseconds: 20_000_000)
+        XCTAssertEqual(model.chat.messages.count, 1)
+        model.resume()
+        await eventually { await fixture.runCount() == 2 }
+        await fixture.ready(1)
+        await fixture.roster(1, state: contacts)
+        await eventually { model.canSend }
+        XCTAssertEqual(model.chat.messages.first?.state, .uncertain)
+        let sent = await fixture.sentMessages()
+        XCTAssertEqual(sent.count, 1)
+        model.disconnect()
+    }
+
+    @MainActor
+    func testUnknownSendersAndPreviousAccountCannotInjectChat() async {
+        let fixture = LoginFixture()
+        let model = model(fixture)
+        start(model)
+        await eventually { await fixture.runCount() == 1 }
+        await fixture.ready(0)
+        await fixture.roster(0, state: contacts)
+        await eventually { model.canSend && model.roster == self.contacts }
+        await fixture.message(0, event: .message(peer: "unknown@localhost", identifier: "spam", body: "Onbekend"))
+        try? await Task.sleep(nanoseconds: 20_000_000)
+        XCTAssertTrue(model.chat.messages.isEmpty)
+        start(model, jid: "second@localhost")
+        await eventually { await fixture.runCount() == 2 }
+        await fixture.ready(1)
+        await fixture.roster(1, state: contacts)
+        await eventually { model.canSend }
+        await fixture.message(0, event: .message(peer: "peer@localhost", identifier: "old", body: "Ander account"))
+        try? await Task.sleep(nanoseconds: 20_000_000)
+        XCTAssertTrue(model.chat.messages.isEmpty)
+        model.disconnect()
+    }
+
+    @MainActor
+    func testOversizedDraftLeavesPreviousTextAndExplainsLimit() {
+        let fixture = LoginFixture()
+        let model = model(fixture)
+        model.setDraft("Bewaren", peer: "peer@localhost")
+        model.setDraft(String(repeating: "a", count: 8193), peer: "peer@localhost")
+        XCTAssertEqual(model.chat.drafts["peer@localhost"], "Bewaren")
+        XCTAssertNotNil(model.chatError)
+    }
 
     @MainActor
     func testRosterClearsOnLogoutSuspendAndFailureAndRejectsLateUpdates() async {

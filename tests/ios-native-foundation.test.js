@@ -86,6 +86,14 @@ test("Project generation is isolated, repeatable and refuses overwriting an exis
   assert.ok(fs.existsSync(path.join(directory, "Assets.xcassets/TeleTypTelLogo.imageset/logo.png")));
   assert.equal(fs.readFileSync(path.join(directory, "Core/NativeRoster.swift"), "utf8"),
     read("Sources/TeleTypTelCore/NativeRoster.swift"));
+  for (const [target, source] of [
+    ["Core/NativeChat.swift", "Sources/TeleTypTelCore/NativeChat.swift"],
+    ["App/NativeChatView.swift", "App/NativeChatView.swift"],
+    ["App/NativeBackgroundController.swift", "App/NativeBackgroundController.swift"]
+  ]) {
+    assert.equal(fs.readFileSync(path.join(directory, target), "utf8"), read(source));
+    assert.ok(projectText().project.includes(target), target);
+  }
   assert.throws(() => prepare(name), /already exists/);
 });
 
@@ -148,4 +156,25 @@ test("Native login UI has cancellation, private input and Debug-only offline fix
   const check = fs.readFileSync(path.join(root, 'scripts/check-ios-native.js'), 'utf8');
   assert.match(check, /releaseFixtureExcluded = true/);
   assert.match(check, /executable\.includes\(Buffer\.from\(marker\)\)/);
+});
+
+test("Native chat and background source guards retain bounded data and honest send states", () => {
+  const chat = read("Sources/TeleTypTelCore/NativeChat.swift");
+  const model = read("Sources/TeleTypTelCore/NativeLoginModel.swift");
+  const session = read("Sources/TeleTypTelCore/NativeXMPPConnection.swift");
+  const background = read("App/NativeBackgroundController.swift");
+  for (const required of ["body.utf8.count <= 8192", "messages.count >= 200", "pendingCount < 8",
+    "drafts.count < 100", "ontvangst niet bevestigd", "niet automatisch opnieuw verzonden", "UUID(uuidString: identifier)"])
+    assert.ok(chat.includes(required), required);
+  for (const required of ["earlyMessages.count < 32", "contacts.contains(where:", "chat.interrupt()",
+    "self.generation == attempt", "resumableAccount = nil", "phase == .suspended", "!isBackground"])
+    assert.ok(model.includes(required), required);
+  for (const required of ["self.pendingMessages.count < 8", ".now() + 8", "Array(pendingMessages.keys)", "continuation.resume()"])
+    assert.ok(session.includes(required), required);
+  for (const required of ["beginBackgroundTask", "endBackgroundTask", "0..<50", "100_000_000",
+    "model.chat.pendingCount > 0", "self.generation == attempt", "model.resume()"])
+    assert.ok(background.includes(required), required);
+  assert.doesNotMatch(chat + model + background, /UserDefaults|NSLog|print\(|AVAudioSession|setCategory\(/);
+  assert.doesNotMatch(read("App/Info.plist"), /UIBackgroundModes/);
+  assert.ok(fs.existsSync(path.join(native, "Tests/TeleTypTelCoreTests/NativeChatTests.swift")));
 });

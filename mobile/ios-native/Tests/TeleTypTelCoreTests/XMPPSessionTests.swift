@@ -45,6 +45,20 @@ final class XMPPSessionTests: XCTestCase {
         }
     }
 
+    func testDirectChatRoutesWithoutAcknowledgingHeartbeatAndStopsOnClose() throws {
+        var stream = try online()
+        let ping = try ProbeXML.parse(stream.heartbeat())
+        let xml = "<message xmlns='jabber:client' from='peer@localhost/tablet' type='chat' id='chat'><body>Hallo</body></message>"
+        let output = try stream.receive(xml)
+        XCTAssertNotNil(output.chat)
+        XCTAssertFalse(output.heartbeatAcknowledged)
+        XCTAssertTrue(output.frames.isEmpty)
+        let identifier = try XCTUnwrap(ping.attributes["id"])
+        XCTAssertTrue(try stream.receive("<iq xmlns='jabber:client' type='result' id='\(identifier)'/>").heartbeatAcknowledged)
+        stream.close()
+        XCTAssertThrowsError(try stream.receive(xml))
+    }
+
     func testRosterIsRequestedOnlyAfterBindingAndTimeoutDoesNotBreakSession() throws {
         var stream = XMPPSessionStream(account: try account(), loadRoster: true)
         let identifier = try reachBinding(&stream)

@@ -21,16 +21,93 @@ claim that those features already work in this target.
   prevent old responses from overwriting newer startup state.
 - Separate `com.tiedragon.teletyptel.nativepreview` bundle identity and unsigned
   build only. No credentials, account data, push configuration or production
-  endpoints are embedded. No server is contacted automatically.
+  endpoints are embedded. No server is contacted automatically on a cold launch.
 
 The probe closes its connection after checking. **Reachable is not authenticated
 or continuously connected.** After a successful probe, the native UI now offers
 an explicit account/password login using the connection foundation below. It
-never logs in automatically or treats a successful probe as a logged-in session.
+never treats a successful probe as a logged-in session. Initial login is manual;
+foreground return can now reconnect an already authenticated in-memory session,
+as described below.
 The configured domain is the XMPP virtual host, not necessarily the HTTPS host.
 For local testing it may still be `localhost`. The placeholder public hostname is
 not evidence of a deployed service. This initial UI is Dutch; other languages are
 part of migration parity, not implemented here.
+
+## Direct chat and bounded background lifecycle (unsigned validation pending)
+
+Prepared on 2026-11-07 in the isolated native preview only. GitHub publication
+and unsigned iPhone/iPad compilation and tests are approved. **Runtime validation
+is pending; no physical-device validation or TestFlight upload is claimed.**
+The working Capacitor app and server configuration are unchanged.
+
+- Selecting a roster contact opens a native one-to-one chat sheet with incoming
+  and outgoing text, accessible send control and no automatic keyboard focus.
+  This is direct XMPP messaging, not TC RTT, group chat, translation or a bot.
+- Chat stanzas use the authenticated WSS session and XML-escaped text. Only
+  direct `chat`/`normal` messages addressed to this account/resource are accepted.
+  Groupchat, nested forwarding/carbons and self echoes are not consumed. Messages
+  from contacts outside the loaded roster are ignored in this preview. Up to 32
+  early events wait for the initial roster; overflow or roster failure drops
+  these events. This is not reliable offline delivery or history synchronization.
+- Each contact has an in-memory draft. Rotating, dismissing the chat sheet and
+  background/foreground return preserve drafts and session messages. Ending the
+  app process, account/configuration changes, a new login or explicit disconnect
+  erase them. There is no database, Keychain session or cold-start auto-login yet.
+- Limits: 8 KiB UTF-8 text, 100 drafts, 200 messages across the session and eight
+  in-flight writes. Old received/submitted messages may be evicted with a visible
+  history-limit notice. Uncertain/rejected writes are retained; if they fill the
+  history, new sends are refused without clearing the draft. Duplicate detection
+  uses sender plus stanza ID within retained incoming history, not globally.
+- A completed socket write means **submitted, not delivered or read**. Errors
+  with matching peer and stanza ID mark rejection. Timeout, cancellation or
+  connection loss mark in-flight messages uncertain, preserving their text.
+  They are never automatically resent. A late socket callback cannot convert an
+  uncertain or rejected write into a success. Domain-only server error senders
+  are not mapped to a conversation in this initial direct-chat codec.
+- On background entry, new sends are disabled. Only already initiated writes
+  receive a finite UIKit background task, capped locally at five seconds and
+  subject to earlier OS expiration. The session is then closed and presence
+  cleared. The task is always ended; no silent audio, background-mode entitlement
+  or permanent socket workaround is added.
+- Returning to the foreground cancels a still-running completion window or
+  rechecks WSS availability and authenticates a fresh XMPP connection with the
+  already approved account credentials held only in RAM. It does not replay the
+  HTTP login, bypass an initial 2FA challenge, restore a stream with XEP-0198,
+  fetch MAM/history or retry failed sends. Explicit logout, a failed reconnect,
+  configuration change or process termination discards those credentials.
+  No reconnect loop runs in the background. Repeated foreground events cannot
+  start concurrent reconnects, and previous-generation events are ignored.
+
+**Still required for background incoming calls/messages:** integrate the
+PushKit/CallKit call engine with this target, authorize its actual app identity,
+connect authenticated push registration/server delivery, and test APNs on real
+locked iPhones. Ordinary message notifications require their own notification
+flow; VoIP pushes are not a generic background-chat transport. This step does
+not promise ringing, vibration, message reception or continued calls while the
+app is suspended or terminated.
+
+Prepared tests: ten chat codec/store tests, four model chat/lifecycle tests, one
+session-routing test and one iPhone/iPad UI scenario covering receive/send,
+rotation, draft retention, sheet reopening and foreground return. Existing
+isolated ejabberd tests still cover the earlier login/roster chain; two-account
+chat interoperability and background timing/expiration are not yet validated.
+The Debug UI fixture is explicitly fictional and never reaches a server.
+
+Local validation: 18 Node harness/source/fixture checks passed; the macOS Swift
+suite was skipped on Windows. Project generation includes all three new sources
+byte-for-byte. Scoped whitespace checks pass. These results do **not** establish
+Swift compilation, simulator success or background execution on actual hardware.
+
+Acceptance gates before release: unsigned Swift and iPhone/iPad simulator tests;
+isolated two-account ejabberd send/receive including offline and rejection cases;
+real-device Home/lock/rapid-return/network-loss tests while writes are in flight;
+VoiceOver, Dynamic Type and rotation/keyboard checks. Verify that return preserves
+drafts, never resends uncertain text and never exposes another account's messages.
+
+References: [RFC 6121 direct messaging](https://www.rfc-editor.org/rfc/rfc6121.html#section-5),
+[Apple finite background tasks](https://developer.apple.com/documentation/uikit/extending-your-app-s-background-execution-time),
+and [Apple VoIP notification handling](https://developer.apple.com/documentation/pushkit/responding-to-voip-notifications-from-pushkit).
 
 ## Contact presence step (runtime validation pending)
 
@@ -83,8 +160,8 @@ fixture checks, not execution of the new Swift presence tests or live ejabberd.
 The isolated native target now requests the XMPP roster after resource binding.
 It shows contact names, bare JIDs and roster categories, with distinct loading,
 empty and unavailable states. Categories are **not MUC chat rooms**. Contact
-editing, phone address-book access, avatars and opening chats are not implemented
-in this step. Presence display is a subsequent change described above.
+editing, phone address-book access and avatars are not implemented in that step.
+Presence and opening direct chats are subsequent changes described above.
 
 Roster results are correlated with the pending request. Pushes accept only an
 absent sender or the authenticated account's bare JID, require one valid item,
@@ -186,10 +263,10 @@ Added and published after the first-stage validation:
   logout remain pending, without bypassing 2FA. The preview button deliberately
   says "Verbinding verbreken": it closes native XMPP, not other backend sessions.
 
-The connection currently supplies readiness/loss detection only, not a chat API.
-Message handling, receipts, MUC, XEP-0198 resume, automatic reconnection and
-background operation are **not delivered by this stage**. Read-only roster
-support was added subsequently as described above. No existing TestFlight
+At this foundation revision the connection supplied readiness/loss detection only,
+not a chat API. Roster, presence and direct-chat/foreground-return handling were
+added subsequently as described above. Receipts, MUC, XEP-0198 resume and background
+incoming calls are still not delivered by this preview. No existing TestFlight
 screen or server has been changed. The native UI adapter added next cancels old
 tasks and rejects old-generation callbacks before starting a new connection.
 
@@ -219,7 +296,7 @@ and the isolated transport evidence below.
 
 - After checking the entered HTTPS origin/domain, the form offers an explicitly
   labelled XMPP account field and a native `SecureField`. No autofocus, credential
-  persistence, automatic login or production server defaults are introduced.
+  persistence, cold-start automatic login or production server defaults are introduced.
 - Pressing login clears the password field, rechecks server availability, invokes
   the account API and only then starts XMPP. The existing single status panel
   distinguishes checking, account verification, XMPP negotiation and connected.
@@ -227,12 +304,13 @@ and the isolated transport evidence below.
   callback must match that same account. Cancellation, account/server edits and
   connection loss invalidate the generation so stale callbacks cannot restore
   an online status or start the next step of an obsolete login.
-- The connection can be explicitly cancelled or disconnected. Backgrounding the
-  preview clears the password and stops the connection, with a clear explanation
-  and manual re-login on return. This is **not** background-call support.
+- The connection can be explicitly cancelled or disconnected. At this adapter
+  revision backgrounding stopped the connection and required manual re-login.
+  The later bounded background/foreground-return step above supersedes that
+  behavior. Neither implementation is background-call support.
 - A 2FA challenge remains fail-closed and explains how to use the existing app;
-  it never suggests disabling 2FA. Chat/calls remain explicitly pending; the
-  later read-only contact list is documented above.
+  it never suggests disabling 2FA. Calls remain pending; the later contact list
+  and direct-chat implementation are documented above.
 - Nine new model tests use injected probe/account/connection actors. Three new
   UI scenarios cover simulated login/disconnect across rotation, a 2FA challenge
   and connection loss, in addition to the two original startup UI tests.

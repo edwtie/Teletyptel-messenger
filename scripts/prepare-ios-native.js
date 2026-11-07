@@ -5,7 +5,8 @@ const crypto = require("node:crypto");
 const root = path.resolve(__dirname, "..");
 const source = path.join(root, "mobile/ios-native");
 const coreFiles = ["Startup.swift", "XMPPProbeStream.swift", "XMPPAvailabilityClient.swift",
-  "NativeAccountClient.swift", "XMPPSessionStream.swift", "NativeXMPPConnection.swift", "NativeLoginModel.swift", "NativeRoster.swift"];
+  "NativeAccountClient.swift", "XMPPSessionStream.swift", "NativeXMPPConnection.swift", "NativeLoginModel.swift", "NativeRoster.swift", "NativeChat.swift"];
+const appFiles = ["App/TeleTypTelNativeApp.swift", "App/NativeChatView.swift", "App/NativeBackgroundController.swift"];
 
 function projectText() {
   const objects = new Map();
@@ -20,7 +21,7 @@ function projectText() {
   };
   const refs = [];
   const buildFiles = [];
-  for (const file of ["App/TeleTypTelNativeApp.swift", ...coreFiles.map(file => "Core/" + file)]) {
+  for (const file of [...appFiles, ...coreFiles.map(file => "Core/" + file)]) {
     const ref = object(file, `{isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ${quote(file)}; sourceTree = "<group>";}`);
     refs.push(ref);
     buildFiles.push(object(file + "-build", `{isa = PBXBuildFile; fileRef = ${ref};}`));
@@ -78,7 +79,7 @@ function prepare(name) {
     fs.writeFileSync(target, content);
   };
   for (const file of coreFiles) write("Core/" + file, fs.readFileSync(path.join(source, "Sources/TeleTypTelCore", file)));
-  for (const file of ["App/TeleTypTelNativeApp.swift", "App/Info.plist", "UITests/NativeStartupUITests.swift"]) {
+  for (const file of [...appFiles, "App/Info.plist", "UITests/NativeStartupUITests.swift"]) {
     write(file, fs.readFileSync(path.join(source, file)));
   }
   write("Assets.xcassets/Contents.json", JSON.stringify({ info: { author: "xcode", version: 1 } }));

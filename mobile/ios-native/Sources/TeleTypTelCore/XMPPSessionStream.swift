@@ -13,6 +13,7 @@ struct XMPPSessionOutput {
     var connectedJID: String?
     var heartbeatAcknowledged = false
     var roster: NativeRosterState?
+    var chat: NativeChatEvent?
 }
 
 struct XMPPSessionStream {
@@ -136,6 +137,9 @@ struct XMPPSessionStream {
                root.attributes["to"] == nil || root.attributes["to"] == expectedJID || root.attributes["to"] == boundJID,
                let update = roster?.receive(root), update.state != nil {
                 return XMPPSessionOutput(roster: update.state)
+            }
+            if root.name == "message", let boundJID = boundJID {
+                return XMPPSessionOutput(chat: NativeChatCodec.decode(root, owner: expectedJID, boundJID: boundJID))
             }
             if root.name == "iq" {
                 if let update = roster?.receive(root), update.state != nil || !update.frames.isEmpty {

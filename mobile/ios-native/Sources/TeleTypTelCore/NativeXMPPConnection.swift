@@ -4,9 +4,20 @@ public protocol NativeXMPPConnecting {
     func run(account: NativeAuthenticatedAccount, onConnected: @escaping @Sendable (String) -> Void) async throws
     func run(account: NativeAuthenticatedAccount, onConnected: @escaping @Sendable (String) -> Void,
              onRoster: @escaping @Sendable (NativeRosterState) -> Void) async throws
+    func run(account: NativeAuthenticatedAccount, onConnected: @escaping @Sendable (String) -> Void,
+             onRoster: @escaping @Sendable (NativeRosterState) -> Void,
+             onChat: @escaping @Sendable (NativeChatEvent) -> Void,
+             onSender: @escaping @Sendable (any NativeChatSending) -> Void) async throws
 }
 
 public extension NativeXMPPConnecting {
+    func run(account: NativeAuthenticatedAccount, onConnected: @escaping @Sendable (String) -> Void,
+             onRoster: @escaping @Sendable (NativeRosterState) -> Void,
+             onChat: @escaping @Sendable (NativeChatEvent) -> Void,
+             onSender: @escaping @Sendable (any NativeChatSending) -> Void) async throws {
+        try await run(account: account, onConnected: onConnected, onRoster: onRoster)
+    }
+
     func run(account: NativeAuthenticatedAccount, onConnected: @escaping @Sendable (String) -> Void,
              onRoster: @escaping @Sendable (NativeRosterState) -> Void) async throws {
         onRoster(.unavailable)
@@ -16,6 +27,17 @@ public extension NativeXMPPConnecting {
 
 public struct NativeXMPPConnection: NativeXMPPConnecting {
     public init() {}
+
+    public func run(account: NativeAuthenticatedAccount, onConnected: @escaping @Sendable (String) -> Void,
+                    onRoster: @escaping @Sendable (NativeRosterState) -> Void,
+                    onChat: @escaping @Sendable (NativeChatEvent) -> Void,
+                    onSender: @escaping @Sendable (any NativeChatSending) -> Void) async throws {
+        let operation = SessionOperation(account: account, onConnected: onConnected, onRoster: onRoster,
+                                         onChat: onChat, onSender: onSender)
+        try await withTaskCancellationHandler(operation: {
+            try await operation.run()
+        }, onCancel: { operation.cancel() })
+    }
 
     public func run(account: NativeAuthenticatedAccount, onConnected: @escaping @Sendable (String) -> Void) async throws {
         let operation = SessionOperation(account: account, onConnected: onConnected)
@@ -33,7 +55,7 @@ public struct NativeXMPPConnection: NativeXMPPConnecting {
     }
 }
 
-private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, @unchecked Sendable {
+private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, NativeChatSending, @unchecked Sendable {
     private let configuration: ServerConfiguration
     private let queue = DispatchQueue(label: "nl.teletyptel.native.session")
     private var onConnected: (@Sendable (String) -> Void)?
@@ -44,16 +66,56 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, @un
     private var heartbeat: DispatchWorkItem?
     private var rosterDeadline: DispatchWorkItem?
     private var onRoster: (@Sendable (NativeRosterState) -> Void)?
+    private var onChat: (@Sendable (NativeChatEvent) -> Void)?
+    private var onSender: (@Sendable (any NativeChatSending) -> Void)?
+    private var pendingMessages: [UUID: CheckedContinuation<Void, Error>] = [:]
+    private var messageDeadlines: [UUID: DispatchWorkItem] = [:]
     private var stream: XMPPSessionStream
     private var cancelled = false
     private var completed = false
 
     init(account: NativeAuthenticatedAccount, onConnected: @escaping @Sendable (String) -> Void,
-         onRoster: (@Sendable (NativeRosterState) -> Void)? = nil) {
+         onRoster: (@Sendable (NativeRosterState) -> Void)? = nil,
+         onChat: (@Sendable (NativeChatEvent) -> Void)? = nil,
+         onSender: (@Sendable (any NativeChatSending) -> Void)? = nil) {
         configuration = account.configuration
         stream = XMPPSessionStream(account: account, loadRoster: onRoster != nil)
         self.onConnected = onConnected
         self.onRoster = onRoster
+        self.onChat = onChat
+        self.onSender = onSender
+    }
+
+    func sendMessage(to jid: String, body: String, identifier: String) async throws {
+        try Task.checkCancellation()
+        let frame = try NativeChatCodec.encode(to: jid, body: body, identifier: identifier)
+        let token = UUID()
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            queue.async {
+                guard !self.completed, self.stream.phase == .online, let socket = self.socket else {
+                    continuation.resume(throwing: NativeChatFailure.disconnected)
+                    return
+                }
+                guard self.pendingMessages.count < 8 else {
+                    continuation.resume(throwing: NativeChatFailure.busy)
+                    return
+                }
+                self.pendingMessages[token] = continuation
+                let deadline = DispatchWorkItem { [weak self] in self?.completeMessage(token, error: ConnectionFailure.timeout) }
+                self.messageDeadlines[token] = deadline
+                self.queue.asyncAfter(deadline: .now() + 8, execute: deadline)
+                socket.send(.string(frame)) { error in
+                    self.queue.async { self.completeMessage(token, error: error) }
+                }
+            }
+        }
+    }
+
+    private func completeMessage(_ token: UUID, error: Error?) {
+        messageDeadlines.removeValue(forKey: token)?.cancel()
+        guard let continuation = pendingMessages.removeValue(forKey: token) else { return }
+        if let error = error { continuation.resume(throwing: error) }
+        else { continuation.resume() }
     }
 
     func run() async throws {
@@ -112,6 +174,9 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, @un
         self.continuation = nil
         onConnected = nil
         onRoster = nil
+        onChat = nil
+        onSender = nil
+        for token in Array(pendingMessages.keys) { completeMessage(token, error: error) }
         rosterDeadline?.cancel()
         rosterDeadline = nil
         deadline?.cancel()
@@ -152,6 +217,8 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, @un
                             self.deadline = nil
                             self.onConnected?(jid)
                             self.onConnected = nil
+                            self.onSender?(self)
+                            self.onSender = nil
                             self.scheduleHeartbeat()
                         }
                         if output.heartbeatAcknowledged {
@@ -173,6 +240,7 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, @un
                                 self.queue.asyncAfter(deadline: .now() + 10, execute: deadline)
                             }
                         }
+                        if let chat = output.chat { self.onChat?(chat) }
                         self.receive()
                     }
                 } catch { self.finish(error) }
