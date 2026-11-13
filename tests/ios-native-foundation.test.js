@@ -187,6 +187,7 @@ test("Native login session exposes bounded Jingle delivery only while connected"
   const connection = read("Sources/TeleTypTelCore/NativeXMPPConnection.swift");
   const transport = read("Sources/TeleTypTelCore/NativeJingleTransport.swift");
   const login = read("Sources/TeleTypTelCore/NativeLoginModel.swift");
+  const roster = read("Sources/TeleTypTelCore/NativeRoster.swift");
   assert.match(connection, /protocol NativeJingleXMPPConnecting/);
   assert.match(connection, /acceptIncomingInitiates: self\.onJingle != nil/);
   assert.match(transport, /acceptIncomingInitiates, action == "session-initiate"/);
@@ -194,6 +195,9 @@ test("Native login session exposes bounded Jingle delivery only while connected"
   assert.match(login, /generation == attempt/);
   assert.match(login, /earlyJingle\.removeAll\(\)/);
   assert.match(login, /jingleSender = nil/);
+  assert.match(roster, /public var callEndpoint: String\? = nil/);
+  assert.match(roster, /return resource\.map \{ jid \+ "\/" \+ \$0 \}/);
+  assert.match(roster, /contact\.callEndpoint = nil/);
 });
 
 test("Native login UI has cancellation, private input and Debug-only offline fixtures", () => {

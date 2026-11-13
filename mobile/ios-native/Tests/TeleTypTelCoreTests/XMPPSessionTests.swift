@@ -104,7 +104,8 @@ final class XMPPSessionTests: XCTestCase {
         let ping = try ProbeXML.parse(stream.heartbeat())
         XCTAssertNil(try stream.receive("<presence xmlns='jabber:client' from='peer@localhost/phone' to='other@localhost'/>").roster)
         let update = try stream.receive("<presence xmlns='jabber:client' from='peer@localhost/phone' to='fixture@localhost/device'/>")
-        XCTAssertEqual(update.roster, .ready([NativeContact(jid: "peer@localhost", name: "", groups: [], subscription: "both", presence: .online)]))
+        XCTAssertEqual(update.roster, .ready([NativeContact(jid: "peer@localhost", name: "", groups: [], subscription: "both", presence: .online,
+                                                           callEndpoint: "peer@localhost/phone")]))
         XCTAssertFalse(update.heartbeatAcknowledged)
         XCTAssertTrue(update.frames.isEmpty)
         let pingID = try XCTUnwrap(ping.attributes["id"])

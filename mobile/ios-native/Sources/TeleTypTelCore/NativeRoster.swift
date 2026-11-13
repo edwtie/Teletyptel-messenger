@@ -21,6 +21,7 @@ public struct NativeContact: Identifiable, Equatable, Sendable {
     public let groups: [String]
     public let subscription: String
     public var presence: NativeContactPresence = .unknown
+    public var callEndpoint: String? = nil
     public var id: String { jid }
     public var displayName: String { name.isEmpty ? jid : name }
 }
@@ -101,6 +102,7 @@ struct NativeRosterStream {
             var updated = contact
             if receivesPresence(contact), let previous = contacts[contact.jid], receivesPresence(previous) {
                 updated.presence = previous.presence
+                updated.callEndpoint = previous.callEndpoint
             } else {
                 resources.removeValue(forKey: contact.jid)
                 overflowed.remove(contact.jid)
@@ -149,9 +151,13 @@ struct NativeRosterStream {
             } else { active[resource] = presence }
         }
         resources[jid] = active.isEmpty ? nil : active
-        if overflowed.contains(jid) { contact.presence = .unknown }
+        if overflowed.contains(jid) {
+            contact.presence = .unknown
+            contact.callEndpoint = nil
+        }
         else {
             contact.presence = [.online, .away, .extendedAway, .busy].first(where: { active.values.contains($0) }) ?? .offline
+            contact.callEndpoint = callEndpoint(jid: jid, resources: active)
         }
         guard contacts[jid] != contact else { return NativeRosterOutput() }
         contacts[jid] = contact
@@ -163,6 +169,25 @@ struct NativeRosterStream {
             let comparison = $0.displayName.localizedCaseInsensitiveCompare($1.displayName)
             return comparison == .orderedSame ? $0.jid < $1.jid : comparison == .orderedAscending
         })
+    }
+
+    private func callEndpoint(jid: String, resources: [String: NativeContactPresence]) -> String? {
+        let resource = resources.keys.filter { !$0.isEmpty }.sorted {
+            let first = presenceOrder(resources[$0] ?? .unknown)
+            let second = presenceOrder(resources[$1] ?? .unknown)
+            return first == second ? $0 < $1 : first < second
+        }.first
+        return resource.map { jid + "/" + $0 }
+    }
+
+    private func presenceOrder(_ presence: NativeContactPresence) -> Int {
+        switch presence {
+        case .online: return 0
+        case .away: return 1
+        case .extendedAway: return 2
+        case .busy: return 3
+        case .unknown, .offline: return 4
+        }
     }
 
     private func query(_ root: ProbeElement) -> ProbeElement? {

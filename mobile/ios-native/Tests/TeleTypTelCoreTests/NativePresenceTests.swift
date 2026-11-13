@@ -21,6 +21,11 @@ final class NativePresenceTests: XCTestCase {
         return contacts.first?.presence
     }
 
+    private func endpoint(_ output: NativeRosterOutput) -> String? {
+        guard case .ready(let contacts) = output.state else { return nil }
+        return contacts.first?.callEndpoint
+    }
+
     private func push(subscription: String = "both", name: String = "Changed") throws -> ProbeElement {
         try ProbeXML.parse("<iq xmlns='jabber:client' type='set' id='update'><query xmlns='jabber:iq:roster'><item jid='peer@localhost' name='\(name)' subscription='\(subscription)'/></query></iq>")
     }
@@ -42,6 +47,17 @@ final class NativePresenceTests: XCTestCase {
         XCTAssertEqual(status(stream.receive(try presence("peer@localhost/tablet", type: "unavailable"))), .away)
         XCTAssertEqual(status(stream.receive(try presence(type: "unavailable"))), .offline)
         XCTAssertNil(stream.receive(try presence(type: "unavailable")).state)
+    }
+
+    func testCallEndpointUsesAnAvailableFullJIDAndClearsWhenUnavailable() throws {
+        var stream = try loaded()
+        XCTAssertEqual(endpoint(stream.receive(try presence("peer@localhost/phone", body: "<show>away</show>"))),
+                       "peer@localhost/phone")
+        XCTAssertEqual(endpoint(stream.receive(try presence("peer@localhost/tablet"))),
+                       "peer@localhost/tablet")
+        XCTAssertEqual(endpoint(stream.receive(try presence("peer@localhost/tablet", type: "unavailable"))),
+                       "peer@localhost/phone")
+        XCTAssertNil(endpoint(stream.receive(try presence("peer@localhost/phone", type: "unavailable"))))
     }
 
     func testBareUnavailableClearsAllResources() throws {
