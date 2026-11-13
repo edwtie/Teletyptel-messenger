@@ -44,6 +44,7 @@ struct NativeGroupsView: View {
 
 private struct NativeGroupChatView: View {
     @ObservedObject var model: NativeGroupModel
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     let room: String
     @State private var showParticipants = false
     private var group: NativeGroupConversation? { model.rooms.first { $0.room == room } }
@@ -78,8 +79,10 @@ private struct NativeGroupChatView: View {
     private func status(_ group: NativeGroupConversation) -> some View {
         if group.joining { ProgressView("Deelname controleren…").padding(8) }
         else if let snapshot = group.snapshot {
-            Text("\(snapshot.participants.count) deelnemers · \(snapshot.canSpeak ? "Groepschat" : "Alleen lezen")")
-                .font(.caption).padding(6).accessibilityIdentifier("group-status")
+            if verticalSizeClass != .compact || !snapshot.canSpeak {
+                Text("\(snapshot.participants.count) deelnemers · \(snapshot.canSpeak ? "Groepschat" : "Alleen lezen")")
+                    .font(.caption).padding(6).accessibilityIdentifier("group-status")
+            }
         } else {
             Text(group.error?.label ?? "Je bent niet meer in de groep.").font(.caption).padding(6)
             Button("Opnieuw deelnemen") { model.join(room: room, nickname: group.nickname) }.disabled(!model.available)
@@ -122,7 +125,7 @@ private struct NativeGroupChatView: View {
             Button { model.send(room: room) } label: { Image(systemName: "paperplane.fill").frame(width: 44, height: 44) }
                 .disabled(!model.available || group.snapshot?.canSpeak != true || group.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 .accessibilityLabel("Groepsbericht verzenden").accessibilityIdentifier("group-send")
-        }.padding(12).background(.background)
+        }.padding(.horizontal, 12).padding(.vertical, verticalSizeClass == .compact ? 4 : 12).background(.background)
     }
 }
 
