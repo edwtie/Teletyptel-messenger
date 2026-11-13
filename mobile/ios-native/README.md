@@ -48,7 +48,7 @@ Native parity status (do not confuse a visible layout with protocol support):
 | Password login, XMPP binding, authenticator 2FA | Implemented; previous unsigned validation recorded below |
 | Face ID/Touch ID opt-in | Implemented; real-device verification still required |
 | Google/Facebook login | SDK/server adapters implemented; preview registration, signing and real-provider tests required |
-| Contacts/presence, direct text, drafts, emoji/copy | Implemented; new layout under simulator validation |
+| Contacts/presence, direct text, drafts, emoji/copy | Implemented; fictional iPhone/iPad UI scenarios pass, including rotation and background return |
 | Private ordinary/live RTT translation | API/UI implementation; fictional contract tests, not a production translation claim |
 | Audio/video/RTT/TC | Existing constrained native engine; public-network/physical-device tests remain |
 | Persistent history, MAM, carbons, receipts/read markers | Not yet implemented in this native target |
@@ -56,10 +56,49 @@ Native parity status (do not confuse a visible layout with protocol support):
 | File/photo upload and download | Not yet implemented; composer does not pretend to send attachments |
 | Edit/delete/reactions/forwarding | Not yet implemented; context menu currently provides copy/translate only |
 | Add contacts/groups, profile/account management | Not yet implemented in the new native interface |
+| Registration and password recovery | Not yet connected in the native interface |
+| Application language selection/localized UI | Dutch native interface; additional UI languages are not yet migrated. Translation target selection does not change the application language |
 | Interpreter/SIP/DTMF, push/background calls | Separate incomplete integration work |
+
+Remaining parity gates, in order:
+
+1. Durable, account-isolated history and archive synchronization, including deduplication after reconnect and independently verified delivery/read states.
+2. Native group membership, invitations, roles and room-scoped messaging, with separate direct/group message identities and negative cross-room authorization tests.
+3. Actual file/photo upload, download and previews using the existing authenticated APIs, bounded files and explicit user selection; no decorative send buttons without a working transfer.
+4. Edit/delete/reactions/forwarding and contact/profile management, with ownership checks, cancellation, offline errors and native UI tests for each action.
+5. Localized application strings and remaining web-style presentation, checked in both orientations, large text, dark mode and manual VoiceOver use. Message translation preferences remain separate from UI language.
+6. Explicit native provider registration and signed physical-device validation. Live APNs, production server changes and TestFlight distribution remain separate authorization/release gates.
 
 No TestFlight upload, live APNs activation or production configuration changes are
 included. The earlier validated baseline remains available in Git history.
+
+Validation of revision `5ed7f01`:
+[unsigned run 43463479659](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43463479659)
+passed Release device compilation/fixture exclusion, 169 Swift tests and all twelve
+UI tests on iPhone 16 Pro and iPad Pro 11-inch (M4), portrait and landscape-left.
+Fifteen opt-in real-server Swift tests were skipped. The four-profile same-host
+WebRTC loopback also passed, with synthetic VP8 and bidirectional T.140; this does
+not prove physical capture, audible speech, push or public-network interoperability.
+Local validation passed 36 Node checks (two macOS-only checks skipped on Windows)
+and the existing native Google/Facebook/translation PHP suites (422 checks), all
+without real provider credentials or external translation requests.
+
+The UI evidence includes eight fictional-account screenshots. Rotation now waits
+for the screen geometry, screenshots use the complete simulator display, and the
+chat test explicitly checks that the most recent outgoing bubble remains visible
+above the keyboard in landscape. Visual inspection found and fixed duplicate back
+buttons, the initially hidden iPad sidebar, incorrect TC artwork, stale resize
+position and content drawing behind the header. The CI harness now selects the
+host simulator architecture and collects both families even when one fails. A
+simulator initialization failure and a later compile-plus-test command timeout
+were retained as failures, not reclassified as passes. The bounded per-family
+command budget is now twenty minutes; individual UI assertions remain bounded and
+the overall workflow remains capped at forty-five minutes. The final run above
+completed successfully with those assertions unchanged.
+
+This is not full web parity or proof of real Google/Facebook login. Preview client
+registration, signed physical-device testing and the remaining parity gates above
+are still required. There was no TestFlight upload or live server/APNs change.
 
 ## Current increment: authenticator second-factor login (2026-11-13)
 
