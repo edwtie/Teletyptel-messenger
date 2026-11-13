@@ -131,7 +131,7 @@ struct NativeJingleTransport {
         }
         guard type == "set", root.children.count == 1, let element = root.children.first,
               element.name == "jingle", element.namespace == Self.namespace,
-              let action = element.attributes["action"], actions.contains(action),
+              let action = element.attributes["action"], Self.actions.contains(action),
               let sid = element.attributes["sid"], Self.validSID(sid),
               Self.validJingle(element, sid: sid, sender: sender, receiver: owner) else {
             return NativeJingleOutput()
