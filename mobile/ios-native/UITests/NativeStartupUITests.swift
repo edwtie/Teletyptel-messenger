@@ -147,7 +147,7 @@ final class NativeStartupUITests: XCTestCase {
     }
 
     func testExistingGroupJoinSendRotationAndLeave() {
-        signInFixture("ready")
+        signInFixture("connected")
         XCTAssertTrue(application.buttons["disconnect-session"].waitForExistence(timeout: 10))
         application.buttons["Hoofdmenu"].tap()
         application.buttons["open-groups"].tap()
@@ -162,7 +162,7 @@ final class NativeStartupUITests: XCTestCase {
         XCTAssertTrue(room.waitForExistence(timeout: 5))
         reveal(room); room.tap()
         XCTAssertTrue(application.staticTexts["group-status"].waitForExistence(timeout: 5))
-        let draft = application.textFields["group-draft"]
+        let draft = application.descendants(matching: .any)["group-draft"].firstMatch
         XCTAssertTrue(draft.waitForExistence(timeout: 5))
         draft.tap(); draft.typeText("Fictieve groepsreactie")
         application.buttons["group-send"].tap()
