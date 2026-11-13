@@ -36,6 +36,7 @@ struct NativeChatView: View {
                         }
                     }
                     .modifier(NativeChatBottomAnchor())
+                    .clipped()
                     .background {
                         GeometryReader { geometry in
                             Image(geometry.size.width > geometry.size.height ? "ChatBackgroundWide" : "ChatBackground")
@@ -68,6 +69,8 @@ struct NativeChatView: View {
             .navigationTitle(contact.displayName)
             .navigationBarTitleDisplayMode(.inline)
             .navigationBarBackButtonHidden(true)
+            .toolbarBackground(Color(uiColor: .systemBackground), for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button { onClose?(); dismiss() } label: {
