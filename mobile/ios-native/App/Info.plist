@@ -3,6 +3,12 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleDisplayName</key><string>TeleTypTel Native Preview</string>
+    <key>TeleTypTelFacebookEnabled</key><false/>
+    <key>FacebookAutoInitEnabled</key><false/>
+    <key>FacebookAutoLogAppEventsEnabled</key><false/>
+    <key>FacebookAdvertiserIDCollectionEnabled</key><false/>
+    <key>FacebookSKAdNetworkReportEnabled</key><false/>
+    <key>FacebookLoggingBehavior</key><array/>
     <key>CFBundleExecutable</key><string>$(EXECUTABLE_NAME)</string>
     <key>CFBundleIdentifier</key><string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
     <key>CFBundleName</key><string>$(PRODUCT_NAME)</string>

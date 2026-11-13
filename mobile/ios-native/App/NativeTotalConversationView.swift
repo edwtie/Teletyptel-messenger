@@ -4,6 +4,7 @@ import WebRTC
 
 struct NativeTotalConversationView: View {
     @ObservedObject var controller: NativeCallController
+    @ObservedObject var translation: NativeTranslationModel
     @FocusState private var rttFocused: Bool
 
     var body: some View {
@@ -56,6 +57,12 @@ struct NativeTotalConversationView: View {
             }
         }
         .interactiveDismissDisabled()
+        .onChange(of: controller.presentation?.remoteText) { text in
+            if let text = text { translateLive(text, direction: "peer") }
+        }
+        .onChange(of: controller.presentation?.ownText) { text in
+            if let text = text { translateLive(text, direction: "self") }
+        }
     }
 
     @ViewBuilder
@@ -132,6 +139,9 @@ struct NativeTotalConversationView: View {
                 .frame(maxWidth: .infinity, minHeight: 44, alignment: .topLeading)
                 .accessibilityLabel("Realtime tekst van gesprekspartner: " +
                                     (presentation.remoteText.isEmpty ? "nog geen tekst" : presentation.remoteText))
+            if let result = translation.results[liveKey("peer")], translation.preferences.mode != "off", translation.sharingConsent {
+                NativeTranslationCaption(result: result).foregroundStyle(.white)
+            }
         }
         .rttPaneStyle()
     }
@@ -155,8 +165,17 @@ struct NativeTotalConversationView: View {
             .accessibilityLabel("Eigen realtime tekst")
             .accessibilityHint(presentation.rttReady ? "Tekst wordt direct tijdens het gesprek verzonden" :
                                "Wacht totdat realtime tekst is verbonden")
+            if let result = translation.results[liveKey("self")], translation.preferences.mode != "off", translation.sharingConsent {
+                NativeTranslationCaption(result: result).foregroundStyle(.white)
+            }
         }
         .rttPaneStyle()
+    }
+
+    private func liveKey(_ direction: String) -> String { "tc:" + (controller.presentation?.callID.uuidString ?? "none") + ":" + direction }
+
+    private func translateLive(_ text: String, direction: String) {
+        translation.translate(text, key: liveKey(direction), automatic: true, liveDirection: direction)
     }
 
     private func controls(_ presentation: NativeCallPresentation) -> some View {

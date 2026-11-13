@@ -5,6 +5,62 @@ Requested scope: the complete iPhone and iPad application, including native UI,
 authentication, messaging and Total Conversation. This is a staged rewrite, not a
 claim that those features already work in this target.
 
+## Web-style UI, provider login and private translation increment (2026-11-13)
+
+This is still the isolated native preview, not the existing signed TestFlight app.
+The current increment adds native Google/Facebook SDK adapters, the existing
+server's native provider challenge/complete contract, an account-bound HTTP session,
+and the server translation API. No production endpoint or provider registration is
+changed and no provider credentials are embedded in the repository.
+
+Provider SDKs are pinned to GoogleSignIn 9.0.0 and Facebook 18.1.1, matching the
+existing application dependency versions. Facebook uses Limited Login with the
+server nonce and disables automatic analytics/advertiser collection. Server client
+identities must match the explicitly configured native build. Cancellation and
+account switching invalidate pending callbacks. Provider success alone does not
+mark XMPP online; account identity and resource binding are still required, and
+authenticator challenges remain mandatory when returned by the server.
+
+Provider configuration is deliberately absent from unsigned CI. To prepare an
+isolated native build with explicitly registered preview clients, pass a local
+JSON path as the second CLI argument after the staging name:
+`node scripts/prepare-ios-native.js ios-native-provider-check /path/to/local-provider-config.json`.
+The JSON schema is `bundleId` (must be `com.tiedragon.teletyptel.nativepreview`),
+optional `google` (`clientId`, `serverClientId`), and optional `facebook` (`appId`,
+`clientToken`). Keep that file outside the repository. Existing production OAuth
+registrations must not be silently relabelled as preview registrations. The
+unsigned tests compile SDK integration and use fictional protocol fixtures; they
+do not prove real provider login, SDK callback routing or signed-device operation.
+
+The native chat now reuses the web wallpaper assets, green outgoing bubbles,
+incoming avatars, single submitted tick, symbol composer, emoji palette, TC button,
+message context menu and compact translation caption. The tick remains submitted,
+not read/delivered. Contacts use a split view on iPad and native compact navigation
+on iPhone. Translation is local presentation only: results are never sent as chat
+stanzas. Off/revoked consent clears results and pending tasks, same-language
+detection suppresses captions, and live own/peer RTT needs separate consent. Live
+results are keyed to the call ID, debounced, bounded and invalidated on logout.
+
+Native parity status (do not confuse a visible layout with protocol support):
+
+| Web feature | Native preview status |
+| --- | --- |
+| Password login, XMPP binding, authenticator 2FA | Implemented; previous unsigned validation recorded below |
+| Face ID/Touch ID opt-in | Implemented; real-device verification still required |
+| Google/Facebook login | SDK/server adapters implemented; preview registration, signing and real-provider tests required |
+| Contacts/presence, direct text, drafts, emoji/copy | Implemented; new layout under simulator validation |
+| Private ordinary/live RTT translation | API/UI implementation; fictional contract tests, not a production translation claim |
+| Audio/video/RTT/TC | Existing constrained native engine; public-network/physical-device tests remain |
+| Persistent history, MAM, carbons, receipts/read markers | Not yet implemented in this native target |
+| MUC/group chat, invitations and group calls | Not yet implemented in this native target |
+| File/photo upload and download | Not yet implemented; composer does not pretend to send attachments |
+| Edit/delete/reactions/forwarding | Not yet implemented; context menu currently provides copy/translate only |
+| Add contacts/groups, profile/account management | Not yet implemented in the new native interface |
+| Interpreter/SIP/DTMF, push/background calls | Separate incomplete integration work |
+
+No TestFlight upload, live APNs activation or production configuration changes are
+included. The earlier validated baseline remains available in Git history.
+
 ## Current increment: authenticator second-factor login (2026-11-13)
 
 The native preview now has a second-factor screen for the existing account API's

@@ -66,8 +66,11 @@ public struct NativeTwoFactorAccountClient: NativeAccountChallenging {
                 return .challenge(NativeHTTPSecondFactorSession(session: session, configuration: configuration,
                                                                 jid: jid, accountID: accountID, cookie: cookie))
             }
-            let account = try NativeAuthenticatedAccount.decode(data, status: status, configuration: configuration)
+            var account = try NativeAuthenticatedAccount.decode(data, status: status, configuration: configuration)
             guard account.jid == jid else { throw NativeAccountFailure.invalidResponse }
+            if let cookie = Self.sessionCookie(response, origin: configuration.origin) {
+                account.webSession = NativeAccountWebSession(configuration: configuration, cookie: cookie)
+            }
             session.invalidateAndCancel()
             return .authenticated(account)
         } catch {
@@ -105,7 +108,7 @@ public struct NativeTwoFactorAccountClient: NativeAccountChallenging {
         return (data, response.statusCode, response)
     }
 
-    private static func sessionCookie(_ response: HTTPURLResponse, origin: URL) -> String? {
+    static func sessionCookie(_ response: HTTPURLResponse, origin: URL) -> String? {
         guard let field = response.value(forHTTPHeaderField: "Set-Cookie"), field.utf8.count <= 4096 else { return nil }
         let matches = HTTPCookie.cookies(withResponseHeaderFields: ["Set-Cookie": field], for: origin).filter {
             $0.name == "PHPSESSID" && $0.isSecure &&
@@ -174,7 +177,7 @@ private final class NativeHTTPSecondFactorSession: NativeSecondFactorSession,
         }
         try reserve()
         do {
-            let (data, status, _) = try await NativeTwoFactorAccountClient.request(session, configuration: configuration,
+            let (data, status, response) = try await NativeTwoFactorAccountClient.request(session, configuration: configuration,
                 input: ["action": "verify_login_two_factor", "accountId": accountID, "code": code], cookie: cookie)
             guard let reply = try? JSONDecoder().decode(VerificationReply.self, from: data) else {
                 throw NativeAccountFailure.invalidResponse
@@ -184,8 +187,10 @@ private final class NativeHTTPSecondFactorSession: NativeSecondFactorSession,
                 throw NativeSecondFactorFailure.expired
             }
             guard ContinuousClock.now < deadline else { throw NativeSecondFactorFailure.expired }
-            let account = try NativeAuthenticatedAccount.decode(data, status: status, configuration: configuration)
+            var account = try NativeAuthenticatedAccount.decode(data, status: status, configuration: configuration)
             guard account.jid == jid else { throw NativeAccountFailure.invalidResponse }
+            let authenticatedCookie = NativeTwoFactorAccountClient.sessionCookie(response, origin: configuration.origin) ?? cookie
+            account.webSession = NativeAccountWebSession(configuration: configuration, cookie: authenticatedCookie)
             cancel()
             return account
         } catch NativeSecondFactorFailure.invalidCode {

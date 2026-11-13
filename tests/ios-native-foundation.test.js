@@ -6,6 +6,7 @@ const { execFileSync } = require("node:child_process");
 const { prepare, projectText } = require("../scripts/prepare-ios-native");
 const { executeLogged, collectTestResults } = require("../scripts/check-ios-native");
 const { checkMedia } = require("../scripts/check-ios-native-media");
+const { providerPlist } = require("../scripts/native-provider-config");
 
 const root = path.resolve(__dirname, "..");
 const native = path.join(root, "mobile/ios-native");
@@ -89,7 +90,11 @@ test("Native preview has separate identity, no web runtime, upload or signing co
   assert.match(project, /CODE_SIGNING_ALLOWED = NO/);
   assert.match(scheme, /NativeStartupUITests/);
   assert.match(scheme, /buildForArchiving="NO"/);
-  assert.doesNotMatch(project, /Capacitor|WebKit|facebook|p8|DEVELOPMENT_TEAM|PROVISIONING_PROFILE/);
+  assert.doesNotMatch(project, /Capacitor|WebKit|p8|DEVELOPMENT_TEAM|PROVISIONING_PROFILE/);
+  assert.match(project, /GoogleSignIn-iOS.git/);
+  assert.match(project, /facebook-ios-sdk.git/);
+  assert.match(project, /kind = exactVersion; version = "9.0.0"/);
+  assert.match(project, /kind = exactVersion; version = "18.1.1"/);
   assert.doesNotMatch(read("App/TeleTypTelNativeApp.swift"), /WKWebView|CAPBridge|\.focused\(|becomeFirstResponder/);
   const plist = read("App/Info.plist");
   assert.doesNotMatch(plist, /NSAllowsArbitraryLoads|UIBackgroundModes/);
@@ -294,6 +299,43 @@ test("Native saved login is opt-in, biometric-bound, revocable and isolated from
   assert.ok(projectText().project.includes("App/NativeBiometricLoginVault.swift"));
 });
 
+test("Native provider configuration is explicit, isolated and keeps tracking disabled", () => {
+  const plist = read("App/Info.plist");
+  assert.equal(providerPlist(plist, null), plist);
+  assert.throws(() => providerPlist(plist, { bundleId: "com.tiedragon.teletyptel", google: {} }));
+  const configured = providerPlist(plist, { bundleId: "com.tiedragon.teletyptel.nativepreview",
+    google: { clientId: "123-fiction.apps.googleusercontent.com", serverClientId: "123-server.apps.googleusercontent.com" },
+    facebook: { appId: "12345", clientToken: "fictional-client-token" } });
+  assert.match(configured, /com.googleusercontent.apps.123-fiction/);
+  assert.match(configured, /<string>fb12345<\/string>/);
+  for (const flag of ["FacebookAutoInitEnabled", "FacebookAutoLogAppEventsEnabled", "FacebookAdvertiserIDCollectionEnabled", "FacebookSKAdNetworkReportEnabled"])
+    assert.ok(configured.includes(`<key>${flag}</key><false/>`));
+  const sdk = read("App/NativeProviderSDK.swift");
+  assert.match(sdk, /tracking: \.limited, nonce: nonce/);
+  assert.match(sdk, /token.nonce == nonce/);
+  assert.match(sdk, /serverAuthCode/);
+  assert.doesNotMatch(sdk, /CAPPlugin|WKWebView|print\(|NSLog/);
+});
+
+test("Native web-style chat keeps translations private, off-gated and call-bound", () => {
+  const model = read("Sources/TeleTypTelCore/NativeTranslation.swift");
+  const chat = read("App/NativeChatView.swift");
+  const tc = read("App/NativeTotalConversationView.swift");
+  const web = read("Sources/TeleTypTelCore/NativeAccountWebSession.swift");
+  for (const token of ['preferences.mode != "off"', 'sharingConsent', 'generation == attempt',
+    'sameLanguage(reply.translation.sourceLanguage, target)', 'liveRttConsent', 'ownLiveRttConsent', 'tasks.count < 4'])
+    assert.ok(model.includes(token), token);
+  assert.doesNotMatch(model, /sendMessage|UserDefaults|print\(|NSLog|apiKey/);
+  assert.match(chat, /ChatBackground/);
+  assert.match(chat, /contextMenu/);
+  assert.match(chat, /NativeTranslationCaption/);
+  assert.match(tc, /presentation\?\.callID.uuidString/);
+  assert.match(web, /settings.httpCookieStorage = nil/);
+  assert.match(web, /generation == attempt/);
+  assert.match(web, /completionHandler\(nil\)/);
+  assert.match(web, /X-CSRF-Token/);
+});
+
 test("Native second factor is a bounded challenge before XMPP, not an authenticated state", () => {
   const client = read("Sources/TeleTypTelCore/NativeTwoFactorAccountClient.swift");
   const model = read("Sources/TeleTypTelCore/NativeLoginModel.swift");
@@ -302,7 +344,7 @@ test("Native second factor is a bounded challenge before XMPP, not an authentica
     '"verify_login_two_factor"', 'attempts < 5', 'ContinuousClock.now', 'data.count < 1048576',
     'account.jid == jid', 'completionHandler(nil)', 'session.invalidateAndCancel()'])
     assert.ok(client.includes(token), token);
-  for (const token of ['case awaitingSecondFactor', 'self.secondFactor = (challenge, configuration, jid)',
+  for (const token of ['case awaitingSecondFactor', 'secondFactor = (challenge, configuration, jid)',
     '300_000_000_000', 'secondFactor?.session.cancel()', 'self.generation == attempt'])
     assert.ok(model.includes(token), token);
   assert.doesNotMatch(client, /UserDefaults|HTTPCookieStorage.shared|NSLog|print\(|SecTrust/);
@@ -356,7 +398,7 @@ test("CallKit/PushKit sources are included in preview but live registration stay
   assert.match(controller, /NativeOutgoingPeerNegotiator/);
   assert.match(controller, /login\?\.activeJingleSender/);
   assert.match(controller, /func startCall\(_ contact: NativeContact, profile: NativeCallMedia\)/);
-  assert.match(read("App/NativeChatView.swift"), /callButton\("Totale conversatie"/);
+  assert.match(read("App/NativeChatView.swift"), /startCall\(\.total\)/);
   assert.match(read("App/NativeChatView.swift"), /calls\.startCall\(contact, profile: profile\)/);
   assert.match(controller, /runtime\.platform\.receive\(invitation/);
   assert.match(controller, /matches\.count == 1/);

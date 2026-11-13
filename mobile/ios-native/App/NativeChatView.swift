@@ -1,104 +1,186 @@
 import SwiftUI
+import UIKit
 
 struct NativeChatView: View {
     @ObservedObject var model: NativeLoginModel
     @ObservedObject var calls: NativeCallController
+    @ObservedObject var translation: NativeTranslationModel
     let contact: NativeContact
+    var onClose: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
+    @State private var showTranslation = false
+    @State private var showEmoji = false
 
     private var messages: [NativeChatMessage] { model.chat.messages.filter { $0.peer == contact.jid } }
+    private var draft: String { model.chat.drafts[contact.jid] ?? "" }
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
                 Text(model.isConnected ? "Verbonden · één-op-één chat" : "Niet verbonden · tekst blijft in deze sessie bewaard")
-                    .font(.footnote)
-                    .padding(8)
+                    .font(.caption).foregroundStyle(.secondary).padding(6)
                     .accessibilityIdentifier("chat-connection")
-                Text("Preview: alleen sessiegeheugen. De app beëindigen, opnieuw aanmelden of uitloggen wist deze gegevens.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal)
                 if model.chat.historyLimited {
-                    Text("Alleen de meest recente berichten passen in deze preview.").font(.caption).padding(8)
+                    Text("Alleen de meest recente berichten passen in deze preview.").font(.caption).padding(6)
                 }
                 ScrollViewReader { proxy in
                     ScrollView {
-                        LazyVStack(alignment: .leading, spacing: 12) {
-                            ForEach(messages) { message in
-                                VStack(alignment: .leading, spacing: 6) {
-                                    Text(message.state == .incoming ? contact.displayName : "Ik").font(.caption.bold())
-                                    Text(message.body).textSelection(.enabled)
-                                    Text(message.state.label).font(.caption).foregroundStyle(.secondary)
-                                }
-                                .padding(12)
-                                .background(message.state == .incoming ? Color(uiColor: .secondarySystemBackground) : Color.blue.opacity(0.12),
-                                            in: RoundedRectangle(cornerRadius: 12))
-                                .frame(maxWidth: .infinity, alignment: message.state == .incoming ? .leading : .trailing)
-                                .accessibilityElement(children: .combine)
-                                .accessibilityIdentifier("chat-message-" + message.id.uuidString)
-                                .id(message.id)
-                            }
+                        LazyVStack(spacing: 12) {
+                            ForEach(messages) { message in bubble(message).id(message.id) }
+                        }.padding(14)
+                    }
+                    .background {
+                        GeometryReader { geometry in
+                            Image(geometry.size.width > geometry.size.height ? "ChatBackgroundWide" : "ChatBackground")
+                                .resizable().scaledToFill()
+                                .frame(width: geometry.size.width, height: geometry.size.height).clipped()
                         }
-                        .padding()
                     }
                     .onChange(of: messages.last?.id) { identifier in
                         if let identifier = identifier { proxy.scrollTo(identifier, anchor: .bottom) }
                     }
+                    .onAppear { if let identifier = messages.last?.id { proxy.scrollTo(identifier, anchor: .bottom) } }
                 }
-                if let error = model.chatError { Text(error).font(.caption).padding(8).accessibilityIdentifier("chat-error") }
-                HStack(alignment: .bottom, spacing: 12) {
-                    TextField("Typ een bericht", text: Binding(
-                        get: { model.chat.drafts[contact.jid] ?? "" },
-                        set: { model.setDraft($0, peer: contact.jid) }), axis: .vertical)
-                        .lineLimit(1...5)
-                        .textFieldStyle(.roundedBorder)
-                        .accessibilityLabel("Bericht")
-                        .accessibilityIdentifier("chat-draft")
-                    Button { model.sendDraft(to: contact.jid) } label: {
-                        Image(systemName: "paperplane.fill").frame(minWidth: 44, minHeight: 44)
+                if let error = model.chatError { Text(error).font(.caption).padding(6).accessibilityIdentifier("chat-error") }
+                if let error = translation.error { Text(error).font(.caption).padding(6) }
+                if showEmoji {
+                    HStack {
+                        ForEach(["🙂", "👍", "❤️", "👋", "🙏", "😂"], id: \.self) { emoji in
+                            Button(emoji) { model.setDraft(draft + emoji, peer: contact.jid) }
+                                .font(.title2).frame(minWidth: 44, minHeight: 44)
+                        }
                     }
-                    .buttonStyle(.borderedProminent)
-                    .accessibilityLabel("Bericht verzenden")
-                    .accessibilityIdentifier("chat-send")
-                    .disabled(!model.canSend || (model.chat.drafts[contact.jid] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
-                .padding()
+                composer
             }
-            .frame(maxWidth: 800)
-            .frame(maxWidth: .infinity)
             .navigationTitle(contact.displayName)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Gereed") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button { if let onClose = onClose { onClose() } else { dismiss() } } label: {
+                        Image(systemName: "arrow.left").frame(width: 44, height: 44)
+                    }.accessibilityLabel("Gereed")
+                }
                 ToolbarItem(placement: .primaryAction) {
-                    Menu {
-                        callButton("Spraak", icon: "phone.fill", profile: .audio)
-                        callButton("Spraak en video", icon: "video.fill", profile: .video)
-                        callButton("Spraak en realtime tekst", icon: "teletype", profile: .audioRtt)
-                        callButton("Totale conversatie", icon: "person.wave.2.fill", profile: .total)
-                    } label: {
-                        Image(systemName: "phone.arrow.up.right.fill")
+                    HStack(spacing: 10) {
+                        Button { startCall(.total) } label: {
+                            Image(systemName: "teletype").font(.title3).foregroundStyle(.white)
+                                .frame(width: 44, height: 44).background(.blue, in: RoundedRectangle(cornerRadius: 12))
+                        }
+                        .disabled(contact.callEndpoint == nil || calls.status != .idle)
+                        .accessibilityLabel("Totale conversatie starten")
+                        Menu {
+                            callButton("Spraak", icon: "phone.fill", profile: .audio)
+                            callButton("Spraak en video", icon: "video.fill", profile: .video)
+                            callButton("Spraak en realtime tekst", icon: "teletype", profile: .audioRtt)
+                            Button { showTranslation = true } label: { Label("Vertaling", systemImage: "globe") }
+                        } label: { Image(systemName: "ellipsis").frame(width: 44, height: 44) }
+                        .accessibilityLabel("Gespreksmenu")
                     }
-                    .disabled(contact.callEndpoint == nil || calls.status != .idle)
-                    .accessibilityLabel(contact.callEndpoint == nil ? "Oproepen niet beschikbaar" : "Bel contact")
                 }
             }
             .scrollDismissesKeyboard(.interactively)
         }
+        .sheet(isPresented: $showTranslation) { NativeTranslationSettingsView(model: translation) }
         .overlay { if scenePhase != .active { Color(uiColor: .systemBackground).ignoresSafeArea().overlay(Text("TeleTypTel")) } }
         .onChange(of: model.phase) { phase in
             if phase == .signedOut || phase == .idle { dismiss() }
         }
+        .task(id: automaticTranslationIdentity) {
+            guard translation.preferences.mode == "automatic" else { return }
+            await translation.automaticallyTranslate(Array(messages.suffix(12)))
+        }
     }
 
-    private func callButton(_ title: String, icon: String, profile: NativeCallMedia) -> some View {
-        Button {
-            calls.startCall(contact, profile: profile)
-            dismiss()
-        } label: {
-            Label(title, systemImage: icon)
+    private var automaticTranslationIdentity: String {
+        "\(messages.count):\(translation.ready):\(translation.preferences.mode):\(translation.preferences.targetLanguage):\(translation.sharingConsent)"
+    }
+
+    private func bubble(_ message: NativeChatMessage) -> some View {
+        let incoming = message.state == .incoming
+        return HStack(alignment: .bottom, spacing: 8) {
+            if !incoming { Spacer(minLength: 36) }
+            if incoming { avatar }
+            VStack(alignment: .leading, spacing: 5) {
+                Text(message.body).textSelection(.enabled)
+                if let result = translation.results[message.id.uuidString], translation.preferences.mode != "off", translation.sharingConsent {
+                    NativeTranslationCaption(result: result)
+                }
+                HStack(spacing: 5) {
+                    Spacer(minLength: 0)
+                    Text(message.date, style: .time).font(.caption2)
+                    if !incoming {
+                        Image(systemName: message.state == .sending ? "clock" : message.state == .submitted ? "checkmark" : "exclamationmark.circle")
+                            .font(.caption2)
+                    }
+                }.foregroundStyle(incoming ? Color.secondary : Color(red: 0.25, green: 0.37, blue: 0.4))
+            }
+            .foregroundStyle(incoming ? Color.primary : Color.black)
+            .padding(12)
+            .background(incoming ? Color(uiColor: .secondarySystemBackground) : Color(red: 0.86, green: 0.97, blue: 0.92),
+                        in: RoundedRectangle(cornerRadius: 15))
+            .overlay(RoundedRectangle(cornerRadius: 15).stroke(incoming ? Color.gray.opacity(0.35) : Color.green.opacity(0.55), lineWidth: 1))
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(accessibleMessage(message))
+            .accessibilityIdentifier("chat-message-" + message.id.uuidString)
+            .contextMenu {
+                Button { UIPasteboard.general.string = message.body } label: { Label("Kopiëren", systemImage: "doc.on.doc") }
+                if translation.preferences.mode != "off" {
+                    Button { translation.translate(message.body, key: message.id.uuidString) } label: { Label("Vertalen", systemImage: "globe") }
+                        .disabled(!translation.ready || !translation.available || !translation.sharingConsent)
+                }
+            }
+            if incoming { Spacer(minLength: 36) }
         }
+    }
+
+    private var avatar: some View {
+        Text(String(contact.displayName.prefix(2)).uppercased()).font(.caption.bold()).foregroundStyle(.white)
+            .frame(width: 30, height: 30).background(.blue, in: Circle()).accessibilityHidden(true)
+    }
+
+    private func accessibleMessage(_ message: NativeChatMessage) -> String {
+        var label = (message.state == .incoming ? contact.displayName : "Ik") + ": " + message.body + ". " + message.state.label
+        if let result = translation.results[message.id.uuidString], translation.preferences.mode != "off", translation.sharingConsent {
+            label += ". Vertaling: " + result.text
+        }
+        return label
+    }
+
+    private var composer: some View {
+        HStack(alignment: .bottom, spacing: 8) {
+            Menu {
+                Button { showTranslation = true } label: { Label("Vertaalinstellingen", systemImage: "globe") }
+                Label("Bijlagen worden nog aangesloten", systemImage: "paperclip")
+            } label: { Image(systemName: "plus").frame(width: 40, height: 44) }
+            .accessibilityLabel("Toevoegen")
+            Button { showEmoji.toggle() } label: { Image(systemName: "face.smiling").frame(width: 40, height: 44) }
+                .accessibilityLabel("Emoji")
+            TextField("Typ een bericht", text: Binding(get: { draft }, set: { model.setDraft($0, peer: contact.jid) }), axis: .vertical)
+                .lineLimit(1...5).textFieldStyle(.plain).padding(.vertical, 12)
+                .accessibilityLabel("Bericht").accessibilityIdentifier("chat-draft")
+            if draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Button { startCall(.video) } label: { Image(systemName: "video").frame(width: 40, height: 44) }
+                    .accessibilityLabel("Videogesprek starten").disabled(contact.callEndpoint == nil || calls.status != .idle)
+                Button { startCall(.audio) } label: { Image(systemName: "mic").frame(width: 40, height: 44) }
+                    .accessibilityLabel("Audiogesprek starten").disabled(contact.callEndpoint == nil || calls.status != .idle)
+            } else {
+                Button { model.sendDraft(to: contact.jid) } label: { Image(systemName: "paperplane.fill").frame(width: 44, height: 44) }
+                    .accessibilityLabel("Bericht verzenden").accessibilityIdentifier("chat-send").disabled(!model.canSend)
+            }
+        }
+        .foregroundStyle(Color(red: 0.12, green: 0.24, blue: 0.39))
+        .padding(.horizontal, 8).padding(.vertical, 4)
+        .background(.background, in: RoundedRectangle(cornerRadius: 28))
+        .shadow(color: .black.opacity(0.12), radius: 5, y: 2)
+        .padding(10)
+    }
+
+    private func startCall(_ profile: NativeCallMedia) { calls.startCall(contact, profile: profile) }
+
+    private func callButton(_ title: String, icon: String, profile: NativeCallMedia) -> some View {
+        Button { startCall(profile) } label: { Label(title, systemImage: icon) }
+            .disabled(contact.callEndpoint == nil || calls.status != .idle)
     }
 }

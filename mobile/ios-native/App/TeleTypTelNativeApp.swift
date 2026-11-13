@@ -2,6 +2,7 @@ import SwiftUI
 
 @main
 struct TeleTypTelNativeApp: App {
+    @UIApplicationDelegateAdaptor(NativeProviderAppDelegate.self) private var providerDelegate
     var body: some Scene {
         WindowGroup { NativeStartupView() }
     }
@@ -62,6 +63,8 @@ struct NativeStartupView: View {
     @StateObject private var savedLogin: NativeSavedLoginModel
     @StateObject private var background = NativeBackgroundController()
     @StateObject private var calls = NativeCallController()
+    @StateObject private var translation = NativeTranslationModel()
+    @StateObject private var providerSDK = NativeProviderSDK()
     @State private var selectedContact: NativeContact?
     @Environment(\.scenePhase) private var scenePhase
     @State private var address = ""
@@ -93,7 +96,7 @@ struct NativeStartupView: View {
         fixtureName = nil
     }
 
-    var body: some View {
+    private var startupContent: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
@@ -265,9 +268,17 @@ struct NativeStartupView: View {
                             .controlSize(.large)
                             .accessibilityIdentifier("login-account")
                             .disabled(loginModel.isWorking || loginModel.isConnected || savedLogin.isWorking || jid.isEmpty || password.isEmpty)
+                            HStack(spacing: 16) {
+                                providerButton(.google, title: "Google")
+                                providerButton(.facebook, title: "Facebook")
+                            }
+                            if !providerSDK.configured(.google) || !providerSDK.configured(.facebook) {
+                                Text("Google/Facebook vereisen providerinstellingen voor de bundle-ID van deze native build. De bestaande web- en TestFlight-aanmelding blijft ongewijzigd.")
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
                         }
                     }
-                    Text("Aanmelden gebruikt het ingevulde HTTPS-adres. Zonder toestemming blijven inloggegevens alleen in het werkgeheugen. Biometrisch aanmelden bewaart ze in de beveiligde iOS-sleutelhanger, niet in iCloud. Alleen ‘Bericht verzenden’ stuurt jouw tekst. Pushmeldingen en Google/Facebook zijn hier nog niet aangesloten.")
+                    Text("Aanmelden gebruikt het ingevulde HTTPS-adres. Zonder toestemming blijven inloggegevens alleen in het werkgeheugen. Biometrisch aanmelden bewaart ze in de beveiligde iOS-sleutelhanger, niet in iCloud. Vertaling gebruikt alleen jouw eigen toestemming. Achtergrondoproepen blijven apart in ontwikkeling.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -279,14 +290,21 @@ struct NativeStartupView: View {
             .navigationBarTitleDisplayMode(.inline)
             .scrollDismissesKeyboard(.interactively)
         }
-        .sheet(item: $selectedContact) { contact in
-            NativeChatView(model: loginModel, calls: calls, contact: contact)
+    }
+
+    var body: some View {
+        Group {
+            if loginModel.isConnected {
+                NativeMessengerView(model: loginModel, calls: calls, translation: translation, logout: logout)
+            } else { startupContent }
         }
+        .background(NativeProviderPresenter(sdk: providerSDK).frame(width: 0, height: 0))
+        .onOpenURL { providerSDK.handle($0) }
         .fullScreenCover(isPresented: Binding(
             get: { calls.presentation != nil },
             set: { visible in if !visible { calls.endCall() } }
         )) {
-            NativeTotalConversationView(controller: calls)
+            NativeTotalConversationView(controller: calls, translation: translation)
         }
         .onAppear { calls.attach(loginModel) }
         .task {
@@ -301,11 +319,15 @@ struct NativeStartupView: View {
         }
         .onChange(of: loginModel.phase) { phase in
             calls.synchronize(phase)
-            if case .connected(let account) = phase { savedLogin.connected(jid: account) }
+            if case .connected(let account) = phase {
+                savedLogin.connected(jid: account)
+                Task { await translation.connect(loginModel.activeWebSession, accountID: loginModel.activeAccountID) }
+            }
             else if case .failed = phase {
                 verificationCode = ""
                 savedLogin.cancel()
             }
+            if !loginModel.isConnected { translation.detach() }
         }
         .onChange(of: scenePhase) { phase in
             if phase == .background {
@@ -327,6 +349,26 @@ struct NativeStartupView: View {
             calls.detach()
             loginModel.suspend()
         }
+    }
+
+    private func logout() {
+        password = ""
+        verificationCode = ""
+        savedLogin.forget()
+        rememberLogin = false
+        translation.detach()
+        loginModel.disconnect()
+    }
+
+    private func providerButton(_ provider: NativeIdentityProvider, title: String) -> some View {
+        Button {
+            password = ""
+            savedLogin.cancel()
+            loginModel.loginSocial(address: address, domain: domain, provider: provider, signer: providerSDK)
+        } label: { Label(title, systemImage: "person.crop.circle").frame(minHeight: 44) }
+        .buttonStyle(.bordered)
+        .disabled(!providerSDK.configured(provider) || loginModel.isWorking || savedLogin.isWorking)
+        .accessibilityIdentifier("login-" + provider.rawValue)
     }
 
     private func resetConfiguration() {

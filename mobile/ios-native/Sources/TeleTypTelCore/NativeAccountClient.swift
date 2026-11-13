@@ -11,6 +11,8 @@ public struct NativeAuthenticatedAccount: CustomStringConvertible, CustomDebugSt
     let configuration: ServerConfiguration
     let jid: String
     let password: String
+    var accountID: String? = nil
+    var webSession: NativeAccountWebSession? = nil
 
     public var description: String { "NativeAuthenticatedAccount(redacted)" }
     public var debugDescription: String { description }
@@ -31,7 +33,9 @@ public struct NativeAuthenticatedAccount: CustomStringConvertible, CustomDebugSt
               !account.password.unicodeScalars.contains(where: { $0.value == 0 }) else {
             throw NativeAccountFailure.invalidResponse
         }
-        return Self(configuration: configuration, jid: account.jid, password: account.password)
+        var value = Self(configuration: configuration, jid: account.jid, password: account.password)
+        value.accountID = account.accountId
+        return value
     }
 
     static func validJID(_ jid: String, domain: String) -> Bool {
@@ -48,6 +52,7 @@ public struct NativeAuthenticatedAccount: CustomStringConvertible, CustomDebugSt
     }
 
     private struct Account: Decodable {
+        let accountId: String?
         let jid: String
         let password: String
     }

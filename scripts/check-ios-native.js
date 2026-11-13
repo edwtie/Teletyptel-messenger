@@ -35,6 +35,14 @@ function collectTestResults(bundle, { root, reports, family, execute = execFileS
         String(error.message) + "\n" + String(error.stderr || ""));
     }
   }
+  try {
+    execute("xcrun", ["xcresulttool", "export", "attachments", "--path", bundle,
+      "--output-path", path.join(reports, family + "-screenshots")], {
+      cwd: root, timeout: 60000, maxBuffer: 8 * 1024 * 1024, encoding: "utf8", stdio: "pipe"
+    });
+  } catch (error) {
+    fs.writeFileSync(path.join(reports, family + "-screenshots-export-error.txt"), String(error.message));
+  }
 }
 
 function run() {

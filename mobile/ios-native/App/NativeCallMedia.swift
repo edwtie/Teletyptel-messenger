@@ -3,6 +3,7 @@ import WebRTC
 
 @MainActor
 struct NativeCallPresentation {
+    let callID: UUID
     let profile: NativeCallMedia
     let localVideo: RTCVideoTrack?
     let remoteVideo: RTCVideoTrack?
@@ -201,12 +202,13 @@ final class NativeWebRTCCallMedia: NativeCallMediaDriver {
     }
 
     private func publishPresentation() {
-        guard let prepared = prepared, let profile = profile else {
+        guard let prepared = prepared, let profile = profile, let handle = handle else {
             presentationChanged?(nil)
             return
         }
         let remoteVideo = prepared.peer.receivers.compactMap { $0.track as? RTCVideoTrack }.first
         presentationChanged?(NativeCallPresentation(
+            callID: handle.id,
             profile: profile,
             localVideo: prepared.camera,
             remoteVideo: remoteVideo,

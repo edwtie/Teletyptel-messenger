@@ -57,10 +57,12 @@ final class NativeStartupUITests: XCTestCase {
         XCTAssertTrue(contact.waitForExistence(timeout: 5))
         reveal(contact)
         XCTAssertTrue(contact.label.contains("Online"))
+        snapshot("contacts-portrait")
         XCUIDevice.shared.orientation = .landscapeLeft
         waitForStatus("XMPP verbonden als fixture@localhost")
         reveal(contact)
         XCTAssertTrue(contact.label.contains("Online"))
+        snapshot("contacts-landscape")
         XCUIDevice.shared.orientation = .portrait
         let disconnect = application.buttons["disconnect-session"]
         reveal(disconnect, upward: false)
@@ -109,6 +111,7 @@ final class NativeStartupUITests: XCTestCase {
         XCTAssertFalse(application.keyboards.firstMatch.exists)
         let greeting = application.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "chat-message-", "Fictief ontvangen bericht")).firstMatch
         XCTAssertTrue(greeting.waitForExistence(timeout: 5))
+        snapshot("chat-portrait")
         draft.tap()
         draft.typeText("Fictieve uitgaande tekst")
         application.buttons["chat-send"].tap()
@@ -118,6 +121,7 @@ final class NativeStartupUITests: XCTestCase {
         draft.typeText("Bewaar mijn concept")
         XCUIDevice.shared.orientation = .landscapeLeft
         XCTAssertEqual(draft.value as? String, "Bewaar mijn concept")
+        snapshot("chat-landscape-keyboard")
         XCUIDevice.shared.orientation = .portrait
         XCUIDevice.shared.press(.home)
         XCTAssertTrue(application.wait(for: .runningBackground, timeout: 5) || application.wait(for: .runningBackgroundSuspended, timeout: 5))
@@ -139,6 +143,13 @@ final class NativeStartupUITests: XCTestCase {
         waitForStatus("De XMPP-server reageert niet meer")
         XCTAssertFalse(application.buttons["disconnect-session"].exists)
         XCTAssertFalse(application.buttons["login-account"].isEnabled)
+    }
+
+    private func snapshot(_ name: String) {
+        let attachment = XCTAttachment(screenshot: application.screenshot())
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
     }
 
     private func signInFixture(_ scenario: String) {

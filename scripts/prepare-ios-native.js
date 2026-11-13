@@ -2,12 +2,13 @@ const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
 const webRTC = require("./ios-testflight/native-webrtc");
+const { providerPlist } = require("./native-provider-config");
 
 const root = path.resolve(__dirname, "..");
 const source = path.join(root, "mobile/ios-native");
 const coreFiles = ["Startup.swift", "XMPPProbeStream.swift", "XMPPAvailabilityClient.swift",
-  "NativeAccountClient.swift", "NativeTwoFactorAccountClient.swift", "XMPPSessionStream.swift", "NativeXMPPConnection.swift", "NativeLoginModel.swift", "NativeSavedLogin.swift", "NativeRoster.swift", "NativeChat.swift", "NativeIncomingCall.swift", "NativeCallCoordinator.swift", "NativeJingleTransport.swift", "NativeJingleMedia.swift", "NativeLocalMediaSDP.swift", "NativeJingleSession.swift"];
-const appFiles = ["App/TeleTypTelNativeApp.swift", "App/NativeBiometricLoginVault.swift", "App/NativeChatView.swift", "App/NativeBackgroundController.swift", "App/NativeCallPlatform.swift", "App/NativeCallMedia.swift", "App/NativeCallController.swift", "App/NativeTotalConversationView.swift", "App/NativeMediaCapture.swift", "App/NativeMediaPeer.swift", "App/NativeActivePeerNegotiating.swift", "App/NativeIncomingPeerNegotiator.swift", "App/NativeOutgoingPeerNegotiator.swift"];
+  "NativeAccountClient.swift", "NativeAccountWebSession.swift", "NativeSocialAccountClient.swift", "NativeTranslation.swift", "NativeTwoFactorAccountClient.swift", "XMPPSessionStream.swift", "NativeXMPPConnection.swift", "NativeLoginModel.swift", "NativeSavedLogin.swift", "NativeRoster.swift", "NativeChat.swift", "NativeIncomingCall.swift", "NativeCallCoordinator.swift", "NativeJingleTransport.swift", "NativeJingleMedia.swift", "NativeLocalMediaSDP.swift", "NativeJingleSession.swift"];
+const appFiles = ["App/TeleTypTelNativeApp.swift", "App/NativeProviderSDK.swift", "App/NativeTranslationView.swift", "App/NativeBiometricLoginVault.swift", "App/NativeChatView.swift", "App/NativeBackgroundController.swift", "App/NativeCallPlatform.swift", "App/NativeCallMedia.swift", "App/NativeCallController.swift", "App/NativeTotalConversationView.swift", "App/NativeMediaCapture.swift", "App/NativeMediaPeer.swift", "App/NativeActivePeerNegotiating.swift", "App/NativeIncomingPeerNegotiator.swift", "App/NativeOutgoingPeerNegotiator.swift"];
 const mediaFiles = ["NativeT140Session.swift", "NativeWebRTCChannel.swift"];
 
 function projectText() {
@@ -42,7 +43,22 @@ function projectText() {
   const rtcPackage = object("webrtc-package", `{isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/stasel/WebRTC.git"; requirement = {kind = revision; revision = ${quote(webRTC.revision)};};}`);
   const rtcProduct = object("webrtc-product", `{isa = XCSwiftPackageProductDependency; package = ${rtcPackage}; productName = WebRTC;}`);
   const rtcBuild = object("webrtc-build", `{isa = PBXBuildFile; productRef = ${rtcProduct};}`);
-  const appPhases = [phase("sources", "PBXSourcesBuildPhase", buildFiles), phase("frameworks", "PBXFrameworksBuildPhase", [rtcBuild]), phase("resources", "PBXResourcesBuildPhase", [assetBuild])];
+  const providerPackages = [];
+  const providerProducts = [];
+  const providerBuilds = [];
+  for (const [name, url, version, products] of [
+    ["google", "https://github.com/google/GoogleSignIn-iOS.git", "9.0.0", ["GoogleSignIn"]],
+    ["facebook", "https://github.com/meta/facebook-ios-sdk.git", "18.1.1", ["FacebookCore", "FacebookLogin"]]
+  ]) {
+    const pkg = object(name + "-package", `{isa = XCRemoteSwiftPackageReference; repositoryURL = ${quote(url)}; requirement = {kind = exactVersion; version = ${quote(version)};};}`);
+    providerPackages.push(pkg);
+    for (const name of products) {
+      const product = object(name + "-product", `{isa = XCSwiftPackageProductDependency; package = ${pkg}; productName = ${quote(name)};}`);
+      providerProducts.push(product);
+      providerBuilds.push(object(name + "-build", `{isa = PBXBuildFile; productRef = ${product};}`));
+    }
+  }
+  const appPhases = [phase("sources", "PBXSourcesBuildPhase", buildFiles), phase("frameworks", "PBXFrameworksBuildPhase", [rtcBuild, ...providerBuilds]), phase("resources", "PBXResourcesBuildPhase", [assetBuild])];
   const testPhases = [phase("test-sources", "PBXSourcesBuildPhase", [testBuild]), phase("test-frameworks", "PBXFrameworksBuildPhase", []), phase("test-resources", "PBXResourcesBuildPhase", [])];
   const configurations = (name, settings) => {
     const configs = ["Debug", "Release"].map(mode => object(name + mode,
@@ -55,9 +71,9 @@ function projectText() {
   const testConfigs = configurations("test", 'PRODUCT_NAME = NativeStartupUITests; PRODUCT_BUNDLE_IDENTIFIER = com.tiedragon.teletyptel.nativepreview.uitests; GENERATE_INFOPLIST_FILE = YES; TEST_TARGET_NAME = TeleTypTelNative;');
   const proxy = object("proxy", `{isa = PBXContainerItemProxy; containerPortal = ${identifier("project")}; proxyType = 1; remoteGlobalIDString = ${identifier("target")}; remoteInfo = TeleTypTelNative;}`);
   const dependency = object("test-dependency", `{isa = PBXTargetDependency; target = ${identifier("target")}; targetProxy = ${proxy};}`);
-  const target = object("target", `{isa = PBXNativeTarget; name = TeleTypTelNative; productName = TeleTypTelNative; productType = "com.apple.product-type.application"; productReference = ${app}; buildConfigurationList = ${appConfigs}; buildPhases = ${list(appPhases)}; packageProductDependencies = ${list([rtcProduct])}; dependencies = (); buildRules = ();}`);
+  const target = object("target", `{isa = PBXNativeTarget; name = TeleTypTelNative; productName = TeleTypTelNative; productType = "com.apple.product-type.application"; productReference = ${app}; buildConfigurationList = ${appConfigs}; buildPhases = ${list(appPhases)}; packageProductDependencies = ${list([rtcProduct, ...providerProducts])}; dependencies = (); buildRules = ();}`);
   const testTarget = object("test-target", `{isa = PBXNativeTarget; name = NativeStartupUITests; productName = NativeStartupUITests; productType = "com.apple.product-type.bundle.ui-testing"; productReference = ${tests}; buildConfigurationList = ${testConfigs}; buildPhases = ${list(testPhases)}; dependencies = ${list([dependency])}; buildRules = ();}`);
-  object("project", `{isa = PBXProject; attributes = {LastUpgradeCheck = 1600;}; buildConfigurationList = ${projectConfigs}; compatibilityVersion = "Xcode 14.0"; developmentRegion = nl; knownRegions = (nl, en, Base); mainGroup = ${main}; productRefGroup = ${products}; projectDirPath = ""; projectRoot = ""; packageReferences = ${list([rtcPackage])}; targets = ${list([target, testTarget])};}`);
+  object("project", `{isa = PBXProject; attributes = {LastUpgradeCheck = 1600;}; buildConfigurationList = ${projectConfigs}; compatibilityVersion = "Xcode 14.0"; developmentRegion = nl; knownRegions = (nl, en, Base); mainGroup = ${main}; productRefGroup = ${products}; projectDirPath = ""; projectRoot = ""; packageReferences = ${list([rtcPackage, ...providerPackages])}; targets = ${list([target, testTarget])};}`);
   const project = `// !$*UTF8*$!\n{archiveVersion = 1; classes = {}; objectVersion = 56; objects = {\n${[...objects].map(([key, value]) => `${key} = ${value};`).join("\n")}\n}; rootObject = ${identifier("project")};}\n`;
   const reference = (id, file, name) => `<BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="${id}" BuildableName="${file}" BlueprintName="${name}" ReferencedContainer="container:TeleTypTelNative.xcodeproj"/>`;
   const appReference = reference(target, "TeleTypTelNative.app", "TeleTypTelNative");
@@ -73,7 +89,7 @@ function projectText() {
   return { project, scheme };
 }
 
-function prepare(name) {
+function prepare(name, { providers = null } = {}) {
   if (!/^ios-native-[a-z0-9-]+$/.test(name || "")) throw new Error("Use an isolated ios-native-* staging name");
   const directory = path.join(root, "artifacts", name);
   if (fs.existsSync(directory)) throw new Error("Staging already exists; choose a fresh name");
@@ -86,16 +102,24 @@ function prepare(name) {
   for (const file of coreFiles) write("Core/" + file, fs.readFileSync(path.join(source, "Sources/TeleTypTelCore", file)));
   for (const file of mediaFiles) write("Media/" + file, fs.readFileSync(path.join(root, "scripts/ios-testflight", file)));
   for (const file of [...appFiles, "App/Info.plist", "UITests/NativeStartupUITests.swift"]) {
-    write(file, fs.readFileSync(path.join(source, file)));
+    const content = fs.readFileSync(path.join(source, file));
+    write(file, file === "App/Info.plist" ? providerPlist(content.toString("utf8"), providers) : content);
   }
   write("Assets.xcassets/Contents.json", JSON.stringify({ info: { author: "xcode", version: 1 } }));
   write("Assets.xcassets/TeleTypTelLogo.imageset/logo.png", fs.readFileSync(path.join(root, "php/public/assets/brand/teletyptel-logo-header@2x.png")));
   write("Assets.xcassets/TeleTypTelLogo.imageset/Contents.json", JSON.stringify({ images: [{ idiom: "universal", filename: "logo.png", scale: "2x" }], info: { author: "xcode", version: 1 } }));
+  for (const [name, file] of [["ChatBackground", "teletyptel-bg-mobile.png"], ["ChatBackgroundWide", "teletyptel-bg-wide-1.png"]]) {
+    write(`Assets.xcassets/${name}.imageset/background.png`, fs.readFileSync(path.join(root, "php/public/assets/backgrounds", file)));
+    write(`Assets.xcassets/${name}.imageset/Contents.json`, JSON.stringify({ images: [{ idiom: "universal", filename: "background.png" }], info: { author: "xcode", version: 1 } }));
+  }
   const generated = projectText();
   write("TeleTypTelNative.xcodeproj/project.pbxproj", generated.project);
   write("TeleTypTelNative.xcodeproj/xcshareddata/xcschemes/TeleTypTelNative.xcscheme", generated.scheme);
   return directory;
 }
 
-if (require.main === module) console.log(prepare(process.argv[2]));
+if (require.main === module) {
+  const providers = process.argv[3] ? JSON.parse(fs.readFileSync(process.argv[3], "utf8")) : null;
+  console.log(prepare(process.argv[2], { providers }));
+}
 module.exports = { prepare, projectText };
