@@ -26,9 +26,12 @@ public final class NativeLoginModel: ObservableObject {
     @Published public private(set) var chatError: String?
     @Published public private(set) var isBackground = false
     @Published private var sender: (any NativeChatSending)?
+    var onJingle: ((NativeJingleRequest, any NativeJingleSending) -> Void)?
     private var resumableAccount: NativeAuthenticatedAccount?
     private var sendTasks: [UUID: Task<Void, Never>] = [:]
     private var earlyMessages: [NativeChatEvent] = []
+    private var earlyJingle: [NativeJingleRequest] = []
+    private var jingleSender: (any NativeJingleSending)?
     private var generation = UUID()
     private var task: Task<Void, Never>?
     private let checker: any ServerChecking
@@ -145,7 +148,7 @@ public final class NativeLoginModel: ObservableObject {
     private func runSession(_ account: NativeAuthenticatedAccount, attempt: UUID) async throws {
         roster = .loading
         let jid = account.jid
-        try await connection.run(account: account, onConnected: { [weak self] fullJID in
+        let connected: @Sendable (String) -> Void = { [weak self] fullJID in
             Task { @MainActor [weak self] in
                 guard let self = self, self.generation == attempt, self.phase == .connecting else { return }
                 let parts = fullJID.split(separator: "/", maxSplits: 1, omittingEmptySubsequences: false)
@@ -156,7 +159,8 @@ public final class NativeLoginModel: ObservableObject {
                 }
                 self.phase = .connected(jid)
             }
-        }, onRoster: { [weak self] roster in
+        }
+        let rosterChanged: @Sendable (NativeRosterState) -> Void = { [weak self] roster in
             Task { @MainActor [weak self] in
                 guard let self = self, self.generation == attempt,
                       self.phase == .connecting || self.isConnected else { return }
@@ -169,20 +173,47 @@ public final class NativeLoginModel: ObservableObject {
                     self.earlyMessages.removeAll()
                 }
             }
-        }, onChat: { [weak self] event in
+        }
+        let chatReceived: @Sendable (NativeChatEvent) -> Void = { [weak self] event in
             Task { @MainActor [weak self] in
                 guard let self = self, self.generation == attempt,
                       self.phase == .connecting || self.isConnected else { return }
                 self.receiveChat(event)
             }
-        }, onSender: { [weak self] sender in
+        }
+        let senderReady: @Sendable (any NativeChatSending) -> Void = { [weak self] sender in
             Task { @MainActor [weak self] in
                 guard let self = self, self.generation == attempt,
                       self.phase == .connecting || self.isConnected else { return }
                 self.sender = sender
             }
-        })
+        }
+        if let calls = connection as? any NativeJingleXMPPConnecting {
+            try await calls.run(account: account, onConnected: connected, onRoster: rosterChanged,
+                onChat: chatReceived, onSender: senderReady, onJingle: { [weak self] request in
+                    Task { @MainActor [weak self] in self?.receiveJingle(request, attempt: attempt) }
+                }, onJingleSender: { [weak self] sender in
+                    Task { @MainActor [weak self] in self?.setJingleSender(sender, attempt: attempt) }
+                })
+        } else {
+            try await connection.run(account: account, onConnected: connected, onRoster: rosterChanged,
+                                     onChat: chatReceived, onSender: senderReady)
+        }
         throw ConnectionFailure.offline
+    }
+
+    private func receiveJingle(_ request: NativeJingleRequest, attempt: UUID) {
+        guard generation == attempt, phase == .connecting || isConnected else { return }
+        if let sender = jingleSender { onJingle?(request, sender) }
+        else if earlyJingle.count < 8 { earlyJingle.append(request) }
+    }
+
+    private func setJingleSender(_ sender: any NativeJingleSending, attempt: UUID) {
+        guard generation == attempt, phase == .connecting || isConnected else { return }
+        jingleSender = sender
+        let pending = earlyJingle
+        earlyJingle.removeAll()
+        for request in pending { onJingle?(request, sender) }
     }
 
     private func receiveChat(_ event: NativeChatEvent) {
@@ -233,6 +264,8 @@ public final class NativeLoginModel: ObservableObject {
         generation = UUID()
         roster = .idle
         earlyMessages.removeAll()
+        earlyJingle.removeAll()
+        jingleSender = nil
         sender = nil
         isBackground = false
         chat.interrupt()

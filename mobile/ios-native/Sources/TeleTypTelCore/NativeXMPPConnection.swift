@@ -25,7 +25,16 @@ public extension NativeXMPPConnecting {
     }
 }
 
-public struct NativeXMPPConnection: NativeXMPPConnecting {
+protocol NativeJingleXMPPConnecting: NativeXMPPConnecting {
+    func run(account: NativeAuthenticatedAccount, onConnected: @escaping @Sendable (String) -> Void,
+             onRoster: @escaping @Sendable (NativeRosterState) -> Void,
+             onChat: @escaping @Sendable (NativeChatEvent) -> Void,
+             onSender: @escaping @Sendable (any NativeChatSending) -> Void,
+             onJingle: @escaping @Sendable (NativeJingleRequest) -> Void,
+             onJingleSender: @escaping @Sendable (any NativeJingleSending) -> Void) async throws
+}
+
+public struct NativeXMPPConnection: NativeXMPPConnecting, NativeJingleXMPPConnecting {
     public init() {}
 
     public func run(account: NativeAuthenticatedAccount, onConnected: @escaping @Sendable (String) -> Void,

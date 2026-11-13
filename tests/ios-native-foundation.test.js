@@ -182,6 +182,16 @@ test("Native authenticated connection is isolated, gated and does not persist cr
   assert.ok(fs.existsSync(path.join(native, 'Tests/TeleTypTelCoreTests/XMPPSessionTests.swift')));
 });
 
+test("Native login session exposes bounded Jingle delivery only while connected", () => {
+  const connection = read("Sources/TeleTypTelCore/NativeXMPPConnection.swift");
+  const login = read("Sources/TeleTypTelCore/NativeLoginModel.swift");
+  assert.match(connection, /protocol NativeJingleXMPPConnecting/);
+  assert.match(login, /earlyJingle\.count < 8/);
+  assert.match(login, /generation == attempt/);
+  assert.match(login, /earlyJingle\.removeAll\(\)/);
+  assert.match(login, /jingleSender = nil/);
+});
+
 test("Native login UI has cancellation, private input and Debug-only offline fixtures", () => {
   const app = read("App/TeleTypTelNativeApp.swift");
   const model = read("Sources/TeleTypTelCore/NativeLoginModel.swift");
