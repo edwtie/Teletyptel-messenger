@@ -63,6 +63,15 @@ struct NativeTotalConversationView: View {
         .onChange(of: controller.presentation?.ownText) { text in
             if let text = text { translateLive(text, direction: "self") }
         }
+        .onChange(of: translation.ready) { _ in translateCurrentText() }
+        .onChange(of: translation.preferences) { _ in translateCurrentText() }
+        .onChange(of: translation.sharingConsent) { _ in translateCurrentText() }
+    }
+
+    private func translateCurrentText() {
+        guard let presentation = controller.presentation else { return }
+        translateLive(presentation.remoteText, direction: "peer")
+        translateLive(presentation.ownText, direction: "self")
     }
 
     @ViewBuilder

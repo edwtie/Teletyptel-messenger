@@ -84,6 +84,7 @@ struct NativeMessengerView: View {
     @ObservedObject var translation: NativeTranslationModel
     let logout: () -> Void
     @State private var selected: String?
+    @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var search = ""
     @State private var showTranslation = false
 
@@ -93,7 +94,7 @@ struct NativeMessengerView: View {
     }
 
     var body: some View {
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
             VStack(spacing: 0) {
                 HStack {
                     Image("TeleTypTelLogo").resizable().scaledToFit().frame(maxWidth: 190, maxHeight: 36)
@@ -144,6 +145,7 @@ struct NativeMessengerView: View {
             }
             .navigationTitle("Contacten en groepen")
             .navigationBarTitleDisplayMode(.inline)
+            .navigationSplitViewColumnWidth(min: 260, ideal: 300, max: 360)
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Menu {
@@ -164,6 +166,7 @@ struct NativeMessengerView: View {
                 }
             }
         }
+        .navigationSplitViewStyle(.balanced)
         .sheet(isPresented: $showTranslation) { NativeTranslationSettingsView(model: translation) }
     }
 
