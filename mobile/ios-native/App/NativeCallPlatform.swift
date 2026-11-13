@@ -60,14 +60,32 @@ final class NativeCallPlatform: NSObject, PKPushRegistryDelegate, CXProviderDele
     }
 
     @discardableResult
+    func connectForeground(account: String) -> UUID? {
+        guard !revocationRequired, registry == nil, !account.isEmpty,
+              account.utf8.count <= 96,
+              !account.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }),
+              self.account == nil || self.account == account else { return nil }
+        if let registration = registration { return registration }
+        self.account = account
+        let created = coordinator.configure(account: account, consented: true)
+        registration = created
+        return created
+    }
+
+    @discardableResult
+    func receive(_ invitation: NativeCallInvitation, completion: @escaping () -> Void) -> Bool {
+        guard let registration = registration else { completion(); return false }
+        coordinator.receive(invitation, registration: registration, completion: completion)
+        return true
+    }
+
+    @discardableResult
     func enable(account: String, consented: Bool, tokenChanged: @escaping (Data?) -> Void) -> Bool {
         guard Bundle.main.object(forInfoDictionaryKey: "TeleTypTelNativeCallPushEnabled") as? Bool == true,
-              consented, !revocationRequired, self.account == nil, !account.isEmpty,
-              account.utf8.count <= 96,
-              !account.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) else { return false }
-        self.account = account
+              consented, registry == nil,
+              let activeRegistration = connectForeground(account: account) else { return false }
         self.tokenChanged = tokenChanged
-        registration = coordinator.configure(account: account, consented: true)
+        registration = activeRegistration
         let created = PKPushRegistry(queue: .main)
         registry = created
         created.delegate = self
@@ -76,7 +94,8 @@ final class NativeCallPlatform: NSObject, PKPushRegistryDelegate, CXProviderDele
     }
 
     func disable() {
-        revocationRequired = revocationRequired || account != nil
+        let hadPushRegistration = registry != nil
+        revocationRequired = revocationRequired || hadPushRegistration
         registration = nil
         registry?.desiredPushTypes = []
         registry = nil
@@ -84,6 +103,7 @@ final class NativeCallPlatform: NSObject, PKPushRegistryDelegate, CXProviderDele
         let notify = tokenChanged
         tokenChanged = nil
         notify?(nil)
+        if !hadPushRegistration { account = nil }
     }
 
     func confirmRevocation(account: String) {

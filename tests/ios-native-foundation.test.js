@@ -253,7 +253,7 @@ test("Native rotation tests check visible geometry before requesting a tap point
 test("Incoming-call foundation stays bounded and does not enable push or silently downgrade TC", () => {
   const calls = read("Sources/TeleTypTelCore/NativeIncomingCall.swift");
   for (const required of ["data.count <= 4096", "registration == generation", "retired.count < 32",
-    "payload.expiresAt <= now + 60", "payload.hasVideo == payload.mediaProfile.hasVideo",
+    "expiresAt <= now + 60", "payload.hasVideo == payload.mediaProfile.hasVideo",
     "requested == negotiated", "Set(readyContents).count == readyContents.count",
     "Set(readyContents) == requested.contents", '!requested.contents.contains("rtt") || rttReady',
     "now + 15", "current?.deadline = nil"])
@@ -271,12 +271,17 @@ test("Incoming-call foundation stays bounded and does not enable push or silentl
 test("CallKit/PushKit sources are included in preview but live registration stays disabled", () => {
   const platform = read("App/NativeCallPlatform.swift");
   const media = read("App/NativeCallMedia.swift");
+  const controller = read("App/NativeCallController.swift");
   const coordinator = read("Sources/TeleTypTelCore/NativeCallCoordinator.swift");
   assert.match(platform, /reportNewIncomingCall/);
   assert.match(platform, /MainActor\.assumeIsolated/);
-  assert.match(platform, /consented, !revocationRequired/);
+  assert.match(platform, /consented, registry == nil/);
+  assert.match(platform, /guard !revocationRequired, registry == nil/);
   assert.match(platform, /registry === self\.registry/);
   assert.match(platform, /TeleTypTelNativeCallPushEnabled/);
+  assert.match(platform, /func connectForeground\(account: String\) -> UUID\?/);
+  assert.match(platform, /func receive\(_ invitation: NativeCallInvitation/);
+  assert.match(platform, /let hadPushRegistration = registry != nil/);
   assert.doesNotMatch(read("App/Info.plist"), /TeleTypTelNativeCallPushEnabled|UIBackgroundModes|aps-environment/);
   assert.match(coordinator, /let rejected = UUID\(\)/);
   assert.match(coordinator, /let callback = self\.answerCompletion\s+self\.answerCompletion = nil\s+callback\?\(true\)/);
@@ -286,6 +291,11 @@ test("CallKit/PushKit sources are included in preview but live registration stay
   assert.match(media, /prepared\.peer\.connectionState == \.connected/);
   assert.match(media, /Set\(contents\) == profile\.contents/);
   assert.match(media, /self\.handle == handle/);
+  assert.match(media, /try await self\.capture\.prepare\(media\)/);
+  assert.match(controller, /login\.onJingle =/);
+  assert.match(controller, /NativeIncomingPeerNegotiator/);
+  assert.match(controller, /runtime\.platform\.receive\(invitation/);
+  assert.match(controller, /matches\.count == 1/);
   assert.doesNotMatch(platform + media, /print\(|NSLog|UserDefaults|setActive\(true/);
   const { revision } = require("../scripts/ios-testflight/native-webrtc");
   assert.match(revision, /^[a-f0-9]{40}$/);

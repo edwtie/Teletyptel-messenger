@@ -4,6 +4,7 @@ import WebRTC
 @MainActor
 final class NativeWebRTCCallMedia: NativeCallMediaDriver {
     private let negotiation: any NativePeerNegotiating
+    private let capture: NativeMediaCapture
     private var handle: NativeCallHandle?
     private var prepared: NativePreparedPeer?
     private var profile: NativeCallMedia?
@@ -13,10 +14,12 @@ final class NativeWebRTCCallMedia: NativeCallMediaDriver {
     private var channel: MessengerWebRTCChannel?
     private var connected = false
     private var audioActive = false
+    private var startTask: Task<Void, Never>?
     private var reconnectDeadline: Task<Void, Never>?
 
-    init(negotiation: any NativePeerNegotiating) {
+    init(negotiation: any NativePeerNegotiating, capture: NativeMediaCapture) {
         self.negotiation = negotiation
+        self.capture = capture
     }
 
     func start(handle: NativeCallHandle, media: NativeCallMedia,
@@ -25,40 +28,56 @@ final class NativeWebRTCCallMedia: NativeCallMediaDriver {
         self.handle = handle
         self.profile = media
         self.event = event
+        startTask = Task { [weak self] in
+            guard let self = self else { return }
+            do {
+                try await self.capture.prepare(media)
+                try Task.checkCancellation()
+                guard self.handle == handle else { return }
+                try self.begin(handle: handle, media: media)
+            } catch {
+                guard self.handle == handle, !(error is CancellationError) else { return }
+                self.event?(.failed)
+            }
+        }
+    }
+
+    private func begin(handle: NativeCallHandle, media: NativeCallMedia) throws {
         let audio = RTCAudioSession.sharedInstance()
         audio.useManualAudio = true
         audio.isAudioEnabled = false
-        do {
-            try configureAudio(audio)
-            let created = try negotiation.prepare(handle: handle, media: media) { [weak self] in
+        try configureAudio(audio)
+        let created = try negotiation.prepare(handle: handle, media: media) { [weak self] in
+            guard self?.handle == handle else { return }
+            self?.refresh()
+        }
+        prepared = created
+        if media.contents.contains("rtt") {
+            let session = MessengerNativeRttSession(callId: handle.id, sid: handle.sid)
+            rtt = session
+            channel = MessengerWebRTCChannel.attach(to: created.peer, session: session) { [weak self] in
                 guard self?.handle == handle else { return }
                 self?.refresh()
             }
-            prepared = created
-            if media.contents.contains("rtt") {
-                let session = MessengerNativeRttSession(callId: handle.id, sid: handle.sid)
-                rtt = session
-                channel = MessengerWebRTCChannel.attach(to: created.peer, session: session) { [weak self] in
-                    guard self?.handle == handle else { return }
-                    self?.refresh()
-                }
-                guard channel != nil else { event(.failed); return }
+            guard channel != nil else { throw NativeMediaPeerFailure.configuration }
+        }
+        negotiation.accept(handle: handle, peer: created.peer) { [weak self] result in
+            guard let self = self, self.handle == handle else { return }
+            guard case .success(let accepted) = result, accepted == media else {
+                self.event?(.failed)
+                return
             }
-            negotiation.accept(handle: handle, peer: created.peer) { [weak self] result in
-                guard let self = self, self.handle == handle else { return }
-                guard case .success(let accepted) = result, accepted == media else {
-                    self.event?(.failed)
-                    return
-                }
-                self.negotiated = true
-                self.refresh()
-            }
-        } catch { event(.failed) }
+            self.negotiated = true
+            self.refresh()
+        }
+        startTask = nil
     }
 
     func stop(handle: NativeCallHandle) {
         guard self.handle == handle else { return }
         self.handle = nil
+        startTask?.cancel()
+        startTask = nil
         event = nil
         connected = false
         negotiated = false
@@ -75,6 +94,7 @@ final class NativeWebRTCCallMedia: NativeCallMediaDriver {
         previous?.camera?.isEnabled = false
         previous?.peer.close()
         negotiation.close(handle: handle)
+        capture.stop()
         audioActivated(false)
     }
 
@@ -153,8 +173,8 @@ final class NativeCallRuntime {
     let media: NativeWebRTCCallMedia
     let platform: NativeCallPlatform
 
-    init(negotiation: any NativePeerNegotiating) {
-        let media = NativeWebRTCCallMedia(negotiation: negotiation)
+    init(negotiation: any NativePeerNegotiating, capture: NativeMediaCapture) {
+        let media = NativeWebRTCCallMedia(negotiation: negotiation, capture: capture)
         self.media = media
         platform = NativeCallPlatform(media: media)
     }

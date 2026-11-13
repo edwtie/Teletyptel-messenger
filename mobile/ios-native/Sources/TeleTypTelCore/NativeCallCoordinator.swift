@@ -88,16 +88,36 @@ final class NativeCallCoordinator {
         let complete = NativeCallOnce(completion)
         guard let handle = lifecycle.receive(data, registration: registration, now: clock.now),
               let invitation = lifecycle.current?.invitation else {
-            let rejected = UUID()
-            var reported = false
-            system.report(id: rejected, hasVideo: false) { [system] success in
-                guard !reported else { return }
-                reported = true
-                if success { system.end(id: rejected, reason: .failed) }
-                complete.finish()
-            }
+            reportRejected(complete)
             return
         }
+        report(handle, invitation: invitation, complete: complete)
+    }
+
+    func receive(_ invitation: NativeCallInvitation, registration: UUID,
+                 completion: @escaping () -> Void) {
+        let complete = NativeCallOnce(completion)
+        guard let handle = lifecycle.receive(invitation, registration: registration, now: clock.now),
+              let accepted = lifecycle.current?.invitation else {
+            reportRejected(complete)
+            return
+        }
+        report(handle, invitation: accepted, complete: complete)
+    }
+
+    private func reportRejected(_ complete: NativeCallOnce) {
+        let rejected = UUID()
+        var reported = false
+        system.report(id: rejected, hasVideo: false) { [system] success in
+            guard !reported else { return }
+            reported = true
+            if success { system.end(id: rejected, reason: .failed) }
+            complete.finish()
+        }
+    }
+
+    private func report(_ handle: NativeCallHandle, invitation: NativeCallInvitation,
+                        complete: NativeCallOnce) {
         schedule(handle)
         var reported = false
         system.report(id: handle.id, hasVideo: invitation.media.hasVideo) { [weak self, system] success in

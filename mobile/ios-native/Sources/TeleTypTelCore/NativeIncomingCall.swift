@@ -24,6 +24,17 @@ struct NativeCallInvitation: Equatable {
     let expiresAt: TimeInterval
     let media: NativeCallMedia
 
+    init?(id: UUID = UUID(), sid: String, expiresAt: TimeInterval,
+          media: NativeCallMedia, now: TimeInterval) {
+        guard now.isFinite, expiresAt.isFinite,
+              sid.range(of: "\\A[A-Za-z0-9_-]{1,128}\\z", options: .regularExpression) != nil,
+              expiresAt > now, expiresAt <= now + 60 else { return nil }
+        self.id = id
+        self.sid = sid
+        self.expiresAt = expiresAt
+        self.media = media
+    }
+
     private struct Payload: Decodable {
         let type: String
         let callId: UUID
@@ -34,14 +45,13 @@ struct NativeCallInvitation: Equatable {
     }
 
     static func decode(_ data: Data, now: TimeInterval) -> Self? {
-        guard data.count <= 4096, now.isFinite,
+        guard data.count <= 4096,
               let payload = try? JSONDecoder().decode(Payload.self, from: data),
               payload.type == "incoming-call",
-              payload.sid.range(of: "\\A[A-Za-z0-9_-]{1,128}\\z", options: .regularExpression) != nil,
-              payload.expiresAt.isFinite, payload.expiresAt.rounded() == payload.expiresAt,
-              payload.expiresAt > now, payload.expiresAt <= now + 60,
+              payload.expiresAt.rounded() == payload.expiresAt,
               payload.hasVideo == payload.mediaProfile.hasVideo else { return nil }
-        return Self(id: payload.callId, sid: payload.sid, expiresAt: payload.expiresAt, media: payload.mediaProfile)
+        return Self(id: payload.callId, sid: payload.sid, expiresAt: payload.expiresAt,
+                    media: payload.mediaProfile, now: now)
     }
 }
 
@@ -85,11 +95,19 @@ struct NativeCallLifecycle {
     }
 
     mutating func receive(_ data: Data, registration: UUID, now: TimeInterval) -> NativeCallHandle? {
-        guard account != nil, registration == generation, now.isFinite else { return nil }
+        guard let invitation = NativeCallInvitation.decode(data, now: now) else { return nil }
+        return receive(invitation, registration: registration, now: now)
+    }
+
+    mutating func receive(_ invitation: NativeCallInvitation, registration: UUID,
+                          now: TimeInterval) -> NativeCallHandle? {
+        guard account != nil, registration == generation, now.isFinite,
+              invitation.expiresAt > now, invitation.expiresAt <= now + 60,
+              invitation.sid.range(of: "\\A[A-Za-z0-9_-]{1,128}\\z", options: .regularExpression) != nil else {
+            return nil
+        }
         retired = retired.filter { $0.value > now }
-        guard current == nil, retired.count < 32,
-              let invitation = NativeCallInvitation.decode(data, now: now),
-              retired[invitation.id] == nil else { return nil }
+        guard current == nil, retired.count < 32, retired[invitation.id] == nil else { return nil }
         let handle = NativeCallHandle(id: invitation.id, sid: invitation.sid, generation: generation)
         current = NativeIncomingCallState(handle: handle, invitation: invitation,
                                          phase: .reporting, deadline: invitation.expiresAt)

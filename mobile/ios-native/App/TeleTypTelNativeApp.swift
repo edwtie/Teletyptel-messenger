@@ -55,6 +55,7 @@ struct NativeStartupView: View {
     @StateObject private var model: NativeStartupModel
     @StateObject private var loginModel: NativeLoginModel
     @StateObject private var background = NativeBackgroundController()
+    @StateObject private var calls = NativeCallController()
     @State private var selectedContact: NativeContact?
     @Environment(\.scenePhase) private var scenePhase
     @State private var address = ""
@@ -131,6 +132,12 @@ struct NativeStartupView: View {
                         Text(statusText)
                             .fixedSize(horizontal: false, vertical: true)
                             .accessibilityIdentifier("startup-status")
+                        if let callStatusText = callStatusText {
+                            Text(callStatusText)
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                                .accessibilityIdentifier("call-status")
+                        }
                         if loginModel.isWorking || loginModel.isConnected {
                             Button(loginModel.isConnected ? "Verbinding verbreken" : "Aanmelding annuleren") {
                                 password = ""
@@ -206,9 +213,11 @@ struct NativeStartupView: View {
             .scrollDismissesKeyboard(.interactively)
         }
         .sheet(item: $selectedContact) { contact in NativeChatView(model: loginModel, contact: contact) }
+        .onAppear { calls.attach(loginModel) }
         .onChange(of: address) { _ in resetConfiguration() }
         .onChange(of: domain) { _ in resetConfiguration() }
         .onChange(of: jid) { _ in loginModel.reset() }
+        .onChange(of: loginModel.phase) { calls.synchronize($0) }
         .onChange(of: scenePhase) { phase in
             if phase == .background {
                 password = ""
@@ -222,6 +231,7 @@ struct NativeStartupView: View {
             password = ""
             model.cancel()
             background.stop()
+            calls.detach()
             loginModel.suspend()
         }
     }
@@ -316,6 +326,15 @@ struct NativeStartupView: View {
             return "De controle is gestopt. Je kunt deze opnieuw starten."
         case .failed(let failure):
             return connectionError(failure)
+        }
+    }
+
+    private var callStatusText: String? {
+        switch calls.status {
+        case .idle: return nil
+        case .ringing: return "Inkomende Total Conversation-oproep. Neem op of weiger via het systeemscherm."
+        case .active: return "Total Conversation is verbonden."
+        case .failed: return "De oproep kon niet veilig worden voorbereid. Probeer opnieuw."
         }
     }
 

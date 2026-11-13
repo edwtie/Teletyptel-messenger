@@ -97,6 +97,22 @@ final class NativeCallCoordinatorTests: XCTestCase {
     }
 
     @MainActor
+    func testValidatedJingleInvitationReportsThroughTheSameCallKitGate() throws {
+        let (coordinator, system, media, clock) = fixture()
+        let invitation = try XCTUnwrap(NativeCallInvitation(sid: "jingle-call", expiresAt: 1045,
+                                                            media: .audioRtt, now: clock.now))
+        var completions = 0
+        coordinator.receive(invitation, registration: coordinator.lifecycle.generation) { completions += 1 }
+        XCTAssertEqual(system.reports.count, 1)
+        XCTAssertFalse(system.reports[0].video)
+        XCTAssertTrue(media.handles.isEmpty)
+        system.reports[0].completion(true)
+        XCTAssertEqual(completions, 1)
+        XCTAssertEqual(coordinator.lifecycle.current?.invitation, invitation)
+        XCTAssertEqual(coordinator.lifecycle.current?.phase, .ringing)
+    }
+
+    @MainActor
     func testInvalidPushStillReportsAndEndsWithoutMedia() async {
         let (coordinator, system, media, _) = fixture()
         var completions = 0

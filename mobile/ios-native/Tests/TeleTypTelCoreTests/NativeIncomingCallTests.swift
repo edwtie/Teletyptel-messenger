@@ -34,6 +34,17 @@ final class NativeIncomingCallTests: XCTestCase {
         XCTAssertEqual(NativeCallMedia.audioRtt.contents, ["audio", "rtt"])
     }
 
+    func testValidatedJingleInvitationUsesTheSameLifecycle() throws {
+        var lifecycle = configured()
+        let invitation = try XCTUnwrap(NativeCallInvitation(sid: "jingle_123", expiresAt: 1045,
+                                                            media: .audioRtt, now: now))
+        let handle = try XCTUnwrap(lifecycle.receive(invitation, registration: lifecycle.generation, now: now))
+        XCTAssertEqual(handle.sid, "jingle_123")
+        XCTAssertEqual(lifecycle.current?.invitation.media, .audioRtt)
+        XCTAssertNil(NativeCallInvitation(sid: "bad/sid", expiresAt: 1045, media: .audio, now: now))
+        XCTAssertNil(NativeCallInvitation(sid: "late", expiresAt: now, media: .audio, now: now))
+    }
+
     func testMalformedExpiredAndOversizedInvitationsAreRejected() throws {
         let invalid: [[String: Any]] = [
             ["type": "chat"], ["callId": "invalid"], ["sid": ""], ["sid": "bad/sid"], ["sid": "session\n"],
