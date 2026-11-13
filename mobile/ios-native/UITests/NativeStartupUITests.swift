@@ -121,6 +121,12 @@ final class NativeStartupUITests: XCTestCase {
         draft.typeText("Bewaar mijn concept")
         rotate(.landscapeLeft)
         XCTAssertEqual(draft.value as? String, "Bewaar mijn concept")
+        let latestVisible = NSPredicate { _, _ in
+            outgoing.exists && outgoing.isHittable && outgoing.frame.maxY <= draft.frame.minY &&
+                outgoing.frame.minY >= self.application.navigationBars.firstMatch.frame.maxY - 1
+        }
+        expectation(for: latestVisible, evaluatedWith: outgoing)
+        waitForExpectations(timeout: 10)
         snapshot("chat-landscape-keyboard")
         rotate(.portrait)
         XCUIDevice.shared.press(.home)

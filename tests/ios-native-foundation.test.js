@@ -348,10 +348,26 @@ test("Native web-style chat keeps translations private, off-gated and call-bound
   assert.match(chat, /contextMenu/);
   assert.match(chat, /NativeTranslationCaption/);
   assert.match(tc, /presentation\?\.callID.uuidString/);
+  for (const value of ["translation.ready", "translation.preferences", "translation.sharingConsent"])
+    assert.ok(tc.includes(".onChange(of: " + value + ") { _ in translateCurrentText() }"), value);
   assert.match(web, /settings.httpCookieStorage = nil/);
   assert.match(web, /generation == attempt/);
   assert.match(web, /completionHandler\(nil\)/);
   assert.match(web, /X-CSRF-Token/);
+});
+
+test("Native navigation source keeps sidebar visibility explicit and avoids duplicate back bars", () => {
+  const messenger = read("App/NativeTranslationView.swift");
+  const chat = read("App/NativeChatView.swift");
+  assert.match(messenger, /columnVisibility: NavigationSplitViewVisibility = \.all/);
+  assert.match(messenger, /NavigationSplitView\(columnVisibility: \$columnVisibility\)/);
+  assert.match(messenger, /navigationSplitViewStyle\(\.balanced\)/);
+  assert.match(chat, /navigationBarBackButtonHidden\(true\)/);
+  assert.doesNotMatch(chat, /NavigationStack\s*\{/);
+  assert.match(chat, /task\(id: geometry.size\)/);
+  assert.match(chat, /defaultScrollAnchor\(\.bottom\)/);
+  assert.match(chat, /id\("chat-bottom"\)/);
+  assert.match(chat, /NativeTotalConversationSymbol\(\)/);
 });
 
 test("Native second factor is a bounded challenge before XMPP, not an authenticated state", () => {

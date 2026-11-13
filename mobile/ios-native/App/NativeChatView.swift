@@ -30,22 +30,26 @@ struct NativeChatView: View {
                     ScrollView {
                         LazyVStack(spacing: 12) {
                             ForEach(messages) { message in bubble(message).id(message.id) }
+                            Color.clear.frame(height: 1).id("chat-bottom")
                         }.padding(14)
                     }
+                    .modifier(NativeChatBottomAnchor())
                     .background {
                         GeometryReader { geometry in
                             Image(geometry.size.width > geometry.size.height ? "ChatBackgroundWide" : "ChatBackground")
                                 .resizable().scaledToFill()
                                 .frame(width: geometry.size.width, height: geometry.size.height).clipped()
-                                .onChange(of: geometry.size) { _ in
-                                    if let identifier = messages.last?.id { proxy.scrollTo(identifier, anchor: .bottom) }
+                                .task(id: geometry.size) {
+                                    await Task.yield()
+                                    guard !Task.isCancelled else { return }
+                                    proxy.scrollTo("chat-bottom", anchor: .bottom)
                                 }
                         }
                     }
                     .onChange(of: messages.last?.id) { identifier in
-                        if let identifier = identifier { proxy.scrollTo(identifier, anchor: .bottom) }
+                        if identifier != nil { proxy.scrollTo("chat-bottom", anchor: .bottom) }
                     }
-                    .onAppear { if let identifier = messages.last?.id { proxy.scrollTo(identifier, anchor: .bottom) } }
+                    .onAppear { proxy.scrollTo("chat-bottom", anchor: .bottom) }
                 }
                 if let error = model.chatError { Text(error).font(.caption).padding(6).accessibilityIdentifier("chat-error") }
                 if let error = translation.error { Text(error).font(.caption).padding(6) }
@@ -187,6 +191,14 @@ struct NativeChatView: View {
     private func callButton(_ title: String, icon: String, profile: NativeCallMedia) -> some View {
         Button { startCall(profile) } label: { Label(title, systemImage: icon) }
             .disabled(contact.callEndpoint == nil || calls.status != .idle)
+    }
+}
+
+private struct NativeChatBottomAnchor: ViewModifier {
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if #available(iOS 17.0, *) { content.defaultScrollAnchor(.bottom) }
+        else { content }
     }
 }
 
