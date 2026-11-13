@@ -85,7 +85,7 @@ final class NativeMediaCapture {
         let preferred: AVCaptureDevice.Position = current.device.position == .front ? .back : .front
         guard let replacement = Self.cameraSelection(preferred: preferred),
               replacement.device.uniqueID != current.device.uniqueID else { return false }
-        capturer.stopCapture()
+        await capturer.stopCapture()
         do {
             try await Self.start(capturer, selection: replacement)
             cameraSelection = replacement
