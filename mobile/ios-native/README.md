@@ -5,6 +5,33 @@ Requested scope: the complete iPhone and iPad application, including native UI,
 authentication, messaging and Total Conversation. This is a staged rewrite, not a
 claim that those features already work in this target.
 
+## Existing MUC room participation increment (2026-11-13)
+
+The native main menu now opens a separate Groups screen. Enter an existing
+`room@conference.<account-domain>` address and a screen name; this limited preview
+does not discover/bookmark rooms or create/configure them. The transport checks
+room disco information before directed join presence and requires XEP-0045
+self-presence (110) before enabling sends. A racing newly-created room (201) is
+left without configuration. Custom/federated MUC services, passwords, invitations,
+administration, room MAM, group translation, attachments and group calls remain
+separate work; direct-chat translation and history must not be confused with them.
+
+Group text uses `type=groupchat` and separate room/nickname identities, not the
+direct chat store. Known participants, correct room/recipient, body bounds and
+role-based speaking permission are checked. Nick conflicts, removal, visitors,
+server-assigned names, eight-room/128-participant/200-message limits and bounded
+join timeouts have explicit handling. Server errors mark the correlated own send
+rejected; transport uncertainty is not read/delivery proof. Leaving/backgrounding
+removes participation and keeps session text/drafts; rejoining is explicit.
+Logout/account changes clear group state and invalidate stale callbacks.
+
+An isolated ejabberd fixture creates a private members-only room for random test
+accounts, denies ordinary room creation, and includes a non-member rejection test.
+No local/production server or existing room is configured. Runtime and UI evidence
+for this increment is pending; earlier green runs below validate the earlier
+direct-chat baseline, not these new groups.
+Protocol reference: [XEP-0045](https://xmpp.org/extensions/xep-0045.html).
+
 ## Recent direct-chat server history increment (2026-11-13)
 
 The native preview now requests the latest 50 archived stanzas for the selected

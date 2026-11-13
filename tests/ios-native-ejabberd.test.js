@@ -25,6 +25,7 @@ test("Isolated ejabberd exposes only loopback WSS and no federation or public re
   assert.match(configuration, /mod_roster: \{\}/);
   assert.match(configuration, /mod_admin_extra: \{\}/);
   assert.match(configuration, /mod_mam:\s+db_type: mnesia\s+default: always/);
+  assert.match(configuration, /mod_muc:\s+host: conference.localhost\s+access_create: none/);
   assert.doesNotMatch(configuration, /mod_register|mod_http_api|ejabberd_c2s|0\.0\.0\.0|5269/);
   for (const ports of [[80, 15281], [15280, 15280], [15280, 65536], [15280, "15281"]]) {
     assert.throws(() => serverConfiguration(directory, ...ports));
@@ -88,4 +89,16 @@ test("MAM test restores isolated direct history with real two-account transports
   const harness = fs.readFileSync(path.join(root, "scripts/check-ios-native-ejabberd.js"), "utf8");
   assert.match(harness, /runSwift\("NativeArchiveIntegrationTests", "native-archive-tests.txt"\)/);
   assert.match(harness, /nativeArchiveTransportTested = true/);
+});
+
+test("MUC test verifies private membership and post-leave refusal on an isolated server", () => {
+  const root = path.resolve(__dirname, "..");
+  const source = fs.readFileSync(path.join(root, "mobile/ios-native/Tests/NativeXMPPIntegrationTests/NativeGroupIntegrationTests.swift"), "utf8");
+  for (const required of ["XCTSkip", '"github-hosted"', "NativeXMPPConnection().run", "joinGroup", "sendGroup",
+    "leaveGroup", "outsiderCount, 0", "directCount, 0", "missing@conference.localhost", ".disconnected"])
+    assert.ok(source.includes(required), required);
+  assert.doesNotMatch(source, /URLCredential|SecTrust|URLProtocol/);
+  const harness = fs.readFileSync(path.join(root, "scripts/check-ios-native-ejabberd.js"), "utf8");
+  assert.match(harness, /runSwift\("NativeGroupIntegrationTests", "native-group-tests.txt"\)/);
+  assert.match(harness, /members_only: true/);
 });

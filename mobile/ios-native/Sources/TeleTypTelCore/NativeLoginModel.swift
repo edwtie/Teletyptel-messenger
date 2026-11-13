@@ -28,6 +28,7 @@ public final class NativeLoginModel: ObservableObject {
     @Published public private(set) var isBackground = false
     @Published public private(set) var twoFactorError: String?
     @Published public private(set) var historyStates: [String: NativeHistoryState] = [:]
+    public let groups = NativeGroupModel()
     private var historyTask: Task<Void, Never>?
     private var historyRequest = UUID()
     @Published private var sender: (any NativeChatSending)?
@@ -107,6 +108,7 @@ public final class NativeLoginModel: ObservableObject {
     public func beginBackground() {
         isBackground = true
         cancelHistory()
+        groups.disconnect(clear: false)
     }
 
     public func loadHistory(for peer: String, refresh: Bool = false) {
@@ -141,6 +143,7 @@ public final class NativeLoginModel: ObservableObject {
 
     public func resume() {
         isBackground = false
+        activateGroups()
         guard phase == .suspended, let account = resumableAccount else { return }
         let attempt = generation
         phase = .checking
@@ -295,6 +298,7 @@ public final class NativeLoginModel: ObservableObject {
                     return
                 }
                 self.phase = .connected(jid)
+                self.activateGroups()
             }
         }
         let rosterChanged: @Sendable (NativeRosterState) -> Void = { [weak self] roster in
@@ -323,6 +327,7 @@ public final class NativeLoginModel: ObservableObject {
                 guard let self = self, self.generation == attempt,
                       self.phase == .connecting || self.isConnected else { return }
                 self.sender = sender
+                self.activateGroups()
             }
         }
         if let calls = connection as? any NativeJingleXMPPConnecting {
@@ -337,6 +342,11 @@ public final class NativeLoginModel: ObservableObject {
                                      onChat: chatReceived, onSender: senderReady)
         }
         throw ConnectionFailure.offline
+    }
+
+    private func activateGroups() {
+        guard canSend, case .connected(let owner) = phase, let sender = sender as? any NativeGroupSending else { return }
+        groups.attach(sender, owner: owner)
     }
 
     private func receiveJingle(_ request: NativeJingleRequest, attempt: UUID) {
@@ -407,6 +417,7 @@ public final class NativeLoginModel: ObservableObject {
     private func invalidate(clearChat: Bool = true, keepAccount: Bool = false) {
         generation = UUID()
         cancelHistory()
+        groups.disconnect(clear: clearChat)
         providerSigner?.cancel()
         providerSigner = nil
         secondFactor?.session.cancel()

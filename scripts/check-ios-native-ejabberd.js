@@ -41,6 +41,14 @@ modules:
   mod_mam:
     db_type: mnesia
     default: always
+  mod_muc:
+    host: conference.localhost
+    access_create: none
+    default_room_options:
+      persistent: true
+      public: false
+      members_only: true
+  mod_muc_admin: {}
 `;
 }
 
@@ -72,9 +80,11 @@ async function run() {
   const identifier = randomBytes(8).toString("hex");
   const username = "native-test-" + identifier;
   const archivePeer = username + "-archive";
+  const groupOutsider = username + "-outsider";
+  const groupRoom = username + "-room";
   const password = randomBytes(32).toString("hex");
   const cookie = randomBytes(32).toString("hex");
-  const secrets = [password, cookie, ...[username, archivePeer].map(user => Buffer.from(`\0${user}\0${password}`).toString("base64"))];
+  const secrets = [password, cookie, ...[username, archivePeer, groupOutsider].map(user => Buffer.from(`\0${user}\0${password}`).toString("base64"))];
   const report = { unsigned: true, uploaded: false, productionServerContacted: false,
     transport: "Apple URLSessionWebSocketTask to loopback ejabberd over WSS",
     accountAPITested: false, physicalDevicesTested: false, passed: false,
@@ -189,11 +199,14 @@ async function run() {
     if (!ready) throw new Error("Isolated ejabberd did not start");
     control("register", username, "localhost", password);
     control("register", archivePeer, "localhost", password);
+    control("register", groupOutsider, "localhost", password);
+    control("create_room", groupRoom, "conference.localhost", "localhost");
+    for (const user of [username, archivePeer]) control("set_room_affiliation", groupRoom, "conference.localhost", user + "@localhost", "member");
     control("add_rosteritem", username, "localhost", "fixture-peer", "localhost", "Fictief testcontact", "Testcontacten", "both");
     loginFixture = await startLoginFixture({ key: fs.readFileSync(certificate("server.key")),
       cert: fs.readFileSync(certificate("server.crt")), ca: fs.readFileSync(certificate("ca.crt")),
       trustedPort, username, password });
-    write("fixture.json", JSON.stringify({ trustedPort, untrustedPort, accountPort: loginFixture.port, username, password, archivePeer }));
+    write("fixture.json", JSON.stringify({ trustedPort, untrustedPort, accountPort: loginFixture.port, username, password, archivePeer, groupOutsider, groupRoom }));
     fixtureReady = true;
     const swiftOutput = await runSwift("EjabberdIntegrationTests", "swift-progress.txt");
     save("swift-tests.txt", swiftOutput);
@@ -216,6 +229,11 @@ async function run() {
     }
     report.nativeArchiveTransportTested = true;
     report.nativeArchiveTransportTests = 1;
+    const groupOutput = await runSwift("NativeGroupIntegrationTests", "native-group-tests.txt");
+    if (!/Executed 1 test, with 0 failures/.test(groupOutput) || /[1-9][0-9]* tests? skipped/i.test(groupOutput)) {
+      throw new Error("Expected the real private-room MUC test without skips or failures");
+    }
+    report.nativeGroupTransportTested = true;
     save("account-contract-statistics.json", JSON.stringify(loginFixture.statistics, null, 2));
     const { scenarios, upgrades, unexpectedRequests, proxyErrors } = loginFixture.statistics;
     if (["success", "rejected", "twofactor", "mismatch", "redirect", "xmpp-rejected", "delayed"]

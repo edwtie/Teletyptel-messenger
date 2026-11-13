@@ -146,6 +146,37 @@ final class NativeStartupUITests: XCTestCase {
         XCTAssertEqual(draft.value as? String, "Bewaar mijn concept")
     }
 
+    func testExistingGroupJoinSendRotationAndLeave() {
+        signInFixture("ready")
+        XCTAssertTrue(application.buttons["disconnect-session"].waitForExistence(timeout: 10))
+        application.buttons["Hoofdmenu"].tap()
+        application.buttons["open-groups"].tap()
+        let address = application.textFields["group-address"]
+        XCTAssertTrue(address.waitForExistence(timeout: 5))
+        address.tap(); address.typeText("fixture@conference.localhost")
+        let nickname = application.textFields["group-nickname"]
+        reveal(nickname); nickname.tap(); nickname.typeText("Testnaam")
+        let join = application.buttons["group-join"]
+        reveal(join); join.tap()
+        let room = application.descendants(matching: .any)["group-room-fixture@conference.localhost"].firstMatch
+        XCTAssertTrue(room.waitForExistence(timeout: 5))
+        reveal(room); room.tap()
+        XCTAssertTrue(application.staticTexts["group-status"].waitForExistence(timeout: 5))
+        let draft = application.textFields["group-draft"]
+        XCTAssertTrue(draft.waitForExistence(timeout: 5))
+        draft.tap(); draft.typeText("Fictieve groepsreactie")
+        application.buttons["group-send"].tap()
+        let outgoing = application.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "group-message-", "Fictieve groepsreactie")).firstMatch
+        XCTAssertTrue(outgoing.waitForExistence(timeout: 5))
+        snapshot("group-portrait")
+        rotate(.landscapeLeft)
+        XCTAssertTrue(outgoing.exists)
+        snapshot("group-landscape")
+        application.buttons["group-leave"].tap()
+        XCTAssertTrue(application.buttons["Opnieuw deelnemen"].waitForExistence(timeout: 5))
+        XCTAssertFalse(application.buttons["group-send"].isEnabled)
+    }
+
     func testConnectionLossIsVisibleWithoutAutomaticRelogin() {
         signInFixture("disconnect")
         waitForStatus("De XMPP-server reageert niet meer")

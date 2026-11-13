@@ -604,7 +604,19 @@ private struct NativeLoginUIFixture: ServerChecking, NativeAccountChallenging, N
     }
 }
 
-private struct NativeChatUIFixture: NativeArchiveSending {
+private struct NativeChatUIFixture: NativeArchiveSending, NativeGroupSending {
+    func joinGroup(room: String, nickname: String, onEvent: @escaping @Sendable (NativeGroupEvent) -> Void) async throws {
+        guard room == "fixture@conference.localhost", nickname == "Testnaam" else { throw NativeGroupFailure.denied }
+        try await Task.sleep(nanoseconds: 100_000_000)
+        onEvent(.snapshot(NativeGroupSnapshot(room: room, nickname: nickname, participants: [nickname, "Fictieve deelnemer"], canSpeak: true)))
+        onEvent(.message(NativeGroupText(id: UUID(), room: room, nickname: "Fictieve deelnemer", identifier: "fixture-welcome",
+            archiveID: nil, body: "Fictief groepsbericht", date: Date(), own: false, state: .incoming)))
+    }
+    func sendGroup(room: String, body: String, identifier: String) async throws {
+        guard room == "fixture@conference.localhost", !body.isEmpty else { throw NativeGroupFailure.denied }
+        try await Task.sleep(nanoseconds: 100_000_000)
+    }
+    func leaveGroup(room: String) async { }
     func fetchArchive(peer: String, before: String?) async throws -> NativeArchivePage {
         guard peer == "demo-contact@localhost", before == nil else { throw NativeArchiveFailure.unavailable }
         try await Task.sleep(nanoseconds: 100_000_000)

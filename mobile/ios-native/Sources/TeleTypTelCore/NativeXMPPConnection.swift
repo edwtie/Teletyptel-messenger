@@ -78,11 +78,23 @@ public struct NativeXMPPConnection: NativeXMPPConnecting, NativeJingleXMPPConnec
     }
 }
 
-private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, NativeArchiveSending, NativeJingleSending, @unchecked Sendable {
+private final class NativeGroupOperation {
+    var stream: NativeMUCStream
+    let callback: @Sendable (NativeGroupEvent) -> Void
+    var continuation: CheckedContinuation<Void, Error>?
+    var deadline: DispatchWorkItem?
+    let token: UUID
+    init(stream: NativeMUCStream, token: UUID, continuation: CheckedContinuation<Void, Error>, callback: @escaping @Sendable (NativeGroupEvent) -> Void) {
+        self.stream = stream; self.token = token; self.continuation = continuation; self.callback = callback
+    }
+}
+
+private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, NativeArchiveSending, NativeGroupSending, NativeJingleSending, @unchecked Sendable {
     private let configuration: ServerConfiguration
     private let ownerJID: String
     private var boundJID: String?
     private var archive: (query: NativeArchiveQuery, token: UUID, continuation: CheckedContinuation<NativeArchivePage, Error>, deadline: DispatchWorkItem)?
+    private var groups: [String: NativeGroupOperation] = [:]
     private let queue = DispatchQueue(label: "nl.teletyptel.native.session")
     private var onConnected: (@Sendable (String) -> Void)?
     private var session: URLSession?
@@ -233,6 +245,87 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
         }
     }
 
+    func joinGroup(room: String, nickname: String, onEvent: @escaping @Sendable (NativeGroupEvent) -> Void) async throws {
+        try Task.checkCancellation()
+        let token = UUID()
+        let cancellation = NativeArchiveCancellation()
+        try await withTaskCancellationHandler(operation: {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                queue.async {
+                    guard !cancellation.isCancelled else { continuation.resume(throwing: CancellationError()); return }
+                    guard !self.completed, self.stream.phase == .online, let bound = self.boundJID else {
+                        continuation.resume(throwing: NativeGroupFailure.disconnected); return
+                    }
+                    guard self.groups[room] == nil, self.groups.count < 8 else { continuation.resume(throwing: NativeGroupFailure.limit); return }
+                    do {
+                        let stream = try NativeMUCStream(room: room, nickname: nickname, boundJID: bound)
+                        let entry = NativeGroupOperation(stream: stream, token: token, continuation: continuation, callback: onEvent)
+                        let deadline = DispatchWorkItem { [weak self] in
+                            self?.endGroup(room: room, token: token, error: NativeGroupFailure.timedOut, sendLeave: true)
+                        }
+                        entry.deadline = deadline
+                        self.groups[room] = entry
+                        self.queue.asyncAfter(deadline: .now() + 15, execute: deadline)
+                        self.send([stream.request]) {}
+                    } catch { continuation.resume(throwing: error) }
+                }
+            }
+        }, onCancel: {
+            cancellation.cancel()
+            self.queue.async { self.endGroup(room: room, token: token, error: CancellationError(), sendLeave: true) }
+        })
+    }
+
+    func sendGroup(room: String, body: String, identifier: String) async throws {
+        try Task.checkCancellation()
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            queue.async {
+                guard !self.completed, let group = self.groups[room], group.stream.phase == .joined else {
+                    continuation.resume(throwing: NativeGroupFailure.disconnected); return
+                }
+                do { self.enqueueMessage(try group.stream.message(body: body, identifier: identifier), continuation: continuation) }
+                catch { continuation.resume(throwing: error) }
+            }
+        }
+    }
+
+    func leaveGroup(room: String) async {
+        await withCheckedContinuation { continuation in
+            queue.async {
+                if let token = self.groups[room]?.token { self.endGroup(room: room, token: token, error: nil, sendLeave: true) }
+                continuation.resume()
+            }
+        }
+    }
+
+    private func endGroup(room: String, token: UUID, error: Error?, sendLeave: Bool) {
+        guard let entry = groups[room], entry.token == token else { return }
+        groups.removeValue(forKey: room)
+        entry.deadline?.cancel()
+        entry.continuation?.resume(throwing: error ?? CancellationError())
+        entry.continuation = nil
+        entry.callback(.ended(error == nil ? nil : (error as? NativeGroupFailure ?? .disconnected)))
+        if sendLeave, entry.stream.phase != .checking, !completed { send([entry.stream.leave]) {} }
+    }
+
+    private func receiveGroups(_ frame: String) {
+        guard !groups.isEmpty, let root = try? ProbeXML.parse(frame) else { return }
+        for room in Array(groups.keys) {
+            guard let entry = groups[room] else { continue }
+            let output = entry.stream.receive(root)
+            for event in output.events {
+                if case .ended(let reason) = event {
+                    endGroup(room: room, token: entry.token, error: reason ?? .unavailable, sendLeave: false)
+                } else { entry.callback(event) }
+            }
+            if entry.stream.phase == .joined {
+                entry.deadline?.cancel(); entry.deadline = nil
+                entry.continuation?.resume(); entry.continuation = nil
+            }
+            if !output.frames.isEmpty { send(output.frames) {} }
+        }
+    }
+
     func fetchArchive(peer: String, before: String?) async throws -> NativeArchivePage {
         try Task.checkCancellation()
         let cancellation = NativeArchiveCancellation()
@@ -366,6 +459,7 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
         onJingle = nil
         onJingleSender = nil
         if let token = archive?.token { completeArchive(token, result: .failure(error)) }
+        for (room, entry) in Array(groups) { endGroup(room: room, token: entry.token, error: NativeGroupFailure.disconnected, sendLeave: false) }
         boundJID = nil
         for identifier in Array(pendingJingle.keys) { completeJingle(identifier, error: error) }
         jingleDeadline?.cancel()
@@ -406,7 +500,7 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
                 do {
                     guard case .string(let frame) = try result.get() else { throw ConnectionFailure.invalidResponse }
                     let output = try self.stream.receive(frame)
-                    if self.stream.phase == .online { self.receiveArchive(frame) }
+                    if self.stream.phase == .online { self.receiveArchive(frame); self.receiveGroups(frame) }
                     self.send(output.frames) {
                         if let jid = output.connectedJID {
                             self.boundJID = jid

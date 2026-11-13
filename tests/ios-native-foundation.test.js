@@ -293,6 +293,25 @@ test("Native MAM history is bounded, correlated and account-bound without local 
   assert.ok(read("Tests/TeleTypTelCoreTests/NativeArchiveTests.swift").includes('testTotalByteBudget'));
 });
 
+test("Native MUC uses existing rooms, membership acknowledgement and isolated group state", () => {
+  const stream = read("Sources/TeleTypTelCore/NativeMUC.swift");
+  const model = read("Sources/TeleTypTelCore/NativeGroupModel.swift");
+  const transport = read("Sources/TeleTypTelCore/NativeXMPPConnection.swift");
+  for (const required of ['disco#info', 'maxstanzas=\'0\'', 'codes.contains("110")', 'codes.contains("201")',
+    'participants.count < 128', 'participants[nick] != nil', 'type=\'groupchat\'', 'phase == .joined'])
+    assert.ok(stream.includes(required), required);
+  for (const required of ['rooms.count < 8', 'messages.count >= 200', 'self.generation == attempt', 'self.tokens[room] == token',
+    'rooms[index].draft', 'sender.sendGroup(', 'case .rejected', 'rooms.removeAll()'])
+    assert.ok(model.includes(required), required);
+  assert.ok(transport.includes('self.groups.count < 8'));
+  assert.ok(transport.includes('.now() + 15'));
+  assert.ok(transport.includes('NativeGroupFailure.disconnected'));
+  assert.doesNotMatch(stream + model, /UserDefaults|FileManager|JSONEncoder|NSLog|print\(/);
+  assert.ok(projectText().project.includes('App/NativeGroupsView.swift'));
+  assert.ok(projectText().project.includes('Core/NativeMUC.swift'));
+  assert.ok(projectText().project.includes('Core/NativeGroupModel.swift'));
+});
+
 test("Native rotation tests check visible geometry before requesting a tap point", () => {
   const ui = read("UITests/NativeStartupUITests.swift");
   const helper = ui.slice(ui.indexOf("private func isUsable("), ui.indexOf("private func waitForStatus("));
