@@ -61,7 +61,8 @@ private struct NativeGroupChatView: View {
                 }
                 ScrollViewReader { proxy in
                     ScrollView {
-                        LazyVStack(spacing: 12) {
+                        VStack(spacing: 0) {
+                          LazyVStack(spacing: 12) {
                             if group.historyLimited { Text("Alleen de meest recente berichten passen in deze preview.").font(.caption) }
                             ForEach(group.messages) { message in
                                 HStack {
@@ -69,20 +70,43 @@ private struct NativeGroupChatView: View {
                                     VStack(alignment: .leading, spacing: 5) {
                                         Text(message.nickname).font(.caption.bold())
                                         Text(message.body).textSelection(.enabled)
-                                        Text(message.state.label).font(.caption2).foregroundStyle(.secondary)
+                                        HStack(spacing: 5) {
+                                            Spacer(minLength: 0)
+                                            Text(message.date, style: .time).font(.caption2)
+                                            if message.own {
+                                                Image(systemName: message.state == .sending ? "clock" : message.state == .submitted ? "checkmark" : "exclamationmark.circle").font(.caption2)
+                                            }
+                                        }.foregroundStyle(.secondary)
                                     }
+                                    .foregroundStyle(message.own ? Color.black : Color.primary)
                                     .padding(12).background(message.own ? Color(red: 0.86, green: 0.97, blue: 0.92) : Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 14))
-                                    .accessibilityElement(children: .combine).accessibilityIdentifier("group-message-" + message.id.uuidString)
+                                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(message.own ? Color.green.opacity(0.55) : Color.gray.opacity(0.35)))
+                                    .accessibilityElement(children: .combine)
+                                    .accessibilityLabel(message.nickname + ": " + message.body + ". " + message.state.label)
+                                    .accessibilityIdentifier("group-message-" + message.id.uuidString)
                                     .contextMenu { Button { UIPasteboard.general.string = message.body } label: { Label("Kopiëren", systemImage: "doc.on.doc") } }
                                     if !message.own { Spacer(minLength: 36) }
                                 }.id(message.id)
                             }
-                        }.padding(14)
+                          }.padding(.horizontal, 14).padding(.top, 14)
+                          Color.clear.frame(height: 1).id("group-bottom")
+                        }
                     }
-                    .background(Image("ChatBackground").resizable().scaledToFill().clipped())
+                    .modifier(NativeChatBottomAnchor())
+                    .background {
+                        GeometryReader { geometry in
+                            Image(geometry.size.width > geometry.size.height ? "ChatBackgroundWide" : "ChatBackground")
+                                .resizable().scaledToFill().frame(width: geometry.size.width, height: geometry.size.height).clipped()
+                                .task(id: geometry.size) {
+                                    await Task.yield()
+                                    guard !Task.isCancelled else { return }
+                                    proxy.scrollTo("group-bottom", anchor: .bottom)
+                                }
+                        }
+                    }
                     .clipped()
-                    .onChange(of: group.messages.last?.id) { identifier in if let identifier = identifier { proxy.scrollTo(identifier, anchor: .bottom) } }
-                    .onAppear { if let identifier = group.messages.last?.id { proxy.scrollTo(identifier, anchor: .bottom) } }
+                    .onChange(of: group.messages.last?.id) { identifier in if identifier != nil { proxy.scrollTo("group-bottom", anchor: .bottom) } }
+                    .onAppear { proxy.scrollTo("group-bottom", anchor: .bottom) }
                 }
                 if let error = model.error { Text(error).font(.caption).foregroundStyle(.red).padding(4) }
                 HStack(spacing: 10) {

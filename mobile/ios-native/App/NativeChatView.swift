@@ -224,7 +224,7 @@ struct NativeChatView: View {
     }
 }
 
-private struct NativeChatBottomAnchor: ViewModifier {
+struct NativeChatBottomAnchor: ViewModifier {
     @ViewBuilder
     func body(content: Content) -> some View {
         if #available(iOS 17.0, *) { content.defaultScrollAnchor(.bottom) }

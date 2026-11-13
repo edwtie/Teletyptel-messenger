@@ -170,7 +170,11 @@ final class NativeStartupUITests: XCTestCase {
         XCTAssertTrue(outgoing.waitForExistence(timeout: 5))
         snapshot("group-portrait")
         rotate(.landscapeLeft)
-        XCTAssertTrue(outgoing.exists)
+        let latestVisible = NSPredicate { _, _ in
+            outgoing.exists && outgoing.isHittable && outgoing.frame.maxY <= draft.frame.minY
+        }
+        expectation(for: latestVisible, evaluatedWith: outgoing)
+        waitForExpectations(timeout: 10)
         snapshot("group-landscape")
         application.buttons["group-leave"].tap()
         XCTAssertTrue(application.buttons["Opnieuw deelnemen"].waitForExistence(timeout: 5))
