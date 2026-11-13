@@ -18,6 +18,22 @@ private final class TwoFactorHTTPFixture: URLProtocol {
         } catch { client?.urlProtocol(self, didFailWithError: error) }
     }
     override func stopLoading() {}
+
+    static func body(_ request: URLRequest) throws -> [String: Any] {
+        var data = request.httpBody ?? Data()
+        if data.isEmpty, let stream = request.httpBodyStream {
+            stream.open()
+            defer { stream.close() }
+            var buffer = [UInt8](repeating: 0, count: 1024)
+            while true {
+                let count = stream.read(&buffer, maxLength: buffer.count)
+                guard count >= 0, data.count + count <= 16384 else { throw NativeAccountFailure.invalidResponse }
+                if count == 0 { break }
+                data.append(contentsOf: buffer.prefix(count))
+            }
+        }
+        return try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    }
 }
 
 final class NativeTwoFactorHTTPTests: XCTestCase {
@@ -53,10 +69,17 @@ final class NativeTwoFactorHTTPTests: XCTestCase {
             XCTAssertEqual(request.url?.path, "/api/account.php")
             XCTAssertEqual(request.httpMethod, "POST")
             XCTAssertEqual(request.value(forHTTPHeaderField: "Origin"), "https://example.invalid")
+            let body = try TwoFactorHTTPFixture.body(request)
             if requests == 1 {
+                XCTAssertEqual(body["action"] as? String, "login")
+                XCTAssertEqual(body["jid"] as? String, "fixture@localhost")
                 XCTAssertNil(request.value(forHTTPHeaderField: "Cookie"))
                 return (200, challenge, ["Set-Cookie": "PHPSESSID=fictional-session; Path=/; Secure; HttpOnly"])
             }
+            XCTAssertEqual(body["action"] as? String, "verify_login_two_factor")
+            XCTAssertEqual(body["accountId"] as? String, "fictional-account")
+            XCTAssertEqual(body["code"] as? String, "123456")
+            XCTAssertNil(body["password"])
             XCTAssertTrue(request.value(forHTTPHeaderField: "Cookie")?.contains("PHPSESSID=fictional-session") == true)
             return (200, account, [:])
         }
@@ -145,6 +168,22 @@ final class NativeTwoFactorHTTPTests: XCTestCase {
             do { _ = try await begin(client()); XCTFail("Invalid session cookie accepted") }
             catch { XCTAssertEqual(error as? NativeAccountFailure, .invalidResponse) }
         }
+    }
+
+    func testMalformedResponsesRemainProtocolErrorsRatherThanNetworkFailures() async throws {
+        TwoFactorHTTPFixture.handler = { _ in (200, "not-json", [:]) }
+        do { _ = try await begin(client()); XCTFail("Malformed response accepted") }
+        catch { XCTAssertEqual(error as? NativeAccountFailure, .invalidResponse) }
+        var requests = 0
+        let challenge = challenge
+        TwoFactorHTTPFixture.handler = { _ in
+            requests += 1
+            return (200, requests == 1 ? challenge : "not-json",
+                ["Set-Cookie": "PHPSESSID=fictional-session; Path=/; Secure; HttpOnly"])
+        }
+        let session = try await begin(client())
+        do { _ = try await session.verify(code: "123456"); XCTFail("Malformed verification accepted") }
+        catch { XCTAssertEqual(error as? NativeAccountFailure, .invalidResponse) }
     }
 }
 

@@ -52,7 +52,9 @@ public struct NativeTwoFactorAccountClient: NativeAccountChallenging {
                 "xmppDomain": configuration.domain, "xmppWebSocket": configuration.webSocket.absoluteString,
                 "xmppTlsMode": "websocket"
             ])
-            let reply = try JSONDecoder().decode(ChallengeReply.self, from: data)
+            guard let reply = try? JSONDecoder().decode(ChallengeReply.self, from: data) else {
+                throw NativeAccountFailure.invalidResponse
+            }
             if status == 200, reply.ok, reply.twoFactorRequired == true {
                 guard reply.method == "authenticator" else { throw NativeAccountFailure.twoFactorRequired }
                 guard let accountID = reply.accountId, !accountID.isEmpty, accountID.utf8.count <= 96,
@@ -174,7 +176,9 @@ private final class NativeHTTPSecondFactorSession: NativeSecondFactorSession,
         do {
             let (data, status, _) = try await NativeTwoFactorAccountClient.request(session, configuration: configuration,
                 input: ["action": "verify_login_two_factor", "accountId": accountID, "code": code], cookie: cookie)
-            let reply = try JSONDecoder().decode(VerificationReply.self, from: data)
+            guard let reply = try? JSONDecoder().decode(VerificationReply.self, from: data) else {
+                throw NativeAccountFailure.invalidResponse
+            }
             if status == 400, !reply.ok, reply.error == "invalid_verification_code" {
                 if retryAllowed() { throw NativeSecondFactorFailure.invalidCode }
                 throw NativeSecondFactorFailure.expired
