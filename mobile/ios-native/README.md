@@ -44,6 +44,15 @@ This foreground-only biometric item must not be reused to bypass authentication
 for locked-screen background calls. That requires a separate scoped and revocable
 call authorization design and server integration.
 
+Validation of revision `92f0755`:
+[unsigned run 43424813510](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43424813510)
+passed device Release compilation and fixture exclusion, 153 Swift tests (including
+eight saved-login tests), and all twelve UI tests across iPhone 16 Pro and iPad Pro
+11-inch (M4), portrait and landscape-left. Fifteen opt-in network tests were skipped;
+no new real-server test is claimed. The existing same-host WebRTC loopback also
+passed all four profiles. UI fixtures keep the biometric vault disabled: these
+results do not prove real Keychain access or Face ID/Touch ID authentication.
+
 Reference: [Apple Keychain accessibility](https://developer.apple.com/documentation/security/restricting-keychain-item-accessibility).
 
 ## Implemented in this first stage
