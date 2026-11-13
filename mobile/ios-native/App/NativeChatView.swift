@@ -2,6 +2,7 @@ import SwiftUI
 
 struct NativeChatView: View {
     @ObservedObject var model: NativeLoginModel
+    @ObservedObject var calls: NativeCallController
     let contact: NativeContact
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
@@ -69,12 +70,35 @@ struct NativeChatView: View {
             .frame(maxWidth: .infinity)
             .navigationTitle(contact.displayName)
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Gereed") { dismiss() } } }
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Gereed") { dismiss() } }
+                ToolbarItem(placement: .primaryAction) {
+                    Menu {
+                        callButton("Spraak", icon: "phone.fill", profile: .audio)
+                        callButton("Spraak en video", icon: "video.fill", profile: .video)
+                        callButton("Spraak en realtime tekst", icon: "teletype", profile: .audioRtt)
+                        callButton("Totale conversatie", icon: "person.wave.2.fill", profile: .total)
+                    } label: {
+                        Image(systemName: "phone.arrow.up.right.fill")
+                    }
+                    .disabled(contact.callEndpoint == nil || calls.status != .idle)
+                    .accessibilityLabel(contact.callEndpoint == nil ? "Oproepen niet beschikbaar" : "Bel contact")
+                }
+            }
             .scrollDismissesKeyboard(.interactively)
         }
         .overlay { if scenePhase != .active { Color(uiColor: .systemBackground).ignoresSafeArea().overlay(Text("TeleTypTel")) } }
         .onChange(of: model.phase) { phase in
             if phase == .signedOut || phase == .idle { dismiss() }
+        }
+    }
+
+    private func callButton(_ title: String, icon: String, profile: NativeCallMedia) -> some View {
+        Button {
+            calls.startCall(contact, profile: profile)
+            dismiss()
+        } label: {
+            Label(title, systemImage: icon)
         }
     }
 }

@@ -306,6 +306,8 @@ test("CallKit/PushKit sources are included in preview but live registration stay
   assert.match(controller, /NativeOutgoingPeerNegotiator/);
   assert.match(controller, /login\?\.activeJingleSender/);
   assert.match(controller, /func startCall\(_ contact: NativeContact, profile: NativeCallMedia\)/);
+  assert.match(read("App/NativeChatView.swift"), /callButton\("Totale conversatie"/);
+  assert.match(read("App/NativeChatView.swift"), /calls\.startCall\(contact, profile: profile\)/);
   assert.match(controller, /runtime\.platform\.receive\(invitation/);
   assert.match(controller, /matches\.count == 1/);
   assert.match(controller, /@Published private\(set\) var presentation: NativeCallPresentation\?/);

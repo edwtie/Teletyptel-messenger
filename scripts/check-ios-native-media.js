@@ -9,7 +9,8 @@ function checkMedia({ root, directory, reports, logged }) {
   const native = path.join(root, "mobile/ios-native");
   const core = ["Startup.swift", "XMPPProbeStream.swift", "NativeIncomingCall.swift", "NativeCallCoordinator.swift", "NativeJingleMedia.swift", "NativeLocalMediaSDP.swift", "NativeChat.swift", "NativeJingleTransport.swift", "NativeJingleSession.swift"];
   const sources = [...core.map(file => path.join(native, "Sources/TeleTypTelCore", file)),
-    path.join(native, "App/NativeMediaPeer.swift"), path.join(native, "App/NativeIncomingPeerNegotiator.swift"),
+    path.join(native, "App/NativeMediaPeer.swift"), path.join(native, "App/NativeActivePeerNegotiating.swift"),
+    path.join(native, "App/NativeIncomingPeerNegotiator.swift"),
     path.join(native, "App/NativeOutgoingPeerNegotiator.swift"),
     path.join(native, "MediaTests/NativeMediaLoopback.swift"),
     ...["NativeT140Session.swift", "NativeWebRTCChannel.swift"].map(file => path.join(root, "scripts/ios-testflight", file))];

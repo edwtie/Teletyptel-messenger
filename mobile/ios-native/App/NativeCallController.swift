@@ -3,13 +3,6 @@ import Foundation
 import WebRTC
 
 @MainActor
-protocol NativeActivePeerNegotiating: NativePeerNegotiating {
-    var sid: String { get }
-    func receive(_ request: NativeJingleRequest) async
-    func cancel(notifyPeer: Bool)
-}
-
-@MainActor
 private final class NativePeerRouter: NativePeerNegotiating {
     private var provider: (any NativePeerNegotiating)?
 

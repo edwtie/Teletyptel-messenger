@@ -212,7 +212,9 @@ struct NativeStartupView: View {
             .navigationBarTitleDisplayMode(.inline)
             .scrollDismissesKeyboard(.interactively)
         }
-        .sheet(item: $selectedContact) { contact in NativeChatView(model: loginModel, contact: contact) }
+        .sheet(item: $selectedContact) { contact in
+            NativeChatView(model: loginModel, calls: calls, contact: contact)
+        }
         .fullScreenCover(isPresented: Binding(
             get: { calls.presentation != nil },
             set: { visible in if !visible { calls.endCall() } }
