@@ -66,6 +66,7 @@ struct NativeStartupView: View {
     @StateObject private var translation = NativeTranslationModel()
     @StateObject private var providerSDK = NativeProviderSDK()
     @State private var selectedContact: NativeContact?
+    @State private var showMessenger = false
     @Environment(\.scenePhase) private var scenePhase
     @State private var address = ""
     @State private var domain = ""
@@ -294,7 +295,7 @@ struct NativeStartupView: View {
 
     var body: some View {
         Group {
-            if loginModel.isConnected {
+            if showMessenger {
                 NativeMessengerView(model: loginModel, calls: calls, translation: translation, logout: logout)
             } else { startupContent }
         }
@@ -320,13 +321,16 @@ struct NativeStartupView: View {
         .onChange(of: loginModel.phase) { phase in
             calls.synchronize(phase)
             if case .connected(let account) = phase {
+                showMessenger = true
                 savedLogin.connected(jid: account)
                 Task { await translation.connect(loginModel.activeWebSession, accountID: loginModel.activeAccountID) }
             }
             else if case .failed = phase {
+                showMessenger = false
                 verificationCode = ""
                 savedLogin.cancel()
             }
+            if phase == .signedOut || phase == .idle { showMessenger = false }
             if !loginModel.isConnected { translation.detach() }
         }
         .onChange(of: scenePhase) { phase in

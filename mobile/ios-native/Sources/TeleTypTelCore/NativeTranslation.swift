@@ -96,6 +96,13 @@ final class NativeTranslationModel: ObservableObject {
     }
 
     func translate(_ text: String, key: String, automatic: Bool = false, liveDirection: String? = nil) {
+        if text.isEmpty {
+            tasks[key]?.cancel()
+            tasks[key] = nil
+            originals[key] = nil
+            results[key] = nil
+            return
+        }
         guard ready, available, preferences.mode != "off", sharingConsent, !text.isEmpty,
               text.count <= 5000, text.utf8.count <= 20000, key.utf8.count <= 200,
               let session = session, let csrf = csrf else { return }
