@@ -287,6 +287,9 @@ test("CallKit/PushKit sources are included in preview but live registration stay
   assert.match(platform, /TeleTypTelNativeCallPushEnabled/);
   assert.match(platform, /func connectForeground\(account: String\) -> UUID\?/);
   assert.match(platform, /func receive\(_ invitation: NativeCallInvitation/);
+  assert.match(platform, /CXStartCallAction/);
+  assert.match(platform, /reportOutgoingCall/);
+  assert.match(platform, /func startOutgoing\(peer: String, sid: String, media: NativeCallMedia/);
   assert.match(platform, /let hadPushRegistration = registry != nil/);
   assert.doesNotMatch(read("App/Info.plist"), /TeleTypTelNativeCallPushEnabled|UIBackgroundModes|aps-environment/);
   assert.match(coordinator, /let rejected = UUID\(\)/);
@@ -300,6 +303,9 @@ test("CallKit/PushKit sources are included in preview but live registration stay
   assert.match(media, /try await self\.capture\.prepare\(media\)/);
   assert.match(controller, /login\.onJingle =/);
   assert.match(controller, /NativeIncomingPeerNegotiator/);
+  assert.match(controller, /NativeOutgoingPeerNegotiator/);
+  assert.match(controller, /login\?\.activeJingleSender/);
+  assert.match(controller, /func startCall\(_ contact: NativeContact, profile: NativeCallMedia\)/);
   assert.match(controller, /runtime\.platform\.receive\(invitation/);
   assert.match(controller, /matches\.count == 1/);
   assert.match(controller, /@Published private\(set\) var presentation: NativeCallPresentation\?/);
@@ -310,6 +316,8 @@ test("CallKit/PushKit sources are included in preview but live registration stay
   assert.match(conversation, /TextField\("Typ realtime tekst"/);
   assert.match(conversation, /\.accessibilityLabel\("Gesprek beëindigen"\)|label: "Gesprek beëindigen"/);
   assert.match(conversation, /foregroundStyle\(\.white\)/);
+  assert.match(read("App/TeleTypTelNativeApp.swift"), /contact\.callEndpoint == nil/);
+  assert.match(read("Sources/TeleTypTelCore/NativeLoginModel.swift"), /var activeJingleSender:/);
   assert.doesNotMatch(conversation, /\.textFieldStyle\(\.roundedBorder\)/);
   assert.doesNotMatch(platform + media, /print\(|NSLog|UserDefaults|setActive\(true/);
   const { revision } = require("../scripts/ios-testflight/native-webrtc");

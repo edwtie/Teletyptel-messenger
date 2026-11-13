@@ -11,6 +11,8 @@ enum NativeCallMediaEvent {
 @MainActor
 protocol NativeCallSystem: AnyObject {
     func report(id: UUID, hasVideo: Bool, completion: @escaping (Bool) -> Void)
+    func start(id: UUID, peer: String, hasVideo: Bool, completion: @escaping (Bool) -> Void)
+    func connected(id: UUID)
     func end(id: UUID, reason: NativeCallEndReason)
 }
 
@@ -60,13 +62,30 @@ private final class NativeCallTimer: NativeCallDeadline {
 
 @MainActor
 final class NativeCallCoordinator {
+    private enum OutgoingPhase { case requesting, connecting, connected }
+
+    private struct OutgoingState {
+        let handle: NativeCallHandle
+        let peer: String
+        let media: NativeCallMedia
+        var phase: OutgoingPhase
+        var deadline: TimeInterval
+    }
+
     private(set) var lifecycle = NativeCallLifecycle()
     private let system: any NativeCallSystem
     private let media: any NativeCallMediaDriver
     private let clock: any NativeCallScheduling
     private var deadline: (any NativeCallDeadline)?
     private var answerCompletion: ((Bool) -> Void)?
+    private var outgoing: OutgoingState?
+    private var outgoingCompletion: ((Bool) -> Void)?
     var changed: (() -> Void)?
+
+    var currentHandle: NativeCallHandle? { lifecycle.current?.handle ?? outgoing?.handle }
+    var isConnected: Bool {
+        lifecycle.current?.phase == .connected || outgoing?.phase == .connected
+    }
 
     init(system: any NativeCallSystem, media: any NativeCallMediaDriver,
          clock: any NativeCallScheduling) {
@@ -77,11 +96,71 @@ final class NativeCallCoordinator {
 
     @discardableResult
     func configure(account: String?, consented: Bool) -> UUID {
-        if let handle = lifecycle.current?.handle { finish(handle, reason: .failed) }
+        if let handle = currentHandle { finish(handle, reason: .failed) }
         media.audioActivated(false)
         lifecycle.configure(account: account, consented: consented)
         changed?()
         return lifecycle.generation
+    }
+
+    @discardableResult
+    func startOutgoing(peer: String, sid: String, media requested: NativeCallMedia,
+                       completion: @escaping (Bool) -> Void) -> UUID? {
+        guard lifecycle.current == nil, outgoing == nil,
+              NativeJingleTransport.fullJID(peer), NativeJingleTransport.validSID(sid) else {
+            completion(false)
+            return nil
+        }
+        let handle = NativeCallHandle(id: UUID(), sid: sid, generation: lifecycle.generation)
+        outgoing = OutgoingState(handle: handle, peer: peer, media: requested,
+                                 phase: .requesting, deadline: clock.now + 20)
+        outgoingCompletion = completion
+        scheduleOutgoing(handle)
+        changed?()
+        var completed = false
+        system.start(id: handle.id, peer: peer, hasVideo: requested.hasVideo) { [weak self] success in
+            guard !completed else { return }
+            completed = true
+            guard let self = self else { return }
+            guard self.outgoing?.handle == handle else { return }
+            let callback = self.outgoingCompletion
+            self.outgoingCompletion = nil
+            if success { callback?(true) }
+            else {
+                callback?(false)
+                self.finish(handle, reason: .failed)
+            }
+        }
+        return handle.id
+    }
+
+    @discardableResult
+    func performStart(id: UUID) -> Bool {
+        guard var state = outgoing, state.handle.id == id, state.phase == .requesting else { return false }
+        state.phase = .connecting
+        state.deadline = min(state.deadline, clock.now + 15)
+        outgoing = state
+        scheduleOutgoing(state.handle)
+        changed?()
+        media.start(handle: state.handle, media: state.media) { [weak self] event in
+            guard let self = self, self.outgoing?.handle == state.handle else { return }
+            switch event {
+            case .ready(let profile, let contents, let rttReady):
+                guard self.outgoing?.phase == .connecting else { return }
+                guard self.ready(requested: state.media, negotiated: profile,
+                                 contents: contents, rttReady: rttReady) else { return }
+                self.deadline?.cancel()
+                self.deadline = nil
+                self.outgoing?.phase = .connected
+                self.system.connected(id: state.handle.id)
+                self.changed?()
+            case .failed:
+                self.finish(state.handle, reason: .failed)
+            case .ended:
+                self.finish(state.handle, reason: .remoteEnded)
+            }
+        }
+        return true
     }
 
     func receive(_ data: Data, registration: UUID, completion: @escaping () -> Void) {
@@ -178,7 +257,7 @@ final class NativeCallCoordinator {
 
     @discardableResult
     func end(id: UUID, reason: NativeCallEndReason = .remoteEnded) -> Bool {
-        guard let handle = lifecycle.current?.handle, handle.id == id else { return false }
+        guard let handle = currentHandle, handle.id == id else { return false }
         finish(handle, reason: reason)
         return true
     }
@@ -188,12 +267,15 @@ final class NativeCallCoordinator {
     }
 
     func audioActivated(_ active: Bool) {
-        media.audioActivated(active && lifecycle.current != nil)
+        media.audioActivated(active && currentHandle != nil)
     }
 
     func setMuted(id: UUID, muted: Bool) -> Bool {
-        guard lifecycle.current?.handle.id == id,
-              lifecycle.current?.phase == .connected || lifecycle.current?.phase == .answering else { return false }
+        let incomingReady = lifecycle.current?.handle.id == id &&
+            (lifecycle.current?.phase == .connected || lifecycle.current?.phase == .answering)
+        let outgoingReady = outgoing?.handle.id == id &&
+            (outgoing?.phase == .connected || outgoing?.phase == .connecting)
+        guard incomingReady || outgoingReady else { return false }
         return media.setMuted(muted)
     }
 
@@ -208,8 +290,30 @@ final class NativeCallCoordinator {
         }
     }
 
+    private func scheduleOutgoing(_ handle: NativeCallHandle) {
+        deadline?.cancel()
+        guard let state = outgoing, state.handle == handle else { return }
+        deadline = clock.schedule(after: max(0, state.deadline - clock.now)) { [weak self] in
+            guard let self = self, let current = self.outgoing, current.handle == handle else { return }
+            if self.clock.now >= current.deadline { self.finish(handle, reason: .failed) }
+            else { self.scheduleOutgoing(handle) }
+        }
+    }
+
+    private func ready(requested: NativeCallMedia, negotiated: NativeCallMedia,
+                       contents: [String], rttReady: Bool) -> Bool {
+        requested == negotiated && Set(contents).count == contents.count &&
+            Set(contents) == requested.contents &&
+            (!requested.contents.contains("rtt") || rttReady)
+    }
+
     private func finish(_ handle: NativeCallHandle, reason: NativeCallEndReason) {
-        guard lifecycle.end(handle) else { return }
+        if lifecycle.current?.handle == handle {
+            guard lifecycle.end(handle) else { return }
+        } else {
+            guard outgoing?.handle == handle else { return }
+            outgoing = nil
+        }
         cleanup(handle, reason: reason)
     }
 
@@ -218,10 +322,13 @@ final class NativeCallCoordinator {
         deadline = nil
         let callback = answerCompletion
         answerCompletion = nil
+        let outgoingCallback = outgoingCompletion
+        outgoingCompletion = nil
         media.stop(handle: handle)
         media.audioActivated(false)
         system.end(id: handle.id, reason: reason)
         callback?(false)
+        outgoingCallback?(false)
         changed?()
     }
 }

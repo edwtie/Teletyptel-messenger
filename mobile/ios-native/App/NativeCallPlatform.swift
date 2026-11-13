@@ -5,6 +5,7 @@ import PushKit
 @MainActor
 private final class NativeCallKitSystem: NativeCallSystem {
     let provider: CXProvider
+    private let controller = CXCallController()
 
     init() {
         let configuration = CXProviderConfiguration(localizedName: "TeleTypTel")
@@ -28,6 +29,18 @@ private final class NativeCallKitSystem: NativeCallSystem {
         provider.reportNewIncomingCall(with: id, update: update) { error in
             Task { @MainActor in completion(error == nil) }
         }
+    }
+
+    func start(id: UUID, peer: String, hasVideo: Bool, completion: @escaping (Bool) -> Void) {
+        let action = CXStartCallAction(call: id, handle: CXHandle(type: .generic, value: peer))
+        action.isVideo = hasVideo
+        controller.request(CXTransaction(action: action)) { error in
+            Task { @MainActor in completion(error == nil) }
+        }
+    }
+
+    func connected(id: UUID) {
+        provider.reportOutgoingCall(with: id, connectedAt: Date())
     }
 
     func end(id: UUID, reason: NativeCallEndReason) {
@@ -77,6 +90,13 @@ final class NativeCallPlatform: NSObject, PKPushRegistryDelegate, CXProviderDele
         guard let registration = registration else { completion(); return false }
         coordinator.receive(invitation, registration: registration, completion: completion)
         return true
+    }
+
+    @discardableResult
+    func startOutgoing(peer: String, sid: String, media: NativeCallMedia,
+                       completion: @escaping (Bool) -> Void) -> UUID? {
+        guard registration != nil else { completion(false); return nil }
+        return coordinator.startOutgoing(peer: peer, sid: sid, media: media, completion: completion)
     }
 
     @discardableResult
@@ -148,6 +168,13 @@ final class NativeCallPlatform: NSObject, PKPushRegistryDelegate, CXProviderDele
             coordinator.answer(id: action.callUUID) { success in
                 if success { action.fulfill() } else { action.fail() }
             }
+        }
+    }
+
+    nonisolated func provider(_ provider: CXProvider, perform action: CXStartCallAction) {
+        MainActor.assumeIsolated {
+            if coordinator.performStart(id: action.callUUID) { action.fulfill() }
+            else { action.fail() }
         }
     }
 

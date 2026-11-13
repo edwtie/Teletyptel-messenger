@@ -15,7 +15,7 @@ private final class NativeDeferredIncomingMedia: NativeMediaNegotiating {
 }
 
 @MainActor
-final class NativeIncomingPeerNegotiator: NativePeerNegotiating {
+final class NativeIncomingPeerNegotiator: NativeActivePeerNegotiating {
     private let request: NativeJingleRequest
     private let profile: NativeCallMedia
     private let signalling: any NativeJingleSending
@@ -31,6 +31,7 @@ final class NativeIncomingPeerNegotiator: NativePeerNegotiating {
     private var captureActive = false
     private var changed: (() -> Void)?
     private(set) var remoteEnded = false
+    var sid: String { request.sid }
     private let deferred = NativeDeferredIncomingMedia()
 
     init(request: NativeJingleRequest, profile: NativeCallMedia, signalling: any NativeJingleSending,

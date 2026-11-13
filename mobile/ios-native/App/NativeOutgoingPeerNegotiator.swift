@@ -2,9 +2,9 @@ import Foundation
 import WebRTC
 
 @MainActor
-final class NativeOutgoingPeerNegotiator: NativePeerNegotiating {
+final class NativeOutgoingPeerNegotiator: NativeActivePeerNegotiating {
     private let peerJID: String
-    private let sid: String
+    let sid: String
     private let profile: NativeCallMedia
     private let signalling: any NativeJingleSending
     private let factory: RTCPeerConnectionFactory

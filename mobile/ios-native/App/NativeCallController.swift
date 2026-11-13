@@ -3,6 +3,13 @@ import Foundation
 import WebRTC
 
 @MainActor
+protocol NativeActivePeerNegotiating: NativePeerNegotiating {
+    var sid: String { get }
+    func receive(_ request: NativeJingleRequest) async
+    func cancel(notifyPeer: Bool)
+}
+
+@MainActor
 private final class NativePeerRouter: NativePeerNegotiating {
     private var provider: (any NativePeerNegotiating)?
 
@@ -43,7 +50,7 @@ private final class NativePeerRouter: NativePeerNegotiating {
 
 @MainActor
 final class NativeCallController: ObservableObject {
-    enum Status: Equatable { case idle, ringing(String), active(String), failed }
+    enum Status: Equatable { case idle, calling(String), ringing(String), active(String), failed }
 
     @Published private(set) var status: Status = .idle
     @Published private(set) var presentation: NativeCallPresentation?
@@ -56,8 +63,8 @@ final class NativeCallController: ObservableObject {
     private var runtime: NativeCallRuntime?
     private weak var login: NativeLoginModel?
     private var account: String?
-    private var incoming: NativeIncomingPeerNegotiator?
-    private var incomingID: UUID?
+    private var activePeer: (any NativeActivePeerNegotiating)?
+    private var activeID: UUID?
     private var prepareTask: Task<Void, Never>?
 
     init() {}
@@ -97,11 +104,15 @@ final class NativeCallController: ObservableObject {
     }
 
     private func receive(_ request: NativeJingleRequest, sender: any NativeJingleSending) {
-        if let provider = incoming {
+        if let provider = activePeer {
+            guard provider.sid == request.sid else {
+                Task { try? await sender.replyJingle(request, rejection: .serviceUnavailable) }
+                return
+            }
             Task { [weak self] in
                 await provider.receive(request)
                 guard let self = self else { return }
-                if provider.remoteEnded, let id = self.incomingID {
+                if provider.remoteEnded, let id = self.activeID {
                     _ = self.runtime?.platform.coordinator.end(id: id, reason: .remoteEnded)
                 }
             }
@@ -124,7 +135,7 @@ final class NativeCallController: ObservableObject {
                         return tracks
                     }, stopCapture: { [weak capture] in capture?.stop() })
                 try Task.checkCancellation()
-                guard self.incoming == nil, router.install(provider) else {
+                guard self.activePeer == nil, router.install(provider) else {
                     provider.cancel(notifyPeer: true)
                     throw NativeJingleFailure.busy
                 }
@@ -135,14 +146,60 @@ final class NativeCallController: ObservableObject {
                     router.clear(provider)
                     throw NativeJingleFailure.invalidRequest
                 }
-                self.incoming = provider
-                self.incomingID = invitation.id
+                self.activePeer = provider
+                self.activeID = invitation.id
                 self.peerName = request.peer
                 self.status = .ringing(request.peer)
                 guard runtime.platform.receive(invitation, completion: {}) else {
                     self.resetCall()
                     throw NativeJingleFailure.disconnected
                 }
+            } catch {
+                guard !(error is CancellationError) else { return }
+                self.status = .failed
+            }
+            self.prepareTask = nil
+        }
+    }
+
+    func startCall(_ contact: NativeContact, profile: NativeCallMedia) {
+        guard activePeer == nil, prepareTask == nil, account != nil,
+              let endpoint = contact.callEndpoint,
+              let sender = login?.activeJingleSender else {
+            status = .failed
+            return
+        }
+        prepareTask = Task { [weak self] in
+            guard let self = self else { return }
+            do {
+                let runtime = self.ensureRuntime()
+                guard let factory = self.factory, let capture = self.capture,
+                      let router = self.router else { throw NativeMediaPeerFailure.configuration }
+                let sid = UUID().uuidString.replacingOccurrences(of: "-", with: "")
+                let provider = try await NativeOutgoingPeerNegotiator(peerJID: endpoint, sid: sid,
+                    profile: profile, signalling: sender, factory: factory, tracks: { [weak capture] in
+                        guard let tracks = capture?.tracks else { throw NativeMediaCaptureFailure.unavailable }
+                        return tracks
+                    }, stopCapture: { [weak capture] in capture?.stop() })
+                try Task.checkCancellation()
+                guard self.login?.activeJingleSender != nil, self.activePeer == nil,
+                      router.install(provider) else {
+                    provider.cancel(notifyPeer: true)
+                    throw NativeJingleFailure.disconnected
+                }
+                self.activePeer = provider
+                self.peerName = contact.displayName
+                self.status = .calling(contact.displayName)
+                guard let id = runtime.platform.startOutgoing(peer: endpoint, sid: sid, media: profile,
+                    completion: { [weak self, weak provider] success in
+                        guard let self = self, let provider = provider,
+                              self.activePeer === provider else { return }
+                        if !success { self.resetCall() }
+                    }) else {
+                    self.resetCall()
+                    throw NativeJingleFailure.disconnected
+                }
+                self.activeID = id
             } catch {
                 guard !(error is CancellationError) else { return }
                 self.status = .failed
@@ -161,14 +218,12 @@ final class NativeCallController: ObservableObject {
     }
 
     private func callChanged() {
-        guard let state = runtime?.platform.coordinator.lifecycle.current else {
-            if incoming != nil { resetCall() }
+        guard let coordinator = runtime?.platform.coordinator,
+              coordinator.currentHandle != nil else {
+            if activePeer != nil { resetCall() }
             return
         }
-        switch state.phase {
-        case .reporting, .ringing, .answering: break
-        case .connected: status = .active(state.invitation.sid)
-        }
+        if coordinator.isConnected { status = .active(activePeer?.sid ?? "") }
     }
 
     func setRttText(_ text: String) {
@@ -176,24 +231,24 @@ final class NativeCallController: ObservableObject {
     }
 
     func toggleMuted() {
-        guard let id = runtime?.platform.coordinator.lifecycle.current?.handle.id else { return }
+        guard let id = runtime?.platform.coordinator.currentHandle?.id else { return }
         let muted = !isMuted
         guard runtime?.platform.coordinator.setMuted(id: id, muted: muted) == true else { return }
         isMuted = muted
     }
 
     func endCall() {
-        guard let id = runtime?.platform.coordinator.lifecycle.current?.handle.id else { return }
+        guard let id = runtime?.platform.coordinator.currentHandle?.id else { return }
         _ = runtime?.platform.coordinator.end(id: id)
     }
 
     private func resetCall() {
         prepareTask?.cancel()
         prepareTask = nil
-        let id = incomingID
-        let provider = incoming
-        incoming = nil
-        incomingID = nil
+        let id = activeID ?? runtime?.platform.coordinator.currentHandle?.id
+        let provider = activePeer
+        activePeer = nil
+        activeID = nil
         peerName = nil
         presentation = nil
         isMuted = false

@@ -95,7 +95,7 @@ struct NativeStartupView: View {
                     Text("Native iPhone- en iPad-app")
                         .font(.title2.bold())
                         .accessibilityAddTraits(.isHeader)
-                    Text("Ontwikkelversie: XMPP-aanmelding, contacten, één-op-één tekstchat en inkomende native Total Conversation. Uitgaande oproepen, pushmeldingen en opgeslagen geschiedenis volgen nog.")
+                    Text("Ontwikkelversie: XMPP-aanmelding, contacten, één-op-één tekstchat en native inkomende en uitgaande Total Conversation. Pushmeldingen en opgeslagen geschiedenis volgen nog.")
                         .foregroundStyle(.secondary)
                     if fixtureName != nil {
                         Text("TESTSCENARIO — geen echte serververbinding")
@@ -268,31 +268,56 @@ struct NativeStartupView: View {
                         .accessibilityIdentifier("contacts-empty")
                 }
                 ForEach(contacts) { contact in
-                    Button { selectedContact = contact } label: {
-                        HStack(alignment: .top, spacing: 12) {
-                            Image(systemName: "person.crop.circle")
-                                .font(.title2)
-                                .accessibilityHidden(true)
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(contact.displayName).font(.headline)
-                                Text(contact.jid).font(.subheadline)
-                                Text(contact.presence.label)
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                                if !contact.groups.isEmpty {
-                                    Text(contact.groups.joined(separator: ", "))
-                                        .font(.footnote)
+                    HStack(spacing: 8) {
+                        Button { selectedContact = contact } label: {
+                            HStack(alignment: .top, spacing: 12) {
+                                Image(systemName: "person.crop.circle")
+                                    .font(.title2)
+                                    .accessibilityHidden(true)
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(contact.displayName).font(.headline)
+                                    Text(contact.jid).font(.subheadline)
+                                    Text(contact.presence.label)
+                                        .font(.subheadline)
                                         .foregroundStyle(.secondary)
+                                    if !contact.groups.isEmpty {
+                                        Text(contact.groups.joined(separator: ", "))
+                                            .font(.footnote)
+                                            .foregroundStyle(.secondary)
+                                    }
                                 }
                             }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .contentShape(Rectangle())
+                            .accessibilityElement(children: .combine)
+                            .accessibilityIdentifier("contact-" + contact.jid)
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding()
-                        .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
-                        .accessibilityElement(children: .combine)
-                        .accessibilityIdentifier("contact-" + contact.jid)
+                        .buttonStyle(.plain)
+                        Menu {
+                            Button { calls.startCall(contact, profile: .audio) } label: {
+                                Label("Spraak", systemImage: "phone.fill")
+                            }
+                            Button { calls.startCall(contact, profile: .video) } label: {
+                                Label("Spraak en video", systemImage: "video.fill")
+                            }
+                            Button { calls.startCall(contact, profile: .audioRtt) } label: {
+                                Label("Spraak en realtime tekst", systemImage: "teletype")
+                            }
+                            Button { calls.startCall(contact, profile: .total) } label: {
+                                Label("Totale conversatie", systemImage: "person.wave.2.fill")
+                            }
+                        } label: {
+                            Image(systemName: "phone.arrow.up.right.fill")
+                                .font(.title3)
+                                .frame(width: 44, height: 44)
+                        }
+                        .disabled(contact.callEndpoint == nil || calls.status != .idle)
+                        .accessibilityLabel(contact.callEndpoint == nil
+                            ? "Oproepen niet beschikbaar voor \(contact.displayName)"
+                            : "Bel \(contact.displayName)")
                     }
-                    .buttonStyle(.plain)
+                    .padding()
+                    .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
                 }
             }
         }
@@ -338,6 +363,7 @@ struct NativeStartupView: View {
     private var callStatusText: String? {
         switch calls.status {
         case .idle: return nil
+        case .calling(let peer): return "Totale Conversation-oproep naar \(peer) wordt opgebouwd."
         case .ringing: return "Inkomende Total Conversation-oproep. Neem op of weiger via het systeemscherm."
         case .active: return "Total Conversation is verbonden."
         case .failed: return "De oproep kon niet veilig worden voorbereid. Probeer opnieuw."

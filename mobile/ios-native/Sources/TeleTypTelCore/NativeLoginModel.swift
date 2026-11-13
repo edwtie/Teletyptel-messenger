@@ -52,6 +52,10 @@ public final class NativeLoginModel: ObservableObject {
     }
 
     public var canSend: Bool { isConnected && sender != nil && !isBackground }
+    var activeJingleSender: (any NativeJingleSending)? {
+        guard isConnected, !isBackground else { return nil }
+        return jingleSender
+    }
 
     public func setDraft(_ body: String, peer: String) {
         guard body.utf8.count <= 8192 else {

@@ -4,11 +4,18 @@ import XCTest
 @MainActor
 private final class CallSystemFixture: NativeCallSystem {
     struct Report { let id: UUID; let video: Bool; let completion: (Bool) -> Void }
+    struct Start { let id: UUID; let peer: String; let video: Bool; let completion: (Bool) -> Void }
     var reports: [Report] = []
+    var starts: [Start] = []
+    var connected: [UUID] = []
     var ended: [UUID] = []
     func report(id: UUID, hasVideo: Bool, completion: @escaping (Bool) -> Void) {
         reports.append(Report(id: id, video: hasVideo, completion: completion))
     }
+    func start(id: UUID, peer: String, hasVideo: Bool, completion: @escaping (Bool) -> Void) {
+        starts.append(Start(id: id, peer: peer, video: hasVideo, completion: completion))
+    }
+    func connected(id: UUID) { connected.append(id) }
     func end(id: UUID, reason: NativeCallEndReason) { ended.append(id) }
 }
 
@@ -254,5 +261,60 @@ final class NativeCallCoordinatorTests: XCTestCase {
         oldDeadline.perform()
         XCTAssertEqual(coordinator.lifecycle.current?.handle.id, second)
         XCTAssertFalse(system.ended.contains(second))
+    }
+
+    @MainActor
+    func testOutgoingCallWaitsForCallKitAndExactTotalConversationMedia() throws {
+        let (coordinator, system, media, _) = fixture()
+        var results: [Bool] = []
+        let id = try XCTUnwrap(coordinator.startOutgoing(peer: "peer@example.test/phone", sid: "outgoing-session",
+                                                         media: .total) { results.append($0) })
+        XCTAssertEqual(system.starts.count, 1)
+        XCTAssertEqual(system.starts[0].peer, "peer@example.test/phone")
+        XCTAssertTrue(system.starts[0].video)
+        XCTAssertTrue(media.handles.isEmpty)
+        system.starts[0].completion(true)
+        XCTAssertEqual(results, [true])
+        XCTAssertTrue(coordinator.performStart(id: id))
+        XCTAssertEqual(media.handles.count, 1)
+        media.callbacks[0](.ready(.video, contents: ["audio", "video"], rttReady: false))
+        media.callbacks[0](.ready(.total, contents: ["audio", "video", "rtt"], rttReady: false))
+        XCTAssertFalse(coordinator.isConnected)
+        media.callbacks[0](.ready(.total, contents: ["audio", "video", "rtt"], rttReady: true))
+        XCTAssertTrue(coordinator.isConnected)
+        XCTAssertEqual(system.connected, [id])
+    }
+
+    @MainActor
+    func testOutgoingTimeoutAndLateMediaFailClosed() throws {
+        let (coordinator, system, media, clock) = fixture()
+        var results: [Bool] = []
+        let id = try XCTUnwrap(coordinator.startOutgoing(peer: "peer@example.test/tablet", sid: "outgoing-timeout",
+                                                         media: .audioRtt) { results.append($0) })
+        system.starts[0].completion(true)
+        XCTAssertTrue(coordinator.performStart(id: id))
+        clock.advance(to: 1015)
+        media.callbacks[0](.ready(.audioRtt, contents: ["audio", "rtt"], rttReady: true))
+        XCTAssertNil(coordinator.currentHandle)
+        XCTAssertFalse(coordinator.isConnected)
+        XCTAssertEqual(system.ended, [id])
+        XCTAssertEqual(results, [true])
+    }
+
+    @MainActor
+    func testOutgoingTransactionFailureAndInvalidPeerDoNotStartMedia() {
+        let (coordinator, system, media, _) = fixture()
+        var invalid: [Bool] = []
+        XCTAssertNil(coordinator.startOutgoing(peer: "peer@example.test", sid: "missing-resource",
+                                               media: .audio) { invalid.append($0) })
+        XCTAssertEqual(invalid, [false])
+        var failed: [Bool] = []
+        let id = coordinator.startOutgoing(peer: "peer@example.test/phone", sid: "transaction-failure",
+                                           media: .audio) { failed.append($0) }
+        XCTAssertNotNil(id)
+        system.starts[0].completion(false)
+        XCTAssertEqual(failed, [false])
+        XCTAssertNil(coordinator.currentHandle)
+        XCTAssertTrue(media.handles.isEmpty)
     }
 }
