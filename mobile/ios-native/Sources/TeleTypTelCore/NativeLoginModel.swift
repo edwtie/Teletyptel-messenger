@@ -13,6 +13,7 @@ public final class NativeLoginModel: ObservableObject {
         case idle
         case checking
         case authenticating
+        case awaitingSecondFactor
         case connecting
         case connected(String)
         case failed(NativeLoginFailure)
@@ -25,6 +26,7 @@ public final class NativeLoginModel: ObservableObject {
     @Published public private(set) var chat = NativeChatStore()
     @Published public private(set) var chatError: String?
     @Published public private(set) var isBackground = false
+    @Published public private(set) var twoFactorError: String?
     @Published private var sender: (any NativeChatSending)?
     var onJingle: ((NativeJingleRequest, any NativeJingleSending) -> Void)?
     private var resumableAccount: NativeAuthenticatedAccount?
@@ -34,12 +36,14 @@ public final class NativeLoginModel: ObservableObject {
     private var jingleSender: (any NativeJingleSending)?
     private var generation = UUID()
     private var task: Task<Void, Never>?
+    private var secondFactor: (session: any NativeSecondFactorSession, configuration: ServerConfiguration, jid: String)?
+    private var secondFactorDeadline: Task<Void, Never>?
     private let checker: any ServerChecking
     private let authenticator: any NativeAccountAuthenticating
     private let connection: any NativeXMPPConnecting
 
     public init(checker: any ServerChecking = XMPPAvailabilityClient(),
-                authenticator: any NativeAccountAuthenticating = NativeAccountClient(),
+                authenticator: any NativeAccountAuthenticating = NativeTwoFactorAccountClient(),
                 connection: any NativeXMPPConnecting = NativeXMPPConnection()) {
         self.checker = checker
         self.authenticator = authenticator
@@ -48,6 +52,8 @@ public final class NativeLoginModel: ObservableObject {
 
     deinit {
         task?.cancel()
+        secondFactorDeadline?.cancel()
+        secondFactor?.session.cancel()
         for send in sendTasks.values { send.cancel() }
     }
 
@@ -118,6 +124,9 @@ public final class NativeLoginModel: ObservableObject {
         return false
     }
 
+    public var isAwaitingSecondFactor: Bool { phase == .awaitingSecondFactor }
+    public var isSecondFactorPending: Bool { secondFactor != nil }
+
     public func login(address: String, domain: String, jid: String, password: String) {
         invalidate()
         let attempt = generation
@@ -135,18 +144,70 @@ public final class NativeLoginModel: ObservableObject {
             do {
                 _ = try await checker.check(configuration)
                 guard !Task.isCancelled, self?.advance(attempt, to: .authenticating) == true else { return }
-                let account = try await authenticator.login(configuration: configuration, jid: jid, password: password)
-                guard !Task.isCancelled, self?.generation == attempt else { return }
-                guard account.jid == jid, account.configuration == configuration else {
-                    throw NativeAccountFailure.invalidResponse
+                if let challenging = authenticator as? any NativeAccountChallenging {
+                    let step = try await challenging.begin(configuration: configuration, jid: jid, password: password)
+                    guard !Task.isCancelled, let self = self, self.generation == attempt else {
+                        if case .challenge(let challenge) = step { challenge.cancel() }
+                        return
+                    }
+                    switch step {
+                    case .authenticated(let account):
+                        try await self.completeAuthentication(account, configuration: configuration, jid: jid, attempt: attempt)
+                    case .challenge(let challenge):
+                        self.secondFactor = (challenge, configuration, jid)
+                        self.phase = .awaitingSecondFactor
+                        self.secondFactorDeadline = Task { [weak self] in
+                            do { try await Task.sleep(nanoseconds: 300_000_000_000) } catch { return }
+                            self?.fail(NativeAccountFailure.twoFactorRequired, attempt: attempt)
+                        }
+                    }
+                } else {
+                    let account = try await authenticator.login(configuration: configuration, jid: jid, password: password)
+                    try await self?.completeAuthentication(account, configuration: configuration, jid: jid, attempt: attempt)
                 }
-                guard self?.advance(attempt, to: .connecting) == true else { return }
-                self?.resumableAccount = account
-                try await self?.runSession(account, attempt: attempt)
             } catch {
                 self?.fail(error, attempt: attempt)
             }
         }
+    }
+
+    public func verifySecondFactor(code: String) {
+        guard isAwaitingSecondFactor, !isBackground, let pending = secondFactor else { return }
+        guard code.range(of: #"\A[0-9]{6}\z"#, options: .regularExpression) != nil else {
+            twoFactorError = "Vul de zes cijfers uit je authenticator-app in."
+            return
+        }
+        let attempt = generation
+        twoFactorError = nil
+        phase = .authenticating
+        task = Task { [weak self] in
+            do {
+                let account = try await pending.session.verify(code: code)
+                guard !Task.isCancelled, let self = self, self.generation == attempt else { return }
+                self.secondFactor?.session.cancel()
+                self.secondFactor = nil
+                self.secondFactorDeadline?.cancel()
+                self.secondFactorDeadline = nil
+                try await self.completeAuthentication(account, configuration: pending.configuration, jid: pending.jid, attempt: attempt)
+            } catch NativeSecondFactorFailure.invalidCode {
+                guard !Task.isCancelled, let self = self, self.generation == attempt else { return }
+                self.twoFactorError = "De code is niet geldig. Controleer je authenticator-app en probeer opnieuw."
+                self.phase = .awaitingSecondFactor
+            } catch NativeSecondFactorFailure.expired {
+                self?.fail(NativeAccountFailure.twoFactorRequired, attempt: attempt)
+            } catch {
+                self?.fail(error, attempt: attempt)
+            }
+        }
+    }
+
+    private func completeAuthentication(_ account: NativeAuthenticatedAccount, configuration: ServerConfiguration,
+                                        jid: String, attempt: UUID) async throws {
+        guard !Task.isCancelled, self.generation == attempt else { return }
+        guard account.jid == jid, account.configuration == configuration else { throw NativeAccountFailure.invalidResponse }
+        guard advance(attempt, to: .connecting) else { return }
+        resumableAccount = account
+        try await runSession(account, attempt: attempt)
     }
 
     private func runSession(_ account: NativeAuthenticatedAccount, attempt: UUID) async throws {
@@ -252,7 +313,7 @@ public final class NativeLoginModel: ObservableObject {
     }
 
     public func suspend() {
-        guard isWorking || isConnected else { return }
+        guard isWorking || isConnected || isAwaitingSecondFactor else { return }
         let keepAccount = isConnected
         invalidate(clearChat: false, keepAccount: keepAccount)
         phase = .suspended
@@ -266,6 +327,11 @@ public final class NativeLoginModel: ObservableObject {
 
     private func invalidate(clearChat: Bool = true, keepAccount: Bool = false) {
         generation = UUID()
+        secondFactor?.session.cancel()
+        secondFactor = nil
+        secondFactorDeadline?.cancel()
+        secondFactorDeadline = nil
+        twoFactorError = nil
         roster = .idle
         earlyMessages.removeAll()
         earlyJingle.removeAll()

@@ -68,6 +68,7 @@ struct NativeStartupView: View {
     @State private var domain = ""
     @State private var jid = ""
     @State private var password = ""
+    @State private var verificationCode = ""
     @State private var rememberLogin = false
     @State private var restoredInput: RestoredInput?
     private let fixtureName: String?
@@ -117,7 +118,7 @@ struct NativeStartupView: View {
                             if !loginModel.isConnected {
                                 Button("Aanmelden met Face ID of Touch ID", action: unlockSavedLogin)
                                     .buttonStyle(.borderedProminent)
-                                    .disabled(loginModel.isWorking || savedLogin.isWorking)
+                                    .disabled(loginModel.isWorking || loginModel.isSecondFactorPending || savedLogin.isWorking)
                                     .accessibilityIdentifier("biometric-login")
                             }
                             Button("Bewaarde aanmelding verwijderen", role: .destructive) {
@@ -168,9 +169,10 @@ struct NativeStartupView: View {
                                 .foregroundStyle(.secondary)
                                 .accessibilityIdentifier("call-status")
                         }
-                        if loginModel.isWorking || loginModel.isConnected {
+                        if loginModel.isWorking || loginModel.isConnected || loginModel.isSecondFactorPending {
                             Button(loginModel.isConnected ? "Verbinding verbreken" : "Aanmelding annuleren") {
                                 password = ""
+                                verificationCode = ""
                                 savedLogin.forget()
                                 rememberLogin = false
                                 loginModel.disconnect()
@@ -198,7 +200,31 @@ struct NativeStartupView: View {
                     if loginModel.isConnected {
                         contactsView
                     }
-                    if model.state.phase == .available && !loginModel.isConnected {
+                    if loginModel.isSecondFactorPending {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Tweestapsverificatie").font(.headline).accessibilityAddTraits(.isHeader)
+                            Text("Vul de zes cijfers uit je authenticator-app in. Deze aanmeldpoging vervalt na vijf minuten.")
+                            SecureField("Verificatiecode", text: $verificationCode)
+                                .textContentType(.oneTimeCode)
+                                .keyboardType(.numberPad)
+                                .textFieldStyle(.roundedBorder)
+                                .accessibilityLabel("Zescijferige verificatiecode")
+                                .accessibilityIdentifier("two-factor-code")
+                                .disabled(!loginModel.isAwaitingSecondFactor)
+                            if let error = loginModel.twoFactorError {
+                                Text(error).foregroundStyle(.red).accessibilityIdentifier("two-factor-error")
+                            }
+                            Button("Code bevestigen") {
+                                let code = verificationCode
+                                verificationCode = ""
+                                loginModel.verifySecondFactor(code: code)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .accessibilityIdentifier("two-factor-verify")
+                            .disabled(!loginModel.isAwaitingSecondFactor || verificationCode.range(of: #"\A[0-9]{6}\z"#, options: .regularExpression) == nil)
+                        }
+                    }
+                    if model.state.phase == .available && !loginModel.isConnected && !loginModel.isSecondFactorPending {
                         VStack(alignment: .leading, spacing: 12) {
                             Text("Aanmelden")
                                 .font(.headline)
@@ -241,7 +267,7 @@ struct NativeStartupView: View {
                             .disabled(loginModel.isWorking || loginModel.isConnected || savedLogin.isWorking || jid.isEmpty || password.isEmpty)
                         }
                     }
-                    Text("Aanmelden gebruikt het ingevulde HTTPS-adres. Zonder toestemming blijven inloggegevens alleen in het werkgeheugen. Biometrisch aanmelden bewaart ze in de beveiligde iOS-sleutelhanger, niet in iCloud. Alleen ‘Bericht verzenden’ stuurt jouw tekst. Pushmeldingen, Google/Facebook en tweestapsverificatie zijn hier nog niet aangesloten.")
+                    Text("Aanmelden gebruikt het ingevulde HTTPS-adres. Zonder toestemming blijven inloggegevens alleen in het werkgeheugen. Biometrisch aanmelden bewaart ze in de beveiligde iOS-sleutelhanger, niet in iCloud. Alleen ‘Bericht verzenden’ stuurt jouw tekst. Pushmeldingen en Google/Facebook zijn hier nog niet aangesloten.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -281,6 +307,7 @@ struct NativeStartupView: View {
         .onChange(of: scenePhase) { phase in
             if phase == .background {
                 password = ""
+                verificationCode = ""
                 savedLogin.cancel()
                 model.cancel()
                 background.enter(loginModel)
@@ -290,6 +317,7 @@ struct NativeStartupView: View {
         }
         .onDisappear {
             password = ""
+            verificationCode = ""
             savedLogin.cancel()
             model.cancel()
             background.stop()
@@ -303,6 +331,7 @@ struct NativeStartupView: View {
         restoredInput = nil
         savedLogin.cancel()
         password = ""
+        verificationCode = ""
         model.reset()
         loginModel.reset()
     }
@@ -404,6 +433,7 @@ struct NativeStartupView: View {
         case .idle: break
         case .checking: return "Chatserver opnieuw controleren voordat je inloggegevens worden verstuurd…"
         case .authenticating: return "Account controleren… Je bent nog niet verbonden met XMPP."
+        case .awaitingSecondFactor: return "Tweestapsverificatie vereist. Bevestig je authenticatorcode om verder te gaan. Je bent nog niet verbonden met XMPP."
         case .connecting: return "Account goedgekeurd. Beveiligde XMPP-aanmelding voltooien…"
         case .connected(let account): return "XMPP verbonden als \(account). Kies een contact om te chatten."
         case .signedOut: return "De XMPP-verbinding is verbroken. Je kunt opnieuw aanmelden."
@@ -411,7 +441,7 @@ struct NativeStartupView: View {
         case .failed(let failure):
             switch failure {
             case .account(.invalidCredentials): return "Aanmelden mislukt. Controleer je XMPP-account en wachtwoord."
-            case .account(.twoFactorRequired): return "Tweestapsverificatie vereist. Deze native preview ondersteunt de verificatiestap nog niet. Gebruik voorlopig de bestaande app; schakel tweestapsverificatie niet uit."
+            case .account(.twoFactorRequired): return "Tweestapsverificatie vereist. De poging is verlopen of de server vraagt een niet-ondersteunde verificatiemethode. Meld opnieuw aan; schakel tweestapsverificatie niet uit."
             case .account(.rejected): return "De server heeft de aanmelding geweigerd. Controleer je accounttoegang."
             case .account(.invalidResponse): return "De accountserver geeft geen geldige aanmeldreactie. Er is geen XMPP-verbinding gestart."
             case .connection(let error): return connectionError(error)
@@ -465,8 +495,20 @@ struct NativeStartupView: View {
 }
 
 #if DEBUG
-private struct NativeLoginUIFixture: ServerChecking, NativeAccountAuthenticating, NativeXMPPConnecting {
+private struct NativeLoginUIFixture: ServerChecking, NativeAccountChallenging, NativeXMPPConnecting {
     let scenario: String
+
+    func begin(configuration: ServerConfiguration, jid: String, password: String) async throws -> NativeAccountLoginStep {
+        if scenario == "two-factor" {
+            try await Task.sleep(nanoseconds: 150_000_000)
+            guard jid == "fixture@localhost", password == "fixture-password" else {
+                throw NativeAccountFailure.invalidCredentials
+            }
+            return .challenge(NativeSecondFactorUIFixture(account:
+                NativeAuthenticatedAccount(configuration: configuration, jid: jid, password: password)))
+        }
+        return .authenticated(try await login(configuration: configuration, jid: jid, password: password))
+    }
 
     func run(account: NativeAuthenticatedAccount, onConnected: @escaping @Sendable (String) -> Void,
              onRoster: @escaping @Sendable (NativeRosterState) -> Void,
@@ -518,5 +560,18 @@ private struct NativeChatUIFixture: NativeChatSending {
         guard jid == "demo-contact@localhost", !body.isEmpty else { throw NativeChatFailure.invalidMessage }
         try await Task.sleep(nanoseconds: 100_000_000)
     }
+}
+
+private final class NativeSecondFactorUIFixture: NativeSecondFactorSession {
+    private let account: NativeAuthenticatedAccount
+    private var cancelled = false
+    init(account: NativeAuthenticatedAccount) { self.account = account }
+    func verify(code: String) async throws -> NativeAuthenticatedAccount {
+        try await Task.sleep(nanoseconds: 100_000_000)
+        guard !cancelled else { throw NativeSecondFactorFailure.expired }
+        guard code == "123456" else { throw NativeSecondFactorFailure.invalidCode }
+        return account
+    }
+    func cancel() { cancelled = true }
 }
 #endif

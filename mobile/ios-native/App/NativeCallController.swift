@@ -79,7 +79,7 @@ final class NativeCallController: ObservableObject {
             resetCall()
             account = jid
             if ensureRuntime().platform.connectForeground(account: jid) == nil { status = .failed }
-        case .checking, .authenticating, .connecting:
+        case .checking, .authenticating, .connecting, .awaitingSecondFactor:
             break
         case .idle, .failed, .signedOut, .suspended:
             resetCall()

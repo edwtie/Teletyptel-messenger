@@ -294,6 +294,23 @@ test("Native saved login is opt-in, biometric-bound, revocable and isolated from
   assert.ok(projectText().project.includes("App/NativeBiometricLoginVault.swift"));
 });
 
+test("Native second factor is a bounded challenge before XMPP, not an authenticated state", () => {
+  const client = read("Sources/TeleTypTelCore/NativeTwoFactorAccountClient.swift");
+  const model = read("Sources/TeleTypTelCore/NativeLoginModel.swift");
+  const app = read("App/TeleTypTelNativeApp.swift");
+  for (const token of ['settings = { .ephemeral }', 'reply.method == "authenticator"',
+    '"verify_login_two_factor"', 'attempts < 5', 'ContinuousClock.now', 'data.count < 1048576',
+    'account.jid == jid', 'completionHandler(nil)', 'session.invalidateAndCancel()'])
+    assert.ok(client.includes(token), token);
+  for (const token of ['case awaitingSecondFactor', 'self.secondFactor = (challenge, configuration, jid)',
+    '300_000_000_000', 'secondFactor?.session.cancel()', 'self.generation == attempt'])
+    assert.ok(model.includes(token), token);
+  assert.doesNotMatch(client, /UserDefaults|HTTPCookieStorage.shared|NSLog|print\(|SecTrust/);
+  assert.match(app, /SecureField\("Verificatiecode"/);
+  assert.match(app, /textContentType\(\.oneTimeCode\)/);
+  assert.ok(projectText().project.includes('Core/NativeTwoFactorAccountClient.swift'));
+});
+
 test("Native total conversation keeps explicit camera controls", () => {
   const capture = read("App/NativeMediaCapture.swift");
   const media = read("App/NativeCallMedia.swift");

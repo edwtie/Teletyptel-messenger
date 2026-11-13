@@ -73,11 +73,28 @@ final class NativeStartupUITests: XCTestCase {
         XCTAssertEqual(application.alerts.count, 0)
     }
 
-    func testTwoFactorRequirementDoesNotShowOnlineState() {
+    func testTwoFactorRequiresValidCodeBeforeConnecting() {
         signInFixture("two-factor")
         waitForStatus("Tweestapsverificatie vereist")
         XCTAssertFalse(application.staticTexts["startup-status"].label.contains("XMPP verbonden"))
-        XCTAssertFalse(application.buttons["disconnect-session"].exists)
+        let code = application.secureTextFields["two-factor-code"]
+        reveal(code)
+        XCTAssertFalse(application.keyboards.firstMatch.exists)
+        code.tap()
+        code.typeText("000000")
+        let verify = application.buttons["two-factor-verify"]
+        reveal(verify)
+        verify.tap()
+        let error = application.staticTexts["two-factor-error"]
+        XCTAssertTrue(error.waitForExistence(timeout: 5))
+        XCTAssertFalse(application.staticTexts["startup-status"].label.contains("XMPP verbonden"))
+        reveal(code)
+        code.tap()
+        code.typeText("123456")
+        reveal(verify)
+        verify.tap()
+        waitForStatus("XMPP verbonden als fixture@localhost")
+        XCTAssertFalse(code.exists)
     }
 
     func testChatDraftAndHistorySurviveRotationAndBackgroundReturn() {

@@ -5,6 +5,38 @@ Requested scope: the complete iPhone and iPad application, including native UI,
 authentication, messaging and Total Conversation. This is a staged rewrite, not a
 claim that those features already work in this target.
 
+## Current increment: authenticator second-factor login (2026-11-13)
+
+The native preview now has a second-factor screen for the existing account API's
+`authenticator` challenge. This supersedes the older statements below that native
+two-factor login is unsupported. Google/Facebook, account registration and password
+recovery are still separate migration work.
+
+- A challenge is not an authenticated account. XMPP, chat and calling stay closed
+  until a successful verification returns the expected account and XMPP resource
+  binding subsequently succeeds. An account change in the verification response
+  is rejected.
+- The login attempt uses its own ephemeral HTTPS session. Its PHP session cookie
+  stays in memory for `verify_login_two_factor` on that same origin; it is not
+  shared with Safari, WebViews or other login attempts. Redirects are rejected.
+- Codes are six ASCII digits, explicitly submitted, never persisted and cleared
+  after submission, cancellation and background entry. There is no automatic
+  focus or automatic code submission. Invalid codes can be retried, but the
+  challenge is capped at five verification requests and five minutes locally.
+  Unsupported email-code challenges fail closed; no security setting is disabled.
+- Logout, account/server changes, expiry and background entry close the challenge
+  session and invalidate late results. Biometric login does not bypass the server's
+  second-factor requirement. Opt-in credential saving still waits for actual XMPP
+  connection.
+- Tests include a private URLProtocol HTTP fixture for challenge/cookie continuity,
+  retry, cancellation, invalid responses and attempt limits, model tests that keep
+  XMPP closed before verification, and a Debug-only iPhone/iPad flow that enters an
+  invalid and then valid fictional code. Real PHP/TOTP operation and physical
+  device testing are not proven by these fixtures.
+
+No production PHP, authentication policy, APNs configuration or TestFlight release
+is changed by this increment.
+
 ## Current increment: opt-in biometric saved login (2026-11-13)
 
 The native preview now includes an optional Face ID/Touch ID login path. This
