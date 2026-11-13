@@ -91,7 +91,10 @@ test("Native preview has separate identity, no web runtime, upload or signing co
   assert.match(scheme, /buildForArchiving="NO"/);
   assert.doesNotMatch(project, /Capacitor|WebKit|facebook|p8|DEVELOPMENT_TEAM|PROVISIONING_PROFILE/);
   assert.doesNotMatch(read("App/TeleTypTelNativeApp.swift"), /WKWebView|CAPBridge|\.focused\(|becomeFirstResponder/);
-  assert.doesNotMatch(read("App/Info.plist"), /NSAllowsArbitraryLoads|UIBackgroundModes|NSCameraUsageDescription/);
+  const plist = read("App/Info.plist");
+  assert.doesNotMatch(plist, /NSAllowsArbitraryLoads|UIBackgroundModes/);
+  assert.match(plist, /NSCameraUsageDescription/);
+  assert.match(plist, /NSMicrophoneUsageDescription/);
 });
 
 test("Project generation is isolated, repeatable and refuses overwriting an existing build", () => {
@@ -112,6 +115,7 @@ test("Project generation is isolated, repeatable and refuses overwriting an exis
     ["Core/NativeLocalMediaSDP.swift", "Sources/TeleTypTelCore/NativeLocalMediaSDP.swift"],
     ["Core/NativeJingleSession.swift", "Sources/TeleTypTelCore/NativeJingleSession.swift"],
     ["App/NativeMediaPeer.swift", "App/NativeMediaPeer.swift"],
+    ["App/NativeMediaCapture.swift", "App/NativeMediaCapture.swift"],
     ["App/NativeOutgoingPeerNegotiator.swift", "App/NativeOutgoingPeerNegotiator.swift"],
     ["App/NativeIncomingPeerNegotiator.swift", "App/NativeIncomingPeerNegotiator.swift"],
     ["App/NativeCallPlatform.swift", "App/NativeCallPlatform.swift"],
