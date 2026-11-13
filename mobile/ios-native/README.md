@@ -19,6 +19,9 @@ recovery are still separate migration work.
 - The login attempt uses its own ephemeral HTTPS session. Its PHP session cookie
   stays in memory for `verify_login_two_factor` on that same origin; it is not
   shared with Safari, WebViews or other login attempts. Redirects are rejected.
+  Automatic cookie storage is disabled. A single bounded, Secure `PHPSESSID` with
+  an exact matching host and API-compatible path is explicitly retained and sent
+  only to the same account API. Missing, foreign or insecure cookies are rejected.
 - Codes are six ASCII digits, explicitly submitted, never persisted and cleared
   after submission, cancellation and background entry. There is no automatic
   focus or automatic code submission. Invalid codes can be retried, but the

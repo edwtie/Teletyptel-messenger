@@ -39,14 +39,15 @@ public struct NativeTwoFactorAccountClient: NativeAccountChallenging {
         }
         try Task.checkCancellation()
         let settings = settings()
-        settings.httpShouldSetCookies = true
+        settings.httpCookieStorage = nil
+        settings.httpShouldSetCookies = false
         settings.urlCache = nil
         settings.urlCredentialStorage = nil
         settings.timeoutIntervalForRequest = 10
         settings.timeoutIntervalForResource = 15
         let session = URLSession(configuration: settings, delegate: NativeSecondFactorRedirectGuard(), delegateQueue: nil)
         do {
-            let (data, status) = try await Self.request(session, configuration: configuration, input: [
+            let (data, status, response) = try await Self.request(session, configuration: configuration, input: [
                 "action": "login", "jid": jid, "password": password, "rememberPassword": false,
                 "xmppDomain": configuration.domain, "xmppWebSocket": configuration.webSocket.absoluteString,
                 "xmppTlsMode": "websocket"
@@ -55,12 +56,13 @@ public struct NativeTwoFactorAccountClient: NativeAccountChallenging {
             if status == 200, reply.ok, reply.twoFactorRequired == true {
                 guard reply.method == "authenticator" else { throw NativeAccountFailure.twoFactorRequired }
                 guard let accountID = reply.accountId, !accountID.isEmpty, accountID.utf8.count <= 96,
-                      !accountID.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) else {
+                      !accountID.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }),
+                      let cookie = Self.sessionCookie(response, origin: configuration.origin) else {
                     throw NativeAccountFailure.invalidResponse
                 }
                 try Task.checkCancellation()
                 return .challenge(NativeHTTPSecondFactorSession(session: session, configuration: configuration,
-                                                                jid: jid, accountID: accountID))
+                                                                jid: jid, accountID: accountID, cookie: cookie))
             }
             let account = try NativeAuthenticatedAccount.decode(data, status: status, configuration: configuration)
             guard account.jid == jid else { throw NativeAccountFailure.invalidResponse }
@@ -73,10 +75,12 @@ public struct NativeTwoFactorAccountClient: NativeAccountChallenging {
     }
 
     static func request(_ session: URLSession, configuration: ServerConfiguration,
-                        input: [String: Any]) async throws -> (Data, Int) {
+                        input: [String: Any], cookie: String? = nil) async throws -> (Data, Int, HTTPURLResponse) {
         try Task.checkCancellation()
         var request = URLRequest(url: configuration.origin.appendingPathComponent("api/account.php"))
         request.httpMethod = "POST"
+        request.httpShouldHandleCookies = false
+        if let cookie = cookie { request.setValue(cookie, forHTTPHeaderField: "Cookie") }
         request.mainDocumentURL = configuration.origin
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
@@ -96,7 +100,20 @@ public struct NativeTwoFactorAccountClient: NativeAccountChallenging {
             data.append(byte)
         }
         try Task.checkCancellation()
-        return (data, response.statusCode)
+        return (data, response.statusCode, response)
+    }
+
+    private static func sessionCookie(_ response: HTTPURLResponse, origin: URL) -> String? {
+        guard let field = response.value(forHTTPHeaderField: "Set-Cookie"), field.utf8.count <= 4096 else { return nil }
+        let matches = HTTPCookie.cookies(withResponseHeaderFields: ["Set-Cookie": field], for: origin).filter {
+            $0.name == "PHPSESSID" && $0.isSecure &&
+            $0.domain.trimmingCharacters(in: CharacterSet(charactersIn: ".")).lowercased() == origin.host?.lowercased() &&
+            ($0.path == "/" || $0.path == "/api" || $0.path == "/api/") &&
+            ($0.expiresDate == nil || $0.expiresDate! > Date()) &&
+            $0.value.range(of: #"\A[A-Za-z0-9,-]{1,256}\z"#, options: .regularExpression) != nil
+        }
+        guard matches.count == 1, let cookie = matches.first else { return nil }
+        return cookie.name + "=" + cookie.value
     }
 
     private struct ChallengeReply: Decodable {
@@ -113,17 +130,19 @@ private final class NativeHTTPSecondFactorSession: NativeSecondFactorSession,
     private let configuration: ServerConfiguration
     private let jid: String
     private let accountID: String
+    private let cookie: String
     private let deadline = ContinuousClock.now.advanced(by: .seconds(300))
     private let lock = NSLock()
     private var closed = false
     private var inFlight = false
     private var attempts = 0
 
-    init(session: URLSession, configuration: ServerConfiguration, jid: String, accountID: String) {
+    init(session: URLSession, configuration: ServerConfiguration, jid: String, accountID: String, cookie: String) {
         self.session = session
         self.configuration = configuration
         self.jid = jid
         self.accountID = accountID
+        self.cookie = cookie
     }
 
     deinit { session.invalidateAndCancel() }
@@ -153,8 +172,8 @@ private final class NativeHTTPSecondFactorSession: NativeSecondFactorSession,
         }
         try reserve()
         do {
-            let (data, status) = try await NativeTwoFactorAccountClient.request(session, configuration: configuration,
-                input: ["action": "verify_login_two_factor", "accountId": accountID, "code": code])
+            let (data, status, _) = try await NativeTwoFactorAccountClient.request(session, configuration: configuration,
+                input: ["action": "verify_login_two_factor", "accountId": accountID, "code": code], cookie: cookie)
             let reply = try JSONDecoder().decode(VerificationReply.self, from: data)
             if status == 400, !reply.ok, reply.error == "invalid_verification_code" {
                 if retryAllowed() { throw NativeSecondFactorFailure.invalidCode }

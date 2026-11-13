@@ -75,7 +75,7 @@ final class NativeTwoFactorHTTPTests: XCTestCase {
         let account = account
         TwoFactorHTTPFixture.handler = { _ in
             requests += 1
-            if requests == 1 { return (200, challenge, [:]) }
+            if requests == 1 { return (200, challenge, ["Set-Cookie": "PHPSESSID=fictional-session; Path=/; Secure; HttpOnly"]) }
             if requests == 2 { return (400, #"{"ok":false,"error":"invalid_verification_code"}"#, [:]) }
             return (200, account, [:])
         }
@@ -89,7 +89,8 @@ final class NativeTwoFactorHTTPTests: XCTestCase {
     func testCancelAndMalformedCodeCannotMakeVerificationRequests() async throws {
         var requests = 0
         let challenge = challenge
-        TwoFactorHTTPFixture.handler = { _ in requests += 1; return (200, challenge, [:]) }
+        TwoFactorHTTPFixture.handler = { _ in requests += 1; return (200, challenge,
+            ["Set-Cookie": "PHPSESSID=fictional-session; Path=/; Secure; HttpOnly"]) }
         let session = try await begin(client())
         for code in ["", "12345", "１２３４５６", "123 45"] {
             do { _ = try await session.verify(code: code); XCTFail("Malformed code accepted") } catch {}
@@ -106,7 +107,8 @@ final class NativeTwoFactorHTTPTests: XCTestCase {
             let challenge = challenge
             TwoFactorHTTPFixture.handler = { _ in
                 requests += 1
-                return (200, requests == 1 ? challenge : reply, [:])
+                return (200, requests == 1 ? challenge : reply,
+                    ["Set-Cookie": "PHPSESSID=fictional-session; Path=/; Secure; HttpOnly"])
             }
             let session = try await begin(client())
             do { _ = try await session.verify(code: "123456"); XCTFail("Invalid response accepted") } catch {}
@@ -120,7 +122,8 @@ final class NativeTwoFactorHTTPTests: XCTestCase {
         let challenge = challenge
         TwoFactorHTTPFixture.handler = { _ in
             requests += 1
-            return requests == 1 ? (200, challenge, [:]) : (400, #"{"ok":false,"error":"invalid_verification_code"}"#, [:])
+            return requests == 1 ? (200, challenge, ["Set-Cookie": "PHPSESSID=fictional-session; Path=/; Secure; HttpOnly"])
+                : (400, #"{"ok":false,"error":"invalid_verification_code"}"#, [:])
         }
         let session = try await begin(client())
         for _ in 0..<6 {
@@ -132,6 +135,16 @@ final class NativeTwoFactorHTTPTests: XCTestCase {
         }
         do { _ = try await begin(client()); XCTFail("Unsupported method accepted") }
         catch { XCTAssertEqual(error as? NativeAccountFailure, .twoFactorRequired) }
+    }
+
+    func testChallengeRejectsMissingForeignOrInsecureSessionCookie() async throws {
+        let challenge = challenge
+        for cookie in ["", "PHPSESSID=fiction; Path=/", "PHPSESSID=fiction; Domain=other.invalid; Path=/; Secure",
+                       "PHPSESSID=fiction; Path=/other; Secure", "OtherSession=fiction; Path=/; Secure"] {
+            TwoFactorHTTPFixture.handler = { _ in (200, challenge, ["Set-Cookie": cookie]) }
+            do { _ = try await begin(client()); XCTFail("Invalid session cookie accepted") }
+            catch { XCTAssertEqual(error as? NativeAccountFailure, .invalidResponse) }
+        }
     }
 }
 
