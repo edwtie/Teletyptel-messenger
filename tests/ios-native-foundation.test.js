@@ -282,7 +282,11 @@ test("Native saved login is opt-in, biometric-bound, revocable and isolated from
     assert.ok(vault.includes(token), token);
   for (const token of ["if consented", "value.jid == jid", "self.generation == attempt", "candidate = nil", "vault.remove()"])
     assert.ok(model.includes(token), token);
-  assert.doesNotMatch(model + vault, /UserDefaults|print\(|NSLog|URLSession/);
+  assert.doesNotMatch(model, /UserDefaults|print\(|NSLog|URLSession/);
+  assert.doesNotMatch(vault, /print\(|NSLog|URLSession/);
+  assert.deepEqual([...vault.matchAll(/UserDefaults\.standard\.set\(([^,]+),/g)].map(match => match[1]),
+    ["false", "true", "false"]);
+  assert.match(app, /savedLogin.canRestoreAutomatically/);
   assert.match(app, /consented: rememberLogin && fixtureName == nil/);
   assert.match(app, /NativeBiometricLoginVault\(enabled: false\)/);
   assert.match(read("App/Info.plist"), /NSFaceIDUsageDescription/);

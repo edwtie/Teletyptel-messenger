@@ -33,6 +33,7 @@ struct NativeSavedLogin: Codable, CustomStringConvertible, CustomDebugStringConv
 @MainActor
 protocol NativeLoginVault: AnyObject {
     var containsLogin: Bool { get }
+    var automaticRestoreAllowed: Bool { get }
     func save(_ login: NativeSavedLogin) async throws
     func load() async throws -> NativeSavedLogin
     func remove() throws
@@ -53,6 +54,8 @@ final class NativeSavedLoginModel: ObservableObject {
         self.vault = vault
         hasSavedLogin = vault.containsLogin
     }
+
+    var canRestoreAutomatically: Bool { hasSavedLogin && vault.automaticRestoreAllowed }
 
     func prepare(address: String, domain: String, jid: String, password: String, consented: Bool) {
         cancel()

@@ -11,11 +11,13 @@ private final class LoginVaultFixture: NativeLoginVault {
     var hold = false
     var pending: CheckedContinuation<NativeSavedLogin, Error>?
     var containsLogin: Bool { value != nil }
+    var automaticRestoreAllowed = false
 
     func save(_ login: NativeSavedLogin) async throws {
         if fail { throw NativeAccountFailure.rejected }
         saves += 1
         value = login
+        automaticRestoreAllowed = true
     }
 
     func load() async throws -> NativeSavedLogin {
@@ -26,6 +28,7 @@ private final class LoginVaultFixture: NativeLoginVault {
     }
 
     func remove() throws {
+        automaticRestoreAllowed = false
         if fail { throw NativeAccountFailure.rejected }
         removals += 1
         value = nil
@@ -92,6 +95,7 @@ final class NativeSavedLoginTests: XCTestCase {
         model.connected(jid: "fiction@localhost")
         XCTAssertEqual(vault.saves, 1)
         XCTAssertTrue(model.hasSavedLogin)
+        XCTAssertTrue(model.canRestoreAutomatically)
     }
 
     func testCancelledLoginCannotSaveCandidate() async {
@@ -160,6 +164,16 @@ final class NativeSavedLoginTests: XCTestCase {
         vault.fail = true
         stored.forget()
         XCTAssertTrue(stored.hasSavedLogin)
+        XCTAssertFalse(stored.canRestoreAutomatically)
         XCTAssertNotNil(stored.notice)
+    }
+
+    func testExistingKeychainItemAloneCannotAuthorizeAutomaticLogin() throws {
+        let vault = LoginVaultFixture()
+        vault.value = try credential()
+        let model = NativeSavedLoginModel(vault: vault)
+        XCTAssertTrue(model.hasSavedLogin)
+        XCTAssertFalse(model.canRestoreAutomatically)
+        XCTAssertEqual(vault.loads, 0)
     }
 }

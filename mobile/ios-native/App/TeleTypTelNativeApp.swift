@@ -264,7 +264,7 @@ struct NativeStartupView: View {
         }
         .onAppear { calls.attach(loginModel) }
         .task {
-            if fixtureName == nil, savedLogin.hasSavedLogin, !loginModel.isWorking, !loginModel.isConnected {
+            if fixtureName == nil, savedLogin.canRestoreAutomatically, !loginModel.isWorking, !loginModel.isConnected {
                 unlockSavedLogin()
             }
         }

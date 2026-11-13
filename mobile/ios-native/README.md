@@ -25,6 +25,10 @@ It does not make background calling operational.
   manual login available; failed unlocks do not loop or silently send credentials.
 - Disconnect/logout removes the saved login. A separate removal button is also
   available. A failed removal remains visible rather than claiming success.
+  Automatic restore is disabled before deletion, even if Keychain deletion fails.
+  Only a nonsecret consent boolean uses preferences; all credentials stay in
+  Keychain. An existing Keychain item alone does not authorize automatic login
+  after reinstall or loss of the consent preference.
   Configuration changes, background entry and cancellation invalidate pending
   operations; stale results cannot log in or update the UI.
 - Preview credentials use a separate Keychain service. Debug UI fixtures disable

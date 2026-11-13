@@ -7,8 +7,11 @@ final class NativeBiometricLoginVault: NativeLoginVault {
     private enum Failure: Error { case unavailable, keychain, missing }
     private var context: LAContext?
     private let enabled: Bool
+    private let consentKey = "teletyptel.nativepreview.biometric-login-consented"
 
     init(enabled: Bool = true) { self.enabled = enabled }
+
+    var automaticRestoreAllowed: Bool { enabled && UserDefaults.standard.bool(forKey: consentKey) }
 
     private var query: [String: Any] {
         [kSecClass as String: kSecClassGenericPassword,
@@ -51,9 +54,11 @@ final class NativeBiometricLoginVault: NativeLoginVault {
         request[kSecAttrAccessControl as String] = access
         request[kSecValueData as String] = data
         request[kSecUseAuthenticationContext as String] = context
+        UserDefaults.standard.set(false, forKey: consentKey)
         let previous = SecItemDelete(query as CFDictionary)
         guard previous == errSecSuccess || previous == errSecItemNotFound else { throw Failure.keychain }
         guard SecItemAdd(request as CFDictionary, nil) == errSecSuccess else { throw Failure.keychain }
+        UserDefaults.standard.set(true, forKey: consentKey)
     }
 
     func load() async throws -> NativeSavedLogin {
@@ -82,6 +87,7 @@ final class NativeBiometricLoginVault: NativeLoginVault {
     func remove() throws {
         cancel()
         guard enabled else { return }
+        UserDefaults.standard.set(false, forKey: consentKey)
         let status = SecItemDelete(query as CFDictionary)
         guard status == errSecSuccess || status == errSecItemNotFound else { throw Failure.keychain }
     }
