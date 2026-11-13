@@ -74,20 +74,26 @@ function run() {
     const inventory = JSON.parse(execute("xcrun", ["simctl", "list", "devices", "available", "--json"]));
     const devices = Object.entries(inventory.devices).filter(([runtime]) => runtime.includes("iOS"))
       .flatMap(([, values]) => values).filter(device => device.isAvailable);
+    const uiFailures = [];
     for (const family of ["iPhone", "iPad"]) {
       const device = devices.find(device => device.name.startsWith(family));
       if (!device) throw new Error("Missing " + family + " simulator; do not silently skip device coverage");
       const resultBundle = path.join(reports, family + ".xcresult");
+      let passed = false;
       try {
         logged(family + "-tests", "xcodebuild", [...common,
           "-destination", "platform=iOS Simulator,arch=" + (process.arch === "arm64" ? "arm64" : "x86_64") + ",id=" + device.udid,
           "-configuration", "Debug", "ONLY_ACTIVE_ARCH=YES",
           "-parallel-testing-enabled", "NO", "-resultBundlePath", resultBundle, "test"], 900000);
+        passed = true;
+      } catch (error) {
+        uiFailures.push(family + ": " + error.message);
       } finally {
         collectTestResults(resultBundle, { root, reports, family });
       }
-      report.uiTests.push({ family, name: device.name, passed: true, orientations: ["portrait", "landscapeLeft"] });
+      report.uiTests.push({ family, name: device.name, passed, orientations: ["portrait", "landscapeLeft"] });
     }
+    if (uiFailures.length) throw new Error(uiFailures.join("\n"));
   } catch (error) {
     fs.writeFileSync(path.join(reports, "failure.txt"), String(error.message) + "\n" + String(error.stderr || "").slice(-32000));
     throw error;

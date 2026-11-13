@@ -9,6 +9,7 @@ struct NativeChatView: View {
     var onClose: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     @State private var showTranslation = false
     @State private var showEmoji = false
 
@@ -17,9 +18,11 @@ struct NativeChatView: View {
 
     var body: some View {
             VStack(spacing: 0) {
-                Text(model.isConnected ? "Verbonden · één-op-één chat" : "Niet verbonden · tekst blijft in deze sessie bewaard")
-                    .font(.caption).foregroundStyle(.secondary).padding(6)
-                    .accessibilityIdentifier("chat-connection")
+                if verticalSizeClass != .compact || !model.isConnected {
+                    Text(model.isConnected ? "Verbonden · één-op-één chat" : "Niet verbonden · tekst blijft in deze sessie bewaard")
+                        .font(.caption).foregroundStyle(.secondary).padding(6)
+                        .accessibilityIdentifier("chat-connection")
+                }
                 if model.chat.historyLimited {
                     Text("Alleen de meest recente berichten passen in deze preview.").font(.caption).padding(6)
                 }
@@ -34,6 +37,9 @@ struct NativeChatView: View {
                             Image(geometry.size.width > geometry.size.height ? "ChatBackgroundWide" : "ChatBackground")
                                 .resizable().scaledToFill()
                                 .frame(width: geometry.size.width, height: geometry.size.height).clipped()
+                                .onChange(of: geometry.size) { _ in
+                                    if let identifier = messages.last?.id { proxy.scrollTo(identifier, anchor: .bottom) }
+                                }
                         }
                     }
                     .onChange(of: messages.last?.id) { identifier in

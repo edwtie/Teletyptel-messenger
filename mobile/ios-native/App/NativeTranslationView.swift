@@ -100,7 +100,7 @@ struct NativeMessengerView: View {
                     Spacer()
                     Button(action: logout) { Image(systemName: "rectangle.portrait.and.arrow.right").frame(width: 44, height: 44) }
                         .accessibilityLabel("Uitloggen").accessibilityIdentifier("disconnect-session")
-                }.padding(.horizontal).padding(.top, 8)
+                }.padding(.horizontal).padding(.top, 12)
                 Text(model.isConnected ? "XMPP verbonden" : "Opnieuw verbinden…")
                     .font(.caption).foregroundStyle(.secondary)
                     .accessibilityLabel(connectionStatus)
