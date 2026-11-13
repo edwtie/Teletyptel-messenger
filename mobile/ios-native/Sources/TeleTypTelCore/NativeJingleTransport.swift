@@ -62,12 +62,16 @@ struct NativeJingleTransport {
         let sid: String
     }
     private let owner: String
+    private let acceptIncomingInitiates: Bool
     private var binding: Binding?
     private(set) var pending: Set<String> = []
     private var incoming: [UUID: (request: NativeJingleRequest, deadline: TimeInterval)] = [:]
     private var seen: [String: String] = [:]
 
-    init(owner: String) { self.owner = owner }
+    init(owner: String, acceptIncomingInitiates: Bool = false) {
+        self.owner = owner
+        self.acceptIncomingInitiates = acceptIncomingInitiates
+    }
 
     var hasIncoming: Bool { !incoming.isEmpty }
 
@@ -125,19 +129,21 @@ struct NativeJingleTransport {
             pending.remove(identifier)
             return NativeJingleOutput(completed: identifier, failure: type == "error" ? .rejected : nil)
         }
-        guard type == "set", root.children.contains(where: { $0.name == "jingle" && $0.namespace == Self.namespace }) else {
+        guard type == "set", root.children.count == 1, let element = root.children.first,
+              element.name == "jingle", element.namespace == Self.namespace,
+              let action = element.attributes["action"], actions.contains(action),
+              let sid = element.attributes["sid"], Self.validSID(sid),
+              Self.validJingle(element, sid: sid, sender: sender, receiver: owner) else {
             return NativeJingleOutput()
         }
-        guard let binding = binding, sender == binding.peer else {
+        if binding == nil, acceptIncomingInitiates, action == "session-initiate", sender != owner {
+            binding = Binding(id: UUID(), peer: sender, sid: sid)
+        }
+        guard let binding = binding, sender == binding.peer, sid == binding.sid else {
             return NativeJingleOutput(frames: [Self.reply(to: sender, identifier: identifier, rejection: .serviceUnavailable)])
         }
         if let reply = seen[identifier] { return NativeJingleOutput(frames: [reply]) }
         if incoming.values.contains(where: { $0.request.identifier == identifier }) { return NativeJingleOutput() }
-        guard root.children.count == 1, let element = root.children.first,
-              Self.validJingle(element, sid: binding.sid, sender: sender, receiver: owner),
-              let action = element.attributes["action"] else {
-            return NativeJingleOutput(frames: [Self.reply(to: sender, identifier: identifier, rejection: .badRequest)])
-        }
         guard incoming.count < 8, seen.count + incoming.count < 256 else {
             return NativeJingleOutput(frames: [Self.reply(to: sender, identifier: identifier, rejection: .resourceConstraint)])
         }

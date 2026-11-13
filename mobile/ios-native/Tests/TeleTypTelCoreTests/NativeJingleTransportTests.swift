@@ -108,6 +108,37 @@ final class NativeJingleTransportTests: XCTestCase {
         }
     }
 
+    func testOptInIncomingInitiateCreatesOneExactBinding() throws {
+        var transport = NativeJingleTransport(owner: owner, acceptIncomingInitiates: true)
+        let initiate = try XCTUnwrap(transport.receive(request(action: "session-initiate"), now: 0).request)
+        XCTAssertEqual(initiate.peer, peer)
+        XCTAssertEqual(initiate.sid, "call-1")
+        XCTAssertEqual(initiate.action, "session-initiate")
+
+        XCTAssertNil(transport.receive(request(identifier: "foreign", sender: "other@localhost/phone",
+                                               action: "session-initiate"), now: 1).request)
+        XCTAssertNil(transport.receive(request(identifier: "other-call", sid: "call-2",
+                                               action: "session-initiate"), now: 1).request)
+        XCTAssertTrue(transport.receive(request(identifier: "other-call", sid: "call-2",
+                                                action: "session-initiate"), now: 1)
+            .frames.first?.contains("service-unavailable") == true)
+
+        _ = try transport.reply(initiate, rejection: .notAcceptable, now: 2)
+        XCTAssertThrowsError(try transport.bind(peer: peer, sid: "call-2"))
+        XCTAssertTrue(transport.unbind(initiate.binding).isEmpty)
+        XCTAssertNoThrow(try transport.bind(peer: peer, sid: "call-2"))
+    }
+
+    func testOptInDoesNotBindNonInitiateOrMalformedOffer() {
+        var transport = NativeJingleTransport(owner: owner, acceptIncomingInitiates: true)
+        for xml in [request(action: "session-info"), request(sid: "bad/sid", action: "session-initiate"),
+                    request(sender: owner, action: "session-initiate")] {
+            let output = transport.receive(xml, now: 0)
+            XCTAssertNil(output.request)
+        }
+        XCTAssertNil(transport.receive(request(action: "session-accept"), now: 1).request)
+    }
+
     func testSpoofedInitiatorAndResponderRejected() throws {
         var transport = NativeJingleTransport(owner: owner)
         let binding = try transport.bind(peer: peer, sid: "call-1")

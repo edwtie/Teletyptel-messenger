@@ -356,7 +356,8 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
                     let output = try self.stream.receive(frame)
                     self.send(output.frames) {
                         if let jid = output.connectedJID {
-                            self.jingle = NativeJingleTransport(owner: jid)
+                            self.jingle = NativeJingleTransport(owner: jid,
+                                acceptIncomingInitiates: self.onJingle != nil)
                             self.deadline?.cancel()
                             self.deadline = nil
                             self.onConnected?(jid)
