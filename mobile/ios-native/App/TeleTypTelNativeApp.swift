@@ -302,7 +302,10 @@ struct NativeStartupView: View {
         .onChange(of: loginModel.phase) { phase in
             calls.synchronize(phase)
             if case .connected(let account) = phase { savedLogin.connected(jid: account) }
-            else if case .failed = phase { savedLogin.cancel() }
+            else if case .failed = phase {
+                verificationCode = ""
+                savedLogin.cancel()
+            }
         }
         .onChange(of: scenePhase) { phase in
             if phase == .background {
