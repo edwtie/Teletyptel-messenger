@@ -28,10 +28,12 @@ struct NativeChatView: View {
                 }
                 ScrollViewReader { proxy in
                     ScrollView {
-                        LazyVStack(spacing: 12) {
-                            ForEach(messages) { message in bubble(message).id(message.id) }
+                        VStack(spacing: 0) {
+                            LazyVStack(spacing: 12) {
+                                ForEach(messages) { message in bubble(message).id(message.id) }
+                            }.padding(.horizontal, 14).padding(.top, 14)
                             Color.clear.frame(height: 1).id("chat-bottom")
-                        }.padding(14)
+                        }
                     }
                     .modifier(NativeChatBottomAnchor())
                     .background {
@@ -183,7 +185,7 @@ struct NativeChatView: View {
         .padding(.horizontal, 8).padding(.vertical, 4)
         .background(.background, in: RoundedRectangle(cornerRadius: 28))
         .shadow(color: .black.opacity(0.12), radius: 5, y: 2)
-        .padding(10)
+        .padding(.horizontal, 10).padding(.vertical, verticalSizeClass == .compact ? 4 : 10)
     }
 
     private func startCall(_ profile: NativeCallMedia) { calls.startCall(contact, profile: profile) }
