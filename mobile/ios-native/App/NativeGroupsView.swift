@@ -51,71 +51,10 @@ private struct NativeGroupChatView: View {
     var body: some View {
         VStack(spacing: 0) {
             if let group = group {
-                if group.joining { ProgressView("Deelname controleren…").padding(8) }
-                else if let snapshot = group.snapshot {
-                    Text("\(snapshot.participants.count) deelnemers · \(snapshot.canSpeak ? "Groepschat" : "Alleen lezen")")
-                        .font(.caption).padding(6).accessibilityIdentifier("group-status")
-                } else {
-                    Text(group.error?.label ?? "Je bent niet meer in de groep.").font(.caption).padding(6)
-                    Button("Opnieuw deelnemen") { model.join(room: room, nickname: group.nickname) }.disabled(!model.available)
-                }
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        VStack(spacing: 0) {
-                          LazyVStack(spacing: 12) {
-                            if group.historyLimited { Text("Alleen de meest recente berichten passen in deze preview.").font(.caption) }
-                            ForEach(group.messages) { message in
-                                HStack {
-                                    if message.own { Spacer(minLength: 36) }
-                                    VStack(alignment: .leading, spacing: 5) {
-                                        Text(message.nickname).font(.caption.bold())
-                                        Text(message.body).textSelection(.enabled)
-                                        HStack(spacing: 5) {
-                                            Spacer(minLength: 0)
-                                            Text(message.date, style: .time).font(.caption2)
-                                            if message.own {
-                                                Image(systemName: message.state == .sending ? "clock" : message.state == .submitted ? "checkmark" : "exclamationmark.circle").font(.caption2)
-                                            }
-                                        }.foregroundStyle(.secondary)
-                                    }
-                                    .foregroundStyle(message.own ? Color.black : Color.primary)
-                                    .padding(12).background(message.own ? Color(red: 0.86, green: 0.97, blue: 0.92) : Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 14))
-                                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(message.own ? Color.green.opacity(0.55) : Color.gray.opacity(0.35)))
-                                    .accessibilityElement(children: .combine)
-                                    .accessibilityLabel(message.nickname + ": " + message.body + ". " + message.state.label)
-                                    .accessibilityIdentifier("group-message-" + message.id.uuidString)
-                                    .contextMenu { Button { UIPasteboard.general.string = message.body } label: { Label("Kopiëren", systemImage: "doc.on.doc") } }
-                                    if !message.own { Spacer(minLength: 36) }
-                                }.id(message.id)
-                            }
-                          }.padding(.horizontal, 14).padding(.top, 14)
-                          Color.clear.frame(height: 1).id("group-bottom")
-                        }
-                    }
-                    .modifier(NativeChatBottomAnchor())
-                    .background {
-                        GeometryReader { geometry in
-                            Image(geometry.size.width > geometry.size.height ? "ChatBackgroundWide" : "ChatBackground")
-                                .resizable().scaledToFill().frame(width: geometry.size.width, height: geometry.size.height).clipped()
-                                .task(id: geometry.size) {
-                                    await Task.yield()
-                                    guard !Task.isCancelled else { return }
-                                    proxy.scrollTo("group-bottom", anchor: .bottom)
-                                }
-                        }
-                    }
-                    .clipped()
-                    .onChange(of: group.messages.last?.id) { identifier in if identifier != nil { proxy.scrollTo("group-bottom", anchor: .bottom) } }
-                    .onAppear { proxy.scrollTo("group-bottom", anchor: .bottom) }
-                }
+                status(group)
+                messageList(group)
                 if let error = model.error { Text(error).font(.caption).foregroundStyle(.red).padding(4) }
-                HStack(spacing: 10) {
-                    TextField("Typ een groepsbericht", text: Binding(get: { self.group?.draft ?? "" }, set: { model.setDraft($0, room: room) }), axis: .vertical)
-                        .lineLimit(1...4).accessibilityIdentifier("group-draft")
-                    Button { model.send(room: room) } label: { Image(systemName: "paperplane.fill").frame(width: 44, height: 44) }
-                        .disabled(!model.available || group.snapshot?.canSpeak != true || group.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                        .accessibilityLabel("Groepsbericht verzenden").accessibilityIdentifier("group-send")
-                }.padding(12).background(.background)
+                composer(group)
             }
         }
         .navigationTitle(room.components(separatedBy: "@")[0]).navigationBarTitleDisplayMode(.inline)
@@ -132,6 +71,85 @@ private struct NativeGroupChatView: View {
                     .navigationTitle("Deelnemers")
                     .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Gereed") { showParticipants = false } } }
             }
+        }
+    }
+
+    @ViewBuilder
+    private func status(_ group: NativeGroupConversation) -> some View {
+        if group.joining { ProgressView("Deelname controleren…").padding(8) }
+        else if let snapshot = group.snapshot {
+            Text("\(snapshot.participants.count) deelnemers · \(snapshot.canSpeak ? "Groepschat" : "Alleen lezen")")
+                .font(.caption).padding(6).accessibilityIdentifier("group-status")
+        } else {
+            Text(group.error?.label ?? "Je bent niet meer in de groep.").font(.caption).padding(6)
+            Button("Opnieuw deelnemen") { model.join(room: room, nickname: group.nickname) }.disabled(!model.available)
+        }
+    }
+
+    private func messageList(_ group: NativeGroupConversation) -> some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(spacing: 0) {
+                    LazyVStack(spacing: 12) {
+                        if group.historyLimited { Text("Alleen de meest recente berichten passen in deze preview.").font(.caption) }
+                        ForEach(group.messages) { message in NativeGroupBubble(message: message).id(message.id) }
+                    }.padding(.horizontal, 14).padding(.top, 14)
+                    Color.clear.frame(height: 1).id("group-bottom")
+                }
+            }
+            .modifier(NativeChatBottomAnchor())
+            .background {
+                GeometryReader { geometry in
+                    Image(geometry.size.width > geometry.size.height ? "ChatBackgroundWide" : "ChatBackground")
+                        .resizable().scaledToFill().frame(width: geometry.size.width, height: geometry.size.height).clipped()
+                        .task(id: geometry.size) {
+                            await Task.yield()
+                            guard !Task.isCancelled else { return }
+                            proxy.scrollTo("group-bottom", anchor: .bottom)
+                        }
+                }
+            }
+            .clipped()
+            .onChange(of: group.messages.last?.id) { identifier in if identifier != nil { proxy.scrollTo("group-bottom", anchor: .bottom) } }
+            .onAppear { proxy.scrollTo("group-bottom", anchor: .bottom) }
+        }
+    }
+
+    private func composer(_ group: NativeGroupConversation) -> some View {
+        HStack(spacing: 10) {
+            TextField("Typ een groepsbericht", text: Binding(get: { self.group?.draft ?? "" }, set: { model.setDraft($0, room: room) }), axis: .vertical)
+                .lineLimit(1...4).accessibilityIdentifier("group-draft")
+            Button { model.send(room: room) } label: { Image(systemName: "paperplane.fill").frame(width: 44, height: 44) }
+                .disabled(!model.available || group.snapshot?.canSpeak != true || group.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .accessibilityLabel("Groepsbericht verzenden").accessibilityIdentifier("group-send")
+        }.padding(12).background(.background)
+    }
+}
+
+private struct NativeGroupBubble: View {
+    let message: NativeGroupText
+    private var background: Color { message.own ? Color(red: 0.86, green: 0.97, blue: 0.92) : Color(uiColor: .secondarySystemBackground) }
+    private var indicator: String { message.state == .sending ? "clock" : message.state == .submitted ? "checkmark" : "exclamationmark.circle" }
+    var body: some View {
+        HStack {
+            if message.own { Spacer(minLength: 36) }
+            VStack(alignment: .leading, spacing: 5) {
+                Text(message.nickname).font(.caption.bold())
+                Text(message.body).textSelection(.enabled)
+                HStack(spacing: 5) {
+                    Spacer(minLength: 0)
+                    Text(message.date, style: .time).font(.caption2)
+                    if message.own { Image(systemName: indicator).font(.caption2) }
+                }.foregroundStyle(.secondary)
+            }
+            .foregroundStyle(message.own ? Color.black : Color.primary)
+            .padding(12).background(background, in: RoundedRectangle(cornerRadius: 14))
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(message.own ? Color.green.opacity(0.55) : Color.gray.opacity(0.35)))
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(message.nickname + ": " + message.body + ". " + message.state.label)
+            .accessibilityIdentifier("group-message-" + message.id.uuidString)
+            .contextMenu { Button { UIPasteboard.general.string = message.body } label: { Label("Kopiëren", systemImage: "doc.on.doc") } }
+            if !message.own { Spacer(minLength: 36) }
         }
     }
 }
