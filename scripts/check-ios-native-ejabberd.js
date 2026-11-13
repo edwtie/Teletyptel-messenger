@@ -201,7 +201,7 @@ async function run() {
     control("register", archivePeer, "localhost", password);
     control("register", groupOutsider, "localhost", password);
     control("create_room", groupRoom, "conference.localhost", "localhost");
-    for (const user of [username, archivePeer]) control("set_room_affiliation", groupRoom, "conference.localhost", user + "@localhost", "member");
+    for (const user of [username, archivePeer]) control("set_room_affiliation", groupRoom, "conference.localhost", user, "localhost", "member");
     control("add_rosteritem", username, "localhost", "fixture-peer", "localhost", "Fictief testcontact", "Testcontacten", "both");
     loginFixture = await startLoginFixture({ key: fs.readFileSync(certificate("server.key")),
       cert: fs.readFileSync(certificate("server.crt")), ca: fs.readFileSync(certificate("ca.crt")),
