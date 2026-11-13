@@ -29,9 +29,36 @@ The isolated ejabberd harness enables MAM only on its disposable loopback server
 and exchanges fictional text between two random accounts. Its Mnesia archive is
 test-only; [ejabberd recommends SQL for deployed MAM storage](https://docs.ejabberd.im/admin/configuration/modules/#mod-mam).
 No local/production server, retention policy, APNs service or TestFlight build is
-changed. Swift runtime, simulator and real-server evidence for this increment is
-pending until the unsigned workflows complete; the older runs below do not prove
-this new history implementation.
+changed.
+
+Validation of revision `1d5b3fc`:
+[unsigned preview run 43515284136](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43515284136)
+passed Release device compilation, Debug fixture exclusion, 182 Swift tests and
+all twelve UI tests (six each on iPhone 16 Pro and iPad Pro 11-inch M4). Sixteen
+opt-in network tests were skipped in this preview run, not counted as passes.
+The four native same-host WebRTC profiles passed with synthetic VP8 and
+bidirectional T.140; no physical capture, APNs or public-network claim is made.
+The UI tests verify the fictional archived message, rotation/background draft
+preservation and the latest outgoing bubble above the landscape keyboard.
+Four chat screenshots were visually inspected in portrait/landscape on both
+families; eight chat/contact screenshots are included in the workflow evidence.
+
+[Isolated ejabberd run 43514381108](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43514381108)
+passed on the same core revision (`3ecb256`; the later commit only fixes the
+standalone media test source list and its regression guard). Its actual ejabberd
+26.09 server passed seven TLS/session checks, seven native HTTP/XMPP login checks,
+one Jingle exchange test, and the new two-account MAM test, with no skips. The
+MAM test sends fictional text both ways, fetches by peer, requests an earlier
+cursor, checks an unrelated peer returns no history, reconnects and imports the
+same archive twice without duplicates or manufactured read receipts. A separate
+post-revocation TLS rejection test also passed; sessions and fixture files were
+removed and the temporary CA was revoked/removed on the disposable runner.
+
+The first full preview attempt (`43514376915`) retained a real failure: the
+standalone media compiler's explicit source list missed `NativeArchive.swift`.
+The dependency and a regression check were added before the green rerun; that
+failure is not counted as successful coverage. Local Windows validation passes
+38 Node checks with two macOS-only checks explicitly skipped.
 
 ## Web-style UI, provider login and private translation increment (2026-11-13)
 
@@ -79,7 +106,8 @@ Native parity status (do not confuse a visible layout with protocol support):
 | Contacts/presence, direct text, drafts, emoji/copy | Implemented; fictional iPhone/iPad UI scenarios pass, including rotation and background return |
 | Private ordinary/live RTT translation | API/UI implementation; fictional contract tests, not a production translation claim |
 | Audio/video/RTT/TC | Existing constrained native engine; public-network/physical-device tests remain |
-| Persistent history, MAM, carbons, receipts/read markers | Not yet implemented in this native target |
+| Recent direct-chat MAM history | Read-only latest page, 50 stanzas per selected peer; server retention required; no older-page UI or legacy-history migration |
+| Durable local history, carbons, receipts/read markers | Not yet implemented in this native target; archive presence does not prove delivery/read state |
 | MUC/group chat, invitations and group calls | Not yet implemented in this native target |
 | File/photo upload and download | Not yet implemented; composer does not pretend to send attachments |
 | Edit/delete/reactions/forwarding | Not yet implemented; context menu currently provides copy/translate only |
@@ -90,7 +118,7 @@ Native parity status (do not confuse a visible layout with protocol support):
 
 Remaining parity gates, in order:
 
-1. Durable, account-isolated history and archive synchronization, including deduplication after reconnect and independently verified delivery/read states.
+1. Extend recent MAM restoration with older-page navigation and, only with an explicit storage design, protected account-isolated offline history. Carbons and independently verified delivery/read states remain separate protocol work.
 2. Native group membership, invitations, roles and room-scoped messaging, with separate direct/group message identities and negative cross-room authorization tests.
 3. Actual file/photo upload, download and previews using the existing authenticated APIs, bounded files and explicit user selection; no decorative send buttons without a working transfer.
 4. Edit/delete/reactions/forwarding and contact/profile management, with ownership checks, cancellation, offline errors and native UI tests for each action.
