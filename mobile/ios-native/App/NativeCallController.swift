@@ -46,7 +46,7 @@ final class NativeCallController: ObservableObject {
     enum Status: Equatable { case idle, ringing(String), active(String), failed }
 
     @Published private(set) var status: Status = .idle
-    private static let initializeWebRTC: Void = RTCInitializeSSL()
+    private static let initializeWebRTC = RTCInitializeSSL()
     private var factory: RTCPeerConnectionFactory?
     private var capture: NativeMediaCapture?
     private var router: NativePeerRouter?
