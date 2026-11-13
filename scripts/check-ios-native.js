@@ -80,7 +80,8 @@ function run() {
       const resultBundle = path.join(reports, family + ".xcresult");
       try {
         logged(family + "-tests", "xcodebuild", [...common,
-          "-destination", "platform=iOS Simulator,id=" + device.udid, "-configuration", "Debug",
+          "-destination", "platform=iOS Simulator,arch=" + (process.arch === "arm64" ? "arm64" : "x86_64") + ",id=" + device.udid,
+          "-configuration", "Debug", "ONLY_ACTIVE_ARCH=YES",
           "-parallel-testing-enabled", "NO", "-resultBundlePath", resultBundle, "test"], 900000);
       } finally {
         collectTestResults(resultBundle, { root, reports, family });

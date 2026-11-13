@@ -58,7 +58,7 @@ struct NativeChatView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button { if let onClose = onClose { onClose() } else { dismiss() } } label: {
+                    Button { onClose?(); dismiss() } label: {
                         Image(systemName: "arrow.left").frame(width: 44, height: 44)
                     }.accessibilityLabel("Gereed")
                 }

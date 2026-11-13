@@ -106,6 +106,18 @@ struct NativeMessengerView: View {
                     .accessibilityLabel(connectionStatus)
                     .accessibilityIdentifier("startup-status")
                 List(selection: $selected) {
+                    switch model.roster {
+                    case .idle, .loading:
+                        ProgressView("Contacten ophalen…")
+                    case .unavailable:
+                        Text("Contacten konden niet worden opgehaald. Meld opnieuw aan om het opnieuw te proberen.")
+                            .accessibilityIdentifier("contacts-error")
+                    case .ready(let roster) where roster.isEmpty:
+                        Text("Nog geen contacten in je XMPP-contactenlijst.")
+                            .accessibilityIdentifier("contacts-empty")
+                    case .ready:
+                        if contacts.isEmpty { Text("Geen contacten gevonden.") }
+                    }
                     ForEach(contacts) { contact in
                         NavigationLink(value: contact.jid) {
                             HStack(spacing: 12) {
