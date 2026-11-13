@@ -24,6 +24,7 @@ test("Isolated ejabberd exposes only loopback WSS and no federation or public re
   assert.match(configuration, /auth_password_format: scram/);
   assert.match(configuration, /mod_roster: \{\}/);
   assert.match(configuration, /mod_admin_extra: \{\}/);
+  assert.match(configuration, /mod_mam:\s+db_type: mnesia\s+default: always/);
   assert.doesNotMatch(configuration, /mod_register|mod_http_api|ejabberd_c2s|0\.0\.0\.0|5269/);
   for (const ports of [[80, 15281], [15280, 15280], [15280, 65536], [15280, "15281"]]) {
     assert.throws(() => serverConfiguration(directory, ...ports));
@@ -73,4 +74,18 @@ test("Jingle harness exercises real resource-bound IQ exchange without media or 
   const harness = fs.readFileSync(path.join(root, "scripts/check-ios-native-ejabberd.js"), "utf8");
   assert.match(harness, /runSwift\("NativeJingleIntegrationTests", "native-jingle-tests.txt"\)/);
   assert.match(harness, /nativeJingleTransportTested = true/);
+});
+
+test("MAM test restores isolated direct history with real two-account transports", () => {
+  const root = path.resolve(__dirname, "..");
+  const source = fs.readFileSync(path.join(root, "mobile/ios-native/Tests/NativeXMPPIntegrationTests/NativeArchiveIntegrationTests.swift"), "utf8");
+  assert.equal((source.match(/func test/g) || []).length, 1);
+  for (const required of ["XCTSkip", "TELETYPTEL_EJABBERD_FIXTURE", '"github-hosted"',
+    "NativeXMPPConnection().run", "fetchArchive", "before: archived.messages[1].archiveID", "restoredConnection",
+    "mergeArchive", ".submitted", ".disconnected"])
+    assert.ok(source.includes(required), required);
+  assert.doesNotMatch(source, /URLCredential|SecTrust|URLProtocol|PKPushRegistry|RTCPeerConnection/);
+  const harness = fs.readFileSync(path.join(root, "scripts/check-ios-native-ejabberd.js"), "utf8");
+  assert.match(harness, /runSwift\("NativeArchiveIntegrationTests", "native-archive-tests.txt"\)/);
+  assert.match(harness, /nativeArchiveTransportTested = true/);
 });

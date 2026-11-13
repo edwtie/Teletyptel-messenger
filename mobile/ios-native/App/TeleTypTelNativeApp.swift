@@ -604,7 +604,15 @@ private struct NativeLoginUIFixture: ServerChecking, NativeAccountChallenging, N
     }
 }
 
-private struct NativeChatUIFixture: NativeChatSending {
+private struct NativeChatUIFixture: NativeArchiveSending {
+    func fetchArchive(peer: String, before: String?) async throws -> NativeArchivePage {
+        guard peer == "demo-contact@localhost", before == nil else { throw NativeArchiveFailure.unavailable }
+        try await Task.sleep(nanoseconds: 100_000_000)
+        let messages = [NativeArchivedText(archiveID: "ui-past-peer", identifier: "ui-past-peer", peer: peer,
+            body: "Fictief eerder bericht", date: Date(timeIntervalSince1970: 1793528430), outgoing: false)]
+        return NativeArchivePage(owner: "fixture@localhost", peer: peer, messages: messages, first: "ui-past-peer", hasEarlier: false)
+    }
+
     func sendMessage(to jid: String, body: String, identifier: String) async throws {
         guard jid == "demo-contact@localhost", !body.isEmpty else { throw NativeChatFailure.invalidMessage }
         try await Task.sleep(nanoseconds: 100_000_000)

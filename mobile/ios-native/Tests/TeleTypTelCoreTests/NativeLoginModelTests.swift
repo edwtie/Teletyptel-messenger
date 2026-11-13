@@ -1,7 +1,7 @@
 import XCTest
 @testable import TeleTypTelCore
 
-private actor LoginFixture: ServerChecking, NativeAccountAuthenticating, NativeXMPPConnecting, NativeChatSending {
+private actor LoginFixture: ServerChecking, NativeAccountAuthenticating, NativeXMPPConnecting, NativeArchiveSending {
     private struct Run {
         let account: NativeAuthenticatedAccount
         let ready: @Sendable (String) -> Void
@@ -22,14 +22,21 @@ private actor LoginFixture: ServerChecking, NativeAccountAuthenticating, NativeX
     let wrongAccount: Bool
     let holdSends: Bool
     private var sentBodies: [String] = []
+    private var archiveRequests = 0
+    private var pendingArchives: [(CheckedContinuation<NativeArchivePage, Error>, NativeArchivePage)] = []
+    private let holdArchive: Bool
+    private let wrongArchiveOwner: Bool
 
     init(accountError: NativeAccountFailure? = nil, probeError: ConnectionFailure? = nil,
-         holdAuthentication: Bool = false, wrongAccount: Bool = false, holdSends: Bool = false) {
+         holdAuthentication: Bool = false, wrongAccount: Bool = false, holdSends: Bool = false,
+         holdArchive: Bool = false, wrongArchiveOwner: Bool = false) {
         self.accountError = accountError
         self.probeError = probeError
         self.holdAuthentication = holdAuthentication
         self.wrongAccount = wrongAccount
         self.holdSends = holdSends
+        self.holdArchive = holdArchive
+        self.wrongArchiveOwner = wrongArchiveOwner
     }
 
     func history() -> [String] { events }
@@ -37,6 +44,23 @@ private actor LoginFixture: ServerChecking, NativeAccountAuthenticating, NativeX
     func cancellationCount() -> Int { cancelled.count }
     func hasPendingAuthentication() -> Bool { pendingAuthentication != nil }
     func sentMessages() -> [String] { sentBodies }
+    func archiveRequestCount() -> Int { archiveRequests }
+
+    func fetchArchive(peer: String, before: String?) async throws -> NativeArchivePage {
+        archiveRequests += 1
+        let owner = wrongArchiveOwner ? "other@localhost" : runs[identifiers.last!]?.account.jid ?? "invalid@localhost"
+        let text = NativeArchivedText(archiveID: "historical", identifier: "historical", peer: peer,
+            body: "Eerder opgeslagen tekst", date: Date(timeIntervalSince1970: 1793528430), outgoing: false)
+        let page = NativeArchivePage(owner: owner, peer: peer, messages: [text], first: "historical", hasEarlier: false)
+        if holdArchive { return try await withCheckedThrowingContinuation { pendingArchives.append(($0, page)) } }
+        return page
+    }
+
+    func releaseArchives() {
+        let replies = pendingArchives
+        pendingArchives.removeAll()
+        for (continuation, page) in replies { continuation.resume(returning: page) }
+    }
 
     func sendMessage(to jid: String, body: String, identifier: String) async throws {
         sentBodies.append(body)
@@ -130,6 +154,74 @@ final class NativeLoginModelTests: XCTestCase {
     private let contacts: NativeRosterState = .ready([
         NativeContact(jid: "peer@localhost", name: "Testcontact", groups: [], subscription: "both", presence: .online)
     ])
+
+    @MainActor
+    func testHistoryReloadsAfterFreshLoginDeduplicatesAndDoesNotSendArchivedText() async {
+        let fixture = LoginFixture()
+        let model = model(fixture)
+        start(model)
+        await eventually { await fixture.runCount() == 1 }
+        await fixture.ready(0)
+        await fixture.roster(0, state: contacts)
+        await eventually { model.canSend && model.roster == self.contacts }
+        model.loadHistory(for: "stranger@localhost")
+        let before = await fixture.archiveRequestCount()
+        XCTAssertEqual(before, 0)
+        model.loadHistory(for: "peer@localhost")
+        await eventually { model.historyStates["peer@localhost"] == .ready }
+        XCTAssertEqual(model.chat.messages.count, 1)
+        model.setDraft("Mijn concept", peer: "peer@localhost")
+        model.loadHistory(for: "peer@localhost", refresh: true)
+        await eventually { model.historyStates["peer@localhost"] == .ready }
+        XCTAssertEqual(model.chat.messages.count, 1)
+        XCTAssertEqual(model.chat.drafts["peer@localhost"], "Mijn concept")
+        let sent = await fixture.sentMessages()
+        XCTAssertTrue(sent.isEmpty)
+        model.disconnect()
+        XCTAssertTrue(model.chat.messages.isEmpty)
+        XCTAssertTrue(model.historyStates.isEmpty)
+        start(model)
+        await eventually { await fixture.runCount() == 2 }
+        await fixture.ready(1)
+        await fixture.roster(1, state: contacts)
+        await eventually { model.canSend && model.roster == self.contacts }
+        model.loadHistory(for: "peer@localhost")
+        await eventually { model.historyStates["peer@localhost"] == .ready }
+        XCTAssertEqual(model.chat.messages.first?.body, "Eerder opgeslagen tekst")
+        model.disconnect()
+    }
+
+    @MainActor
+    func testForeignArchiveOwnerAndLateHistoryAfterLogoutAreRejected() async {
+        let foreign = LoginFixture(wrongArchiveOwner: true)
+        let first = model(foreign)
+        start(first)
+        await eventually { await foreign.runCount() == 1 }
+        await foreign.ready(0)
+        await foreign.roster(0, state: contacts)
+        await eventually { first.canSend && first.roster == self.contacts }
+        first.loadHistory(for: "peer@localhost")
+        await eventually { first.historyStates["peer@localhost"] == .failed }
+        XCTAssertTrue(first.chat.messages.isEmpty)
+        XCTAssertTrue(first.isConnected)
+        first.disconnect()
+
+        let delayed = LoginFixture(holdArchive: true)
+        let second = model(delayed)
+        start(second)
+        await eventually { await delayed.runCount() == 1 }
+        await delayed.ready(0)
+        await delayed.roster(0, state: contacts)
+        await eventually { second.canSend && second.roster == self.contacts }
+        second.loadHistory(for: "peer@localhost")
+        await eventually { await delayed.archiveRequestCount() == 1 }
+        second.disconnect()
+        await delayed.releaseArchives()
+        for _ in 0..<10 { await Task.yield() }
+        XCTAssertTrue(second.chat.messages.isEmpty)
+        XCTAssertTrue(second.historyStates.isEmpty)
+        XCTAssertEqual(second.phase, .signedOut)
+    }
 
     @MainActor
     func testChatSendReceiveAndResumePreserveDraftWithoutResending() async {

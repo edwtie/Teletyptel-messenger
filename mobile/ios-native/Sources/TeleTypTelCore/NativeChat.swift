@@ -27,13 +27,15 @@ public struct NativeChatMessage: Identifiable, Equatable, Sendable {
     public let stanzaID: String?
     public let peer: String
     public let body: String
-    public let date: Date
+    public var date: Date
     public var state: NativeMessageState
+    public var archiveID: String? = nil
 }
 
 public enum NativeChatEvent: Sendable {
     case message(peer: String, identifier: String?, body: String)
     case rejected(peer: String, identifier: String)
+    case archivedIdentity(peer: String, identifier: String?, body: String, archiveID: String)
 }
 
 enum NativeChatCodec {
@@ -76,6 +78,9 @@ enum NativeChatCodec {
         let bodies = root.children.filter { $0.name == "body" && $0.namespace == "jabber:client" }
         guard let body = bodies.first(where: { $0.attributes["xml:lang"] == nil }) ?? bodies.first,
               body.children.isEmpty, validBody(body.text) else { return nil }
+        if let archiveID = NativeArchiveQuery.trustedArchiveID(root, owner: owner) {
+            return .archivedIdentity(peer: peer, identifier: identifier, body: body.text, archiveID: archiveID)
+        }
         return .message(peer: peer, identifier: identifier, body: body.text)
     }
 
@@ -132,7 +137,44 @@ public struct NativeChatStore: Equatable {
         case .rejected(let peer, let identifier):
             guard let index = messages.firstIndex(where: { $0.peer == peer && $0.stanzaID == identifier && $0.state != .incoming }) else { return }
             messages[index].state = .rejected
+        case .archivedIdentity(let peer, let identifier, let body, let archiveID):
+            guard NativeChatCodec.bareJID(peer) == peer, NativeChatCodec.validBody(body), NativeArchiveQuery.validID(archiveID) else { return }
+            if messages.contains(where: { $0.peer == peer && $0.state == .incoming &&
+                ($0.archiveID == archiveID || (identifier != nil && $0.stanzaID == identifier)) }) { return }
+            guard makeRoom() else { historyLimited = true; return }
+            messages.append(NativeChatMessage(id: UUID(), stanzaID: identifier, peer: peer, body: body,
+                                             date: Date(), state: .incoming, archiveID: archiveID))
         }
+    }
+
+    mutating func mergeArchive(_ page: NativeArchivePage) throws {
+        guard page.messages.count <= NativeArchiveQuery.maximum, page.messages.allSatisfy({
+            $0.peer == page.peer && NativeChatCodec.validBody($0.body) && NativeArchiveQuery.validID($0.archiveID)
+        }) else { throw NativeArchiveFailure.invalidResponse }
+        var merged = messages
+        for archived in page.messages {
+            if merged.contains(where: { $0.archiveID == archived.archiveID && ($0.peer != archived.peer || ($0.state != .incoming) != archived.outgoing) }) {
+                throw NativeArchiveFailure.invalidResponse
+            }
+            if let index = merged.firstIndex(where: {
+                $0.peer == archived.peer && ($0.state != .incoming) == archived.outgoing &&
+                ($0.archiveID == archived.archiveID || (archived.identifier != nil && $0.stanzaID == archived.identifier))
+            }) {
+                guard merged[index].body == archived.body else { continue }
+                merged[index].archiveID = archived.archiveID
+                merged[index].date = archived.date
+            } else {
+                merged.append(NativeChatMessage(id: UUID(), stanzaID: archived.identifier, peer: archived.peer,
+                    body: archived.body, date: archived.date, state: archived.outgoing ? .submitted : .incoming, archiveID: archived.archiveID))
+            }
+        }
+        merged.sort { $0.date == $1.date ? $0.id.uuidString < $1.id.uuidString : $0.date < $1.date }
+        while merged.count > 200 {
+            guard let index = merged.firstIndex(where: { $0.state == .incoming || $0.state == .submitted }) else { throw NativeChatFailure.historyFull }
+            merged.remove(at: index)
+            historyLimited = true
+        }
+        messages = merged
     }
 
     private mutating func makeRoom() -> Bool {

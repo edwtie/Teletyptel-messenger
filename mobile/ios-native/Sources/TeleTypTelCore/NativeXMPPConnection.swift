@@ -78,8 +78,11 @@ public struct NativeXMPPConnection: NativeXMPPConnecting, NativeJingleXMPPConnec
     }
 }
 
-private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, NativeChatSending, NativeJingleSending, @unchecked Sendable {
+private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, NativeArchiveSending, NativeJingleSending, @unchecked Sendable {
     private let configuration: ServerConfiguration
+    private let ownerJID: String
+    private var boundJID: String?
+    private var archive: (query: NativeArchiveQuery, token: UUID, continuation: CheckedContinuation<NativeArchivePage, Error>, deadline: DispatchWorkItem)?
     private let queue = DispatchQueue(label: "nl.teletyptel.native.session")
     private var onConnected: (@Sendable (String) -> Void)?
     private var session: URLSession?
@@ -110,6 +113,7 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
          onJingle: (@Sendable (NativeJingleRequest) -> Void)? = nil,
          onJingleSender: (@Sendable (any NativeJingleSending) -> Void)? = nil) {
         configuration = account.configuration
+        ownerJID = account.jid
         stream = XMPPSessionStream(account: account, loadRoster: onRoster != nil)
         self.onConnected = onConnected
         self.onRoster = onRoster
@@ -229,6 +233,52 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
         }
     }
 
+    func fetchArchive(peer: String, before: String?) async throws -> NativeArchivePage {
+        try Task.checkCancellation()
+        let cancellation = NativeArchiveCancellation()
+        let token = UUID()
+        return try await withTaskCancellationHandler(operation: {
+            try await withCheckedThrowingContinuation { continuation in
+                queue.async {
+                    guard !cancellation.isCancelled else { continuation.resume(throwing: CancellationError()); return }
+                    guard !self.completed, self.stream.phase == .online, let boundJID = self.boundJID else {
+                        continuation.resume(throwing: NativeChatFailure.disconnected)
+                        return
+                    }
+                    guard self.archive == nil else { continuation.resume(throwing: NativeArchiveFailure.busy); return }
+                    do {
+                        let query = try NativeArchiveQuery(owner: self.ownerJID, boundJID: boundJID, peer: peer, before: before)
+                        let deadline = DispatchWorkItem { [weak self] in
+                            self?.completeArchive(token, result: .failure(ConnectionFailure.timeout))
+                        }
+                        self.archive = (query, token, continuation, deadline)
+                        self.queue.asyncAfter(deadline: .now() + 15, execute: deadline)
+                        self.send([query.request]) {}
+                    } catch { continuation.resume(throwing: error) }
+                }
+            }
+        }, onCancel: {
+            cancellation.cancel()
+            self.queue.async { self.completeArchive(token, result: .failure(CancellationError())) }
+        })
+    }
+
+    private func receiveArchive(_ frame: String) {
+        guard var pending = archive else { return }
+        do {
+            if let page = try pending.query.consume(frame) {
+                completeArchive(pending.token, result: .success(page))
+            } else { archive?.query = pending.query }
+        } catch { completeArchive(pending.token, result: .failure(error)) }
+    }
+
+    private func completeArchive(_ token: UUID, result: Result<NativeArchivePage, Error>) {
+        guard let pending = archive, pending.token == token else { return }
+        archive = nil
+        pending.deadline.cancel()
+        pending.continuation.resume(with: result)
+    }
+
     private func enqueueMessage(_ frame: String, continuation: CheckedContinuation<Void, Error>) {
         let token = UUID()
         guard !completed, stream.phase == .online, let socket = socket else {
@@ -315,6 +365,8 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
         onSender = nil
         onJingle = nil
         onJingleSender = nil
+        if let token = archive?.token { completeArchive(token, result: .failure(error)) }
+        boundJID = nil
         for identifier in Array(pendingJingle.keys) { completeJingle(identifier, error: error) }
         jingleDeadline?.cancel()
         jingleDeadline = nil
@@ -354,8 +406,10 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
                 do {
                     guard case .string(let frame) = try result.get() else { throw ConnectionFailure.invalidResponse }
                     let output = try self.stream.receive(frame)
+                    if self.stream.phase == .online { self.receiveArchive(frame) }
                     self.send(output.frames) {
                         if let jid = output.connectedJID {
+                            self.boundJID = jid
                             self.jingle = NativeJingleTransport(owner: jid,
                                 acceptIncomingInitiates: self.onJingle != nil)
                             self.deadline?.cancel()

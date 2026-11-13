@@ -5,6 +5,34 @@ Requested scope: the complete iPhone and iPad application, including native UI,
 authentication, messaging and Total Conversation. This is a staged rewrite, not a
 claim that those features already work in this target.
 
+## Recent direct-chat server history increment (2026-11-13)
+
+The native preview now requests the latest 50 archived stanzas for the selected
+roster contact using [XEP-0313 MAM 2](https://xmpp.org/extensions/xep-0313.html).
+This is read-only access to the signed-in user's archive, not a change to server
+archiving preferences. History appears only if that server already retains it.
+There is no local plaintext chat file, legacy PHP history migration, room archive
+support or older-page navigation in this increment. The session remains bounded
+to 200 messages; rejected, uncertain and pending sends are not silently evicted.
+
+Query IDs, IQ IDs, archive sender/recipient, direct peer pairs, namespaces, final
+RSM cursors, timestamps and byte/result limits are checked before importing a
+completed page. Unsupported, unstable, malformed or timed-out history produces a
+history-specific status without claiming that XMPP itself disconnected. Logout,
+account changes and stale requests cannot repopulate the next account's history.
+Original message IDs and owner-attributed XEP-0359 archive IDs deduplicate within
+peer/direction boundaries. These IDs are not cryptographic authentication: the
+authenticated server must implement XEP-0359's own-ID sanitization. Archived
+outgoing text is at most submitted, never evidence of delivery or reading.
+
+The isolated ejabberd harness enables MAM only on its disposable loopback server
+and exchanges fictional text between two random accounts. Its Mnesia archive is
+test-only; [ejabberd recommends SQL for deployed MAM storage](https://docs.ejabberd.im/admin/configuration/modules/#mod-mam).
+No local/production server, retention policy, APNs service or TestFlight build is
+changed. Swift runtime, simulator and real-server evidence for this increment is
+pending until the unsigned workflows complete; the older runs below do not prove
+this new history implementation.
+
 ## Web-style UI, provider login and private translation increment (2026-11-13)
 
 This is still the isolated native preview, not the existing signed TestFlight app.

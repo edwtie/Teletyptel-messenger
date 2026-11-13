@@ -29,6 +29,7 @@ struct NativeChatView: View {
                 ScrollViewReader { proxy in
                     ScrollView {
                         VStack(spacing: 0) {
+                            historyHeader.padding(.horizontal, 14).padding(.vertical, 8)
                             LazyVStack(spacing: 12) {
                                 ForEach(messages) { message in bubble(message).id(message.id) }
                             }.padding(.horizontal, 14).padding(.top, 14)
@@ -90,6 +91,8 @@ struct NativeChatView: View {
                             callButton("Spraak en video", icon: "video.fill", profile: .video)
                             callButton("Spraak en realtime tekst", icon: "teletype", profile: .audioRtt)
                             Button { showTranslation = true } label: { Label("Vertaling", systemImage: "globe") }
+                            Button { model.loadHistory(for: contact.jid, refresh: true) } label: { Label("Geschiedenis ophalen", systemImage: "clock.arrow.circlepath") }
+                                .disabled(!model.canSend || model.historyStates[contact.jid] == .loading)
                         } label: { Image(systemName: "ellipsis").frame(width: 44, height: 44) }
                         .accessibilityLabel("Gespreksmenu")
                     }
@@ -104,6 +107,28 @@ struct NativeChatView: View {
         .task(id: automaticTranslationIdentity) {
             guard translation.preferences.mode == "automatic" else { return }
             await translation.automaticallyTranslate(Array(messages.suffix(12)))
+        }
+        .task(id: "\(contact.jid):\(model.canSend)") {
+            if model.canSend { model.loadHistory(for: contact.jid, refresh: true) }
+        }
+    }
+
+    @ViewBuilder
+    private var historyHeader: some View {
+        switch model.historyStates[contact.jid] ?? .idle {
+        case .loading:
+            ProgressView("Servergeschiedenis ophalen…").font(.caption)
+        case .ready:
+            Text("Recent serverarchief · maximaal 50 resultaten per keer").font(.caption).foregroundStyle(.secondary)
+                .accessibilityIdentifier("history-ready")
+        case .unavailable:
+            Text("Serverarchief niet beschikbaar. Berichten uit deze sessie blijven zichtbaar.")
+                .font(.caption).accessibilityIdentifier("history-unavailable")
+        case .failed:
+            Button("Geschiedenis niet opgehaald · opnieuw proberen") { model.loadHistory(for: contact.jid, refresh: true) }
+                .font(.caption).disabled(!model.canSend).accessibilityIdentifier("history-retry")
+        case .idle:
+            EmptyView()
         }
     }
 

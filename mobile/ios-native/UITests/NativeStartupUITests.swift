@@ -111,6 +111,8 @@ final class NativeStartupUITests: XCTestCase {
         XCTAssertFalse(application.keyboards.firstMatch.exists)
         let greeting = application.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "chat-message-", "Fictief ontvangen bericht")).firstMatch
         XCTAssertTrue(greeting.waitForExistence(timeout: 5))
+        let archived = application.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "chat-message-", "Fictief eerder bericht")).firstMatch
+        XCTAssertTrue(archived.waitForExistence(timeout: 5))
         snapshot("chat-portrait")
         draft.tap()
         draft.typeText("Fictieve uitgaande tekst")

@@ -38,6 +38,9 @@ modules:
   mod_ping: {}
   mod_roster: {}
   mod_admin_extra: {}
+  mod_mam:
+    db_type: mnesia
+    default: always
 `;
 }
 
@@ -68,9 +71,10 @@ async function run() {
   fs.mkdirSync(reports, { recursive: true });
   const identifier = randomBytes(8).toString("hex");
   const username = "native-test-" + identifier;
+  const archivePeer = username + "-archive";
   const password = randomBytes(32).toString("hex");
   const cookie = randomBytes(32).toString("hex");
-  const secrets = [password, cookie, Buffer.from(`\0${username}\0${password}`).toString("base64")];
+  const secrets = [password, cookie, ...[username, archivePeer].map(user => Buffer.from(`\0${user}\0${password}`).toString("base64"))];
   const report = { unsigned: true, uploaded: false, productionServerContacted: false,
     transport: "Apple URLSessionWebSocketTask to loopback ejabberd over WSS",
     accountAPITested: false, physicalDevicesTested: false, passed: false,
@@ -184,11 +188,12 @@ async function run() {
     }
     if (!ready) throw new Error("Isolated ejabberd did not start");
     control("register", username, "localhost", password);
+    control("register", archivePeer, "localhost", password);
     control("add_rosteritem", username, "localhost", "fixture-peer", "localhost", "Fictief testcontact", "Testcontacten", "both");
     loginFixture = await startLoginFixture({ key: fs.readFileSync(certificate("server.key")),
       cert: fs.readFileSync(certificate("server.crt")), ca: fs.readFileSync(certificate("ca.crt")),
       trustedPort, username, password });
-    write("fixture.json", JSON.stringify({ trustedPort, untrustedPort, accountPort: loginFixture.port, username, password }));
+    write("fixture.json", JSON.stringify({ trustedPort, untrustedPort, accountPort: loginFixture.port, username, password, archivePeer }));
     fixtureReady = true;
     const swiftOutput = await runSwift("EjabberdIntegrationTests", "swift-progress.txt");
     save("swift-tests.txt", swiftOutput);
@@ -205,6 +210,12 @@ async function run() {
     }
     report.nativeJingleTransportTested = true;
     report.nativeJingleTransportTests = 1;
+    const archiveOutput = await runSwift("NativeArchiveIntegrationTests", "native-archive-tests.txt");
+    if (!/Executed 1 test, with 0 failures/.test(archiveOutput) || /[1-9][0-9]* tests? skipped/i.test(archiveOutput)) {
+      throw new Error("Expected the real two-account MAM history test to execute without skips or failures");
+    }
+    report.nativeArchiveTransportTested = true;
+    report.nativeArchiveTransportTests = 1;
     save("account-contract-statistics.json", JSON.stringify(loginFixture.statistics, null, 2));
     const { scenarios, upgrades, unexpectedRequests, proxyErrors } = loginFixture.statistics;
     if (["success", "rejected", "twofactor", "mismatch", "redirect", "xmpp-rejected", "delayed"]

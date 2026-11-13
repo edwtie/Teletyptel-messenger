@@ -27,6 +27,9 @@ public final class NativeLoginModel: ObservableObject {
     @Published public private(set) var chatError: String?
     @Published public private(set) var isBackground = false
     @Published public private(set) var twoFactorError: String?
+    @Published public private(set) var historyStates: [String: NativeHistoryState] = [:]
+    private var historyTask: Task<Void, Never>?
+    private var historyRequest = UUID()
     @Published private var sender: (any NativeChatSending)?
     var onJingle: ((NativeJingleRequest, any NativeJingleSending) -> Void)?
     private var resumableAccount: NativeAuthenticatedAccount?
@@ -56,6 +59,7 @@ public final class NativeLoginModel: ObservableObject {
         secondFactorDeadline?.cancel()
         secondFactor?.session.cancel()
         for send in sendTasks.values { send.cancel() }
+        historyTask?.cancel()
     }
 
     public var canSend: Bool { isConnected && sender != nil && !isBackground }
@@ -101,6 +105,36 @@ public final class NativeLoginModel: ObservableObject {
     }
 
     public func beginBackground() { isBackground = true }
+
+    public func loadHistory(for peer: String, refresh: Bool = false) {
+        guard canSend, case .connected(let owner) = phase,
+              case .ready(let contacts) = roster, contacts.contains(where: { $0.jid == peer }) else { return }
+        guard historyStates[peer] != .loading, refresh || historyStates[peer] != .ready else { return }
+        guard historyStates[peer] != nil || historyStates.count < 100 else { return }
+        guard let archive = sender as? any NativeArchiveSending else { historyStates[peer] = .unavailable; return }
+        historyTask?.cancel()
+        for key in Array(historyStates.keys) where historyStates[key] == .loading { historyStates[key] = .idle }
+        let attempt = generation
+        let request = UUID()
+        historyRequest = request
+        historyStates[peer] = .loading
+        historyTask = Task { [weak self] in
+            do {
+                let page = try await archive.fetchArchive(peer: peer, before: nil)
+                try Task.checkCancellation()
+                guard let self = self, self.generation == attempt, self.historyRequest == request,
+                      self.isConnected, !self.isBackground else { return }
+                guard page.owner == owner, page.peer == peer else { throw NativeArchiveFailure.invalidResponse }
+                try self.chat.mergeArchive(page)
+                self.historyStates[peer] = .ready
+                self.historyTask = nil
+            } catch {
+                guard !Task.isCancelled, let self = self, self.generation == attempt, self.historyRequest == request else { return }
+                self.historyStates[peer] = error as? NativeArchiveFailure == .unavailable ? .unavailable : .failed
+                self.historyTask = nil
+            }
+        }
+    }
 
     public func resume() {
         isBackground = false
@@ -320,7 +354,7 @@ public final class NativeLoginModel: ObservableObject {
         if case .ready(let contacts) = roster {
             let peer: String
             switch event {
-            case .message(let sender, _, _), .rejected(let sender, _): peer = sender
+            case .message(let sender, _, _), .rejected(let sender, _), .archivedIdentity(let sender, _, _, _): peer = sender
             }
             guard contacts.contains(where: { $0.jid == peer }) else { return }
             chat.receive(event)
@@ -362,6 +396,10 @@ public final class NativeLoginModel: ObservableObject {
 
     private func invalidate(clearChat: Bool = true, keepAccount: Bool = false) {
         generation = UUID()
+        historyRequest = UUID()
+        historyTask?.cancel()
+        historyTask = nil
+        for key in Array(historyStates.keys) where historyStates[key] == .loading { historyStates[key] = .idle }
         providerSigner?.cancel()
         providerSigner = nil
         secondFactor?.session.cancel()
@@ -376,7 +414,7 @@ public final class NativeLoginModel: ObservableObject {
         sender = nil
         isBackground = false
         chat.interrupt()
-        if clearChat { chat = NativeChatStore(); chatError = nil }
+        if clearChat { chat = NativeChatStore(); chatError = nil; historyStates.removeAll() }
         if !keepAccount {
             if let session = resumableAccount?.webSession { Task { await session.close() } }
             resumableAccount = nil
