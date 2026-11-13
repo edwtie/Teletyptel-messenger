@@ -25,7 +25,14 @@ test("Native media runner requires runtime results for every profile and keeps f
   fs.mkdirSync(path.join(directory, "DerivedData/SourcePackages/artifacts/sdk/WebRTC.xcframework/macos-x86_64_arm64/WebRTC.framework"), { recursive: true });
   const complete = ["audio", "video", "audio-rtt", "total"].map(profile => "Native media profile passed: " + profile + "\n").join("") +
     "Native incoming peer provider passed\nNative audio/video/RTT negotiation loopback passed\n";
-  const result = checkMedia({ root, directory, reports, logged: name => name === "media-runtime" ? complete : "compiled" });
+  const result = checkMedia({ root, directory, reports, logged: (name, command, args) => {
+    if (name === "media-compile") {
+      for (const required of ["NativeChat.swift", "NativeArchive.swift", "XMPPProbeStream.swift"]) {
+        assert.ok(args.some(argument => argument === path.join(native, "Sources/TeleTypTelCore", required)), required);
+      }
+    }
+    return name === "media-runtime" ? complete : "compiled";
+  } });
   assert.equal(result.passed, true);
   assert.equal(result.profiles.length, 4);
   assert.throws(() => checkMedia({ root, directory, reports, logged: () => "compiled" }), /Missing native media result/);
