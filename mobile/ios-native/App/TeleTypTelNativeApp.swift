@@ -95,7 +95,7 @@ struct NativeStartupView: View {
                     Text("Native iPhone- en iPad-app")
                         .font(.title2.bold())
                         .accessibilityAddTraits(.isHeader)
-                    Text("Ontwikkelversie: XMPP-aanmelding, contacten en één-op-één tekstchat. Bellen, pushmeldingen en opgeslagen geschiedenis zijn hier nog niet aangesloten.")
+                    Text("Ontwikkelversie: XMPP-aanmelding, contacten, één-op-één tekstchat en inkomende native Total Conversation. Uitgaande oproepen, pushmeldingen en opgeslagen geschiedenis volgen nog.")
                         .foregroundStyle(.secondary)
                     if fixtureName != nil {
                         Text("TESTSCENARIO — geen echte serververbinding")
@@ -213,6 +213,12 @@ struct NativeStartupView: View {
             .scrollDismissesKeyboard(.interactively)
         }
         .sheet(item: $selectedContact) { contact in NativeChatView(model: loginModel, contact: contact) }
+        .fullScreenCover(isPresented: Binding(
+            get: { calls.presentation != nil },
+            set: { visible in if !visible { calls.endCall() } }
+        )) {
+            NativeTotalConversationView(controller: calls)
+        }
         .onAppear { calls.attach(loginModel) }
         .onChange(of: address) { _ in resetConfiguration() }
         .onChange(of: domain) { _ in resetConfiguration() }

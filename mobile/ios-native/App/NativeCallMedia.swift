@@ -2,6 +2,16 @@ import AVFAudio
 import WebRTC
 
 @MainActor
+struct NativeCallPresentation {
+    let profile: NativeCallMedia
+    let localVideo: RTCVideoTrack?
+    let remoteVideo: RTCVideoTrack?
+    let ownText: String
+    let remoteText: String
+    let rttReady: Bool
+}
+
+@MainActor
 final class NativeWebRTCCallMedia: NativeCallMediaDriver {
     private let negotiation: any NativePeerNegotiating
     private let capture: NativeMediaCapture
@@ -16,6 +26,7 @@ final class NativeWebRTCCallMedia: NativeCallMediaDriver {
     private var audioActive = false
     private var startTask: Task<Void, Never>?
     private var reconnectDeadline: Task<Void, Never>?
+    var presentationChanged: ((NativeCallPresentation?) -> Void)?
 
     init(negotiation: any NativePeerNegotiating, capture: NativeMediaCapture) {
         self.negotiation = negotiation
@@ -52,6 +63,7 @@ final class NativeWebRTCCallMedia: NativeCallMediaDriver {
             self?.refresh()
         }
         prepared = created
+        publishPresentation()
         if media.contents.contains("rtt") {
             let session = MessengerNativeRttSession(callId: handle.id, sid: handle.sid)
             rtt = session
@@ -90,6 +102,7 @@ final class NativeWebRTCCallMedia: NativeCallMediaDriver {
         channel = nil
         let previous = prepared
         prepared = nil
+        presentationChanged?(nil)
         previous?.microphone.isEnabled = false
         previous?.camera?.isEnabled = false
         previous?.peer.close()
@@ -119,7 +132,11 @@ final class NativeWebRTCCallMedia: NativeCallMediaDriver {
         return true
     }
 
-    func setRttText(_ text: String) -> Bool { rtt?.setText(text) ?? false }
+    func setRttText(_ text: String) -> Bool {
+        let changed = rtt?.setText(text) ?? false
+        if changed { publishPresentation() }
+        return changed
+    }
     var ownText: String { rtt?.ownText ?? "" }
     var remoteText: String { rtt?.remoteText ?? "" }
 
@@ -131,6 +148,7 @@ final class NativeWebRTCCallMedia: NativeCallMediaDriver {
 
     private func refresh() {
         guard let prepared = prepared, let profile = profile else { return }
+        publishPresentation()
         if negotiation.remoteEnded { event?(.ended); return }
         if prepared.peer.connectionState == .disconnected {
             if connected && reconnectDeadline == nil, let currentHandle = handle {
@@ -165,6 +183,22 @@ final class NativeWebRTCCallMedia: NativeCallMediaDriver {
         guard Set(contents) == profile.contents else { return }
         connected = true
         event?(.ready(profile, contents: contents, rttReady: rtt?.isReady ?? false))
+    }
+
+    private func publishPresentation() {
+        guard let prepared = prepared, let profile = profile else {
+            presentationChanged?(nil)
+            return
+        }
+        let remoteVideo = prepared.peer.receivers.compactMap { $0.track as? RTCVideoTrack }.first
+        presentationChanged?(NativeCallPresentation(
+            profile: profile,
+            localVideo: prepared.camera,
+            remoteVideo: remoteVideo,
+            ownText: rtt?.ownText ?? "",
+            remoteText: rtt?.remoteText ?? "",
+            rttReady: rtt?.isReady ?? false
+        ))
     }
 }
 

@@ -120,6 +120,7 @@ test("Project generation is isolated, repeatable and refuses overwriting an exis
     ["App/NativeIncomingPeerNegotiator.swift", "App/NativeIncomingPeerNegotiator.swift"],
     ["App/NativeCallPlatform.swift", "App/NativeCallPlatform.swift"],
     ["App/NativeCallMedia.swift", "App/NativeCallMedia.swift"],
+    ["App/NativeTotalConversationView.swift", "App/NativeTotalConversationView.swift"],
     ["App/NativeChatView.swift", "App/NativeChatView.swift"],
     ["App/NativeBackgroundController.swift", "App/NativeBackgroundController.swift"]
   ]) {
@@ -272,6 +273,7 @@ test("CallKit/PushKit sources are included in preview but live registration stay
   const platform = read("App/NativeCallPlatform.swift");
   const media = read("App/NativeCallMedia.swift");
   const controller = read("App/NativeCallController.swift");
+  const conversation = read("App/NativeTotalConversationView.swift");
   const coordinator = read("Sources/TeleTypTelCore/NativeCallCoordinator.swift");
   assert.match(platform, /reportNewIncomingCall/);
   assert.match(platform, /MainActor\.assumeIsolated/);
@@ -296,6 +298,15 @@ test("CallKit/PushKit sources are included in preview but live registration stay
   assert.match(controller, /NativeIncomingPeerNegotiator/);
   assert.match(controller, /runtime\.platform\.receive\(invitation/);
   assert.match(controller, /matches\.count == 1/);
+  assert.match(controller, /@Published private\(set\) var presentation: NativeCallPresentation\?/);
+  assert.match(media, /presentationChanged: \(\(NativeCallPresentation\?\) -> Void\)\?/);
+  assert.match(media, /prepared\.peer\.receivers\.compactMap \{ \$0\.track as\? RTCVideoTrack \}/);
+  assert.match(conversation, /RTCMTLVideoView/);
+  assert.match(conversation, /videoContentMode = \.scaleAspectFill/);
+  assert.match(conversation, /TextField\("Typ realtime tekst"/);
+  assert.match(conversation, /\.accessibilityLabel\("Gesprek beëindigen"\)|label: "Gesprek beëindigen"/);
+  assert.match(conversation, /foregroundStyle\(\.white\)/);
+  assert.doesNotMatch(conversation, /\.textFieldStyle\(\.roundedBorder\)/);
   assert.doesNotMatch(platform + media, /print\(|NSLog|UserDefaults|setActive\(true/);
   const { revision } = require("../scripts/ios-testflight/native-webrtc");
   assert.match(revision, /^[a-f0-9]{40}$/);

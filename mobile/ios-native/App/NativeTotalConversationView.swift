@@ -1,0 +1,234 @@
+import SwiftUI
+import UIKit
+import WebRTC
+
+struct NativeTotalConversationView: View {
+    @ObservedObject var controller: NativeCallController
+    @FocusState private var rttFocused: Bool
+
+    var body: some View {
+        GeometryReader { geometry in
+            if let presentation = controller.presentation {
+                let landscape = geometry.size.width > geometry.size.height
+                ZStack {
+                    videoCanvas(presentation)
+                    VStack(spacing: 0) {
+                        header(presentation)
+                        Spacer(minLength: 12)
+                        if presentation.profile.contents.contains("rtt") {
+                            rttPanes(presentation, landscape: landscape)
+                                .padding(.horizontal, landscape ? 16 : 12)
+                                .padding(.bottom, 10)
+                        }
+                        controls(presentation)
+                            .padding(.horizontal, 12)
+                            .padding(.bottom, max(12, geometry.safeAreaInsets.bottom))
+                    }
+                    if let localVideo = presentation.localVideo, presentation.profile.hasVideo {
+                        NativeVideoSurface(track: localVideo)
+                            .frame(width: min(landscape ? 220 : 150, geometry.size.width * 0.34),
+                                   height: min(landscape ? 138 : 190, geometry.size.height * 0.25))
+                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.blue, lineWidth: 2))
+                            .shadow(radius: 8)
+                            .padding(.top, 78)
+                            .padding(.trailing, 14)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                            .accessibilityLabel("Eigen camerabeeld")
+                    }
+                }
+                .background(Color(red: 0.02, green: 0.06, blue: 0.12))
+                .ignoresSafeArea(edges: .bottom)
+                .statusBarHidden(landscape)
+            }
+        }
+        .interactiveDismissDisabled()
+    }
+
+    @ViewBuilder
+    private func videoCanvas(_ presentation: NativeCallPresentation) -> some View {
+        if let remoteVideo = presentation.remoteVideo, presentation.profile.hasVideo {
+            NativeVideoSurface(track: remoteVideo)
+                .ignoresSafeArea(edges: .bottom)
+                .accessibilityLabel("Videobeeld van gesprekspartner")
+        } else {
+            ZStack {
+                Color(red: 0.02, green: 0.06, blue: 0.12)
+                VStack(spacing: 12) {
+                    Image(systemName: presentation.profile.hasVideo ? "video.slash.fill" : "waveform")
+                        .font(.system(size: 42, weight: .semibold))
+                    Text(presentation.profile.hasVideo ? "Video wordt verbonden" : "Audiogesprek")
+                        .font(.headline)
+                }
+                .foregroundStyle(.white.opacity(0.78))
+                .accessibilityElement(children: .combine)
+            }
+        }
+    }
+
+    private func header(_ presentation: NativeCallPresentation) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: "person.crop.circle.fill")
+                .font(.system(size: 38))
+                .foregroundStyle(.blue)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(controller.peerName ?? "TeleTypTel-contact")
+                    .font(.headline)
+                    .lineLimit(1)
+                Text(profileName(presentation.profile))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            if presentation.profile.contents.contains("rtt") {
+                Image(systemName: presentation.rttReady ? "text.bubble.fill" : "text.bubble")
+                    .foregroundStyle(presentation.rttReady ? .green : .orange)
+                    .accessibilityLabel(presentation.rttReady ? "Realtime tekst verbonden" : "Realtime tekst wordt verbonden")
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(.regularMaterial)
+        .accessibilityElement(children: .contain)
+    }
+
+    @ViewBuilder
+    private func rttPanes(_ presentation: NativeCallPresentation, landscape: Bool) -> some View {
+        if landscape {
+            HStack(alignment: .bottom, spacing: 12) {
+                remoteRttPane(presentation)
+                ownRttPane(presentation)
+            }
+        } else {
+            VStack(spacing: 10) {
+                remoteRttPane(presentation)
+                ownRttPane(presentation)
+            }
+        }
+    }
+
+    private func remoteRttPane(_ presentation: NativeCallPresentation) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(controller.peerName ?? "Gesprekspartner")
+                .font(.caption.bold())
+                .foregroundStyle(Color(red: 0.55, green: 0.75, blue: 1))
+            Text(presentation.remoteText.isEmpty ? "…" : presentation.remoteText)
+                .font(.title3)
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .topLeading)
+                .accessibilityLabel("Realtime tekst van gesprekspartner: " +
+                                    (presentation.remoteText.isEmpty ? "nog geen tekst" : presentation.remoteText))
+        }
+        .rttPaneStyle()
+    }
+
+    private func ownRttPane(_ presentation: NativeCallPresentation) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Ik")
+                .font(.caption.bold())
+                .foregroundStyle(Color(red: 0.55, green: 0.75, blue: 1))
+            TextField("Typ realtime tekst", text: Binding(
+                get: { controller.presentation?.ownText ?? "" },
+                set: controller.setRttText
+            ), axis: .vertical)
+            .lineLimit(2...5)
+            .textFieldStyle(.plain)
+            .font(.title3)
+            .foregroundStyle(.white)
+            .tint(.blue)
+            .focused($rttFocused)
+            .disabled(!presentation.rttReady)
+            .accessibilityLabel("Eigen realtime tekst")
+            .accessibilityHint(presentation.rttReady ? "Tekst wordt direct tijdens het gesprek verzonden" :
+                               "Wacht totdat realtime tekst is verbonden")
+        }
+        .rttPaneStyle()
+    }
+
+    private func controls(_ presentation: NativeCallPresentation) -> some View {
+        HStack(spacing: 14) {
+            callButton(symbol: controller.isMuted ? "mic.slash.fill" : "mic.fill",
+                       color: controller.isMuted ? .red : .green,
+                       label: controller.isMuted ? "Microfoon inschakelen" : "Microfoon dempen",
+                       action: controller.toggleMuted)
+            if presentation.profile.contents.contains("rtt") {
+                callButton(symbol: "keyboard.fill", color: presentation.rttReady ? .green : .orange,
+                           label: "Realtime tekst typen") { rttFocused = true }
+                    .disabled(!presentation.rttReady)
+            }
+            callButton(symbol: "phone.down.fill", color: .red, label: "Gesprek beëindigen",
+                       action: controller.endCall)
+        }
+        .padding(10)
+        .background(Color(red: 0.02, green: 0.06, blue: 0.12).opacity(0.94),
+                    in: RoundedRectangle(cornerRadius: 18))
+        .overlay(RoundedRectangle(cornerRadius: 18)
+            .stroke(Color(red: 0.12, green: 0.32, blue: 0.62), lineWidth: 1.5))
+        .frame(maxWidth: .infinity)
+    }
+
+    private func callButton(symbol: String, color: Color, label: String,
+                            action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 24, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 56, height: 56)
+                .background(color, in: RoundedRectangle(cornerRadius: 14))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
+    }
+
+    private func profileName(_ profile: NativeCallMedia) -> String {
+        switch profile {
+        case .audio: return "Spraak"
+        case .video: return "Spraak en video"
+        case .audioRtt: return "Spraak en realtime tekst"
+        case .total: return "Total Conversation"
+        }
+    }
+}
+
+private struct NativeVideoSurface: UIViewRepresentable {
+    let track: RTCVideoTrack
+
+    final class Coordinator {
+        var track: RTCVideoTrack?
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    func makeUIView(context: Context) -> RTCMTLVideoView {
+        let view = RTCMTLVideoView(frame: .zero)
+        view.videoContentMode = .scaleAspectFill
+        view.clipsToBounds = true
+        view.backgroundColor = .black
+        return view
+    }
+
+    func updateUIView(_ view: RTCMTLVideoView, context: Context) {
+        guard context.coordinator.track !== track else { return }
+        context.coordinator.track?.remove(view)
+        track.add(view)
+        context.coordinator.track = track
+    }
+
+    static func dismantleUIView(_ view: RTCMTLVideoView, coordinator: Coordinator) {
+        coordinator.track?.remove(view)
+        coordinator.track = nil
+    }
+}
+
+private extension View {
+    func rttPaneStyle() -> some View {
+        self
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .background(Color(red: 0.02, green: 0.06, blue: 0.12).opacity(0.92),
+                        in: RoundedRectangle(cornerRadius: 16))
+            .overlay(RoundedRectangle(cornerRadius: 16)
+                .stroke(Color(red: 0.12, green: 0.32, blue: 0.62), lineWidth: 2))
+    }
+}

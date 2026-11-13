@@ -46,6 +46,9 @@ final class NativeCallController: ObservableObject {
     enum Status: Equatable { case idle, ringing(String), active(String), failed }
 
     @Published private(set) var status: Status = .idle
+    @Published private(set) var presentation: NativeCallPresentation?
+    @Published private(set) var peerName: String?
+    @Published private(set) var isMuted = false
     private static let initializeWebRTC = RTCInitializeSSL()
     private var factory: RTCPeerConnectionFactory?
     private var capture: NativeMediaCapture?
@@ -134,6 +137,7 @@ final class NativeCallController: ObservableObject {
                 }
                 self.incoming = provider
                 self.incomingID = invitation.id
+                self.peerName = request.peer
                 self.status = .ringing(request.peer)
                 guard runtime.platform.receive(invitation, completion: {}) else {
                     self.resetCall()
@@ -167,6 +171,22 @@ final class NativeCallController: ObservableObject {
         }
     }
 
+    func setRttText(_ text: String) {
+        _ = runtime?.media.setRttText(text)
+    }
+
+    func toggleMuted() {
+        guard let id = runtime?.platform.coordinator.lifecycle.current?.handle.id else { return }
+        let muted = !isMuted
+        guard runtime?.platform.coordinator.setMuted(id: id, muted: muted) == true else { return }
+        isMuted = muted
+    }
+
+    func endCall() {
+        guard let id = runtime?.platform.coordinator.lifecycle.current?.handle.id else { return }
+        _ = runtime?.platform.coordinator.end(id: id)
+    }
+
     private func resetCall() {
         prepareTask?.cancel()
         prepareTask = nil
@@ -174,6 +194,9 @@ final class NativeCallController: ObservableObject {
         let provider = incoming
         incoming = nil
         incomingID = nil
+        peerName = nil
+        presentation = nil
+        isMuted = false
         if let id = id { _ = runtime?.platform.coordinator.end(id: id, reason: .failed) }
         if let provider = provider {
             provider.cancel(notifyPeer: true)
@@ -195,6 +218,9 @@ final class NativeCallController: ObservableObject {
         self.capture = capture
         self.router = router
         self.runtime = runtime
+        runtime.media.presentationChanged = { [weak self] snapshot in
+            self?.presentation = snapshot
+        }
         runtime.platform.coordinator.changed = { [weak self] in self?.callChanged() }
         return runtime
     }
