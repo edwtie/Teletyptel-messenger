@@ -165,7 +165,8 @@ final class NativeCallCoordinator {
 
     func receive(_ data: Data, registration: UUID, completion: @escaping () -> Void) {
         let complete = NativeCallOnce(completion)
-        guard let handle = lifecycle.receive(data, registration: registration, now: clock.now),
+        guard outgoing == nil,
+              let handle = lifecycle.receive(data, registration: registration, now: clock.now),
               let invitation = lifecycle.current?.invitation else {
             reportRejected(complete)
             return
@@ -176,7 +177,8 @@ final class NativeCallCoordinator {
     func receive(_ invitation: NativeCallInvitation, registration: UUID,
                  completion: @escaping () -> Void) {
         let complete = NativeCallOnce(completion)
-        guard let handle = lifecycle.receive(invitation, registration: registration, now: clock.now),
+        guard outgoing == nil,
+              let handle = lifecycle.receive(invitation, registration: registration, now: clock.now),
               let accepted = lifecycle.current?.invitation else {
             reportRejected(complete)
             return

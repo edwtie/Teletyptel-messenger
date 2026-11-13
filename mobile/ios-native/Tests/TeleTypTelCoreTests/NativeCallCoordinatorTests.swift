@@ -317,4 +317,19 @@ final class NativeCallCoordinatorTests: XCTestCase {
         XCTAssertNil(coordinator.currentHandle)
         XCTAssertTrue(media.handles.isEmpty)
     }
+
+    @MainActor
+    func testIncomingInvitationCannotReplaceOutgoingCall() throws {
+        let (coordinator, system, _, _) = fixture()
+        let outgoingID = try XCTUnwrap(coordinator.startOutgoing(peer: "peer@example.test/phone",
+                                                                 sid: "active-outgoing", media: .audio) { _ in })
+        var completions = 0
+        coordinator.receive(try payload(), registration: coordinator.lifecycle.generation) { completions += 1 }
+        XCTAssertEqual(system.reports.count, 1)
+        XCTAssertEqual(coordinator.currentHandle?.id, outgoingID)
+        system.reports[0].completion(true)
+        XCTAssertEqual(completions, 1)
+        XCTAssertEqual(coordinator.currentHandle?.id, outgoingID)
+        XCTAssertFalse(system.ended.contains(outgoingID))
+    }
 }

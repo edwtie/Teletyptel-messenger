@@ -363,7 +363,7 @@ struct NativeStartupView: View {
     private var callStatusText: String? {
         switch calls.status {
         case .idle: return nil
-        case .calling(let peer): return "Totale Conversation-oproep naar \(peer) wordt opgebouwd."
+        case .calling(let peer): return "Total Conversation-oproep naar \(peer) wordt opgebouwd."
         case .ringing: return "Inkomende Total Conversation-oproep. Neem op of weiger via het systeemscherm."
         case .active: return "Total Conversation is verbonden."
         case .failed: return "De oproep kon niet veilig worden voorbereid. Probeer opnieuw."
