@@ -83,6 +83,24 @@ test("Native runner exports structured result evidence without hiding export fai
   });
 });
 
+test("Native runner exports screenshots and selects one host-compatible simulator architecture", () => {
+  const reports = diagnosticDirectory();
+  const bundle = path.join(reports, "iPad.xcresult");
+  fs.mkdirSync(bundle);
+  const calls = [];
+  collectTestResults(bundle, { root, reports, family: "iPad", execute: (command, args) => {
+    calls.push([command, ...args]);
+    return JSON.stringify({ passedTests: 6 });
+  } });
+  assert.ok(calls.some(args => args[2] === "export" && args[3] === "attachments" &&
+    args.includes(path.join(reports, "iPad-screenshots"))));
+  assert.equal(fs.existsSync(path.join(reports, "iPad-screenshots-export-error.txt")), false);
+  const runner = fs.readFileSync(path.join(root, "scripts/check-ios-native.js"), "utf8");
+  assert.match(runner, /process\.arch === "arm64" \? "arm64" : "x86_64"/);
+  assert.match(runner, /ONLY_ACTIVE_ARCH=YES/);
+  assert.doesNotMatch(runner, /EXCLUDED_ARCHS/);
+});
+
 test("Native preview has separate identity, no web runtime, upload or signing configuration", () => {
   const { project, scheme } = projectText();
   assert.match(project, /com\.tiedragon\.teletyptel\.nativepreview;/);

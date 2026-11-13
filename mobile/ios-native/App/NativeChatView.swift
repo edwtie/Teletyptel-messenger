@@ -16,7 +16,6 @@ struct NativeChatView: View {
     private var draft: String { model.chat.drafts[contact.jid] ?? "" }
 
     var body: some View {
-        NavigationStack {
             VStack(spacing: 0) {
                 Text(model.isConnected ? "Verbonden · één-op-één chat" : "Niet verbonden · tekst blijft in deze sessie bewaard")
                     .font(.caption).foregroundStyle(.secondary).padding(6)
@@ -56,16 +55,17 @@ struct NativeChatView: View {
             }
             .navigationTitle(contact.displayName)
             .navigationBarTitleDisplayMode(.inline)
+            .navigationBarBackButtonHidden(true)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button { onClose?(); dismiss() } label: {
                         Image(systemName: "arrow.left").frame(width: 44, height: 44)
-                    }.accessibilityLabel("Gereed")
+                    }.accessibilityLabel("Terug naar contacten").accessibilityIdentifier("chat-back")
                 }
                 ToolbarItem(placement: .primaryAction) {
                     HStack(spacing: 10) {
                         Button { startCall(.total) } label: {
-                            Image(systemName: "teletype").font(.title3).foregroundStyle(.white)
+                            NativeTotalConversationSymbol().fill(.white).frame(width: 26, height: 26)
                                 .frame(width: 44, height: 44).background(.blue, in: RoundedRectangle(cornerRadius: 12))
                         }
                         .disabled(contact.callEndpoint == nil || calls.status != .idle)
@@ -81,7 +81,6 @@ struct NativeChatView: View {
                 }
             }
             .scrollDismissesKeyboard(.interactively)
-        }
         .sheet(isPresented: $showTranslation) { NativeTranslationSettingsView(model: translation) }
         .overlay { if scenePhase != .active { Color(uiColor: .systemBackground).ignoresSafeArea().overlay(Text("TeleTypTel")) } }
         .onChange(of: model.phase) { phase in
@@ -182,5 +181,23 @@ struct NativeChatView: View {
     private func callButton(_ title: String, icon: String, profile: NativeCallMedia) -> some View {
         Button { startCall(profile) } label: { Label(title, systemImage: icon) }
             .disabled(contact.callEndpoint == nil || calls.status != .idle)
+    }
+}
+
+struct NativeTotalConversationSymbol: Shape {
+    func path(in rect: CGRect) -> Path {
+        let polygons: [[CGPoint]] = [
+            [[365, 840], [381, 738], [474, 738], [556, 222], [456, 222], [427, 402],
+             [321, 402], [366, 120], [885, 120], [840, 402], [734, 402], [762, 222],
+             [662, 222], [580, 738], [673, 738], [657, 840]].map { CGPoint(x: $0[0], y: $0[1]) },
+            [[150, 280], [163, 200], [313, 200], [300, 280]].map { CGPoint(x: $0[0], y: $0[1]) },
+            [[125, 440], [138, 360], [288, 360], [275, 440]].map { CGPoint(x: $0[0], y: $0[1]) },
+            [[75, 760], [87, 680], [337, 680], [325, 760]].map { CGPoint(x: $0[0], y: $0[1]) },
+            [[100, 600], [113, 520], [363, 520], [350, 600]].map { CGPoint(x: $0[0], y: $0[1]) }
+        ]
+        var path = Path()
+        for polygon in polygons { path.addLines(polygon); path.closeSubpath() }
+        return path.applying(CGAffineTransform(scaleX: rect.width / 960, y: rect.height / 960)
+            .concatenating(CGAffineTransform(translationX: rect.minX, y: rect.minY)))
     }
 }

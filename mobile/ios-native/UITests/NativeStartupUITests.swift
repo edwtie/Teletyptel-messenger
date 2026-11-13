@@ -34,10 +34,10 @@ final class NativeStartupUITests: XCTestCase {
         let domain = application.textFields["xmpp-domain"]
         domain.tap()
         domain.typeText("localhost")
-        XCUIDevice.shared.orientation = .landscapeLeft
+        rotate(.landscapeLeft)
         XCTAssertEqual(server.value as? String, "http://example.invalid")
         XCTAssertEqual(domain.value as? String, "localhost")
-        XCUIDevice.shared.orientation = .portrait
+        rotate(.portrait)
         let check = application.buttons["check-connection"]
         reveal(check)
         check.tap()
@@ -58,12 +58,12 @@ final class NativeStartupUITests: XCTestCase {
         reveal(contact)
         XCTAssertTrue(contact.label.contains("Online"))
         snapshot("contacts-portrait")
-        XCUIDevice.shared.orientation = .landscapeLeft
+        rotate(.landscapeLeft)
         waitForStatus("XMPP verbonden als fixture@localhost")
         reveal(contact)
         XCTAssertTrue(contact.label.contains("Online"))
         snapshot("contacts-landscape")
-        XCUIDevice.shared.orientation = .portrait
+        rotate(.portrait)
         let disconnect = application.buttons["disconnect-session"]
         reveal(disconnect, upward: false)
         disconnect.tap()
@@ -119,10 +119,10 @@ final class NativeStartupUITests: XCTestCase {
         XCTAssertTrue(outgoing.waitForExistence(timeout: 5))
         draft.tap()
         draft.typeText("Bewaar mijn concept")
-        XCUIDevice.shared.orientation = .landscapeLeft
+        rotate(.landscapeLeft)
         XCTAssertEqual(draft.value as? String, "Bewaar mijn concept")
         snapshot("chat-landscape-keyboard")
-        XCUIDevice.shared.orientation = .portrait
+        rotate(.portrait)
         XCUIDevice.shared.press(.home)
         XCTAssertTrue(application.wait(for: .runningBackground, timeout: 5) || application.wait(for: .runningBackgroundSuspended, timeout: 5))
         application.activate()
@@ -131,7 +131,7 @@ final class NativeStartupUITests: XCTestCase {
         waitForExpectations(timeout: 10)
         XCTAssertEqual(draft.value as? String, "Bewaar mijn concept")
         XCTAssertTrue(outgoing.exists)
-        application.buttons["Gereed"].tap()
+        application.buttons["chat-back"].tap()
         reveal(contact)
         contact.tap()
         XCTAssertTrue(draft.waitForExistence(timeout: 5))
@@ -146,10 +146,22 @@ final class NativeStartupUITests: XCTestCase {
     }
 
     private func snapshot(_ name: String) {
-        let attachment = XCTAttachment(screenshot: application.screenshot())
+        let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         attachment.name = name
         attachment.lifetime = .keepAlways
         add(attachment)
+    }
+
+    private func rotate(_ orientation: UIDeviceOrientation) {
+        XCUIDevice.shared.orientation = orientation
+        let landscape = orientation == .landscapeLeft || orientation == .landscapeRight
+        let settled = NSPredicate { [self] _, _ in
+            let frame = application.frame
+            let image = XCUIScreen.main.screenshot().image.size
+            return (frame.width > frame.height) == landscape && (image.width > image.height) == landscape
+        }
+        expectation(for: settled, evaluatedWith: application)
+        waitForExpectations(timeout: 10)
     }
 
     private func signInFixture(_ scenario: String) {
