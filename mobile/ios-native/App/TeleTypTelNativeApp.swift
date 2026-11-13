@@ -52,8 +52,14 @@ final class NativeStartupModel: ObservableObject {
 }
 
 struct NativeStartupView: View {
+    private struct RestoredInput {
+        let address: String
+        let domain: String
+        let jid: String
+    }
     @StateObject private var model: NativeStartupModel
     @StateObject private var loginModel: NativeLoginModel
+    @StateObject private var savedLogin: NativeSavedLoginModel
     @StateObject private var background = NativeBackgroundController()
     @StateObject private var calls = NativeCallController()
     @State private var selectedContact: NativeContact?
@@ -62,6 +68,8 @@ struct NativeStartupView: View {
     @State private var domain = ""
     @State private var jid = ""
     @State private var password = ""
+    @State private var rememberLogin = false
+    @State private var restoredInput: RestoredInput?
     private let fixtureName: String?
 
     init() {
@@ -71,6 +79,7 @@ struct NativeStartupView: View {
             let fixture = NativeLoginUIFixture(scenario: scenario)
             _model = StateObject(wrappedValue: NativeStartupModel(checker: fixture))
             _loginModel = StateObject(wrappedValue: NativeLoginModel(checker: fixture, authenticator: fixture, connection: fixture))
+            _savedLogin = StateObject(wrappedValue: NativeSavedLoginModel(vault: NativeBiometricLoginVault(enabled: false)))
             _address = State(initialValue: "https://example.invalid")
             _domain = State(initialValue: "localhost")
             fixtureName = scenario
@@ -79,6 +88,7 @@ struct NativeStartupView: View {
         #endif
         _model = StateObject(wrappedValue: NativeStartupModel())
         _loginModel = StateObject(wrappedValue: NativeLoginModel())
+        _savedLogin = StateObject(wrappedValue: NativeSavedLoginModel(vault: NativeBiometricLoginVault()))
         fixtureName = nil
     }
 
@@ -101,6 +111,26 @@ struct NativeStartupView: View {
                         Text("TESTSCENARIO — geen echte serververbinding")
                             .font(.headline)
                             .accessibilityIdentifier("fixture-banner")
+                    }
+                    if savedLogin.hasSavedLogin {
+                        VStack(alignment: .leading, spacing: 12) {
+                            if !loginModel.isConnected {
+                                Button("Aanmelden met Face ID of Touch ID", action: unlockSavedLogin)
+                                    .buttonStyle(.borderedProminent)
+                                    .disabled(loginModel.isWorking || savedLogin.isWorking)
+                                    .accessibilityIdentifier("biometric-login")
+                            }
+                            Button("Bewaarde aanmelding verwijderen", role: .destructive) {
+                                savedLogin.forget()
+                                rememberLogin = false
+                            }
+                            .disabled(savedLogin.isWorking)
+                            .accessibilityIdentifier("forget-saved-login")
+                        }
+                    }
+                    if savedLogin.isWorking { ProgressView("Face ID of Touch ID…") }
+                    if let notice = savedLogin.notice {
+                        Text(notice).font(.footnote).accessibilityIdentifier("saved-login-status")
                     }
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Serveradres (HTTPS)")
@@ -141,6 +171,8 @@ struct NativeStartupView: View {
                         if loginModel.isWorking || loginModel.isConnected {
                             Button(loginModel.isConnected ? "Verbinding verbreken" : "Aanmelding annuleren") {
                                 password = ""
+                                savedLogin.forget()
+                                rememberLogin = false
                                 loginModel.disconnect()
                             }
                             .buttonStyle(.bordered)
@@ -188,19 +220,28 @@ struct NativeStartupView: View {
                                 .accessibilityLabel("Wachtwoord")
                                 .accessibilityIdentifier("login-password")
                                 .disabled(loginModel.isWorking || loginModel.isConnected)
+                            Toggle("Automatisch aanmelden met Face ID of Touch ID", isOn: $rememberLogin)
+                                .accessibilityIdentifier("remember-biometric-login")
+                                .disabled(loginModel.isWorking || savedLogin.isWorking)
+                            Text("Optioneel: bewaar je aanmelding alleen op dit apparaat, beschermd met Face ID of Touch ID. Bij openen vraagt iOS om ontgrendeling. Uitloggen verwijdert deze aanmelding.")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
                             Button("Aanmelden") {
                                 let submittedPassword = password
                                 password = ""
+                                savedLogin.prepare(address: address, domain: domain,
+                                    jid: jid.trimmingCharacters(in: .whitespacesAndNewlines),
+                                    password: submittedPassword, consented: rememberLogin && fixtureName == nil)
                                 loginModel.login(address: address, domain: domain,
                                                  jid: jid.trimmingCharacters(in: .whitespacesAndNewlines), password: submittedPassword)
                             }
                             .buttonStyle(.borderedProminent)
                             .controlSize(.large)
                             .accessibilityIdentifier("login-account")
-                            .disabled(loginModel.isWorking || loginModel.isConnected || jid.isEmpty || password.isEmpty)
+                            .disabled(loginModel.isWorking || loginModel.isConnected || savedLogin.isWorking || jid.isEmpty || password.isEmpty)
                         }
                     }
-                    Text("Aanmelden gebruikt het ingevulde HTTPS-adres. XMPP-inloggegevens blijven alleen in het werkgeheugen om na appwisselen opnieuw te verbinden; uitloggen wist ze. Alleen ‘Bericht verzenden’ stuurt jouw tekst. Pushmeldingen, Google/Facebook en tweestapsverificatie zijn hier nog niet aangesloten.")
+                    Text("Aanmelden gebruikt het ingevulde HTTPS-adres. Zonder toestemming blijven inloggegevens alleen in het werkgeheugen. Biometrisch aanmelden bewaart ze in de beveiligde iOS-sleutelhanger, niet in iCloud. Alleen ‘Bericht verzenden’ stuurt jouw tekst. Pushmeldingen, Google/Facebook en tweestapsverificatie zijn hier nog niet aangesloten.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -222,13 +263,25 @@ struct NativeStartupView: View {
             NativeTotalConversationView(controller: calls)
         }
         .onAppear { calls.attach(loginModel) }
+        .task {
+            if fixtureName == nil, savedLogin.hasSavedLogin, !loginModel.isWorking, !loginModel.isConnected {
+                unlockSavedLogin()
+            }
+        }
         .onChange(of: address) { _ in resetConfiguration() }
         .onChange(of: domain) { _ in resetConfiguration() }
-        .onChange(of: jid) { _ in loginModel.reset() }
-        .onChange(of: loginModel.phase) { calls.synchronize($0) }
+        .onChange(of: jid) { _ in
+            if !matchesRestoredInput { savedLogin.cancel(); loginModel.reset() }
+        }
+        .onChange(of: loginModel.phase) { phase in
+            calls.synchronize(phase)
+            if case .connected(let account) = phase { savedLogin.connected(jid: account) }
+            else if case .failed = phase { savedLogin.cancel() }
+        }
         .onChange(of: scenePhase) { phase in
             if phase == .background {
                 password = ""
+                savedLogin.cancel()
                 model.cancel()
                 background.enter(loginModel)
             } else if phase == .active {
@@ -237,6 +290,7 @@ struct NativeStartupView: View {
         }
         .onDisappear {
             password = ""
+            savedLogin.cancel()
             model.cancel()
             background.stop()
             calls.detach()
@@ -245,9 +299,29 @@ struct NativeStartupView: View {
     }
 
     private func resetConfiguration() {
+        guard !matchesRestoredInput else { return }
+        restoredInput = nil
+        savedLogin.cancel()
         password = ""
         model.reset()
         loginModel.reset()
+    }
+
+    private var matchesRestoredInput: Bool {
+        guard let restored = restoredInput else { return false }
+        return address == restored.address && domain == restored.domain && jid == restored.jid
+    }
+
+    private func unlockSavedLogin() {
+        savedLogin.unlock { value in
+            guard scenePhase == .active, !loginModel.isWorking, !loginModel.isConnected else { return }
+            restoredInput = RestoredInput(address: value.address, domain: value.domain, jid: value.jid)
+            address = value.address
+            domain = value.domain
+            jid = value.jid
+            password = ""
+            loginModel.login(address: value.address, domain: value.domain, jid: value.jid, password: value.password)
+        }
     }
 
     private var contactsView: some View {

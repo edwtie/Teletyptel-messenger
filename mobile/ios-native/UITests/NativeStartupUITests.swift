@@ -51,6 +51,8 @@ final class NativeStartupUITests: XCTestCase {
     func testNativeLoginAndDisconnectPreserveStateAcrossRotation() {
         signInFixture("connected")
         waitForStatus("XMPP verbonden als fixture@localhost")
+        XCTAssertFalse(application.buttons["biometric-login"].exists)
+        XCTAssertFalse(application.buttons["forget-saved-login"].exists)
         let contact = application.descendants(matching: .any)["contact-demo-contact@localhost"].firstMatch
         XCTAssertTrue(contact.waitForExistence(timeout: 5))
         reveal(contact)
@@ -139,6 +141,9 @@ final class NativeStartupUITests: XCTestCase {
         reveal(password)
         password.tap()
         password.typeText("fixture-password")
+        let remember = application.switches["remember-biometric-login"]
+        reveal(remember)
+        XCTAssertEqual(remember.value as? String, "0")
         let login = application.buttons["login-account"]
         reveal(login)
         XCTAssertTrue(login.isEnabled)

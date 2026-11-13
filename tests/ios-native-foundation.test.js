@@ -273,6 +273,23 @@ test("Incoming-call foundation stays bounded and does not enable push or silentl
   assert.deepEqual(mediaCases(calls), mediaCases(previous));
 });
 
+test("Native saved login is opt-in, biometric-bound, revocable and isolated from fixtures", () => {
+  const vault = read("App/NativeBiometricLoginVault.swift");
+  const model = read("Sources/TeleTypTelCore/NativeSavedLogin.swift");
+  const app = read("App/TeleTypTelNativeApp.swift");
+  for (const token of ["kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly", ".biometryCurrentSet",
+    "kSecAttrSynchronizable as String: false", "deviceOwnerAuthenticationWithBiometrics", "context?.invalidate()"])
+    assert.ok(vault.includes(token), token);
+  for (const token of ["if consented", "value.jid == jid", "self.generation == attempt", "candidate = nil", "vault.remove()"])
+    assert.ok(model.includes(token), token);
+  assert.doesNotMatch(model + vault, /UserDefaults|print\(|NSLog|URLSession/);
+  assert.match(app, /consented: rememberLogin && fixtureName == nil/);
+  assert.match(app, /NativeBiometricLoginVault\(enabled: false\)/);
+  assert.match(read("App/Info.plist"), /NSFaceIDUsageDescription/);
+  assert.ok(projectText().project.includes("Core/NativeSavedLogin.swift"));
+  assert.ok(projectText().project.includes("App/NativeBiometricLoginVault.swift"));
+});
+
 test("Native total conversation keeps explicit camera controls", () => {
   const capture = read("App/NativeMediaCapture.swift");
   const media = read("App/NativeCallMedia.swift");

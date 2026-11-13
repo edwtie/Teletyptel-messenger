@@ -5,6 +5,43 @@ Requested scope: the complete iPhone and iPad application, including native UI,
 authentication, messaging and Total Conversation. This is a staged rewrite, not a
 claim that those features already work in this target.
 
+## Current increment: opt-in biometric saved login (2026-11-13)
+
+The native preview now includes an optional Face ID/Touch ID login path. This
+section supersedes the older statements below about Keychain/cold-start login.
+It does not make background calling operational.
+
+- Remembering is off by default. The user must select the biometric-login option
+  during manual login; credentials are saved only after the matching XMPP account
+  is actually connected, not after HTTP authentication alone.
+- iOS biometric authentication is required before saving and unlocking. The
+  Keychain item uses `biometryCurrentSet`,
+  `kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly`, and no iCloud synchronization.
+  Changed biometric enrollment invalidates access. No unprotected password fallback
+  or biometric data is stored by the app.
+- On a later cold launch, an existing saved item starts biometric unlocking.
+  Only after success does the normal HTTPS/account/XMPP login chain run, including
+  certificate verification and server availability checks. Cancellation leaves
+  manual login available; failed unlocks do not loop or silently send credentials.
+- Disconnect/logout removes the saved login. A separate removal button is also
+  available. A failed removal remains visible rather than claiming success.
+  Configuration changes, background entry and cancellation invalidate pending
+  operations; stale results cannot log in or update the UI.
+- Preview credentials use a separate Keychain service. Debug UI fixtures disable
+  the real vault and cannot save or automatically restore test credentials.
+- Swift tests cover payload validation/redaction, opt-in, confirmed matching login,
+  cancellation, successful/failed unlocking, deletion and late results. Source
+  checks are not proof of real Keychain or Face ID operation. Actual enrollment,
+  permission denial, lockout, reboot, logout/relaunch and cancellation require
+  physical iPhone/iPad validation before a signed release. No TestFlight upload,
+  APNs activation or server changes are included.
+
+This foreground-only biometric item must not be reused to bypass authentication
+for locked-screen background calls. That requires a separate scoped and revocable
+call authorization design and server integration.
+
+Reference: [Apple Keychain accessibility](https://developer.apple.com/documentation/security/restricting-keychain-item-accessibility).
+
 ## Implemented in this first stage
 
 ### Concrete native media engine and call lifecycle

@@ -19,5 +19,6 @@
     <key>NSLocalNetworkUsageDescription</key><string>Alleen na jouw opdracht controleert TeleTypTel of de opgegeven lokale chatserver bereikbaar is.</string>
     <key>NSMicrophoneUsageDescription</key><string>TeleTypTel gebruikt de microfoon alleen tijdens een gesprek dat je zelf start of aanneemt.</string>
     <key>NSCameraUsageDescription</key><string>TeleTypTel gebruikt de camera alleen tijdens een videogesprek dat je zelf start of aanneemt.</string>
+    <key>NSFaceIDUsageDescription</key><string>Alleen met jouw toestemming ontgrendelt Face ID je bewaarde aanmelding op dit apparaat. TeleTypTel ontvangt geen gezichtsgegevens.</string>
 </dict>
 </plist>
