@@ -224,6 +224,31 @@ final class NativeLoginModelTests: XCTestCase {
     }
 
     @MainActor
+    func testBackgroundCancellationAllowsHistoryRetryWithoutLateImport() async {
+        let fixture = LoginFixture(holdArchive: true)
+        let model = model(fixture)
+        start(model)
+        await eventually { await fixture.runCount() == 1 }
+        await fixture.ready(0)
+        await fixture.roster(0, state: contacts)
+        await eventually { model.canSend && model.roster == self.contacts }
+        model.loadHistory(for: "peer@localhost")
+        await eventually { await fixture.archiveRequestCount() == 1 }
+        model.beginBackground()
+        XCTAssertEqual(model.historyStates["peer@localhost"], .idle)
+        await fixture.releaseArchives()
+        for _ in 0..<10 { await Task.yield() }
+        XCTAssertTrue(model.chat.messages.isEmpty)
+        model.resume()
+        model.loadHistory(for: "peer@localhost")
+        await eventually { await fixture.archiveRequestCount() == 2 }
+        await fixture.releaseArchives()
+        await eventually { model.historyStates["peer@localhost"] == .ready }
+        XCTAssertEqual(model.chat.messages.count, 1)
+        model.disconnect()
+    }
+
+    @MainActor
     func testChatSendReceiveAndResumePreserveDraftWithoutResending() async {
         let fixture = LoginFixture()
         let model = model(fixture)

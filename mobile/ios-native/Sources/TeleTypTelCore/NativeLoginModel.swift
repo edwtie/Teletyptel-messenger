@@ -104,7 +104,10 @@ public final class NativeLoginModel: ObservableObject {
         }
     }
 
-    public func beginBackground() { isBackground = true }
+    public func beginBackground() {
+        isBackground = true
+        cancelHistory()
+    }
 
     public func loadHistory(for peer: String, refresh: Bool = false) {
         guard canSend, case .connected(let owner) = phase,
@@ -394,12 +397,16 @@ public final class NativeLoginModel: ObservableObject {
         return true
     }
 
-    private func invalidate(clearChat: Bool = true, keepAccount: Bool = false) {
-        generation = UUID()
+    private func cancelHistory() {
         historyRequest = UUID()
         historyTask?.cancel()
         historyTask = nil
         for key in Array(historyStates.keys) where historyStates[key] == .loading { historyStates[key] = .idle }
+    }
+
+    private func invalidate(clearChat: Bool = true, keepAccount: Bool = false) {
+        generation = UUID()
+        cancelHistory()
         providerSigner?.cancel()
         providerSigner = nil
         secondFactor?.session.cancel()

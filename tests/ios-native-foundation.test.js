@@ -264,6 +264,28 @@ test("Native chat and background source guards retain bounded data and honest se
   assert.ok(fs.existsSync(path.join(native, "Tests/TeleTypTelCoreTests/NativeChatTests.swift")));
 });
 
+test("Native MAM history is bounded, correlated and account-bound without local persistence", () => {
+  const archive = read("Sources/TeleTypTelCore/NativeArchive.swift");
+  const chat = read("Sources/TeleTypTelCore/NativeChat.swift");
+  const model = read("Sources/TeleTypTelCore/NativeLoginModel.swift");
+  const transport = read("Sources/TeleTypTelCore/NativeXMPPConnection.swift");
+  for (const required of ['urn:xmpp:mam:2', 'static let maximum = 50', 'queryID', 'boundJID',
+    'bytes <= 524288', 'archiveIDs.contains', 'first == archiveIDs.first', 'last == archiveIDs.last',
+    'from == owner && to == peer', 'from == peer && to == owner', 'NativeArchiveFailure.unstable'])
+    assert.ok(archive.includes(required), required);
+  for (const required of ['page.owner == owner', 'page.peer == peer', 'self.historyRequest == request',
+    'historyTask?.cancel()', 'historyStates.removeAll()', 'cancelHistory()'])
+    assert.ok(model.includes(required), required);
+  for (const required of ['self.archive == nil', '.now() + 15', 'cancellation.isCancelled',
+    'completeArchive(token', 'pending.continuation.resume(with: result)'])
+    assert.ok(transport.includes(required), required);
+  assert.match(chat, /state: archived.outgoing \? \.submitted : \.incoming/);
+  assert.match(chat, /merged\.count > 200/);
+  assert.doesNotMatch(archive + chat + model, /UserDefaults|FileManager|JSONEncoder|NSLog|print\(/);
+  assert.ok(projectText().project.includes('Core/NativeArchive.swift'));
+  assert.ok(read("Tests/TeleTypTelCoreTests/NativeArchiveTests.swift").includes('testTotalByteBudget'));
+});
+
 test("Native rotation tests check visible geometry before requesting a tap point", () => {
   const ui = read("UITests/NativeStartupUITests.swift");
   const helper = ui.slice(ui.indexOf("private func isUsable("), ui.indexOf("private func waitForStatus("));

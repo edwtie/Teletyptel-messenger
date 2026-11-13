@@ -151,6 +151,46 @@ final class NativeArchiveTests: XCTestCase {
         XCTAssertEqual(store.messages.first?.body, "Hallo 👋")
     }
 
+    func testTotalByteBudgetAndStableOrderingOfEqualServerTimestamps() throws {
+        var budget = try query()
+        let padding = "<extra xmlns='urn:fixture'>" + String(repeating: "x", count: 12000) + "</extra>"
+        var rejected = false
+        for index in 0..<50 {
+            let frame = result(budget, id: "large-\(index)", identifier: "m\(index)")
+                .replacingOccurrences(of: "</body>", with: "</body>" + padding)
+            do { _ = try budget.consume(frame) }
+            catch {
+                XCTAssertEqual(error as? NativeArchiveFailure, .invalidResponse)
+                rejected = true
+                break
+            }
+        }
+        XCTAssertTrue(rejected)
+        var ordered = try query()
+        for index in 0..<50 { _ = try ordered.consume(result(ordered, id: "ordered-\(index)", identifier: "m\(index)")) }
+        let page = try XCTUnwrap(ordered.consume(fin(ordered, first: "ordered-0", last: "ordered-49")))
+        var store = NativeChatStore()
+        try store.mergeArchive(page)
+        XCTAssertEqual(store.messages.map(\.stanzaID), (0..<50).map { "m\($0)" })
+        try store.mergeArchive(page)
+        XCTAssertEqual(store.messages.map(\.stanzaID), (0..<50).map { "m\($0)" })
+    }
+
+    func testArchivedPageCannotEvictUncertainSendsOrExceedSessionBound() throws {
+        var store = NativeChatStore()
+        store.setDraft("Onzekere verzending bewaren", peer: peer)
+        let uncertain = try store.enqueue(peer: peer)
+        store.finish(uncertain.id, submitted: false)
+        for index in 0..<199 { store.receive(.message(peer: peer, identifier: "live-\(index)", body: "Live")) }
+        var query = try query()
+        for index in 0..<50 { _ = try query.consume(result(query, id: "archive-\(index)", identifier: "old-\(index)")) }
+        try store.mergeArchive(XCTUnwrap(query.consume(fin(query, first: "archive-0", last: "archive-49"))))
+        XCTAssertEqual(store.messages.count, 200)
+        XCTAssertTrue(store.historyLimited)
+        XCTAssertEqual(store.messages.first(where: { $0.id == uncertain.id })?.state, .uncertain)
+        XCTAssertEqual(store.messages.first(where: { $0.id == uncertain.id })?.body, "Onzekere verzending bewaren")
+    }
+
     func testOnlyOwnerAttributedStableIDsAreUsedForLiveMessages() throws {
         let xml = "<message xmlns='jabber:client' from='peer@localhost/mobile' to='owner@localhost/phone'><body>Hello</body><stanza-id xmlns='urn:xmpp:sid:0' by='owner@localhost' id='stable'/></message>"
         let event = try XCTUnwrap(NativeChatCodec.decode(ProbeXML.parse(xml), owner: owner, boundJID: owner + "/phone"))

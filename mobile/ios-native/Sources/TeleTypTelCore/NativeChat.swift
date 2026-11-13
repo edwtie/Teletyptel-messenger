@@ -168,7 +168,9 @@ public struct NativeChatStore: Equatable {
                     body: archived.body, date: archived.date, state: archived.outgoing ? .submitted : .incoming, archiveID: archived.archiveID))
             }
         }
-        merged.sort { $0.date == $1.date ? $0.id.uuidString < $1.id.uuidString : $0.date < $1.date }
+        merged = merged.enumerated().sorted {
+            $0.element.date == $1.element.date ? $0.offset < $1.offset : $0.element.date < $1.element.date
+        }.map(\.element)
         while merged.count > 200 {
             guard let index = merged.firstIndex(where: { $0.state == .incoming || $0.state == .submitted }) else { throw NativeChatFailure.historyFull }
             merged.remove(at: index)
