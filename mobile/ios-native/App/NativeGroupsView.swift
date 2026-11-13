@@ -128,28 +128,38 @@ private struct NativeGroupChatView: View {
 
 private struct NativeGroupBubble: View {
     let message: NativeGroupText
-    private var background: Color { message.own ? Color(red: 0.86, green: 0.97, blue: 0.92) : Color(uiColor: .secondarySystemBackground) }
+    private var fillColor: Color { message.own ? Color(red: 0.86, green: 0.97, blue: 0.92) : Color(uiColor: .secondarySystemBackground) }
+    private var borderColor: Color { message.own ? Color.green.opacity(0.55) : Color.gray.opacity(0.35) }
+    private var description: String { message.nickname + ": " + message.body + ". " + message.state.label }
     private var indicator: String { message.state == .sending ? "clock" : message.state == .submitted ? "checkmark" : "exclamationmark.circle" }
     var body: some View {
         HStack {
             if message.own { Spacer(minLength: 36) }
-            VStack(alignment: .leading, spacing: 5) {
-                Text(message.nickname).font(.caption.bold())
-                Text(message.body).textSelection(.enabled)
-                HStack(spacing: 5) {
-                    Spacer(minLength: 0)
-                    Text(message.date, style: .time).font(.caption2)
-                    if message.own { Image(systemName: indicator).font(.caption2) }
-                }.foregroundStyle(.secondary)
-            }
+            content
             .foregroundStyle(message.own ? Color.black : Color.primary)
-            .padding(12).background(background, in: RoundedRectangle(cornerRadius: 14))
-            .overlay(RoundedRectangle(cornerRadius: 14).stroke(message.own ? Color.green.opacity(0.55) : Color.gray.opacity(0.35)))
+            .padding(12).background(RoundedRectangle(cornerRadius: 14).fill(fillColor))
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(borderColor, lineWidth: 1))
             .accessibilityElement(children: .combine)
-            .accessibilityLabel(message.nickname + ": " + message.body + ". " + message.state.label)
+            .accessibilityLabel(description)
             .accessibilityIdentifier("group-message-" + message.id.uuidString)
             .contextMenu { Button { UIPasteboard.general.string = message.body } label: { Label("Kopiëren", systemImage: "doc.on.doc") } }
             if !message.own { Spacer(minLength: 36) }
         }
+    }
+
+    private var content: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(message.nickname).font(.caption.bold())
+            Text(message.body).textSelection(.enabled)
+            metadata
+        }
+    }
+
+    private var metadata: some View {
+        HStack(spacing: 5) {
+            Spacer(minLength: 0)
+            Text(message.date, style: .time).font(.caption2)
+            if message.own { Image(systemName: indicator).font(.caption2) }
+        }.foregroundStyle(.secondary)
     }
 }
