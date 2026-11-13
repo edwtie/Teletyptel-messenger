@@ -40,6 +40,17 @@ recovery are still separate migration work.
 No production PHP, authentication policy, APNs configuration or TestFlight release
 is changed by this increment.
 
+Validation of revision `7d7e40a`:
+[unsigned run 43431351085](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43431351085)
+passed Release device compilation/fixture exclusion, 163 Swift tests including ten
+second-factor tests, and all twelve iPhone/iPad UI tests in portrait and
+landscape-left. Fifteen opt-in real-server tests were skipped. The four-profile
+same-host WebRTC loopback remained green. The second-factor UI scenario now checks
+both a rejected fictional code and successful connection after a valid fictional
+code. The initial HTTP fixture exposed missing automatic cookie continuity; this
+was fixed with explicit, origin-bound cookie handling rather than weakening the
+verification test. Real PHP/TOTP and physical-device validation remain required.
+
 ## Current increment: opt-in biometric saved login (2026-11-13)
 
 The native preview now includes an optional Face ID/Touch ID login path. This
