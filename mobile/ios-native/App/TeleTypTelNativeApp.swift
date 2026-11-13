@@ -314,7 +314,7 @@ struct NativeStartupView: View {
 
     private func unlockSavedLogin() {
         savedLogin.unlock { value in
-            guard scenePhase == .active, !loginModel.isWorking, !loginModel.isConnected else { return }
+            guard scenePhase != .background, !loginModel.isWorking, !loginModel.isConnected else { return }
             restoredInput = RestoredInput(address: value.address, domain: value.domain, jid: value.jid)
             address = value.address
             domain = value.domain

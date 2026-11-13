@@ -50,6 +50,7 @@ final class NativeBiometricLoginVault: NativeLoginVault {
             throw Failure.unavailable
         }
         let data = try JSONEncoder().encode(login)
+        context.interactionNotAllowed = true
         var request = query
         request[kSecAttrAccessControl as String] = access
         request[kSecValueData as String] = data
@@ -74,6 +75,7 @@ final class NativeBiometricLoginVault: NativeLoginVault {
             localizedReason: "Ontgrendel je bewaarde TeleTypTel-aanmelding.") else { throw Failure.unavailable }
         try Task.checkCancellation()
         var request = query
+        context.interactionNotAllowed = true
         request[kSecUseAuthenticationContext as String] = context
         request[kSecReturnData as String] = true
         request[kSecMatchLimit as String] = kSecMatchLimitOne
