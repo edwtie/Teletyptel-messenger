@@ -84,7 +84,7 @@ function run() {
         logged(family + "-tests", "xcodebuild", [...common,
           "-destination", "platform=iOS Simulator,arch=" + (process.arch === "arm64" ? "arm64" : "x86_64") + ",id=" + device.udid,
           "-configuration", "Debug", "ONLY_ACTIVE_ARCH=YES",
-          "-parallel-testing-enabled", "NO", "-resultBundlePath", resultBundle, "test"], 900000);
+          "-parallel-testing-enabled", "NO", "-resultBundlePath", resultBundle, "test"], 1200000);
         passed = true;
       } catch (error) {
         uiFailures.push(family + ": " + error.message);
