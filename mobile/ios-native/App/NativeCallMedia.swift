@@ -9,6 +9,8 @@ struct NativeCallPresentation {
     let ownText: String
     let remoteText: String
     let rttReady: Bool
+    let cameraEnabled: Bool
+    let canSwitchCamera: Bool
 }
 
 @MainActor
@@ -137,6 +139,19 @@ final class NativeWebRTCCallMedia: NativeCallMediaDriver {
         if changed { publishPresentation() }
         return changed
     }
+
+    func setCameraEnabled(_ enabled: Bool) -> Bool {
+        guard profile?.hasVideo == true, capture.setCameraEnabled(enabled) else { return false }
+        publishPresentation()
+        return true
+    }
+
+    func switchCamera() async -> Bool {
+        guard profile?.hasVideo == true else { return false }
+        let switched = await capture.switchCamera()
+        publishPresentation()
+        return switched
+    }
     var ownText: String { rtt?.ownText ?? "" }
     var remoteText: String { rtt?.remoteText ?? "" }
 
@@ -197,7 +212,9 @@ final class NativeWebRTCCallMedia: NativeCallMediaDriver {
             remoteVideo: remoteVideo,
             ownText: rtt?.ownText ?? "",
             remoteText: rtt?.remoteText ?? "",
-            rttReady: rtt?.isReady ?? false
+            rttReady: rtt?.isReady ?? false,
+            cameraEnabled: capture.cameraEnabled,
+            canSwitchCamera: capture.canSwitchCamera
         ))
     }
 }

@@ -273,6 +273,18 @@ test("Incoming-call foundation stays bounded and does not enable push or silentl
   assert.deepEqual(mediaCases(calls), mediaCases(previous));
 });
 
+test("Native total conversation keeps explicit camera controls", () => {
+  const capture = read("App/NativeMediaCapture.swift");
+  const media = read("App/NativeCallMedia.swift");
+  const view = read("App/NativeTotalConversationView.swift");
+  assert.match(capture, /func setCameraEnabled\(_ enabled: Bool\)/);
+  assert.match(capture, /func switchCamera\(\) async -> Bool/);
+  assert.match(media, /let cameraEnabled: Bool/);
+  assert.match(media, /let canSwitchCamera: Bool/);
+  assert.match(view, /Camera uitschakelen/);
+  assert.match(view, /Camera wisselen/);
+});
+
 test("CallKit/PushKit sources are included in preview but live registration stays disabled", () => {
   const platform = read("App/NativeCallPlatform.swift");
   const media = read("App/NativeCallMedia.swift");

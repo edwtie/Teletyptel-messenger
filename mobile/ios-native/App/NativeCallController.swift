@@ -230,6 +230,17 @@ final class NativeCallController: ObservableObject {
         isMuted = muted
     }
 
+    func toggleCamera() {
+        guard let enabled = presentation?.cameraEnabled else { return }
+        _ = runtime?.media.setCameraEnabled(!enabled)
+    }
+
+    func switchCamera() {
+        Task { [weak self] in
+            _ = await self?.runtime?.media.switchCamera()
+        }
+    }
+
     func endCall() {
         guard let id = runtime?.platform.coordinator.currentHandle?.id else { return }
         _ = runtime?.platform.coordinator.end(id: id)

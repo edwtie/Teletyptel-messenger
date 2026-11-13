@@ -36,6 +36,19 @@ struct NativeTotalConversationView: View {
                             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
                             .accessibilityLabel("Eigen camerabeeld")
                     }
+                    if presentation.profile.hasVideo, presentation.canSwitchCamera {
+                        Button(action: controller.switchCamera) {
+                            Image(systemName: "arrow.triangle.2.circlepath.camera.fill")
+                                .font(.system(size: 22, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .frame(width: 52, height: 52)
+                                .background(Color.black.opacity(0.62), in: Circle())
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.top, 78)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                        .accessibilityLabel("Camera wisselen")
+                    }
                 }
                 .background(Color(red: 0.02, green: 0.06, blue: 0.12))
                 .ignoresSafeArea(edges: .bottom)
@@ -148,6 +161,12 @@ struct NativeTotalConversationView: View {
 
     private func controls(_ presentation: NativeCallPresentation) -> some View {
         HStack(spacing: 14) {
+            if presentation.profile.hasVideo {
+                callButton(symbol: presentation.cameraEnabled ? "video.fill" : "video.slash.fill",
+                           color: presentation.cameraEnabled ? .green : .red,
+                           label: presentation.cameraEnabled ? "Camera uitschakelen" : "Camera inschakelen",
+                           action: controller.toggleCamera)
+            }
             callButton(symbol: controller.isMuted ? "mic.slash.fill" : "mic.fill",
                        color: controller.isMuted ? .red : .green,
                        label: controller.isMuted ? "Microfoon inschakelen" : "Microfoon dempen",
