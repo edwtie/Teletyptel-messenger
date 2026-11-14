@@ -259,17 +259,19 @@ final class NativeStartupUITests: XCTestCase {
         XCTAssertTrue(room.waitForExistence(timeout: 5)); reveal(room); room.tap()
         application.buttons["Deelnemers en groepsmenu"].tap(); application.buttons["Deelnemers en groepsbeheer"].tap()
         let settings = application.buttons["Instellingen ophalen"]
-        XCTAssertTrue(settings.waitForExistence(timeout: 5)); reveal(settings); settings.tap()
+        reveal(settings); XCTAssertTrue(settings.waitForExistence(timeout: 5)); settings.tap()
         let name = application.textFields["Groepsnaam"]
-        XCTAssertTrue(name.waitForExistence(timeout: 5)); reveal(name); name.tap(); name.typeText(" gewijzigd")
+        reveal(name); XCTAssertTrue(name.waitForExistence(timeout: 5)); name.tap(); name.typeText(" gewijzigd")
         let save = application.buttons["Groepsinstellingen opslaan"]; reveal(save); save.tap()
         application.buttons["Wijziging uitvoeren"].tap()
         let status = application.staticTexts["group-management-status"]
+        reveal(status)
         expectation(for: NSPredicate(format: "label CONTAINS %@", "Wijziging bevestigd"), evaluatedWith: status); waitForExpectations(timeout: 5)
         snapshot("group-settings-confirmed")
         application.buttons["close-group-management"].tap()
         application.buttons["Deelnemers en groepsmenu"].tap(); application.buttons["Berichten zoeken"].tap()
-        let search = application.textFields["group-search"]; XCTAssertTrue(search.waitForExistence(timeout: 5)); search.tap(); search.typeText("onvindbaar")
+        let search = application.textFields["group-search"]; XCTAssertTrue(search.waitForExistence(timeout: 5)); reveal(search); search.tap()
+        XCTAssertTrue(application.keyboards.firstMatch.waitForExistence(timeout: 5)); search.typeText("onvindbaar")
         XCTAssertFalse(application.staticTexts["Fictief groepsbericht"].exists)
     }
 

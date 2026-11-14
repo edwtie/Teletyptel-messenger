@@ -68,13 +68,14 @@ private struct NativeGroupChatView: View {
     @State private var showInvite = false
     @State private var searching = false
     @State private var search = ""
+    @FocusState private var searchFocused: Bool
     private var group: NativeGroupConversation? { model.rooms.first { $0.room == room } }
 
     var body: some View {
         VStack(spacing: 0) {
             if let group = group {
                 status(group)
-                if searching { TextField("Zoek in deze groepssessie", text: $search).padding(8).accessibilityIdentifier("group-search") }
+                if searching { TextField("Zoek in deze groepssessie", text: $search).focused($searchFocused).frame(minHeight: 44).padding(.horizontal, 8).accessibilityIdentifier("group-search") }
                 messageList(group)
                 if let error = model.error { Text(error).font(.caption).foregroundStyle(.red).padding(4) }
                 composer(group)
@@ -87,7 +88,11 @@ private struct NativeGroupChatView: View {
                     .disabled(group?.snapshot?.canSpeak != true).accessibilityLabel("Contact uitnodigen").accessibilityIdentifier("group-invite")
                 Menu {
                     Button { showParticipants = true } label: { Label("Deelnemers en groepsbeheer", systemImage: "person.3") }
-                    Button { searching.toggle(); if !searching { search = "" } } label: { Label("Berichten zoeken", systemImage: "magnifyingglass") }
+                    Button {
+                        searching.toggle()
+                        if !searching { search = ""; searchFocused = false }
+                        else { Task { await Task.yield(); searchFocused = true } }
+                    } label: { Label("Berichten zoeken", systemImage: "magnifyingglass") }
                 } label: { Image(systemName: "person.3").frame(width: 44, height: 44) }.accessibilityLabel("Deelnemers en groepsmenu")
                 Button { model.leave(room: room) } label: { Image(systemName: "rectangle.portrait.and.arrow.right").frame(width: 44, height: 44) }
                     .tint(.red).accessibilityLabel("Groep verlaten").accessibilityIdentifier("group-leave")
