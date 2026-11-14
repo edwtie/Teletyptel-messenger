@@ -11,7 +11,7 @@ const coreFiles = ["Startup.swift", "XMPPProbeStream.swift", "XMPPAvailabilityCl
 const appFiles = ["App/TeleTypTelNativeApp.swift", "App/NativeInvitationViews.swift", "App/NativeGroupsView.swift", "App/NativeProviderSDK.swift", "App/NativeTranslationView.swift", "App/NativeBiometricLoginVault.swift", "App/NativeChatView.swift", "App/NativeBackgroundController.swift", "App/NativeCallPlatform.swift", "App/NativeCallMedia.swift", "App/NativeCallController.swift", "App/NativeTotalConversationView.swift", "App/NativeMediaCapture.swift", "App/NativeMediaPeer.swift", "App/NativeActivePeerNegotiating.swift", "App/NativeIncomingPeerNegotiator.swift", "App/NativeOutgoingPeerNegotiator.swift"];
 const mediaFiles = ["NativeT140Session.swift", "NativeWebRTCChannel.swift"];
 coreFiles.push("NativeGroupManagement.swift", "NativeAccountFeatures.swift");
-appFiles.push("App/NativeGroupManagementView.swift", "App/NativeAccountSettingsView.swift", "App/NativeAttachmentsView.swift", "App/NativeFeatureFixture.swift");
+appFiles.push("App/NativeGroupManagementView.swift", "App/NativeAccountSettingsView.swift", "App/NativeAttachmentsView.swift", "App/NativeFeatureFixture.swift", "App/NativeWebStyle.swift");
 
 function projectText() {
   const objects = new Map();

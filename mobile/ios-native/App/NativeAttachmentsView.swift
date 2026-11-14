@@ -9,7 +9,8 @@ struct NativeAttachmentButton: View {
     let stage: (String) -> Void
     @State private var show = false
     var body: some View {
-        Button { show = true } label: { Image(systemName: "paperclip").frame(width: 40, height: 44) }
+        Button { show = true } label: { Image(systemName: "plus").frame(width: 40, height: 44) }
+            .buttonStyle(NativeWebIconStyle(round: true))
             .accessibilityLabel("Foto of bestand toevoegen").accessibilityIdentifier("attachment-picker")
             .disabled(!login.canSend || login.activeWebSession == nil)
             .sheet(isPresented: $show) { NativeAttachmentPicker(login: login, stage: stage) }
@@ -58,6 +59,7 @@ private struct NativeAttachmentPicker: View {
                     } label: { Label("Link in bericht plaatsen", systemImage: "plus.message") }.accessibilityIdentifier("attachment-stage")
                 }
             }
+            .nativeWebForm()
             .navigationTitle("Bijlage")
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button { dismiss() } label: { Image(systemName: "xmark").frame(width: 44, height: 44) }.accessibilityLabel("Sluiten") } }
         }

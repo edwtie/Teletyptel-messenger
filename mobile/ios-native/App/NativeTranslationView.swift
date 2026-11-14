@@ -71,6 +71,7 @@ struct NativeTranslationSettingsView: View {
                     .disabled(saving || !model.ready || (preferences.mode != "off" && !consent))
                 }
             }
+            .nativeWebForm()
             .navigationTitle("Vertaling")
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Gereed") { dismiss() } } }
             .onAppear { preferences = model.preferences; consent = model.sharingConsent }
@@ -89,6 +90,8 @@ struct NativeMessengerView: View {
     @State private var showTranslation = false
     @State private var showGroups = false
     @State private var showAccount = false
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     private var contacts: [NativeContact] {
         guard case .ready(let contacts) = model.roster else { return [] }
@@ -98,16 +101,17 @@ struct NativeMessengerView: View {
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             VStack(spacing: 0) {
-                HStack {
-                    Image("TeleTypTelLogo").resizable().scaledToFit().frame(maxWidth: 190, maxHeight: 36)
-                    Spacer()
-                    Button(action: logout) { Image(systemName: "rectangle.portrait.and.arrow.right").frame(width: 44, height: 44) }
-                        .accessibilityLabel("Uitloggen").accessibilityIdentifier("disconnect-session")
-                }.padding(.horizontal).padding(.top, 12)
-                Text(model.isConnected ? "XMPP verbonden" : "Opnieuw verbinden…")
-                    .font(.caption).foregroundStyle(.secondary)
-                    .accessibilityLabel(connectionStatus)
-                    .accessibilityIdentifier("startup-status")
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Contacten en groepen").font(NativeWebStyle.font())
+                    HStack(spacing: 8) {
+                        Image(systemName: "magnifyingglass").foregroundStyle(NativeWebStyle.muted)
+                        TextField("Contacten zoeken", text: $search).textFieldStyle(.plain)
+                            .accessibilityLabel("Contacten zoeken")
+                    }
+                    .padding(.horizontal, 10).frame(minHeight: 44)
+                    .background(NativeWebStyle.panel, in: RoundedRectangle(cornerRadius: 8))
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(NativeWebStyle.line, lineWidth: 1))
+                }.padding(12)
                 NativeInvitationNotice(model: model.groups.invitationModel) { showGroups = true }
                 List(selection: $selected) {
                     switch model.roster {
@@ -124,46 +128,67 @@ struct NativeMessengerView: View {
                     }
                     ForEach(contacts) { contact in
                         NavigationLink(value: contact.jid) {
-                            HStack(spacing: 12) {
-                                Text(String(contact.displayName.prefix(2)).uppercased())
-                                    .font(.subheadline.bold()).foregroundStyle(.white)
-                                    .frame(width: 44, height: 44).background(.blue, in: Circle())
+                            HStack(spacing: 8) {
+                                NativeWebAvatar(name: contact.displayName)
                                 VStack(alignment: .leading, spacing: 4) {
-                                    Text(contact.displayName).font(.headline)
-                                    Text(contact.presence.label).font(.caption).foregroundStyle(.secondary)
+                                    Text(contact.displayName).font(NativeWebStyle.font(14, weight: .bold)).lineLimit(1)
                                     if let last = model.chat.messages.last(where: { $0.peer == contact.jid }) {
-                                        Text(last.body).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
-                                    }
+                                        Text(last.body).font(NativeWebStyle.font(13)).lineLimit(1)
+                                    } else { Text(contact.presence.label).font(NativeWebStyle.font(13)) }
                                 }
-                                Spacer()
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                if let last = model.chat.messages.last(where: { $0.peer == contact.jid }) {
+                                    Text(last.date, style: .time).font(NativeWebStyle.font(10)).lineLimit(1)
+                                }
+                                Circle().fill(presenceColor(contact.presence)).frame(width: 10, height: 10)
+                                    .accessibilityLabel(contact.presence.label)
                             }
-                            .padding(.vertical, 6)
+                            .foregroundStyle(selected == contact.jid ? Color.white : NativeWebStyle.muted)
+                            .padding(.horizontal, 10).padding(.vertical, 10)
+                            .background(selected == contact.jid ? NativeWebStyle.accent : NativeWebStyle.button, in: RoundedRectangle(cornerRadius: 6))
                             .accessibilityElement(children: .combine)
                             .accessibilityIdentifier("contact-" + contact.jid)
                         }
+                        .listRowInsets(EdgeInsets(top: 0, leading: 12, bottom: 6, trailing: 12))
+                        .listRowSeparator(.hidden).listRowBackground(Color.clear)
+                    }
+                    ForEach(model.groups.rooms.filter { search.isEmpty || $0.room.localizedCaseInsensitiveContains(search) }) { group in
+                        NavigationLink(value: group.room) {
+                            HStack(spacing: 8) {
+                                NativeWebAvatar(name: group.room)
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(group.room.components(separatedBy: "@")[0]).font(NativeWebStyle.font(14, weight: .bold)).lineLimit(1)
+                                    Text(group.messages.last?.body ?? "Groep").font(NativeWebStyle.font(13)).lineLimit(1)
+                                }.frame(maxWidth: .infinity, alignment: .leading)
+                                Circle().fill(Color.blue).frame(width: 10, height: 10).accessibilityLabel("Groep")
+                            }.padding(10)
+                                .foregroundStyle(selected == group.room ? Color.white : NativeWebStyle.muted)
+                                .background(selected == group.room ? NativeWebStyle.accent : NativeWebStyle.button, in: RoundedRectangle(cornerRadius: 6))
+                        }
+                        .listRowInsets(EdgeInsets(top: 0, leading: 12, bottom: 6, trailing: 12))
+                        .listRowSeparator(.hidden).listRowBackground(Color.clear)
                     }
                 }
-                .searchable(text: $search, prompt: "Contacten zoeken")
-                .listStyle(.sidebar)
-            }
-            .navigationTitle("Contacten en groepen")
-            .navigationBarTitleDisplayMode(.inline)
-            .navigationSplitViewColumnWidth(min: 260, ideal: 300, max: 360)
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
+                .listStyle(.plain).scrollContentBackground(.hidden)
+                HStack {
+                    Spacer()
                     Menu {
-                        Button { showGroups = true } label: { Label("Groepschats", systemImage: "person.3.fill") }
-                            .accessibilityIdentifier("open-groups")
-                        Button { showAccount = true } label: { Label("Accountinstellingen", systemImage: "person.crop.circle") }.accessibilityIdentifier("open-account-settings")
-                        Button { showTranslation = true } label: { Label("Vertaling", systemImage: "globe") }
-                        Button(action: logout) { Label("Uitloggen", systemImage: "rectangle.portrait.and.arrow.right") }
-                    } label: { Image(systemName: "line.3.horizontal").frame(width: 44, height: 44) }
-                    .accessibilityLabel("Hoofdmenu")
-                }
+                        Button { showGroups = true } label: { Label("Groepschats openen of maken", systemImage: "person.3") }
+                    } label: { Image(systemName: "plus").frame(width: 52, height: 52) }
+                        .buttonStyle(NativeWebIconStyle(prominent: true, round: true))
+                        .accessibilityLabel("Contacten en groepen toevoegen")
+                }.padding(12)
             }
+            .background(NativeWebStyle.panel).foregroundStyle(NativeWebStyle.text)
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar(.hidden, for: .navigationBar)
+            .navigationSplitViewColumnWidth(min: 260, ideal: 300, max: 360)
         } detail: {
             if let contact = contacts.first(where: { $0.jid == selected }) {
                 NativeChatView(model: model, calls: calls, translation: translation, contact: contact, onClose: { selected = nil })
+            } else if let room = model.groups.rooms.first(where: { $0.room == selected }) {
+                NativeGroupChatView(model: model.groups, room: room.room, login: model, translation: translation)
             } else {
                 GeometryReader { geometry in
                     Image(geometry.size.width > geometry.size.height ? "ChatBackgroundWide" : "ChatBackground")
@@ -173,9 +198,50 @@ struct NativeMessengerView: View {
             }
         }
         .navigationSplitViewStyle(.balanced)
+        .font(NativeWebStyle.font()).tint(NativeWebStyle.accent)
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if verticalSizeClass != .compact || selected == nil { brandHeader }
+        }
         .sheet(isPresented: $showGroups) { NativeGroupsView(model: model.groups, login: model, translation: translation) }
         .sheet(isPresented: $showAccount) { NativeAccountSettingsView(login: model, translation: translation) }
         .sheet(isPresented: $showTranslation) { NativeTranslationSettingsView(model: translation) }
+    }
+
+    private var brandHeader: some View {
+        HStack(spacing: 12) {
+            Image("TeleTypTelLogo").resizable().scaledToFit().frame(maxWidth: 190, maxHeight: 38).accessibilityLabel("TeleTypTel")
+            Text(model.isConnected ? "XMPP connected" : "Opnieuw verbinden…")
+                .font(NativeWebStyle.font(10)).foregroundStyle(NativeWebStyle.muted).lineLimit(2)
+                .accessibilityLabel(connectionStatus).accessibilityIdentifier("startup-status")
+            Spacer(minLength: 0)
+            if horizontalSizeClass == .regular {
+                Button(action: logout) { Image(systemName: "rectangle.portrait.and.arrow.right") }
+                    .buttonStyle(NativeWebIconStyle(destructive: true))
+                    .accessibilityLabel("Uitloggen").accessibilityIdentifier("disconnect-session")
+            }
+            Menu {
+                Button { showGroups = true } label: { Label("Groepschats", systemImage: "person.3") }.accessibilityIdentifier("open-groups")
+                Button { showAccount = true } label: { Label("Accountinstellingen", systemImage: "person.crop.circle") }.accessibilityIdentifier("open-account-settings")
+                Button { showTranslation = true } label: { Label("Vertaling", systemImage: "globe") }
+                Button(action: logout) { Label("Uitloggen", systemImage: "rectangle.portrait.and.arrow.right") }.accessibilityIdentifier("menu-logout")
+            } label: { Image(systemName: "line.3.horizontal") }
+                .buttonStyle(NativeWebIconStyle()).accessibilityLabel("Hoofdmenu")
+        }
+        .padding(.horizontal, 14).padding(.vertical, 8)
+        .frame(maxWidth: .infinity, minHeight: 58)
+        .background(NativeWebStyle.panel)
+        .overlay(alignment: .bottom) { NativeWebStyle.line.frame(height: 1) }
+        .accessibilityIdentifier("messenger-brand-header")
+    }
+
+    private func presenceColor(_ presence: NativeContactPresence) -> Color {
+        switch presence {
+        case .online: return .green
+        case .offline: return .red
+        case .away, .extendedAway: return .orange
+        case .busy: return .red
+        case .unknown: return .gray
+        }
     }
 
     private var connectionStatus: String {

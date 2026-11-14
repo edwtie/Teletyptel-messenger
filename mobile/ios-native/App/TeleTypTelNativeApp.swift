@@ -4,7 +4,7 @@ import SwiftUI
 struct TeleTypTelNativeApp: App {
     @UIApplicationDelegateAdaptor(NativeProviderAppDelegate.self) private var providerDelegate
     var body: some Scene {
-        WindowGroup { NativeStartupView() }
+        WindowGroup { NativeStartupView().font(NativeWebStyle.font()).tint(NativeWebStyle.accent) }
     }
 }
 
@@ -107,11 +107,11 @@ struct NativeStartupView: View {
                         .frame(maxWidth: 300)
                         .accessibilityLabel("TeleTypTel")
                         .frame(maxWidth: .infinity)
-                    Text("Native iPhone- en iPad-app")
-                        .font(.title2.bold())
+                    Text("Aanmelden")
+                        .font(NativeWebStyle.font(28, weight: .bold))
                         .accessibilityAddTraits(.isHeader)
-                    Text("Ontwikkelversie: XMPP-aanmelding, contacten, één-op-één tekstchat en native inkomende en uitgaande Total Conversation. Pushmeldingen en opgeslagen geschiedenis volgen nog.")
-                        .foregroundStyle(.secondary)
+                    Text("Gebruik je XMPP-account om je aan te melden bij TeleTypTel.")
+                        .foregroundStyle(NativeWebStyle.muted)
                     if fixtureName != nil {
                         Text("TESTSCENARIO — geen echte serververbinding")
                             .font(.headline)
@@ -200,7 +200,8 @@ struct NativeStartupView: View {
                     }
                     .padding()
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
+                    .background(NativeWebStyle.incoming, in: RoundedRectangle(cornerRadius: 8))
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(NativeWebStyle.line, lineWidth: 1))
                     if loginModel.isConnected {
                         contactsView
                     }
@@ -287,7 +288,8 @@ struct NativeStartupView: View {
                 .padding(24)
                 .frame(maxWidth: .infinity)
             }
-            .navigationTitle("TeleTypTel Native")
+            .background(NativeWebStyle.panel).foregroundStyle(NativeWebStyle.text)
+            .navigationTitle("TeleTypTel")
             .navigationBarTitleDisplayMode(.inline)
             .scrollDismissesKeyboard(.interactively)
         }

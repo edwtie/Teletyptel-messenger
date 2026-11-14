@@ -46,6 +46,7 @@ struct NativeGroupsView: View {
                 }
                 NativeRoomDiscovery(model: model.management) { room = $0 }
             }
+            .nativeWebForm()
             .navigationTitle("Groepschats")
             .toolbar { ToolbarItem(placement: .cancellationAction) {
                 Button { dismiss() } label: { Image(systemName: "xmark").frame(width: 44, height: 44) }.accessibilityLabel("Sluiten")
@@ -58,7 +59,7 @@ struct NativeGroupsView: View {
     }
 }
 
-private struct NativeGroupChatView: View {
+struct NativeGroupChatView: View {
     @ObservedObject var model: NativeGroupModel
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     let room: String
@@ -82,6 +83,10 @@ private struct NativeGroupChatView: View {
             }
         }
         .navigationTitle(room.components(separatedBy: "@")[0]).navigationBarTitleDisplayMode(.inline)
+        .toolbar(.visible, for: .navigationBar)
+        .toolbarBackground(NativeWebStyle.panel, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .font(NativeWebStyle.font()).foregroundStyle(NativeWebStyle.text)
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 Button { showInvite = true } label: { Image(systemName: "person.badge.plus").frame(width: 44, height: 44) }
@@ -150,17 +155,18 @@ private struct NativeGroupChatView: View {
     }
 
     private func composer(_ group: NativeGroupConversation) -> some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 6) {
             if let login = login { NativeAttachmentButton(login: login) { link in
                 let draft = self.group?.draft ?? ""
                 model.setDraft(draft.isEmpty ? link : draft + "\n" + link, room: room)
             }.disabled(group.snapshot?.canSpeak != true) }
             TextField("Typ een groepsbericht", text: Binding(get: { self.group?.draft ?? "" }, set: { model.setDraft($0, room: room) }), axis: .vertical)
                 .lineLimit(1...4).accessibilityIdentifier("group-draft")
-            Button { model.send(room: room) } label: { Image(systemName: "paperplane.fill").frame(width: 44, height: 44) }
+            Button { model.send(room: room) } label: { Image(systemName: "paperplane").frame(width: 44, height: 44) }
+                .buttonStyle(NativeWebIconStyle(prominent: true, round: true))
                 .disabled(!model.available || group.snapshot?.canSpeak != true || group.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 .accessibilityLabel("Groepsbericht verzenden").accessibilityIdentifier("group-send")
-        }.padding(.horizontal, 12).padding(.vertical, verticalSizeClass == .compact ? 4 : 12).background(.background)
+        }.nativeWebComposer().padding(.horizontal, 10).padding(.vertical, verticalSizeClass == .compact ? 4 : 10)
     }
 }
 
@@ -168,22 +174,24 @@ private struct NativeGroupBubble: View {
     let message: NativeGroupText
     var translation: NativeTranslationModel? = nil
     var session: NativeAccountWebSession? = nil
-    private var fillColor: Color { message.own ? Color(red: 0.86, green: 0.97, blue: 0.92) : Color(uiColor: .secondarySystemBackground) }
-    private var borderColor: Color { message.own ? Color.green.opacity(0.55) : Color.gray.opacity(0.35) }
+    private var fillColor: Color { message.own ? NativeWebStyle.outgoing : NativeWebStyle.incoming }
+    private var borderColor: Color { message.own ? NativeWebStyle.outgoingLine : NativeWebStyle.incomingLine }
     private var description: String { message.nickname + ": " + message.body + ". " + message.state.label }
     private var indicator: String { message.state == .sending ? "clock" : message.state == .submitted ? "checkmark" : "exclamationmark.circle" }
     var body: some View {
         HStack {
             if message.own { Spacer(minLength: 36) }
+            else { NativeWebAvatar(name: message.nickname, size: 30) }
             content
-            .foregroundStyle(message.own ? Color.black : Color.primary)
-            .padding(12).background(RoundedRectangle(cornerRadius: 14).fill(fillColor))
-            .overlay(RoundedRectangle(cornerRadius: 14).stroke(borderColor, lineWidth: 1))
+            .foregroundStyle(NativeWebStyle.text)
+            .padding(.horizontal, 10).padding(.vertical, 8).background(NativeWebBubble(own: message.own).fill(fillColor))
+            .overlay(NativeWebBubble(own: message.own).stroke(borderColor, lineWidth: 1))
             .accessibilityElement(children: .combine)
             .accessibilityLabel(description)
             .accessibilityIdentifier("group-message-" + message.id.uuidString)
             .contextMenu { Button { UIPasteboard.general.string = message.body } label: { Label("Kopiëren", systemImage: "doc.on.doc") } }
             if !message.own { Spacer(minLength: 36) }
+            else { NativeWebAvatar(name: message.nickname, size: 30) }
         }
     }
 

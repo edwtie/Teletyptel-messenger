@@ -64,6 +64,7 @@ struct NativeGroupManagementView: View {
                 if model.room == room, let status = model.status { Text(status).font(.caption).accessibilityIdentifier("group-management-status") }
                 Text("De server controleert alle rechten. Verwijderen uit het gesprek is niet hetzelfde als een lidmaatschap intrekken of blokkeren. Eigenarenoverdracht en de groep vernietigen zijn hier bewust niet beschikbaar.").font(.caption)
             }
+            .nativeWebForm()
             .navigationTitle("Groepsbeheer")
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button { dismiss() } label: { Image(systemName: "xmark").frame(width: 44, height: 44) }.accessibilityLabel("Sluiten").accessibilityIdentifier("close-group-management") } }
         }

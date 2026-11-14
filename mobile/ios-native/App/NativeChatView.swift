@@ -18,7 +18,7 @@ struct NativeChatView: View {
 
     var body: some View {
             VStack(spacing: 0) {
-                if verticalSizeClass != .compact || !model.isConnected {
+                if !model.isConnected {
                     Text(model.isConnected ? "Verbonden · één-op-één chat" : "Niet verbonden · tekst blijft in deze sessie bewaard")
                         .font(.caption).foregroundStyle(.secondary).padding(6)
                         .accessibilityIdentifier("chat-connection")
@@ -70,20 +70,33 @@ struct NativeChatView: View {
             .navigationTitle(contact.displayName)
             .navigationBarTitleDisplayMode(.inline)
             .navigationBarBackButtonHidden(true)
-            .toolbarBackground(Color(uiColor: .systemBackground), for: .navigationBar)
+            .toolbar(.visible, for: .navigationBar)
+            .font(NativeWebStyle.font())
+            .foregroundStyle(NativeWebStyle.text)
+            .toolbarBackground(NativeWebStyle.panel, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button { onClose?(); dismiss() } label: {
                         Image(systemName: "arrow.left").frame(width: 44, height: 44)
-                    }.accessibilityLabel("Terug naar contacten").accessibilityIdentifier("chat-back")
+                    }.buttonStyle(NativeWebIconStyle()).accessibilityLabel("Terug naar contacten").accessibilityIdentifier("chat-back")
+                }
+                ToolbarItem(placement: .principal) {
+                    HStack(spacing: 8) {
+                        NativeWebAvatar(name: contact.displayName)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(contact.displayName).font(NativeWebStyle.font(16, weight: .bold)).lineLimit(1)
+                            Text(contact.presence.label).font(NativeWebStyle.font(12)).foregroundStyle(NativeWebStyle.muted)
+                        }
+                    }.accessibilityElement(children: .combine)
                 }
                 ToolbarItem(placement: .primaryAction) {
                     HStack(spacing: 10) {
                         Button { startCall(.total) } label: {
                             NativeTotalConversationSymbol().fill(.white).frame(width: 26, height: 26)
-                                .frame(width: 44, height: 44).background(.blue, in: RoundedRectangle(cornerRadius: 12))
+                                .frame(width: 44, height: 44)
                         }
+                        .buttonStyle(NativeWebIconStyle(prominent: true))
                         .disabled(contact.callEndpoint == nil || calls.status != .idle)
                         .accessibilityLabel("Totale conversatie starten")
                         Menu {
@@ -93,7 +106,8 @@ struct NativeChatView: View {
                             Button { showTranslation = true } label: { Label("Vertaling", systemImage: "globe") }
                             Button { model.loadHistory(for: contact.jid, refresh: true) } label: { Label("Geschiedenis ophalen", systemImage: "clock.arrow.circlepath") }
                                 .disabled(!model.canSend || model.historyStates[contact.jid] == .loading)
-                        } label: { Image(systemName: "ellipsis").frame(width: 44, height: 44) }
+                        } label: { Image(systemName: "ellipsis").rotationEffect(.degrees(90)) }
+                        .buttonStyle(NativeWebIconStyle())
                         .accessibilityLabel("Gespreksmenu")
                     }
                 }
@@ -158,11 +172,10 @@ struct NativeChatView: View {
                     }
                 }.foregroundStyle(incoming ? Color.secondary : Color(red: 0.25, green: 0.37, blue: 0.4))
             }
-            .foregroundStyle(incoming ? Color.primary : Color.black)
-            .padding(12)
-            .background(incoming ? Color(uiColor: .secondarySystemBackground) : Color(red: 0.86, green: 0.97, blue: 0.92),
-                        in: RoundedRectangle(cornerRadius: 15))
-            .overlay(RoundedRectangle(cornerRadius: 15).stroke(incoming ? Color.gray.opacity(0.35) : Color.green.opacity(0.55), lineWidth: 1))
+            .foregroundStyle(NativeWebStyle.text)
+            .padding(.horizontal, 10).padding(.vertical, 8)
+            .background(NativeWebBubble(own: !incoming).fill(incoming ? NativeWebStyle.incoming : NativeWebStyle.outgoing))
+            .overlay(NativeWebBubble(own: !incoming).stroke(incoming ? NativeWebStyle.incomingLine : NativeWebStyle.outgoingLine, lineWidth: 1))
             .accessibilityElement(children: .combine)
             .accessibilityLabel(accessibleMessage(message))
             .accessibilityIdentifier("chat-message-" + message.id.uuidString)
@@ -174,12 +187,12 @@ struct NativeChatView: View {
                 }
             }
             if incoming { Spacer(minLength: 36) }
+            else { NativeWebAvatar(name: "Ik", size: 30) }
         }
     }
 
     private var avatar: some View {
-        Text(String(contact.displayName.prefix(2)).uppercased()).font(.caption.bold()).foregroundStyle(.white)
-            .frame(width: 30, height: 30).background(.blue, in: Circle()).accessibilityHidden(true)
+        NativeWebAvatar(name: contact.displayName, size: 30)
     }
 
     private func accessibleMessage(_ message: NativeChatMessage) -> String {
@@ -194,24 +207,25 @@ struct NativeChatView: View {
         HStack(alignment: .bottom, spacing: 8) {
             NativeAttachmentButton(login: model) { link in model.setDraft(draft.isEmpty ? link : draft + "\n" + link, peer: contact.jid) }
             Button { showEmoji.toggle() } label: { Image(systemName: "face.smiling").frame(width: 40, height: 44) }
+                .buttonStyle(NativeWebIconStyle(round: true))
                 .accessibilityLabel("Emoji")
             TextField("Typ een bericht", text: Binding(get: { draft }, set: { model.setDraft($0, peer: contact.jid) }), axis: .vertical)
                 .lineLimit(1...5).textFieldStyle(.plain).padding(.vertical, 12)
                 .accessibilityLabel("Bericht").accessibilityIdentifier("chat-draft")
             if draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 Button { startCall(.video) } label: { Image(systemName: "video").frame(width: 40, height: 44) }
+                    .buttonStyle(NativeWebIconStyle(round: true))
                     .accessibilityLabel("Videogesprek starten").disabled(contact.callEndpoint == nil || calls.status != .idle)
                 Button { startCall(.audio) } label: { Image(systemName: "mic").frame(width: 40, height: 44) }
+                    .buttonStyle(NativeWebIconStyle(round: true))
                     .accessibilityLabel("Audiogesprek starten").disabled(contact.callEndpoint == nil || calls.status != .idle)
             } else {
-                Button { model.sendDraft(to: contact.jid) } label: { Image(systemName: "paperplane.fill").frame(width: 44, height: 44) }
+                Button { model.sendDraft(to: contact.jid) } label: { Image(systemName: "paperplane").frame(width: 44, height: 44) }
+                    .buttonStyle(NativeWebIconStyle(prominent: true, round: true))
                     .accessibilityLabel("Bericht verzenden").accessibilityIdentifier("chat-send").disabled(!model.canSend)
             }
         }
-        .foregroundStyle(Color(red: 0.12, green: 0.24, blue: 0.39))
-        .padding(.horizontal, 8).padding(.vertical, 4)
-        .background(.background, in: RoundedRectangle(cornerRadius: 28))
-        .shadow(color: .black.opacity(0.12), radius: 5, y: 2)
+        .nativeWebComposer()
         .padding(.horizontal, 10).padding(.vertical, verticalSizeClass == .compact ? 4 : 10)
     }
 

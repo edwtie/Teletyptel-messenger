@@ -6,6 +6,7 @@ struct NativeTotalConversationView: View {
     @ObservedObject var controller: NativeCallController
     @ObservedObject var translation: NativeTranslationModel
     @FocusState private var rttFocused: Bool
+    @State private var controlsOpen = false
 
     var body: some View {
         GeometryReader { geometry in
@@ -21,16 +22,13 @@ struct NativeTotalConversationView: View {
                                 .padding(.horizontal, landscape ? 16 : 12)
                                 .padding(.bottom, 10)
                         }
-                        controls(presentation)
-                            .padding(.horizontal, 12)
-                            .padding(.bottom, max(12, geometry.safeAreaInsets.bottom))
                     }
                     if let localVideo = presentation.localVideo, presentation.profile.hasVideo {
                         NativeVideoSurface(track: localVideo)
                             .frame(width: min(landscape ? 220 : 150, geometry.size.width * 0.34),
                                    height: min(landscape ? 138 : 190, geometry.size.height * 0.25))
                             .clipShape(RoundedRectangle(cornerRadius: 16))
-                            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.blue, lineWidth: 2))
+                            .overlay(RoundedRectangle(cornerRadius: 16).stroke(NativeWebStyle.callLine, lineWidth: 1))
                             .shadow(radius: 8)
                             .padding(.top, 78)
                             .padding(.trailing, 14)
@@ -51,8 +49,8 @@ struct NativeTotalConversationView: View {
                         .accessibilityLabel("Camera wisselen")
                     }
                 }
-                .background(Color(red: 0.02, green: 0.06, blue: 0.12))
-                .ignoresSafeArea(edges: .bottom)
+                .background(NativeWebStyle.callBackground)
+                .font(NativeWebStyle.font())
                 .statusBarHidden(landscape)
             }
         }
@@ -97,13 +95,10 @@ struct NativeTotalConversationView: View {
 
     private func header(_ presentation: NativeCallPresentation) -> some View {
         HStack(spacing: 12) {
-            Image(systemName: "person.crop.circle.fill")
-                .font(.system(size: 38))
-                .foregroundStyle(.blue)
-                .accessibilityHidden(true)
+            NativeWebAvatar(name: controller.peerName ?? "TeleTypTel", size: 44)
             VStack(alignment: .leading, spacing: 2) {
                 Text(controller.peerName ?? "TeleTypTel-contact")
-                    .font(.headline)
+                    .font(NativeWebStyle.font(18, weight: .bold))
                     .lineLimit(1)
                 Text(profileName(presentation.profile))
                     .font(.caption)
@@ -115,10 +110,19 @@ struct NativeTotalConversationView: View {
                     .foregroundStyle(presentation.rttReady ? .green : .orange)
                     .accessibilityLabel(presentation.rttReady ? "Realtime tekst verbonden" : "Realtime tekst wordt verbonden")
             }
+            Button { controlsOpen.toggle() } label: { Image(systemName: "slider.horizontal.3") }
+                .buttonStyle(NativeWebIconStyle()).accessibilityLabel("Gespreksbediening")
+                .popover(isPresented: $controlsOpen, arrowEdge: .top) {
+                    controls(presentation).padding(12).background(NativeWebStyle.callBackground)
+                        .presentationCompactAdaptation(.popover)
+                }
+            Button(action: controller.endCall) { Image(systemName: "phone.down.fill") }
+                .buttonStyle(NativeWebIconStyle(destructive: true)).accessibilityLabel("Gesprek beëindigen")
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
-        .background(.regularMaterial)
+        .background(NativeWebStyle.panel).foregroundStyle(NativeWebStyle.text)
+        .overlay(alignment: .bottom) { NativeWebStyle.line.frame(height: 1) }
         .accessibilityElement(children: .contain)
     }
 
@@ -188,24 +192,22 @@ struct NativeTotalConversationView: View {
     }
 
     private func controls(_ presentation: NativeCallPresentation) -> some View {
-        HStack(spacing: 14) {
+        HStack(spacing: 8) {
             if presentation.profile.hasVideo {
                 callButton(symbol: presentation.cameraEnabled ? "video.fill" : "video.slash.fill",
-                           color: presentation.cameraEnabled ? .green : .red,
+                           color: presentation.cameraEnabled ? NativeWebStyle.enabled : NativeWebStyle.disabled,
                            label: presentation.cameraEnabled ? "Camera uitschakelen" : "Camera inschakelen",
                            action: controller.toggleCamera)
             }
             callButton(symbol: controller.isMuted ? "mic.slash.fill" : "mic.fill",
-                       color: controller.isMuted ? .red : .green,
+                       color: controller.isMuted ? NativeWebStyle.disabled : NativeWebStyle.enabled,
                        label: controller.isMuted ? "Microfoon inschakelen" : "Microfoon dempen",
                        action: controller.toggleMuted)
             if presentation.profile.contents.contains("rtt") {
-                callButton(symbol: "keyboard.fill", color: presentation.rttReady ? .green : .orange,
+                callButton(symbol: "keyboard.fill", color: presentation.rttReady ? NativeWebStyle.enabled : .orange,
                            label: "Realtime tekst typen") { rttFocused = true }
                     .disabled(!presentation.rttReady)
             }
-            callButton(symbol: "phone.down.fill", color: .red, label: "Gesprek beëindigen",
-                       action: controller.endCall)
         }
         .padding(10)
         .background(Color(red: 0.02, green: 0.06, blue: 0.12).opacity(0.94),
@@ -221,8 +223,8 @@ struct NativeTotalConversationView: View {
             Image(systemName: symbol)
                 .font(.system(size: 24, weight: .semibold))
                 .foregroundStyle(.white)
-                .frame(width: 56, height: 56)
-                .background(color, in: RoundedRectangle(cornerRadius: 14))
+                .frame(width: 48, height: 48)
+                .background(color, in: RoundedRectangle(cornerRadius: 6))
         }
         .buttonStyle(.plain)
         .accessibilityLabel(label)
@@ -271,11 +273,9 @@ private struct NativeVideoSurface: UIViewRepresentable {
 private extension View {
     func rttPaneStyle() -> some View {
         self
-            .padding(14)
+            .padding(10)
             .frame(maxWidth: .infinity, alignment: .topLeading)
-            .background(Color(red: 0.02, green: 0.06, blue: 0.12).opacity(0.92),
-                        in: RoundedRectangle(cornerRadius: 16))
-            .overlay(RoundedRectangle(cornerRadius: 16)
-                .stroke(Color(red: 0.12, green: 0.32, blue: 0.62), lineWidth: 2))
+            .background(NativeWebStyle.callBackground.opacity(0.94), in: RoundedRectangle(cornerRadius: 8))
+            .overlay(RoundedRectangle(cornerRadius: 8).stroke(NativeWebStyle.callLine, lineWidth: 2))
     }
 }

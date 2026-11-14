@@ -487,6 +487,36 @@ test("Native navigation source keeps sidebar visibility explicit and avoids dupl
   assert.ok(chat.indexOf('accessibilityIdentifier("chat-error")') < chat.indexOf("LazyVStack"));
 });
 
+test("Native web visual contract shares palette, shell, bubbles and reachable symbol controls", () => {
+  const theme = read("App/NativeWebStyle.swift");
+  const css = fs.readFileSync(path.join(root, "php/public/chat-client.css"), "utf8");
+  for (const value of ["ffffff", "111827", "53657c", "2563eb", "ddf8ea", "f5f7fb", "1d8d68", "3f536d", "edf4ff", "6aa2ff"]) {
+    assert.ok(theme.includes("0x" + value), value);
+    assert.ok(css.toLowerCase().includes("#" + value), value);
+  }
+  assert.match(theme, /minWidth: 44, minHeight: 44/);
+  assert.match(theme, /relativeTo: \.body/);
+  assert.match(theme, /userInterfaceStyle == \.dark/);
+  assert.ok(projectText().project.includes("NativeWebStyle.swift"));
+  const messenger = read("App/NativeTranslationView.swift");
+  assert.match(messenger, /safeAreaInset\(edge: \.top/);
+  assert.match(messenger, /messenger-brand-header/);
+  assert.match(messenger, /Contacten en groepen toevoegen/);
+  assert.match(messenger, /model.groups.rooms/);
+  assert.doesNotMatch(messenger, /\.searchable\(/);
+  for (const file of ["App/NativeChatView.swift", "App/NativeGroupsView.swift"]) {
+    const source = read(file);
+    assert.match(source, /NativeWebBubble/);
+    assert.match(source, /nativeWebComposer\(\)/);
+    assert.match(source, /NativeWebAvatar/);
+  }
+  const tc = read("App/NativeTotalConversationView.swift");
+  assert.match(tc, /popover\(isPresented: \$controlsOpen/);
+  assert.match(tc, /NativeWebStyle.enabled/);
+  assert.match(tc, /NativeWebStyle.disabled/);
+  assert.match(tc, /Button\(action: controller.endCall\)/);
+});
+
 test("Native second factor is a bounded challenge before XMPP, not an authenticated state", () => {
   const client = read("Sources/TeleTypTelCore/NativeTwoFactorAccountClient.swift");
   const model = read("Sources/TeleTypTelCore/NativeLoginModel.swift");

@@ -34,6 +34,7 @@ struct NativeAccountSettingsView: View {
                 }
                 Button { Task { await load() } } label: { Label("Opnieuw ophalen", systemImage: "arrow.clockwise") }.disabled(model.busy)
             }
+            .nativeWebForm()
             .navigationTitle("Accountinstellingen")
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button { dismiss() } label: { Image(systemName: "xmark").frame(width: 44, height: 44) }.accessibilityLabel("Sluiten") } }
         }

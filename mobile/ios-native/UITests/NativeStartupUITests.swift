@@ -23,6 +23,8 @@ final class NativeStartupUITests: XCTestCase {
         XCTAssertFalse(application.keyboards.firstMatch.exists)
         XCTAssertFalse(application.buttons["check-connection"].isEnabled)
         XCTAssertTrue(application.staticTexts["startup-status"].exists)
+        XCTAssertFalse(application.staticTexts["Native iPhone- en iPad-app"].exists)
+        snapshot("login-web-style")
     }
 
     func testRotationPreservesConfigurationAndInvalidAddressShowsInlineError() {
@@ -57,6 +59,11 @@ final class NativeStartupUITests: XCTestCase {
         XCTAssertTrue(contact.waitForExistence(timeout: 5))
         reveal(contact)
         XCTAssertTrue(contact.label.contains("Online"))
+        let brand = application.descendants(matching: .any)["messenger-brand-header"].firstMatch
+        XCTAssertTrue(brand.exists)
+        XCTAssertGreaterThanOrEqual(brand.frame.height, 58)
+        XCTAssertTrue(application.buttons["Hoofdmenu"].isHittable)
+        XCTAssertTrue(application.buttons["Contacten en groepen toevoegen"].exists)
         snapshot("contacts-portrait")
         rotate(.landscapeLeft)
         waitForStatus("XMPP verbonden als fixture@localhost")
@@ -64,9 +71,8 @@ final class NativeStartupUITests: XCTestCase {
         XCTAssertTrue(contact.label.contains("Online"))
         snapshot("contacts-landscape")
         rotate(.portrait)
-        let disconnect = application.buttons["disconnect-session"]
-        reveal(disconnect, upward: false)
-        disconnect.tap()
+        application.buttons["Hoofdmenu"].tap()
+        application.buttons["menu-logout"].tap()
         waitForStatus("De XMPP-verbinding is verbroken")
         XCTAssertFalse(contact.exists)
         let password = application.secureTextFields["login-password"]
@@ -148,7 +154,7 @@ final class NativeStartupUITests: XCTestCase {
 
     func testExistingGroupJoinSendRotationAndLeave() {
         signInFixture("connected")
-        XCTAssertTrue(application.buttons["disconnect-session"].waitForExistence(timeout: 10))
+        waitForStatus("XMPP verbonden als fixture@localhost")
         application.buttons["Hoofdmenu"].tap()
         application.buttons["open-groups"].tap()
         let address = application.textFields["group-address"]
@@ -212,7 +218,7 @@ final class NativeStartupUITests: XCTestCase {
 
     func testAccountSettingsSaveWithoutChangingIdentity() {
         signInFixture("connected")
-        XCTAssertTrue(application.buttons["disconnect-session"].waitForExistence(timeout: 10))
+        waitForStatus("XMPP verbonden als fixture@localhost")
         application.buttons["Hoofdmenu"].tap(); application.buttons["open-account-settings"].tap()
         let name = application.textFields["profile-name"]
         XCTAssertTrue(name.waitForExistence(timeout: 10)); reveal(name); name.tap(); name.typeText(" gewijzigd")
@@ -248,7 +254,7 @@ final class NativeStartupUITests: XCTestCase {
 
     func testGroupDiscoveryManagementAndSessionSearch() {
         signInFixture("connected")
-        XCTAssertTrue(application.buttons["disconnect-session"].waitForExistence(timeout: 10))
+        waitForStatus("XMPP verbonden als fixture@localhost")
         application.buttons["Hoofdmenu"].tap(); application.buttons["open-groups"].tap()
         let discovery = application.buttons["Beschikbare groepen ophalen"]
         XCTAssertTrue(discovery.waitForExistence(timeout: 5)); reveal(discovery); discovery.tap()
