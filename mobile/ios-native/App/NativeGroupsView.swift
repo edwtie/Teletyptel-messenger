@@ -220,26 +220,27 @@ private struct NativeGroupBubble: View {
 
     private var content: some View {
         VStack(alignment: .leading, spacing: 5) {
-            HStack(alignment: .top, spacing: 4) {
             VStack(alignment: .leading, spacing: 3) {
             Text(message.nickname).font(.caption.bold())
             if message.retracted { Text("Bericht ingetrokken") }
             else {
             if let session = session, NativeFileReference.inMessage(message.body, configuration: session.configuration) != nil {
-                Text(message.body).textSelection(.enabled)
+                Text(message.body)
                 NativeFileMessageButton(bodyText: message.body, session: session)
             } else if let translation = translation {
                 NativeGroupTranslationExtras(model: translation, message: message)
             } else {
-                Text(message.body).textSelection(.enabled)
+                Text(message.body)
             }
             }
-            }
-            Menu { actions } label: { Image(systemName: "ellipsis").frame(width: 44, height: 44) }
-                .buttonStyle(.plain).accessibilityLabel("Berichtmenu").accessibilityIdentifier("group-message-menu-" + message.id.uuidString)
-            }
+            }.padding(.trailing, 44)
             metadata
             if let notice = message.actionNotice { Text(notice).font(.caption2) }
+        }
+        .overlay(alignment: .topTrailing) {
+            Menu { actions } label: {
+                Image(systemName: "ellipsis").frame(width: 44, height: 24).frame(height: 44, alignment: .top)
+            }.buttonStyle(.plain).accessibilityLabel("Berichtmenu").accessibilityIdentifier("group-message-menu-" + message.id.uuidString)
         }
     }
 
@@ -269,7 +270,7 @@ private struct NativeGroupTranslationExtras: View {
     private var key: String { "group:" + message.room + ":" + message.id.uuidString }
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
-            Text(message.body).textSelection(.enabled)
+            Text(message.body)
             if model.preferences.mode != "off", model.sharingConsent, let result = model.results[key] { NativeTranslationCaption(result: result) }
             if model.preferences.mode == "manual" {
                 Button("Vertalen") { model.translate(message.body, key: key) }.font(.caption)

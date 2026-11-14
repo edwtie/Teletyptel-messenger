@@ -50,7 +50,11 @@ struct NativeEditMessageView: View {
     var body: some View {
         NavigationStack {
             Form {
-                TextField("Bericht", text: $text, axis: .vertical).lineLimit(3...8).accessibilityIdentifier("message-edit-text")
+                HStack(alignment: .top) {
+                    TextField("Bericht", text: $text, axis: .vertical).lineLimit(3...8).autocorrectionDisabled().accessibilityIdentifier("message-edit-text")
+                    Button { text = "" } label: { Image(systemName: "xmark.circle.fill").frame(width: 44, height: 44) }
+                        .buttonStyle(.plain).accessibilityLabel("Bewerkingstekst wissen").accessibilityIdentifier("message-edit-clear")
+                }
                 Text("Correctieverzoek voor je laatste eigen bericht. Andere clients kunnen een los gecorrigeerd bericht tonen.").font(.caption)
                 Button {
                     model.changeMessage(message.id, correctedBody: text)

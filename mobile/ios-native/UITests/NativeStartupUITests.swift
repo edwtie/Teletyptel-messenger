@@ -160,6 +160,9 @@ final class NativeStartupUITests: XCTestCase {
         XCTAssertTrue(contact.waitForExistence(timeout: 5)); reveal(contact); tapContact(contact)
         let draft = application.descendants(matching: .any)["chat-draft"].firstMatch
         XCTAssertTrue(draft.waitForExistence(timeout: 5))
+        let incoming = application.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "chat-message-", "Fictief ontvangen bericht")).firstMatch
+        XCTAssertTrue(incoming.waitForExistence(timeout: 5)); incoming.press(forDuration: 0.8)
+        XCTAssertTrue(application.buttons["Kopiëren"].waitForExistence(timeout: 5)); application.buttons["Kopiëren"].tap()
         draft.tap(); draft.typeText("Menu testorigineel")
         application.buttons["chat-send"].tap()
         let outgoing = application.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "chat-message-", "Menu testorigineel")).firstMatch
@@ -171,7 +174,10 @@ final class NativeStartupUITests: XCTestCase {
         snapshot("message-actions-menu")
         application.buttons["Bewerken"].tap()
         let edit = application.descendants(matching: .any)["message-edit-text"].firstMatch
-        XCTAssertTrue(edit.waitForExistence(timeout: 5)); edit.tap(); edit.typeText(" bewerkt")
+        XCTAssertTrue(edit.waitForExistence(timeout: 5))
+        application.buttons["message-edit-clear"].tap()
+        edit.tap(); edit.typeText("Menu testorigineel bewerkt")
+        XCTAssertEqual(edit.value as? String, "Menu testorigineel bewerkt")
         let save = application.buttons["message-edit-save"]; reveal(save); save.tap()
         let edited = application.descendants(matching: .any)["chat-message-" + messageID].firstMatch
         let corrected = NSPredicate(format: "label CONTAINS %@", "Menu testorigineel bewerkt")

@@ -194,11 +194,7 @@ struct NativeChatView: View {
 
     private func bubbleContent(_ message: NativeChatMessage) -> some View {
         VStack(alignment: .leading, spacing: 5) {
-                HStack(alignment: .top, spacing: 4) {
-                    Text(message.retracted ? "Bericht ingetrokken" : message.body).textSelection(.enabled)
-                    Menu { messageActions(message) } label: { Image(systemName: "ellipsis").frame(width: 44, height: 44) }
-                        .buttonStyle(.plain).accessibilityLabel("Berichtmenu").accessibilityIdentifier("message-menu-" + message.id.uuidString)
-                }
+                Text(message.retracted ? "Bericht ingetrokken" : message.body).padding(.trailing, 44)
                 if let session = model.activeWebSession, NativeFileReference.inMessage(message.body, configuration: session.configuration) != nil {
                     NativeFileMessageButton(bodyText: message.body, session: session)
                 }
@@ -215,6 +211,11 @@ struct NativeChatView: View {
                     }
                 }.foregroundStyle(NativeWebStyle.muted)
                 if let notice = message.actionNotice { Text(notice).font(.caption2).foregroundStyle(NativeWebStyle.muted) }
+            }
+            .overlay(alignment: .topTrailing) {
+                Menu { messageActions(message) } label: {
+                    Image(systemName: "ellipsis").frame(width: 44, height: 24).frame(height: 44, alignment: .top)
+                }.buttonStyle(.plain).accessibilityLabel("Berichtmenu").accessibilityIdentifier("message-menu-" + message.id.uuidString)
             }
             .task(id: message.body) { translation.discardStale(key: message.id.uuidString, text: message.body) }
     }
