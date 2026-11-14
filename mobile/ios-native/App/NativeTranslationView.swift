@@ -206,6 +206,7 @@ struct NativeMessengerView: View {
                         .resizable().scaledToFill().frame(width: geometry.size.width, height: geometry.size.height).clipped()
                         .overlay { Text("Kies een gesprek").font(.headline).padding().background(.regularMaterial, in: Capsule()) }
                 }
+                .toolbar(.hidden, for: .navigationBar)
             }
         }
         .navigationSplitViewStyle(.balanced)

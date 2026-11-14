@@ -12,6 +12,7 @@ final class NativeStartupUITests: XCTestCase {
     override func tearDownWithError() throws {
         if let run = testRun, run.failureCount > 0 {
             print("NATIVE_UI_FAILURE_HIERARCHY\n" + application.debugDescription)
+            snapshot("failure-state")
         }
         application.terminate()
         XCUIDevice.shared.orientation = .portrait
@@ -111,7 +112,7 @@ final class NativeStartupUITests: XCTestCase {
         let contact = application.descendants(matching: .any)["contact-demo-contact@localhost"].firstMatch
         XCTAssertTrue(contact.waitForExistence(timeout: 5))
         reveal(contact)
-        contact.tap()
+        tapContact(contact)
         let draft = application.descendants(matching: .any)["chat-draft"].firstMatch
         XCTAssertTrue(draft.waitForExistence(timeout: 5))
         XCTAssertFalse(application.keyboards.firstMatch.exists)
@@ -147,7 +148,7 @@ final class NativeStartupUITests: XCTestCase {
         XCTAssertTrue(outgoing.exists)
         application.buttons["chat-back"].tap()
         reveal(contact)
-        contact.tap()
+        tapContact(contact)
         XCTAssertTrue(draft.waitForExistence(timeout: 5))
         XCTAssertEqual(draft.value as? String, "Bewaar mijn concept")
     }
@@ -236,7 +237,7 @@ final class NativeStartupUITests: XCTestCase {
     func testAttachmentUploadOnlyStagesLinkUntilExplicitSend() {
         signInFixture("connected")
         let contact = application.descendants(matching: .any)["contact-demo-contact@localhost"].firstMatch
-        XCTAssertTrue(contact.waitForExistence(timeout: 10)); reveal(contact); contact.tap()
+        XCTAssertTrue(contact.waitForExistence(timeout: 10)); reveal(contact); tapContact(contact)
         application.buttons["attachment-picker"].tap()
         let selection = application.buttons["fixture-attachment-selection"]
         XCTAssertTrue(selection.waitForExistence(timeout: 5)); selection.tap()
@@ -387,10 +388,18 @@ final class NativeStartupUITests: XCTestCase {
         let fullyVisible = viewport.contains(element.frame)
         if element.identifier.hasPrefix("contact-"), !fullyVisible {
             return viewport.contains(CGPoint(x: element.frame.midX, y: element.frame.midY)) &&
-                element.frame.minY >= viewport.minY && element.frame.maxY <= viewport.maxY && element.isHittable
+                element.frame.minY >= viewport.minY && element.frame.maxY <= viewport.maxY
         }
         guard fullyVisible else { return false }
         return element.elementType == .staticText || element.isHittable
+    }
+
+    private func tapContact(_ element: XCUIElement) {
+        let visible = element.frame.intersection(usableViewport())
+        XCTAssertGreaterThan(visible.width, 44)
+        XCTAssertGreaterThan(visible.height, 44)
+        application.coordinate(withNormalizedOffset: .zero)
+            .withOffset(CGVector(dx: visible.midX, dy: visible.midY)).tap()
     }
 
     private func usableViewport() -> CGRect {

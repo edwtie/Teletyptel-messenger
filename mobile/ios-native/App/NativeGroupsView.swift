@@ -186,6 +186,7 @@ private struct NativeGroupBubble: View {
             .foregroundStyle(NativeWebStyle.text)
             .padding(.horizontal, 10).padding(.vertical, 8).background(NativeWebBubble(own: message.own).fill(fillColor))
             .overlay(NativeWebBubble(own: message.own).stroke(borderColor, lineWidth: 1))
+            .contentShape(Rectangle())
             .accessibilityElement(children: .combine)
             .accessibilityLabel(description)
             .accessibilityIdentifier("group-message-" + message.id.uuidString)

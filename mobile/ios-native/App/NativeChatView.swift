@@ -89,6 +89,8 @@ struct NativeChatView: View {
                             Text(contact.presence.label).font(NativeWebStyle.font(12)).foregroundStyle(NativeWebStyle.muted)
                         }
                     }.accessibilityElement(children: .combine)
+                        .accessibilityLabel((model.isConnected ? "Verbonden · " : "Niet verbonden · ") + contact.displayName + " · " + contact.presence.label)
+                        .accessibilityIdentifier("chat-connection")
                 }
                 ToolbarItem(placement: .primaryAction) {
                     HStack(spacing: 10) {
@@ -176,6 +178,7 @@ struct NativeChatView: View {
             .padding(.horizontal, 10).padding(.vertical, 8)
             .background(NativeWebBubble(own: !incoming).fill(incoming ? NativeWebStyle.incoming : NativeWebStyle.outgoing))
             .overlay(NativeWebBubble(own: !incoming).stroke(incoming ? NativeWebStyle.incomingLine : NativeWebStyle.outgoingLine, lineWidth: 1))
+            .contentShape(Rectangle())
             .accessibilityElement(children: .combine)
             .accessibilityLabel(accessibleMessage(message))
             .accessibilityIdentifier("chat-message-" + message.id.uuidString)
