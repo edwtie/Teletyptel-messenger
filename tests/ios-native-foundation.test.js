@@ -36,6 +36,7 @@ test("Native interaction/history/dialer sources stay in the isolated target with
   assert.match(dialing, /NativeAuthenticatedAccount\.validJID\(bare, domain: configuration\.domain\)/);
   assert.match(read("App/NativeDialerView.swift"), /\.tint\(NativeWebStyle\.enabled\)/);
   assert.match(read("App/TeleTypTelNativeApp.swift"), /\.overlay\(RoundedRectangle\(cornerRadius: 8\)\.stroke\(NativeWebStyle\.line, lineWidth: 1\)\.allowsHitTesting\(false\)\)/);
+  assert.equal((read("App/TeleTypTelNativeApp.swift").match(/\.buttonStyle\(\.borderedProminent\)\.tint\(NativeWebStyle\.accent\)\.foregroundStyle\(\.white\)/g) || []).length, 4);
 });
 
 function diagnosticDirectory() {

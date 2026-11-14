@@ -121,7 +121,7 @@ struct NativeStartupView: View {
                         VStack(alignment: .leading, spacing: 12) {
                             if !loginModel.isConnected {
                                 Button("Aanmelden met Face ID of Touch ID", action: unlockSavedLogin)
-                                    .buttonStyle(.borderedProminent)
+                                    .buttonStyle(.borderedProminent).tint(NativeWebStyle.accent).foregroundStyle(.white)
                                     .disabled(loginModel.isWorking || loginModel.isSecondFactorPending || savedLogin.isWorking)
                                     .accessibilityIdentifier("biometric-login")
                             }
@@ -192,7 +192,7 @@ struct NativeStartupView: View {
                                 loginModel.reset()
                                 model.check(address: address, domain: domain)
                             }
-                                .buttonStyle(.borderedProminent)
+                                .buttonStyle(.borderedProminent).tint(NativeWebStyle.accent).foregroundStyle(.white)
                                 .controlSize(.large)
                                 .accessibilityIdentifier("check-connection")
                                 .disabled(address.isEmpty || domain.isEmpty)
@@ -224,7 +224,7 @@ struct NativeStartupView: View {
                                 verificationCode = ""
                                 loginModel.verifySecondFactor(code: code)
                             }
-                            .buttonStyle(.borderedProminent)
+                            .buttonStyle(.borderedProminent).tint(NativeWebStyle.accent).foregroundStyle(.white)
                             .accessibilityIdentifier("two-factor-verify")
                             .disabled(!loginModel.isAwaitingSecondFactor || verificationCode.range(of: #"\A[0-9]{6}\z"#, options: .regularExpression) == nil)
                         }
@@ -266,7 +266,7 @@ struct NativeStartupView: View {
                                 loginModel.login(address: address, domain: domain,
                                                  jid: jid.trimmingCharacters(in: .whitespacesAndNewlines), password: submittedPassword)
                             }
-                            .buttonStyle(.borderedProminent)
+                            .buttonStyle(.borderedProminent).tint(NativeWebStyle.accent).foregroundStyle(.white)
                             .controlSize(.large)
                             .accessibilityIdentifier("login-account")
                             .disabled(loginModel.isWorking || loginModel.isConnected || savedLogin.isWorking || jid.isEmpty || password.isEmpty)

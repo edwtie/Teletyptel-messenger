@@ -43,7 +43,7 @@ struct NativeDialerView: View {
                         guard let route = route, login.canSend, !calls.hasLiveCall else { notice = "Controleer de lokale HTTPS-server, gateway-resource en testnummer 600."; return }
                         calls.startCall(route.contact, profile: .total)
                         dismiss()
-                    } label: { Image(systemName: "phone.fill").font(.title2).frame(maxWidth: .infinity, minHeight: 52) }
+                    } label: { Image(systemName: "phone.fill").font(.title2).foregroundStyle(.white).frame(maxWidth: .infinity, minHeight: 52) }
                         .buttonStyle(.borderedProminent).tint(NativeWebStyle.enabled).accessibilityLabel("Lokale Asterisk-echo met TC bellen")
                         .accessibilityIdentifier("sip-lab-call").disabled(route == nil || !login.canSend || calls.hasLiveCall)
                 }.padding(20).frame(maxWidth: 420).frame(maxWidth: .infinity)
