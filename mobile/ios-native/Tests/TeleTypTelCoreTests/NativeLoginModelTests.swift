@@ -155,12 +155,15 @@ private actor LoginFixture: ServerChecking, NativeAccountAuthenticating, NativeX
 private final class EncryptedHistoryFixture: NativeHistoryStoring {
     private let key = SymmetricKey(size: .bits256)
     private var values: [String: Data] = [:]
+    var failLoad = false
+    private(set) var removedScopes: [NativeHistoryScope] = []
     func load(_ scope: NativeHistoryScope) throws -> NativeHistorySnapshot? {
+        if failLoad { throw NativeAccountFailure.invalidResponse }
         guard let bytes = values[scope.filename] else { return nil }
         return try NativeHistoryCrypto.open(bytes, scope: scope, key: key)
     }
     func save(_ snapshot: NativeHistorySnapshot) throws { values[snapshot.scope.filename] = try NativeHistoryCrypto.seal(snapshot, key: key) }
-    func remove(_ scope: NativeHistoryScope) throws { values[scope.filename] = nil }
+    func remove(_ scope: NativeHistoryScope) throws { removedScopes.append(scope); values[scope.filename] = nil; failLoad = false }
 }
 
 final class NativeLoginModelTests: XCTestCase {
@@ -464,6 +467,23 @@ final class NativeLoginModelTests: XCTestCase {
         XCTAssertFalse(second.chat.preferences.keepHistory)
         XCTAssertTrue(second.chat.messages.isEmpty); XCTAssertTrue(second.chat.drafts.isEmpty)
         second.disconnect()
+    }
+
+    @MainActor
+    func testCorruptHistoryIsNotOverwrittenUntilExplicitAccountScopedClear() async throws {
+        let storage = EncryptedHistoryFixture(); storage.failLoad = true
+        let fixture = LoginFixture(); let login = model(fixture, history: storage)
+        start(login); await eventually { await fixture.runCount() == 1 }
+        await fixture.ready(0); await eventually { login.canSend }
+        XCTAssertTrue(login.historyNotice?.contains("beschadigd") == true)
+        login.flushHistory()
+        XCTAssertTrue(storage.removedScopes.isEmpty)
+        login.clearLocalHistory()
+        let scope = try NativeHistoryScope(configuration: ServerConfiguration(address: "https://example.invalid", domain: "localhost"), owner: "fixture@localhost")
+        XCTAssertEqual(storage.removedScopes, [scope])
+        let restored = try XCTUnwrap(storage.load(scope))
+        XCTAssertTrue(restored.chat.messages.isEmpty); XCTAssertTrue(restored.chat.drafts.isEmpty)
+        login.disconnect()
     }
 
     @MainActor

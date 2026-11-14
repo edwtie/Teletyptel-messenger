@@ -140,6 +140,12 @@ public final class NativeLoginModel: ObservableObject {
 
     public func clearLocalHistory() {
         guard sendTasks.isEmpty, chat.pendingCount == 0, !groups.hasPendingSends else { historyNotice = "Wacht tot lopende verzendingen klaar zijn."; return }
+        if let history = history {
+            guard let account = resumableAccount, let scope = try? NativeHistoryScope(configuration: account.configuration, owner: account.jid),
+                  isConnected else { historyNotice = "Meld eerst aan bij dit account om de lokale kopie veilig te wissen."; return }
+            do { try history.remove(scope); historyScope = scope }
+            catch { historyNotice = "Lokale geschiedenis niet gewist. Ontgrendel het apparaat en probeer opnieuw."; return }
+        }
         let preferences = chat.preferences
         restoringHistory = true; chat = NativeChatStore(); chat.preferences = preferences; groups.clearLocalHistory(); restoringHistory = false
         flushHistory()
