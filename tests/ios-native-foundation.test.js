@@ -335,7 +335,7 @@ test("Native mediated invitations remain explicit, contact-bound and session-pri
 test("Native rotation tests check visible geometry before requesting a tap point", () => {
   const ui = read("UITests/NativeStartupUITests.swift");
   const helper = ui.slice(ui.indexOf("private func isUsable("), ui.indexOf("private func waitForStatus("));
-  for (const required of ["navigation.frame.maxY", "keyboard.frame.minY", "viewport.contains(element.frame)",
+  for (const required of ["navigationBars.allElementsBoundByIndex.last { $0.isHittable }", "$0.frame.maxY", "keyboard.frame.minY", "viewport.contains(element.frame)",
     "element.elementType == .staticText || element.isHittable"])
     assert.ok(helper.includes(required), required);
   assert.ok(helper.indexOf("viewport.contains(element.frame)") < helper.indexOf("element.isHittable"));
