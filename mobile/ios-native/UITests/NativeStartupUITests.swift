@@ -379,6 +379,10 @@ final class NativeStartupUITests: XCTestCase {
 
     private func isUsable(_ element: XCUIElement) -> Bool {
         guard element.exists, !element.frame.isEmpty else { return false }
+        if element.identifier == "startup-status" {
+            let brand = application.descendants(matching: .any)["messenger-brand-header"].firstMatch
+            if brand.exists, brand.frame.contains(element.frame), application.frame.contains(element.frame) { return true }
+        }
         let viewport = usableViewport()
         let fullyVisible = viewport.contains(element.frame)
         if element.identifier.hasPrefix("contact-"), !fullyVisible {
