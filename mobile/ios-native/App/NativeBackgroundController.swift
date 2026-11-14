@@ -7,9 +7,11 @@ final class NativeBackgroundController: ObservableObject {
     private var task: Task<Void, Never>?
     private var generation = UUID()
 
-    func enter(_ model: NativeLoginModel) {
+    func enter(_ model: NativeLoginModel, keepingCall: Bool = false) {
         stop()
         model.beginBackground()
+        model.flushHistory()
+        if keepingCall && model.isConnected { return }
         guard model.isConnected, model.chat.pendingCount > 0 else {
             model.suspend()
             return

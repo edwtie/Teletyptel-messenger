@@ -153,6 +153,11 @@ final class NativeWebRTCCallMedia: NativeCallMediaDriver {
         publishPresentation()
         return switched
     }
+
+    func setForeground(_ active: Bool) async {
+        await capture.setForeground(active)
+        publishPresentation()
+    }
     var ownText: String { rtt?.ownText ?? "" }
     var remoteText: String { rtt?.remoteText ?? "" }
 

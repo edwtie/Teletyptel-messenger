@@ -29,6 +29,7 @@ public final class NativeGroupModel: ObservableObject {
     private var joins: [String: Task<Void, Never>] = [:]
     private var tokens: [String: UUID] = [:]
     private var sends: [UUID: Task<Void, Never>] = [:]
+    var hasPendingSends: Bool { !sends.isEmpty }
 
     public init() {}
     func restoreHistory(_ histories: [NativeGroupHistory], owner: String) {

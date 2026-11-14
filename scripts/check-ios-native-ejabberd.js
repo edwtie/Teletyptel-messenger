@@ -236,11 +236,11 @@ async function run() {
     report.nativeJingleTransportTested = true;
     report.nativeJingleTransportTests = 1;
     const archiveOutput = await runSwift("NativeArchiveIntegrationTests", "native-archive-tests.txt");
-    if (!/Executed 2 tests, with 0 failures/.test(archiveOutput) || /[1-9][0-9]* tests? skipped/i.test(archiveOutput)) {
-      throw new Error("Expected both real two-account MAM and message-action tests to execute without skips or failures");
+    if (!/Executed 3 tests, with 0 failures/.test(archiveOutput) || /[1-9][0-9]* tests? skipped/i.test(archiveOutput)) {
+      throw new Error("Expected all three real two-account MAM, message-action and interaction tests without skips or failures");
     }
     report.nativeArchiveTransportTested = true;
-    report.nativeArchiveTransportTests = 2;
+    report.nativeArchiveTransportTests = 3;
     const groupOutput = await runSwift("NativeGroupIntegrationTests", "native-group-tests.txt");
     if (!/Executed 1 test, with 0 failures/.test(groupOutput) || /[1-9][0-9]* tests? skipped/i.test(groupOutput)) {
       throw new Error("Expected the real private-room MUC test without skips or failures");

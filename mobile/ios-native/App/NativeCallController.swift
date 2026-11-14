@@ -59,6 +59,17 @@ final class NativeCallController: ObservableObject {
     private var activePeer: (any NativeActivePeerNegotiating)?
     private var activeID: UUID?
     private var prepareTask: Task<Void, Never>?
+    private var isForeground = true
+    var backgroundCallEnded: (() -> Void)?
+    var hasLiveCall: Bool { runtime?.platform.coordinator.currentHandle != nil }
+
+    func setForeground(_ active: Bool) {
+        isForeground = active
+        Task { [weak self] in
+            guard let self = self else { return }
+            await self.runtime?.media.setForeground(active)
+        }
+    }
 
     init() {}
 
@@ -226,6 +237,7 @@ final class NativeCallController: ObservableObject {
         guard let coordinator = runtime?.platform.coordinator,
               coordinator.currentHandle != nil else {
             if activePeer != nil { resetCall() }
+            if !isForeground { backgroundCallEnded?() }
             return
         }
         if coordinator.isConnected { status = .active(activePeer?.sid ?? "") }
@@ -282,7 +294,7 @@ final class NativeCallController: ObservableObject {
         _ = Self.initializeWebRTC
         let factory = RTCPeerConnectionFactory(encoderFactory: RTCDefaultVideoEncoderFactory(),
                                                decoderFactory: RTCDefaultVideoDecoderFactory())
-        let capture = NativeMediaCapture(factory: factory)
+        let capture = NativeMediaCapture(factory: factory, foreground: isForeground)
         let router = NativePeerRouter()
         let runtime = NativeCallRuntime(negotiation: router, capture: capture)
         self.factory = factory

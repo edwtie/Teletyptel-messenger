@@ -138,7 +138,7 @@ public final class NativeLoginModel: ObservableObject {
     }
 
     public func clearLocalHistory() {
-        guard sendTasks.isEmpty, chat.pendingCount == 0 else { historyNotice = "Wacht tot lopende verzendingen klaar zijn."; return }
+        guard sendTasks.isEmpty, chat.pendingCount == 0, !groups.hasPendingSends else { historyNotice = "Wacht tot lopende verzendingen klaar zijn."; return }
         let preferences = chat.preferences
         restoringHistory = true; chat = NativeChatStore(); chat.preferences = preferences; groups.clearLocalHistory(); restoringHistory = false
         flushHistory()

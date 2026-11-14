@@ -18,8 +18,12 @@ final class NativeMediaCapture {
     private var camera: RTCVideoTrack?
     private var capturer: RTCCameraVideoCapturer?
     private var cameraSelection: CameraSelection?
+    private var foreground = true
+    private var foregroundGeneration = UUID()
+    private var restoreCamera = false
+    private var cameraTransition: Task<Void, Never>?
 
-    init(factory: RTCPeerConnectionFactory) { self.factory = factory }
+    init(factory: RTCPeerConnectionFactory, foreground: Bool = true) { self.factory = factory; self.foreground = foreground }
 
     var tracks: (RTCAudioTrack, RTCVideoTrack?)? {
         guard let microphone = microphone else { return nil }
@@ -46,9 +50,12 @@ final class NativeMediaCapture {
         let camera = factory.videoTrack(with: source, trackId: "teletyptel-camera-\(UUID().uuidString)")
         self.camera = camera
         self.capturer = capturer
+        cameraSelection = selection
+        if !foreground { camera.isEnabled = false; restoreCamera = true; return }
         do {
             try await Self.start(capturer, selection: selection)
             cameraSelection = selection
+            if !foreground { camera.isEnabled = false; restoreCamera = true; await capturer.stopCapture() }
             try Task.checkCancellation()
         } catch {
             stop()
@@ -58,6 +65,9 @@ final class NativeMediaCapture {
     }
 
     func stop() {
+        foregroundGeneration = UUID()
+        restoreCamera = false
+        cameraTransition?.cancel(); cameraTransition = nil
         microphone?.isEnabled = false
         camera?.isEnabled = false
         capturer?.stopCapture()
@@ -70,18 +80,18 @@ final class NativeMediaCapture {
     var cameraEnabled: Bool { camera?.isEnabled == true }
 
     var canSwitchCamera: Bool {
-        guard let current = cameraSelection?.device.position else { return false }
+        guard foreground, let current = cameraSelection?.device.position else { return false }
         return RTCCameraVideoCapturer.captureDevices().contains { $0.position != current }
     }
 
     func setCameraEnabled(_ enabled: Bool) -> Bool {
-        guard let camera = camera else { return false }
+        guard foreground, let camera = camera else { return false }
         camera.isEnabled = enabled
         return true
     }
 
     func switchCamera() async -> Bool {
-        guard let capturer = capturer, let current = cameraSelection else { return false }
+        guard foreground, let capturer = capturer, let current = cameraSelection else { return false }
         let preferred: AVCaptureDevice.Position = current.device.position == .front ? .back : .front
         guard let replacement = Self.cameraSelection(preferred: preferred),
               replacement.device.uniqueID != current.device.uniqueID else { return false }
@@ -107,6 +117,32 @@ final class NativeMediaCapture {
         case .denied, .restricted: return false
         @unknown default: return false
         }
+    }
+
+    func setForeground(_ active: Bool) async {
+        guard foreground != active else { return }
+        foreground = active
+        let attempt = UUID(); foregroundGeneration = attempt
+        guard let capturer = capturer else { return }
+        if !active {
+            restoreCamera = camera?.isEnabled == true
+            camera?.isEnabled = false
+        }
+        let previous = cameraTransition
+        let operation = Task { [weak self] in
+            await previous?.value
+            guard !Task.isCancelled, let self = self, self.foregroundGeneration == attempt, self.capturer === capturer else { return }
+            if !active { await capturer.stopCapture(); return }
+            guard let selection = self.cameraSelection else { return }
+            do {
+                try await Self.start(capturer, selection: selection)
+                guard !Task.isCancelled, self.foregroundGeneration == attempt, self.foreground, self.capturer === capturer else { await capturer.stopCapture(); return }
+                self.camera?.isEnabled = self.restoreCamera
+                self.restoreCamera = false
+            } catch { self.camera?.isEnabled = false; self.restoreCamera = false }
+        }
+        cameraTransition = operation
+        await operation.value
     }
 
     private static func start(_ capturer: RTCCameraVideoCapturer, selection: CameraSelection) async throws {

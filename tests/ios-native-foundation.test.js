@@ -122,7 +122,8 @@ test("Native preview has separate identity, no web runtime, upload or signing co
   assert.match(project, /kind = exactVersion; version = "18.1.1"/);
   assert.doesNotMatch(read("App/TeleTypTelNativeApp.swift"), /WKWebView|CAPBridge|\.focused\(|becomeFirstResponder/);
   const plist = read("App/Info.plist");
-  assert.doesNotMatch(plist, /NSAllowsArbitraryLoads|UIBackgroundModes/);
+  assert.doesNotMatch(plist, /NSAllowsArbitraryLoads/);
+  assert.match(plist, /<key>UIBackgroundModes<\/key><array><string>audio<\/string><\/array>/);
   assert.match(plist, /NSCameraUsageDescription/);
   assert.match(plist, /NSMicrophoneUsageDescription/);
 });
@@ -267,11 +268,14 @@ test("Native chat and background source guards retain bounded data and honest se
     "model.chat.pendingCount > 0", "self.generation == attempt", "model.resume()"])
     assert.ok(background.includes(required), required);
   assert.doesNotMatch(chat + model + background, /UserDefaults|NSLog|print\(|AVAudioSession|setCategory\(/);
-  assert.doesNotMatch(read("App/Info.plist"), /UIBackgroundModes/);
+  assert.match(background, /if keepingCall && model\.isConnected \{ return \}/);
+  assert.match(read("App/TeleTypTelNativeApp.swift"), /keepingCall: calls\.hasLiveCall/);
+  assert.match(read("App/NativeCallController.swift"), /if !isForeground \{ backgroundCallEnded\?\(\) \}/);
+  assert.match(read("App/NativeMediaCapture.swift"), /await capturer\.stopCapture\(\)/);
   assert.ok(fs.existsSync(path.join(native, "Tests/TeleTypTelCoreTests/NativeChatTests.swift")));
 });
 
-test("Native MAM history is bounded, correlated and account-bound without local persistence", () => {
+test("Native MAM history remains bounded, correlated and account-bound", () => {
   const archive = read("Sources/TeleTypTelCore/NativeArchive.swift");
   const chat = read("Sources/TeleTypTelCore/NativeChat.swift");
   const model = read("Sources/TeleTypTelCore/NativeLoginModel.swift");
@@ -355,7 +359,7 @@ test("Incoming-call foundation stays bounded and does not enable push or silentl
     "now + 15", "current?.deadline = nil"])
     assert.ok(calls.includes(required), required);
   assert.doesNotMatch(calls, /URLSession|UserDefaults|Keychain|PKPushRegistry|print\(|NSLog/);
-  assert.doesNotMatch(read("App/Info.plist"), /UIBackgroundModes|aps-environment/);
+  assert.doesNotMatch(read("App/Info.plist"), /aps-environment|<string>voip<\/string>|<string>fetch<\/string>/);
   assert.ok(fs.existsSync(path.join(native, "Tests/TeleTypTelCoreTests/NativeIncomingCallTests.swift")));
   const previous = fs.readFileSync(path.join(root, "scripts/ios-testflight/CallMediaProfile.swift"), "utf8");
   const mediaCases = source => [...source.matchAll(/case \.(audio|video|audioRtt|total): return \[([^\]]+)\]/g)]
@@ -582,7 +586,7 @@ test("CallKit/PushKit sources are included in preview but live registration stay
   assert.match(platform, /reportOutgoingCall/);
   assert.match(platform, /func startOutgoing\(peer: String, sid: String, media: NativeCallMedia/);
   assert.match(platform, /let hadPushRegistration = registry != nil/);
-  assert.doesNotMatch(read("App/Info.plist"), /TeleTypTelNativeCallPushEnabled|UIBackgroundModes|aps-environment/);
+  assert.doesNotMatch(read("App/Info.plist"), /TeleTypTelNativeCallPushEnabled|aps-environment|<string>voip<\/string>/);
   assert.match(coordinator, /let rejected = UUID\(\)/);
   assert.match(coordinator, /let callback = self\.answerCompletion\s+self\.answerCompletion = nil\s+callback\?\(true\)/);
   assert.match(media, /audio\.useManualAudio = true/);

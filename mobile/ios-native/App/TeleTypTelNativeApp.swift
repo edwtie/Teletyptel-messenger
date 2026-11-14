@@ -346,8 +346,15 @@ struct NativeStartupView: View {
                 verificationCode = ""
                 savedLogin.cancel()
                 model.cancel()
-                background.enter(loginModel)
+                calls.setForeground(false)
+                calls.backgroundCallEnded = { [weak loginModel, weak background] in
+                    guard let loginModel = loginModel else { return }
+                    background?.enter(loginModel)
+                }
+                background.enter(loginModel, keepingCall: calls.hasLiveCall)
             } else if phase == .active {
+                calls.backgroundCallEnded = nil
+                calls.setForeground(true)
                 background.returnToForeground(loginModel)
             }
         }

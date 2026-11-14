@@ -150,6 +150,56 @@ final class NativeArchiveIntegrationTests: XCTestCase {
         XCTAssertEqual(restoredMessage?.body, "")
     }
 
+    func testRealServerZZRoutesReactionsDeliveryAndDisplayedWithoutFallbackBodies() async throws {
+        let fixture = try fixture()
+        let configuration = try ServerConfiguration(address: "https://localhost:\(fixture.trustedPort)", domain: "localhost")
+        let owner = fixture.username + "@localhost"; let peer = fixture.archivePeer + "@localhost"
+        let left = ArchiveEndpoint(); let right = ArchiveEndpoint()
+        let leftConnection = connect(NativeAuthenticatedAccount(configuration: configuration, jid: owner, password: fixture.password), endpoint: left)
+        let rightConnection = connect(NativeAuthenticatedAccount(configuration: configuration, jid: peer, password: fixture.password), endpoint: right)
+        defer { leftConnection.cancel(); rightConnection.cancel() }
+        let sender = try await ready(left); let recipient = try await ready(right)
+        let interacting = try XCTUnwrap(recipient as? any NativeChatInteracting)
+        var sent = NativeChatStore()
+        let message = try sent.enqueueBody("Fictief interactiebericht", peer: peer)
+        try await sender.sendMessage(to: peer, body: message.body, identifier: message.stanzaID!)
+        sent.finish(message.id, submitted: true)
+        for _ in 0..<300 {
+            if await right.hasTracked(message.stanzaID!) { break }
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        let tracked = await right.hasTracked(message.stanzaID!)
+        XCTAssertTrue(tracked)
+        let values: [NativeChatInteraction] = [.receipt(target: message.stanzaID!, displayed: false),
+            .receipt(target: message.stanzaID!, displayed: true), .reactions(target: message.stanzaID!, values: ["👍", "❤️"]),
+            .reactions(target: message.stanzaID!, values: ["😂"]), .reactions(target: message.stanzaID!, values: [])]
+        for value in values { try await interacting.interact(to: owner, interaction: value, identifier: UUID().uuidString) }
+        for _ in 0..<300 {
+            if await left.interactionCount >= values.count { break }
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        let events = await left.events
+        let received = events.compactMap { event -> NativeChatInteraction? in
+            if case .interaction(let author, _, let value) = event, author == peer { return value }; return nil
+        }
+        XCTAssertEqual(received, values)
+        for event in events { sent.receive(event) }
+        XCTAssertEqual(sent.messages.count, 1)
+        XCTAssertEqual(sent.messages[0].delivery, .displayed)
+        XCTAssertTrue(sent.messages[0].reactions.isEmpty)
+        var archived: NativeArchivePage?
+        for _ in 0..<30 {
+            let page = try await sender.fetchArchive(peer: peer, before: nil)
+            if page.messages.contains(where: { $0.interaction == values.last }) { archived = page; break }
+            try await Task.sleep(nanoseconds: 100_000_000)
+        }
+        let page = try XCTUnwrap(archived)
+        var restored = NativeChatStore(); try restored.mergeArchive(page)
+        let original = try XCTUnwrap(restored.messages.first { $0.stanzaID == message.stanzaID })
+        XCTAssertTrue(original.reactions.isEmpty)
+        XCTAssertEqual(original.body, message.body)
+    }
+
     private func awaitedChanges(_ events: [NativeChatEvent]) -> [String] {
         events.compactMap { event in if case .change(_, let identifier, _) = event { return identifier }; return nil }
     }
@@ -159,6 +209,10 @@ private actor ArchiveEndpoint {
     private(set) var events: [NativeChatEvent] = []
     var changeCount: Int { events.reduce(0) { count, event in if case .change = event { return count + 1 }; return count } }
     func receive(_ event: NativeChatEvent) { events.append(event) }
+    var interactionCount: Int { events.filter { if case .interaction = $0 { return true }; return false }.count }
+    func hasTracked(_ identifier: String) -> Bool {
+        events.contains { if case .trackedMessage(_, let value, _, let receipt, let markable, _) = $0 { return value == identifier && receipt && markable }; return false }
+    }
     private var jid: String?
     private var sender: (any NativeArchiveSending)?
     var ready: (any NativeArchiveSending)? { jid == nil ? nil : sender }
