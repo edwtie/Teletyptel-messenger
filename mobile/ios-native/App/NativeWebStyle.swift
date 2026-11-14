@@ -62,34 +62,45 @@ struct NativeWebAvatar: View {
     let name: String
     var size: CGFloat = 34
     var profile: NativePublicAvatar? = nil
-    @State private var image: UIImage?
+    private var image: UIImage? { NativeAvatarImages.decode(profile?.imageData) }
     private var avatarColor: Color {
         guard let value = profile?.avatarColor.dropFirst(), let number = UInt32(value, radix: 16) else { return NativeWebStyle.accent }
         return NativeWebStyle.color(number, dark: number)
     }
     var body: some View {
         ZStack {
-            if let image = image { Image(uiImage: image).resizable().scaledToFill() }
+            if let image = image { Image(uiImage: image).renderingMode(.original).resizable().scaledToFill() }
             else { Text(NativePublicAvatar.initials(profile.flatMap { $0.displayName.isEmpty ? nil : $0.displayName } ?? name))
             .font(NativeWebStyle.font(size > 34 ? 16 : 13, weight: .bold))
             .foregroundStyle(.white) }
         }.frame(width: size, height: size).background(avatarColor, in: Circle()).clipShape(Circle())
             .overlay(Circle().stroke(Color.white.opacity(0.35), lineWidth: 1))
             .accessibilityHidden(true)
-            .onAppear { prepareImage() }
-            .onChange(of: profile?.imageData) { _ in prepareImage() }
     }
-    private func prepareImage() {
-        image = nil
-        guard let data = profile?.imageData,
+}
+
+@MainActor
+enum NativeAvatarImages {
+    private static let cache: NSCache<NSData, UIImage> = {
+        let cache = NSCache<NSData, UIImage>()
+        cache.countLimit = 128; cache.totalCostLimit = 16 * 1024 * 1024
+        return cache
+    }()
+    static func clear() { cache.removeAllObjects() }
+    static func decode(_ data: Data?) -> UIImage? {
+        guard let data = data else { return nil }
+        if let cached = cache.object(forKey: data as NSData) { return cached }
+        guard
               let source = CGImageSourceCreateWithData(data as CFData, [kCGImageSourceShouldCache: false] as CFDictionary),
               let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
               let width = properties[kCGImagePropertyPixelWidth] as? NSNumber,
               let height = properties[kCGImagePropertyPixelHeight] as? NSNumber,
               width.doubleValue > 0, height.doubleValue > 0, width.doubleValue * height.doubleValue <= 16000000,
               let thumbnail = CGImageSourceCreateThumbnailAtIndex(source, 0, [kCGImageSourceCreateThumbnailFromImageAlways: true,
-                kCGImageSourceCreateThumbnailWithTransform: true, kCGImageSourceThumbnailMaxPixelSize: 192] as CFDictionary) else { return }
-        image = UIImage(cgImage: thumbnail)
+                kCGImageSourceCreateThumbnailWithTransform: true, kCGImageSourceThumbnailMaxPixelSize: 192] as CFDictionary) else { return nil }
+        let image = UIImage(cgImage: thumbnail)
+        cache.setObject(image, forKey: data as NSData, cost: thumbnail.bytesPerRow * thumbnail.height + data.count)
+        return image
     }
 }
 

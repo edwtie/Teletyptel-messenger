@@ -113,6 +113,7 @@ struct NativeMessengerView: View {
         .task(id: model.canSend) { loadAvatars() }
         .onChange(of: model.roster) { _ in loadAvatars() }
         .onChange(of: showAccount) { if !$0 { avatars.refreshOwner() } }
+        .onDisappear { NativeAvatarImages.clear() }
     }
 
     private var conversationLayout: some View {

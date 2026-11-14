@@ -7,6 +7,7 @@ struct NativeDialerView: View {
     @State private var number = "600"
     @State private var gateway = ""
     @State private var notice: String?
+    @FocusState private var gatewayFocused: Bool
     private let keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "*", "0", "#"]
     private var route: NativeSIPLabRoute? {
         guard let configuration = login.connectedConfiguration else { return nil }
@@ -20,6 +21,7 @@ struct NativeDialerView: View {
                     Text("Alleen testextensie 600 (echo), via de door jou gekozen lokale XMPP/SIP-gateway. Geen openbare telefoonnummers, 112 of tolkdienst. De gatewaybeheerder moet jouw XMPP-resource vooraf toestaan.")
                         .font(.caption).fixedSize(horizontal: false, vertical: true)
                     TextField("Gateway-JID inclusief /resource", text: $gateway)
+                        .focused($gatewayFocused).onSubmit { gatewayFocused = false }
                         .textInputAutocapitalization(.never).autocorrectionDisabled().keyboardType(.asciiCapable)
                         .textFieldStyle(.roundedBorder).accessibilityIdentifier("sip-lab-gateway")
                     HStack {
@@ -31,7 +33,7 @@ struct NativeDialerView: View {
                     }
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 3), spacing: 10) {
                         ForEach(keys, id: \.self) { key in
-                            NativeDialKey(key: key) { value in if number.count < 40 { number += value } }
+                            NativeDialKey(key: key) { value in gatewayFocused = false; if number.count < 40 { number += value } }
                         }
                     }
                     Text("Kort drukken: cijfer. Ingedrukt houden: letter kiezen, loslaten: invoegen. Letters worden bij bellen naar cijfers omgezet; dit is geen DTMF-tekst.").font(.caption)

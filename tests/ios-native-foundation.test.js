@@ -12,6 +12,30 @@ const root = path.resolve(__dirname, "..");
 const native = path.join(root, "mobile/ios-native");
 const read = file => fs.readFileSync(path.join(native, file), "utf8");
 
+test("Native interaction/history/dialer sources stay in the isolated target with explicit safety gates", () => {
+  const project = projectText().project;
+  for (const source of ["Core/NativeChatInteractions.swift", "Core/NativeHistory.swift", "Core/NativeDialing.swift",
+    "App/NativeDeviceHistory.swift", "App/NativeChatEnhancements.swift", "App/NativeDialerView.swift"]) assert.ok(project.includes(source), source);
+  const history = read("Sources/TeleTypTelCore/NativeHistory.swift");
+  assert.match(history, /AES\.GCM\.seal\(bytes, using: key, authenticating: value\.scope\.identity\)/);
+  assert.match(history, /snapshot\.scope == scope/);
+  assert.match(history, /if !chat\.preferences\.keepHistory/);
+  const device = read("App/NativeDeviceHistory.swift");
+  for (const required of ["kSecAttrAccessibleWhenUnlockedThisDeviceOnly", "isExcludedFromBackup = true", ".completeFileProtection", "isSymbolicLinkKey", "create: !manager.fileExists"])
+    assert.ok(device.includes(required), required);
+  assert.doesNotMatch(device, /UserDefaults|NSLog|print\(/);
+  const interactions = read("Sources/TeleTypTelCore/NativeChatInteractions.swift");
+  assert.match(interactions, /sendDisplayed = false/);
+  assert.match(interactions, /guard !group \|\| displayed/);
+  const chat = read("App/NativeChatView.swift");
+  assert.match(chat, /CGRect\(origin: \.zero, size: viewport\.size\)\.contains/);
+  assert.match(chat, /scenePhase == \.active && allowReadMarkers/);
+  const dialing = read("Sources/TeleTypTelCore/NativeDialing.swift");
+  assert.match(dialing, /NativeDialing\.normalized\(number\) == "600"/);
+  assert.match(dialing, /parts\.count == 4, octets\.count == 4/);
+  assert.match(dialing, /NativeAuthenticatedAccount\.validJID\(bare, domain: configuration\.domain\)/);
+});
+
 function diagnosticDirectory() {
   const artifacts = path.join(root, "artifacts");
   fs.mkdirSync(artifacts, { recursive: true });
