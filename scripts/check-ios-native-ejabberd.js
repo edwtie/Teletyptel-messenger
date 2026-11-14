@@ -57,6 +57,7 @@ modules:
       persistent: true
       public: false
       members_only: true
+      mam: true
   mod_muc_admin: {}
 `;
 }

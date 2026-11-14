@@ -227,6 +227,30 @@ final class NativeStartupUITests: XCTestCase {
         XCTAssertTrue(application.buttons["message-menu-" + identifier].waitForExistence(timeout: 5))
     }
 
+    func testNativeDialerShowsPhoneLettersAndKeepsPublicCallingDisabled() {
+        signInFixture("connected")
+        waitForStatus("XMPP verbonden als fixture@localhost")
+        application.buttons["Hoofdmenu"].tap()
+        application.buttons["open-number-dialer"].tap()
+        let display = application.staticTexts["dialer-number"]
+        XCTAssertTrue(display.waitForExistence(timeout: 5))
+        for _ in 0..<3 { application.buttons["Laatste teken wissen"].tap() }
+        let two = application.buttons["dial-key-2"]
+        XCTAssertTrue(two.waitForExistence(timeout: 5)); reveal(two)
+        XCTAssertTrue(two.label.contains("ABC")); two.tap()
+        XCTAssertEqual(display.label, "2")
+        two.press(forDuration: 0.6)
+        expectation(for: NSPredicate(format: "label == %@", "2A"), evaluatedWith: display); waitForExpectations(timeout: 5)
+        let star = application.buttons["dial-key-*"]; reveal(star); star.tap()
+        application.buttons["dial-key-0"].tap(); application.buttons["dial-key-#"].tap()
+        XCTAssertEqual(display.label, "2A*0#")
+        XCTAssertFalse(application.buttons["sip-lab-call"].isEnabled)
+        snapshot("native-number-pad")
+        rotate(.landscapeLeft)
+        let close = application.buttons["Sluiten"].firstMatch
+        XCTAssertTrue(close.isHittable)
+    }
+
     func testExistingGroupJoinSendRotationAndLeave() {
         signInFixture("connected")
         waitForStatus("XMPP verbonden als fixture@localhost")

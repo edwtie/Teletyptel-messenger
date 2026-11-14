@@ -34,7 +34,7 @@ struct NativeAccountSettingsView: View {
                     Toggle("Leesbevestigingen versturen", isOn: preference(\.sendDisplayed)).accessibilityIdentifier("send-displayed-markers")
                     Text("Leesstatus wordt alleen gedeeld voor berichten die volledig in de geopende chat in beeld staan. Een ontvangstbevestiging betekent niet dat iemand het bericht heeft gelezen.").font(.caption)
                     Toggle("Geschiedenis op dit apparaat bewaren", isOn: preference(\.keepHistory)).accessibilityIdentifier("keep-local-history")
-                    Text("Berichten en concepten worden versleuteld en per server/account bewaard, zonder iCloud-back-up. Uitschakelen verwijdert opgeslagen berichtinhoud; dit verwijdert geen serverarchief of gedeelde bestanden.").font(.caption)
+                    Text("Versleuteld op dit apparaat, per server/account: tot 200 directe berichten, 100 concepten en 200 berichten per groep (maximaal 8 groepen), zonder iCloud-back-up. Uitschakelen verwijdert opgeslagen berichtinhoud; dit verwijdert geen serverarchief of gedeelde bestanden.").font(.caption)
                     Button(role: .destructive) { clearHistory = true } label: { Label("Lokale berichten en concepten wissen", systemImage: "trash") }
                     if let notice = login.historyNotice { Text(notice).font(.caption).accessibilityIdentifier("local-history-status") }
                     Button { showTranslation = true } label: { Label("Vertaalinstellingen", systemImage: "globe") }

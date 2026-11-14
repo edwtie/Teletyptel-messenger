@@ -87,6 +87,7 @@ private struct NativeDialKey: View {
             preview = nil; pressing = false
         })
         .accessibilityElement(children: .ignore).accessibilityLabel(key + (letters.isEmpty ? "" : ", " + letters))
+        .accessibilityIdentifier("dial-key-" + key).accessibilityValue(preview ?? key)
         .accessibilityAddTraits(.isButton).accessibilityAction { selected(key) }
         .accessibilityActions { ForEach(letters.map(String.init), id: \.self) { letter in Button(letter) { selected(letter) } } }
         .onChange(of: touching) { active in if !active { task?.cancel(); task = nil; pressing = false; preview = nil } }

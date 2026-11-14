@@ -27,6 +27,7 @@ final class NativeWebRTCCallMedia: NativeCallMediaDriver {
     private var channel: MessengerWebRTCChannel?
     private var connected = false
     private var audioActive = false
+    private var systemAudioActive = false
     private var startTask: Task<Void, Never>?
     private var reconnectDeadline: Task<Void, Never>?
     var presentationChanged: ((NativeCallPresentation?) -> Void)?
@@ -40,6 +41,7 @@ final class NativeWebRTCCallMedia: NativeCallMediaDriver {
                event: @escaping (NativeCallMediaEvent) -> Void) {
         guard self.handle == nil else { event(.failed); return }
         self.handle = handle
+        audioActivated(systemAudioActive)
         self.profile = media
         self.event = event
         startTask = Task { [weak self] in
@@ -59,7 +61,7 @@ final class NativeWebRTCCallMedia: NativeCallMediaDriver {
     private func begin(handle: NativeCallHandle, media: NativeCallMedia) throws {
         let audio = RTCAudioSession.sharedInstance()
         audio.useManualAudio = true
-        audio.isAudioEnabled = false
+        audio.isAudioEnabled = audioActive
         try configureAudio(audio)
         let created = try negotiation.prepare(handle: handle, media: media) { [weak self] in
             guard self?.handle == handle else { return }
@@ -115,6 +117,7 @@ final class NativeWebRTCCallMedia: NativeCallMediaDriver {
     }
 
     func audioActivated(_ active: Bool) {
+        systemAudioActive = active
         let permitted = active && handle != nil
         guard audioActive != permitted else { return }
         audioActive = permitted

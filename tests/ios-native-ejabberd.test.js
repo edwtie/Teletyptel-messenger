@@ -97,6 +97,8 @@ test("MAM test restores isolated direct history with real two-account transports
 
 test("MUC test verifies private membership and post-leave refusal on an isolated server", () => {
   const root = path.resolve(__dirname, "..");
+  const fixture = fs.readFileSync(path.join(root, "scripts/check-ios-native-ejabberd.js"), "utf8");
+  assert.match(fixture, /members_only: true\s+mam: true/);
   const source = fs.readFileSync(path.join(root, "mobile/ios-native/Tests/NativeXMPPIntegrationTests/NativeGroupIntegrationTests.swift"), "utf8");
   for (const required of ["XCTSkip", '"github-hosted"', "NativeXMPPConnection().run", "joinGroup", "sendGroup",
     "leaveGroup", "outsiderCount, 0", "directCount, 0", "missing@conference.localhost", ".disconnected"])
