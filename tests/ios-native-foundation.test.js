@@ -29,6 +29,10 @@ test("Native DTMF uses negotiated RTP events and CallKit, never RTT or message s
   assert.doesNotMatch(policy, /NativeChat|Rtt|sendMessage|http|print\(/);
   assert.match(read("Sources/TeleTypTelCore/NativeJingleMedia.swift"), /proposed\.telephoneEvent\?\.payload == event\.payload/);
   assert.match(read("UITests/NativeStartupUITests.swift"), /XCTAssertFalse\(keypad\.isEnabled\)/);
+  const keypad = read("App/NativeTotalConversationView.swift").split("private var callKeypad:")[1].split("private func callButton")[0];
+  assert.match(keypad, /ScrollView \{/);
+  assert.match(keypad, /"\*", "0", "#"/);
+  assert.match(read("UITests/NativeStartupUITests.swift"), /testUnsupportedCallKeypadKeepsPhoneKeysReachableAcrossRotationWithoutKeyboard/);
 });
 
 test("Native push registry remains explicit-consent, bounded and inactive in the preview", () => {

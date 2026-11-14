@@ -442,6 +442,42 @@ final class NativeStartupUITests: XCTestCase {
         snapshot("tc-web-controls")
     }
 
+    func testUnsupportedCallKeypadKeepsPhoneKeysReachableAcrossRotationWithoutKeyboard() {
+        application.launchEnvironment["TELETYPTEL_NATIVE_UI_FIXTURE"] = "connected"
+        application.launchEnvironment["TELETYPTEL_NATIVE_CALL_VISUAL_FIXTURE"] = "total"
+        application.launchEnvironment["TELETYPTEL_NATIVE_CALL_KEYPAD_FIXTURE"] = "disabled"
+        application.launch()
+        let first = application.buttons["call-dtmf-1"]
+        XCTAssertTrue(first.waitForExistence(timeout: 10))
+        let scroll = application.scrollViews["call-dtmf-scroll"]
+        func revealPhoneKey(_ key: XCUIElement) {
+            for _ in 0..<8 {
+                let viewport = scroll.frame.intersection(application.frame).insetBy(dx: 0, dy: 3)
+                if key.exists, !key.frame.isEmpty, viewport.contains(key.frame) { return }
+                if key.exists, !key.frame.isEmpty, key.frame.midY < viewport.midY { scroll.swipeDown() }
+                else { scroll.swipeUp() }
+            }
+            XCTFail("Disabled telephone key remains outside the visible scroll viewport")
+        }
+        for orientation: UIDeviceOrientation in [.portrait, .landscapeLeft, .portrait] {
+            rotate(orientation)
+            revealPhoneKey(first)
+            XCTAssertFalse(first.isEnabled)
+            let last = application.buttons["call-dtmf-#"]
+            revealPhoneKey(last)
+            for tone in ["*", "0", "#"] {
+                let key = application.buttons["call-dtmf-" + tone]
+                XCTAssertTrue(scroll.frame.intersection(application.frame).contains(key.frame))
+                XCTAssertFalse(key.isEnabled)
+            }
+            XCTAssertFalse(application.keyboards.firstMatch.exists)
+            XCTAssertTrue(application.buttons["call-dtmf-close"].isHittable)
+            snapshot(orientation == .landscapeLeft ? "dtmf-keypad-landscape" : "dtmf-keypad-portrait")
+        }
+        application.buttons["call-dtmf-close"].tap()
+        XCTAssertTrue(application.buttons["Gespreksbediening"].isHittable)
+    }
+
     private func snapshot(_ name: String) {
         let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         attachment.name = name

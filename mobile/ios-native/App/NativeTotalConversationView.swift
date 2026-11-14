@@ -68,6 +68,16 @@ struct NativeTotalConversationView: View {
         .onChange(of: translation.sharingConsent) { _ in translateCurrentText() }
         .sheet(isPresented: $keypadOpen) { callKeypad }
         .onChange(of: controller.presentation?.callID) { _ in keypadOpen = false; keypadNotice = nil }
+        #if DEBUG
+        .onAppear {
+            let environment = ProcessInfo.processInfo.environment
+            if environment["TELETYPTEL_NATIVE_UI_FIXTURE"] == "connected",
+               environment["TELETYPTEL_NATIVE_CALL_VISUAL_FIXTURE"] == "total",
+               environment["TELETYPTEL_NATIVE_CALL_KEYPAD_FIXTURE"] == "disabled" {
+                keypadOpen = true
+            }
+        }
+        #endif
     }
 
     private func translateCurrentText() {
@@ -229,30 +239,33 @@ struct NativeTotalConversationView: View {
 
     private var callKeypad: some View {
         NavigationStack {
-            VStack(spacing: 16) {
-                Text("Toetsen voor het verbonden gesprek. Deze toetsen versturen geen chat of RTT-tekst.").font(.caption)
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 3), spacing: 12) {
-                    ForEach(["1", "2", "3", "4", "5", "6", "7", "8", "9", "*", "0", "#"], id: \.self) { tone in
-                        Button {
-                            keypadNotice = controller.sendDtmf(tone) ? "Toets verzonden." : "Geen toets verzonden. Controleer het gesprek en de DTMF-ondersteuning."
-                        } label: {
-                            VStack(spacing: 3) {
-                                Text(tone).font(.title)
-                                Text(NativeDialing.letters[tone] ?? "").font(.caption).accessibilityHidden(true)
-                            }.frame(maxWidth: .infinity, minHeight: 58)
+            ScrollView {
+                VStack(spacing: 16) {
+                    Text("Toetsen voor het verbonden gesprek. Deze toetsen versturen geen chat of RTT-tekst.").font(.caption)
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 3), spacing: 12) {
+                        ForEach(["1", "2", "3", "4", "5", "6", "7", "8", "9", "*", "0", "#"], id: \.self) { tone in
+                            Button {
+                                keypadNotice = controller.sendDtmf(tone) ? "Toets verzonden." : "Geen toets verzonden. Controleer het gesprek en de DTMF-ondersteuning."
+                            } label: {
+                                VStack(spacing: 3) {
+                                    Text(tone).font(.title)
+                                    Text(NativeDialing.letters[tone] ?? "").font(.caption).accessibilityHidden(true)
+                                }.frame(maxWidth: .infinity, minHeight: 58)
+                            }
+                            .disabled(controller.presentation?.canSendDtmf != true)
+                            .buttonStyle(.bordered).accessibilityLabel("Telefoontoets " + tone)
+                            .accessibilityIdentifier("call-dtmf-" + tone)
                         }
-                        .disabled(controller.presentation?.canSendDtmf != true)
-                        .buttonStyle(.bordered).accessibilityLabel("Telefoontoets " + tone)
-                        .accessibilityIdentifier("call-dtmf-" + tone)
                     }
-                }
-                if let notice = keypadNotice { Text(notice).font(.caption).accessibilityIdentifier("call-dtmf-status") }
-                Spacer(minLength: 0)
-            }.padding(20).frame(maxWidth: 420).frame(maxWidth: .infinity)
-                .navigationTitle("Telefoontoetsen")
-                .toolbar { ToolbarItem(placement: .cancellationAction) {
-                    Button { keypadOpen = false; keypadNotice = nil } label: { Image(systemName: "xmark").frame(width: 44, height: 44) }.accessibilityLabel("Sluiten")
-                } }
+                    if let notice = keypadNotice { Text(notice).font(.caption).accessibilityIdentifier("call-dtmf-status") }
+                }.padding(20).frame(maxWidth: 420).frame(maxWidth: .infinity)
+            }
+            .accessibilityIdentifier("call-dtmf-scroll")
+            .navigationTitle("Telefoontoetsen")
+            .toolbar { ToolbarItem(placement: .cancellationAction) {
+                Button { keypadOpen = false; keypadNotice = nil } label: { Image(systemName: "xmark").frame(width: 44, height: 44) }.accessibilityLabel("Sluiten")
+                    .accessibilityIdentifier("call-dtmf-close")
+            } }
         }
     }
 
