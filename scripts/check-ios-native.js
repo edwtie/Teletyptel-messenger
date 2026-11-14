@@ -45,6 +45,14 @@ function collectTestResults(bundle, { root, reports, family, execute = execFileS
   }
 }
 
+function runSimulatorChecks({ common, family, destination, resultBundle, logged }) {
+  const simulatorArguments = [...common, "-destination", destination,
+    "-configuration", "Debug", "ONLY_ACTIVE_ARCH=YES", "-parallel-testing-enabled", "NO"];
+  logged(family + "-build", "xcodebuild", [...simulatorArguments, "build-for-testing"]);
+  logged(family + "-tests", "xcodebuild", [...simulatorArguments,
+    "-resultBundlePath", resultBundle, "test-without-building"], 1200000);
+}
+
 function run() {
   if (process.platform !== "darwin") throw new Error("Native iOS compilation and UI tests require macOS/Xcode");
   const root = path.resolve(__dirname, "..");
@@ -81,10 +89,8 @@ function run() {
       const resultBundle = path.join(reports, family + ".xcresult");
       let passed = false;
       try {
-        logged(family + "-tests", "xcodebuild", [...common,
-          "-destination", "platform=iOS Simulator,arch=" + (process.arch === "arm64" ? "arm64" : "x86_64") + ",id=" + device.udid,
-          "-configuration", "Debug", "ONLY_ACTIVE_ARCH=YES",
-          "-parallel-testing-enabled", "NO", "-resultBundlePath", resultBundle, "test"], 1200000);
+        runSimulatorChecks({ common, family, resultBundle, logged,
+          destination: "platform=iOS Simulator,arch=" + (process.arch === "arm64" ? "arm64" : "x86_64") + ",id=" + device.udid });
         passed = true;
       } catch (error) {
         uiFailures.push(family + ": " + error.message);
@@ -104,4 +110,4 @@ function run() {
 }
 
 if (require.main === module) run();
-module.exports = { run, executeLogged, collectTestResults };
+module.exports = { run, executeLogged, collectTestResults, runSimulatorChecks };

@@ -4,7 +4,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { execFileSync } = require("node:child_process");
 const { prepare, projectText } = require("../scripts/prepare-ios-native");
-const { executeLogged, collectTestResults } = require("../scripts/check-ios-native");
+const { executeLogged, collectTestResults, runSimulatorChecks } = require("../scripts/check-ios-native");
 const { checkMedia } = require("../scripts/check-ios-native-media");
 const { providerPlist } = require("../scripts/native-provider-config");
 
@@ -44,6 +44,40 @@ function diagnosticDirectory() {
   fs.mkdirSync(artifacts, { recursive: true });
   return fs.mkdtempSync(path.join(artifacts, "ios-native-diagnostics-test-"));
 }
+
+test("Native simulator checks keep compilation separate from the unchanged UI deadline", () => {
+  const calls = [];
+  runSimulatorChecks({ common: ["-project", "fixture.xcodeproj", "CODE_SIGNING_ALLOWED=NO"],
+    family: "iPhone", destination: "platform=iOS Simulator,id=fixture", resultBundle: "fixture.xcresult",
+    logged: (...args) => calls.push(args) });
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0][0], "iPhone-build");
+  assert.equal(calls[0][2].at(-1), "build-for-testing");
+  assert.equal(calls[0][3], undefined);
+  assert.equal(calls[1][0], "iPhone-tests");
+  assert.equal(calls[1][2].at(-1), "test-without-building");
+  assert.equal(calls[1][3], 1200000);
+  assert.deepEqual(calls[0][2].slice(0, -1), calls[1][2].slice(0, -3));
+  assert.deepEqual(calls[1][2].slice(-3), ["-resultBundlePath", "fixture.xcresult", "test-without-building"]);
+  for (const call of calls) {
+    assert.equal(call[1], "xcodebuild");
+    assert.ok(call[2].includes("CODE_SIGNING_ALLOWED=NO"));
+    assert.ok(!call[2].some(value => /skip-testing|retry|test-iterations/.test(value)));
+  }
+});
+
+test("Native simulator checks propagate build and assertion failures without retry or fallback", () => {
+  for (const failedStage of ["iPad-build", "iPad-tests"]) {
+    const calls = [];
+    const failure = new Error(failedStage);
+    assert.throws(() => runSimulatorChecks({ common: [], family: "iPad", destination: "fixture",
+      resultBundle: "fixture.xcresult", logged: name => {
+        calls.push(name);
+        if (name === failedStage) throw failure;
+      } }), error => error === failure);
+    assert.deepEqual(calls, failedStage === "iPad-build" ? ["iPad-build"] : ["iPad-build", "iPad-tests"]);
+  }
+});
 
 test("Native media runner requires runtime results for every profile and keeps failed evidence", () => {
   const directory = diagnosticDirectory();
