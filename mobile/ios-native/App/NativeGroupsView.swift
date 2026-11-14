@@ -165,7 +165,7 @@ struct NativeGroupChatView: View {
                 }
             }
             .clipped()
-            .onChange(of: group.messages.last?.id) { identifier in if identifier != nil { proxy.scrollTo("group-bottom", anchor: .bottom) } }
+            .onChange(of: group.messages.last) { message in if message != nil { proxy.scrollTo("group-bottom", anchor: .bottom) } }
             .onAppear { proxy.scrollTo("group-bottom", anchor: .bottom) }
         }
     }

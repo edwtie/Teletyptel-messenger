@@ -163,6 +163,13 @@ public struct NativeChatStore: Equatable {
             if case .retract = change {
                 guard rememberRetraction(peer: peer, target: change.target) else { historyLimited = true; return }
             }
+            if matches.isEmpty, case .correct(let target, let body) = change, NativeChatCodec.validBody(body) {
+                guard makeRoom() else { historyLimited = true; return }
+                messages.append(NativeChatMessage(id: UUID(), stanzaID: identifier, peer: peer, body: body, date: Date(),
+                    state: .incoming, edited: true, previousIDs: [target]))
+                applyRememberedRetraction(to: messages.count - 1)
+                return
+            }
             guard matches.count == 1, let index = matches.first, !messages[index].retracted else { return }
             guard messages[index].stanzaID != identifier, !messages[index].previousIDs.contains(identifier) else { return }
             apply(change, at: index, identifier: identifier)
@@ -239,6 +246,15 @@ public struct NativeChatStore: Equatable {
             let matches = messages.indices.filter { messages[$0].peer == archived.peer &&
                 (messages[$0].state != .incoming) == archived.outgoing &&
                 (messages[$0].stanzaID == change.target || messages[$0].previousIDs.contains(change.target)) }
+            if matches.isEmpty, case .correct(let target, let body) = change {
+                guard !messages.contains(where: { $0.peer == archived.peer && ($0.state != .incoming) == archived.outgoing &&
+                    ($0.stanzaID == identifier || $0.previousIDs.contains(identifier)) }) else { continue }
+                guard makeRoom() else { historyLimited = true; continue }
+                messages.append(NativeChatMessage(id: UUID(), stanzaID: identifier, peer: archived.peer, body: body,
+                    date: archived.date, state: archived.outgoing ? .submitted : .incoming, archiveID: archived.archiveID,
+                    edited: true, previousIDs: [target]))
+                continue
+            }
             guard matches.count == 1, let index = matches.first, !messages[index].retracted,
                   messages[index].stanzaID != identifier, !messages[index].previousIDs.contains(identifier) else { continue }
             if case .correct = change, messages[index].stanzaID != change.target { continue }
@@ -269,8 +285,9 @@ public struct NativeChatStore: Equatable {
 
     mutating func beginChange(_ identifier: UUID, correctedBody: String?) throws -> (NativeChatMessage, NativeMessageChange, String) {
         guard correctedBody == nil ? canRetract(identifier) : canCorrect(identifier),
-              let index = messages.firstIndex(where: { $0.id == identifier }), let target = messages[index].stanzaID,
+              let index = messages.firstIndex(where: { $0.id == identifier }), let current = messages[index].stanzaID,
               retainedActionCount < 128 || messages[index].edited else { throw NativeChatFailure.invalidMessage }
+        let target = correctedBody == nil ? (messages[index].previousIDs.first ?? current) : current
         let change: NativeMessageChange = correctedBody.map { .correct(target: target, body: $0) } ?? .retract(target: target)
         let request = UUID().uuidString
         _ = try NativeMessageActionCodec.encode(to: messages[index].peer, change: change, identifier: request)
@@ -311,8 +328,9 @@ public struct NativeChatStore: Equatable {
     }
 
     private mutating func applyRememberedRetraction(to index: Int) {
-        if messages[index].state == .incoming, let identifier = messages[index].stanzaID,
-           retractionTombstones[messages[index].peer]?.contains(identifier) == true {
+        let identifiers = messages[index].previousIDs + (messages[index].stanzaID.map { [$0] } ?? [])
+        if messages[index].state == .incoming,
+           identifiers.contains(where: { retractionTombstones[messages[index].peer]?.contains($0) == true }) {
             messages[index].body = ""; messages[index].retracted = true
         }
     }

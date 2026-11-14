@@ -57,8 +57,8 @@ struct NativeChatView: View {
                                 }
                         }
                     }
-                    .onChange(of: messages.last?.id) { identifier in
-                        if identifier != nil { proxy.scrollTo("chat-bottom", anchor: .bottom) }
+                    .onChange(of: messages.last) { message in
+                        if message != nil { proxy.scrollTo("chat-bottom", anchor: .bottom) }
                     }
                     .onAppear { proxy.scrollTo("chat-bottom", anchor: .bottom) }
                 }

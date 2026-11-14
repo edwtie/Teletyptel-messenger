@@ -133,6 +133,31 @@ private actor GroupFixture: NativeGroupMessageChanging {
 
 final class NativeGroupModelTests: XCTestCase {
     @MainActor
+    func testOwnGroupRetractionRequiresServerEchoAndWaitsForAuthorMatchedReflection() async {
+        let fixture = GroupFixture(); let model = NativeGroupModel()
+        let room = "room@conference.localhost"
+        model.attach(fixture, owner: "owner@localhost"); model.join(room: room, nickname: "Me")
+        await wait { model.rooms.first?.snapshot != nil }
+        model.setDraft("Eigen tekst", room: room); model.send(room: room)
+        await wait { model.rooms[0].messages.first?.state == .submitted }
+        let message = model.rooms[0].messages[0]
+        XCTAssertFalse(model.canRetract(room: room, identifier: message.id))
+        await fixture.emit(.snapshot(NativeGroupSnapshot(room: room, nickname: "Me", participants: ["Me", "Peer"], canSpeak: true, supportsRetraction: true)), room: room)
+        await fixture.emit(.message(NativeGroupText(id: UUID(), room: room, nickname: "Me", identifier: message.identifier,
+            archiveID: "server-own", body: message.body, date: Date(), own: true, state: .submitted, occupantID: "stable-own")), room: room)
+        await wait { model.canRetract(room: room, identifier: message.id) }
+        XCTAssertEqual(model.rooms[0].messages.count, 1)
+        model.retract(room: room, identifier: message.id)
+        await wait { !model.rooms[0].messages[0].actionPending }
+        let sent = await fixture.retractions
+        XCTAssertEqual(sent, 1)
+        XCTAssertFalse(model.rooms[0].messages[0].retracted)
+        await fixture.emit(.retracted(target: "server-own", occupantID: "stable-own"), room: room)
+        await wait { model.rooms[0].messages[0].retracted }
+        XCTAssertEqual(model.rooms[0].messages[0].body, "")
+        model.disconnect(clear: true)
+    }
+    @MainActor
     func testRoomRetractionCannotUseNicknameOrAnotherOccupantsIdentity() async {
         let fixture = GroupFixture(); let model = NativeGroupModel()
         let room = "room@conference.localhost"

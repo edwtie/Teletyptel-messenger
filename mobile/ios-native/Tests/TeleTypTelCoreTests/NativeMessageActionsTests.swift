@@ -52,17 +52,18 @@ final class NativeMessageActionsTests: XCTestCase {
         store.receive(.change(peer: "stranger@localhost", identifier: "bad", change: .correct(target: "original", body: "Onjuist")))
         store.receive(.change(peer: peer, identifier: "bad-own", change: .retract(target: outgoing.stanzaID!)))
         XCTAssertEqual(store.messages.first?.body, "Origineel")
-        XCTAssertEqual(store.messages.last?.body, "Oude tekst")
+        XCTAssertEqual(store.messages.last(where: { $0.peer == peer })?.body, "Oude tekst")
         store.receive(.change(peer: peer, identifier: "edit-1", change: .correct(target: "original", body: "Nieuwe tekst")))
         store.receive(.change(peer: peer, identifier: "edit-2", change: .correct(target: "edit-1", body: "Laatste tekst")))
         store.receive(.change(peer: peer, identifier: "edit-1", change: .correct(target: "original", body: "Nieuwe tekst")))
         store.receive(.message(peer: peer, identifier: "original", body: "Oude tekst"))
-        XCTAssertEqual(store.messages.count, 2)
-        XCTAssertEqual(store.messages.last?.body, "Laatste tekst")
-        XCTAssertTrue(store.messages.last?.edited == true)
+        XCTAssertEqual(store.messages.filter { $0.peer == peer }.count, 2)
+        XCTAssertEqual(store.messages.last(where: { $0.peer == peer })?.body, "Laatste tekst")
+        XCTAssertTrue(store.messages.last(where: { $0.peer == peer })?.edited == true)
         store.receive(.change(peer: peer, identifier: "retract-1", change: .retract(target: "original")))
-        XCTAssertTrue(store.messages.last?.retracted == true)
-        XCTAssertEqual(store.messages.last?.body, "")
+        XCTAssertTrue(store.messages.last(where: { $0.peer == peer })?.retracted == true)
+        XCTAssertEqual(store.messages.last(where: { $0.peer == peer })?.body, "")
+        XCTAssertEqual(store.messages.last(where: { $0.peer == "stranger@localhost" })?.body, "Onjuist")
     }
 
     func testLocalDeleteDoesNotSendRetractionOrResurrectOnArchiveMerge() throws {
@@ -134,7 +135,7 @@ final class NativeMessageActionsTests: XCTestCase {
         let correction = NativeArchivedText(archiveID: "a2", identifier: "edit-1", peer: peer, body: "", date: time, outgoing: false, change: .correct(target: "original", body: "Nieuw"))
         let retraction = NativeArchivedText(archiveID: "a3", identifier: "retract-2", peer: peer, body: "", date: time.addingTimeInterval(1), outgoing: false, change: .retract(target: "edit-1"))
         try store.mergeArchive(page([correction, retraction]))
-        XCTAssertEqual(store.messages.count, 1)
+        XCTAssertEqual(store.messages.count, 2)
         let original = NativeArchivedText(archiveID: "a1", identifier: "original", peer: peer, body: "Oud", date: time.addingTimeInterval(-1), outgoing: false)
         try store.mergeArchive(page([original]))
         try store.mergeArchive(page([original, correction, retraction]))
@@ -142,6 +143,40 @@ final class NativeMessageActionsTests: XCTestCase {
         XCTAssertTrue(store.messages.last?.retracted == true)
         XCTAssertEqual(store.messages.last?.body, "")
         XCTAssertTrue(store.messages.last?.edited == true)
+    }
+
+    func testCorrectionWithoutLoadedOriginalIsVisibleAndLaterOriginalDoesNotDuplicateIt() throws {
+        var store = NativeChatStore()
+        store.receive(.change(peer: peer, identifier: "edit", change: .correct(target: "missing", body: "Nieuwe tekst")))
+        XCTAssertEqual(store.messages.count, 1)
+        XCTAssertEqual(store.messages[0].body, "Nieuwe tekst")
+        XCTAssertTrue(store.messages[0].edited)
+        store.receive(.message(peer: peer, identifier: "missing", body: "Oude tekst"))
+        XCTAssertEqual(store.messages.count, 1)
+        store.receive(.change(peer: peer, identifier: "retract", change: .retract(target: "missing")))
+        XCTAssertTrue(store.messages[0].retracted)
+    }
+
+    func testRetractionAfterEditingTargetsRootAndArchivedCorrectionCannotResurrectIt() throws {
+        var store = NativeChatStore()
+        let message = try submitted(&store)
+        let (_, edit, identifier) = try store.beginChange(message.id, correctedBody: "Gecorrigeerd")
+        store.finishChange(message.id, change: edit, request: identifier, submitted: true)
+        let (_, retract, request) = try store.beginChange(message.id, correctedBody: nil)
+        XCTAssertEqual(retract, .retract(target: message.stanzaID!))
+        store.finishChange(message.id, change: retract, request: request, submitted: true)
+        XCTAssertTrue(store.messages[0].retracted)
+        var restored = NativeChatStore()
+        let time = Date()
+        try restored.mergeArchive(page([
+            NativeArchivedText(archiveID: "edit", identifier: identifier, peer: peer, body: "", date: time, outgoing: false,
+                change: .correct(target: message.stanzaID!, body: "Gecorrigeerd")),
+            NativeArchivedText(archiveID: "retract", identifier: request, peer: peer, body: "", date: time.addingTimeInterval(1), outgoing: false,
+                change: .retract(target: message.stanzaID!))
+        ]))
+        XCTAssertEqual(restored.messages.count, 1)
+        XCTAssertTrue(restored.messages[0].retracted)
+        XCTAssertEqual(restored.messages[0].body, "")
     }
 
     func testCapabilityDiscoveryIsScopedAndAdvertisesBothActions() throws {

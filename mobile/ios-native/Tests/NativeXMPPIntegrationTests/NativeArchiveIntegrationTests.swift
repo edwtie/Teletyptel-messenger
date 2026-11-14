@@ -117,7 +117,7 @@ final class NativeArchiveIntegrationTests: XCTestCase {
         let original = UUID().uuidString; let edit = UUID().uuidString; let retract = UUID().uuidString
         try await sender.sendMessage(to: peer, body: "Fictief origineel voor berichtacties", identifier: original)
         try await changes.changeMessage(to: peer, change: .correct(target: original, body: "Fictief gecorrigeerd"), identifier: edit)
-        try await changes.changeMessage(to: peer, change: .retract(target: edit), identifier: retract)
+        try await changes.changeMessage(to: peer, change: .retract(target: original), identifier: retract)
         for _ in 0..<300 {
             if await right.changeCount >= 2 { break }
             try await Task.sleep(nanoseconds: 10_000_000)
