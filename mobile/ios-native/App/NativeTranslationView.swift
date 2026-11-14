@@ -88,6 +88,7 @@ struct NativeMessengerView: View {
     @State private var search = ""
     @State private var showTranslation = false
     @State private var showGroups = false
+    @State private var showAccount = false
 
     private var contacts: [NativeContact] {
         guard case .ready(let contacts) = model.roster else { return [] }
@@ -153,6 +154,7 @@ struct NativeMessengerView: View {
                     Menu {
                         Button { showGroups = true } label: { Label("Groepschats", systemImage: "person.3.fill") }
                             .accessibilityIdentifier("open-groups")
+                        Button { showAccount = true } label: { Label("Accountinstellingen", systemImage: "person.crop.circle") }.accessibilityIdentifier("open-account-settings")
                         Button { showTranslation = true } label: { Label("Vertaling", systemImage: "globe") }
                         Button(action: logout) { Label("Uitloggen", systemImage: "rectangle.portrait.and.arrow.right") }
                     } label: { Image(systemName: "line.3.horizontal").frame(width: 44, height: 44) }
@@ -171,7 +173,8 @@ struct NativeMessengerView: View {
             }
         }
         .navigationSplitViewStyle(.balanced)
-        .sheet(isPresented: $showGroups) { NativeGroupsView(model: model.groups) }
+        .sheet(isPresented: $showGroups) { NativeGroupsView(model: model.groups, login: model, translation: translation) }
+        .sheet(isPresented: $showAccount) { NativeAccountSettingsView(login: model, translation: translation) }
         .sheet(isPresented: $showTranslation) { NativeTranslationSettingsView(model: translation) }
     }
 

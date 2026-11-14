@@ -10,12 +10,14 @@ public struct NativeGroupConversation: Identifiable, Equatable {
     public var draft = ""
     public var messages: [NativeGroupText] = []
     public var historyLimited = false
+    public var subject = ""
     public var id: String { room }
 }
 
 @MainActor
 public final class NativeGroupModel: ObservableObject {
     public let invitationModel = NativeGroupInvitationModel()
+    public let management = NativeGroupManagementModel()
     @Published public private(set) var rooms: [NativeGroupConversation] = []
     @Published public private(set) var error: String?
     @Published public private(set) var available = false
@@ -36,6 +38,7 @@ public final class NativeGroupModel: ObservableObject {
         self.sender = sender
         available = true
         if let inviting = sender as? any NativeGroupInviting { invitationModel.attach(inviting, owner: owner) }
+        if let managing = sender as? any NativeGroupManaging { management.attach(managing) }
     }
 
     func updateContacts(_ contacts: [NativeContact], owner: String) {
@@ -59,6 +62,7 @@ public final class NativeGroupModel: ObservableObject {
     func disconnect(clear: Bool) {
         generation = UUID()
         invitationModel.disconnect(clear: clear)
+        management.disconnect()
         for task in joins.values { task.cancel() }
         for task in sends.values { task.cancel() }
         joins.removeAll(); sends.removeAll(); tokens.removeAll()
@@ -78,7 +82,7 @@ public final class NativeGroupModel: ObservableObject {
         if clear { rooms.removeAll(); owner = nil; error = nil }
     }
 
-    public func join(room: String, nickname: String) {
+    public func join(room: String, nickname: String, create: Bool = false) {
         guard available, let sender = sender, let owner = owner else { error = NativeGroupFailure.disconnected.label; return }
         do { _ = try NativeMUCStream(room: room, nickname: nickname, boundJID: owner + "/validation") }
         catch { self.error = NativeGroupFailure.invalidRoom.label; return }
@@ -93,12 +97,16 @@ public final class NativeGroupModel: ObservableObject {
         error = nil
         joins[room] = Task { [weak self] in
             do {
-                try await sender.joinGroup(room: room, nickname: nickname) { [weak self] event in
+                let callback: @Sendable (NativeGroupEvent) -> Void = { [weak self] event in
                     Task { @MainActor [weak self] in
                         guard let self = self, self.generation == attempt, self.tokens[room] == token else { return }
                         self.receive(event, room: room)
                     }
                 }
+                if create {
+                    guard let managing = sender as? any NativeGroupManaging else { throw NativeGroupFailure.unavailable }
+                    try await managing.createGroup(room: room, nickname: nickname, onEvent: callback)
+                } else { try await sender.joinGroup(room: room, nickname: nickname, onEvent: callback) }
                 guard let self = self, self.generation == attempt, self.tokens[room] == token else { return }
                 self.joins.removeValue(forKey: room)
             } catch {
@@ -119,6 +127,24 @@ public final class NativeGroupModel: ObservableObject {
     public func setDraft(_ text: String, room: String) {
         guard text.utf8.count <= 8192, let index = rooms.firstIndex(where: { $0.room == room }) else { return }
         rooms[index].draft = text
+    }
+
+    public func setSubject(_ subject: String, room: String) {
+        guard let sender = sender as? any NativeGroupManaging, available, subject.utf8.count <= 512,
+              rooms.first(where: { $0.room == room })?.snapshot?.canSpeak == true, sends.count < 8 else { error = NativeGroupFailure.denied.label; return }
+        let identifier = UUID(); let attempt = generation
+        sends[identifier] = Task { [weak self] in
+            do {
+                try await sender.setGroupSubject(room: room, subject: subject)
+                guard let self = self, self.generation == attempt else { return }
+                self.error = "Onderwerp verzonden; de server bepaalt of het wordt toegepast."
+            } catch {
+                guard let self = self, self.generation == attempt else { return }
+                self.error = "Onderwerp niet bevestigd. Controleer je groepsrechten."
+            }
+            guard let self = self, self.generation == attempt else { return }
+            self.sends.removeValue(forKey: identifier)
+        }
     }
 
     public func send(room: String) {
@@ -149,6 +175,8 @@ public final class NativeGroupModel: ObservableObject {
     private func receive(_ event: NativeGroupEvent, room: String) {
         guard let index = rooms.firstIndex(where: { $0.room == room }) else { return }
         switch event {
+        case .subject(let subject):
+            if subject.utf8.count <= 512 { rooms[index].subject = subject }
         case .snapshot(let snapshot):
             guard snapshot.room == room, NativeMUCStream.validNickname(snapshot.nickname), snapshot.participants.count <= 128 else { return }
             rooms[index].snapshot = snapshot; rooms[index].nickname = snapshot.nickname

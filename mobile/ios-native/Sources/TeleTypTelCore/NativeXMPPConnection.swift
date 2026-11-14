@@ -106,12 +106,13 @@ private final class NativeSessionClosure {
     }
 }
 
-private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, NativeArchiveSending, NativeGroupInviting, NativeJingleSending, @unchecked Sendable {
+private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, NativeArchiveSending, NativeGroupManaging, NativeJingleSending, @unchecked Sendable {
     private let configuration: ServerConfiguration
     private let ownerJID: String
     private var boundJID: String?
     private var archive: (query: NativeArchiveQuery, token: UUID, continuation: CheckedContinuation<NativeArchivePage, Error>, deadline: DispatchWorkItem)?
     private var groups: [String: NativeGroupOperation] = [:]
+    private var management: [String: (command: NativeGroupCommand, target: String, continuation: CheckedContinuation<NativeGroupReply, Error>, deadline: DispatchWorkItem)] = [:]
     private var invitationObserver: (@Sendable (NativeGroupInvitationEvent) -> Void)?
     private var earlyInvitations: [NativeGroupInvitationEvent] = []
     private let queue = DispatchQueue(label: "nl.teletyptel.native.session")
@@ -266,6 +267,30 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
     }
 
     func joinGroup(room: String, nickname: String, onEvent: @escaping @Sendable (NativeGroupEvent) -> Void) async throws {
+        try await enterGroup(room: room, nickname: nickname, creating: false, onEvent: onEvent)
+    }
+
+    func createGroup(room: String, nickname: String, onEvent: @escaping @Sendable (NativeGroupEvent) -> Void) async throws {
+        try await enterGroup(room: room, nickname: nickname, creating: true, onEvent: onEvent)
+        do {
+            guard case .configuration(var configuration) = try await manageGroup(.configuration(room)),
+                  configuration.fields["muc#roomconfig_membersonly"] != nil,
+                  configuration.fields["muc#roomconfig_publicroom"] != nil else { throw NativeGroupFailure.unavailable }
+            configuration.membersOnly = true; configuration.publicRoom = false; configuration.persistent = true
+            _ = try await manageGroup(.configure(room, configuration))
+            try Task.checkCancellation()
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                queue.async {
+                    if !self.completed, let entry = self.groups[room] {
+                        entry.stream.confirmCreation(); entry.callback(.snapshot(entry.stream.snapshot))
+                    }
+                    continuation.resume()
+                }
+            }
+        } catch { await leaveGroup(room: room); throw error }
+    }
+
+    private func enterGroup(room: String, nickname: String, creating: Bool, onEvent: @escaping @Sendable (NativeGroupEvent) -> Void) async throws {
         try Task.checkCancellation()
         let token = UUID()
         let cancellation = NativeArchiveCancellation()
@@ -278,7 +303,7 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
                     }
                     guard self.groups[room] == nil, self.groups.count < 8 else { continuation.resume(throwing: NativeGroupFailure.limit); return }
                     do {
-                        let stream = try NativeMUCStream(room: room, nickname: nickname, boundJID: bound)
+                        let stream = try NativeMUCStream(room: room, nickname: nickname, boundJID: bound, creating: creating)
                         let entry = NativeGroupOperation(stream: stream, token: token, continuation: continuation, callback: onEvent)
                         let deadline = DispatchWorkItem { [weak self] in
                             self?.endGroup(room: room, token: token, error: NativeGroupFailure.timedOut, sendLeave: true)
@@ -294,6 +319,55 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
             cancellation.cancel()
             self.queue.async { self.endGroup(room: room, token: token, error: CancellationError(), sendLeave: true) }
         })
+    }
+
+    func manageGroup(_ command: NativeGroupCommand) async throws -> NativeGroupReply {
+        try Task.checkCancellation()
+        let identifier = "muc-manage-" + UUID().uuidString
+        let cancellation = NativeArchiveCancellation()
+        return try await withTaskCancellationHandler(operation: {
+            try await withCheckedThrowingContinuation { continuation in
+                queue.async {
+                    guard !cancellation.isCancelled else { continuation.resume(throwing: CancellationError()); return }
+                    guard !self.completed, self.stream.phase == .online, self.management.count < 4 else {
+                        continuation.resume(throwing: NativeGroupFailure.disconnected); return
+                    }
+                    do {
+                        let target = try NativeGroupManagementCodec.target(command, account: self.ownerJID)
+                        let frame = try NativeGroupManagementCodec.request(command, account: self.ownerJID, identifier: identifier)
+                        let deadline = DispatchWorkItem { [weak self] in self?.finishManagement(identifier, result: .failure(NativeGroupFailure.timedOut)) }
+                        self.management[identifier] = (command, target, continuation, deadline)
+                        self.queue.asyncAfter(deadline: .now() + 10, execute: deadline)
+                        self.send([frame]) {}
+                    } catch { continuation.resume(throwing: error) }
+                }
+            }
+        }, onCancel: { cancellation.cancel(); self.queue.async { self.finishManagement(identifier, result: .failure(CancellationError())) } })
+    }
+
+    private func finishManagement(_ identifier: String, result: Result<NativeGroupReply, Error>) {
+        guard let pending = management.removeValue(forKey: identifier) else { return }
+        pending.deadline.cancel(); pending.continuation.resume(with: result)
+    }
+
+    private func receiveManagement(_ frame: String) {
+        guard !management.isEmpty, let root = try? ProbeXML.parse(frame), root.name == "iq", root.namespace == "jabber:client",
+              let identifier = root.attributes["id"], let pending = management[identifier], root.attributes["from"] == pending.target,
+              ["result", "error"].contains(root.attributes["type"] ?? ""),
+              root.attributes["to"] == nil || root.attributes["to"] == ownerJID || root.attributes["to"] == boundJID else { return }
+        do { finishManagement(identifier, result: .success(try NativeGroupManagementCodec.decode(root, command: pending.command, account: ownerJID))) }
+        catch { finishManagement(identifier, result: .failure(error)) }
+    }
+
+    func setGroupSubject(room: String, subject: String) async throws {
+        guard NativeInvitationCodec.isRoom(room, owner: ownerJID), subject.utf8.count <= 512 else { throw NativeGroupFailure.invalidRoom }
+        try Task.checkCancellation()
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            queue.async {
+                guard self.groups[room]?.stream.canSpeak == true else { continuation.resume(throwing: NativeGroupFailure.denied); return }
+                self.enqueueMessage("<message xmlns='jabber:client' type='groupchat' to='\(NativeMUCStream.escape(room))' id='\(UUID().uuidString)'><subject>\(NativeMUCStream.escape(subject))</subject></message>", continuation: continuation)
+            }
+        }
     }
 
     func observeGroupInvitations(_ observer: @escaping @Sendable (NativeGroupInvitationEvent) -> Void) async {
@@ -532,6 +606,7 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
         if let token = archive?.token { completeArchive(token, result: .failure(error)) }
         invitationObserver = nil
         earlyInvitations.removeAll()
+        for identifier in Array(management.keys) { finishManagement(identifier, result: .failure(error)) }
         for (room, entry) in Array(groups) { endGroup(room: room, token: entry.token, error: NativeGroupFailure.disconnected, sendLeave: false) }
         boundJID = nil
         for identifier in Array(pendingJingle.keys) { completeJingle(identifier, error: error) }
@@ -596,7 +671,7 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
                 do {
                     guard case .string(let frame) = try result.get() else { throw ConnectionFailure.invalidResponse }
                     let output = try self.stream.receive(frame)
-                    if self.stream.phase == .online { self.receiveArchive(frame); self.receiveGroups(frame); self.receiveInvitation(frame) }
+                    if self.stream.phase == .online { self.receiveArchive(frame); self.receiveGroups(frame); self.receiveInvitation(frame); self.receiveManagement(frame) }
                     self.send(output.frames) {
                         if let jid = output.connectedJID {
                             self.boundJID = jid

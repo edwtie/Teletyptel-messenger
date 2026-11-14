@@ -209,6 +209,39 @@ final class NativeStartupUITests: XCTestCase {
         application.buttons["close-invite-contacts"].tap()
     }
 
+    func testAccountSettingsSaveWithoutChangingIdentity() {
+        signInFixture("connected")
+        XCTAssertTrue(application.buttons["disconnect-session"].waitForExistence(timeout: 10))
+        application.buttons["Hoofdmenu"].tap(); application.buttons["open-account-settings"].tap()
+        let name = application.textFields["profile-name"]
+        XCTAssertTrue(name.waitForExistence(timeout: 10)); reveal(name); name.tap(); name.typeText(" gewijzigd")
+        let save = application.buttons["profile-save"]; reveal(save); save.tap()
+        let status = application.staticTexts["profile-status"]
+        expectation(for: NSPredicate(format: "label CONTAINS %@", "Accountinstellingen opgeslagen"), evaluatedWith: status)
+        waitForExpectations(timeout: 10)
+        XCTAssertTrue(application.staticTexts["fixture@localhost"].exists)
+        snapshot("account-settings-saved")
+    }
+
+    func testAttachmentUploadOnlyStagesLinkUntilExplicitSend() {
+        signInFixture("connected")
+        let contact = application.descendants(matching: .any)["contact-demo-contact@localhost"].firstMatch
+        XCTAssertTrue(contact.waitForExistence(timeout: 10)); reveal(contact); contact.tap()
+        application.buttons["attachment-picker"].tap()
+        let selection = application.buttons["fixture-attachment-selection"]
+        XCTAssertTrue(selection.waitForExistence(timeout: 5)); selection.tap()
+        let upload = application.buttons["attachment-upload"]; reveal(upload); upload.tap()
+        let stage = application.buttons["attachment-stage"]
+        XCTAssertTrue(stage.waitForExistence(timeout: 10)); reveal(stage)
+        snapshot("attachment-uploaded-not-sent"); stage.tap()
+        let draft = application.descendants(matching: .any)["chat-draft"].firstMatch
+        XCTAssertTrue((draft.value as? String)?.contains("Bestand: test.txt") == true)
+        let submitted = application.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "chat-message-", "Bestand: test.txt")).firstMatch
+        XCTAssertFalse(submitted.exists)
+        application.buttons["chat-send"].tap()
+        XCTAssertTrue(submitted.waitForExistence(timeout: 10))
+    }
+
     func testConnectionLossIsVisibleWithoutAutomaticRelogin() {
         signInFixture("disconnect")
         waitForStatus("De XMPP-server reageert niet meer")

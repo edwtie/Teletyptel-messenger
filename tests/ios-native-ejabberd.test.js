@@ -116,4 +116,10 @@ test("Invitation fixture checks real room mediation, decline and explicit accept
   const harness = fs.readFileSync(path.join(root, "scripts/check-ios-native-ejabberd.js"), "utf8");
   assert.match(harness, /runSwift\("NativeInvitationIntegrationTests", "native-invitation-tests.txt"\)/);
   assert.match(harness, /control\("set_room_affiliation", invitationRoom, "conference.localhost", username, "localhost", "owner"\)/);
+  for (const required of ['manageGroup(.configure', 'Non-owner configured', '"visitor"', '"outcast"', 'createGroup', 'createdConfiguration.membersOnly'])
+    assert.ok(source.includes(required), required);
+  assert.throws(() => serverConfiguration(path.resolve("artifacts/fake-only"), 15280, 15281, "ordinary-user"));
+  const allowed = serverConfiguration(path.resolve("artifacts/fake-only"), 15280, 15281, "native-test-0123456789abcdef");
+  assert.match(allowed, /allow: native_creator\s+deny: all/);
+  assert.match(allowed, /access_create: native_create/);
 });

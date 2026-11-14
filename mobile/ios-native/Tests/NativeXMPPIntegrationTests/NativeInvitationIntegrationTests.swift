@@ -87,6 +87,30 @@ final class NativeInvitationIntegrationTests: XCTestCase {
         let acceptedCount = await accepted.groupCount; let declinedCount = await declined.groupCount
         let directCount = await accepted.directCount
         XCTAssertEqual(acceptedCount, 1); XCTAssertEqual(declinedCount, 0); XCTAssertEqual(directCount, 0)
+        let managing = try XCTUnwrap(ownerSender as? any NativeGroupManaging)
+        let nonOwner = try XCTUnwrap(acceptSender as? any NativeGroupManaging)
+        guard case .configuration(var configuration) = try await managing.manageGroup(.configuration(room)) else { return XCTFail("Owner configuration missing") }
+        configuration.name = "Fictieve besloten testgroep"; configuration.membersOnly = true; configuration.publicRoom = false
+        _ = try await managing.manageGroup(.configure(room, configuration))
+        do { _ = try await nonOwner.manageGroup(.configure(room, configuration)); XCTFail("Non-owner configured the room") } catch {}
+        guard case .members(let members) = try await managing.manageGroup(.members(room, "member")) else { return XCTFail("No member list") }
+        XCTAssertTrue(members.contains(fixture.groupOutsider + "@localhost"))
+        _ = try await managing.manageGroup(.role(room, "Accepted", "visitor"))
+        for _ in 0..<500 { if await accepted.canSpeak == false { break }; try await Task.sleep(nanoseconds: 10_000_000) }
+        let muted = await accepted.canSpeak; XCTAssertEqual(muted, false)
+        do { try await acceptSender.sendGroup(room: room, body: "Must not speak", identifier: UUID().uuidString); XCTFail("Visitor spoke") } catch { XCTAssertEqual(error as? NativeGroupFailure, .denied) }
+        _ = try await managing.manageGroup(.role(room, "Accepted", "participant"))
+        _ = try await managing.manageGroup(.affiliation(room, fixture.archivePeer + "@localhost", "outcast"))
+        guard case .members(let banned) = try await managing.manageGroup(.members(room, "outcast")) else { return XCTFail("No ban list") }
+        XCTAssertTrue(banned.contains(fixture.archivePeer + "@localhost"))
+        try await managing.setGroupSubject(room: room, subject: "Fictief onderwerp")
+        for _ in 0..<500 { if await owner.subject == "Fictief onderwerp" { break }; try await Task.sleep(nanoseconds: 10_000_000) }
+        let subject = await owner.subject; XCTAssertEqual(subject, "Fictief onderwerp")
+        let created = fixture.invitationRoom + "-new@conference.localhost"
+        try await managing.createGroup(room: created, nickname: "Creator") { _ in }
+        guard case .configuration(let createdConfiguration) = try await managing.manageGroup(.configuration(created)) else { return XCTFail("No created configuration") }
+        XCTAssertTrue(createdConfiguration.membersOnly); XCTAssertFalse(createdConfiguration.publicRoom)
+        await managing.leaveGroup(room: created)
         await acceptSender.leaveGroup(room: room); await ownerSender.leaveGroup(room: room)
         ownerConnection.cancel(); declinedConnection.cancel(); acceptedConnection.cancel()
         _ = try? await ownerConnection.value; _ = try? await declinedConnection.value; _ = try? await acceptedConnection.value
@@ -99,9 +123,15 @@ private actor InvitationEndpoint {
     private(set) var decliner: String?
     private(set) var groupCount = 0
     private(set) var directCount = 0
+    private(set) var canSpeak: Bool?
+    private(set) var subject: String?
     func setSender(_ sender: any NativeChatSending) { self.sender = sender as? any NativeGroupInviting }
     func recordDirect() { directCount += 1 }
-    func appendGroup(_ event: NativeGroupEvent) { if case .message = event { groupCount += 1 } }
+    func appendGroup(_ event: NativeGroupEvent) {
+        if case .message = event { groupCount += 1 }
+        if case .snapshot(let snapshot) = event { canSpeak = snapshot.canSpeak }
+        if case .subject(let text) = event { subject = text }
+    }
     func append(_ event: NativeGroupInvitationEvent) {
         switch event {
         case .invited(let invitation): self.invitation = invitation

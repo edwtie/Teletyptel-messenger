@@ -14,11 +14,12 @@ function requireHostedMac(platform, environment) {
   }
 }
 
-function serverConfiguration(directory, trustedPort, untrustedPort) {
+function serverConfiguration(directory, trustedPort, untrustedPort, creator = null) {
   if (!path.isAbsolute(directory) || ![trustedPort, untrustedPort].every(port =>
     Number.isInteger(port) && port >= 1024 && port <= 65535) || trustedPort === untrustedPort) {
     throw new Error("Invalid isolated ejabberd configuration");
   }
+  if (creator !== null && !/^native-test-[a-f0-9]{16}$/.test(creator)) throw new Error("Invalid isolated room creator");
   const listener = port => `  - port: ${port}
     ip: "127.0.0.1"
     module: ejabberd_http
@@ -34,6 +35,14 @@ certfiles:
   - ${JSON.stringify(path.join(directory, "trusted.pem"))}
 listen:
 ${listener(trustedPort)}
+${creator ? `acl:
+  native_creator:
+    user: ["${creator}@localhost"]
+access_rules:
+  native_create:
+    allow: native_creator
+    deny: all
+` : ""}
 modules:
   mod_ping: {}
   mod_roster: {}
@@ -43,7 +52,7 @@ modules:
     default: always
   mod_muc:
     host: conference.localhost
-    access_create: none
+    access_create: ${creator ? "native_create" : "none"}
     default_room_options:
       persistent: true
       public: false
@@ -141,7 +150,7 @@ async function run() {
     let untrustedPort = await freePort();
     while (untrustedPort === trustedPort) untrustedPort = await freePort();
     for (const name of ["spool", "logs"]) fs.mkdirSync(path.join(temporary, name), { mode: 0o700 });
-    write("ejabberd.yml", serverConfiguration(temporary, trustedPort, untrustedPort));
+    write("ejabberd.yml", serverConfiguration(temporary, trustedPort, untrustedPort, username));
     write("ejabberdctl.cfg", "INET_DIST_INTERFACE=127.0.0.1\nERL_EPMD_ADDRESS=127.0.0.1\nERL_OPTIONS=\"+S 2:2\"\n");
     write("vm.args", `-setcookie ${cookie}\n`);
     write("inetrc", "{lookup, [file, native]}.\n");

@@ -29,6 +29,9 @@ public struct NativeGroupSnapshot: Equatable, Sendable {
     public let nickname: String
     public let participants: [String]
     public let canSpeak: Bool
+    public var ownRole: String = "participant"
+    public var ownAffiliation: String = "none"
+    public var occupants: [NativeGroupOccupant] = []
 }
 
 public struct NativeGroupText: Identifiable, Equatable, Sendable {
@@ -44,6 +47,7 @@ public struct NativeGroupText: Identifiable, Equatable, Sendable {
 }
 
 public enum NativeGroupEvent: Sendable {
+    case subject(String)
     case snapshot(NativeGroupSnapshot)
     case message(NativeGroupText)
     case rejected(String)
@@ -63,9 +67,12 @@ struct NativeMUCStream {
     private(set) var nickname: String
     let identifier = "muc-info-" + UUID().uuidString
     private var participants: [String: String] = [:]
+    private var affiliations: [String: String] = [:]
     private let owner: String
+    private let creating: Bool
+    private var creationConfigured = false
 
-    init(room: String, nickname: String, boundJID: String) throws {
+    init(room: String, nickname: String, boundJID: String, creating: Bool = false) throws {
         guard let owner = NativeChatCodec.bareJID(boundJID), owner != boundJID,
               NativeChatCodec.bareJID(room) == room, Self.validNickname(nickname),
               room.components(separatedBy: "@").last == "conference." + owner.components(separatedBy: "@").last! else {
@@ -75,6 +82,7 @@ struct NativeMUCStream {
         self.nickname = nickname
         self.boundJID = boundJID
         self.owner = owner
+        self.creating = creating
     }
 
     var request: String {
@@ -85,7 +93,13 @@ struct NativeMUCStream {
         "<presence xmlns='jabber:client' type='unavailable' to='\(Self.escape(room + "/" + nickname))'/>"
     }
 
-    var canSpeak: Bool { phase == .joined && ["participant", "moderator"].contains(participants[nickname] ?? "") }
+    var canSpeak: Bool { phase == .joined && (!creating || creationConfigured) && ["participant", "moderator"].contains(participants[nickname] ?? "") }
+    mutating func confirmCreation() { creationConfigured = true }
+    var snapshot: NativeGroupSnapshot {
+        NativeGroupSnapshot(room: room, nickname: nickname, participants: participants.keys.sorted(), canSpeak: canSpeak,
+            ownRole: participants[nickname] ?? "visitor", ownAffiliation: affiliations[nickname] ?? "none",
+            occupants: participants.keys.sorted().map { NativeGroupOccupant(nickname: $0, role: participants[$0]!, affiliation: affiliations[$0] ?? "none") })
+    }
 
     func message(body: String, identifier: String) throws -> String {
         guard canSpeak else { throw NativeGroupFailure.denied }
@@ -99,6 +113,11 @@ struct NativeMUCStream {
               let from = root.attributes["from"], NativeChatCodec.bareJID(from) == room else { return NativeMUCOutput() }
         if phase == .checking {
             guard root.name == "iq", from == room, root.attributes["id"] == identifier else { return NativeMUCOutput() }
+            if creating {
+                guard root.attributes["type"] == "error", root.children.contains(where: { $0.name == "error" && $0.children.contains(where: { $0.name == "item-not-found" && $0.namespace == "urn:ietf:params:xml:ns:xmpp-stanzas" }) }) else { return end(.denied, sendLeave: false) }
+                phase = .joining
+                return NativeMUCOutput(frames: ["<presence xmlns='jabber:client' to='\(Self.escape(room + "/" + nickname))'><x xmlns='http://jabber.org/protocol/muc'><history maxstanzas='0'/></x></presence>"])
+            }
             guard root.attributes["type"] == "result",
                   let query = root.children.first(where: { $0.name == "query" && $0.namespace == "http://jabber.org/protocol/disco#info" }),
                   query.children.contains(where: { $0.name == "feature" && $0.namespace == "http://jabber.org/protocol/disco#info" && $0.attributes["var"] == "http://jabber.org/protocol/muc" }) else {
@@ -115,6 +134,13 @@ struct NativeMUCStream {
         if phase == .joined, root.name == "message", root.attributes["type"] == "error", from == room,
            let identifier = root.attributes["id"], NativeArchiveQuery.validID(identifier) {
             return NativeMUCOutput(events: [.rejected(identifier)])
+        }
+        if phase == .joined, root.name == "message", root.attributes["type"] == "groupchat",
+           from == room || participants[String(from.dropFirst(room.count + 1))] != nil {
+            let subjects = root.children.filter { $0.name == "subject" && $0.namespace == "jabber:client" }
+            if subjects.count == 1, subjects[0].children.isEmpty, subjects[0].text.utf8.count <= 512 {
+                return NativeMUCOutput(events: [.subject(subjects[0].text)])
+            }
         }
         guard from.hasPrefix(room + "/") else { return NativeMUCOutput() }
         let nick = String(from.dropFirst(room.count + 1))
@@ -153,7 +179,8 @@ struct NativeMUCStream {
         if own {
             guard nick == nickname || codes.contains("210"),
                   item.attributes["jid"] == nil || item.attributes["jid"].flatMap(NativeChatCodec.bareJID) == owner else { return NativeMUCOutput() }
-            if codes.contains("201") { return end(.unavailable, sendLeave: true) }
+            if codes.contains("201") && !creating { return end(.unavailable, sendLeave: true) }
+            if phase == .joining && creating && !codes.contains("201") { return end(.denied, sendLeave: true) }
             if root.attributes["type"] == "unavailable" {
                 return end(codes.contains("303") ? .changedNickname : .removed, sendLeave: true)
             }
@@ -161,16 +188,17 @@ struct NativeMUCStream {
         }
         if root.attributes["type"] == "unavailable" {
             participants.removeValue(forKey: nick)
+            affiliations.removeValue(forKey: nick)
         } else {
             guard root.attributes["type"] == nil,
                   let role = item.attributes["role"], ["moderator", "participant", "visitor"].contains(role) else { return NativeMUCOutput() }
             guard participants[nick] != nil || participants.count < 128 else { return end(.limit, sendLeave: true) }
             participants[nick] = role
+            affiliations[nick] = ["owner", "admin", "member", "outcast", "none"].contains(item.attributes["affiliation"] ?? "") ? item.attributes["affiliation"]! : "none"
             if own { phase = .joined }
         }
         guard phase == .joined else { return NativeMUCOutput() }
-        return NativeMUCOutput(events: [.snapshot(NativeGroupSnapshot(room: room, nickname: nickname,
-            participants: participants.keys.sorted(), canSpeak: canSpeak))])
+        return NativeMUCOutput(events: [.snapshot(snapshot)])
     }
 
     private mutating func end(_ reason: NativeGroupFailure, sendLeave: Bool) -> NativeMUCOutput {

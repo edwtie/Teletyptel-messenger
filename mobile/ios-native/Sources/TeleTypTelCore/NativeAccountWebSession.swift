@@ -5,6 +5,7 @@ enum NativeAccountRoute: String {
     case google = "api/auth/google/native.php"
     case facebook = "api/auth/facebook/native.php"
     case translation = "api/translation.php"
+    case profile = "api/native-profile.php"
 }
 
 actor NativeAccountWebSession: CustomStringConvertible, CustomDebugStringConvertible {
@@ -90,6 +91,42 @@ actor NativeAccountWebSession: CustomStringConvertible, CustomDebugStringConvert
         generation = UUID()
         cookie = nil
         session.invalidateAndCancel()
+    }
+
+    func uploadChunk(_ body: Data, boundary: String, csrf: String) async throws -> Data {
+        guard body.count <= 280000, UUID(uuidString: boundary) != nil,
+              csrf.range(of: #"\A[0-9a-f]{64}\z"#, options: .regularExpression) != nil else { throw NativeAccountFailure.rejected }
+        var request = URLRequest(url: configuration.origin.appendingPathComponent("api/native-upload.php"))
+        request.httpMethod = "POST"; request.httpBody = body
+        request.setValue("multipart/form-data; boundary=" + boundary, forHTTPHeaderField: "Content-Type")
+        request.setValue(csrf, forHTTPHeaderField: "X-CSRF-Token")
+        request.setValue(configuration.origin.absoluteString.trimmingCharacters(in: CharacterSet(charactersIn: "/")), forHTTPHeaderField: "Origin")
+        if let cookie = cookie { request.setValue(cookie, forHTTPHeaderField: "Cookie") }
+        return try await binaryRequest(request, limit: 32768)
+    }
+
+    func downloadFile(_ reference: NativeFileReference) async throws -> Data {
+        guard NativeFileReference.parse(reference.url.absoluteString, configuration: configuration) != nil else { throw NativeAccountFailure.rejected }
+        return try await binaryRequest(URLRequest(url: reference.url), limit: NativeUploadSelection.maximumBytes)
+    }
+
+    private func binaryRequest(_ input: URLRequest, limit: Int) async throws -> Data {
+        try Task.checkCancellation()
+        guard !closed else { throw CancellationError() }
+        let attempt = generation
+        var request = input; request.httpShouldHandleCookies = false
+        request.setValue("no-store", forHTTPHeaderField: "Cache-Control")
+        let (bytes, response) = try await session.bytes(for: request)
+        guard let response = response as? HTTPURLResponse, response.url == request.url,
+              (200...299).contains(response.statusCode), response.expectedContentLength <= limit else { throw NativeAccountFailure.rejected }
+        var output = Data()
+        for try await byte in bytes {
+            try Task.checkCancellation()
+            guard output.count < limit else { throw NativeAccountFailure.invalidResponse }
+            output.append(byte)
+        }
+        guard !closed, generation == attempt, !Task.isCancelled else { throw CancellationError() }
+        return output
     }
 
     nonisolated static func sessionCookie(_ response: HTTPURLResponse, origin: URL) -> String? {

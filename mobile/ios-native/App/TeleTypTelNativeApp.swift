@@ -589,7 +589,12 @@ private struct NativeLoginUIFixture: ServerChecking, NativeAccountChallenging, N
             throw NativeAccountFailure.invalidCredentials
         }
         if scenario == "two-factor" { throw NativeAccountFailure.twoFactorRequired }
-        return NativeAuthenticatedAccount(configuration: configuration, jid: jid, password: password)
+        var account = NativeAuthenticatedAccount(configuration: configuration, jid: jid, password: password)
+        account.accountID = "fixture-ui"
+        let settings = URLSessionConfiguration.ephemeral
+        settings.protocolClasses = [NativeFeatureFixture.self]
+        account.webSession = NativeAccountWebSession(configuration: configuration, cookie: "PHPSESSID=fixture-session", settings: settings)
+        return account
     }
 
     func run(account: NativeAuthenticatedAccount, onConnected: @escaping @Sendable (String) -> Void) async throws {
@@ -604,8 +609,22 @@ private struct NativeLoginUIFixture: ServerChecking, NativeAccountChallenging, N
     }
 }
 
-private struct NativeChatUIFixture: NativeArchiveSending, NativeGroupInviting {
+private struct NativeChatUIFixture: NativeArchiveSending, NativeGroupManaging {
     let includeInvitations: Bool
+    func manageGroup(_ command: NativeGroupCommand) async throws -> NativeGroupReply {
+        try await Task.sleep(nanoseconds: 100_000_000)
+        switch command {
+        case .discover: return .rooms([NativeDiscoveredRoom(room: "fixture@conference.localhost", name: "Fictieve testgroep")])
+        case .configuration:
+            return .configuration(NativeRoomConfiguration(name: "Fictieve testgroep", description: "Fictieve groep", membersOnly: true, moderated: false, publicRoom: false, persistent: true, allowInvites: true, fields: [:]))
+        case .members: return .members(["demo-contact@localhost"])
+        default: return .confirmed
+        }
+    }
+    func createGroup(room: String, nickname: String, onEvent: @escaping @Sendable (NativeGroupEvent) -> Void) async throws {
+        try await joinGroup(room: room, nickname: nickname, onEvent: onEvent)
+    }
+    func setGroupSubject(room: String, subject: String) async throws { try await Task.sleep(nanoseconds: 100_000_000) }
     func observeGroupInvitations(_ observer: @escaping @Sendable (NativeGroupInvitationEvent) -> Void) async {
         guard includeInvitations else { return }
         for room in ["fixture@conference.localhost", "ignore@conference.localhost"] {
@@ -624,7 +643,8 @@ private struct NativeChatUIFixture: NativeArchiveSending, NativeGroupInviting {
     func joinGroup(room: String, nickname: String, onEvent: @escaping @Sendable (NativeGroupEvent) -> Void) async throws {
         guard room == "fixture@conference.localhost", nickname == "Testnaam" else { throw NativeGroupFailure.denied }
         try await Task.sleep(nanoseconds: 100_000_000)
-        onEvent(.snapshot(NativeGroupSnapshot(room: room, nickname: nickname, participants: [nickname, "Fictieve deelnemer"], canSpeak: true)))
+        onEvent(.snapshot(NativeGroupSnapshot(room: room, nickname: nickname, participants: [nickname, "Fictieve deelnemer"], canSpeak: true,
+            ownRole: "moderator", ownAffiliation: "owner", occupants: [NativeGroupOccupant(nickname: nickname, role: "moderator", affiliation: "owner"), NativeGroupOccupant(nickname: "Fictieve deelnemer", role: "participant", affiliation: "member")])))
         onEvent(.message(NativeGroupText(id: UUID(), room: room, nickname: "Fictieve deelnemer", identifier: "fixture-welcome",
             archiveID: nil, body: "Fictief groepsbericht", date: Date(), own: false, state: .incoming)))
     }

@@ -143,6 +143,9 @@ struct NativeChatView: View {
             if incoming { avatar }
             VStack(alignment: .leading, spacing: 5) {
                 Text(message.body).textSelection(.enabled)
+                if let session = model.activeWebSession, NativeFileReference.inMessage(message.body, configuration: session.configuration) != nil {
+                    NativeFileMessageButton(bodyText: message.body, session: session)
+                }
                 if let result = translation.results[message.id.uuidString], translation.preferences.mode != "off", translation.sharingConsent {
                     NativeTranslationCaption(result: result)
                 }
@@ -189,11 +192,7 @@ struct NativeChatView: View {
 
     private var composer: some View {
         HStack(alignment: .bottom, spacing: 8) {
-            Menu {
-                Button { showTranslation = true } label: { Label("Vertaalinstellingen", systemImage: "globe") }
-                Label("Bijlagen worden nog aangesloten", systemImage: "paperclip")
-            } label: { Image(systemName: "plus").frame(width: 40, height: 44) }
-            .accessibilityLabel("Toevoegen")
+            NativeAttachmentButton(login: model) { link in model.setDraft(draft.isEmpty ? link : draft + "\n" + link, peer: contact.jid) }
             Button { showEmoji.toggle() } label: { Image(systemName: "face.smiling").frame(width: 40, height: 44) }
                 .accessibilityLabel("Emoji")
             TextField("Typ een bericht", text: Binding(get: { draft }, set: { model.setDraft($0, peer: contact.jid) }), axis: .vertical)

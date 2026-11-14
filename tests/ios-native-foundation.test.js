@@ -434,6 +434,36 @@ test("Native session cancellation closes the XMPP stream with bounded exactly-on
   assert.match(source, /root\.name == "close", root\.namespace == "urn:ietf:params:xml:ns:xmpp-framing"/);
 });
 
+test("Native feature expansion uses scoped server mutations and explicit attachment staging", () => {
+  const features = read("Sources/TeleTypTelCore/NativeAccountFeatures.swift");
+  const web = read("Sources/TeleTypTelCore/NativeAccountWebSession.swift");
+  const attachment = read("App/NativeAttachmentsView.swift");
+  for (const text of ["20 * 1024 * 1024", "accountId == accountID", "generation == attempt", "reference.identifier == file.id", "items.count == 1"])
+    assert.ok(features.includes(text), text);
+  assert.match(web, /httpShouldHandleCookies = false/);
+  assert.match(web, /body.count <= 280000/);
+  assert.match(attachment, /PhotosPicker/);
+  assert.match(attachment, /startAccessingSecurityScopedResource/);
+  assert.match(attachment, /kCGImageSourceThumbnailMaxPixelSize: 2048/);
+  assert.match(attachment, /stage\(link\); dismiss\(\)/);
+  assert.doesNotMatch(features + attachment, /UserDefaults|NSLog|print\(|SecTrust/);
+  for (const name of ["NativeGroupManagement.swift", "NativeAccountFeatures.swift", "NativeAttachmentsView.swift", "NativeAccountSettingsView.swift"])
+    assert.ok(projectText().project.includes(name), name);
+});
+
+test("Native MUC management uses bounded correlated IQs and server-only authority", () => {
+  const connection = read("Sources/TeleTypTelCore/NativeXMPPConnection.swift");
+  const management = read("Sources/TeleTypTelCore/NativeGroupManagement.swift");
+  assert.match(connection, /self.management.count < 4/);
+  assert.match(connection, /root.attributes\["from"\] == pending.target/);
+  assert.match(connection, /for identifier in Array\(management.keys\)/);
+  assert.match(management, /fields\["FORM_TYPE"\] ==/);
+  assert.match(management, /field.attributes\["type"\] == "fixed"/);
+  assert.match(management, /text-private/);
+  assert.doesNotMatch(management, /<destroy|affiliation='owner'/);
+  assert.match(read("Sources/TeleTypTelCore/NativeMUC.swift"), /!creating \|\| creationConfigured/);
+});
+
 test("Native navigation source keeps sidebar visibility explicit and avoids duplicate back bars", () => {
   const messenger = read("App/NativeTranslationView.swift");
   const chat = read("App/NativeChatView.swift");

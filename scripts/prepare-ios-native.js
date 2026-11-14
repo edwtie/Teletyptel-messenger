@@ -10,6 +10,8 @@ const coreFiles = ["Startup.swift", "XMPPProbeStream.swift", "XMPPAvailabilityCl
   "NativeAccountClient.swift", "NativeAccountWebSession.swift", "NativeSocialAccountClient.swift", "NativeTranslation.swift", "NativeTwoFactorAccountClient.swift", "XMPPSessionStream.swift", "NativeXMPPConnection.swift", "NativeLoginModel.swift", "NativeSavedLogin.swift", "NativeRoster.swift", "NativeChat.swift", "NativeArchive.swift", "NativeMUC.swift", "NativeGroupModel.swift", "NativeGroupInvitations.swift", "NativeIncomingCall.swift", "NativeCallCoordinator.swift", "NativeJingleTransport.swift", "NativeJingleMedia.swift", "NativeLocalMediaSDP.swift", "NativeJingleSession.swift"];
 const appFiles = ["App/TeleTypTelNativeApp.swift", "App/NativeInvitationViews.swift", "App/NativeGroupsView.swift", "App/NativeProviderSDK.swift", "App/NativeTranslationView.swift", "App/NativeBiometricLoginVault.swift", "App/NativeChatView.swift", "App/NativeBackgroundController.swift", "App/NativeCallPlatform.swift", "App/NativeCallMedia.swift", "App/NativeCallController.swift", "App/NativeTotalConversationView.swift", "App/NativeMediaCapture.swift", "App/NativeMediaPeer.swift", "App/NativeActivePeerNegotiating.swift", "App/NativeIncomingPeerNegotiator.swift", "App/NativeOutgoingPeerNegotiator.swift"];
 const mediaFiles = ["NativeT140Session.swift", "NativeWebRTCChannel.swift"];
+coreFiles.push("NativeGroupManagement.swift", "NativeAccountFeatures.swift");
+appFiles.push("App/NativeGroupManagementView.swift", "App/NativeAccountSettingsView.swift", "App/NativeAttachmentsView.swift", "App/NativeFeatureFixture.swift");
 
 function projectText() {
   const objects = new Map();
