@@ -36,8 +36,49 @@ test harness adds a second temporary private room with a fictional owner, so the
 actual server can test invite delivery, declines and explicit joining without
 changing any existing local or production room.
 
-Validation for this increment is pending until the new unsigned workflows finish;
-the green runs in the older sections do not prove the invitation implementation.
+[Isolated ejabberd run 43537900852](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43537900852)
+passes at revision `671f33e`: the real room mediates an invite, forwards a decline,
+and admits a different contact only after explicit joining. Receiving an invite
+does not join, the declined contact gets no room text, and invitation/group text
+does not enter the direct-chat callback. All previous TLS, login-contract, Jingle,
+MAM and private-MUC scenarios pass too, with released sessions, temporary-file
+cleanup and post-revocation TLS rejection verified on disposable ejabberd 26.09.
+
+The first invitation server run (`43537028408`) passed the invitation exchange
+but failed the final released-session assertion; it is not counted as green.
+Online cancellation now sends the RFC 7395 framing `close` before cancelling the
+WebSocket, stops callbacks/pending actions immediately, and awaits closure for at
+most two seconds before a forced cleanup. Continuations are completed once, not
+replayed after logout. The original five-second server-release assertion remains
+unchanged, and a failed assertion records the fictional remaining session IDs.
+The passing rerun proves session release in these scenarios, not every possible
+network-loss or suspended-device case.
+
+[Unsigned preview run 43542653163](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43542653163)
+passes at app revision `0fa887b`: Release device compilation, Debug fixture
+exclusion, 198 passed Swift tests and sixteen UI tests (eight each on iPhone 16
+Pro and iPad Pro 11-inch M4, iOS 18.5). Eighteen opt-in server tests are explicitly
+skipped in that preview, not counted as passes. The isolated server run above
+provides separate actual-transport evidence; the later app revision only clears
+an old own-join status before sending a new invitation and adds regression tests.
+
+The UI scenario receives two fictional invites, declines one, explicitly accepts
+the other, waits for self-presence, selects a known contact and verifies the honest
+submitted state. The older own-join confirmation no longer appears under that new
+send, where it could be mistaken for the recipient joining. An earlier green
+preview (`43537904167`) exposed that confusing status during visual inspection;
+the final Swift/UI assertions and rechecked screenshots cover its removal.
+Existing direct/group rotation and complete-latest-bubble checks still pass.
+The four same-host native WebRTC profiles also pass within their synthetic-media
+scope: not real camera capture, audible speech, public-network or APNs proof.
+Fourteen fictional screenshots are retained in the workflow evidence and copied
+locally to ignored `artifacts/native-ui-43542653163/`.
+
+Local Windows validation passes 119 Node checks with four macOS-only checks
+explicitly skipped. Manual VoiceOver, large text, dark mode and signed physical
+iPhone/iPad checks remain release gates. No TestFlight upload, provider changes,
+live APNs activation or local/production server configuration is included.
+Protocol reference: [XEP-0045](https://xmpp.org/extensions/xep-0045.html).
 
 ## Existing MUC room participation increment (2026-11-14)
 
@@ -46,9 +87,10 @@ The native main menu now opens a separate Groups screen. Enter an existing
 does not discover/bookmark rooms or create/configure them. The transport checks
 room disco information before directed join presence and requires XEP-0045
 self-presence (110) before enabling sends. A racing newly-created room (201) is
-left without configuration. Custom/federated MUC services, passwords, invitations,
-administration, room MAM, group translation, attachments and group calls remain
-separate work; direct-chat translation and history must not be confused with them.
+left without configuration. At that baseline, custom/federated MUC services,
+passwords, invitations, administration, room MAM, group translation, attachments
+and group calls remained separate work; direct-chat translation and history must
+not be confused with them.
 
 Group text uses `type=groupchat` and separate room/nickname identities, not the
 direct chat store. Known participants, correct room/recipient, body bounds and
@@ -205,7 +247,8 @@ Native parity status (do not confuse a visible layout with protocol support):
 | Recent direct-chat MAM history | Read-only latest page, 50 stanzas per selected peer; server retention required; no older-page UI or legacy-history migration |
 | Durable local history, carbons, receipts/read markers | Not yet implemented in this native target; archive presence does not prove delivery/read state |
 | Existing MUC room text chat | Manual same-domain room entry, membership/self-presence, participants, roles, sending/receiving and leaving implemented; separate room state |
-| Group discovery/bookmarks, invitations, administration and group calls | Not yet implemented in this native interface |
+| Room-mediated invitations | Known-contact inbox, explicit accept/decline/hide and joined-room contact picker implemented; same-domain MUC service only |
+| Group discovery/bookmarks, administration and group calls | Not yet implemented in this native interface; direct/alias/password invitation variants also remain |
 | File/photo upload and download | Not yet implemented; composer does not pretend to send attachments |
 | Edit/delete/reactions/forwarding | Not yet implemented; context menu currently provides copy/translate only |
 | Add contacts/groups, profile/account management | Not yet implemented in the new native interface |
@@ -216,7 +259,7 @@ Native parity status (do not confuse a visible layout with protocol support):
 Remaining parity gates, in order:
 
 1. Extend recent MAM restoration with older-page navigation and, only with an explicit storage design, protected account-isolated offline history. Carbons and independently verified delivery/read states remain separate protocol work.
-2. Extend existing-room participation with native room discovery/bookmarks, invitations, administration, group archives and protected group media. Group translation requires its own privacy/UI integration; it is not enabled by the direct-chat translation settings alone.
+2. Extend existing-room participation with room discovery/bookmarks, direct/federated/password invitation variants, administration, group archives and protected group media. Group translation requires its own privacy/UI integration; it is not enabled by the direct-chat translation settings alone.
 3. Actual file/photo upload, download and previews using the existing authenticated APIs, bounded files and explicit user selection; no decorative send buttons without a working transfer.
 4. Edit/delete/reactions/forwarding and contact/profile management, with ownership checks, cancellation, offline errors and native UI tests for each action.
 5. Localized application strings and remaining web-style presentation, checked in both orientations, large text, dark mode and manual VoiceOver use. Message translation preferences remain separate from UI language.
