@@ -215,7 +215,7 @@ private struct NativeGroupBubble: View {
             Spacer(minLength: 0)
             Text(message.date, style: .time).font(.caption2)
             if message.own { Image(systemName: indicator).font(.caption2) }
-        }.foregroundStyle(.secondary)
+        }.foregroundStyle(NativeWebStyle.muted)
     }
 }
 

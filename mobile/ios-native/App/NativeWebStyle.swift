@@ -45,7 +45,7 @@ struct NativeWebIconStyle: ButtonStyle {
             .background(destructive ? NativeWebStyle.disabled : prominent ? NativeWebStyle.accent : NativeWebStyle.button,
                         in: RoundedRectangle(cornerRadius: round ? 999 : 6))
             .overlay(RoundedRectangle(cornerRadius: round ? 999 : 6)
-                .stroke(round ? Color.clear : NativeWebStyle.buttonBorder, lineWidth: 1))
+                .stroke(round ? Color.clear : destructive ? NativeWebStyle.disabled : NativeWebStyle.buttonBorder, lineWidth: 1))
             .opacity(enabled ? (configuration.isPressed ? 0.75 : 1) : 0.4)
     }
 }

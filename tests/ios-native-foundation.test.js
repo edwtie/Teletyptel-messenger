@@ -518,6 +518,23 @@ test("Native web visual contract shares palette, shell, bubbles and reachable sy
   assert.match(tc, /Button\(action: controller.endCall\)/);
 });
 
+test("Native web message palette keeps body and metadata contrast in light and dark", () => {
+  const luminance = hex => {
+    const channels = [16, 8, 0].map(shift => ((hex >> shift) & 255) / 255)
+      .map(channel => channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4);
+    return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+  };
+  for (const [foreground, backgrounds] of [[0x111827, [0xddf8ea, 0xf5f7fb]], [0xf9fafb, [0x144f3a, 0x273242]],
+    [0x53657c, [0xddf8ea, 0xf5f7fb]], [0xb6c2d1, [0x144f3a, 0x273242]]]) {
+    for (const background of backgrounds) {
+      const values = [luminance(foreground), luminance(background)].sort((first, second) => second - first);
+      assert.ok((values[0] + 0.05) / (values[1] + 0.05) >= 4.5);
+    }
+  }
+  for (const file of ["App/NativeChatView.swift", "App/NativeGroupsView.swift"])
+    assert.match(read(file), /foregroundStyle\(NativeWebStyle.muted\)/);
+});
+
 test("Native second factor is a bounded challenge before XMPP, not an authenticated state", () => {
   const client = read("Sources/TeleTypTelCore/NativeTwoFactorAccountClient.swift");
   const model = read("Sources/TeleTypTelCore/NativeLoginModel.swift");

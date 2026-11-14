@@ -170,7 +170,7 @@ struct NativeChatView: View {
                         Image(systemName: message.state == .sending ? "clock" : message.state == .submitted ? "checkmark" : "exclamationmark.circle")
                             .font(.caption2)
                     }
-                }.foregroundStyle(incoming ? Color.secondary : Color(red: 0.25, green: 0.37, blue: 0.4))
+                }.foregroundStyle(NativeWebStyle.muted)
             }
             .foregroundStyle(NativeWebStyle.text)
             .padding(.horizontal, 10).padding(.vertical, 8)
