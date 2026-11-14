@@ -436,6 +436,9 @@ final class NativeStartupUITests: XCTestCase {
         controls.tap()
         XCTAssertTrue(application.buttons["Camera inschakelen"].waitForExistence(timeout: 5))
         XCTAssertTrue(application.buttons["Microfoon dempen"].isHittable)
+        let keypad = application.buttons["call-dtmf-keypad"]
+        XCTAssertTrue(keypad.exists)
+        XCTAssertFalse(keypad.isEnabled)
         snapshot("tc-web-controls")
     }
 

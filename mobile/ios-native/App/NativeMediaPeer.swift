@@ -79,8 +79,10 @@ final class NativeMediaPeer: NativeMediaNegotiating {
 
     private static func add(_ track: RTCMediaStreamTrack, kind: String, codec: String,
                             factory: RTCPeerConnectionFactory, peer: RTCPeerConnection) throws {
-        let codecs = factory.rtpSenderCapabilities(forKind: kind).codecs.filter { $0.name.uppercased() == codec }
-        guard !codecs.isEmpty, let sender = peer.add(track, streamIds: ["conversation"]),
+        let codecs = factory.rtpSenderCapabilities(forKind: kind).codecs.filter {
+            $0.name.uppercased() == codec || (kind == "audio" && $0.name.lowercased() == "telephone-event" && $0.clockRate?.intValue == 8000)
+        }
+        guard codecs.contains(where: { $0.name.uppercased() == codec }), let sender = peer.add(track, streamIds: ["conversation"]),
               let transceiver = peer.transceivers.first(where: { $0.sender.senderId == sender.senderId }),
               transceiver.direction == .sendRecv else {
             throw NativeMediaPeerFailure.configuration

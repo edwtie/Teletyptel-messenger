@@ -144,6 +144,10 @@ enum NativeMediaLoopback {
             precondition(fixture.engine.prepared.peer.transceivers.count == (profile.hasVideo ? 2 : 1))
             precondition(fixture.engine.prepared.peer.transceivers.allSatisfy { $0.direction == .sendRecv && $0.sender.track != nil })
             precondition(fixture.engine.prepared.peer.receivers.contains { $0.track is RTCAudioTrack })
+            let sender = fixture.engine.prepared.peer.senders.first(where: { $0.track is RTCAudioTrack })?.dtmfSender
+            precondition(sender?.canInsertDtmf == true, "telephone-event negotiated by both native peers")
+            precondition(sender?.insertDtmf("1*#", duration: NativeDtmf.duration, interToneGap: NativeDtmf.gap) == true)
+            precondition(sender?.insertDtmf("", duration: NativeDtmf.duration, interToneGap: NativeDtmf.gap) == true)
         }
         if profile.hasVideo {
             let firstTrack = first.engine.prepared.peer.receivers.compactMap { $0.track as? RTCVideoTrack }.first!

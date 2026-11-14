@@ -81,7 +81,7 @@ final class NativeCallController: ObservableObject {
         peerName = "Fictieve UI-test"
         presentation = NativeCallPresentation(callID: UUID(), profile: .total, localVideo: nil,
             remoteVideo: nil, ownText: "", remoteText: "Fictieve realtime tekst", rttReady: false,
-            cameraEnabled: false, canSwitchCamera: false)
+            cameraEnabled: false, canSwitchCamera: false, canSendDtmf: false)
     }
     #endif
 
@@ -254,6 +254,11 @@ final class NativeCallController: ObservableObject {
         isMuted = muted
     }
 
+    func sendDtmf(_ tone: String) -> Bool {
+        guard let coordinator = runtime?.platform.coordinator, let id = coordinator.currentHandle?.id else { return false }
+        return coordinator.sendDtmf(id: id, tone: tone)
+    }
+
     func toggleCamera() {
         guard let enabled = presentation?.cameraEnabled else { return }
         _ = runtime?.media.setCameraEnabled(!enabled)
@@ -303,6 +308,9 @@ final class NativeCallController: ObservableObject {
         self.runtime = runtime
         runtime.media.presentationChanged = { [weak self] snapshot in
             self?.presentation = snapshot
+            if let snapshot = snapshot {
+                self?.runtime?.platform.setDtmfEnabled(id: snapshot.callID, enabled: snapshot.canSendDtmf)
+            }
         }
         runtime.platform.coordinator.changed = { [weak self] in self?.callChanged() }
         return runtime

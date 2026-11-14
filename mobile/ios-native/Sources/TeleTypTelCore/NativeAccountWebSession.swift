@@ -7,6 +7,7 @@ enum NativeAccountRoute: String {
     case translation = "api/translation.php"
     case profile = "api/native-profile.php"
     case history = "api/native-history.php"
+    case callPush = "api/call-push.php"
 }
 
 actor NativeAccountWebSession: CustomStringConvertible, CustomDebugStringConvertible {
@@ -85,13 +86,14 @@ actor NativeAccountWebSession: CustomStringConvertible, CustomDebugStringConvert
             request.setValue(csrf, forHTTPHeaderField: "X-CSRF-Token")
         }
         let (bytes, response) = try await session.bytes(for: request)
+        let responseLimit = route == .callPush ? 16384 : 1048576
         guard let response = response as? HTTPURLResponse, response.url == url,
-              response.expectedContentLength <= 1048576 else { throw NativeAccountFailure.invalidResponse }
+              response.expectedContentLength <= Int64(responseLimit) else { throw NativeAccountFailure.invalidResponse }
         guard !(300...399).contains(response.statusCode) else { throw ConnectionFailure.redirectRejected }
         var data = Data()
         for try await byte in bytes {
             try Task.checkCancellation()
-            guard data.count < 1048576 else { throw NativeAccountFailure.invalidResponse }
+            guard data.count < responseLimit else { throw NativeAccountFailure.invalidResponse }
             data.append(byte)
         }
         try Task.checkCancellation()

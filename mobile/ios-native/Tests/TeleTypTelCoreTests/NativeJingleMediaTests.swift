@@ -25,6 +25,59 @@ final class NativeJingleMediaTests: XCTestCase {
         try NativeJingleMedia.fromSDP(fixture(profile), sid: "call-1", action: "session-initiate", profile: profile)
     }
 
+    private func dtmf(_ text: String, payload: String = "101", events: String = "0-16") -> String {
+        text.replacingOccurrences(of: "m=audio 9 UDP/TLS/RTP/SAVPF 0\r\n", with: "m=audio 9 UDP/TLS/RTP/SAVPF 0 \(payload)\r\n")
+            .replacingOccurrences(of: "a=rtpmap:0 PCMU/8000\r\n", with: "a=rtpmap:0 PCMU/8000\r\na=rtpmap:\(payload) telephone-event/8000\r\na=fmtp:\(payload) \(events)\r\n")
+    }
+
+    func testOptionalTelephoneEventsRoundTripWithoutChangingAudioVideoOrRtt() throws {
+        for profile in NativeCallMedia.allCases {
+            for action in ["session-initiate", "session-accept"] {
+                let media = try NativeJingleMedia.fromSDP(dtmf(fixture(profile, answer: action == "session-accept")), sid: "call-1", action: action, profile: profile)
+                XCTAssertTrue(media.supportsDTMF)
+                XCTAssertTrue(media.xml.contains("name='events' value='0-16'"))
+                let decoded = try NativeJingleMedia.decode(media.xml, sid: "call-1", action: action, profile: profile)
+                XCTAssertEqual(decoded.sdp, media.sdp)
+                XCTAssertEqual(Set(decoded.mids), profile.contents)
+                XCTAssertFalse(try NativeJingleMedia.fromSDP(fixture(profile, answer: action == "session-accept"), sid: "call-1", action: action, profile: profile).supportsDTMF)
+            }
+        }
+    }
+
+    func testDtmfAnswerMayDeclineOrNarrowButCannotInventPayloadsOrEvents() throws {
+        let offered = try NativeJingleMedia.fromSDP(dtmf(fixture()), sid: "call-1", action: "session-initiate", profile: .total)
+        let declined = try NativeJingleMedia.fromSDP(fixture(answer: true), sid: "call-1", action: "session-accept", profile: .total)
+        XCTAssertNoThrow(try declined.validateAnswer(to: offered))
+        let accepted = try NativeJingleMedia.fromSDP(dtmf(fixture(answer: true), events: "0-15"), sid: "call-1", action: "session-accept", profile: .total)
+        XCTAssertNoThrow(try accepted.validateAnswer(to: offered))
+        XCTAssertThrowsError(try accepted.validateAnswer(to: offer()))
+        let remapped = try NativeJingleMedia.fromSDP(dtmf(fixture(answer: true), payload: "102"), sid: "call-1", action: "session-accept", profile: .total)
+        XCTAssertThrowsError(try remapped.validateAnswer(to: offered))
+        let smaller = try NativeJingleMedia.fromSDP(dtmf(fixture(), events: "0-15"), sid: "call-1", action: "session-initiate", profile: .total)
+        let wider = try NativeJingleMedia.fromSDP(dtmf(fixture(answer: true)), sid: "call-1", action: "session-accept", profile: .total)
+        XCTAssertThrowsError(try wider.validateAnswer(to: smaller))
+    }
+
+    func testMalformedTelephoneEventsCannotWeakenTheConstrainedMediaProfile() throws {
+        let valid = dtmf(fixture())
+        for text in [dtmf(fixture(), payload: "0"), dtmf(fixture(), payload: "128"), dtmf(fixture(), events: "0-255"),
+                     valid.replacingOccurrences(of: "telephone-event/8000", with: "telephone-event/48000"),
+                     valid.replacingOccurrences(of: "a=fmtp:101 0-16", with: "a=fmtp:0 0-16"),
+                     valid.replacingOccurrences(of: "a=fmtp:101 0-16", with: "a=fmtp:101 0-16\r\na=fmtp:101 0-15"),
+                     valid.replacingOccurrences(of: "m=audio 9 UDP/TLS/RTP/SAVPF 0 101", with: "m=audio 9 UDP/TLS/RTP/SAVPF 101 0"),
+                     valid.replacingOccurrences(of: "m=video 9 UDP/TLS/RTP/SAVPF 96", with: "m=video 9 UDP/TLS/RTP/SAVPF 96 101")] {
+            XCTAssertThrowsError(try NativeJingleMedia.fromSDP(text, sid: "call-1", action: "session-initiate", profile: .total))
+        }
+        let noFormat = valid.replacingOccurrences(of: "a=fmtp:101 0-16\r\n", with: "")
+        let defaultEvents = try NativeJingleMedia.fromSDP(noFormat, sid: "call-1", action: "session-initiate", profile: .total)
+        XCTAssertTrue(defaultEvents.sdp.contains("a=fmtp:101 0-15"))
+        for xml in [try offer().xml.replacingOccurrences(of: "<rtcp-mux/>", with: "<payload-type id='101' name='telephone-event' clockrate='48000'/><rtcp-mux/>"),
+                    defaultEvents.xml.replacingOccurrences(of: "name='events'", with: "name='unknown'"),
+                    defaultEvents.xml.replacingOccurrences(of: "value='0-15'", with: "value='0-99'")] {
+            XCTAssertThrowsError(try decode(xml))
+        }
+    }
+
     private func decode(_ xml: String, profile: NativeCallMedia = .total) throws -> NativeJingleMedia {
         try NativeJingleMedia.decode(xml, sid: "call-1", action: "session-initiate", profile: profile)
     }

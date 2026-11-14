@@ -29,6 +29,12 @@ struct NativeJingleMedia: CustomStringConvertible, CustomDebugStringConvertible 
         let fingerprint: String
         let setup: String
         let candidates: [[String: String]]
+        let telephoneEvent: TelephoneEvent?
+    }
+
+    struct TelephoneEvent: Equatable {
+        let payload: String
+        let events: String
     }
 
     let sid: String
@@ -36,6 +42,7 @@ struct NativeJingleMedia: CustomStringConvertible, CustomDebugStringConvertible 
     let profile: NativeCallMedia
     private let contents: [Content]
     var mids: [String] { contents.map(\.mid) }
+    var supportsDTMF: Bool { contents.contains { $0.kind == "audio" && $0.telephoneEvent != nil } }
     var description: String { "NativeJingleMedia(redacted)" }
     var debugDescription: String { description }
 
@@ -57,6 +64,7 @@ struct NativeJingleMedia: CustomStringConvertible, CustomDebugStringConvertible 
                 (element.attributes["senders"] == nil || element.attributes["senders"] == "both") && element.children.count == 2)
             let media = try one(element, "description", kind == "rtt" ? rtt : rtp)
             var payload = "", feedback: [String] = [], port = ""
+            var telephoneEvent: TelephoneEvent?
             if kind == "rtt" {
                 try node(media, "description", rtt, attributes: ["profile"])
                 try require(media.attributes["profile"] == "dc-t140" && media.children.count == 2)
@@ -64,9 +72,12 @@ struct NativeJingleMedia: CustomStringConvertible, CustomDebugStringConvertible 
                 try exact(try one(media, "rtt-sync", rtt), ["role": "conversation", "source": "human", "sync-mode": "co-session"])
             } else {
                 try node(media, "description", rtp, attributes: ["media"])
-                try require(media.attributes["media"] == kind && media.children.count == 2)
+                try require(media.attributes["media"] == kind && (media.children.count == 2 || (kind == "audio" && media.children.count == 3)))
                 try exact(try one(media, "rtcp-mux", rtp), [:])
-                let codec = try one(media, "payload-type", rtp)
+                let codecs = media.children.filter { $0.name == "payload-type" && $0.namespace == rtp }
+                let primary = codecs.filter { $0.attributes["name"]?.uppercased() == (kind == "audio" ? "PCMU" : "VP8") }
+                try require(primary.count == 1 && codecs.count == media.children.count - 1)
+                let codec = primary[0]
                 try node(codec, "payload-type", rtp, attributes: ["id", "name", "clockrate", "channels"])
                 payload = codec.attributes["id"] ?? ""
                 try require((codec.attributes["channels"] == nil || codec.attributes["channels"] == "1") &&
@@ -76,6 +87,19 @@ struct NativeJingleMedia: CustomStringConvertible, CustomDebugStringConvertible 
                     try node(entry, "rtcp-fb", Self.feedback, attributes: ["type", "subtype"])
                     try require(entry.children.isEmpty)
                     feedback.append([entry.attributes["type"], entry.attributes["subtype"]].compactMap { $0 }.joined(separator: " "))
+                }
+                if codecs.count == 2 {
+                    let event = codecs.first { $0 !== codec }!
+                    try node(event, "payload-type", rtp, attributes: ["id", "name", "clockrate", "channels"])
+                    try require(kind == "audio" && event.attributes["name"]?.lowercased() == "telephone-event" &&
+                        event.attributes["clockrate"] == "8000" && (event.attributes["channels"] == nil || event.attributes["channels"] == "1") && event.children.count <= 1)
+                    var events = "0-15"
+                    if let parameter = event.children.first {
+                        events = parameter.attributes["value"] ?? ""
+                        try exact(parameter, ["name": "events", "value": events])
+                        try require(parameter.name == "parameter" && parameter.namespace == rtp)
+                    }
+                    telephoneEvent = TelephoneEvent(payload: event.attributes["id"] ?? "", events: events)
                 }
             }
             let transport = try one(element, "transport", ice)
@@ -97,7 +121,7 @@ struct NativeJingleMedia: CustomStringConvertible, CustomDebugStringConvertible 
             contents.append(Content(kind: kind, mid: element.attributes["name"] ?? "", payload: payload,
                 feedback: feedback, port: port, ufrag: transport.attributes["ufrag"] ?? "", password: transport.attributes["pwd"] ?? "",
                 fingerprint: fingerprint.text.trimmingCharacters(in: .whitespacesAndNewlines), setup: fingerprint.attributes["setup"] ?? "",
-                candidates: candidates.map(\.attributes)))
+                candidates: candidates.map(\.attributes), telephoneEvent: telephoneEvent))
         }
         let result = Self(sid: sid, action: action, profile: profile, contents: contents)
         try result.validate()
@@ -124,7 +148,7 @@ struct NativeJingleMedia: CustomStringConvertible, CustomDebugStringConvertible 
         for (index, section) in sections.enumerated() {
             let kind = kinds[index]
             let prefixes = ["m=", "c=", "a=mid:", "a=ice-ufrag:", "a=ice-pwd:", "a=ice-options:", "a=fingerprint:",
-                "a=setup:", "a=candidate:", "a=rtpmap:", "a=rtcp-fb:", "a=sctp-port:", "a=max-message-size:",
+                "a=setup:", "a=candidate:", "a=rtpmap:", "a=rtcp-fb:", "a=fmtp:", "a=sctp-port:", "a=max-message-size:",
                 "a=rtcp:", "a=extmap:", "a=msid:", "a=ssrc:", "a=ssrc-group:"]
             let flags: Set<String> = ["a=sendrecv", "a=rtcp-mux", "a=rtcp-rsize", "a=end-of-candidates", "a=extmap-allow-mixed"]
             if let unknown = section.first(where: { line in !flags.contains(line) && !prefixes.contains(where: { line.hasPrefix($0) }) }) {
@@ -132,14 +156,15 @@ struct NativeJingleMedia: CustomStringConvertible, CustomDebugStringConvertible 
                 throw NativeJingleMediaFailure.unsupportedField(field)
             }
             let media = section[0].components(separatedBy: " ")
-            try require(media.count == 4 && number(media[1], 1, 65535))
+            try require((media.count == 4 || (kind == "audio" && media.count == 5)) && number(media[1], 1, 65535))
             try require(media[0] == "m=\(kind == "rtt" ? "application" : kind)" &&
                 media[2] == (kind == "rtt" ? "UDP/DTLS/SCTP" : "UDP/TLS/RTP/SAVPF"))
-            try require(!section.contains { matches($0, "a=(?:sendonly|recvonly|inactive|crypto:.*|ice-lite|bundle-only|dcmap:.*|dcsa:.*|fmtp:.*)") })
+            try require(!section.contains { matches($0, "a=(?:sendonly|recvonly|inactive|crypto:.*|ice-lite|bundle-only|dcmap:.*|dcsa:.*)") })
             let hash = try once(section, "a=fingerprint:")
             try require(hash.hasPrefix("sha-256 "))
             let payload = kind == "rtt" ? "" : media[3]
             var feedback: [String] = [], port = ""
+            var telephoneEvent: TelephoneEvent?
             if kind == "rtt" {
                 try require(media[3] == "webrtc-datachannel")
                 port = try once(section, "a=sctp-port:")
@@ -149,15 +174,27 @@ struct NativeJingleMedia: CustomStringConvertible, CustomDebugStringConvertible 
                 }
             } else {
                 try require(section.filter { $0 == "a=rtcp-mux" }.count == 1 && section.filter { $0 == "a=sendrecv" }.count == 1)
-                let codec = try once(section, "a=rtpmap:")
-                try require(codec.uppercased() == "\(payload) \(kind == "audio" ? "PCMU/8000" : "VP8/90000")" ||
-                    (kind == "audio" && codec.uppercased() == "\(payload) PCMU/8000/1"))
+                let mappings = section.filter { $0.hasPrefix("a=rtpmap:") }
+                try require(mappings.count == media.count - 3)
+                let codec = try once(section, "a=rtpmap:\(payload) ")
+                try require(codec.uppercased() == (kind == "audio" ? "PCMU/8000" : "VP8/90000") ||
+                    (kind == "audio" && codec.uppercased() == "PCMU/8000/1"))
+                if media.count == 5 {
+                    let eventPayload = media[4]
+                    let mapping = try once(section, "a=rtpmap:\(eventPayload) ")
+                    try require(mapping.lowercased() == "telephone-event/8000" || mapping.lowercased() == "telephone-event/8000/1")
+                    let formats = section.filter { $0.hasPrefix("a=fmtp:") }
+                    try require(formats.count <= 1)
+                    let events = formats.isEmpty ? "0-15" : try once(section, "a=fmtp:\(eventPayload) ")
+                    telephoneEvent = TelephoneEvent(payload: eventPayload, events: events)
+                }
                 for line in section where line.hasPrefix("a=rtcp-fb:") {
                     let prefix = "a=rtcp-fb:\(payload) "
                     try require(line.hasPrefix(prefix))
                     feedback.append(String(line.dropFirst(prefix.count)))
                 }
             }
+            try require(telephoneEvent != nil || !section.contains { $0.hasPrefix("a=fmtp:") })
             let candidateLines = section.filter { $0.hasPrefix("a=candidate:") }
             try require(candidateLines.count <= 64)
             var candidates: [[String: String]] = []
@@ -184,7 +221,7 @@ struct NativeJingleMedia: CustomStringConvertible, CustomDebugStringConvertible 
             }
             contents.append(Content(kind: kind, mid: try once(section, "a=mid:"), payload: payload, feedback: feedback, port: port,
                 ufrag: try once(section, "a=ice-ufrag:"), password: try once(section, "a=ice-pwd:"),
-                fingerprint: String(hash.dropFirst(8)), setup: try once(section, "a=setup:"), candidates: candidates))
+                fingerprint: String(hash.dropFirst(8)), setup: try once(section, "a=setup:"), candidates: candidates, telephoneEvent: telephoneEvent))
         }
         let result = Self(sid: sid, action: action, profile: profile, contents: contents)
         try result.validate()
@@ -196,6 +233,10 @@ struct NativeJingleMedia: CustomStringConvertible, CustomDebugStringConvertible 
         try Self.require(action == "session-accept" && offer.action == "session-initiate" && sid == offer.sid && profile == offer.profile && mids == offer.mids)
         for (answer, proposed) in zip(contents, offer.contents) {
             try Self.require(answer.kind == proposed.kind && answer.payload == proposed.payload && Set(answer.feedback).isSubset(of: Set(proposed.feedback)))
+            if let event = answer.telephoneEvent {
+                try Self.require(proposed.telephoneEvent?.payload == event.payload &&
+                    (proposed.telephoneEvent?.events == event.events || (proposed.telephoneEvent?.events == "0-16" && event.events == "0-15")))
+            }
         }
     }
 
@@ -211,7 +252,11 @@ struct NativeJingleMedia: CustomStringConvertible, CustomDebugStringConvertible 
                     let parts = feedback.components(separatedBy: " ")
                     result += "<rtcp-fb xmlns='\(Self.feedback)' type='\(parts[0])'" + (parts.count == 2 ? " subtype='\(parts[1])'" : "") + "/>"
                 }
-                result += "</payload-type><rtcp-mux/></description>"
+                result += "</payload-type>"
+                if let event = item.telephoneEvent {
+                    result += "<payload-type id='\(event.payload)' name='telephone-event' clockrate='8000' channels='1'><parameter name='events' value='\(event.events)'/></payload-type>"
+                }
+                result += "<rtcp-mux/></description>"
             }
             result += "<transport xmlns='\(Self.ice)' ufrag='\(item.ufrag)' pwd='\(item.password)'><fingerprint xmlns='\(Self.dtls)' hash='sha-256' setup='\(item.setup)'>\(item.fingerprint)</fingerprint>"
             if item.kind == "rtt" {
@@ -228,11 +273,13 @@ struct NativeJingleMedia: CustomStringConvertible, CustomDebugStringConvertible 
     var sdp: String {
         var lines = ["v=0", "o=- 1 1 IN IP4 0.0.0.0", "s=-", "t=0 0"]
         for item in contents {
-            lines += [item.kind == "rtt" ? "m=application 9 UDP/DTLS/SCTP webrtc-datachannel" : "m=\(item.kind) 9 UDP/TLS/RTP/SAVPF \(item.payload)", "c=IN IP4 0.0.0.0", "a=mid:\(item.mid)"]
+            let payloads = item.payload + (item.telephoneEvent.map { " " + $0.payload } ?? "")
+            lines += [item.kind == "rtt" ? "m=application 9 UDP/DTLS/SCTP webrtc-datachannel" : "m=\(item.kind) 9 UDP/TLS/RTP/SAVPF \(payloads)", "c=IN IP4 0.0.0.0", "a=mid:\(item.mid)"]
             if item.kind == "rtt" { lines += ["a=sctp-port:\(item.port)", "a=max-message-size:4096"] }
             else {
                 lines += ["a=sendrecv", "a=rtcp-mux", "a=rtpmap:\(item.payload) \(item.kind == "audio" ? "PCMU/8000" : "VP8/90000")"]
                 lines += item.feedback.map { "a=rtcp-fb:\(item.payload) \($0)" }
+                if let event = item.telephoneEvent { lines += ["a=rtpmap:\(event.payload) telephone-event/8000", "a=fmtp:\(event.payload) \(event.events)"] }
             }
             lines += ["a=ice-ufrag:\(item.ufrag)", "a=ice-pwd:\(item.password)", "a=fingerprint:sha-256 \(item.fingerprint)", "a=setup:\(item.setup)"]
             for candidate in item.candidates {
@@ -253,6 +300,10 @@ struct NativeJingleMedia: CustomStringConvertible, CustomDebugStringConvertible 
                 (action == "session-initiate" ? item.setup == "actpass" : ["active", "passive"].contains(item.setup)))
             try Self.require(item.kind == "rtt" ? Self.number(item.port, 1, 65535) :
                 (item.kind == "audio" ? item.payload == "0" : Self.number(item.payload, 96, 127)))
+            if let event = item.telephoneEvent {
+                try Self.require(item.kind == "audio" && Self.number(event.payload, 96, 127) &&
+                    event.payload != item.payload && ["0-15", "0-16"].contains(event.events))
+            }
             let permittedFeedback: Set<String> = item.kind == "video" ? Self.feedbackValues : (item.kind == "audio" ? ["nack"] : [])
             try Self.require(Set(item.feedback).isSubset(of: permittedFeedback) && Set(item.feedback).count == item.feedback.count)
             try Self.require(!item.candidates.isEmpty && item.candidates.count <= 24)

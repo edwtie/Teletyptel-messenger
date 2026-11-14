@@ -32,6 +32,58 @@ Before switching the signed target to `com.tiedragon.teletyptel`:
 The existing signed/TestFlight workflow still builds the working wrapper. This
 step did not silently redirect it to the incomplete native target.
 
+## Remaining call work: negotiated DTMF and push registration (2026-11-14)
+
+The native RTP audio profile now optionally negotiates `telephone-event/8000`
+alongside mandatory PCMU. The answer can decline the optional event codec or
+narrow its event range, but cannot invent a payload or widen the offer. The
+connected-call keypad and CallKit single-tone actions use the native WebRTC
+DTMF sender only when the audio session is active and the sender reports actual
+negotiated capability. They do not generate chat, RTT characters or SIP INFO.
+Each input is a single telephone key, with a bounded 16-tone queue; pending tones
+are cleared when audio deactivates, transport disconnects or the call ends.
+The symbols retain accessibility names; an unsupported peer leaves the keypad
+disabled. Phone-number letter selection remains a separate pre-call feature.
+
+This is **not full native SIP calling**. The existing isolated route remains
+restricted to the private/loopback lab gateway and echo extension 600. That
+gateway currently does not negotiate/forward RFC 4733 events. No public number,
+provider, 112 or Tolkcontact connection is enabled by this change. Before enabling
+gateway DTMF, verify negotiated event payloads on both WebRTC and SIP legs and
+record real Asterisk receipt of 0–9, `*`, `#`, duplicate handling and hangup cleanup.
+Local WebRTC enqueue acceptance is not evidence of remote gateway tone receipt.
+
+`NativePushRegistryClient` implements the existing authenticated `call-push.php`
+contract with explicit consent, its own fresh CSRF challenge, account/device/
+generation/expiry validation, a 16 KiB response limit, confirmed revocation and
+redacted registration descriptions. The optional control credential remains
+opaque and must never be treated as an answer or full-session credential.
+The client is a tested foundation, not an activated background-call integration:
+no device is registered automatically, no credential is persisted, and the
+preview's push flag remains false. Native consent UI, secure registration
+lifecycle, cold-start runtime and authoritative answer/session recovery still
+need wiring. Signed identity/capabilities, deployed server policy/worker and
+real locked-screen APNs delivery must be verified before replacing TestFlight.
+
+For device acceptance, use two authorized test accounts and record app build,
+iOS version, Wi-Fi/mobile connection, orientation and observed result:
+- Incoming TC while foregrounded, backgrounded and locked; answer, reject,
+  caller cancellation, expiry, duplicate/late push and an unavailable server.
+- Audio activation and interruption, mute, camera permission/off/switch,
+  portrait/landscape, RTT edits in both directions, reconnect and remote hangup.
+- Explicit consent off/on, token rotation, logout, account switch, failed revoke
+  and relaunch; no former account's calls or credentials may be reused.
+- DTMF only after capability negotiation, with confirmed remote lab receipt;
+  without support, taps must not send anything or become chat/RTT text.
+- Compare direct/group chat, attachments, menus, account settings, translations,
+  history and accessibility against the web client on iPhone and iPad. Existing
+  simulator cases do not establish complete web parity or physical-device behavior.
+
+Validation of this step is pending the new unsigned Apple SDK CI run. A Linux
+compatibility attempt compiled the new core sources but could not validate the
+existing Darwin SDP fixtures (CRLF splitting differs); it is not a native pass.
+The production signed workflow, server configuration and APNs keys are unchanged.
+
 ## Shared online chat history (2026-11-14)
 
 The native target now uses the same `message_history` database as the web client:

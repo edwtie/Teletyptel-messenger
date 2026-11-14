@@ -7,6 +7,8 @@ struct NativeTotalConversationView: View {
     @ObservedObject var translation: NativeTranslationModel
     @FocusState private var rttFocused: Bool
     @State private var controlsOpen = false
+    @State private var keypadOpen = false
+    @State private var keypadNotice: String?
 
     var body: some View {
         GeometryReader { geometry in
@@ -64,6 +66,8 @@ struct NativeTotalConversationView: View {
         .onChange(of: translation.ready) { _ in translateCurrentText() }
         .onChange(of: translation.preferences) { _ in translateCurrentText() }
         .onChange(of: translation.sharingConsent) { _ in translateCurrentText() }
+        .sheet(isPresented: $keypadOpen) { callKeypad }
+        .onChange(of: controller.presentation?.callID) { _ in keypadOpen = false; keypadNotice = nil }
     }
 
     private func translateCurrentText() {
@@ -205,6 +209,10 @@ struct NativeTotalConversationView: View {
                        color: controller.isMuted ? NativeWebStyle.disabled : NativeWebStyle.enabled,
                        label: controller.isMuted ? "Microfoon inschakelen" : "Microfoon dempen",
                        action: controller.toggleMuted)
+            callButton(symbol: "circle.grid.3x3.fill", color: presentation.canSendDtmf ? NativeWebStyle.enabled : NativeWebStyle.disabled,
+                       label: "Telefoontoetsen tijdens gesprek") { controlsOpen = false; keypadNotice = nil; keypadOpen = true }
+                .disabled(!presentation.canSendDtmf)
+                .accessibilityIdentifier("call-dtmf-keypad")
             if presentation.profile.contents.contains("rtt") {
                 callButton(symbol: "keyboard.fill", color: presentation.rttReady ? NativeWebStyle.enabled : .orange,
                            label: "Realtime tekst typen") { rttFocused = true }
@@ -217,6 +225,35 @@ struct NativeTotalConversationView: View {
         .overlay(RoundedRectangle(cornerRadius: 18)
             .stroke(Color(red: 0.12, green: 0.32, blue: 0.62), lineWidth: 1.5))
         .frame(maxWidth: .infinity)
+    }
+
+    private var callKeypad: some View {
+        NavigationStack {
+            VStack(spacing: 16) {
+                Text("Toetsen voor het verbonden gesprek. Deze toetsen versturen geen chat of RTT-tekst.").font(.caption)
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 3), spacing: 12) {
+                    ForEach(["1", "2", "3", "4", "5", "6", "7", "8", "9", "*", "0", "#"], id: \.self) { tone in
+                        Button {
+                            keypadNotice = controller.sendDtmf(tone) ? "Toets verzonden." : "Geen toets verzonden. Controleer het gesprek en de DTMF-ondersteuning."
+                        } label: {
+                            VStack(spacing: 3) {
+                                Text(tone).font(.title)
+                                Text(NativeDialing.letters[tone] ?? "").font(.caption).accessibilityHidden(true)
+                            }.frame(maxWidth: .infinity, minHeight: 58)
+                        }
+                        .disabled(controller.presentation?.canSendDtmf != true)
+                        .buttonStyle(.bordered).accessibilityLabel("Telefoontoets " + tone)
+                        .accessibilityIdentifier("call-dtmf-" + tone)
+                    }
+                }
+                if let notice = keypadNotice { Text(notice).font(.caption).accessibilityIdentifier("call-dtmf-status") }
+                Spacer(minLength: 0)
+            }.padding(20).frame(maxWidth: 420).frame(maxWidth: .infinity)
+                .navigationTitle("Telefoontoetsen")
+                .toolbar { ToolbarItem(placement: .cancellationAction) {
+                    Button { keypadOpen = false; keypadNotice = nil } label: { Image(systemName: "xmark").frame(width: 44, height: 44) }.accessibilityLabel("Sluiten")
+                } }
+        }
     }
 
     private func callButton(symbol: String, color: Color, label: String,

@@ -12,6 +12,38 @@ const root = path.resolve(__dirname, "..");
 const native = path.join(root, "mobile/ios-native");
 const read = file => fs.readFileSync(path.join(native, file), "utf8");
 
+test("Native DTMF uses negotiated RTP events and CallKit, never RTT or message signaling", () => {
+  for (const source of ["Core/NativeDtmf.swift", "Core/NativePushRegistry.swift"]) assert.ok(projectText().project.includes(source));
+  const media = read("App/NativeCallMedia.swift");
+  assert.match(media, /guard connected, audioActive, prepared\?\.peer\.connectionState == \.connected/);
+  assert.match(media, /sender\.canInsertDtmf/);
+  assert.match(media, /sender\.remainingTones\(\)/);
+  assert.match(media, /return sender\.insertDtmf/);
+  const coordinator = read("Sources/TeleTypTelCore/NativeCallCoordinator.swift");
+  assert.match(coordinator, /guard currentHandle\?\.id == id, isConnected, NativeDtmf\.appending/);
+  assert.match(read("App/NativeCallPlatform.swift"), /action\.type == \.singleTone, coordinator\.sendDtmf/);
+  const policy = read("Sources/TeleTypTelCore/NativeDtmf.swift");
+  assert.match(policy, /maximumQueued = 16/);
+  assert.doesNotMatch(policy, /NativeChat|Rtt|sendMessage|http|print\(/);
+  assert.match(read("Sources/TeleTypTelCore/NativeJingleMedia.swift"), /proposed\.telephoneEvent\?\.payload == event\.payload/);
+  assert.match(read("UITests/NativeStartupUITests.swift"), /XCTAssertFalse\(keypad\.isEnabled\)/);
+});
+
+test("Native push registry remains explicit-consent, bounded and inactive in the preview", () => {
+  const client = read("Sources/TeleTypTelCore/NativePushRegistry.swift");
+  assert.match(client, /guard consented, \(16\.\.\.256\)\.contains\(token\.count\)/);
+  assert.match(client, /reply\.accountId == accountID/);
+  assert.match(client, /UUID\(uuidString: reply\.deviceId\) == deviceID/);
+  assert.match(client, /expiry <= current \+ 86430/);
+  assert.match(client, /reply\.devices\.count <= 8/);
+  assert.match(client, /session\.request\(\.callPush, body: body, csrf: csrf\)/);
+  assert.match(client, /NativePushRegistration\(redacted\)/);
+  assert.doesNotMatch(client, /UserDefaults|print\(|NSLog|SecItem|PKPushRegistry/);
+  assert.match(read("Sources/TeleTypTelCore/NativeAccountWebSession.swift"), /route == \.callPush \? 16384 : 1048576/);
+  assert.doesNotMatch(read("App/Info.plist"), /<key>TeleTypTelNativeCallPushEnabled<\/key>\s*<true\s*\/>/);
+  assert.match(read("App/NativeCallPlatform.swift"), /forInfoDictionaryKey: "TeleTypTelNativeCallPushEnabled"\) as\? Bool == true/);
+});
+
 test("Native interaction/history/dialer sources stay in the isolated target with explicit safety gates", () => {
   const project = projectText().project;
   for (const source of ["Core/NativeChatInteractions.swift", "Core/NativeHistory.swift", "Core/NativeDialing.swift",

@@ -23,6 +23,11 @@ protocol NativeCallMediaDriver: AnyObject {
     func stop(handle: NativeCallHandle)
     func audioActivated(_ active: Bool)
     func setMuted(_ muted: Bool) -> Bool
+    func sendDtmf(_ tone: String) -> Bool
+}
+
+extension NativeCallMediaDriver {
+    func sendDtmf(_ tone: String) -> Bool { false }
 }
 
 @MainActor
@@ -270,6 +275,11 @@ final class NativeCallCoordinator {
 
     func audioActivated(_ active: Bool) {
         media.audioActivated(active && currentHandle != nil)
+    }
+
+    func sendDtmf(id: UUID, tone: String) -> Bool {
+        guard currentHandle?.id == id, isConnected, NativeDtmf.appending(tone, to: "") != nil else { return false }
+        return media.sendDtmf(tone)
     }
 
     func setMuted(id: UUID, muted: Bool) -> Bool {

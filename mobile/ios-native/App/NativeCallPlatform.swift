@@ -43,6 +43,12 @@ private final class NativeCallKitSystem: NativeCallSystem {
         provider.reportOutgoingCall(with: id, connectedAt: Date())
     }
 
+    func setDtmfEnabled(id: UUID, enabled: Bool) {
+        let update = CXCallUpdate()
+        update.supportsDTMF = enabled
+        provider.reportCall(with: id, updated: update)
+    }
+
     func end(id: UUID, reason: NativeCallEndReason) {
         let mapped: CXCallEndedReason
         switch reason {
@@ -130,6 +136,18 @@ final class NativeCallPlatform: NSObject, PKPushRegistryDelegate, CXProviderDele
         guard registry == nil, self.account == account else { return }
         revocationRequired = false
         self.account = nil
+    }
+
+    func setDtmfEnabled(id: UUID, enabled: Bool) {
+        guard coordinator.currentHandle?.id == id else { return }
+        system.setDtmfEnabled(id: id, enabled: enabled && coordinator.isConnected)
+    }
+
+    nonisolated func provider(_ provider: CXProvider, perform action: CXPlayDTMFCallAction) {
+        MainActor.assumeIsolated {
+            if action.type == .singleTone, coordinator.sendDtmf(id: action.callUUID, tone: action.digits) { action.fulfill() }
+            else { action.fail() }
+        }
     }
 
     nonisolated func pushRegistry(_ registry: PKPushRegistry, didUpdate pushCredentials: PKPushCredentials,

@@ -26,6 +26,8 @@ private final class CallMediaFixture: NativeCallMediaDriver {
     var stopped: [NativeCallHandle] = []
     var activation: [Bool] = []
     var muted: [Bool] = []
+    var tones: [String] = []
+    var dtmfAccepted = true
     func start(handle: NativeCallHandle, media: NativeCallMedia, event: @escaping (NativeCallMediaEvent) -> Void) {
         handles.append(handle)
         callbacks.append(event)
@@ -33,6 +35,7 @@ private final class CallMediaFixture: NativeCallMediaDriver {
     func stop(handle: NativeCallHandle) { stopped.append(handle) }
     func audioActivated(_ active: Bool) { activation.append(active) }
     func setMuted(_ muted: Bool) -> Bool { self.muted.append(muted); return true }
+    func sendDtmf(_ tone: String) -> Bool { tones.append(tone); return dtmfAccepted }
 }
 
 @MainActor
@@ -63,6 +66,24 @@ private final class CallClockFixture: NativeCallScheduling {
 }
 
 final class NativeCallCoordinatorTests: XCTestCase {
+    @MainActor
+    func testDtmfRequiresTheExactConnectedCallAndAnAcceptedMediaOperation() async throws {
+        let (coordinator, system, media, _) = fixture()
+        let identifier = try ring(coordinator, system)
+        XCTAssertFalse(coordinator.sendDtmf(id: identifier, tone: "1"))
+        coordinator.answer(id: identifier) { _ in }
+        XCTAssertFalse(coordinator.sendDtmf(id: identifier, tone: "1"))
+        media.callbacks.last?(.ready(.total, contents: ["audio", "video", "rtt"], rttReady: true))
+        XCTAssertTrue(coordinator.sendDtmf(id: identifier, tone: "#"))
+        XCTAssertFalse(coordinator.sendDtmf(id: UUID(), tone: "1"))
+        XCTAssertFalse(coordinator.sendDtmf(id: identifier, tone: "12"))
+        media.dtmfAccepted = false
+        XCTAssertFalse(coordinator.sendDtmf(id: identifier, tone: "2"))
+        XCTAssertEqual(media.tones, ["#", "2"])
+        _ = coordinator.end(id: identifier)
+        XCTAssertFalse(coordinator.sendDtmf(id: identifier, tone: "3"))
+        XCTAssertEqual(media.tones, ["#", "2"])
+    }
     @MainActor
     private func fixture() -> (NativeCallCoordinator, CallSystemFixture, CallMediaFixture, CallClockFixture) {
         let system = CallSystemFixture()

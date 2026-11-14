@@ -12,6 +12,7 @@ struct NativeCallPresentation {
     let rttReady: Bool
     let cameraEnabled: Bool
     let canSwitchCamera: Bool
+    let canSendDtmf: Bool
 }
 
 @MainActor
@@ -92,6 +93,7 @@ final class NativeWebRTCCallMedia: NativeCallMediaDriver {
 
     func stop(handle: NativeCallHandle) {
         guard self.handle == handle else { return }
+        clearDtmf()
         self.handle = nil
         startTask?.cancel()
         startTask = nil
@@ -127,15 +129,34 @@ final class NativeWebRTCCallMedia: NativeCallMediaDriver {
             audio.audioSessionDidActivate(AVAudioSession.sharedInstance())
             audio.isAudioEnabled = true
         } else {
+            clearDtmf()
             audio.isAudioEnabled = false
             audio.audioSessionDidDeactivate(AVAudioSession.sharedInstance())
         }
+        publishPresentation()
     }
 
     func setMuted(_ muted: Bool) -> Bool {
         guard let microphone = prepared?.microphone else { return false }
         microphone.isEnabled = !muted
         return true
+    }
+
+    private var dtmfSender: (any RTCDtmfSender)? {
+        guard connected, audioActive, prepared?.peer.connectionState == .connected else { return nil }
+        return prepared?.peer.senders.first(where: { $0.track is RTCAudioTrack && $0.track?.readyState == .live })?.dtmfSender
+    }
+
+    func sendDtmf(_ tone: String) -> Bool {
+        guard let sender = dtmfSender, sender.canInsertDtmf,
+              let tones = NativeDtmf.appending(tone, to: sender.remainingTones()) else { return false }
+        return sender.insertDtmf(tones, duration: NativeDtmf.duration, interToneGap: NativeDtmf.gap)
+    }
+
+    private func clearDtmf() {
+        for sender in prepared?.peer.senders ?? [] where sender.track is RTCAudioTrack {
+            _ = sender.dtmfSender?.insertDtmf("", duration: NativeDtmf.duration, interToneGap: NativeDtmf.gap)
+        }
     }
 
     func setRttText(_ text: String) -> Bool {
@@ -175,6 +196,7 @@ final class NativeWebRTCCallMedia: NativeCallMediaDriver {
         publishPresentation()
         if negotiation.remoteEnded { event?(.ended); return }
         if prepared.peer.connectionState == .disconnected {
+            clearDtmf()
             if connected && reconnectDeadline == nil, let currentHandle = handle {
                 reconnectDeadline = Task { [weak self] in
                     do { try await Task.sleep(nanoseconds: 10_000_000_000) }
@@ -207,6 +229,7 @@ final class NativeWebRTCCallMedia: NativeCallMediaDriver {
         guard Set(contents) == profile.contents else { return }
         connected = true
         event?(.ready(profile, contents: contents, rttReady: rtt?.isReady ?? false))
+        publishPresentation()
     }
 
     private func publishPresentation() {
@@ -224,7 +247,8 @@ final class NativeWebRTCCallMedia: NativeCallMediaDriver {
             remoteText: rtt?.remoteText ?? "",
             rttReady: rtt?.isReady ?? false,
             cameraEnabled: capture.cameraEnabled,
-            canSwitchCamera: capture.canSwitchCamera
+            canSwitchCamera: capture.canSwitchCamera,
+            canSendDtmf: dtmfSender?.canInsertDtmf == true
         ))
     }
 }
