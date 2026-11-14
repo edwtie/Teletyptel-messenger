@@ -28,7 +28,9 @@ final class NativeArchiveIntegrationTests: XCTestCase {
         Task {
             try await NativeXMPPConnection().run(account: account, onConnected: { jid in
                 Task { await endpoint.setJID(jid) }
-            }, onRoster: { _ in }, onChat: { _ in }, onSender: { sender in
+            }, onRoster: { _ in }, onChat: { event in
+                Task { await endpoint.receive(event) }
+            }, onSender: { sender in
                 Task { await endpoint.setSender(sender) }
             })
         }
@@ -99,9 +101,59 @@ final class NativeArchiveIntegrationTests: XCTestCase {
             XCTFail("Disconnected transport must not fetch history")
         } catch { XCTAssertEqual(error as? NativeChatFailure, .disconnected) }
     }
+
+    func testRealServerRoutesAndArchivesAuthorScopedCorrectionAndRetraction() async throws {
+        let fixture = try fixture()
+        let configuration = try ServerConfiguration(address: "https://localhost:\(fixture.trustedPort)", domain: "localhost")
+        let owner = fixture.username + "@localhost"
+        let peer = fixture.archivePeer + "@localhost"
+        let left = ArchiveEndpoint(); let right = ArchiveEndpoint()
+        let leftConnection = connect(NativeAuthenticatedAccount(configuration: configuration, jid: owner, password: fixture.password), endpoint: left)
+        let rightConnection = connect(NativeAuthenticatedAccount(configuration: configuration, jid: peer, password: fixture.password), endpoint: right)
+        defer { leftConnection.cancel(); rightConnection.cancel() }
+        let sender = try await ready(left)
+        _ = try await ready(right)
+        let changes = try XCTUnwrap(sender as? any NativeMessageChanging)
+        let original = UUID().uuidString; let edit = UUID().uuidString; let retract = UUID().uuidString
+        try await sender.sendMessage(to: peer, body: "Fictief origineel voor berichtacties", identifier: original)
+        try await changes.changeMessage(to: peer, change: .correct(target: original, body: "Fictief gecorrigeerd"), identifier: edit)
+        try await changes.changeMessage(to: peer, change: .retract(target: edit), identifier: retract)
+        for _ in 0..<300 {
+            if await right.changeCount >= 2 { break }
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        let received = await right.events
+        XCTAssertEqual(awaitedChanges(received), [edit, retract])
+        var live = NativeChatStore()
+        for event in received { live.receive(event) }
+        XCTAssertEqual(live.messages.count, 1)
+        XCTAssertTrue(live.messages.first?.edited == true)
+        XCTAssertTrue(live.messages.first?.retracted == true)
+        XCTAssertEqual(live.messages.first?.body, "")
+        let rightSender = try await ready(right)
+        var archived: NativeArchivePage?
+        for _ in 0..<30 {
+            let page = try await rightSender.fetchArchive(peer: owner, before: nil)
+            if page.messages.contains(where: { $0.identifier == retract && $0.change != nil }) { archived = page; break }
+            try await Task.sleep(nanoseconds: 100_000_000)
+        }
+        let page = try XCTUnwrap(archived)
+        var restored = NativeChatStore()
+        try restored.mergeArchive(page)
+        let restoredMessage = restored.messages.first { $0.previousIDs.contains(original) }
+        XCTAssertTrue(restoredMessage?.retracted == true)
+        XCTAssertEqual(restoredMessage?.body, "")
+    }
+
+    private func awaitedChanges(_ events: [NativeChatEvent]) -> [String] {
+        events.compactMap { event in if case .change(_, let identifier, _) = event { return identifier }; return nil }
+    }
 }
 
 private actor ArchiveEndpoint {
+    private(set) var events: [NativeChatEvent] = []
+    var changeCount: Int { events.reduce(0) { count, event in if case .change = event { return count + 1 }; return count } }
+    func receive(_ event: NativeChatEvent) { events.append(event) }
     private var jid: String?
     private var sender: (any NativeArchiveSending)?
     var ready: (any NativeArchiveSending)? { jid == nil ? nil : sender }

@@ -88,21 +88,54 @@ public final class NativeLoginModel: ObservableObject {
         }
         do {
             let message = try chat.enqueue(peer: peer)
+            submit(message, sender: sender)
+        } catch {
+            chatError = "Bericht niet gestart. Controleer je tekst (maximaal 8 kB) of wacht tot eerdere verzendingen klaar zijn. Je tekst blijft bewaard."
+        }
+    }
+
+    public func forwardMessage(_ body: String, to peer: String) -> Bool {
+        guard canSend, let sender = sender, case .ready(let contacts) = roster,
+              contacts.contains(where: { $0.jid == peer }), NativeChatCodec.validBody(body) else { return false }
+        do { submit(try chat.enqueueBody("Doorgestuurd:\n" + body, peer: peer), sender: sender); return true }
+        catch { chatError = "Doorsturen niet gestart. Controleer de lengte en wacht op eerdere verzendingen."; return false }
+    }
+
+    private func submit(_ message: NativeChatMessage, sender: any NativeChatSending) {
+        let attempt = generation
+        chatError = nil
+        sendTasks[message.id] = Task { [weak self] in
+            var submitted = false
+            do { try await sender.sendMessage(to: message.peer, body: message.body, identifier: message.id.uuidString); submitted = true } catch { }
+            guard let self = self, self.generation == attempt else { return }
+            self.chat.finish(message.id, submitted: submitted)
+            self.sendTasks.removeValue(forKey: message.id)
+        }
+    }
+
+    public var canChangeMessages: Bool { canSend && sender is any NativeMessageChanging }
+
+    public func hideMessage(_ identifier: UUID) {
+        do { try chat.hide(identifier); chatError = nil }
+        catch { chatError = "Verwijderen niet gestart. Wacht op de verzending of de sessielimiet is bereikt." }
+    }
+
+    public func changeMessage(_ identifier: UUID, correctedBody: String? = nil) {
+        guard canSend, let sender = sender as? any NativeMessageChanging, sendTasks.count < 8 else {
+            chatError = "Niet verbonden; het wijzigingsverzoek is niet verstuurd."; return
+        }
+        do {
+            let (message, change, request) = try chat.beginChange(identifier, correctedBody: correctedBody)
             let attempt = generation
             chatError = nil
             sendTasks[message.id] = Task { [weak self] in
                 var submitted = false
-                do {
-                    try await sender.sendMessage(to: peer, body: message.body, identifier: message.id.uuidString)
-                    submitted = true
-                } catch { }
+                do { try await sender.changeMessage(to: message.peer, change: change, identifier: request); submitted = true } catch { }
                 guard let self = self, self.generation == attempt else { return }
-                self.chat.finish(message.id, submitted: submitted)
+                self.chat.finishChange(message.id, change: change, request: request, submitted: submitted)
                 self.sendTasks.removeValue(forKey: message.id)
             }
-        } catch {
-            chatError = "Bericht niet gestart. Controleer je tekst (maximaal 8 kB) of wacht tot eerdere verzendingen klaar zijn. Je tekst blijft bewaard."
-        }
+        } catch { chatError = "Wijziging niet gestart. Alleen eigen verzonden berichten kunnen worden ingetrokken; bewerken geldt voor je laatste bericht." }
     }
 
     public func beginBackground() {
@@ -369,7 +402,7 @@ public final class NativeLoginModel: ObservableObject {
         if case .ready(let contacts) = roster {
             let peer: String
             switch event {
-            case .message(let sender, _, _), .rejected(let sender, _), .archivedIdentity(let sender, _, _, _): peer = sender
+            case .message(let sender, _, _), .rejected(let sender, _), .archivedIdentity(let sender, _, _, _), .change(let sender, _, _): peer = sender
             }
             guard contacts.contains(where: { $0.jid == peer }) else { return }
             chat.receive(event)

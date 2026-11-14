@@ -616,7 +616,10 @@ private struct NativeLoginUIFixture: ServerChecking, NativeAccountChallenging, N
     }
 }
 
-private struct NativeChatUIFixture: NativeArchiveSending, NativeGroupManaging {
+private struct NativeChatUIFixture: NativeArchiveSending, NativeGroupManaging, NativeMessageChanging {
+    func changeMessage(to peer: String, change: NativeMessageChange, identifier: String) async throws {
+        _ = try NativeMessageActionCodec.encode(to: peer, change: change, identifier: identifier)
+    }
     let includeInvitations: Bool
     func manageGroup(_ command: NativeGroupCommand) async throws -> NativeGroupReply {
         try await Task.sleep(nanoseconds: 100_000_000)

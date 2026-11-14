@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import ImageIO
 
 enum NativeWebStyle {
     static func color(_ light: UInt32, dark: UInt32) -> Color {
@@ -53,24 +54,61 @@ struct NativeWebIconStyle: ButtonStyle {
 struct NativeWebAvatar: View {
     let name: String
     var size: CGFloat = 34
+    var profile: NativePublicAvatar? = nil
+    @State private var image: UIImage?
+    private var avatarColor: Color {
+        guard let value = profile?.avatarColor.dropFirst(), let number = UInt32(value, radix: 16) else { return NativeWebStyle.accent }
+        return NativeWebStyle.color(number, dark: number)
+    }
     var body: some View {
-        Text(String(name.prefix(2)).uppercased())
+        ZStack {
+            if let image = image { Image(uiImage: image).resizable().scaledToFill() }
+            else { Text(String((profile.flatMap { $0.displayName.isEmpty ? nil : $0.displayName } ?? name).prefix(2)).uppercased())
             .font(NativeWebStyle.font(size > 34 ? 16 : 13, weight: .bold))
-            .foregroundStyle(.white).frame(width: size, height: size)
-            .background(NativeWebStyle.accent, in: Circle())
+            .foregroundStyle(.white) }
+        }.frame(width: size, height: size).background(avatarColor, in: Circle()).clipShape(Circle())
             .overlay(Circle().stroke(Color.white.opacity(0.35), lineWidth: 1))
             .accessibilityHidden(true)
+            .onAppear { prepareImage() }
+            .onChange(of: profile?.imageData) { _ in prepareImage() }
+    }
+    private func prepareImage() {
+        image = nil
+        guard let data = profile?.imageData,
+              let source = CGImageSourceCreateWithData(data as CFData, [kCGImageSourceShouldCache: false] as CFDictionary),
+              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+              let width = properties[kCGImagePropertyPixelWidth] as? NSNumber,
+              let height = properties[kCGImagePropertyPixelHeight] as? NSNumber,
+              width.doubleValue > 0, height.doubleValue > 0, width.doubleValue * height.doubleValue <= 16000000,
+              let thumbnail = CGImageSourceCreateThumbnailAtIndex(source, 0, [kCGImageSourceCreateThumbnailFromImageAlways: true,
+                kCGImageSourceCreateThumbnailWithTransform: true, kCGImageSourceThumbnailMaxPixelSize: 192] as CFDictionary) else { return }
+        image = UIImage(cgImage: thumbnail)
     }
 }
 
 struct NativeWebBubble: Shape {
     let own: Bool
     func path(in rect: CGRect) -> Path {
-        var path = RoundedRectangle(cornerRadius: 8).path(in: rect)
-        let edge = own ? rect.maxX : rect.minX
-        path.move(to: CGPoint(x: edge, y: rect.minY + 10))
-        path.addLine(to: CGPoint(x: edge + (own ? 8 : -8), y: rect.minY + 18))
-        path.addLine(to: CGPoint(x: edge, y: rect.minY + 26))
+        var path = Path()
+        path.move(to: CGPoint(x: rect.minX + 8, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX - 8, y: rect.minY))
+        path.addQuadCurve(to: CGPoint(x: rect.maxX, y: rect.minY + 8), control: CGPoint(x: rect.maxX, y: rect.minY))
+        if own {
+            path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY + 10))
+            path.addLine(to: CGPoint(x: rect.maxX + 8, y: rect.minY + 18))
+            path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY + 26))
+        }
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - 8))
+        path.addQuadCurve(to: CGPoint(x: rect.maxX - 8, y: rect.maxY), control: CGPoint(x: rect.maxX, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.minX + 8, y: rect.maxY))
+        path.addQuadCurve(to: CGPoint(x: rect.minX, y: rect.maxY - 8), control: CGPoint(x: rect.minX, y: rect.maxY))
+        if !own {
+            path.addLine(to: CGPoint(x: rect.minX, y: rect.minY + 26))
+            path.addLine(to: CGPoint(x: rect.minX - 8, y: rect.minY + 18))
+            path.addLine(to: CGPoint(x: rect.minX, y: rect.minY + 10))
+        }
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.minY + 8))
+        path.addQuadCurve(to: CGPoint(x: rect.minX + 8, y: rect.minY), control: CGPoint(x: rect.minX, y: rect.minY))
         path.closeSubpath()
         return path
     }

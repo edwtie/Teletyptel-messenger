@@ -1,5 +1,6 @@
 #if DEBUG
 import Foundation
+import UIKit
 
 final class NativeFeatureFixture: URLProtocol {
     private static let lock = NSLock()
@@ -10,6 +11,18 @@ final class NativeFeatureFixture: URLProtocol {
         Self.lock.lock(); defer { Self.lock.unlock() }
         var value: [String: Any] = ["ok": false, "error": "fixture_route_unavailable"]
         var status = 404
+        if request.url?.path == "/api/account.php", request.httpMethod == "GET",
+           let url = request.url, let jid = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "lookupJid" })?.value,
+           ["fixture@localhost", "demo-contact@localhost"].contains(jid) {
+            let image = UIGraphicsImageRenderer(size: CGSize(width: 72, height: 72)).image { context in
+                UIColor.systemBlue.setFill(); context.fill(CGRect(x: 0, y: 0, width: 72, height: 72))
+                UIColor.white.setFill()
+                UIBezierPath(ovalIn: CGRect(x: 25, y: 12, width: 22, height: 22)).fill()
+                UIBezierPath(ovalIn: CGRect(x: 13, y: 39, width: 46, height: 44)).fill()
+            }
+            value = ["ok": true, "profile": ["jid": jid, "displayName": jid == "fixture@localhost" ? "Fictieve gebruiker" : "Fictief contact", "avatarColor": "#2563eb", "avatarDataUrl": "data:image/png;base64," + (image.pngData()?.base64EncodedString() ?? "")]]
+            status = 200
+        }
         if request.url?.path == "/api/native-profile.php" {
             var data = request.httpBody ?? Data()
             if data.isEmpty, let stream = request.httpBodyStream {

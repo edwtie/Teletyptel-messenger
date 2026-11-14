@@ -3,6 +3,25 @@ import XCTest
 
 final class NativeMUCTests: XCTestCase {
     private let room = "room@conference.localhost"
+
+    func testRetractionRequiresAdvertisedStableAuthorAndRoomScopedIdentifier() throws {
+        var stream = try stream()
+        let discovery = info(stream).replacingOccurrences(of: "</query>", with: "<feature var='urn:xmpp:occupant-id:0'/><feature var='urn:xmpp:message-retract:1'/></query>")
+        _ = stream.receive(try ProbeXML.parse(discovery))
+        _ = stream.receive(try ProbeXML.parse(presence(nickname: "Peer", codes: [])))
+        let selfPresence = stream.receive(try ProbeXML.parse(presence()))
+        guard case .snapshot(let snapshot) = selfPresence.events.first else { return XCTFail("No snapshot") }
+        XCTAssertTrue(snapshot.supportsRetraction)
+        let original = "<message xmlns='jabber:client' from='\(room)/Peer' type='groupchat' id='client-id'><body>Tekst</body><stanza-id xmlns='urn:xmpp:sid:0' by='\(room)' id='room-id'/><occupant-id xmlns='urn:xmpp:occupant-id:0' id='stable-peer'/></message>"
+        guard case .message(let text) = stream.receive(try ProbeXML.parse(original)).events.first else { return XCTFail("No text") }
+        XCTAssertEqual(text.archiveID, "room-id"); XCTAssertEqual(text.occupantID, "stable-peer")
+        let retract = "<message xmlns='jabber:client' from='\(room)/Peer' type='groupchat' id='request'><retract xmlns='urn:xmpp:message-retract:1' id='room-id'/><occupant-id xmlns='urn:xmpp:occupant-id:0' id='stable-peer'/></message>"
+        guard case .retracted(let target, let author) = stream.receive(try ProbeXML.parse(retract)).events.first else { return XCTFail("No retraction") }
+        XCTAssertEqual(target, "room-id"); XCTAssertEqual(author, "stable-peer")
+        XCTAssertTrue(stream.receive(try ProbeXML.parse(retract.replacingOccurrences(of: "<occupant-id xmlns='urn:xmpp:occupant-id:0' id='stable-peer'/>", with: ""))).events.isEmpty)
+        var legacy = try joined()
+        XCTAssertTrue(legacy.receive(try ProbeXML.parse(retract)).events.isEmpty)
+    }
     private func stream() throws -> NativeMUCStream { try NativeMUCStream(room: room, nickname: "Me", boundJID: "owner@localhost/phone") }
     private func info(_ stream: NativeMUCStream) -> String {
         "<iq xmlns='jabber:client' from='\(room)' id='\(stream.identifier)' type='result'><query xmlns='http://jabber.org/protocol/disco#info'><feature var='http://jabber.org/protocol/muc'/></query></iq>"

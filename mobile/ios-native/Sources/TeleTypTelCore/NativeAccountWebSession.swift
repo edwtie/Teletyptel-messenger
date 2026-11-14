@@ -34,7 +34,7 @@ actor NativeAccountWebSession: CustomStringConvertible, CustomDebugStringConvert
     var hasSessionCookie: Bool { !closed && cookie != nil }
 
     func request(_ route: NativeAccountRoute, body: Data? = nil, csrf: String? = nil,
-                 accountID: String? = nil) async throws -> Data {
+                 accountID: String? = nil, lookupJID: String? = nil) async throws -> Data {
         try Task.checkCancellation()
         guard !closed, (body?.count ?? 0) <= 32768 else { throw NativeAccountFailure.rejected }
         let attempt = generation
@@ -42,6 +42,10 @@ actor NativeAccountWebSession: CustomStringConvertible, CustomDebugStringConvert
         if let accountID = accountID {
             guard route == .account, !accountID.isEmpty, accountID.utf8.count <= 96 else { throw NativeAccountFailure.invalidResponse }
             components.queryItems = [URLQueryItem(name: "accountId", value: accountID)]
+        }
+        if let lookupJID = lookupJID {
+            guard route == .account, accountID == nil, body == nil, NativeChatCodec.bareJID(lookupJID) == lookupJID else { throw NativeAccountFailure.invalidResponse }
+            components.queryItems = [URLQueryItem(name: "lookupJid", value: lookupJID)]
         }
         guard let url = components.url else { throw NativeAccountFailure.invalidResponse }
         var request = URLRequest(url: url)

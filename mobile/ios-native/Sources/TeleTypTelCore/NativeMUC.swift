@@ -24,6 +24,10 @@ public protocol NativeGroupSending: NativeChatSending {
     func leaveGroup(room: String) async
 }
 
+public protocol NativeGroupMessageChanging: NativeGroupSending {
+    func retractGroupMessage(room: String, target: String, identifier: String) async throws
+}
+
 public struct NativeGroupSnapshot: Equatable, Sendable {
     public let room: String
     public let nickname: String
@@ -32,6 +36,7 @@ public struct NativeGroupSnapshot: Equatable, Sendable {
     public var ownRole: String = "participant"
     public var ownAffiliation: String = "none"
     public var occupants: [NativeGroupOccupant] = []
+    public var supportsRetraction = false
 }
 
 public struct NativeGroupText: Identifiable, Equatable, Sendable {
@@ -39,14 +44,21 @@ public struct NativeGroupText: Identifiable, Equatable, Sendable {
     public let room: String
     public let nickname: String
     public let identifier: String?
-    public let archiveID: String?
-    public let body: String
+    public var archiveID: String?
+    public var body: String
     public let date: Date
     public let own: Bool
     public var state: NativeMessageState
+    public var occupantID: String? = nil
+    public var hidden = false
+    public var retracted = false
+    public var actionPending = false
+    public var actionRequestID: String? = nil
+    public var actionNotice: String? = nil
 }
 
 public enum NativeGroupEvent: Sendable {
+    case retracted(target: String, occupantID: String)
     case subject(String)
     case snapshot(NativeGroupSnapshot)
     case message(NativeGroupText)
@@ -70,6 +82,8 @@ struct NativeMUCStream {
     private var affiliations: [String: String] = [:]
     private let owner: String
     private let creating: Bool
+    private var stableOccupants = false
+    private var retractionsSupported = false
     private var creationConfigured = false
 
     init(room: String, nickname: String, boundJID: String, creating: Bool = false) throws {
@@ -98,7 +112,8 @@ struct NativeMUCStream {
     var snapshot: NativeGroupSnapshot {
         NativeGroupSnapshot(room: room, nickname: nickname, participants: participants.keys.sorted(), canSpeak: canSpeak,
             ownRole: participants[nickname] ?? "visitor", ownAffiliation: affiliations[nickname] ?? "none",
-            occupants: participants.keys.sorted().map { NativeGroupOccupant(nickname: $0, role: participants[$0]!, affiliation: affiliations[$0] ?? "none") })
+            occupants: participants.keys.sorted().map { NativeGroupOccupant(nickname: $0, role: participants[$0]!, affiliation: affiliations[$0] ?? "none") },
+            supportsRetraction: stableOccupants && retractionsSupported)
     }
 
     func message(body: String, identifier: String) throws -> String {
@@ -123,6 +138,8 @@ struct NativeMUCStream {
                   query.children.contains(where: { $0.name == "feature" && $0.namespace == "http://jabber.org/protocol/disco#info" && $0.attributes["var"] == "http://jabber.org/protocol/muc" }) else {
                 return end(.unavailable, sendLeave: false)
             }
+            stableOccupants = query.children.contains { $0.name == "feature" && $0.namespace == "http://jabber.org/protocol/disco#info" && $0.attributes["var"] == "urn:xmpp:occupant-id:0" }
+            retractionsSupported = query.children.contains { $0.name == "feature" && $0.namespace == "http://jabber.org/protocol/disco#info" && $0.attributes["var"] == NativeMessageActionCodec.retraction }
             phase = .joining
             return NativeMUCOutput(frames: ["<presence xmlns='jabber:client' to='\(Self.escape(room + "/" + nickname))'><x xmlns='http://jabber.org/protocol/muc'><history maxstanzas='0'/></x></presence>"])
         }
@@ -148,6 +165,14 @@ struct NativeMUCStream {
         if root.name == "presence" { return presence(root, nick: nick) }
         guard phase == .joined, root.name == "message", root.attributes["type"] == "groupchat",
               participants[nick] != nil else { return NativeMUCOutput() }
+        let occupantIDs = root.children.filter { $0.name == "occupant-id" && $0.namespace == "urn:xmpp:occupant-id:0" }
+        let occupantID = stableOccupants && occupantIDs.count == 1 ? occupantIDs.first?.attributes["id"] : nil
+        let validOccupant = occupantID.flatMap { NativeMessageActionCodec.validID($0) ? $0 : nil }
+        if NativeMessageActionCodec.hasChange(root) {
+            guard stableOccupants, retractionsSupported, let occupant = validOccupant,
+                  case .retract(let target) = NativeMessageActionCodec.decode(root) else { return NativeMUCOutput() }
+            return NativeMUCOutput(events: [.retracted(target: target, occupantID: occupant)])
+        }
         let bodies = root.children.filter { $0.name == "body" && $0.namespace == "jabber:client" }
         guard let body = bodies.first(where: { $0.attributes["xml:lang"] == nil }) ?? bodies.first,
               body.children.isEmpty, NativeChatCodec.validBody(body.text) else { return NativeMUCOutput() }
@@ -165,7 +190,7 @@ struct NativeMUCStream {
         }
         return NativeMUCOutput(events: [.message(NativeGroupText(id: UUID(), room: room, nickname: nick,
             identifier: messageID, archiveID: NativeArchiveQuery.trustedArchiveID(root, owner: room),
-            body: body.text, date: date, own: nick == nickname, state: nick == nickname ? .submitted : .incoming))])
+            body: body.text, date: date, own: nick == nickname, state: nick == nickname ? .submitted : .incoming, occupantID: validOccupant))])
     }
 
     private mutating func presence(_ root: ProbeElement, nick: String) -> NativeMUCOutput {

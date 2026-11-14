@@ -144,7 +144,7 @@ final class XMPPSessionTests: XCTestCase {
         XCTAssertEqual(stream.phase, .binding)
         let result = try stream.receive(bound(identifier))
         XCTAssertEqual(result.connectedJID, "fixture@localhost/device")
-        XCTAssertEqual(result.frames, ["<presence xmlns='jabber:client'/>"])
+        XCTAssertEqual(result.frames, [NativeMessageActionCodec.presence])
         XCTAssertEqual(stream.phase, .online)
     }
 

@@ -15,6 +15,7 @@ public struct NativeArchivedText: Equatable, Sendable {
     public let body: String
     public let date: Date
     public let outgoing: Bool
+    public var change: NativeMessageChange? = nil
 }
 
 public struct NativeArchivePage: Equatable, Sendable {
@@ -111,6 +112,12 @@ struct NativeArchiveQuery {
         guard let from = message.attributes["from"].flatMap(NativeChatCodec.bareJID),
               let to = message.attributes["to"].flatMap(NativeChatCodec.bareJID),
               (from == owner && to == peer) || (from == peer && to == owner) else { throw NativeArchiveFailure.invalidResponse }
+        if NativeMessageActionCodec.hasChange(message) {
+            guard let identifier = message.attributes["id"], NativeMessageActionCodec.validID(identifier),
+                  let change = NativeMessageActionCodec.decode(message), identifier != change.target else { throw NativeArchiveFailure.invalidResponse }
+            return NativeArchivedText(archiveID: archiveID, identifier: identifier, peer: peer,
+                body: "", date: date, outgoing: from == owner, change: change)
+        }
         let bodies = message.children.filter { $0.name == "body" && $0.namespace == "jabber:client" }
         guard let body = bodies.first(where: { $0.attributes["xml:lang"] == nil }) ?? bodies.first else { return nil }
         guard body.children.isEmpty, NativeChatCodec.validBody(body.text) else { throw NativeArchiveFailure.invalidResponse }

@@ -90,6 +90,7 @@ struct NativeMessengerView: View {
     @State private var showTranslation = false
     @State private var showGroups = false
     @State private var showAccount = false
+    @StateObject private var avatars = NativeAvatarCache()
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.verticalSizeClass) private var verticalSizeClass
 
@@ -107,6 +108,10 @@ struct NativeMessengerView: View {
         .sheet(isPresented: $showGroups) { NativeGroupsView(model: model.groups, login: model, translation: translation) }
         .sheet(isPresented: $showAccount) { NativeAccountSettingsView(login: model, translation: translation) }
         .sheet(isPresented: $showTranslation) { NativeTranslationSettingsView(model: translation) }
+        .task(id: model.canSend) { loadAvatars() }
+        .onChange(of: model.roster) { _ in loadAvatars() }
+        .onChange(of: showAccount) { if !$0 { avatars.refreshOwner() } }
+        .onDisappear { avatars.detach() }
     }
 
     private var conversationLayout: some View {
@@ -140,15 +145,15 @@ struct NativeMessengerView: View {
                     ForEach(contacts) { contact in
                         NavigationLink(value: contact.jid) {
                             HStack(spacing: 8) {
-                                NativeWebAvatar(name: contact.displayName)
+                                NativeWebAvatar(name: contact.displayName, profile: avatars.profiles[contact.jid])
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(contact.displayName).font(NativeWebStyle.font(14, weight: .bold)).lineLimit(1)
-                                    if let last = model.chat.messages.last(where: { $0.peer == contact.jid }) {
-                                        Text(last.body).font(NativeWebStyle.font(13)).lineLimit(1)
+                                    if let last = model.chat.messages.last(where: { $0.peer == contact.jid && !$0.hidden }) {
+                                        Text(last.retracted ? "Bericht ingetrokken" : last.body).font(NativeWebStyle.font(13)).lineLimit(1)
                                     } else { Text(contact.presence.label).font(NativeWebStyle.font(13)) }
                                 }
                                 .frame(maxWidth: .infinity, alignment: .leading)
-                                if let last = model.chat.messages.last(where: { $0.peer == contact.jid }) {
+                                if let last = model.chat.messages.last(where: { $0.peer == contact.jid && !$0.hidden }) {
                                     Text(last.date, style: .time).font(NativeWebStyle.font(10)).lineLimit(1)
                                 }
                                 Circle().fill(presenceColor(contact.presence)).frame(width: 10, height: 10)
@@ -197,7 +202,8 @@ struct NativeMessengerView: View {
             .navigationSplitViewColumnWidth(min: 260, ideal: 300, max: 360)
         } detail: {
             if let contact = contacts.first(where: { $0.jid == selected }) {
-                NativeChatView(model: model, calls: calls, translation: translation, contact: contact, onClose: { selected = nil })
+                NativeChatView(model: model, calls: calls, translation: translation, contact: contact, onClose: { selected = nil },
+                    contactProfile: avatars.profiles[contact.jid], ownProfile: avatars.owner.flatMap { avatars.profiles[$0] })
             } else if let room = model.groups.rooms.first(where: { $0.room == selected }) {
                 NativeGroupChatView(model: model.groups, room: room.room, login: model, translation: translation)
             } else {
@@ -238,6 +244,11 @@ struct NativeMessengerView: View {
         .overlay(alignment: .bottom) { NativeWebStyle.line.frame(height: 1) }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("messenger-brand-header")
+    }
+
+    private func loadAvatars() {
+        guard case .connected(let owner) = model.phase, case .ready(let roster) = model.roster else { avatars.detach(); return }
+        avatars.connect(model.activeWebSession, owner: owner, contacts: roster)
     }
 
     private func presenceColor(_ presence: NativeContactPresence) -> Color {

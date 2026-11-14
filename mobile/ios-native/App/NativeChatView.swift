@@ -7,13 +7,18 @@ struct NativeChatView: View {
     @ObservedObject var translation: NativeTranslationModel
     let contact: NativeContact
     var onClose: (() -> Void)? = nil
+    var contactProfile: NativePublicAvatar? = nil
+    var ownProfile: NativePublicAvatar? = nil
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @State private var showTranslation = false
     @State private var showEmoji = false
+    @State private var forwarding: NativeChatMessage?
+    @State private var editing: NativeChatMessage?
+    @State private var deleting: NativeChatMessage?
 
-    private var messages: [NativeChatMessage] { model.chat.messages.filter { $0.peer == contact.jid } }
+    private var messages: [NativeChatMessage] { model.chat.messages.filter { $0.peer == contact.jid && !$0.hidden } }
     private var draft: String { model.chat.drafts[contact.jid] ?? "" }
 
     var body: some View {
@@ -83,7 +88,7 @@ struct NativeChatView: View {
                 }
                 ToolbarItem(placement: .principal) {
                     HStack(spacing: 8) {
-                        NativeWebAvatar(name: contact.displayName)
+                        NativeWebAvatar(name: contact.displayName, profile: contactProfile)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(contact.displayName).font(NativeWebStyle.font(16, weight: .bold)).lineLimit(1)
                             Text(contact.presence.label).font(NativeWebStyle.font(12)).foregroundStyle(NativeWebStyle.muted)
@@ -116,6 +121,17 @@ struct NativeChatView: View {
             }
             .scrollDismissesKeyboard(.interactively)
         .sheet(isPresented: $showTranslation) { NativeTranslationSettingsView(model: translation) }
+        .sheet(item: $forwarding) { NativeForwardMessageView(model: model, text: $0.body) }
+        .sheet(item: $editing) { NativeEditMessageView(model: model, message: $0) }
+        .confirmationDialog("Bericht verwijderen?", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }), titleVisibility: .visible) {
+            if let message = deleting {
+                Button("Verwijderen voor mij", role: .destructive) { translation.translate("", key: message.id.uuidString); model.hideMessage(message.id); deleting = nil }
+                if model.canChangeMessages, model.chat.canRetract(message.id) {
+                    Button("Voor iedereen intrekken", role: .destructive) { model.changeMessage(message.id); deleting = nil }
+                }
+            }
+            Button("Annuleren", role: .cancel) { deleting = nil }
+        } message: { Text("Voor mij geldt voor deze sessie op dit apparaat. Voor iedereen is een verzoek: andere apparaten, archieven en kopieën kunnen het origineel behouden.") }
         .overlay { if scenePhase != .active { Color(uiColor: .systemBackground).ignoresSafeArea().overlay(Text("TeleTypTel")) } }
         .onChange(of: model.phase) { phase in
             if phase == .signedOut || phase == .idle { dismiss() }
@@ -149,7 +165,7 @@ struct NativeChatView: View {
     }
 
     private var automaticTranslationIdentity: String {
-        "\(messages.count):\(translation.ready):\(translation.preferences.mode):\(translation.preferences.targetLanguage):\(translation.sharingConsent)"
+        "\(messages.suffix(12).map { $0.id.uuidString + $0.body + String($0.retracted) }.joined(separator: "\u{1F}")):\(translation.ready):\(translation.preferences.mode):\(translation.preferences.targetLanguage):\(translation.sharingConsent)"
     }
 
     private func bubble(_ message: NativeChatMessage) -> some View {
@@ -157,50 +173,75 @@ struct NativeChatView: View {
         return HStack(alignment: .bottom, spacing: 8) {
             if !incoming { Spacer(minLength: 36) }
             if incoming { avatar }
-            VStack(alignment: .leading, spacing: 5) {
-                Text(message.body).textSelection(.enabled)
-                if let session = model.activeWebSession, NativeFileReference.inMessage(message.body, configuration: session.configuration) != nil {
-                    NativeFileMessageButton(bodyText: message.body, session: session)
-                }
-                if let result = translation.results[message.id.uuidString], translation.preferences.mode != "off", translation.sharingConsent {
-                    NativeTranslationCaption(result: result)
-                }
-                HStack(spacing: 5) {
-                    Spacer(minLength: 0)
-                    Text(message.date, style: .time).font(.caption2)
-                    if !incoming {
-                        Image(systemName: message.state == .sending ? "clock" : message.state == .submitted ? "checkmark" : "exclamationmark.circle")
-                            .font(.caption2)
-                    }
-                }.foregroundStyle(NativeWebStyle.muted)
+            ViewThatFits(in: .horizontal) {
+                bubbleContent(message).fixedSize(horizontal: true, vertical: true)
+                bubbleContent(message)
             }
             .foregroundStyle(NativeWebStyle.text)
             .padding(.horizontal, 10).padding(.vertical, 8)
             .background(NativeWebBubble(own: !incoming).fill(incoming ? NativeWebStyle.incoming : NativeWebStyle.outgoing))
             .overlay(NativeWebBubble(own: !incoming).stroke(incoming ? NativeWebStyle.incomingLine : NativeWebStyle.outgoingLine, lineWidth: 1))
+            .shadow(color: .black.opacity(0.06), radius: 3, y: 1)
             .contentShape(Rectangle())
-            .accessibilityElement(children: .combine)
+            .accessibilityElement(children: .contain)
             .accessibilityLabel(accessibleMessage(message))
             .accessibilityIdentifier("chat-message-" + message.id.uuidString)
-            .contextMenu {
+            .contextMenu { messageActions(message) }
+            if incoming { Spacer(minLength: 36) }
+            else { NativeWebAvatar(name: "Ik", size: 30, profile: ownProfile) }
+        }
+    }
+
+    private func bubbleContent(_ message: NativeChatMessage) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+                HStack(alignment: .top, spacing: 4) {
+                    Text(message.retracted ? "Bericht ingetrokken" : message.body).textSelection(.enabled)
+                    Menu { messageActions(message) } label: { Image(systemName: "ellipsis").frame(width: 44, height: 44) }
+                        .buttonStyle(.plain).accessibilityLabel("Berichtmenu").accessibilityIdentifier("message-menu-" + message.id.uuidString)
+                }
+                if let session = model.activeWebSession, NativeFileReference.inMessage(message.body, configuration: session.configuration) != nil {
+                    NativeFileMessageButton(bodyText: message.body, session: session)
+                }
+                if !message.retracted, translation.isCurrent(key: message.id.uuidString, text: message.body), let result = translation.results[message.id.uuidString], translation.preferences.mode != "off", translation.sharingConsent {
+                    NativeTranslationCaption(result: result)
+                }
+                HStack(spacing: 5) {
+                    Spacer(minLength: 0)
+                    Text(message.date, style: .time).font(.caption2)
+                    if message.edited { Text("bewerkt").font(.caption2) }
+                    if message.state != .incoming {
+                        Image(systemName: message.state == .sending ? "clock" : message.state == .submitted ? "checkmark" : "exclamationmark.circle")
+                            .font(.caption2)
+                    }
+                }.foregroundStyle(NativeWebStyle.muted)
+                if let notice = message.actionNotice { Text(notice).font(.caption2).foregroundStyle(NativeWebStyle.muted) }
+            }
+            .task(id: message.body) { translation.discardStale(key: message.id.uuidString, text: message.body) }
+    }
+
+    @ViewBuilder private func messageActions(_ message: NativeChatMessage) -> some View {
+        if !message.retracted {
+                Button { model.setDraft("> " + message.body + "\n\n" + draft, peer: contact.jid) } label: { Label("Beantwoorden", systemImage: "arrowshape.turn.up.left") }
+                    .disabled(!NativeChatCodec.validBody("> " + message.body + "\n\n" + draft))
                 Button { UIPasteboard.general.string = message.body } label: { Label("Kopiëren", systemImage: "doc.on.doc") }
+                Button { forwarding = message } label: { Label("Doorsturen", systemImage: "arrowshape.turn.up.right") }
+                if model.canChangeMessages, model.chat.canCorrect(message.id) { Button { editing = message } label: { Label("Bewerken", systemImage: "pencil") } }
                 if translation.preferences.mode != "off" {
                     Button { translation.translate(message.body, key: message.id.uuidString) } label: { Label("Vertalen", systemImage: "globe") }
                         .disabled(!translation.ready || !translation.available || !translation.sharingConsent)
                 }
-            }
-            if incoming { Spacer(minLength: 36) }
-            else { NativeWebAvatar(name: "Ik", size: 30) }
         }
+        Button(role: .destructive) { deleting = message } label: { Label("Verwijderen", systemImage: "trash") }
+            .disabled(message.state == .sending || message.actionPending)
     }
 
     private var avatar: some View {
-        NativeWebAvatar(name: contact.displayName, size: 30)
+        NativeWebAvatar(name: contact.displayName, size: 30, profile: contactProfile)
     }
 
     private func accessibleMessage(_ message: NativeChatMessage) -> String {
-        var label = (message.state == .incoming ? contact.displayName : "Ik") + ": " + message.body + ". " + message.state.label
-        if let result = translation.results[message.id.uuidString], translation.preferences.mode != "off", translation.sharingConsent {
+        var label = (message.state == .incoming ? contact.displayName : "Ik") + ": " + (message.retracted ? "Bericht ingetrokken" : message.body) + ". " + message.state.label
+        if !message.retracted, translation.isCurrent(key: message.id.uuidString, text: message.body), let result = translation.results[message.id.uuidString], translation.preferences.mode != "off", translation.sharingConsent {
             label += ". Vertaling: " + result.text
         }
         return label

@@ -153,6 +153,52 @@ final class NativeStartupUITests: XCTestCase {
         XCTAssertEqual(draft.value as? String, "Bewaar mijn concept")
     }
 
+    func testMessageMenuEditForwardAndBothDeletionOptions() {
+        signInFixture("connected")
+        waitForStatus("XMPP verbonden als fixture@localhost")
+        let contact = application.descendants(matching: .any)["contact-demo-contact@localhost"].firstMatch
+        XCTAssertTrue(contact.waitForExistence(timeout: 5)); reveal(contact); tapContact(contact)
+        let draft = application.descendants(matching: .any)["chat-draft"].firstMatch
+        XCTAssertTrue(draft.waitForExistence(timeout: 5))
+        draft.tap(); draft.typeText("Menu testorigineel")
+        application.buttons["chat-send"].tap()
+        let outgoing = application.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "chat-message-", "Menu testorigineel")).firstMatch
+        XCTAssertTrue(outgoing.waitForExistence(timeout: 5))
+        let messageID = String(outgoing.identifier.dropFirst("chat-message-".count))
+        let menu = application.buttons["message-menu-" + messageID]
+        XCTAssertTrue(menu.waitForExistence(timeout: 5)); menu.tap()
+        XCTAssertTrue(application.buttons["Kopiëren"].waitForExistence(timeout: 5))
+        snapshot("message-actions-menu")
+        application.buttons["Bewerken"].tap()
+        let edit = application.descendants(matching: .any)["message-edit-text"].firstMatch
+        XCTAssertTrue(edit.waitForExistence(timeout: 5)); edit.tap(); edit.typeText(" bewerkt")
+        let save = application.buttons["message-edit-save"]; reveal(save); save.tap()
+        let edited = application.descendants(matching: .any)["chat-message-" + messageID].firstMatch
+        let corrected = NSPredicate(format: "label CONTAINS %@", "Menu testorigineel bewerkt")
+        expectation(for: corrected, evaluatedWith: edited); waitForExpectations(timeout: 10)
+        menu.tap(); application.buttons["Doorsturen"].tap()
+        let recipient = application.buttons["forward-contact-demo-contact@localhost"]
+        XCTAssertTrue(recipient.waitForExistence(timeout: 5)); reveal(recipient); recipient.tap()
+        let confirm = application.buttons["forward-confirm"]; reveal(confirm)
+        snapshot("message-forward-confirmation"); confirm.tap()
+        let forwarded = application.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "chat-message-", "Doorgestuurd:")).firstMatch
+        XCTAssertTrue(forwarded.waitForExistence(timeout: 5))
+        let forwardID = String(forwarded.identifier.dropFirst("chat-message-".count))
+        application.buttons["message-menu-" + forwardID].tap(); application.buttons["Verwijderen"].tap()
+        XCTAssertTrue(application.buttons["Verwijderen voor mij"].waitForExistence(timeout: 5))
+        application.buttons["Verwijderen voor mij"].tap()
+        let hidden = NSPredicate(format: "exists == false")
+        expectation(for: hidden, evaluatedWith: forwarded); waitForExpectations(timeout: 5)
+        reveal(menu); menu.tap(); application.buttons["Verwijderen"].tap()
+        let retract = application.buttons["Voor iedereen intrekken"]
+        XCTAssertTrue(retract.waitForExistence(timeout: 5)); retract.tap()
+        let tombstone = NSPredicate(format: "label CONTAINS %@", "Bericht ingetrokken")
+        expectation(for: tombstone, evaluatedWith: edited); waitForExpectations(timeout: 10)
+        snapshot("message-actions-retracted-portrait")
+        rotate(.landscapeLeft)
+        snapshot("message-actions-retracted-landscape")
+    }
+
     func testExistingGroupJoinSendRotationAndLeave() {
         signInFixture("connected")
         waitForStatus("XMPP verbonden als fixture@localhost")

@@ -11,6 +11,7 @@ public struct NativeGroupConversation: Identifiable, Equatable {
     public var messages: [NativeGroupText] = []
     public var historyLimited = false
     public var subject = ""
+    var retractionTombstones: [String: String] = [:]
     public var id: String { room }
 }
 
@@ -77,6 +78,10 @@ public final class NativeGroupModel: ObservableObject {
             rooms[index].error = .disconnected
             for message in rooms[index].messages.indices where rooms[index].messages[message].state == .sending {
                 rooms[index].messages[message].state = .uncertain
+            }
+            for message in rooms[index].messages.indices where rooms[index].messages[message].actionPending {
+                rooms[index].messages[message].actionPending = false
+                rooms[index].messages[message].actionNotice = "Intrekverzoek onzeker; niet automatisch opnieuw verzonden."
             }
         }
         if clear { rooms.removeAll(); owner = nil; error = nil }
@@ -172,9 +177,62 @@ public final class NativeGroupModel: ObservableObject {
         }
     }
 
+    public func hideMessage(room: String, identifier: UUID) {
+        guard let index = rooms.firstIndex(where: { $0.room == room }),
+              let message = rooms[index].messages.firstIndex(where: { $0.id == identifier }),
+              !rooms[index].messages[message].actionPending, rooms[index].messages[message].state != .sending,
+              rooms[index].messages.filter({ $0.hidden || $0.retracted }).count < 128 else { return }
+        rooms[index].messages[message].hidden = true
+        rooms[index].messages[message].body = ""
+    }
+
+    public func canRetract(room: String, identifier: UUID) -> Bool {
+        guard available, sender is any NativeGroupMessageChanging,
+              let group = rooms.first(where: { $0.room == room }), group.snapshot?.canSpeak == true,
+              group.snapshot?.supportsRetraction == true, let message = group.messages.first(where: { $0.id == identifier }) else { return false }
+        return message.own && message.state == .submitted && !message.hidden && !message.retracted && !message.actionPending &&
+            message.archiveID != nil && message.occupantID != nil
+    }
+
+    public func retract(room: String, identifier: UUID) {
+        guard canRetract(room: room, identifier: identifier), sends.count < 8,
+              let sender = sender as? any NativeGroupMessageChanging,
+              let index = rooms.firstIndex(where: { $0.room == room }),
+              let message = rooms[index].messages.firstIndex(where: { $0.id == identifier }),
+              let target = rooms[index].messages[message].archiveID else { return }
+        let request = UUID().uuidString
+        rooms[index].messages[message].actionPending = true
+        rooms[index].messages[message].actionRequestID = request
+        rooms[index].messages[message].actionNotice = "Intrekverzoek wordt verzonden…"
+        let attempt = generation
+        sends[identifier] = Task { [weak self] in
+            var submitted = false
+            do { try await sender.retractGroupMessage(room: room, target: target, identifier: request); submitted = true } catch { }
+            guard let self = self, self.generation == attempt,
+                  let index = self.rooms.firstIndex(where: { $0.room == room }),
+                  let message = self.rooms[index].messages.firstIndex(where: { $0.id == identifier }),
+                  self.rooms[index].messages[message].actionPending else { self?.sends[identifier] = nil; return }
+            self.rooms[index].messages[message].actionPending = false
+            self.rooms[index].messages[message].actionNotice = submitted ? "Intrekverzoek verzonden; verwerking door de groep niet bevestigd." : "Intrekverzoek onzeker; niet automatisch opnieuw verzonden."
+            self.sends[identifier] = nil
+        }
+    }
+
     private func receive(_ event: NativeGroupEvent, room: String) {
         guard let index = rooms.firstIndex(where: { $0.room == room }) else { return }
         switch event {
+        case .retracted(let target, let occupant):
+            let matches = rooms[index].messages.indices.filter { rooms[index].messages[$0].archiveID == target }
+            if !matches.isEmpty {
+                guard matches.count == 1, let message = matches.first,
+                      rooms[index].messages[message].occupantID == occupant else { return }
+                rooms[index].messages[message].body = ""; rooms[index].messages[message].retracted = true
+                rooms[index].messages[message].actionPending = false
+                rooms[index].messages[message].actionNotice = "Intrekking door de groepsserver doorgestuurd; externe kopieën kunnen blijven bestaan."
+            }
+            if rooms[index].retractionTombstones.count < 128 || rooms[index].retractionTombstones[target] == occupant {
+                rooms[index].retractionTombstones[target] = occupant
+            }
         case .subject(let subject):
             if subject.utf8.count <= 512 { rooms[index].subject = subject }
         case .snapshot(let snapshot):
@@ -191,23 +249,38 @@ public final class NativeGroupModel: ObservableObject {
             }
         case .rejected(let identifier):
             invitationModel.rejected(identifier, room: room)
+            if let message = rooms[index].messages.firstIndex(where: { $0.own && $0.actionRequestID == identifier }) {
+                rooms[index].messages[message].actionPending = false
+                rooms[index].messages[message].actionNotice = "Intrekverzoek geweigerd door de groep."
+                return
+            }
             if let message = rooms[index].messages.firstIndex(where: { $0.own && $0.identifier == identifier }) {
                 rooms[index].messages[message].state = .rejected
             }
         case .message(let text):
             guard text.room == room, NativeChatCodec.validBody(text.body) else { return }
+            if text.own, let message = rooms[index].messages.firstIndex(where: { $0.own && $0.identifier != nil && $0.identifier == text.identifier }) {
+                rooms[index].messages[message].archiveID = text.archiveID
+                rooms[index].messages[message].occupantID = text.occupantID
+                if rooms[index].messages[message].state == .sending { rooms[index].messages[message].state = .submitted }
+                return
+            }
             if rooms[index].messages.contains(where: {
                 ($0.archiveID != nil && $0.archiveID == text.archiveID) ||
                 ($0.nickname == text.nickname && $0.identifier != nil && $0.identifier == text.identifier)
             }) { return }
             guard makeRoom(index) else { error = NativeGroupFailure.limit.label; return }
             rooms[index].messages.append(text)
+            if let archive = text.archiveID, let occupant = text.occupantID, rooms[index].retractionTombstones[archive] == occupant {
+                let message = rooms[index].messages.count - 1
+                rooms[index].messages[message].body = ""; rooms[index].messages[message].retracted = true
+            }
         }
     }
 
     private func makeRoom(_ index: Int) -> Bool {
         guard rooms[index].messages.count >= 200 else { return true }
-        guard let oldest = rooms[index].messages.firstIndex(where: { $0.state == .incoming || $0.state == .submitted }) else { return false }
+        guard let oldest = rooms[index].messages.firstIndex(where: { !$0.hidden && !$0.retracted && !$0.actionPending && ($0.state == .incoming || $0.state == .submitted) }) else { return false }
         rooms[index].messages.remove(at: oldest)
         rooms[index].historyLimited = true
         return true

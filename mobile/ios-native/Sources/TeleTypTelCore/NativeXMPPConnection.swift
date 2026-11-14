@@ -106,7 +106,7 @@ private final class NativeSessionClosure {
     }
 }
 
-private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, NativeArchiveSending, NativeGroupManaging, NativeJingleSending, @unchecked Sendable {
+private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, NativeArchiveSending, NativeGroupManaging, NativeMessageChanging, NativeGroupMessageChanging, NativeJingleSending, @unchecked Sendable {
     private let configuration: ServerConfiguration
     private let ownerJID: String
     private var boundJID: String?
@@ -263,6 +263,28 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
         let frame = try NativeChatCodec.encode(to: jid, body: body, identifier: identifier)
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             queue.async { self.enqueueMessage(frame, continuation: continuation) }
+        }
+    }
+
+    func changeMessage(to peer: String, change: NativeMessageChange, identifier: String) async throws {
+        try Task.checkCancellation()
+        let frame = try NativeMessageActionCodec.encode(to: peer, change: change, identifier: identifier)
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            queue.async { self.enqueueMessage(frame, continuation: continuation) }
+        }
+    }
+
+    func retractGroupMessage(room: String, target: String, identifier: String) async throws {
+        try Task.checkCancellation()
+        let frame = try NativeMessageActionCodec.encode(to: room, change: .retract(target: target), identifier: identifier, group: true)
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            queue.async {
+                guard self.groups[room]?.stream.snapshot.supportsRetraction == true,
+                      self.groups[room]?.stream.snapshot.canSpeak == true else {
+                    continuation.resume(throwing: NativeGroupFailure.denied); return
+                }
+                self.enqueueMessage(frame, continuation: continuation)
+            }
         }
     }
 

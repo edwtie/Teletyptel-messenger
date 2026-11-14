@@ -60,6 +60,30 @@ final class NativeServicesTests: XCTestCase {
     }
     override func tearDown() { NativeServiceHTTPFixture.handler = nil }
 
+    func testPublicAvatarLookupUsesAuthenticatedSameOriginAndRejectsOtherRoutes() async throws {
+        let configuration = try ServerConfiguration(address: "https://example.invalid", domain: "localhost")
+        let settings = URLSessionConfiguration.ephemeral
+        settings.protocolClasses = [NativeServiceHTTPFixture.self]
+        let session = NativeAccountWebSession(configuration: configuration, cookie: "PHPSESSID=fictional-session", settings: settings)
+        var requests = 0
+        NativeServiceHTTPFixture.handler = { request in
+            requests += 1
+            XCTAssertEqual(request.httpMethod, "GET")
+            XCTAssertEqual(request.url?.host, "example.invalid")
+            XCTAssertEqual(request.url?.path, "/api/account.php")
+            XCTAssertEqual(URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems, [URLQueryItem(name: "lookupJid", value: "peer@localhost")])
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Cookie"), "PHPSESSID=fictional-session")
+            return (200, ["ok": true], [:])
+        }
+        _ = try await session.request(.account, lookupJID: "peer@localhost")
+        do { _ = try await session.request(.google, lookupJID: "peer@localhost"); XCTFail("Foreign route accepted") } catch { }
+        do { _ = try await session.request(.account, accountID: "fiction", lookupJID: "peer@localhost"); XCTFail("Ambiguous query accepted") } catch { }
+        do { _ = try await session.request(.account, lookupJID: "peer@localhost/resource"); XCTFail("Resource accepted") } catch { }
+        do { _ = try await session.request(.account, body: Data("{}".utf8), lookupJID: "peer@localhost"); XCTFail("Write accepted") } catch { }
+        XCTAssertEqual(requests, 1)
+        await session.close()
+    }
+
     private func preferences(mode: String = "automatic", target: String = "en") -> NativeTranslationPreferences {
         var result = NativeTranslationPreferences()
         result.mode = mode

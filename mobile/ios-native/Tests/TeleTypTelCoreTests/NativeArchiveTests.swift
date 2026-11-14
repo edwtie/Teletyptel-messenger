@@ -5,6 +5,19 @@ final class NativeArchiveTests: XCTestCase {
     private let owner = "owner@localhost"
     private let peer = "peer@localhost"
 
+    func testArchivedRetractionIsAnAuthorScopedChangeNotItsFallbackBody() throws {
+        var query = try query()
+        let xml = result(query).replacingOccurrences(of: "<body>Hallo 👋</body>", with: "<retract xmlns='urn:xmpp:message-retract:1' id='older'/><body>Untrusted fallback</body>")
+        _ = try query.consume(xml)
+        let archived = try XCTUnwrap(query.consume(fin(query)))
+        XCTAssertEqual(archived.messages[0].change, .retract(target: "older"))
+        XCTAssertEqual(archived.messages[0].body, "")
+        XCTAssertFalse(archived.messages[0].outgoing)
+        var bad = try self.query()
+        let malformed = result(bad).replacingOccurrences(of: "<body>Hallo 👋</body>", with: "<retract xmlns='urn:xmpp:message-retract:1' id='older'/><retract xmlns='urn:xmpp:message-retract:1' id='older'/>")
+        XCTAssertThrowsError(try bad.consume(malformed))
+    }
+
     private func query(before: String? = nil) throws -> NativeArchiveQuery {
         try NativeArchiveQuery(owner: owner, boundJID: owner + "/phone", peer: peer, before: before)
     }

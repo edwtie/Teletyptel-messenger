@@ -156,6 +156,12 @@ final class NativeTranslationModel: ObservableObject {
         }
     }
 
+    func isCurrent(key: String, text: String) -> Bool { originals[key] == text }
+
+    func discardStale(key: String, text: String) {
+        if let previous = originals[key], previous != text { translate("", key: key) }
+    }
+
     nonisolated static func sameLanguage(_ left: String, _ right: String) -> Bool {
         guard !left.isEmpty, !right.isEmpty else { return false }
         return left.lowercased().split(separator: "-").first == right.lowercased().split(separator: "-").first

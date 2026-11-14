@@ -128,7 +128,7 @@ struct XMPPSessionStream {
             }
             boundJID = jid.text
             phase = .online
-            return XMPPSessionOutput(frames: (roster.map { [$0.request] } ?? []) + ["<presence xmlns='jabber:client'/>"],
+            return XMPPSessionOutput(frames: (roster.map { [$0.request] } ?? []) + [NativeMessageActionCodec.presence],
                                      connectedJID: jid.text, roster: roster == nil ? nil : .loading)
         case .online:
             guard root.namespace == "jabber:client", ["message", "presence", "iq"].contains(root.name) else {
@@ -143,6 +143,9 @@ struct XMPPSessionStream {
                 return XMPPSessionOutput(chat: NativeChatCodec.decode(root, owner: expectedJID, boundJID: boundJID))
             }
             if root.name == "iq" {
+                if let bound = boundJID, let reply = NativeMessageActionCodec.discovery(root, owner: expectedJID, bound: bound) {
+                    return XMPPSessionOutput(frames: [reply])
+                }
                 if let update = roster?.receive(root), update.state != nil || !update.frames.isEmpty {
                     return XMPPSessionOutput(frames: update.frames, roster: update.state)
                 }

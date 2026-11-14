@@ -70,6 +70,8 @@ struct NativeGroupChatView: View {
     @State private var searching = false
     @State private var search = ""
     @FocusState private var searchFocused: Bool
+    @State private var forwarding: NativeGroupText?
+    @State private var deleting: NativeGroupText?
     private var group: NativeGroupConversation? { model.rooms.first { $0.room == room } }
 
     var body: some View {
@@ -107,6 +109,16 @@ struct NativeGroupChatView: View {
             NativeGroupManagementView(groups: model, model: model.management, room: room)
         }
         .sheet(isPresented: $showInvite) { NativeInviteContactView(groups: model, model: model.invitationModel, room: room) }
+        .sheet(item: $forwarding) { message in if let login = login { NativeForwardMessageView(model: login, text: message.body) } }
+        .confirmationDialog("Groepsbericht verwijderen?", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }), titleVisibility: .visible) {
+            if let message = deleting {
+                Button("Verwijderen voor mij", role: .destructive) { model.hideMessage(room: room, identifier: message.id); deleting = nil }
+                if model.canRetract(room: room, identifier: message.id) {
+                    Button("Voor iedereen intrekken", role: .destructive) { model.retract(room: room, identifier: message.id); deleting = nil }
+                }
+            }
+            Button("Annuleren", role: .cancel) { deleting = nil }
+        } message: { Text("Voor mij geldt voor deze sessie. Voor iedereen is alleen beschikbaar voor eigen berichten met door de groepsserver bevestigde auteur- en bericht-ID's. Externe kopieën kunnen blijven bestaan.") }
     }
 
     @ViewBuilder
@@ -129,8 +141,12 @@ struct NativeGroupChatView: View {
                 VStack(spacing: 0) {
                     LazyVStack(spacing: 12) {
                         if group.historyLimited { Text("Alleen de meest recente berichten passen in deze preview.").font(.caption) }
-                        ForEach(group.messages.filter { search.isEmpty || $0.body.localizedCaseInsensitiveContains(search) || $0.nickname.localizedCaseInsensitiveContains(search) }) { message in
-                            NativeGroupBubble(message: message, translation: translation, session: login?.activeWebSession).id(message.id)
+                        ForEach(group.messages.filter { !$0.hidden && (search.isEmpty || $0.body.localizedCaseInsensitiveContains(search) || $0.nickname.localizedCaseInsensitiveContains(search)) }) { message in
+                            NativeGroupBubble(message: message, translation: translation, session: login?.activeWebSession,
+                                canForward: login?.canSend == true,
+                                canReply: NativeChatCodec.validBody("> " + message.nickname + ": " + message.body + "\n\n" + group.draft), onForward: { forwarding = message },
+                                onReply: { model.setDraft("> " + message.nickname + ": " + message.body + "\n\n" + (self.group?.draft ?? ""), room: room) },
+                                onDelete: { deleting = message }).id(message.id)
                         }
                     }.padding(.horizontal, 14).padding(.top, 14)
                     Color.clear.frame(height: 1).id("group-bottom")
@@ -174,23 +190,29 @@ private struct NativeGroupBubble: View {
     let message: NativeGroupText
     var translation: NativeTranslationModel? = nil
     var session: NativeAccountWebSession? = nil
+    var canForward = false
+    var canReply = true
+    var onForward: () -> Void = {}
+    var onReply: () -> Void = {}
+    var onDelete: () -> Void = {}
     private var fillColor: Color { message.own ? NativeWebStyle.outgoing : NativeWebStyle.incoming }
     private var borderColor: Color { message.own ? NativeWebStyle.outgoingLine : NativeWebStyle.incomingLine }
-    private var description: String { message.nickname + ": " + message.body + ". " + message.state.label }
+    private var description: String { message.nickname + ": " + (message.retracted ? "Bericht ingetrokken" : message.body) + ". " + message.state.label }
     private var indicator: String { message.state == .sending ? "clock" : message.state == .submitted ? "checkmark" : "exclamationmark.circle" }
     var body: some View {
         HStack {
             if message.own { Spacer(minLength: 36) }
             else { NativeWebAvatar(name: message.nickname, size: 30) }
-            content
+            ViewThatFits(in: .horizontal) { content.fixedSize(horizontal: true, vertical: true); content }
             .foregroundStyle(NativeWebStyle.text)
             .padding(.horizontal, 10).padding(.vertical, 8).background(NativeWebBubble(own: message.own).fill(fillColor))
             .overlay(NativeWebBubble(own: message.own).stroke(borderColor, lineWidth: 1))
+            .shadow(color: .black.opacity(0.06), radius: 3, y: 1)
             .contentShape(Rectangle())
-            .accessibilityElement(children: .combine)
+            .accessibilityElement(children: .contain)
             .accessibilityLabel(description)
             .accessibilityIdentifier("group-message-" + message.id.uuidString)
-            .contextMenu { Button { UIPasteboard.general.string = message.body } label: { Label("Kopiëren", systemImage: "doc.on.doc") } }
+            .contextMenu { actions }
             if !message.own { Spacer(minLength: 36) }
             else { NativeWebAvatar(name: message.nickname, size: 30) }
         }
@@ -198,7 +220,11 @@ private struct NativeGroupBubble: View {
 
     private var content: some View {
         VStack(alignment: .leading, spacing: 5) {
+            HStack(alignment: .top, spacing: 4) {
+            VStack(alignment: .leading, spacing: 3) {
             Text(message.nickname).font(.caption.bold())
+            if message.retracted { Text("Bericht ingetrokken") }
+            else {
             if let session = session, NativeFileReference.inMessage(message.body, configuration: session.configuration) != nil {
                 Text(message.body).textSelection(.enabled)
                 NativeFileMessageButton(bodyText: message.body, session: session)
@@ -207,8 +233,25 @@ private struct NativeGroupBubble: View {
             } else {
                 Text(message.body).textSelection(.enabled)
             }
+            }
+            }
+            Menu { actions } label: { Image(systemName: "ellipsis").frame(width: 44, height: 44) }
+                .buttonStyle(.plain).accessibilityLabel("Berichtmenu").accessibilityIdentifier("group-message-menu-" + message.id.uuidString)
+            }
             metadata
+            if let notice = message.actionNotice { Text(notice).font(.caption2) }
         }
+    }
+
+    @ViewBuilder private var actions: some View {
+        if !message.retracted {
+            Button(action: onReply) { Label("Beantwoorden", systemImage: "arrowshape.turn.up.left") }
+                .disabled(!canReply)
+            Button { UIPasteboard.general.string = message.body } label: { Label("Kopiëren", systemImage: "doc.on.doc") }
+            Button(action: onForward) { Label("Doorsturen", systemImage: "arrowshape.turn.up.right") }.disabled(!canForward)
+        }
+        Button(role: .destructive, action: onDelete) { Label("Verwijderen", systemImage: "trash") }
+            .disabled(message.state == .sending || message.actionPending)
     }
 
     private var metadata: some View {
