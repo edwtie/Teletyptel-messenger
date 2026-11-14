@@ -27,7 +27,7 @@ struct NativePushRegistryClient {
     }
 
     func register(deviceID: UUID, token: Data, consented: Bool) async throws -> NativePushRegistration {
-        guard consented, (16...256).contains(token.count) else { throw NativePushRegistryFailure.rejected }
+        guard consented, (16...256).contains(token.count), Self.validDevice(deviceID.uuidString) else { throw NativePushRegistryFailure.rejected }
         let csrf = try await challenge()
         let body = try JSONSerialization.data(withJSONObject: ["action": "register", "deviceId": deviceID.uuidString.lowercased(),
             "token": token.map { String(format: "%02x", $0) }.joined(), "consent": true])
@@ -36,7 +36,7 @@ struct NativePushRegistryClient {
         try validate(reply)
         guard UUID(uuidString: reply.deviceId) == deviceID,
               Self.matches(reply.generation, "[0-9a-f]{32}"), validExpiry(reply.expiresAt),
-              reply.controlToken.map({ Self.matches($0, "[0-9a-f]{2,960}\\.[0-9a-f]{64}") && $0.split(separator: ".")[0].count.isMultiple(of: 2) }) ?? true else {
+              reply.controlToken.map({ Self.matches($0, "[0-9a-f]{2,958}\\.[0-9a-f]{64}") && $0.split(separator: ".")[0].count.isMultiple(of: 2) }) ?? true else {
             throw NativePushRegistryFailure.invalidResponse
         }
         try Task.checkCancellation()
@@ -45,6 +45,7 @@ struct NativePushRegistryClient {
     }
 
     func revoke(deviceID: UUID) async throws {
+        guard Self.validDevice(deviceID.uuidString) else { throw NativePushRegistryFailure.rejected }
         let csrf = try await challenge()
         let body = try JSONSerialization.data(withJSONObject: ["action": "revoke-device", "deviceId": deviceID.uuidString.lowercased()])
         let reply = try JSONDecoder().decode(Revoked.self, from: await request(body: body, csrf: csrf))
@@ -57,7 +58,7 @@ struct NativePushRegistryClient {
         let reply = try JSONDecoder().decode(Challenge.self, from: await request())
         try validate(reply)
         guard reply.devices.count <= 8, Set(reply.devices.compactMap { UUID(uuidString: $0.device_id) }).count == reply.devices.count,
-              reply.devices.allSatisfy({ Self.matches($0.generation, "[0-9a-f]{32}") && validExpiry($0.expires.value) }) else {
+              reply.devices.allSatisfy({ Self.validDevice($0.device_id) && Self.matches($0.generation, "[0-9a-f]{32}") && validExpiry($0.expires.value) }) else {
             throw NativePushRegistryFailure.invalidResponse
         }
         try Task.checkCancellation()
@@ -88,6 +89,10 @@ struct NativePushRegistryClient {
     private func validExpiry(_ expiry: TimeInterval) -> Bool {
         let current = now()
         return current.isFinite && expiry.isFinite && expiry.rounded() == expiry && expiry > current && expiry <= current + 86430
+    }
+
+    private static func validDevice(_ value: String) -> Bool {
+        matches(value.lowercased(), "[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}")
     }
 
     private static func matches(_ value: String, _ pattern: String) -> Bool {

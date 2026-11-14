@@ -84,6 +84,30 @@ compatibility attempt compiled the new core sources but could not validate the
 existing Darwin SDP fixtures (CRLF splitting differs); it is not a native pass.
 The production signed workflow, server configuration and APNs keys are unchanged.
 
+### Current parity and release gates
+
+This is a source/test inventory, not a declaration that the native app is already
+equivalent to the web client. Historical results later in this document retain
+their original scope; they are not proof of features added after those runs.
+
+| Area | Native basis present | Still required before calling it complete |
+| --- | --- | --- |
+| Account/password, Google/Facebook, opt-in biometrics | Native screens, SDK adapters and authenticated XMPP chain | Signed production-bundle provider callbacks, real-device account recovery and upgrade/migration tests |
+| Direct and MUC chat | Contacts/presence, drafts, message actions, reactions, receipts, archive and group management | Two-device web/native matrix, room policy differences, reconnect/offline and retained-history scenarios |
+| Files/photos and profiles | Native pickers, bounded authenticated upload, profile/settings API | Real PHP deployment contract plus camera/library permission, cancellation and file interoperability checks |
+| Appearance | Web-style avatars, bubbles, symbol menus, adaptive layout and TC panes | Side-by-side iPhone/iPad comparison, accessibility/Dynamic Type, keyboard and rotation tests; not pixel-identity proof |
+| Translation | Private opt-in message/live-RTT translation model and captions | Own/remote/device tests, source=target suppression, opt-out and failure recovery with the deployed provider |
+| Interface languages | Dutch native UI and profile-language selection | Full UI localization; the profile language currently does not translate the native interface |
+| TC audio/video/RTT | Native Jingle/WebRTC and four media profiles | Physical camera/audio/routing, independent-network/TURN and interruption/long-call tests |
+| Telephone/SIP/DTMF | Private echo route and optionally negotiated native RTP events | Gateway event forwarding and actual Asterisk receipt, authorized routing/provider integration; no emergency-service readiness claim |
+| Background incoming calls | CallKit/PushKit engine and bounded registry client foundation | Native opt-in/secure lifecycle/cold-start recovery, authoritative backend/worker, provisioning and signed locked-screen APNs tests |
+| Interpreter and three-party calling | No connected native three-party/interpreter workflow in this target | Authorized interpreter discovery/invite, three-party media topology, consent, interruption and leave/rejoin tests |
+| iOS address book | No native `CNContactStore` permission/import path in this target | Explicit minimal-access permission and selection flow; never silently upload the full address book |
+
+The preview must not show enabled-looking shortcuts for missing workflows or
+reuse successful simulator checks as proof of public SIP, interpreter service,
+APNs delivery or emergency access. The signed release gate remains closed.
+
 ## Shared online chat history (2026-11-14)
 
 The native target now uses the same `message_history` database as the web client:

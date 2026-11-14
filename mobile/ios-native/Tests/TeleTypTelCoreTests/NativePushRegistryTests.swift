@@ -32,7 +32,7 @@ private final class PushRegistryHTTPFixture: URLProtocol {
 
 @MainActor
 final class NativePushRegistryTests: XCTestCase {
-    private let deviceID = UUID(uuidString: "12345678-1234-1234-1234-123456789abc")!
+    private let deviceID = UUID(uuidString: "12345678-1234-4234-9234-123456789abc")!
     private let csrf = String(repeating: "a", count: 64)
     private let generation = String(repeating: "b", count: 32)
     private let current: TimeInterval = 1_800_000_000
@@ -108,6 +108,11 @@ final class NativePushRegistryTests: XCTestCase {
         for length in [0, 15, 257] {
             await assertFailure(.rejected) { _ = try await service.register(deviceID: self.deviceID, token: Data(repeating: 1, count: length), consented: true) }
         }
+        for identifier in ["12345678-1234-4234-1234-123456789abc", "12345678-1234-7234-9234-123456789abc"] {
+            let invalid = try XCTUnwrap(UUID(uuidString: identifier))
+            await assertFailure(.rejected) { _ = try await service.register(deviceID: invalid, token: Data(repeating: 1, count: 32), consented: true) }
+            await assertFailure(.rejected) { try await service.revoke(deviceID: invalid) }
+        }
         for candidate in [try client(cookie: nil), try client(accountID: ""), try client(accountID: "bad\naccount"), try client(accountID: String(repeating: "a", count: 97))] {
             await assertFailure(.unavailable) { try await candidate.checkAvailability() }
         }
@@ -135,7 +140,8 @@ final class NativePushRegistryTests: XCTestCase {
         let challenge = try envelope()
         for fields: [String: Any] in [["accountId": "other"], ["deviceId": UUID().uuidString], ["generation": "bad"],
             ["expiresAt": current], ["expiresAt": current + 86431], ["expiresAt": current + 0.5],
-            ["controlToken": "bad"], ["controlToken": "abc." + String(repeating: "c", count: 64)]] {
+            ["controlToken": "bad"], ["controlToken": "abc." + String(repeating: "c", count: 64)],
+            ["controlToken": String(repeating: "a", count: 960) + "." + String(repeating: "c", count: 64)]] {
             let invalid = try registration(fields)
             PushRegistryHTTPFixture.handler = { request, _ in (200, request.httpMethod == "GET" ? challenge : invalid) }
             await assertFailure(.invalidResponse) { _ = try await service.register(deviceID: self.deviceID, token: Data(repeating: 1, count: 32), consented: true) }
