@@ -5,6 +5,120 @@ Requested scope: the complete iPhone and iPad application, including native UI,
 authentication, messaging and Total Conversation. This is a staged rewrite, not a
 claim that those features already work in this target.
 
+## Attachments, account settings and extended MUC increment (2026-11-14)
+
+These four requested areas are implemented together in the isolated native
+preview, not silently substituted for the signed TestFlight application:
+
+- Explicit document/photo selection, review, authenticated upload in 256 KiB
+  chunks (20 MB maximum), actual server-confirmed chunk progress and a separate
+  action to place the resulting link in a draft. Uploading never sends a chat
+  automatically. The existing web XMPP format, a plain filename and absolute
+  file URL, works in direct and room messages. Received same-server file URLs
+  offer an explicit download/export; foreign URLs are never fetched by this
+  component, cookies are not forwarded on downloads and redirects are refused.
+  Photos selected through either picker are limited to 64 megapixels, converted
+  to JPEG up to 2048 pixels and stripped of original metadata. These exports
+  intentionally do not preserve original photo resolution or metadata.
+- Account profile read/update: display name, phone number, profile language and
+  avatar colour, plus access to existing translation preferences. The authenticated
+  server session determines the account; the native API cannot edit JIDs, provider
+  identities, passwords, roles, backend addresses or other accounts. Profile
+  language is not an implementation of a translated application interface.
+- MUC discovery, explicit creation of new members-only/non-public rooms where
+  server policy permits it, subject display/update, detailed occupant roles,
+  owner configuration, membership/admin/ban lists and changes, and moderation
+  (speaking permissions, moderator promotion, removal). Changes require an
+  explicit confirmation and correlated server IQ result; timeouts are not proof
+  of rejection and never trigger automatic retries. A new room cannot send text
+  until private configuration is acknowledged. Joining an existing room never
+  creates one implicitly. If creation/configuration is interrupted, an owner or
+  server administrator may need to inspect a leftover locked room; it is not
+  silently destroyed by the client.
+- Session-local group message search and private own/remote group translation
+  using the existing off/manual/automatic settings and sharing consent. Attachment
+  links are excluded from group translation. Original group messages remain
+  unchanged; translated text is not broadcast back to the room.
+
+Deploy `api/native-profile.php`, `api/native-upload.php`, the matching
+`NativeProfileService.php`/`NativeUploadPolicy.php` libraries and updated
+`api/upload.php` together with the native client. No database migration is needed:
+they use existing `account_profiles` and `uploaded_files` tables. The profile API
+uses a session CSRF token and a four-field whitelist instead of resubmitting the
+old account editor's password/connection fields. Native chunk identifiers are
+server-derived per account/session. Native completed uploads are MIME-checked;
+DOCX structure/uncompressed-size limits reject macro containers. This is not
+antivirus scanning or a guarantee that a document is harmless. Legacy web upload
+behaviour remains unchanged apart from finally cleaning failed chunk assemblies.
+
+File links are existing bearer URLs, not recipient ACLs or end-to-end encryption.
+The UI warns that anyone with a link can open it, even for a private room.
+Cancellation prevents late UI/draft updates but cannot recall bytes already
+stored on the server. Stored completed uploads need the existing server retention
+policy; this increment does not pretend to delete orphaned uploads automatically.
+Do not use these ordinary chat attachments for confidential intake documents.
+
+The actual ejabberd 26.09 management scenarios pass in isolated run
+[43546982709](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43546982709)
+at revision `ff4c617`: owner configuration, non-owner denial, member list, visitor
+speaking prohibition/restoration, ban list, subject echo and explicit private room
+creation, alongside the previous login, TLS, Jingle, archive and invitation cases.
+Only one random fictional account may create rooms in this disposable fixture;
+no local/production server configuration, provider registration, APNs or keys are
+changed. Session release and temporary CA revocation/removal also pass.
+
+[Isolated PHP/MySQL run 43547946697](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43547946697)
+passes actual profile GET/POST, CSRF rejection, immutable account identity,
+second-account isolation, multipart assembly, exact downloaded bytes, cross-account
+chunk separation, active-content rejection and blocked-session rejection. It uses
+a disposable MySQL 8.4 service and the actual PHP endpoint scripts. Only the two
+fictional web sessions are seeded by a hosted-runner/loopback-only test router;
+this is not another claim to have tested provider login. Temporary session/chunk
+files are removed and the disposable runner/container owns all test database
+state. The workflow has no production secrets or server connection.
+
+Local validation passes profile isolation/field-preservation/CSRF and upload MIME/
+DOCX policy PHP tests, plus 122 Node checks (four macOS-only checks skipped).
+Swift HTTP tests separately exercise the Apple URLSession adapter with fictional
+protocol responses. A complete signed-device-to-deployed-server transfer, actual
+photo/document pickers and metadata/capture checks remain release gates.
+[Unsigned preview 43559158536](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43559158536)
+passes at revision `e422ffe`: 206 passed Swift tests (224 total, eighteen opt-in
+server tests skipped), unsigned device Release compilation, exclusion of Debug
+fixtures from Release, and 22 UI tests with no skips or failures. Eleven run on
+iPhone 16 Pro and eleven on iPad Pro 11-inch (M4), both iOS 18.5, including portrait
+and landscape-left keyboard/complete-latest-message checks. New scenarios save a
+profile without changing its JID, upload/stage an attachment without sending it
+until explicit Send, and discover/manage/search a group. The four same-host native
+media profiles pass too, with synthetic VP8/T140 and the microphone disabled;
+this is not physical-camera, audible-speech, APNs or public-network evidence.
+Fourteen selected screenshots and sanitized reports are retained locally under
+ignored `artifacts/native-selected-evidence-43559158536/`. Profile, upload,
+management and compact/landscape chat screenshots were visually checked. No
+TestFlight upload, signing keys or local/production server change was involved.
+
+Earlier previews `43546980164`, `43547571768`, `43550463074`, `43551138488`
+and `43556335038`
+were not green and are not treated as release evidence. Simulator diagnostics
+identified compact-chat clipping, feedback/controls outside the keyboard viewport,
+an incorrect test query for SwiftUI's combined account-identity label, and a
+search field inset outside the test's usable viewport. The final iPhone-only
+failure also used a covered, underlying navigation bar to calculate that
+viewport; the helper now selects the last hittable foreground bar. Preview
+`43559136756` stopped at its source guard for the old helper spelling, corrected
+in `e422ffe`; it supplies no runtime pass evidence. The fixes keep errors in
+scrollable chat content, avoid empty translation layout, reveal virtualized form
+controls, give the immutable identity a stable accessible label and inset the
+explicitly focused search field. Full latest-message geometry assertions remain
+in place; timeouts were not enlarged to conceal failures.
+
+Still deliberately outside this increment: password/security-provider changes,
+registration/recovery UI, federated/custom/password MUC services, bookmarks,
+owner transfer, room destruction, room MAM, group media calls, durable offline
+storage, public-network interoperability and full web-feature parity. Relevant
+protocol: [XEP-0045](https://xmpp.org/extensions/xep-0045.html). The existing PHP
+upload adapter is **not** claimed as an implementation of XEP-0363 slot requests.
+
 ## Mediated group invitations increment (2026-11-14)
 
 The native preview now adds room-mediated XEP-0045 invitations, explicit accept,
@@ -248,10 +362,11 @@ Native parity status (do not confuse a visible layout with protocol support):
 | Durable local history, carbons, receipts/read markers | Not yet implemented in this native target; archive presence does not prove delivery/read state |
 | Existing MUC room text chat | Manual same-domain room entry, membership/self-presence, participants, roles, sending/receiving and leaving implemented; separate room state |
 | Room-mediated invitations | Known-contact inbox, explicit accept/decline/hide and joined-room contact picker implemented; same-domain MUC service only |
-| Group discovery/bookmarks, administration and group calls | Not yet implemented in this native interface; direct/alias/password invitation variants also remain |
-| File/photo upload and download | Not yet implemented; composer does not pretend to send attachments |
+| MUC discovery, private creation, roles/membership and configuration | Implemented with explicit actions and actual server authority; custom/federated/password services, bookmarks and group calls remain |
+| File/photo upload and download | Explicit bounded document/photo upload, draft-link staging and same-server download/export; existing bearer-URL storage, not recipient ACLs |
 | Edit/delete/reactions/forwarding | Not yet implemented; context menu currently provides copy/translate only |
-| Add contacts/groups, profile/account management | Not yet implemented in the new native interface |
+| Profile/account management | Four editable profile fields, account-bound API and translation settings; passwords/providers remain separate |
+| Add contacts and group bookmarks | Not yet implemented in the new native interface; explicit room creation/participation are available |
 | Registration and password recovery | Not yet connected in the native interface |
 | Application language selection/localized UI | Dutch native interface; additional UI languages are not yet migrated. Translation target selection does not change the application language |
 | Interpreter/SIP/DTMF, push/background calls | Separate incomplete integration work |
@@ -259,9 +374,9 @@ Native parity status (do not confuse a visible layout with protocol support):
 Remaining parity gates, in order:
 
 1. Extend recent MAM restoration with older-page navigation and, only with an explicit storage design, protected account-isolated offline history. Carbons and independently verified delivery/read states remain separate protocol work.
-2. Extend existing-room participation with room discovery/bookmarks, direct/federated/password invitation variants, administration, group archives and protected group media. Group translation requires its own privacy/UI integration; it is not enabled by the direct-chat translation settings alone.
-3. Actual file/photo upload, download and previews using the existing authenticated APIs, bounded files and explicit user selection; no decorative send buttons without a working transfer.
-4. Edit/delete/reactions/forwarding and contact/profile management, with ownership checks, cancellation, offline errors and native UI tests for each action.
+2. Extend implemented MUC discovery/administration with bookmarks, direct/federated/password invitation variants, group archives and protected group media. Group translation now has a private, consent-gated native presentation path.
+3. Validate deployed PHP/MySQL multipart transfers and real document/photo pickers; design recipient ACLs and orphan/retention controls before confidential-file use. Inline media previews and XEP-0363 interoperability are not implemented by the PHP upload adapter.
+4. Edit/delete/reactions/forwarding and contact/security-profile management, with ownership checks, cancellation, offline errors and native UI tests for each action.
 5. Localized application strings and remaining web-style presentation, checked in both orientations, large text, dark mode and manual VoiceOver use. Message translation preferences remain separate from UI language.
 6. Explicit native provider registration and signed physical-device validation. Live APNs, production server changes and TestFlight distribution remain separate authorization/release gates.
 
