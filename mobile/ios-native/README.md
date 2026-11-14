@@ -5,6 +5,74 @@ Requested scope: the complete iPhone and iPad application, including native UI,
 authentication, messaging and Total Conversation. This is a staged rewrite, not a
 claim that those features already work in this target.
 
+## Web visual language in the native preview (2026-11-14)
+
+The native app uses TeleTypTel's web UI as its visual reference, not the default
+iOS sidebar/large-title/grouped-card look. `App/NativeWebStyle.swift` centralizes
+light/dark colours from `php/public/chat-client.css`, 8-point message bubbles with
+tails, avatar sizing, round composer buttons and bordered symbol controls. The
+web font stack falls back to Arial on Apple platforms; native Arial fonts scale
+with Dynamic Type. Symbol controls keep at least 44-point touch areas and spoken
+labels, rather than copying smaller desktop hit targets.
+
+The brand/status/main-menu bar spans the messenger, with a compact-landscape
+exception to preserve keyboard and latest-message space. Contacts use web-style
+search, rows, preview/time and actual presence dots. Joined groups also appear in
+this conversation list; the floating plus opens existing native group actions.
+Chat headers show an avatar, name/presence, primary T button and symbol menu.
+Direct and room composers share the same capsule/button styling. Profile,
+attachment, translation and group-management forms use the same panel colours and
+compact modal headers. TC keeps separate dark RTT panes, a top control-menu button,
+separate camera-switch control and always-visible red hangup; media switches stay
+green/red. No nonfunctional web buttons are added to imply unsupported features.
+
+This is a shared visual contract, not a claim of full pixel or feature parity.
+Apple permission prompts, photo/document pickers, OAuth, keyboard, text selection,
+native menus and accessibility affordances remain system UI. Room management
+still uses native forms and menus. The app does not embed the website to simulate
+native functionality, and this change does not alter protocols, consent or account
+permissions. Live TC verification and real-device visual review remain separate
+from synthetic media and Debug-only call-layout fixtures.
+
+Local validation passes 124 Node checks with four macOS-only checks skipped.
+Source/generator tests compare the native palette with the web CSS, check shared
+composer/bubble/shell use and require at least 4.5:1 contrast for the selected
+body/metadata colours against both message backgrounds in light and dark. This
+limited palette check is not a complete accessibility audit.
+
+[Unsigned preview 43571570894](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43571570894)
+passes at revision `fecefde`: 206 Swift tests (eighteen opt-in server tests
+explicitly skipped), unsigned Release device compilation and 24 UI tests with
+zero failures/skips. Twelve scenarios run on each iPhone 16 Pro and iPad Pro
+11-inch M4 simulator, iOS 18.5, with portrait and landscape-left transitions.
+Draft/history/background-return and full latest-bubble geometry assertions remain
+in place. The new TC layout scenario is an explicitly fictional Debug-only
+presentation with no tracks, media capture or ready RTT; it verifies panes, the
+top symbol menu and red hangup remain reachable across rotation, not that a live
+call works. Release fixture-exclusion checks and the separate four synthetic
+same-host native media profiles pass too, within their existing limited scope.
+
+Twenty-six selected fictional screenshots and sanitized reports are downloaded
+to ignored `artifacts/native-selected-evidence-43571570894/`. Contacts, compact
+chat with keyboard, settings/upload and TC views were visually inspected. This is
+not an automated pixel-diff against a browser, nor a physical-device assessment.
+Manual dark mode, larger text, VoiceOver and actual iPhone/iPad/web side-by-side
+review remain required before claiming complete visual parity or release.
+
+Earlier runs `43564006318` and `43568369221` failed iOS 16 API availability checks;
+popover adaptation is now availability-gated and the RTT prompt uses compatible
+text colouring. Runs `43564766043` and `43569031070` exposed header/accessibility
+and rotation regressions and are not counted as green. The brand bar now has its
+own layout above split navigation rather than overlapping content, its child
+identifiers remain separate, and connection status lives in the compact chat
+header without an extra row. Message context-menu hit regions are explicit.
+XCTest uses the actually visible centre of a contact row because UIKit can expose
+an offscreen extended activation frame after split-view rotation; it still verifies
+navigation/draft preservation, and non-row controls keep normal hit testing.
+Superseded cancelled previews are not pass evidence. No timeouts or complete-bubble
+geometry assertions were relaxed. No TestFlight upload, live APNs/server activation
+or production credentials were involved.
+
 ## Attachments, account settings and extended MUC increment (2026-11-14)
 
 These four requested areas are implemented together in the isolated native
