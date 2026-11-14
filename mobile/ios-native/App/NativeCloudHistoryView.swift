@@ -50,8 +50,10 @@ struct NativeHistoricalContacts: View {
                         }
                         .frame(maxWidth: .infinity, minHeight: 58, alignment: .leading)
                         .contentShape(Rectangle())
+                        .accessibilityElement(children: .combine)
                         .accessibilityIdentifier("cloud-contact-" + conversation.peer)
                     }
+                    .buttonStyle(.plain)
                 }
             }
         }

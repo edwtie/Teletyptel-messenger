@@ -28,7 +28,7 @@ final class NativeStartupUITests: XCTestCase {
         snapshot("login-web-style")
     }
 
-    func testOnlineHistoryCatalogAndOlderPagesDoNotAuthorizeAnUnknownContact() {
+    func testCloudHistoryCatalogAndOlderPagesDoNotAuthorizeAnUnknownContact() {
         application.launchEnvironment["TELETYPTEL_NATIVE_CLOUD_UI_FIXTURE"] = "1"
         signInFixture("connected")
         waitForStatus("XMPP verbonden als fixture@localhost")
