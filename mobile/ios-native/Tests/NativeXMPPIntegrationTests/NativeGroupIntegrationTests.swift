@@ -70,6 +70,18 @@ final class NativeGroupIntegrationTests: XCTestCase {
         let text = try XCTUnwrap(received)
         XCTAssertEqual(text.room, room); XCTAssertEqual(text.nickname, "Left"); XCTAssertFalse(text.own)
         XCTAssertEqual(text.body, "Fictieve tekst voor leden")
+        let snapshot = await right.snapshot
+        XCTAssertTrue(snapshot?.supportsReactions == true)
+        let reactor = try XCTUnwrap(rightSender as? any NativeGroupReacting)
+        let target = try XCTUnwrap(text.archiveID)
+        try await reactor.reactGroup(room: room, target: target, values: ["👍"], identifier: UUID().uuidString)
+        for _ in 0..<300 {
+            if await left.reactionTarget == target { break }
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        let reflectedTarget = await left.reactionTarget
+        let reflectedValues = await left.reactionValues
+        XCTAssertEqual(reflectedTarget, target); XCTAssertEqual(reflectedValues, ["👍"])
         let outsiderCount = await outsider.messageCount
         let directCount = await right.directCount
         XCTAssertEqual(outsiderCount, 0); XCTAssertEqual(directCount, 0)
@@ -85,12 +97,19 @@ final class NativeGroupIntegrationTests: XCTestCase {
 }
 
 private actor GroupEndpoint {
+    private(set) var snapshot: NativeGroupSnapshot?
+    private(set) var reactionTarget: String?
+    private(set) var reactionValues: [String] = []
     private(set) var sender: (any NativeGroupSending)?
     private var messages: [NativeGroupText] = []
     private(set) var directCount = 0
     var messageCount: Int { messages.count }
     func setSender(_ sender: any NativeChatSending) { self.sender = sender as? any NativeGroupSending }
     func recordDirect() { directCount += 1 }
-    func append(_ event: NativeGroupEvent) { if case .message(let text) = event { messages.append(text) } }
+    func append(_ event: NativeGroupEvent) {
+        if case .message(let text) = event { messages.append(text) }
+        if case .snapshot(let value) = event { snapshot = value }
+        if case .reactions(let target, _, let values) = event { reactionTarget = target; reactionValues = values }
+    }
     func message(_ identifier: String) -> NativeGroupText? { messages.first { $0.identifier == identifier } }
 }

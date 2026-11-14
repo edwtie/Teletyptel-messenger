@@ -1,4 +1,5 @@
 import XCTest
+import CryptoKit
 @testable import TeleTypTelCore
 
 private actor LoginFixture: ServerChecking, NativeAccountAuthenticating, NativeXMPPConnecting, NativeArchiveSending {
@@ -148,6 +149,18 @@ private actor LoginFixture: ServerChecking, NativeAccountAuthenticating, NativeX
         runs[identifier]?.continuation = nil
         continuation?.resume(throwing: error)
     }
+}
+
+@MainActor
+private final class EncryptedHistoryFixture: NativeHistoryStoring {
+    private let key = SymmetricKey(size: .bits256)
+    private var values: [String: Data] = [:]
+    func load(_ scope: NativeHistoryScope) throws -> NativeHistorySnapshot? {
+        guard let bytes = values[scope.filename] else { return nil }
+        return try NativeHistoryCrypto.open(bytes, scope: scope, key: key)
+    }
+    func save(_ snapshot: NativeHistorySnapshot) throws { values[snapshot.scope.filename] = try NativeHistoryCrypto.seal(snapshot, key: key) }
+    func remove(_ scope: NativeHistoryScope) throws { values[scope.filename] = nil }
 }
 
 final class NativeLoginModelTests: XCTestCase {
@@ -393,8 +406,64 @@ final class NativeLoginModelTests: XCTestCase {
     }
 
     @MainActor
-    private func model(_ fixture: LoginFixture) -> NativeLoginModel {
-        NativeLoginModel(checker: fixture, authenticator: fixture, connection: fixture)
+    private func model(_ fixture: LoginFixture, history: (any NativeHistoryStoring)? = nil) -> NativeLoginModel {
+        NativeLoginModel(checker: fixture, authenticator: fixture, connection: fixture, history: history)
+    }
+
+    @MainActor
+    func testEncryptedHistoryOnlyRestoresAfterConfirmedBindAndStaysAccountScoped() async {
+        let storage = EncryptedHistoryFixture()
+        let fixture = LoginFixture()
+        let first = model(fixture, history: storage)
+        start(first)
+        await eventually { await fixture.runCount() == 1 }
+        await fixture.ready(0); await fixture.roster(0, state: contacts)
+        await eventually { first.canSend && first.roster == self.contacts }
+        await fixture.message(0, event: .message(peer: "peer@localhost", identifier: "persisted", body: "Privé fictief bericht"))
+        await eventually { first.chat.messages.count == 1 }
+        first.setDraft("Bewaard concept", peer: "peer@localhost")
+        var preferences = first.chat.preferences; preferences.sendDisplayed = true
+        first.setChatPreferences(preferences)
+        first.disconnect()
+        XCTAssertTrue(first.chat.messages.isEmpty)
+        let second = model(fixture, history: storage)
+        start(second)
+        await eventually { await fixture.runCount() == 2 }
+        XCTAssertTrue(second.chat.messages.isEmpty)
+        await fixture.ready(1)
+        await eventually { second.canSend && second.chat.messages.count == 1 }
+        XCTAssertEqual(second.chat.messages[0].body, "Privé fictief bericht")
+        XCTAssertEqual(second.chat.drafts["peer@localhost"], "Bewaard concept")
+        XCTAssertTrue(second.chat.preferences.sendDisplayed)
+        XCTAssertEqual(second.cachedContacts.first?.presence, .unknown)
+        second.disconnect()
+        let third = model(fixture, history: storage)
+        start(third, jid: "other@localhost")
+        await eventually { await fixture.runCount() == 3 }
+        await fixture.ready(2)
+        await eventually { third.canSend }
+        XCTAssertTrue(third.chat.messages.isEmpty)
+        XCTAssertTrue(third.chat.drafts.isEmpty)
+        XCTAssertFalse(third.chat.preferences.sendDisplayed)
+        third.disconnect()
+    }
+
+    @MainActor
+    func testHistoryOptOutCannotRestoreOldContentOnNextLogin() async {
+        let storage = EncryptedHistoryFixture(); let fixture = LoginFixture()
+        let first = model(fixture, history: storage)
+        start(first); await eventually { await fixture.runCount() == 1 }
+        await fixture.ready(0); await fixture.roster(0, state: contacts)
+        await eventually { first.canSend && first.roster == self.contacts }
+        first.setDraft("Geheim concept", peer: "peer@localhost")
+        var preferences = first.chat.preferences; preferences.keepHistory = false
+        first.setChatPreferences(preferences); first.disconnect()
+        let second = model(fixture, history: storage)
+        start(second); await eventually { await fixture.runCount() == 2 }
+        await fixture.ready(1); await eventually { second.canSend }
+        XCTAssertFalse(second.chat.preferences.keepHistory)
+        XCTAssertTrue(second.chat.messages.isEmpty); XCTAssertTrue(second.chat.drafts.isEmpty)
+        second.disconnect()
     }
 
     @MainActor

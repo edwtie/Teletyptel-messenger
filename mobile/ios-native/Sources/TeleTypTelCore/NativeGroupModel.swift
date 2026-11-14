@@ -188,6 +188,34 @@ public final class NativeGroupModel: ObservableObject {
         }
     }
 
+    public func canReact(room: String, identifier: UUID) -> Bool {
+        guard available, sender is any NativeGroupReacting, let group = rooms.first(where: { $0.room == room }),
+              group.snapshot?.canSpeak == true, group.snapshot?.supportsReactions == true,
+              let message = group.messages.first(where: { $0.id == identifier }) else { return false }
+        return !message.hidden && !message.retracted && !message.actionPending && message.archiveID != nil && [.incoming, .submitted].contains(message.state)
+    }
+
+    public func react(room: String, identifier: UUID, emoji: String) {
+        guard canReact(room: room, identifier: identifier), sends.count < 8, NativeInteractionCodec.picker.contains(emoji),
+              let sender = sender as? any NativeGroupReacting, let index = rooms.firstIndex(where: { $0.room == room }),
+              let message = rooms[index].messages.firstIndex(where: { $0.id == identifier }),
+              let target = rooms[index].messages[message].archiveID, let actor = rooms[index].snapshot?.ownOccupantID else { return }
+        var values = rooms[index].messages[message].reactions[actor] ?? []
+        if values.contains(emoji) { values.removeAll { $0 == emoji } } else if values.count < 16 { values.append(emoji) }
+        let request = UUID().uuidString; let attempt = generation
+        rooms[index].messages[message].actionPending = true; rooms[index].messages[message].actionRequestID = request
+        sends[identifier] = Task { [weak self] in
+            var submitted = false
+            do { try await sender.reactGroup(room: room, target: target, values: values, identifier: request); submitted = true } catch { }
+            guard let self = self, self.generation == attempt, let index = self.rooms.firstIndex(where: { $0.room == room }),
+                  let message = self.rooms[index].messages.firstIndex(where: { $0.id == identifier }),
+                  self.rooms[index].messages[message].actionRequestID == request else { return }
+            self.rooms[index].messages[message].actionPending = false
+            if !submitted { self.rooms[index].messages[message].actionNotice = "Reactie onzeker; niet automatisch opnieuw verzonden." }
+            self.sends[identifier] = nil
+        }
+    }
+
     public func hideMessage(room: String, identifier: UUID) {
         guard let index = rooms.firstIndex(where: { $0.room == room }),
               let message = rooms[index].messages.firstIndex(where: { $0.id == identifier }),
@@ -195,6 +223,7 @@ public final class NativeGroupModel: ObservableObject {
               rooms[index].messages.filter({ $0.hidden || $0.retracted }).count < 128 else { return }
         rooms[index].messages[message].hidden = true
         rooms[index].messages[message].body = ""
+        rooms[index].messages[message].reactions.removeAll()
     }
 
     public func canRetract(room: String, identifier: UUID) -> Bool {
@@ -232,12 +261,20 @@ public final class NativeGroupModel: ObservableObject {
     private func receive(_ event: NativeGroupEvent, room: String) {
         guard let index = rooms.firstIndex(where: { $0.room == room }) else { return }
         switch event {
+        case .reactions(let target, let occupant, let values):
+            guard rooms[index].snapshot?.supportsReactions == true, NativeMessageActionCodec.validID(occupant),
+                  values.count <= 16, values.allSatisfy(NativeInteractionCodec.validReaction) else { return }
+            let matches = rooms[index].messages.indices.filter { rooms[index].messages[$0].archiveID == target }
+            guard matches.count == 1, let message = matches.first, !rooms[index].messages[message].hidden, !rooms[index].messages[message].retracted,
+                  rooms[index].messages[message].reactions[occupant] != nil || rooms[index].messages[message].reactions.count < 64 else { return }
+            rooms[index].messages[message].reactions[occupant] = values.isEmpty ? nil : Array(Set(values)).sorted()
         case .retracted(let target, let occupant):
             let matches = rooms[index].messages.indices.filter { rooms[index].messages[$0].archiveID == target }
             if !matches.isEmpty {
                 guard matches.count == 1, let message = matches.first,
                       rooms[index].messages[message].occupantID == occupant else { return }
                 rooms[index].messages[message].body = ""; rooms[index].messages[message].retracted = true
+                rooms[index].messages[message].reactions.removeAll()
                 rooms[index].messages[message].actionPending = false
                 rooms[index].messages[message].actionNotice = "Intrekking door de groepsserver doorgestuurd; externe kopieën kunnen blijven bestaan."
             }
@@ -264,9 +301,9 @@ public final class NativeGroupModel: ObservableObject {
             }
         case .rejected(let identifier):
             invitationModel.rejected(identifier, room: room)
-            if let message = rooms[index].messages.firstIndex(where: { $0.own && $0.actionRequestID == identifier }) {
+            if let message = rooms[index].messages.firstIndex(where: { $0.actionRequestID == identifier }) {
                 rooms[index].messages[message].actionPending = false
-                rooms[index].messages[message].actionNotice = "Intrekverzoek geweigerd door de groep."
+                rooms[index].messages[message].actionNotice = "Berichtactie geweigerd door de groep."
                 return
             }
             if let message = rooms[index].messages.firstIndex(where: { $0.own && $0.identifier == identifier }) {

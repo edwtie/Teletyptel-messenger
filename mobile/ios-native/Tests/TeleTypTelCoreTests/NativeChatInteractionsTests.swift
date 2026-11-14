@@ -99,4 +99,17 @@ final class NativeChatInteractionsTests: XCTestCase {
         XCTAssertTrue(store.messages[0].reactions.isEmpty)
         XCTAssertEqual(store.messages[0].body, "")
     }
+
+    func testConcurrentMessageMutationDoesNotReplacePendingReaction() throws {
+        var store = NativeChatStore()
+        let message = try sent(&store)
+        _ = try store.beginReaction(message.id)
+        XCTAssertFalse(store.canCorrect(message.id))
+        XCTAssertFalse(store.canRetract(message.id))
+        XCTAssertThrowsError(try store.hide(message.id))
+        XCTAssertThrowsError(try store.beginReaction(message.id))
+        store.interrupt()
+        _ = try store.beginChange(message.id, correctedBody: "Bewerkt")
+        XCTAssertThrowsError(try store.beginReaction(message.id))
+    }
 }

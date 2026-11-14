@@ -623,7 +623,10 @@ private struct NativeLoginUIFixture: ServerChecking, NativeAccountChallenging, N
     }
 }
 
-private struct NativeChatUIFixture: NativeArchiveSending, NativeGroupManaging, NativeMessageChanging {
+private struct NativeChatUIFixture: NativeArchiveSending, NativeGroupManaging, NativeMessageChanging, NativeChatInteracting {
+    func interact(to peer: String, interaction: NativeChatInteraction, identifier: String) async throws {
+        _ = try NativeInteractionCodec.encode(to: peer, interaction: interaction, identifier: identifier)
+    }
     func changeMessage(to peer: String, change: NativeMessageChange, identifier: String) async throws {
         _ = try NativeMessageActionCodec.encode(to: peer, change: change, identifier: identifier)
     }

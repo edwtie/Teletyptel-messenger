@@ -144,6 +144,8 @@ struct NativeGroupChatView: View {
                         ForEach(group.messages.filter { !$0.hidden && (search.isEmpty || $0.body.localizedCaseInsensitiveContains(search) || $0.nickname.localizedCaseInsensitiveContains(search)) }) { message in
                             NativeGroupBubble(message: message, translation: translation, session: login?.activeWebSession,
                                 canForward: login?.canSend == true,
+                                canReact: model.canReact(room: room, identifier: message.id), reactionOwner: group.snapshot?.ownOccupantID,
+                                onReact: { emoji in model.react(room: room, identifier: message.id, emoji: emoji) },
                                 canReply: NativeChatCodec.validBody("> " + message.nickname + ": " + message.body + "\n\n" + group.draft), onForward: { forwarding = message },
                                 onReply: { model.setDraft("> " + message.nickname + ": " + message.body + "\n\n" + (self.group?.draft ?? ""), room: room) },
                                 onDelete: { deleting = message }).id(message.id)
@@ -191,6 +193,9 @@ private struct NativeGroupBubble: View {
     var translation: NativeTranslationModel? = nil
     var session: NativeAccountWebSession? = nil
     var canForward = false
+    var canReact = false
+    var reactionOwner: String?
+    var onReact: (String) -> Void = { _ in }
     var canReply = true
     var onForward: () -> Void = {}
     var onReply: () -> Void = {}
@@ -235,6 +240,7 @@ private struct NativeGroupBubble: View {
             }
             }.padding(.trailing, 44)
             metadata
+            NativeReactionChips(reactions: message.reactions, owner: reactionOwner, enabled: canReact, selected: onReact)
             if let notice = message.actionNotice { Text(notice).font(.caption2) }
         }
         .overlay(alignment: .topTrailing) {
@@ -246,6 +252,7 @@ private struct NativeGroupBubble: View {
 
     @ViewBuilder private var actions: some View {
         if !message.retracted {
+            Menu { ForEach(NativeInteractionCodec.picker, id: \.self) { emoji in Button(emoji) { onReact(emoji) } } } label: { Label("Reageren", systemImage: "face.smiling") }.disabled(!canReact)
             Button(action: onReply) { Label("Beantwoorden", systemImage: "arrowshape.turn.up.left") }
                 .disabled(!canReply)
             Button { UIPasteboard.general.string = message.body } label: { Label("Kopiëren", systemImage: "doc.on.doc") }

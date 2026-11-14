@@ -52,6 +52,7 @@ public struct NativeHistorySnapshot: Codable, Equatable {
             NativeMUCStream.validNickname(group.nickname) && NativeChatCodec.bareJID(group.room) == group.room &&
             group.draft.utf8.count <= 8192 && group.subject.utf8.count <= 512 && group.messages.count <= 200 && group.tombstones.count <= 128 &&
             group.messages.allSatisfy { $0.room == group.room && NativeMUCStream.validNickname($0.nickname) &&
+                $0.reactions.count <= 64 && $0.reactions.values.allSatisfy { $0.count <= 16 && $0.allSatisfy(NativeInteractionCodec.validReaction) } &&
                 (($0.hidden || $0.retracted) ? $0.body.isEmpty : NativeChatCodec.validBody($0.body)) }
         }
     }

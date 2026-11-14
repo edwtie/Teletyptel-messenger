@@ -9,6 +9,7 @@ struct NativeChatView: View {
     var onClose: (() -> Void)? = nil
     var contactProfile: NativePublicAvatar? = nil
     var ownProfile: NativePublicAvatar? = nil
+    var allowReadMarkers = true
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.verticalSizeClass) private var verticalSizeClass
@@ -52,7 +53,7 @@ struct NativeChatView: View {
                     .overlayPreferenceValue(NativeMessageFramesKey.self) { frames in
                         GeometryReader { viewport in
                             let visible = frames.filter { CGRect(origin: .zero, size: viewport.size).contains($0.value) }.map(\.key)
-                            let enabled = scenePhase == .active && model.canSend && model.chat.preferences.sendDisplayed
+                            let enabled = scenePhase == .active && allowReadMarkers && !showTranslation && forwarding == nil && editing == nil && deleting == nil && calls.presentation == nil && model.canSend && model.chat.preferences.sendDisplayed
                             Color.clear.allowsHitTesting(false).task(id: enabled ? visible.map(\.uuidString).sorted().joined() : "hidden") {
                                 if enabled { model.displayed(visible) }
                             }

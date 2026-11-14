@@ -205,6 +205,28 @@ final class NativeStartupUITests: XCTestCase {
         snapshot("message-actions-retracted-landscape")
     }
 
+    func testMessageReactionTogglesAcrossRotation() {
+        signInFixture("connected")
+        waitForStatus("XMPP verbonden als fixture@localhost")
+        let contact = application.descendants(matching: .any)["contact-demo-contact@localhost"].firstMatch
+        XCTAssertTrue(contact.waitForExistence(timeout: 5)); reveal(contact); tapContact(contact)
+        let draft = application.descendants(matching: .any)["chat-draft"].firstMatch
+        XCTAssertTrue(draft.waitForExistence(timeout: 5)); draft.tap(); draft.typeText("Fictieve reactietest")
+        application.buttons["chat-send"].tap()
+        let message = application.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "chat-message-", "Fictieve reactietest")).firstMatch
+        XCTAssertTrue(message.waitForExistence(timeout: 5))
+        let identifier = String(message.identifier.dropFirst("chat-message-".count))
+        application.buttons["message-menu-" + identifier].tap()
+        XCTAssertTrue(application.buttons["Reageren"].waitForExistence(timeout: 5)); application.buttons["Reageren"].tap()
+        XCTAssertTrue(application.buttons["👍"].waitForExistence(timeout: 5)); application.buttons["👍"].tap()
+        let reaction = application.buttons["👍, 1 reacties"].firstMatch
+        XCTAssertTrue(reaction.waitForExistence(timeout: 5)); snapshot("message-reaction")
+        reaction.tap()
+        expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: reaction); waitForExpectations(timeout: 5)
+        XCUIDevice.shared.orientation = .landscapeLeft
+        XCTAssertTrue(application.buttons["message-menu-" + identifier].waitForExistence(timeout: 5))
+    }
+
     func testExistingGroupJoinSendRotationAndLeave() {
         signInFixture("connected")
         waitForStatus("XMPP verbonden als fixture@localhost")

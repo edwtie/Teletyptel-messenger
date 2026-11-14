@@ -126,6 +126,7 @@ public final class NativeLoginModel: ObservableObject {
     }
 
     public var canChangeMessages: Bool { canSend && sender is any NativeMessageChanging }
+    var connectedConfiguration: ServerConfiguration? { isConnected ? resumableAccount?.configuration : nil }
 
     public func hideMessage(_ identifier: UUID) {
         do { try chat.hide(identifier); chatError = nil }

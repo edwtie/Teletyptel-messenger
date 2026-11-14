@@ -4,6 +4,25 @@ import XCTest
 final class NativeMUCTests: XCTestCase {
     private let room = "room@conference.localhost"
 
+    func testReactionsRequireAdvertisedRoomIDsStableOccupantAndJoinedSender() throws {
+        var stream = try stream()
+        let discovery = info(stream).replacingOccurrences(of: "</query>", with: "<feature var='urn:xmpp:occupant-id:0'/><feature var='urn:xmpp:sid:0'/></query>")
+        _ = stream.receive(try ProbeXML.parse(discovery))
+        _ = stream.receive(try ProbeXML.parse(presence(nickname: "Peer", codes: [])))
+        let own = presence().replacingOccurrences(of: "</presence>", with: "<occupant-id xmlns='urn:xmpp:occupant-id:0' id='stable-own'/></presence>")
+        _ = stream.receive(try ProbeXML.parse(own))
+        XCTAssertTrue(stream.snapshot.supportsReactions)
+        XCTAssertEqual(stream.snapshot.ownOccupantID, "stable-own")
+        let xml = "<message xmlns='jabber:client' from='\(room)/Peer' type='groupchat'><reactions xmlns='urn:xmpp:reactions:0' id='room-id'><reaction>👍</reaction></reactions><occupant-id xmlns='urn:xmpp:occupant-id:0' id='stable-peer'/></message>"
+        guard case .reactions(let target, let actor, let values) = stream.receive(try ProbeXML.parse(xml)).events.first else { return XCTFail("Missing group reaction") }
+        XCTAssertEqual(target, "room-id"); XCTAssertEqual(actor, "stable-peer"); XCTAssertEqual(values, ["👍"])
+        XCTAssertTrue(stream.receive(try ProbeXML.parse(xml.replacingOccurrences(of: "/Peer", with: "/Unknown"))).events.isEmpty)
+        XCTAssertTrue(stream.receive(try ProbeXML.parse(xml.replacingOccurrences(of: "<occupant-id xmlns='urn:xmpp:occupant-id:0' id='stable-peer'/>", with: ""))).events.isEmpty)
+        var unsupported = try joined()
+        XCTAssertFalse(unsupported.snapshot.supportsReactions)
+        XCTAssertTrue(unsupported.receive(try ProbeXML.parse(xml)).events.isEmpty)
+    }
+
     func testRetractionRequiresAdvertisedStableAuthorAndRoomScopedIdentifier() throws {
         var stream = try stream()
         let discovery = info(stream).replacingOccurrences(of: "</query>", with: "<feature var='urn:xmpp:occupant-id:0'/><feature var='urn:xmpp:message-retract:1'/></query>")
@@ -112,10 +131,15 @@ final class NativeMUCTests: XCTestCase {
     }
 }
 
-private actor GroupFixture: NativeGroupMessageChanging {
+private actor GroupFixture: NativeGroupMessageChanging, NativeGroupReacting {
     var callbacks: [String: @Sendable (NativeGroupEvent) -> Void] = [:]
     var sends = 0
     var retractions = 0
+    var reactions: [NativeChatInteraction] = []
+    func reactGroup(room: String, target: String, values: [String], identifier: String) async throws {
+        reactions.append(.reactions(target: target, values: values))
+        callbacks[room]?(.reactions(target: target, occupantID: "stable-own", values: values))
+    }
     func retractGroupMessage(room: String, target: String, identifier: String) async throws { retractions += 1 }
     func joinGroup(room: String, nickname: String, onEvent: @escaping @Sendable (NativeGroupEvent) -> Void) async throws {
         callbacks[room] = onEvent
@@ -132,6 +156,29 @@ private actor GroupFixture: NativeGroupMessageChanging {
 }
 
 final class NativeGroupModelTests: XCTestCase {
+    @MainActor
+    func testReactionTargetsRoomIDAndUpdatesOnlyServerConfirmedStableActor() async {
+        let fixture = GroupFixture(); let model = NativeGroupModel(); let room = "room@conference.localhost"
+        model.attach(fixture, owner: "owner@localhost"); model.join(room: room, nickname: "Me")
+        await wait { model.rooms.first?.snapshot != nil }
+        let message = NativeGroupText(id: UUID(), room: room, nickname: "Peer", identifier: "client-id", archiveID: "room-id", body: "Tekst", date: Date(), own: false, state: .incoming, occupantID: "stable-peer")
+        await fixture.emit(.message(message), room: room)
+        await wait { model.rooms[0].messages.count == 1 }
+        XCTAssertFalse(model.canReact(room: room, identifier: message.id))
+        await fixture.emit(.snapshot(NativeGroupSnapshot(room: room, nickname: "Me", participants: ["Me", "Peer"], canSpeak: true, supportsReactions: true, ownOccupantID: "stable-own")), room: room)
+        await wait { model.canReact(room: room, identifier: message.id) }
+        model.react(room: room, identifier: message.id, emoji: "👍")
+        await wait { model.rooms[0].messages[0].reactions["stable-own"] == ["👍"] && !model.rooms[0].messages[0].actionPending }
+        let sent = await fixture.reactions
+        XCTAssertEqual(sent, [.reactions(target: "room-id", values: ["👍"])])
+        model.react(room: room, identifier: message.id, emoji: "👍")
+        await wait { model.rooms[0].messages[0].reactions.isEmpty && !model.rooms[0].messages[0].actionPending }
+        await fixture.emit(.reactions(target: "client-id", occupantID: "stable-peer", values: ["😂"]), room: room)
+        await fixture.emit(.subject("Barrier"), room: room)
+        await wait { model.rooms[0].subject == "Barrier" }
+        XCTAssertTrue(model.rooms[0].messages[0].reactions.isEmpty)
+        model.disconnect(clear: true)
+    }
     @MainActor
     func testOwnGroupRetractionRequiresServerEchoAndWaitsForAuthorMatchedReflection() async {
         let fixture = GroupFixture(); let model = NativeGroupModel()

@@ -309,22 +309,23 @@ public struct NativeChatStore: Codable, Equatable {
 
     public func canCorrect(_ identifier: UUID) -> Bool {
         guard let message = messages.first(where: { $0.id == identifier }), !message.hidden, !message.retracted,
-              !message.actionPending, message.state == .submitted, message.previousIDs.count < 16,
+              !message.actionPending, !message.reactionPending, message.state == .submitted, message.previousIDs.count < 16,
               message.stanzaID.map(NativeMessageActionCodec.validID) == true else { return false }
         return messages.last(where: { $0.peer == message.peer && $0.state != .incoming })?.id == identifier
     }
 
     public func canRetract(_ identifier: UUID) -> Bool {
         guard let message = messages.first(where: { $0.id == identifier }) else { return false }
-        return !message.hidden && !message.retracted && !message.actionPending && message.state == .submitted &&
+        return !message.hidden && !message.retracted && !message.actionPending && !message.reactionPending && message.state == .submitted &&
             message.stanzaID.map(NativeMessageActionCodec.validID) == true
     }
 
     mutating func hide(_ identifier: UUID) throws {
-        guard let index = messages.firstIndex(where: { $0.id == identifier }), !messages[index].actionPending,
+        guard let index = messages.firstIndex(where: { $0.id == identifier }), !messages[index].actionPending, !messages[index].reactionPending,
               messages[index].state != .sending, retainedActionCount < 128 || messages[index].hidden || messages[index].retracted else { throw NativeChatFailure.busy }
         messages[index].hidden = true
         messages[index].body = ""
+        messages[index].reactions.removeAll()
     }
 
     mutating func beginChange(_ identifier: UUID, correctedBody: String?) throws -> (NativeChatMessage, NativeMessageChange, String) {
@@ -409,7 +410,7 @@ public struct NativeChatStore: Codable, Equatable {
 
     mutating func beginReaction(_ identifier: UUID) throws -> (NativeChatMessage, String) {
         guard let index = messages.firstIndex(where: { $0.id == identifier }), !messages[index].hidden, !messages[index].retracted,
-              !messages[index].reactionPending, [.incoming, .submitted].contains(messages[index].state),
+              !messages[index].reactionPending, !messages[index].actionPending, [.incoming, .submitted].contains(messages[index].state),
               messages[index].stanzaID.map(NativeMessageActionCodec.validID) == true else { throw NativeChatFailure.invalidMessage }
         let request = UUID().uuidString
         messages[index].reactionRequest = request; messages[index].reactionPending = true

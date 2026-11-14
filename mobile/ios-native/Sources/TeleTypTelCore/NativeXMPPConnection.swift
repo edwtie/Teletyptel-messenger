@@ -106,7 +106,7 @@ private final class NativeSessionClosure {
     }
 }
 
-private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, NativeArchiveSending, NativeGroupManaging, NativeMessageChanging, NativeGroupMessageChanging, NativeChatInteracting, NativeJingleSending, @unchecked Sendable {
+private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, NativeArchiveSending, NativeGroupManaging, NativeMessageChanging, NativeGroupMessageChanging, NativeGroupReacting, NativeChatInteracting, NativeJingleSending, @unchecked Sendable {
     private let configuration: ServerConfiguration
     private let ownerJID: String
     private var boundJID: String?
@@ -279,6 +279,19 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
         let frame = try NativeInteractionCodec.encode(to: peer, interaction: interaction, identifier: identifier)
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             queue.async { self.enqueueMessage(frame, continuation: continuation) }
+        }
+    }
+
+    func reactGroup(room: String, target: String, values: [String], identifier: String) async throws {
+        try Task.checkCancellation()
+        let frame = try NativeInteractionCodec.encode(to: room, interaction: .reactions(target: target, values: values), identifier: identifier, group: true)
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            queue.async {
+                guard self.groups[room]?.stream.snapshot.supportsReactions == true, self.groups[room]?.stream.canSpeak == true else {
+                    continuation.resume(throwing: NativeGroupFailure.denied); return
+                }
+                self.enqueueMessage(frame, continuation: continuation)
+            }
         }
     }
 

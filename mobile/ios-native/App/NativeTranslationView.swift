@@ -90,6 +90,7 @@ struct NativeMessengerView: View {
     @State private var showTranslation = false
     @State private var showGroups = false
     @State private var showAccount = false
+    @State private var showDialer = false
     @StateObject private var avatars = NativeAvatarCache()
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.verticalSizeClass) private var verticalSizeClass
@@ -108,6 +109,7 @@ struct NativeMessengerView: View {
         .sheet(isPresented: $showGroups) { NativeGroupsView(model: model.groups, login: model, translation: translation) }
         .sheet(isPresented: $showAccount) { NativeAccountSettingsView(login: model, translation: translation) }
         .sheet(isPresented: $showTranslation) { NativeTranslationSettingsView(model: translation) }
+        .sheet(isPresented: $showDialer) { NativeDialerView(login: model, calls: calls) }
         .task(id: model.canSend) { loadAvatars() }
         .onChange(of: model.roster) { _ in loadAvatars() }
         .onChange(of: showAccount) { if !$0 { avatars.refreshOwner() } }
@@ -202,7 +204,8 @@ struct NativeMessengerView: View {
         } detail: {
             if let contact = contacts.first(where: { $0.jid == selected }) {
                 NativeChatView(model: model, calls: calls, translation: translation, contact: contact, onClose: { selected = nil },
-                    contactProfile: avatars.profiles[contact.jid], ownProfile: avatars.owner.flatMap { avatars.profiles[$0] })
+                    contactProfile: avatars.profiles[contact.jid], ownProfile: avatars.owner.flatMap { avatars.profiles[$0] },
+                    allowReadMarkers: !showAccount && !showTranslation && !showGroups && !showDialer)
             } else if let room = model.groups.rooms.first(where: { $0.room == selected }) {
                 NativeGroupChatView(model: model.groups, room: room.room, login: model, translation: translation)
             } else {
@@ -230,6 +233,7 @@ struct NativeMessengerView: View {
                     .accessibilityLabel("Uitloggen").accessibilityIdentifier("disconnect-session")
             }
             Menu {
+                Button { showDialer = true } label: { Label("Nummerbellen · lokale test", systemImage: "circle.grid.3x3.fill") }.accessibilityIdentifier("open-number-dialer")
                 Button { showGroups = true } label: { Label("Groepschats", systemImage: "person.3") }.accessibilityIdentifier("open-groups")
                 Button { showAccount = true } label: { Label("Accountinstellingen", systemImage: "person.crop.circle") }.accessibilityIdentifier("open-account-settings")
                 Button { showTranslation = true } label: { Label("Vertaling", systemImage: "globe") }
