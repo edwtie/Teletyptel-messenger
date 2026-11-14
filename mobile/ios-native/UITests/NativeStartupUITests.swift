@@ -354,8 +354,8 @@ final class NativeStartupUITests: XCTestCase {
 
     private func usableViewport() -> CGRect {
         let window = application.frame
-        let navigation = application.navigationBars.firstMatch
-        let top = navigation.exists ? max(window.minY + 12, navigation.frame.maxY + 8) : window.minY + 12
+        let navigation = application.navigationBars.allElementsBoundByIndex.last { $0.isHittable }
+        let top = navigation.map { max(window.minY + 12, $0.frame.maxY + 8) } ?? window.minY + 12
         let keyboard = application.keyboards.firstMatch
         let bottom = keyboard.exists ? min(window.maxY - 24, keyboard.frame.minY - 8) : window.maxY - 24
         return CGRect(x: window.minX + 12, y: top, width: max(0, window.width - 24), height: max(0, bottom - top))
