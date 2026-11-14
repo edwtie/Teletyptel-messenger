@@ -43,9 +43,13 @@ private final class NativeCallKitSystem: NativeCallSystem {
         provider.reportOutgoingCall(with: id, connectedAt: Date())
     }
 
-    func setDtmfEnabled(id: UUID, enabled: Bool) {
+    func setDtmfEnabled(id: UUID, enabled: Bool, hasVideo: Bool) {
         let update = CXCallUpdate()
         update.supportsDTMF = enabled
+        update.hasVideo = hasVideo
+        update.supportsHolding = false
+        update.supportsGrouping = false
+        update.supportsUngrouping = false
         provider.reportCall(with: id, updated: update)
     }
 
@@ -68,6 +72,7 @@ final class NativeCallPlatform: NSObject, PKPushRegistryDelegate, CXProviderDele
     private var registration: UUID?
     private var tokenChanged: ((Data?) -> Void)?
     private var account: String?
+    private var dtmfCapability: (id: UUID, enabled: Bool, hasVideo: Bool)?
     private(set) var revocationRequired = false
 
     init(media: any NativeCallMediaDriver) {
@@ -138,9 +143,12 @@ final class NativeCallPlatform: NSObject, PKPushRegistryDelegate, CXProviderDele
         self.account = nil
     }
 
-    func setDtmfEnabled(id: UUID, enabled: Bool) {
+    func setDtmfEnabled(id: UUID, enabled: Bool, hasVideo: Bool) {
         guard coordinator.currentHandle?.id == id else { return }
-        system.setDtmfEnabled(id: id, enabled: enabled && coordinator.isConnected)
+        let permitted = enabled && coordinator.isConnected
+        guard dtmfCapability?.id != id || dtmfCapability?.enabled != permitted || dtmfCapability?.hasVideo != hasVideo else { return }
+        dtmfCapability = (id, permitted, hasVideo)
+        system.setDtmfEnabled(id: id, enabled: permitted, hasVideo: hasVideo)
     }
 
     nonisolated func provider(_ provider: CXProvider, perform action: CXPlayDTMFCallAction) {

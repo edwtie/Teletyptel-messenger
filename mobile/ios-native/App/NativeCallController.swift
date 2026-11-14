@@ -309,7 +309,7 @@ final class NativeCallController: ObservableObject {
         runtime.media.presentationChanged = { [weak self] snapshot in
             self?.presentation = snapshot
             if let snapshot = snapshot {
-                self?.runtime?.platform.setDtmfEnabled(id: snapshot.callID, enabled: snapshot.canSendDtmf)
+                self?.runtime?.platform.setDtmfEnabled(id: snapshot.callID, enabled: snapshot.canSendDtmf, hasVideo: snapshot.profile.hasVideo)
             }
         }
         runtime.platform.coordinator.changed = { [weak self] in self?.callChanged() }

@@ -22,6 +22,8 @@ test("Native DTMF uses negotiated RTP events and CallKit, never RTT or message s
   const coordinator = read("Sources/TeleTypTelCore/NativeCallCoordinator.swift");
   assert.match(coordinator, /guard currentHandle\?\.id == id, isConnected, NativeDtmf\.appending/);
   assert.match(read("App/NativeCallPlatform.swift"), /action\.type == \.singleTone, coordinator\.sendDtmf/);
+  assert.match(read("App/NativeCallPlatform.swift"), /update\.hasVideo = hasVideo/);
+  assert.match(read("App/NativeCallPlatform.swift"), /dtmfCapability\?\.enabled != permitted/);
   const policy = read("Sources/TeleTypTelCore/NativeDtmf.swift");
   assert.match(policy, /maximumQueued = 16/);
   assert.doesNotMatch(policy, /NativeChat|Rtt|sendMessage|http|print\(/);
