@@ -157,6 +157,7 @@ public final class NativeGroupInvitationModel: ObservableObject {
               (try? NativeInvitationCodec.invite(room: room, peer: peer, owner: owner, identifier: UUID().uuidString)) != nil else {
             notice = "Uitnodiging niet gestart. Kies een bekend contact of probeer later opnieuw."; return
         }
+        notice = nil
         let identifier = UUID(); let attempt = generation
         attempts.append(NativeGroupInviteAttempt(id: identifier, room: room, peer: peer, state: .sending))
         tasks[identifier] = Task { [weak self] in

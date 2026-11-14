@@ -137,6 +137,10 @@ final class NativeInvitationModelTests: XCTestCase {
         await fixture.confirm(room: room)
         await wait { groups.invitationModel.invitations.isEmpty }
         XCTAssertNotNil(groups.rooms[0].snapshot)
+        XCTAssertEqual(groups.invitationModel.notice, "Deelname bevestigd door de groep.")
+        groups.invite(room: room, peer: peer.jid)
+        await wait { groups.invitationModel.attempts.first?.state == .submitted }
+        XCTAssertNil(groups.invitationModel.notice)
         groups.disconnect(clear: true)
     }
     @MainActor

@@ -204,6 +204,7 @@ final class NativeStartupUITests: XCTestCase {
         XCTAssertTrue(contact.waitForExistence(timeout: 5)); reveal(contact); contact.tap()
         let submitted = application.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "invite-attempt-", "ontvangst en toegang niet bevestigd")).firstMatch
         XCTAssertTrue(submitted.waitForExistence(timeout: 5))
+        XCTAssertFalse(application.staticTexts["Deelname bevestigd door de groep."].exists)
         snapshot("invitation-contact-submitted")
         application.buttons["close-invite-contacts"].tap()
     }
