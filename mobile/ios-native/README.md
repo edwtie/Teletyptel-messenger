@@ -79,6 +79,12 @@ turned into an unintended insertion of an old cached message. Reading on open
 or explicit refresh is not a continuous cross-device SQL push subscription.
 The legacy web endpoint still has its existing upsert behavior; native CAS does
 not prevent a later independent legacy-web write from changing the same row.
+Native writes only the active account's SQL history, not another recipient's
+account or an alias account. Offline incoming delivery also relies on ejabberd
+MAM being enabled with suitable retention; the fresh known-contact view reads
+that archive as well. Interrupted, opted-out or unconfirmed SQL saves are not
+silently repaired by uploading an old device cache. This is not an assertion
+that every historical message already exists in SQL or is retained forever.
 
 The native account page separates new online writes from encrypted local-cache
 storage. Disabling native online writes cancels queued uploads but permits
@@ -111,8 +117,68 @@ Deployment and acceptance boundaries:
   unlimited conversation-index browsing, retention/deletion administration,
   signed device upgrade and hardware acceptance remain separate work.
 
-Validation is recorded after the current native run finishes; earlier green
-builds below do not constitute evidence for this additional online-history code.
+Online-history validation record:
+- Local Node guards: 133 passed, 4 platform-specific skips, zero failures (137
+  total), including the isolated PHP unit/HTTP fixtures. PHP 8.4 confirms session,
+  CSRF, origin, account/peer/cursor scoping, metadata preservation, CAS conflicts,
+  terminal retractions, web `read` compatibility and unique-index enforcement.
+  SQLite fixtures are not evidence of a live MySQL concurrency/load test.
+- The Linux compatibility harness passes 103 merge/sync/archive/interaction
+  tests, but uses test shims and is not substituted for genuine Apple SDK tests.
+- Genuine macOS unit/Release/media evidence at `f5a1dc3`: 317 Swift tests passed,
+  20 opt-in integration cases explicitly skipped in the unit job, zero unit
+  failures; unsigned Release compilation, fixture exclusion and all four
+  same-host native media profiles passed. The skipped integration cases are
+  exercised separately, not silently counted as passes.
+- [Isolated real ejabberd run 43606641353](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43606641353)
+  passes all 20 transport/login/MAM/Jingle/group/invitation checks at `609131f`.
+  Subsequent code changes only affect archive UI accessibility and the test
+  harness, not the transport or cloud core. No production server was contacted.
+- Earlier failed runs are retained as negative evidence: `43604675767` exposed
+  an accidental group-model dependency in the standalone media compiler, fixed
+  by keeping that helper in the MUC source. `43606640912` and `43609203497` exposed
+  inherited archive-label accessibility IDs; the latter iPad full-suite attempt
+  also exhausted the unchanged 20-minute UI deadline. `43611473622` then exposed
+  the existing test helper's viewport assumption for full-width archive rows.
+  These runs are not treated as successful acceptance tests.
+- `43606381245` was cancelled in favor of the consolidated fixes.
+  `43613768098` then exposed an inherited header status ID overriding the two
+  paging controls; the ID now belongs to the status text only. In `43615080635`
+  the iPhone passed the preflight and all 16 full-suite cases, while iPad hit
+  the new preflight's cold-initialization deadline before any UI case started.
+  The preflight now has a separate ten-minute initialization/execution budget;
+  this did not raise the full-suite deadline or change its assertions.
+- The cloud-history scenario now runs as an additional fail-fast preflight;
+  success must still be followed by the full, unfiltered 16-case UI suite for
+  each family, with the original 20-minute full-suite limit and assertions.
+  No skipped cases, retries or smaller replacement suite are used to turn a
+  failing full run green.
+- [Unsigned native regression run 43617226936](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43617226936)
+  is green at `f5a1dc3`: the iPhone 16 Pro and iPad Pro 11-inch (M4), both iOS 18.5,
+  each pass the additional one-case cloud preflight and the full unfiltered
+  16-case UI suite, with zero UI failures or skips. The cloud scenario opens a
+  non-roster archive read-only, reads incoming web records plus a real-web-shaped
+  own record with empty sender and `read` delivery, fetches an older page and
+  rotates without enabling its composer or displaying the keyboard.
+  Release compilation, fixture exclusion and all four native media profiles
+  also pass for both matrix jobs. Reports remain `unsigned: true` and
+  `uploaded: false`; this is not a signed-device or production acceptance test.
+  Selected summaries/logs/screenshots are retained locally in
+  `artifacts/native-selected-evidence-43617226936-iPhone/` and
+  `artifacts/native-selected-evidence-43617226936-iPad/`; disposable ejabberd
+  evidence is in `artifacts/native-cloud-ejabberd-final/`.
+- Visual review then found dark text on the selected blue archive row. Its
+  foreground now follows the same selection state and white selected text as
+  the existing native roster. The [post-QA run 43620235754](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43620235754)
+  is green at `b776a5d`: both families again pass 317 Swift unit tests, unsigned
+  Release/fixture checks, all four media profiles, the one-case cloud preflight
+  and all 16 full-suite UI cases, with zero UI failures/skips. The same 20 opt-in
+  integration cases remain separately verified by the real-ejabberd run above.
+  Portrait/landscape cloud-history screenshots were reviewed; the fixture's
+  unavailable-translation banner is not a live Google service test. Current
+  selected evidence is in `artifacts/native-selected-evidence-43620235754-iPhone/`
+  and `artifacts/native-selected-evidence-43620235754-iPad/`. No signed app,
+  TestFlight upload, server deployment or live APNs activation was performed.
 
 ## Reactions, acknowledgements, device history and local SIP (2026-11-14)
 
@@ -777,7 +843,10 @@ stanzas. Off/revoked consent clears results and pending tasks, same-language
 detection suppresses captions, and live own/peer RTT needs separate consent. Live
 results are keyed to the call ID, debounced, bounded and invalidated on logout.
 
-Native parity status (do not confuse a visible layout with protocol support):
+Historical parity checkpoint, before the 2026-11-14 interaction/history/dialer
+and online-history additions. The newer sections at the top supersede this
+table; it is retained as a migration record, not the current readiness list.
+Do not confuse a visible layout with protocol support.
 
 | Web feature | Native preview status |
 | --- | --- |
@@ -801,7 +870,7 @@ Native parity status (do not confuse a visible layout with protocol support):
 | Application language selection/localized UI | Dutch native interface; additional UI languages are not yet migrated. Translation target selection does not change the application language |
 | Interpreter/SIP/DTMF, push/background calls | Separate incomplete integration work |
 
-Remaining parity gates, in order:
+Remaining parity gates at that historical checkpoint:
 
 1. Extend recent MAM restoration with older-page navigation and, only with an explicit storage design, protected account-isolated offline history. Carbons and independently verified delivery/read states remain separate protocol work.
 2. Extend implemented MUC discovery/administration with bookmarks, direct/federated/password invitation variants, group archives and protected group media. Group translation now has a private, consent-gated native presentation path.
