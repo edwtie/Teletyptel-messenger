@@ -49,6 +49,7 @@ test("Native cloud loads cannot manufacture XMPP receipt or membership authority
   assert.match(read("scripts/check-ios-native.js"), /TELETYPTEL_NATIVE_CLOUD_UI_FIXTURE/);
   assert.match(read("mobile/ios-native/App/NativeCloudHistoryView.swift"), /minHeight: 58/);
   assert.match(read("mobile/ios-native/App/NativeCloudHistoryView.swift"), /\.accessibilityElement\(children: \.combine\)/);
+  assert.doesNotMatch(read("mobile/ios-native/App/NativeCloudHistoryView.swift"), /}\s*\.accessibilityIdentifier\(state\.ready/);
 });
 
 for (const file of ["native-cloud-history-test.php", "native-cloud-history-http-test.php"]) {

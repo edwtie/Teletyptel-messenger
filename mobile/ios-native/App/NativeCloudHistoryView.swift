@@ -13,6 +13,7 @@ struct NativeCloudHistoryHeader: View {
                 if state.loading { ProgressView().accessibilityLabel("Online geschiedenis ophalen") }
                 Text(model.available ? "Online geschiedenis" : "Offline · lokale cache")
                     .font(.caption).foregroundStyle(NativeWebStyle.muted)
+                    .accessibilityIdentifier(state.ready ? "cloud-history-ready" : "cloud-history-status")
                 Spacer()
                 if state.nextCursor != nil {
                     Button { load(true, false) } label: { Image(systemName: "arrow.up").frame(width: 44, height: 44) }
@@ -25,7 +26,6 @@ struct NativeCloudHistoryHeader: View {
             }
             if let notice = state.notice { Text(notice).font(.caption).accessibilityIdentifier("cloud-history-notice") }
         }
-        .accessibilityIdentifier(state.ready ? "cloud-history-ready" : "cloud-history-status")
         .task(id: model.available) { if model.available { load(false, false) } }
     }
 }
