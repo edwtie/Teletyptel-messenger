@@ -34,6 +34,7 @@ struct NativeHistoricalContacts: View {
     @ObservedObject var cloud: NativeCloudSync
     let rosterJIDs: Set<String>
     let search: String
+    let selected: String?
     var body: some View {
         let previous = cloud.conversations.filter { $0.kind == "contact" && !rosterJIDs.contains($0.peer) &&
             (search.isEmpty || $0.name.localizedCaseInsensitiveContains(search) || $0.peer.localizedCaseInsensitiveContains(search)) }
@@ -49,6 +50,7 @@ struct NativeHistoricalContacts: View {
                             }
                         }
                         .frame(maxWidth: .infinity, minHeight: 58, alignment: .leading)
+                        .foregroundStyle(selected == conversation.peer ? Color.white : NativeWebStyle.muted)
                         .contentShape(Rectangle())
                         .accessibilityElement(children: .combine)
                         .accessibilityIdentifier("cloud-contact-" + conversation.peer)

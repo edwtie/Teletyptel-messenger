@@ -181,7 +181,7 @@ struct NativeMessengerView: View {
                         .listRowInsets(EdgeInsets(top: 0, leading: 12, bottom: 6, trailing: 12))
                         .listRowSeparator(.hidden).listRowBackground(Color.clear)
                     }
-                    NativeHistoricalContacts(cloud: model.cloudHistory, rosterJIDs: rosterJIDs, search: search)
+                    NativeHistoricalContacts(cloud: model.cloudHistory, rosterJIDs: rosterJIDs, search: search, selected: selected)
                     ForEach(model.groups.rooms.filter { search.isEmpty || $0.room.localizedCaseInsensitiveContains(search) }) { group in
                         NavigationLink(value: group.room) {
                             HStack(spacing: 8) {
