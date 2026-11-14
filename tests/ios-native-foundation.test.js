@@ -312,6 +312,26 @@ test("Native MUC uses existing rooms, membership acknowledgement and isolated gr
   assert.ok(projectText().project.includes('Core/NativeGroupModel.swift'));
 });
 
+test("Native mediated invitations remain explicit, contact-bound and session-private", () => {
+  const source = read("Sources/TeleTypTelCore/NativeGroupInvitations.swift");
+  const groups = read("Sources/TeleTypTelCore/NativeGroupModel.swift");
+  const transport = read("Sources/TeleTypTelCore/NativeXMPPConnection.swift");
+  for (const required of ['actions.count == 1', 'invitations.count < 16', 'early.count < 16',
+    'tasks.count < 8', 'requiresPassword', 'invitation.current', 'allowed(invitation.inviter)',
+    'self.generation == attempt', 'contacts.removeAll()', 'ontvangst en toegang niet bevestigd']) {
+    assert.ok(source.includes(required), required);
+  }
+  assert.doesNotMatch(source, /UserDefaults|FileManager|JSONEncoder|NSLog|print\(/);
+  assert.ok(source.includes('matches.count == 1'));
+  assert.ok(groups.includes('invitationModel.candidate('));
+  assert.ok(groups.includes('invitationModel.accepted(room: room)'));
+  assert.ok(transport.includes('earlyInvitations.count < 16'));
+  assert.ok(transport.includes('invitationObserver = nil'));
+  assert.ok(read("Sources/TeleTypTelCore/NativeChat.swift").includes('["invite", "decline"]'));
+  assert.ok(projectText().project.includes('Core/NativeGroupInvitations.swift'));
+  assert.ok(projectText().project.includes('App/NativeInvitationViews.swift'));
+});
+
 test("Native rotation tests check visible geometry before requesting a tap point", () => {
   const ui = read("UITests/NativeStartupUITests.swift");
   const helper = ui.slice(ui.indexOf("private func isUsable("), ui.indexOf("private func waitForStatus("));

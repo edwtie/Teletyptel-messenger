@@ -5,6 +5,40 @@ Requested scope: the complete iPhone and iPad application, including native UI,
 authentication, messaging and Total Conversation. This is a staged rewrite, not a
 claim that those features already work in this target.
 
+## Mediated group invitations increment (2026-11-14)
+
+The native preview now adds room-mediated XEP-0045 invitations, explicit accept,
+decline and local hide actions, and a joined-room contact picker for sending.
+Invites are a separate inbox, never ordinary direct-chat messages. Only the
+configured `conference.<account-domain>` service and known roster contacts are
+accepted. Direct XEP-0249 invites, occupant-alias inviters, custom/federated MUC
+services, password entry and APNs/offline invitation delivery are not implemented
+in this increment. Password markers are shown as unsupported without retaining
+the supplied password. Room addresses, sender/recipient, action namespace and
+ambiguous duplicate payloads are checked before presentation.
+
+Receiving an invite never joins a room or opens the keyboard. Accepting needs an
+explicit action, a valid nickname, a known inviter and an invitation received
+within ten minutes; room self-presence still controls whether joining succeeds.
+Inviting is restricted to a joined speaking room and an explicitly chosen roster
+contact. The UI warns that inviting may grant private-room membership; the server
+decides permission. A submitted WebSocket write does not prove receipt or access.
+Declining does not revoke membership that the server may already have granted.
+Where multiple invites could match a decline, the UI does not fabricate which
+particular send was declined.
+
+Inbox/early-event bounds are sixteen; outgoing attempts are limited to sixteen
+and concurrent actions to eight. Background/logout/account changes invalidate
+callbacks and pending actions; nothing is persisted to a local invitation file.
+Already-submitted network actions cannot be undone by cancellation. Existing
+room privacy/membership policies are not changed by this client. The isolated
+test harness adds a second temporary private room with a fictional owner, so the
+actual server can test invite delivery, declines and explicit joining without
+changing any existing local or production room.
+
+Validation for this increment is pending until the new unsigned workflows finish;
+the green runs in the older sections do not prove the invitation implementation.
+
 ## Existing MUC room participation increment (2026-11-14)
 
 The native main menu now opens a separate Groups screen. Enter an existing

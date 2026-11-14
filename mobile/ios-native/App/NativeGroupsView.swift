@@ -21,6 +21,9 @@ struct NativeGroupsView: View {
                         .disabled(!model.available).accessibilityIdentifier("group-join")
                 }
                 if let error = model.error { Text(error).foregroundStyle(.red).accessibilityIdentifier("group-error") }
+                NativeInvitationInbox(model: model.invitationModel, nickname: $nickname) { identifier in
+                    model.acceptInvitation(identifier, nickname: nickname)
+                }
                 Section("Groepschats") {
                     if model.rooms.isEmpty { Text("Nog geen groepen geopend in deze sessie.") }
                     ForEach(model.rooms) { group in
@@ -47,6 +50,7 @@ private struct NativeGroupChatView: View {
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     let room: String
     @State private var showParticipants = false
+    @State private var showInvite = false
     private var group: NativeGroupConversation? { model.rooms.first { $0.room == room } }
 
     var body: some View {
@@ -61,6 +65,8 @@ private struct NativeGroupChatView: View {
         .navigationTitle(room.components(separatedBy: "@")[0]).navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
+                Button { showInvite = true } label: { Image(systemName: "person.badge.plus").frame(width: 44, height: 44) }
+                    .disabled(group?.snapshot?.canSpeak != true).accessibilityLabel("Contact uitnodigen").accessibilityIdentifier("group-invite")
                 Button { showParticipants = true } label: { Image(systemName: "person.3").frame(width: 44, height: 44) }.accessibilityLabel("Deelnemers")
                 Button { model.leave(room: room) } label: { Image(systemName: "rectangle.portrait.and.arrow.right").frame(width: 44, height: 44) }
                     .tint(.red).accessibilityLabel("Groep verlaten").accessibilityIdentifier("group-leave")
@@ -73,6 +79,7 @@ private struct NativeGroupChatView: View {
                     .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Gereed") { showParticipants = false } } }
             }
         }
+        .sheet(isPresented: $showInvite) { NativeInviteContactView(groups: model, model: model.invitationModel, room: room) }
     }
 
     @ViewBuilder

@@ -102,3 +102,15 @@ test("MUC test verifies private membership and post-leave refusal on an isolated
   assert.match(harness, /runSwift\("NativeGroupIntegrationTests", "native-group-tests.txt"\)/);
   assert.match(harness, /members_only: true/);
 });
+
+test("Invitation fixture checks real room mediation, decline and explicit acceptance", () => {
+  const root = path.resolve(__dirname, "..");
+  const source = fs.readFileSync(path.join(root, "mobile/ios-native/Tests/NativeXMPPIntegrationTests/NativeInvitationIntegrationTests.swift"), "utf8");
+  for (const required of ['XCTSkip', '"github-hosted"', 'observeGroupInvitations', 'inviteToGroup',
+    'declineGroupInvitation', 'Must not autojoin', 'joinGroup', 'acceptedCount, 1', 'declinedCount, 0', 'directCount, 0'])
+    assert.ok(source.includes(required), required);
+  assert.doesNotMatch(source, /URLCredential|SecTrust|URLProtocol/);
+  const harness = fs.readFileSync(path.join(root, "scripts/check-ios-native-ejabberd.js"), "utf8");
+  assert.match(harness, /runSwift\("NativeInvitationIntegrationTests", "native-invitation-tests.txt"\)/);
+  assert.match(harness, /control\("set_room_affiliation", invitationRoom, "conference.localhost", username, "localhost", "owner"\)/);
+});

@@ -82,6 +82,7 @@ async function run() {
   const archivePeer = username + "-archive";
   const groupOutsider = username + "-outsider";
   const groupRoom = username + "-room";
+  const invitationRoom = groupRoom + "-invites";
   const password = randomBytes(32).toString("hex");
   const cookie = randomBytes(32).toString("hex");
   const secrets = [password, cookie, ...[username, archivePeer, groupOutsider].map(user => Buffer.from(`\0${user}\0${password}`).toString("base64"))];
@@ -202,11 +203,13 @@ async function run() {
     control("register", groupOutsider, "localhost", password);
     control("create_room", groupRoom, "conference.localhost", "localhost");
     for (const user of [username, archivePeer]) control("set_room_affiliation", groupRoom, "conference.localhost", user, "localhost", "member");
+    control("create_room", invitationRoom, "conference.localhost", "localhost");
+    control("set_room_affiliation", invitationRoom, "conference.localhost", username, "localhost", "owner");
     control("add_rosteritem", username, "localhost", "fixture-peer", "localhost", "Fictief testcontact", "Testcontacten", "both");
     loginFixture = await startLoginFixture({ key: fs.readFileSync(certificate("server.key")),
       cert: fs.readFileSync(certificate("server.crt")), ca: fs.readFileSync(certificate("ca.crt")),
       trustedPort, username, password });
-    write("fixture.json", JSON.stringify({ trustedPort, untrustedPort, accountPort: loginFixture.port, username, password, archivePeer, groupOutsider, groupRoom }));
+    write("fixture.json", JSON.stringify({ trustedPort, untrustedPort, accountPort: loginFixture.port, username, password, archivePeer, groupOutsider, groupRoom, invitationRoom }));
     fixtureReady = true;
     const swiftOutput = await runSwift("EjabberdIntegrationTests", "swift-progress.txt");
     save("swift-tests.txt", swiftOutput);
@@ -234,6 +237,11 @@ async function run() {
       throw new Error("Expected the real private-room MUC test without skips or failures");
     }
     report.nativeGroupTransportTested = true;
+    const invitationOutput = await runSwift("NativeInvitationIntegrationTests", "native-invitation-tests.txt");
+    if (!/Executed 1 test, with 0 failures/.test(invitationOutput) || /[1-9][0-9]* tests? skipped/i.test(invitationOutput)) {
+      throw new Error("Expected the real mediated invitation/decline test without skips or failures");
+    }
+    report.nativeInvitationTransportTested = true;
     save("account-contract-statistics.json", JSON.stringify(loginFixture.statistics, null, 2));
     const { scenarios, upgrades, unexpectedRequests, proxyErrors } = loginFixture.statistics;
     if (["success", "rejected", "twofactor", "mismatch", "redirect", "xmpp-rejected", "delayed"]

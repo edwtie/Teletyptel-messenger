@@ -182,6 +182,32 @@ final class NativeStartupUITests: XCTestCase {
         XCTAssertFalse(application.buttons["group-send"].isEnabled)
     }
 
+    func testInvitationDeclineExplicitAcceptAndKnownContactInvite() {
+        signInFixture("invitations")
+        let notice = application.buttons["invitation-notice"]
+        XCTAssertTrue(notice.waitForExistence(timeout: 10))
+        reveal(notice); notice.tap()
+        let decline = application.buttons["decline-invitation-ignore@conference.localhost-demo-contact@localhost"]
+        XCTAssertTrue(decline.waitForExistence(timeout: 5))
+        reveal(decline); decline.tap()
+        let gone = NSPredicate(format: "exists == false")
+        expectation(for: gone, evaluatedWith: decline); waitForExpectations(timeout: 5)
+        let nickname = application.textFields["group-nickname"]
+        reveal(nickname); nickname.tap(); nickname.typeText("Testnaam")
+        let accept = application.buttons["accept-invitation-fixture@conference.localhost-demo-contact@localhost"]
+        reveal(accept); XCTAssertTrue(accept.isEnabled); accept.tap()
+        let room = application.descendants(matching: .any)["group-room-fixture@conference.localhost"].firstMatch
+        XCTAssertTrue(room.waitForExistence(timeout: 5)); reveal(room); room.tap()
+        XCTAssertTrue(application.staticTexts["group-status"].waitForExistence(timeout: 5))
+        application.buttons["group-invite"].tap()
+        let contact = application.buttons["invite-contact-demo-contact@localhost"]
+        XCTAssertTrue(contact.waitForExistence(timeout: 5)); reveal(contact); contact.tap()
+        let submitted = application.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "invite-attempt-", "ontvangst en toegang niet bevestigd")).firstMatch
+        XCTAssertTrue(submitted.waitForExistence(timeout: 5))
+        snapshot("invitation-contact-submitted")
+        application.buttons["close-invite-contacts"].tap()
+    }
+
     func testConnectionLossIsVisibleWithoutAutomaticRelogin() {
         signInFixture("disconnect")
         waitForStatus("De XMPP-server reageert niet meer")

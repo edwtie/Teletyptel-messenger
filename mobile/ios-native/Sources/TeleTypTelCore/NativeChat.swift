@@ -74,6 +74,8 @@ enum NativeChatCodec {
         if root.attributes["type"] == "error", let identifier = identifier {
             return .rejected(peer: peer, identifier: identifier)
         }
+        if root.children.contains(where: { $0.name == "x" && $0.namespace == "http://jabber.org/protocol/muc#user" &&
+            $0.children.contains(where: { ["invite", "decline"].contains($0.name) && $0.namespace == "http://jabber.org/protocol/muc#user" }) }) { return nil }
         guard root.attributes["type"] == nil || root.attributes["type"] == "normal" || root.attributes["type"] == "chat" else { return nil }
         let bodies = root.children.filter { $0.name == "body" && $0.namespace == "jabber:client" }
         guard let body = bodies.first(where: { $0.attributes["xml:lang"] == nil }) ?? bodies.first,

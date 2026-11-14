@@ -306,6 +306,8 @@ public final class NativeLoginModel: ObservableObject {
                 guard let self = self, self.generation == attempt,
                       self.phase == .connecting || self.isConnected else { return }
                 self.roster = roster
+                if case .ready(let contacts) = roster { self.groups.updateContacts(contacts, owner: jid) }
+                else if roster == .unavailable { self.groups.updateContacts([], owner: jid) }
                 if case .ready = roster {
                     let pending = self.earlyMessages
                     self.earlyMessages.removeAll()

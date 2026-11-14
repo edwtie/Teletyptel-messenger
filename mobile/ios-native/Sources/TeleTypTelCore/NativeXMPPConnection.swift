@@ -89,12 +89,14 @@ private final class NativeGroupOperation {
     }
 }
 
-private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, NativeArchiveSending, NativeGroupSending, NativeJingleSending, @unchecked Sendable {
+private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, NativeArchiveSending, NativeGroupInviting, NativeJingleSending, @unchecked Sendable {
     private let configuration: ServerConfiguration
     private let ownerJID: String
     private var boundJID: String?
     private var archive: (query: NativeArchiveQuery, token: UUID, continuation: CheckedContinuation<NativeArchivePage, Error>, deadline: DispatchWorkItem)?
     private var groups: [String: NativeGroupOperation] = [:]
+    private var invitationObserver: (@Sendable (NativeGroupInvitationEvent) -> Void)?
+    private var earlyInvitations: [NativeGroupInvitationEvent] = []
     private let queue = DispatchQueue(label: "nl.teletyptel.native.session")
     private var onConnected: (@Sendable (String) -> Void)?
     private var session: URLSession?
@@ -274,6 +276,56 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
             cancellation.cancel()
             self.queue.async { self.endGroup(room: room, token: token, error: CancellationError(), sendLeave: true) }
         })
+    }
+
+    func observeGroupInvitations(_ observer: @escaping @Sendable (NativeGroupInvitationEvent) -> Void) async {
+        let cancellation = NativeArchiveCancellation()
+        await withTaskCancellationHandler(operation: {
+            await withCheckedContinuation { continuation in
+                queue.async {
+                    if !cancellation.isCancelled, !self.completed, self.stream.phase == .online {
+                        self.invitationObserver = observer
+                        let buffered = self.earlyInvitations; self.earlyInvitations.removeAll()
+                        for event in buffered { observer(event) }
+                    }
+                    continuation.resume()
+                }
+            }
+        }, onCancel: { cancellation.cancel() })
+    }
+
+    func inviteToGroup(room: String, peer: String, identifier: String) async throws {
+        try Task.checkCancellation()
+        let cancellation = NativeArchiveCancellation()
+        try await withTaskCancellationHandler(operation: {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                queue.async {
+                    guard !cancellation.isCancelled else { continuation.resume(throwing: CancellationError()); return }
+                    guard !self.completed, self.groups[room]?.stream.canSpeak == true else {
+                        continuation.resume(throwing: NativeGroupFailure.disconnected); return
+                    }
+                    do {
+                        self.enqueueMessage(try NativeInvitationCodec.invite(room: room, peer: peer, owner: self.ownerJID,
+                            identifier: identifier), continuation: continuation)
+                    } catch { continuation.resume(throwing: error) }
+                }
+            }
+        }, onCancel: { cancellation.cancel() })
+    }
+
+    func declineGroupInvitation(_ invitation: NativeGroupInvitation) async throws {
+        try Task.checkCancellation()
+        let frame = try NativeInvitationCodec.decline(invitation, owner: ownerJID)
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            queue.async { self.enqueueMessage(frame, continuation: continuation) }
+        }
+    }
+
+    private func receiveInvitation(_ frame: String) {
+        guard let boundJID = boundJID, let root = try? ProbeXML.parse(frame),
+              let event = NativeInvitationCodec.decode(root, owner: ownerJID, boundJID: boundJID) else { return }
+        if let observer = invitationObserver { observer(event) }
+        else if earlyInvitations.count < 16 { earlyInvitations.append(event) }
     }
 
     func sendGroup(room: String, body: String, identifier: String) async throws {
@@ -459,6 +511,8 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
         onJingle = nil
         onJingleSender = nil
         if let token = archive?.token { completeArchive(token, result: .failure(error)) }
+        invitationObserver = nil
+        earlyInvitations.removeAll()
         for (room, entry) in Array(groups) { endGroup(room: room, token: entry.token, error: NativeGroupFailure.disconnected, sendLeave: false) }
         boundJID = nil
         for identifier in Array(pendingJingle.keys) { completeJingle(identifier, error: error) }
@@ -500,7 +554,7 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
                 do {
                     guard case .string(let frame) = try result.get() else { throw ConnectionFailure.invalidResponse }
                     let output = try self.stream.receive(frame)
-                    if self.stream.phase == .online { self.receiveArchive(frame); self.receiveGroups(frame) }
+                    if self.stream.phase == .online { self.receiveArchive(frame); self.receiveGroups(frame); self.receiveInvitation(frame) }
                     self.send(output.frames) {
                         if let jid = output.connectedJID {
                             self.boundJID = jid

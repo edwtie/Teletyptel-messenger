@@ -15,6 +15,7 @@ public struct NativeGroupConversation: Identifiable, Equatable {
 
 @MainActor
 public final class NativeGroupModel: ObservableObject {
+    public let invitationModel = NativeGroupInvitationModel()
     @Published public private(set) var rooms: [NativeGroupConversation] = []
     @Published public private(set) var error: String?
     @Published public private(set) var available = false
@@ -34,10 +35,30 @@ public final class NativeGroupModel: ObservableObject {
         self.owner = owner
         self.sender = sender
         available = true
+        if let inviting = sender as? any NativeGroupInviting { invitationModel.attach(inviting, owner: owner) }
+    }
+
+    func updateContacts(_ contacts: [NativeContact], owner: String) {
+        if self.owner != owner { disconnect(clear: true); self.owner = owner }
+        invitationModel.updateContacts(contacts, owner: owner)
+    }
+
+    public func acceptInvitation(_ identifier: UUID, nickname: String) {
+        guard let invitation = invitationModel.candidate(identifier, nickname: nickname) else { return }
+        join(room: invitation.room, nickname: nickname)
+        if rooms.first(where: { $0.room == invitation.room })?.snapshot != nil { invitationModel.accepted(room: invitation.room) }
+    }
+
+    public func invite(room: String, peer: String) {
+        guard rooms.first(where: { $0.room == room })?.snapshot?.canSpeak == true else {
+            error = "Neem eerst deel aan de groep voordat je iemand uitnodigt."; return
+        }
+        invitationModel.send(room: room, peer: peer)
     }
 
     func disconnect(clear: Bool) {
         generation = UUID()
+        invitationModel.disconnect(clear: clear)
         for task in joins.values { task.cancel() }
         for task in sends.values { task.cancel() }
         joins.removeAll(); sends.removeAll(); tokens.removeAll()
@@ -132,6 +153,7 @@ public final class NativeGroupModel: ObservableObject {
             guard snapshot.room == room, NativeMUCStream.validNickname(snapshot.nickname), snapshot.participants.count <= 128 else { return }
             rooms[index].snapshot = snapshot; rooms[index].nickname = snapshot.nickname
             rooms[index].joining = false; rooms[index].error = nil
+            invitationModel.accepted(room: room)
         case .ended(let reason):
             tokens.removeValue(forKey: room)
             joins.removeValue(forKey: room)
@@ -140,6 +162,7 @@ public final class NativeGroupModel: ObservableObject {
                 rooms[index].messages[message].state = .uncertain
             }
         case .rejected(let identifier):
+            invitationModel.rejected(identifier, room: room)
             if let message = rooms[index].messages.firstIndex(where: { $0.own && $0.identifier == identifier }) {
                 rooms[index].messages[message].state = .rejected
             }

@@ -107,6 +107,7 @@ struct NativeMessengerView: View {
                     .font(.caption).foregroundStyle(.secondary)
                     .accessibilityLabel(connectionStatus)
                     .accessibilityIdentifier("startup-status")
+                NativeInvitationNotice(model: model.groups.invitationModel) { showGroups = true }
                 List(selection: $selected) {
                     switch model.roster {
                     case .idle, .loading:

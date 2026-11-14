@@ -80,7 +80,7 @@ struct NativeStartupView: View {
     init() {
         #if DEBUG
         if let scenario = ProcessInfo.processInfo.environment["TELETYPTEL_NATIVE_UI_FIXTURE"],
-           ["connected", "two-factor", "disconnect"].contains(scenario) {
+           ["connected", "two-factor", "disconnect", "invitations"].contains(scenario) {
             let fixture = NativeLoginUIFixture(scenario: scenario)
             _model = StateObject(wrappedValue: NativeStartupModel(checker: fixture))
             _loginModel = StateObject(wrappedValue: NativeLoginModel(checker: fixture, authenticator: fixture, connection: fixture))
@@ -563,7 +563,7 @@ private struct NativeLoginUIFixture: ServerChecking, NativeAccountChallenging, N
              onRoster: @escaping @Sendable (NativeRosterState) -> Void,
              onChat: @escaping @Sendable (NativeChatEvent) -> Void,
              onSender: @escaping @Sendable (any NativeChatSending) -> Void) async throws {
-        onSender(NativeChatUIFixture())
+        onSender(NativeChatUIFixture(includeInvitations: scenario == "invitations"))
         onChat(.message(peer: "demo-contact@localhost", identifier: "fixture-greeting", body: "Fictief ontvangen bericht"))
         try await run(account: account, onConnected: onConnected, onRoster: onRoster)
     }
@@ -604,7 +604,23 @@ private struct NativeLoginUIFixture: ServerChecking, NativeAccountChallenging, N
     }
 }
 
-private struct NativeChatUIFixture: NativeArchiveSending, NativeGroupSending {
+private struct NativeChatUIFixture: NativeArchiveSending, NativeGroupInviting {
+    let includeInvitations: Bool
+    func observeGroupInvitations(_ observer: @escaping @Sendable (NativeGroupInvitationEvent) -> Void) async {
+        guard includeInvitations else { return }
+        for room in ["fixture@conference.localhost", "ignore@conference.localhost"] {
+            observer(.invited(NativeGroupInvitation(id: UUID(), room: room, inviter: "demo-contact@localhost",
+                replyTo: "demo-contact@localhost/device", requiresPassword: false, receivedAt: Date())))
+        }
+    }
+    func inviteToGroup(room: String, peer: String, identifier: String) async throws {
+        guard room == "fixture@conference.localhost", peer == "demo-contact@localhost" else { throw NativeGroupFailure.denied }
+        try await Task.sleep(nanoseconds: 100_000_000)
+    }
+    func declineGroupInvitation(_ invitation: NativeGroupInvitation) async throws {
+        guard invitation.inviter == "demo-contact@localhost" else { throw NativeGroupFailure.denied }
+        try await Task.sleep(nanoseconds: 100_000_000)
+    }
     func joinGroup(room: String, nickname: String, onEvent: @escaping @Sendable (NativeGroupEvent) -> Void) async throws {
         guard room == "fixture@conference.localhost", nickname == "Testnaam" else { throw NativeGroupFailure.denied }
         try await Task.sleep(nanoseconds: 100_000_000)
