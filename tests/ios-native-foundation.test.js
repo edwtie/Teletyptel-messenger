@@ -451,6 +451,14 @@ test("Native feature expansion uses scoped server mutations and explicit attachm
     assert.ok(projectText().project.includes(name), name);
 });
 
+test("Native PHP transport integration refuses local or non-disposable databases", () => {
+  const { requireHostedLinux } = require("../scripts/check-native-feature-http");
+  const environment = { GITHUB_ACTIONS: "true", RUNNER_ENVIRONMENT: "github-hosted", TELETYPTEL_DB_HOST: "127.0.0.1", TELETYPTEL_DB_NAME: "native_feature_test" };
+  assert.doesNotThrow(() => requireHostedLinux("linux", environment));
+  for (const [platform, input] of [["win32", environment], ["linux", {}], ["linux", { ...environment, RUNNER_ENVIRONMENT: "self-hosted" }], ["linux", { ...environment, TELETYPTEL_DB_NAME: "teletyptel" }]])
+    assert.throws(() => requireHostedLinux(platform, input), /ephemeral/);
+});
+
 test("Native MUC management uses bounded correlated IQs and server-only authority", () => {
   const connection = read("Sources/TeleTypTelCore/NativeXMPPConnection.swift");
   const management = read("Sources/TeleTypTelCore/NativeGroupManagement.swift");
