@@ -34,6 +34,7 @@ test("Native interaction/history/dialer sources stay in the isolated target with
   assert.match(dialing, /NativeDialing\.normalized\(number\) == "600"/);
   assert.match(dialing, /parts\.count == 4, octets\.count == 4/);
   assert.match(dialing, /NativeAuthenticatedAccount\.validJID\(bare, domain: configuration\.domain\)/);
+  assert.match(read("App/NativeDialerView.swift"), /\.tint\(NativeWebStyle\.enabled\)/);
 });
 
 function diagnosticDirectory() {

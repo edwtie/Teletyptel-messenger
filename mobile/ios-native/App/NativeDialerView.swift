@@ -44,7 +44,7 @@ struct NativeDialerView: View {
                         calls.startCall(route.contact, profile: .total)
                         dismiss()
                     } label: { Image(systemName: "phone.fill").font(.title2).frame(maxWidth: .infinity, minHeight: 52) }
-                        .buttonStyle(.borderedProminent).tint(.green).accessibilityLabel("Lokale Asterisk-echo met TC bellen")
+                        .buttonStyle(.borderedProminent).tint(NativeWebStyle.enabled).accessibilityLabel("Lokale Asterisk-echo met TC bellen")
                         .accessibilityIdentifier("sip-lab-call").disabled(route == nil || !login.canSend || calls.hasLiveCall)
                 }.padding(20).frame(maxWidth: 420).frame(maxWidth: .infinity)
             }
