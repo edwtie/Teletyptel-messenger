@@ -114,7 +114,35 @@ iOS version, Wi-Fi/mobile connection, orientation and observed result:
   history and accessibility against the web client on iPhone and iPad. Existing
   simulator cases do not establish complete web parity or physical-device behavior.
 
-Validation at source revision `dc2d5fb`:
+Validation of the current native changes at source revision `ca45425`:
+- [Unsigned Apple SDK run 43650266496](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43650266496)
+  passed both simulator families. Each job passed 336 Swift tests with 20
+  explicitly opt-in integration cases skipped (356 total), unsigned Release
+  compilation and Release test-fixture exclusion. All six new push-lifecycle
+  cases and the explicit registry-versus-answer-recovery capability case passed.
+- Each iPhone 16 Pro and iPad Pro 11-inch M4 passed all 17 UI cases, without
+  skips or failures, plus its separate one-case online-history preflight.
+  The account-settings case confirms that the disabled preview exposes status
+  but no push opt-in action. Rotation/keypad and account screenshots were also
+  inspected; unsupported DTMF remains disabled rather than simulating input.
+- All four native media profiles passed on same-host peers: ICE/DTLS, audio
+  negotiation with capture disabled, synthetic VP8 decoding and bidirectional
+  T.140. This is not physical camera/audio, SIP receipt, APNs delivery or a
+  locked-screen answering test.
+- Locally, 137 Node cases passed with four platform skips; the Linux lifecycle
+  compatibility harness passed six cases. The sixteen local gateway checks,
+  including real ICE/DTLS event remapping with a fixture SIP answer, passed.
+  The disposable real browser/ejabberd/Asterisk all-twelve-key fixture passed
+  twice and cleaned up its resources. Existing PHP registry/control/media
+  checks passed 180 assertions plus ten endpoint guards without sending APNs.
+- Superseded run `43649883689` at `1b27fb8` was deliberately cancelled after
+  publishing the renewal follow-up; it is not a completed UI validation.
+
+No signed build, TestFlight upload, APNs activation or live server configuration
+change is included in this validation. The remaining call/parity gates below
+are still open; a green unsigned run does not close them.
+
+Earlier validation at source revision `dc2d5fb`:
 - [Unsigned Apple SDK run 43625619117](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43625619117)
   passed both families: 329 Swift tests passed, with 20 opt-in integration tests
   explicitly skipped. Each iPhone 16 Pro / iPad Pro 11-inch M4 simulator on iOS
