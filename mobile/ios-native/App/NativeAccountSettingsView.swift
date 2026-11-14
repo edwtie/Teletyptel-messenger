@@ -14,6 +14,8 @@ struct NativeAccountSettingsView: View {
                 if let profile = draft {
                     Section("Account") {
                         LabeledContent("XMPP", value: profile.jid)
+                            .accessibilityElement(children: .combine)
+                            .accessibilityIdentifier("profile-jid")
                         TextField("Naam", text: binding(\.displayName)).accessibilityIdentifier("profile-name")
                         TextField("Telefoonnummer", text: binding(\.phoneNumber)).keyboardType(.phonePad)
                         Picker("Profieltaal", selection: binding(\.preferredLanguage)) {

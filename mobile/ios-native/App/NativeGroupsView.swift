@@ -75,7 +75,7 @@ private struct NativeGroupChatView: View {
         VStack(spacing: 0) {
             if let group = group {
                 status(group)
-                if searching { TextField("Zoek in deze groepssessie", text: $search).focused($searchFocused).frame(minHeight: 44).padding(.horizontal, 8).accessibilityIdentifier("group-search") }
+                if searching { TextField("Zoek in deze groepssessie", text: $search).focused($searchFocused).textFieldStyle(.roundedBorder).frame(minHeight: 44).padding(.horizontal, 16).accessibilityIdentifier("group-search") }
                 messageList(group)
                 if let error = model.error { Text(error).font(.caption).foregroundStyle(.red).padding(4) }
                 composer(group)

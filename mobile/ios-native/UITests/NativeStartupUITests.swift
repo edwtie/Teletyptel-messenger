@@ -221,8 +221,9 @@ final class NativeStartupUITests: XCTestCase {
         reveal(status)
         expectation(for: NSPredicate(format: "label CONTAINS %@", "Accountinstellingen opgeslagen"), evaluatedWith: status)
         waitForExpectations(timeout: 10)
-        let identity = application.staticTexts["fixture@localhost"]
+        let identity = application.descendants(matching: .any)["profile-jid"].firstMatch
         reveal(identity, upward: false); XCTAssertTrue(identity.exists)
+        XCTAssertTrue(identity.label.contains("fixture@localhost"))
         snapshot("account-settings-saved")
     }
 
