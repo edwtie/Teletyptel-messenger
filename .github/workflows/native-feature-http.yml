@@ -1,5 +1,11 @@
 name: Native profile and upload HTTP integration (isolated)
 on:
+  push:
+    branches: [codex/teletyptel-beta-polish]
+    paths:
+      - .github/workflows/native-feature-http.yml
+      - scripts/check-native-feature-http.js
+      - php/tests/native-feature-*.php
   workflow_dispatch:
 permissions:
   contents: read
