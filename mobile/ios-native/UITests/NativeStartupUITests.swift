@@ -355,6 +355,10 @@ final class NativeStartupUITests: XCTestCase {
         reveal(identity, upward: false); XCTAssertTrue(identity.exists)
         XCTAssertTrue(identity.label.contains("fixture@localhost"))
         snapshot("account-settings-saved")
+        let push = application.staticTexts["push-registration-status"]
+        reveal(push)
+        XCTAssertTrue(push.label.contains("nog niet geactiveerd"))
+        XCTAssertFalse(application.buttons["Oproepmeldingen inschakelen"].exists)
     }
 
     func testAttachmentUploadOnlyStagesLinkUntilExplicitSend() {

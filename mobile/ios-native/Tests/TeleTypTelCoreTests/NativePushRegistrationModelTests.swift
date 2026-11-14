@@ -121,6 +121,25 @@ final class NativePushRegistrationModelTests: XCTestCase {
         XCTAssertNil(store.value); XCTAssertTrue(other.available); XCTAssertFalse(other.consented)
     }
 
+    func testLeaseRefreshReusesOnlyTheInMemoryTokenWhileForegrounded() async {
+        let store = PushStoreFixture(), driver = PushDriverFixture(), client = PushRegistryFixture()
+        var time = Date().timeIntervalSince1970
+        let model = NativePushRegistrationModel(enabled: true, store: store, driver: driver, now: { time })
+        await model.connect(client, scope: scope); await model.enable(consented: true)
+        driver.changed?(Data(repeating: 42, count: 32))
+        await settle { !model.busy && client.requests.filter { $0 == "register" }.count == 1 }
+        model.flushToken()
+        XCTAssertEqual(client.requests.filter { $0 == "register" }.count, 1)
+        model.setForeground(false); time += 86400
+        model.flushToken()
+        XCTAssertEqual(client.requests.filter { $0 == "register" }.count, 1)
+        model.setForeground(true)
+        await settle { !model.busy && client.requests.filter { $0 == "register" }.count == 2 }
+        model.logout()
+        model.setForeground(true); model.flushToken()
+        XCTAssertEqual(client.requests.filter { $0 == "register" }.count, 2)
+    }
+
     func testStorageFailureNeverEnablesPushAndTokenRenewalWaitsForCallAndForeground() async {
         let store = PushStoreFixture(), driver = PushDriverFixture(), client = PushRegistryFixture()
         let model = NativePushRegistrationModel(enabled: true, store: store, driver: driver)

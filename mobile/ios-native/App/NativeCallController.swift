@@ -74,7 +74,10 @@ final class NativeCallController: ObservableObject, NativePushRegistering {
 
     func stopPushRegistration() { runtime?.platform.stopPushRegistration() }
     func confirmPushRevocation() {
-        if let account = account { runtime?.platform.confirmRevocation(account: account) }
+        if let account = account {
+            runtime?.platform.confirmRevocation(account: account)
+            if login?.isConnected == true { _ = runtime?.platform.connectForeground(account: account) }
+        }
     }
 
     func synchronizePush() async {

@@ -48,11 +48,17 @@ final class NativePushRegistrationModel: ObservableObject {
     private var epoch = UUID()
     private var exchange: Task<Void, Never>?
     private var token: Data?
+    private var lastToken: Data?
+    private var renewal: Task<Void, Never>?
     private var foreground = true
+    private let now: () -> TimeInterval
 
-    init(enabled: Bool, store: any NativePushStoring, driver: any NativePushRegistering) {
+    init(enabled: Bool, store: any NativePushStoring, driver: any NativePushRegistering,
+         now: @escaping () -> TimeInterval = { Date().timeIntervalSince1970 }) {
         self.enabled = enabled; self.store = store; self.driver = driver
+        self.now = now
     }
+    deinit { renewal?.cancel() }
 
     func connect(_ client: (any NativePushRegistryServing)?, scope: NativePushScope?) async {
         guard enabled, let client = client, let scope = scope else { return }
@@ -62,7 +68,7 @@ final class NativePushRegistrationModel: ObservableObject {
         var attempt = epoch
         self.scope = scope; self.client = client
         busy = true
-        defer { if epoch == attempt { busy = false } }
+        defer { if epoch == attempt { busy = false; flushToken() } }
         do {
             record = try store.load()
             if let record = record, record.scope != scope {
@@ -77,7 +83,7 @@ final class NativePushRegistrationModel: ObservableObject {
             let ready = try await client.backgroundAnswerReady()
             guard epoch == attempt else { return }
             available = ready
-            guard ready else { notice = "De server heeft nog geen veilige achtergrond-opname en oproepherstel beschikbaar."; return }
+            guard ready else { notice = "De server ondersteunt veilig oproepherstel op de achtergrond nog niet."; return }
             notice = "Oproepmeldingen staan uit. Inschakelen vraagt eerst jouw toestemming."
             if record?.consented == true { await enable(consented: true) }
         } catch {
@@ -100,11 +106,12 @@ final class NativePushRegistrationModel: ObservableObject {
             guard driver?.startPushRegistration(tokenChanged: { [weak self] data in
                 guard let self = self else { return }
                 guard let data = data else { self.logout(); return }
-                self.token = data; self.flushToken()
+                self.lastToken = data; self.token = data; self.flushToken()
             }) == true else {
                 await disable()
                 return
             }
+            startRenewal()
         } catch {
             driver?.stopPushRegistration()
             self.consented = false
@@ -115,11 +122,25 @@ final class NativePushRegistrationModel: ObservableObject {
 
     func setForeground(_ active: Bool) {
         foreground = active
-        if active { flushToken() }
+        renewal?.cancel(); renewal = nil
+        if active { flushToken(); startRenewal() }
+    }
+
+    private func startRenewal() {
+        renewal?.cancel(); renewal = nil
+        guard enabled, foreground, consented else { return }
+        renewal = Task { [weak self] in
+            while !Task.isCancelled {
+                do { try await Task.sleep(nanoseconds: 600_000_000_000) } catch { return }
+                guard let self = self, self.foreground, self.consented else { return }
+                self.flushToken()
+            }
+        }
     }
 
     func flushToken() {
-        guard enabled, foreground, consented, driver?.pushCallActive == false,
+        if token == nil, let expiry = record?.expiresAt, expiry <= now() + 3600 { token = lastToken }
+        guard enabled, foreground, consented, !busy, driver?.pushCallActive == false,
               let token = token, let value = record, let client = client, value.scope == scope else { return }
         self.token = nil
         let attempt = epoch
@@ -128,7 +149,7 @@ final class NativePushRegistrationModel: ObservableObject {
         exchange = Task { [weak self] in
             await previous?.value
             guard let self = self, self.epoch == attempt, self.consented else { return }
-            defer { if self.epoch == attempt { self.busy = false } }
+            defer { if self.epoch == attempt { self.busy = false; if self.token != nil { self.flushToken() } } }
             do {
                 let registered = try await client.register(deviceID: value.deviceID, token: token, consented: true)
                 guard self.epoch == attempt, self.consented else { return }
@@ -176,7 +197,8 @@ final class NativePushRegistrationModel: ObservableObject {
     }
 
     private func markRevocation() {
-        epoch = UUID(); token = nil; consented = false; busy = false
+        epoch = UUID(); token = nil; lastToken = nil; consented = false; busy = false
+        renewal?.cancel(); renewal = nil
         driver?.stopPushRegistration()
         guard var value = record else { return }
         value.consented = false; value.pendingRevocation = true; value.controlCredential = nil

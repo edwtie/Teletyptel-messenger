@@ -71,6 +71,11 @@ device-only Keychain record; no APNs token, chat password or Face ID credential
 is copied there. A separate non-secret boolean disables automatic restoration
 before Keychain mutations, including failed opt-out writes. Turning off push
 registration does not reset the active foreground conversation.
+Lease renewal uses only the in-memory device token, within an hour of expiry,
+while foregrounded and outside a call. A foreground timer checks every ten
+minutes and is cancelled on background entry or logout; it is not a background
+keepalive. Pending revocation is retried before ordinary foreground calling is
+reconnected for the same account.
 
 This still is **not an activated background-call integration**. The shipping
 preview flag remains off. Even an enabled build requires an authenticated
@@ -86,7 +91,7 @@ single-phone-property picker. It returns only the chosen number, does not read
 or upload the address book, and never starts a call automatically. The local
 echo-only routing restriction is unchanged. Real contact-picker permission and
 cancellation behavior remain part of device acceptance, not a simulator fixture
-claim. The new lifecycle cases passed an isolated Linux compatibility harness;
+claim. Six new lifecycle cases passed an isolated Linux compatibility harness;
 the updated unsigned Apple SDK matrix is recorded after completion below.
 
 For device acceptance, use two authorized test accounts and record app build,
