@@ -138,6 +138,11 @@ final class NativeArchiveIntegrationTests: XCTestCase {
             try await Task.sleep(nanoseconds: 100_000_000)
         }
         let page = try XCTUnwrap(archived)
+        print("NATIVE_ACTION_ARCHIVE", page.messages.map { message in
+            ["kind": message.change == nil ? (message.retracted ? "tombstone" : "text") : "change",
+             "id": message.identifier == original ? "original" : message.identifier == edit ? "edit" : message.identifier == retract ? "retract" : "earlier",
+             "outgoing": String(message.outgoing)]
+        })
         var restored = NativeChatStore()
         try restored.mergeArchive(page)
         let restoredMessage = restored.messages.first { $0.previousIDs.contains(original) }
