@@ -79,10 +79,42 @@ iOS version, Wi-Fi/mobile connection, orientation and observed result:
   history and accessibility against the web client on iPhone and iPad. Existing
   simulator cases do not establish complete web parity or physical-device behavior.
 
-Validation of this step is pending the new unsigned Apple SDK CI run. A Linux
-compatibility attempt compiled the new core sources but could not validate the
-existing Darwin SDP fixtures (CRLF splitting differs); it is not a native pass.
-The production signed workflow, server configuration and APNs keys are unchanged.
+Validation at source revision `dc2d5fb`:
+- [Unsigned Apple SDK run 43625619117](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43625619117)
+  passed both families: 329 Swift tests passed, with 20 opt-in integration tests
+  explicitly skipped. Each iPhone 16 Pro / iPad Pro 11-inch M4 simulator on iOS
+  18.5 passed all 17 UI cases, plus the separate online-history preflight. No UI
+  cases were skipped. The extra keypad case checks portrait/landscape/portrait,
+  reachable `* 0 #`, disabled unsupported input, no keyboard and explicit close.
+- Unsigned Release compilation and test-fixture exclusion passed. All four
+  same-host native media profiles passed, including actual WebRTC DTMF enqueue
+  acceptance and clearing on both peers. Audio capture remains disabled in this
+  fixture; this is not audible audio, received SIP events or real camera evidence.
+- [Disposable ejabberd run 43624344494](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43624344494)
+  at `d262d02` passed all 20 isolated transport/account-contract/Jingle/archive/
+  group/invitation cases. That Jingle transport/media source is unchanged by the
+  later app UI and registry-bound refinements. This does not test real PHP login,
+  a configured APNs worker or an Asterisk/provider leg.
+- Locally, 135 Node tests passed and four platform-dependent cases were skipped.
+  Existing isolated PHP registry/control/reconciliation/media suites passed
+  180 checks, plus ten disabled/insecure/method/token endpoint guards. No Apple
+  notification, live database or user account was used. The six native registry
+  tests use URLProtocol fixtures, not a live PHP/APNs service.
+
+The earlier `d262d02` run 43624331730 passed iPad but its full iPhone UI suite
+timed out waiting for animation-idle notifications during the existing chat
+draft scenario. It did not finish the iPhone suite; its passing preflight is not
+a substitute. The later green run does not establish the cause or a permanent
+fix for that intermittent stall. The full 20-minute UI deadline and assertions
+were not weakened, filtered or retried. Intermediate runs 43624827175 and
+43625355121 were cancelled after newer source revisions superseded them; they
+are not counted as successful full runs. Selected evidence is retained locally
+under `artifacts/native-selected-evidence-43625619117-iPhone/` and `-iPad/`.
+
+A Linux compatibility attempt compiled the new core sources but could not
+validate the existing Darwin SDP fixtures (CRLF splitting differs); it is not a
+native pass. The production signed workflow, server configuration and APNs keys
+are unchanged. There is no TestFlight upload or physical-device result here.
 
 ### Current parity and release gates
 
