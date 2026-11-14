@@ -29,6 +29,7 @@ try {
         return;
     }
     $_POST['uploadId'] = hash_hmac('sha256', $accountId . ':' . $uploadId, (string)$_SESSION['teletyptel_native_csrf']);
+    define('TELETYPTEL_NATIVE_UPLOAD', true);
     session_write_close();
     require __DIR__ . '/upload.php';
 } catch (AccountAccessDenied $error) {

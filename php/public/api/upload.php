@@ -191,13 +191,16 @@ function handleChunkUpload(array $file): void
         return;
     }
 
-    $fileRecord = persistUploadedFile(
+    try {
+        $fileRecord = persistUploadedFile(
         $assembledPath,
         sanitizeFileName((string)$_POST['originalName']),
         (string)($_POST['mimeType'] ?? $file['type'] ?? ''),
         $actualSize
-    );
-    cleanupChunkDir($chunkDir);
+        );
+    } finally {
+        cleanupChunkDir($chunkDir);
+    }
     echo json_encode(['ok' => true, 'done' => true, 'file' => $fileRecord], JSON_UNESCAPED_SLASHES);
 }
 
@@ -216,6 +219,10 @@ function persistUploadedFile(string $path, string $originalName, string $fallbac
     $fileId = bin2hex(random_bytes(16));
     $storedName = $fileId . ($extension !== '' ? '.' . $extension : '');
     $mime = detectMime($path, $fallbackMime);
+    if (defined('TELETYPTEL_NATIVE_UPLOAD') && TELETYPTEL_NATIVE_UPLOAD === true) {
+        require_once dirname(__DIR__, 2) . '/lib/NativeUploadPolicy.php';
+        NativeUploadPolicy::validate($path, $originalName, $mime);
+    }
     $content = file_get_contents($path);
     if ($content === false) {
         throw new RuntimeException('Cannot read uploaded file.');

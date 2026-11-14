@@ -242,6 +242,34 @@ final class NativeStartupUITests: XCTestCase {
         XCTAssertTrue(submitted.waitForExistence(timeout: 10))
     }
 
+    func testGroupDiscoveryManagementAndSessionSearch() {
+        signInFixture("connected")
+        XCTAssertTrue(application.buttons["disconnect-session"].waitForExistence(timeout: 10))
+        application.buttons["Hoofdmenu"].tap(); application.buttons["open-groups"].tap()
+        let discovery = application.buttons["Beschikbare groepen ophalen"]
+        XCTAssertTrue(discovery.waitForExistence(timeout: 5)); reveal(discovery); discovery.tap()
+        let discovered = application.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Fictieve testgroep")).firstMatch
+        XCTAssertTrue(discovered.waitForExistence(timeout: 5)); reveal(discovered); discovered.tap()
+        let nickname = application.textFields["group-nickname"]; reveal(nickname); nickname.tap(); nickname.typeText("Testnaam")
+        let join = application.buttons["group-join"]; reveal(join); join.tap()
+        let room = application.descendants(matching: .any)["group-room-fixture@conference.localhost"].firstMatch
+        XCTAssertTrue(room.waitForExistence(timeout: 5)); reveal(room); room.tap()
+        application.buttons["Deelnemers en groepsmenu"].tap(); application.buttons["Deelnemers en groepsbeheer"].tap()
+        let settings = application.buttons["Instellingen ophalen"]
+        XCTAssertTrue(settings.waitForExistence(timeout: 5)); reveal(settings); settings.tap()
+        let name = application.textFields["Groepsnaam"]
+        XCTAssertTrue(name.waitForExistence(timeout: 5)); reveal(name); name.tap(); name.typeText(" gewijzigd")
+        let save = application.buttons["Groepsinstellingen opslaan"]; reveal(save); save.tap()
+        application.buttons["Wijziging uitvoeren"].tap()
+        let status = application.staticTexts["group-management-status"]
+        expectation(for: NSPredicate(format: "label CONTAINS %@", "Wijziging bevestigd"), evaluatedWith: status); waitForExpectations(timeout: 5)
+        snapshot("group-settings-confirmed")
+        application.buttons["close-group-management"].tap()
+        application.buttons["Deelnemers en groepsmenu"].tap(); application.buttons["Berichten zoeken"].tap()
+        let search = application.textFields["group-search"]; XCTAssertTrue(search.waitForExistence(timeout: 5)); search.tap(); search.typeText("onvindbaar")
+        XCTAssertFalse(application.staticTexts["Fictief groepsbericht"].exists)
+    }
+
     func testConnectionLossIsVisibleWithoutAutomaticRelogin() {
         signInFixture("disconnect")
         waitForStatus("De XMPP-server reageert niet meer")

@@ -67,18 +67,20 @@ private struct NativeAttachmentPicker: View {
                 let access = url.startAccessingSecurityScopedResource(); defer { if access { url.stopAccessingSecurityScopedResource() } }
                 let values = try url.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey])
                 guard values.isRegularFile == true, let size = values.fileSize, size > 0, size <= NativeUploadSelection.maximumBytes else { throw NativeAccountFailure.rejected }
-                selection = try NativeUploadSelection(name: url.lastPathComponent, data: Data(contentsOf: url)); link = nil; error = nil
+                task?.cancel()
+                let bytes = try Data(contentsOf: url)
+                if ["jpg", "jpeg", "png", "heic"].contains(url.pathExtension.lowercased()) {
+                    selection = try NativeUploadSelection(name: "foto.jpg", data: NativePhotoPreparation.jpeg(bytes))
+                } else { selection = try NativeUploadSelection(name: url.lastPathComponent, data: bytes) }
+                link = nil; error = nil
             } catch { self.error = "Bestand niet geselecteerd. Controleer type en grootte." }
         }
         .onChange(of: photo) { item in
             task?.cancel()
             task = Task {
                 do {
-                    guard let bytes = try await item?.loadTransferable(type: Data.self), bytes.count <= NativeUploadSelection.maximumBytes,
-                          let source = CGImageSourceCreateWithData(bytes as CFData, nil),
-                          let image = CGImageSourceCreateThumbnailAtIndex(source, 0, [kCGImageSourceCreateThumbnailFromImageAlways: true, kCGImageSourceCreateThumbnailWithTransform: true, kCGImageSourceThumbnailMaxPixelSize: 2048] as CFDictionary),
-                          let jpeg = UIImage(cgImage: image).jpegData(compressionQuality: 0.85), !Task.isCancelled else { throw NativeAccountFailure.rejected }
-                    selection = try NativeUploadSelection(name: "foto.jpg", data: jpeg); link = nil; error = nil
+                    guard let bytes = try await item?.loadTransferable(type: Data.self), !Task.isCancelled else { throw NativeAccountFailure.rejected }
+                    selection = try NativeUploadSelection(name: "foto.jpg", data: NativePhotoPreparation.jpeg(bytes)); link = nil; error = nil
                 } catch { if !Task.isCancelled { self.error = "Foto niet geladen. Kies een kleinere foto." } }
             }
         }
@@ -93,6 +95,19 @@ private struct NativeAttachmentPicker: View {
             guard !Task.isCancelled, login.canSend, login.activeAccountID == account else { return }
             link = value
         }
+    }
+}
+
+enum NativePhotoPreparation {
+    static func jpeg(_ bytes: Data) throws -> Data {
+        guard bytes.count <= NativeUploadSelection.maximumBytes,
+              let source = CGImageSourceCreateWithData(bytes as CFData, [kCGImageSourceShouldCache: false] as CFDictionary),
+              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+              let width = properties[kCGImagePropertyPixelWidth] as? NSNumber, let height = properties[kCGImagePropertyPixelHeight] as? NSNumber,
+              width.doubleValue > 0, height.doubleValue > 0, width.doubleValue * height.doubleValue <= 64000000,
+              let image = CGImageSourceCreateThumbnailAtIndex(source, 0, [kCGImageSourceCreateThumbnailFromImageAlways: true, kCGImageSourceCreateThumbnailWithTransform: true, kCGImageSourceThumbnailMaxPixelSize: 2048] as CFDictionary),
+              let result = UIImage(cgImage: image).jpegData(compressionQuality: 0.85) else { throw NativeAccountFailure.rejected }
+        return result
     }
 }
 

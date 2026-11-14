@@ -65,7 +65,7 @@ struct NativeGroupManagementView: View {
                 Text("De server controleert alle rechten. Verwijderen uit het gesprek is niet hetzelfde als een lidmaatschap intrekken of blokkeren. Eigenarenoverdracht en de groep vernietigen zijn hier bewust niet beschikbaar.").font(.caption)
             }
             .navigationTitle("Groepsbeheer")
-            .toolbar { ToolbarItem(placement: .cancellationAction) { Button { dismiss() } label: { Image(systemName: "xmark").frame(width: 44, height: 44) }.accessibilityLabel("Sluiten") } }
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button { dismiss() } label: { Image(systemName: "xmark").frame(width: 44, height: 44) }.accessibilityLabel("Sluiten").accessibilityIdentifier("close-group-management") } }
         }
         .confirmationDialog("Groepsrechten of toegang wijzigen?", isPresented: $confirm, titleVisibility: .visible) {
             Button("Wijziging uitvoeren", role: .destructive) { if let command = pending { model.run(command) }; pending = nil }
