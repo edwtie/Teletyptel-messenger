@@ -66,7 +66,7 @@ test("Network tests are opt-in, use actual transports and leave application trus
 test("Jingle harness exercises real resource-bound IQ exchange without media or push activation", () => {
   const root = path.resolve(__dirname, "..");
   const source = fs.readFileSync(path.join(root, "mobile/ios-native/Tests/NativeXMPPIntegrationTests/NativeJingleIntegrationTests.swift"), "utf8");
-  assert.equal((source.match(/func test/g) || []).length, 1);
+  assert.equal((source.match(/func test/g) || []).length, 2);
   for (const required of ["XCTSkip", "TELETYPTEL_EJABBERD_FIXTURE", '"github-hosted"',
     "https://localhost:", "NativeXMPPConnection().run", "exchangeJingle", "replyJingle", "unbindCall",
     "CancellationError", ".timedOut", ".staleBinding", ".disconnected"])
@@ -86,7 +86,8 @@ test("MAM test restores isolated direct history with real two-account transports
   assert.equal((source.match(/func test/g) || []).length, 1);
   for (const required of ["XCTSkip", "TELETYPTEL_EJABBERD_FIXTURE", '"github-hosted"',
     "NativeXMPPConnection().run", "fetchArchive", "before: archived.messages[1].archiveID", "restoredConnection",
-    "mergeArchive", ".submitted", ".disconnected"])
+    "mergeArchive", ".submitted", ".disconnected", "testRealServerRoutesAndArchivesAuthorScopedCorrectionAndRetraction",
+    "changeMessage", "live.messages.first?.retracted", "restoredMessage?.retracted"])
     assert.ok(source.includes(required), required);
   assert.doesNotMatch(source, /URLCredential|SecTrust|URLProtocol|PKPushRegistry|RTCPeerConnection/);
   const harness = fs.readFileSync(path.join(root, "scripts/check-ios-native-ejabberd.js"), "utf8");
