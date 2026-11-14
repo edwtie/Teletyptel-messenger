@@ -112,4 +112,26 @@ final class NativeChatInteractionsTests: XCTestCase {
         _ = try store.beginChange(message.id, correctedBody: "Bewerkt")
         XCTAssertThrowsError(try store.beginReaction(message.id))
     }
+
+    func testOlderMAMPageCannotResurrectReplacedOrRemovedReaction() throws {
+        var store = NativeChatStore(); let message = try sent(&store)
+        let older = NativeArchivedText(archiveID: "old-reaction", identifier: "old-event", peer: peer, body: "", date: Date(timeIntervalSinceNow: -60), outgoing: false, interaction: .reactions(target: message.stanzaID!, values: ["👍"]))
+        store.receive(.interaction(peer: peer, identifier: "new", value: .reactions(target: message.stanzaID!, values: ["😂"])))
+        let page = NativeArchivePage(owner: "owner@localhost", peer: peer, messages: [older], first: older.archiveID, hasEarlier: false)
+        try store.mergeArchive(page)
+        XCTAssertEqual(store.messages[0].reactions[peer], ["😂"])
+        store.receive(.interaction(peer: peer, identifier: "removed", value: .reactions(target: message.stanzaID!, values: [])))
+        try store.mergeArchive(page)
+        XCTAssertTrue(store.messages[0].reactions.isEmpty)
+    }
+
+    func testSameTimestampArchiveReactionsRetainServerResultOrder() throws {
+        var store = NativeChatStore(); let message = try sent(&store); let date = Date(timeIntervalSince1970: 1000)
+        let changes: [NativeArchivedText] = [["👍"], ["😂"], []].enumerated().map { index, values in
+            NativeArchivedText(archiveID: "archived-\(index)", identifier: "event-\(index)", peer: peer, body: "", date: date, outgoing: false, interaction: .reactions(target: message.stanzaID!, values: values))
+        }
+        let page = NativeArchivePage(owner: "owner@localhost", peer: peer, messages: changes, first: changes[0].archiveID, hasEarlier: false)
+        try store.mergeArchive(page); try store.mergeArchive(page)
+        XCTAssertTrue(store.messages[0].reactions.isEmpty)
+    }
 }

@@ -39,6 +39,7 @@ public struct NativeChatMessage: Identifiable, Codable, Equatable, Sendable {
     public var actionNotice: String? = nil
     public var delivery = NativeDeliveryStatus.unconfirmed
     public var reactions: [String: [String]] = [:]
+    public var reactionUpdatedAt: [String: Date] = [:]
     public var reactionRequest: String? = nil
     public var reactionPending = false
     public var receiptRequested = false
@@ -241,7 +242,7 @@ public struct NativeChatStore: Codable, Equatable {
 
     mutating func mergeArchive(_ page: NativeArchivePage) throws {
         guard page.messages.count <= NativeArchiveQuery.maximum, page.messages.allSatisfy({
-            $0.peer == page.peer && ($0.change != nil || $0.interaction != nil || $0.retracted || NativeChatCodec.validBody($0.body)) && NativeArchiveQuery.validID($0.archiveID)
+            $0.peer == page.peer && $0.date.timeIntervalSince1970.isFinite && ($0.change != nil || $0.interaction != nil || $0.retracted || NativeChatCodec.validBody($0.body)) && NativeArchiveQuery.validID($0.archiveID)
         }) else { throw NativeArchiveFailure.invalidResponse }
         var changes = archivedChanges
         for archived in page.messages where archived.change != nil || archived.interaction != nil {
@@ -285,7 +286,7 @@ public struct NativeChatStore: Codable, Equatable {
         messages = merged
         archivedChanges = changes.sorted { $0.date < $1.date }
         for archived in archivedChanges {
-            if let interaction = archived.interaction { applyInteraction(interaction, peer: archived.peer, actor: archived.outgoing ? page.owner : archived.peer); continue }
+            if let interaction = archived.interaction { applyInteraction(interaction, peer: archived.peer, actor: archived.outgoing ? page.owner : archived.peer, archivedAt: archived.date); continue }
             guard let change = archived.change, let identifier = archived.identifier else { continue }
             let matches = messages.indices.filter { messages[$0].peer == archived.peer &&
                 (messages[$0].state != .incoming) == archived.outgoing &&
@@ -388,14 +389,16 @@ public struct NativeChatStore: Codable, Equatable {
         return true
     }
 
-    mutating func applyInteraction(_ value: NativeChatInteraction, peer: String, actor: String) {
+    mutating func applyInteraction(_ value: NativeChatInteraction, peer: String, actor: String, archivedAt: Date? = nil) {
         let matches = messages.indices.filter { messages[$0].peer == peer &&
             (messages[$0].stanzaID == value.target || messages[$0].previousIDs.contains(value.target)) }
         guard matches.count == 1, let index = matches.first, !messages[index].hidden, !messages[index].retracted else { return }
         switch value {
         case .reactions(_, let values):
             guard values.count <= 16, values.allSatisfy(NativeInteractionCodec.validReaction),
-                  messages[index].reactions[actor] != nil || messages[index].reactions.count < 64 else { return }
+                  messages[index].reactionUpdatedAt[actor] != nil || messages[index].reactionUpdatedAt.count < 64 else { return }
+            if let archivedAt = archivedAt, let latest = messages[index].reactionUpdatedAt[actor], archivedAt < latest { return }
+            messages[index].reactionUpdatedAt[actor] = archivedAt ?? Date()
             messages[index].reactions[actor] = values.isEmpty ? nil : Array(Set(values)).sorted()
         case .receipt(_, let displayed):
             guard messages[index].state != .incoming, actor == peer else { return }
@@ -444,7 +447,7 @@ public struct NativeChatStore: Codable, Equatable {
         retractionTombstones.values.reduce(0, { $0 + $1.count }) <= 256 && drafts.allSatisfy { NativeChatCodec.bareJID($0.key) == $0.key && $0.value.utf8.count <= 8192 } &&
         messages.allSatisfy { message in
             NativeChatCodec.bareJID(message.peer) == message.peer && message.previousIDs.count <= 16 &&
-            message.date.timeIntervalSince1970.isFinite && message.reactions.count <= 64 && message.reactions.values.allSatisfy { $0.count <= 16 && $0.allSatisfy(NativeInteractionCodec.validReaction) } &&
+            message.date.timeIntervalSince1970.isFinite && message.reactions.count <= 64 && message.reactionUpdatedAt.count <= 64 && message.reactionUpdatedAt.values.allSatisfy { $0.timeIntervalSince1970.isFinite } && message.reactions.values.allSatisfy { $0.count <= 16 && $0.allSatisfy(NativeInteractionCodec.validReaction) } &&
             ((message.hidden || message.retracted) ? message.body.isEmpty : NativeChatCodec.validBody(message.body))
         }
     }
