@@ -5,6 +5,104 @@ Requested scope: the complete iPhone and iPad application, including native UI,
 authentication, messaging and Total Conversation. This is a staged rewrite, not a
 claim that those features already work in this target.
 
+## Avatars, bubbles and message actions (2026-11-14)
+
+The unsigned native preview now reads existing public profile avatars from the
+authenticated, same-origin `api/account.php?lookupJid=...` route. Requests are
+limited to the signed-in account and its roster (128 cached identities, four
+concurrent requests); account changes/logout discard the cache and late replies.
+Only bounded PNG/JPEG data URLs are decoded, with a raster signature check,
+16-megapixel decode ceiling and 192-pixel thumbnails. Remote image URLs and SVG
+are never loaded. Missing/invalid avatars fall back to coloured initials.
+Anonymous room nicknames stay anonymous: they are not resolved to real accounts.
+This is avatar **display**, not profile-photo upload/editing.
+
+Chat and room bubbles use natural-width content, continuous tails without an
+internal seam, light shadows and the existing web artwork/colour palette. A
+44-point ellipsis and long-press menu expose actual actions, not decorative icons:
+
+| Action | Direct chat | Room chat |
+| --- | --- | --- |
+| Reply | Plain quoted original in the draft | Quoted nickname/original in the draft |
+| Copy | Original, never the private translation | Same |
+| Forward | Explicit known-contact selection and confirmation, new direct message; preserves drafts | Same, from the selected room message |
+| Edit | Last own submitted text, correction request | Not offered in this step |
+| Delete for me | Hides and clears this session's item, preserving its identity against archive replay | Session-local hide |
+| Retract for everyone | Explicit request for own submitted messages | Only when the room advertises retraction and stable occupant IDs, and the own echo supplies room-owned stanza/occupant IDs |
+
+Local deletion is **session-local**, not a persistent device blocklist or an
+account deletion. Forwarding attachment links does not revoke their existing
+access. Quoted replies are plain text, not a claim of XEP-0461 reply support.
+Edits use [XEP-0308](https://xmpp.org/extensions/xep-0308.html); requests use the
+current [XEP-0424 namespace `urn:xmpp:message-retract:1`](https://xmpp.org/extensions/xep-0424.html),
+with generic fallback text and a storage hint. Capabilities are advertised through
+disco and [XEP-0115](https://xmpp.org/extensions/xep-0115.html). Retractions are
+**unenforceable requests**: other clients, screenshots, copies and archives may
+retain the original. A successful socket write is not acknowledgement by others;
+the UI says so, handles rejection/disconnect and never silently retries a change.
+Private incoming changes match bare sender, direction and message identity.
+Room changes additionally match [XEP-0421 occupant identity](https://xmpp.org/extensions/xep-0421.html)
+and the room's [XEP-0359 stanza ID](https://xmpp.org/extensions/xep-0359.html), not
+just a reusable nickname or sender-supplied client ID. Servers without these
+features keep the group-wide action disabled. Other legacy retraction namespaces,
+moderator deletion and automatic enforcement of advertised server time limits
+are not implemented here; a server may refuse a request.
+
+MAM retrieval treats corrections/retractions as author-scoped events rather than
+displaying their fallback bodies. Authenticated archive tombstones suppress old
+text. Bounded retained identities/events keep hidden/retracted items from being
+resurrected by a subsequently loaded older page in the same session. This does
+not promise that an unloaded page, an unaware server or a fresh session has all
+the information required to apply every historical request. Changed/deleted
+text cannot keep a stale private translation displayed underneath it.
+
+[Isolated ejabberd run 43580949741](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43580949741)
+passes at `4750b2d`: nineteen opt-in integration tests execute without skips,
+including actual two-account correction/retraction delivery and MAM restoration,
+private-room membership and invitations, authenticated WSS, Jingle signalling and
+the fictional HTTP login contract. The disposable server is ejabberd 26.09 on a
+GitHub-hosted macOS runner. Cleanup, session release and test-CA removal/revocation
+checks pass; neither the local WAMP server nor production accounts are contacted.
+
+The transport test exposed a real archive edge case: retracting only a correction
+ID can leave the original archived stanza. Native retraction now targets the
+original message identity, and sparse MAM pages can restore a corrected item even
+when the original is absent, then apply its author-matched retraction. Unit tests
+also cover older-page replay, forged/ambiguous payloads, edit limits, interrupted
+or rejected requests, stale private translations and stable room authorship.
+This is not a guarantee of server-side data erasure or cross-vendor compatibility.
+
+[Unsigned preview 43583743962](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43583743962)
+passes at `9e7f8bb`: 226 Swift tests pass, with nineteen opt-in integration tests
+explicitly skipped in that non-server job. Unsigned Release device compilation,
+Debug-fixture exclusion and all 26 simulator UI checks pass (thirteen each on
+iPhone 16 Pro and iPad Pro 11-inch M4, iOS 18.5). The new scenario verifies an
+actual long-press copy menu, explicit text editing, confirmed forwarding, local
+deletion and retraction presentation, with portrait/landscape captures. The
+existing complete-latest-bubble, keyboard, rotation and background-return
+assertions are retained. Four same-host synthetic media profiles pass too, without
+live camera, audible audio, APNs or public-network media. Local Node validation
+passes 124 checks with four macOS-only checks explicitly skipped.
+
+Run `43580692365` was not green: message-menu row height clipped the latest bubble
+above the landscape keyboard, and the edit test typed over a native text selection.
+The 44-point menu target is now an overlay rather than an extra minimum-height
+row, and editing has an explicit clear action with an exact field-value assertion.
+No geometry assertion or timeout was weakened. Earlier server runs also exposed
+the corrected-message archive issue described above; superseded failed/cancelled
+runs are not counted as successful evidence.
+
+Selected fictional screenshots and reports are downloaded to ignored
+`artifacts/native-selected-evidence-43583743962/`; the compact keyboard layout,
+message menu, forwarding confirmation and retraction presentation were visually
+inspected. Raster avatars were visibly decoded in chat headers/bubbles. Roster
+captures still show the initials fallback, so those images alone do not prove
+late-loaded roster-photo replacement or complete photo parity. Room-wide
+retraction is covered by bounded stream/model tests, not a real third-party MUC
+retraction scenario. Physical-device, VoiceOver, larger-text, dark-mode and real
+web/other-client review remain release gates. No TestFlight release, signing,
+APNs activation or production-server change is part of this work.
+
 ## Web visual language in the native preview (2026-11-14)
 
 The native app uses TeleTypTel's web UI as its visual reference, not the default
@@ -30,8 +128,8 @@ This is a shared visual contract, not a claim of full pixel or feature parity.
 Apple permission prompts, photo/document pickers, OAuth, keyboard, text selection,
 native menus and accessibility affordances remain system UI. Room management
 still uses native forms and menus. The app does not embed the website to simulate
-native functionality, and this change does not alter protocols, consent or account
-permissions. Live TC verification and real-device visual review remain separate
+native functionality. That earlier styling-only step did not alter protocols,
+consent or account permissions. Live TC verification and real-device visual review remain separate
 from synthetic media and Debug-only call-layout fixtures.
 
 Local validation passes 124 Node checks with four macOS-only checks skipped.
@@ -432,7 +530,8 @@ Native parity status (do not confuse a visible layout with protocol support):
 | Room-mediated invitations | Known-contact inbox, explicit accept/decline/hide and joined-room contact picker implemented; same-domain MUC service only |
 | MUC discovery, private creation, roles/membership and configuration | Implemented with explicit actions and actual server authority; custom/federated/password services, bookmarks and group calls remain |
 | File/photo upload and download | Explicit bounded document/photo upload, draft-link staging and same-server download/export; existing bearer-URL storage, not recipient ACLs |
-| Edit/delete/reactions/forwarding | Not yet implemented; context menu currently provides copy/translate only |
+| Message actions | Last own direct-message correction, session-local hiding, author-scoped retraction requests and confirmed original-only direct forwarding; room-wide retraction requires server capabilities/stable author IDs |
+| Reactions | Not yet implemented in this native target |
 | Profile/account management | Four editable profile fields, account-bound API and translation settings; passwords/providers remain separate |
 | Add contacts and group bookmarks | Not yet implemented in the new native interface; explicit room creation/participation are available |
 | Registration and password recovery | Not yet connected in the native interface |
@@ -444,7 +543,7 @@ Remaining parity gates, in order:
 1. Extend recent MAM restoration with older-page navigation and, only with an explicit storage design, protected account-isolated offline history. Carbons and independently verified delivery/read states remain separate protocol work.
 2. Extend implemented MUC discovery/administration with bookmarks, direct/federated/password invitation variants, group archives and protected group media. Group translation now has a private, consent-gated native presentation path.
 3. Validate deployed PHP/MySQL multipart transfers and real document/photo pickers; design recipient ACLs and orphan/retention controls before confidential-file use. Inline media previews and XEP-0363 interoperability are not implemented by the PHP upload adapter.
-4. Edit/delete/reactions/forwarding and contact/security-profile management, with ownership checks, cancellation, offline errors and native UI tests for each action.
+4. Reactions, persistent local hiding, room corrections and contact/security-profile management; expand cross-client/physical-device validation of the new author-scoped message actions.
 5. Localized application strings and remaining web-style presentation, checked in both orientations, large text, dark mode and manual VoiceOver use. Message translation preferences remain separate from UI language.
 6. Explicit native provider registration and signed physical-device validation. Live APNs, production server changes and TestFlight distribution remain separate authorization/release gates.
 
