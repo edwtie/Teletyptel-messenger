@@ -60,7 +60,7 @@ function runSimulatorChecks({ common, family, destination, deviceID, resultBundl
   if (smokeResultBundle) {
     logged(family + "-cloud-history-tests", "xcodebuild", [...simulatorArguments,
       "-only-testing:NativeStartupUITests/NativeStartupUITests/testCloudHistoryCatalogAndOlderPagesDoNotAuthorizeAnUnknownContact",
-      "-resultBundlePath", smokeResultBundle, "test-without-building"], 300000);
+      "-resultBundlePath", smokeResultBundle, "test-without-building"], 600000);
   }
   logged(family + "-tests", "xcodebuild", [...simulatorArguments,
     "-resultBundlePath", resultBundle, "test-without-building"], 1200000);

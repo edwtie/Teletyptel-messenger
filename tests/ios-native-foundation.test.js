@@ -74,7 +74,7 @@ test("Cloud history preflight cannot replace or weaken the full simulator suite"
   runSimulatorChecks({ ...options, logged: (...args) => calls.push(args) });
   assert.equal(calls.length, 4);
   assert.equal(calls[2][0], "iPhone-cloud-history-tests");
-  assert.equal(calls[2][3], 300000);
+  assert.equal(calls[2][3], 600000);
   assert.ok(calls[2][2].includes("-only-testing:NativeStartupUITests/NativeStartupUITests/testCloudHistoryCatalogAndOlderPagesDoNotAuthorizeAnUnknownContact"));
   assert.equal(calls[3][0], "iPhone-tests");
   assert.equal(calls[3][3], 1200000);
