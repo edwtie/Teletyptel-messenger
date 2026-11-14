@@ -484,6 +484,7 @@ test("Native navigation source keeps sidebar visibility explicit and avoids dupl
   assert.match(chat, /defaultScrollAnchor\(\.bottom\)/);
   assert.match(chat, /id\("chat-bottom"\)/);
   assert.match(chat, /NativeTotalConversationSymbol\(\)/);
+  assert.ok(chat.indexOf('accessibilityIdentifier("chat-error")') < chat.indexOf("LazyVStack"));
 });
 
 test("Native second factor is a bounded challenge before XMPP, not an authenticated state", () => {

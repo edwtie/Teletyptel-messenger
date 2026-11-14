@@ -22,11 +22,7 @@ struct NativeGroupsView: View {
                         .font(.caption).foregroundStyle(.secondary)
                     Button { model.join(room: room, nickname: nickname) } label: { Label("Groep openen", systemImage: "person.3.fill") }
                         .disabled(!model.available).accessibilityIdentifier("group-join")
-                    Button { confirmCreate = true } label: { Label("Nieuwe besloten groep maken", systemImage: "plus.bubble") }
-                        .disabled(!model.available || !NativeMUCStream.validNickname(nickname) || room.isEmpty)
-                        .accessibilityIdentifier("group-create")
                 }
-                NativeRoomDiscovery(model: model.management) { room = $0 }
                 if let error = model.error { Text(error).foregroundStyle(.red).accessibilityIdentifier("group-error") }
                 NativeInvitationInbox(model: model.invitationModel, nickname: $nickname) { identifier in
                     model.acceptInvitation(identifier, nickname: nickname)
@@ -43,6 +39,12 @@ struct NativeGroupsView: View {
                         }.accessibilityIdentifier("group-room-" + group.room)
                     }
                 }
+                Section("Nieuwe groep") {
+                    Button { confirmCreate = true } label: { Label("Nieuwe besloten groep maken", systemImage: "plus.bubble") }
+                        .disabled(!model.available || !NativeMUCStream.validNickname(nickname) || room.isEmpty)
+                        .accessibilityIdentifier("group-create")
+                }
+                NativeRoomDiscovery(model: model.management) { room = $0 }
             }
             .navigationTitle("Groepschats")
             .toolbar { ToolbarItem(placement: .cancellationAction) {
@@ -183,11 +185,13 @@ private struct NativeGroupBubble: View {
     private var content: some View {
         VStack(alignment: .leading, spacing: 5) {
             Text(message.nickname).font(.caption.bold())
-            Text(message.body).textSelection(.enabled)
             if let session = session, NativeFileReference.inMessage(message.body, configuration: session.configuration) != nil {
+                Text(message.body).textSelection(.enabled)
                 NativeFileMessageButton(bodyText: message.body, session: session)
             } else if let translation = translation {
                 NativeGroupTranslationExtras(model: translation, message: message)
+            } else {
+                Text(message.body).textSelection(.enabled)
             }
             metadata
         }
@@ -207,7 +211,8 @@ private struct NativeGroupTranslationExtras: View {
     let message: NativeGroupText
     private var key: String { "group:" + message.room + ":" + message.id.uuidString }
     var body: some View {
-        VStack(alignment: .leading) {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(message.body).textSelection(.enabled)
             if model.preferences.mode != "off", model.sharingConsent, let result = model.results[key] { NativeTranslationCaption(result: result) }
             if model.preferences.mode == "manual" {
                 Button("Vertalen") { model.translate(message.body, key: key) }.font(.caption)

@@ -188,12 +188,13 @@ final class NativeStartupUITests: XCTestCase {
         XCTAssertTrue(notice.waitForExistence(timeout: 10))
         reveal(notice); notice.tap()
         let decline = application.buttons["decline-invitation-ignore@conference.localhost-demo-contact@localhost"]
+        reveal(decline)
         XCTAssertTrue(decline.waitForExistence(timeout: 5))
         reveal(decline); decline.tap()
         let gone = NSPredicate(format: "exists == false")
         expectation(for: gone, evaluatedWith: decline); waitForExpectations(timeout: 5)
         let nickname = application.textFields["group-nickname"]
-        reveal(nickname); nickname.tap(); nickname.typeText("Testnaam")
+        reveal(nickname, upward: false); nickname.tap(); nickname.typeText("Testnaam")
         let accept = application.buttons["accept-invitation-fixture@conference.localhost-demo-contact@localhost"]
         reveal(accept); XCTAssertTrue(accept.isEnabled); accept.tap()
         let room = application.descendants(matching: .any)["group-room-fixture@conference.localhost"].firstMatch
@@ -217,9 +218,11 @@ final class NativeStartupUITests: XCTestCase {
         XCTAssertTrue(name.waitForExistence(timeout: 10)); reveal(name); name.tap(); name.typeText(" gewijzigd")
         let save = application.buttons["profile-save"]; reveal(save); save.tap()
         let status = application.staticTexts["profile-status"]
+        reveal(status)
         expectation(for: NSPredicate(format: "label CONTAINS %@", "Accountinstellingen opgeslagen"), evaluatedWith: status)
         waitForExpectations(timeout: 10)
-        XCTAssertTrue(application.staticTexts["fixture@localhost"].exists)
+        let identity = application.staticTexts["fixture@localhost"]
+        reveal(identity, upward: false); XCTAssertTrue(identity.exists)
         snapshot("account-settings-saved")
     }
 

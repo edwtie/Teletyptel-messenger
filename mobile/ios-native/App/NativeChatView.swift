@@ -30,6 +30,8 @@ struct NativeChatView: View {
                     ScrollView {
                         VStack(spacing: 0) {
                             historyHeader.padding(.horizontal, 14).padding(.vertical, 8)
+                            if let error = model.chatError { Text(error).font(.caption).padding(6).accessibilityIdentifier("chat-error") }
+                            if let error = translation.error { Text(error).font(.caption).padding(6) }
                             LazyVStack(spacing: 12) {
                                 ForEach(messages) { message in bubble(message).id(message.id) }
                             }.padding(.horizontal, 14).padding(.top, 14)
@@ -55,8 +57,6 @@ struct NativeChatView: View {
                     }
                     .onAppear { proxy.scrollTo("chat-bottom", anchor: .bottom) }
                 }
-                if let error = model.chatError { Text(error).font(.caption).padding(6).accessibilityIdentifier("chat-error") }
-                if let error = translation.error { Text(error).font(.caption).padding(6) }
                 if showEmoji {
                     HStack {
                         ForEach(["🙂", "👍", "❤️", "👋", "🙏", "😂"], id: \.self) { emoji in

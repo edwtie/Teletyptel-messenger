@@ -25,11 +25,11 @@ struct NativeAccountSettingsView: View {
                     Button { Task { await model.save(profile) } } label: { Label("Accountinstellingen opslaan", systemImage: "checkmark") }
                         .disabled(model.busy || !profile.valid).accessibilityIdentifier("profile-save")
                 }
+                if let status = model.status { Text(status).accessibilityIdentifier("profile-status") }
                 Section("Privacy en vertaling") {
                     Button { showTranslation = true } label: { Label("Vertaalinstellingen", systemImage: "globe") }
                     Text("Face ID en Touch ID blijven een afzonderlijke keuze op het aanmeldscherm. Wachtwoorden en aanmeldproviders worden hier niet gewijzigd.").font(.caption)
                 }
-                if let status = model.status { Text(status).accessibilityIdentifier("profile-status") }
                 Button { Task { await load() } } label: { Label("Opnieuw ophalen", systemImage: "arrow.clockwise") }.disabled(model.busy)
             }
             .navigationTitle("Accountinstellingen")
