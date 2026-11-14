@@ -168,7 +168,7 @@ struct NativeTotalConversationView: View {
             TextField("Typ realtime tekst", text: Binding(
                 get: { controller.presentation?.ownText ?? "" },
                 set: controller.setRttText
-            ), prompt: Text("Typ realtime tekst").foregroundStyle(Color.white.opacity(0.65)), axis: .vertical)
+            ), prompt: Text("Typ realtime tekst").foregroundColor(Color.white.opacity(0.65)), axis: .vertical)
             .lineLimit(2...5)
             .textFieldStyle(.plain)
             .font(.title3)
