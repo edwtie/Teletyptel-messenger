@@ -42,7 +42,7 @@ private final class NativePeerRouter: NativePeerNegotiating {
 }
 
 @MainActor
-final class NativeCallController: ObservableObject {
+final class NativeCallController: ObservableObject, NativePushRegistering {
     enum Status: Equatable { case idle, calling(String), ringing(String), active(String), failed }
 
     @Published private(set) var status: Status = .idle
@@ -62,9 +62,30 @@ final class NativeCallController: ObservableObject {
     private var isForeground = true
     var backgroundCallEnded: (() -> Void)?
     var hasLiveCall: Bool { runtime?.platform.coordinator.currentHandle != nil }
+    var pushCallActive: Bool { hasLiveCall }
+    lazy var pushRegistration = NativePushRegistrationModel(
+        enabled: Bundle.main.object(forInfoDictionaryKey: "TeleTypTelNativeCallPushEnabled") as? Bool == true,
+        store: NativePushVault(), driver: self)
+
+    func startPushRegistration(tokenChanged: @escaping (Data?) -> Void) -> Bool {
+        guard let account = account else { return false }
+        return ensureRuntime().platform.enable(account: account, consented: true, tokenChanged: tokenChanged)
+    }
+
+    func stopPushRegistration() { runtime?.platform.stopPushRegistration() }
+    func confirmPushRevocation() {
+        if let account = account { runtime?.platform.confirmRevocation(account: account) }
+    }
+
+    func synchronizePush() async {
+        guard let session = login?.activeWebSession, let identifier = login?.activeAccountID else { return }
+        await pushRegistration.connect(NativePushRegistryClient(session: session, accountID: identifier),
+            scope: NativePushScope(origin: session.configuration.origin.absoluteString, accountID: identifier))
+    }
 
     func setForeground(_ active: Bool) {
         isForeground = active
+        pushRegistration.setForeground(active)
         Task { [weak self] in
             guard let self = self else { return }
             await self.runtime?.media.setForeground(active)
@@ -104,7 +125,11 @@ final class NativeCallController: ObservableObject {
             if ensureRuntime().platform.connectForeground(account: jid) == nil { status = .failed }
         case .checking, .authenticating, .connecting, .awaitingSecondFactor:
             break
-        case .idle, .failed, .signedOut, .suspended:
+        case .suspended:
+            if !hasLiveCall { resetCall() }
+            if !pushRegistration.consented { account = nil; runtime?.logout() }
+        case .idle, .failed, .signedOut:
+            pushRegistration.logout()
             resetCall()
             account = nil
             runtime?.logout()
@@ -112,6 +137,7 @@ final class NativeCallController: ObservableObject {
     }
 
     func detach() {
+        pushRegistration.logout()
         login?.onJingle = nil
         login = nil
         resetCall()
@@ -237,6 +263,7 @@ final class NativeCallController: ObservableObject {
         guard let coordinator = runtime?.platform.coordinator,
               coordinator.currentHandle != nil else {
             if activePeer != nil { resetCall() }
+            pushRegistration.flushToken()
             if !isForeground { backgroundCallEnded?() }
             return
         }

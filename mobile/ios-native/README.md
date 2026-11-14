@@ -46,24 +46,48 @@ The symbols retain accessibility names; an unsupported peer leaves the keypad
 disabled. Phone-number letter selection remains a separate pre-call feature.
 
 This is **not full native SIP calling**. The existing isolated route remains
-restricted to the private/loopback lab gateway and echo extension 600. That
-gateway currently does not negotiate/forward RFC 4733 events. No public number,
-provider, 112 or Tolkcontact connection is enabled by this change. Before enabling
-gateway DTMF, verify negotiated event payloads on both WebRTC and SIP legs and
-record real Asterisk receipt of 0–9, `*`, `#`, duplicate handling and hangup cleanup.
-Local WebRTC enqueue acceptance is not evidence of remote gateway tone receipt.
+restricted to the private/loopback lab gateway and echo extension 600. The local
+gateway follow-up now maps optional RFC 4733 events between negotiated WebRTC
+and SIP payloads without turning them into chat/RTT text. A disposable real
+ejabberd/Asterisk/Chromium fixture confirmed Asterisk receipt of all 0–9, `*`, `#`
+exactly once, plus decoded PCMU/VP8, returned T.140 edits, hangup/disconnect and
+resource cleanup. It also relays valid return event packets over DTLS; browser
+API acceptance or packet counters alone do not prove application-level delivery
+on an independent remote client. The local gateway/Docker work is not part of
+the signed app or this narrow native-source publication. There are no public
+numbers, providers, 112 or Tolkcontact connections enabled by these checks.
 
 `NativePushRegistryClient` implements the existing authenticated `call-push.php`
 contract with explicit consent, its own fresh CSRF challenge, account/device/
 generation/expiry validation, a 16 KiB response limit, confirmed revocation and
 redacted registration descriptions. The optional control credential remains
 opaque and must never be treated as an answer or full-session credential.
-The client is a tested foundation, not an activated background-call integration:
-no device is registered automatically, no credential is persisted, and the
-preview's push flag remains false. Native consent UI, secure registration
-lifecycle, cold-start runtime and authoritative answer/session recovery still
-need wiring. Signed identity/capabilities, deployed server policy/worker and
-real locked-screen APNs delivery must be verified before replacing TestFlight.
+The native account screen now includes a consent-first registration lifecycle:
+registration and revocation are serialized, late replies are generation-bound,
+offline revocation survives relaunch, other accounts cannot inherit a pending
+registration, and renewal is deferred during calls/background entry. Only the
+installation metadata and opaque limited control credential go into a separate
+device-only Keychain record; no APNs token, chat password or Face ID credential
+is copied there. A separate non-secret boolean disables automatic restoration
+before Keychain mutations, including failed opt-out writes. Turning off push
+registration does not reset the active foreground conversation.
+
+This still is **not an activated background-call integration**. The shipping
+preview flag remains off. Even an enabled build requires an authenticated
+`capabilities.backgroundAnswerRecovery: true` registry response before showing
+the opt-in action; the existing endpoint does not provide this capability. Do
+not add that field merely to expose the button: the server needs an actual
+authoritative wake/answer/signaling-recovery adapter, not its current status/end
+credential. Cold-start runtime, signed identity/capabilities, deployed policy/
+worker and real locked-screen APNs delivery/answering remain release gates.
+
+Native number selection now offers an explicit consent prompt before Apple's
+single-phone-property picker. It returns only the chosen number, does not read
+or upload the address book, and never starts a call automatically. The local
+echo-only routing restriction is unchanged. Real contact-picker permission and
+cancellation behavior remain part of device acceptance, not a simulator fixture
+claim. The new lifecycle cases passed an isolated Linux compatibility harness;
+the updated unsigned Apple SDK matrix is recorded after completion below.
 
 For device acceptance, use two authorized test accounts and record app build,
 iOS version, Wi-Fi/mobile connection, orientation and observed result:
@@ -132,9 +156,9 @@ their original scope; they are not proof of features added after those runs.
 | Interface languages | Dutch native UI and profile-language selection | Full UI localization; the profile language currently does not translate the native interface |
 | TC audio/video/RTT | Native Jingle/WebRTC and four media profiles | Physical camera/audio/routing, independent-network/TURN and interruption/long-call tests |
 | Telephone/SIP/DTMF | Private echo route and optionally negotiated native RTP events | Gateway event forwarding and actual Asterisk receipt, authorized routing/provider integration; no emergency-service readiness claim |
-| Background incoming calls | CallKit/PushKit engine and bounded registry client foundation | Native opt-in/secure lifecycle/cold-start recovery, authoritative backend/worker, provisioning and signed locked-screen APNs tests |
+| Background incoming calls | CallKit/PushKit engine, consent UI, Keychain registration/revocation lifecycle and bounded registry client | Cold-start/authoritative call recovery, deployed backend/worker, provisioning and signed locked-screen APNs tests |
 | Interpreter and three-party calling | No connected native three-party/interpreter workflow in this target | Authorized interpreter discovery/invite, three-party media topology, consent, interruption and leave/rejoin tests |
-| iOS address book | No native `CNContactStore` permission/import path in this target | Explicit minimal-access permission and selection flow; never silently upload the full address book |
+| iOS address book | Explicit app consent plus Apple's single-phone-property picker; no broad `CNContactStore` request or upload | Real-device selection/cancel and accessibility checks; importing a number does not enable public calling |
 
 The preview must not show enabled-looking shortcuts for missing workflows or
 reuse successful simulator checks as proof of public SIP, interpreter service,

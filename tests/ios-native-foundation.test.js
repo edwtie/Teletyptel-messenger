@@ -12,6 +12,36 @@ const root = path.resolve(__dirname, "..");
 const native = path.join(root, "mobile/ios-native");
 const read = file => fs.readFileSync(path.join(native, file), "utf8");
 
+test("Native push lifecycle persists revocation and never treats basic registry availability as answer recovery", () => {
+  for (const file of ["Core/NativePushRegistrationModel.swift", "App/NativePushVault.swift"]) assert.ok(projectText().project.includes(file));
+  const model = read("Sources/TeleTypTelCore/NativePushRegistrationModel.swift");
+  assert.match(model, /guard enabled, consented, available/);
+  assert.match(model, /await previous\?\.value/);
+  assert.match(model, /record\.scope != scope/);
+  assert.match(model, /value\.consented = false; value\.pendingRevocation = true; value\.controlCredential = nil/);
+  assert.match(model, /driver\?\.pushCallActive == false/);
+  assert.match(read("Sources/TeleTypTelCore/NativePushRegistry.swift"), /reply\.capabilities\?\.backgroundAnswerRecovery == true/);
+  const vault = read("App/NativePushVault.swift");
+  assert.match(vault, /kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly/);
+  assert.match(vault, /kSecAttrSynchronizable as String: false/);
+  assert.match(vault, /UserDefaults\.standard\.set\(false, forKey: consentKey\)/);
+  assert.doesNotMatch(vault, /NativeSavedLogin|password|print\(|NSLog/);
+  assert.match(read("App/NativeAccountSettingsView.swift"), /Toestemming voor oproepmeldingen/);
+  assert.match(read("App/TeleTypTelNativeApp.swift"), /\.environmentObject\(calls\.pushRegistration\)/);
+  assert.doesNotMatch(read("App/Info.plist"), /TeleTypTelNativeCallPushEnabled|aps-environment|<string>voip<\/string>/);
+});
+
+test("Native address-book selection is explicit and cannot silently upload or dial contacts", () => {
+  assert.ok(projectText().project.includes("App/NativePhoneContactPicker.swift"));
+  const picker = read("App/NativePhoneContactPicker.swift");
+  assert.match(picker, /CNContactPickerViewController/);
+  assert.match(picker, /contactProperty\.key == CNContactPhoneNumbersKey/);
+  assert.doesNotMatch(picker, /CNContactStore|enumerateContacts|URLSession|startCall|requestAccess/);
+  const dialer = read("App/NativeDialerView.swift");
+  assert.match(dialer, /\.alert\("Een contact kiezen\?"/);
+  assert.match(dialer, /Nummer ingevuld\. Alleen lokale testextensie 600/);
+});
+
 test("Native DTMF uses negotiated RTP events and CallKit, never RTT or message signaling", () => {
   for (const source of ["Core/NativeDtmf.swift", "Core/NativePushRegistry.swift"]) assert.ok(projectText().project.includes(source));
   const media = read("App/NativeCallMedia.swift");

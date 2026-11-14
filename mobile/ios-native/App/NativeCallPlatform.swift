@@ -140,7 +140,15 @@ final class NativeCallPlatform: NSObject, PKPushRegistryDelegate, CXProviderDele
     func confirmRevocation(account: String) {
         guard registry == nil, self.account == account else { return }
         revocationRequired = false
-        self.account = nil
+        if registration == nil { self.account = nil }
+    }
+
+    func stopPushRegistration() {
+        let hadPushRegistration = registry != nil
+        revocationRequired = revocationRequired || hadPushRegistration
+        registry?.desiredPushTypes = []
+        registry = nil
+        tokenChanged = nil
     }
 
     func setDtmfEnabled(id: UUID, enabled: Bool, hasVideo: Bool) {

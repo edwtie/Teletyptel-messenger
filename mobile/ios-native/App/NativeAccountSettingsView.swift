@@ -3,10 +3,12 @@ import SwiftUI
 struct NativeAccountSettingsView: View {
     @ObservedObject var login: NativeLoginModel
     @ObservedObject var translation: NativeTranslationModel
+    @EnvironmentObject private var push: NativePushRegistrationModel
     @StateObject private var model = NativeAccountSettingsModel()
     @State private var draft: NativeAccountProfile?
     @State private var showTranslation = false
     @State private var clearHistory = false
+    @State private var confirmPush = false
     @Environment(\.dismiss) private var dismiss
     var body: some View {
         NavigationStack {
@@ -29,6 +31,17 @@ struct NativeAccountSettingsView: View {
                         .disabled(model.busy || !profile.valid).accessibilityIdentifier("profile-save")
                 }
                 if let status = model.status { Text(status).accessibilityIdentifier("profile-status") }
+                Section("Inkomende achtergrondoproepen") {
+                    Text(push.notice).accessibilityIdentifier("push-registration-status")
+                    if push.available && !push.consented {
+                        Button { confirmPush = true } label: { Label("Oproepmeldingen inschakelen", systemImage: "phone.badge.waveform.fill") }
+                            .disabled(push.busy)
+                    }
+                    if push.consented {
+                        Button(role: .destructive) { Task { await push.disable() } } label: { Label("Oproepmeldingen uitschakelen", systemImage: "phone.down.fill") }
+                            .disabled(push.busy)
+                    }
+                }
                 Section("Privacy en vertaling") {
                     Toggle("Ontvangstbevestigingen versturen", isOn: preference(\.sendDelivery)).accessibilityIdentifier("send-delivery-receipts")
                     Toggle("Leesbevestigingen versturen", isOn: preference(\.sendDisplayed)).accessibilityIdentifier("send-displayed-markers")
@@ -54,6 +67,12 @@ struct NativeAccountSettingsView: View {
         .onChange(of: login.phase) { _ in if !login.canSend { model.detach(); draft = nil; dismiss() } }
         .onDisappear { model.detach(); draft = nil }
         .sheet(isPresented: $showTranslation) { NativeTranslationSettingsView(model: translation) }
+        .alert("Toestemming voor oproepmeldingen", isPresented: $confirmPush) {
+            Button("Inschakelen") { Task { await push.enable(consented: true) } }
+            Button("Annuleren", role: .cancel) {}
+        } message: {
+            Text("TeleTypTel registreert dit apparaat via Apple voor inkomende oproepen. Het oproeptoken en een beperkte oproepmachtiging worden beveiligd opgeslagen; je chatwachtwoord en Face ID-gegevens worden hiervoor niet gekopieerd. Je kunt dit weer uitschakelen.")
+        }
         .confirmationDialog("Lokale berichten en concepten wissen?", isPresented: $clearHistory, titleVisibility: .visible) {
             Button("Wissen op dit apparaat", role: .destructive) { login.clearLocalHistory() }
             Button("Annuleren", role: .cancel) {}

@@ -302,6 +302,7 @@ struct NativeStartupView: View {
             } else { startupContent }
         }
         .background(NativeProviderPresenter(sdk: providerSDK).frame(width: 0, height: 0))
+        .environmentObject(calls.pushRegistration)
         .onOpenURL { providerSDK.handle($0) }
         .fullScreenCover(isPresented: Binding(
             get: { calls.presentation != nil },
@@ -327,6 +328,7 @@ struct NativeStartupView: View {
         }
         .onChange(of: loginModel.phase) { phase in
             calls.synchronize(phase)
+            if loginModel.isConnected { Task { await calls.synchronizePush() } }
             if case .connected(let account) = phase {
                 showMessenger = true
                 savedLogin.connected(jid: account)
@@ -370,6 +372,7 @@ struct NativeStartupView: View {
     }
 
     private func logout() {
+        calls.pushRegistration.logout()
         password = ""
         verificationCode = ""
         savedLogin.forget()

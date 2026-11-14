@@ -7,6 +7,8 @@ struct NativeDialerView: View {
     @State private var number = "600"
     @State private var gateway = ""
     @State private var notice: String?
+    @State private var contactConsent = false
+    @State private var contactPicker = false
     @FocusState private var gatewayFocused: Bool
     private let keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "*", "0", "#"]
     private var route: NativeSIPLabRoute? {
@@ -37,6 +39,9 @@ struct NativeDialerView: View {
                         }
                     }
                     Text("Kort drukken: cijfer. Ingedrukt houden: letter kiezen, loslaten: invoegen. Letters worden bij bellen naar cijfers omgezet; dit is geen DTMF-tekst.").font(.caption)
+                    Button { gatewayFocused = false; contactConsent = true } label: {
+                        Label("Kies een telefoonnummer uit Contacten", systemImage: "person.crop.circle")
+                    }.accessibilityIdentifier("dialer-device-contact")
                     if let converted = NativeDialing.normalized(number), converted != number { Text("Te bellen: " + converted).font(.caption) }
                     if let notice = notice { Text(notice).font(.caption).accessibilityIdentifier("sip-lab-notice") }
                     Button {
@@ -50,6 +55,21 @@ struct NativeDialerView: View {
             }
             .nativeWebForm().navigationTitle("Nummerbellen")
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button { dismiss() } label: { Image(systemName: "xmark").frame(width: 44, height: 44) }.accessibilityLabel("Sluiten") } }
+        }
+        .alert("Een contact kiezen?", isPresented: $contactConsent) {
+            Button("Kiezen") { contactPicker = true }
+            Button("Annuleren", role: .cancel) {}
+        } message: {
+            Text("Je kiest zelf één telefoonnummer in de Apple-contactenkiezer. TeleTypTel leest of uploadt niet je volledige adresboek en belt niet automatisch. Openbaar nummerbellen is in deze testversie nog uitgeschakeld.")
+        }
+        .sheet(isPresented: $contactPicker) {
+            NativePhoneContactPicker { selected in
+                contactPicker = false
+                if let selected = selected {
+                    number = selected
+                    notice = "Nummer ingevuld. Alleen lokale testextensie 600 is nu belbaar."
+                }
+            }
         }
     }
 }

@@ -17,13 +17,25 @@ struct NativePushRegistration: CustomStringConvertible, CustomDebugStringConvert
     var debugDescription: String { description }
 }
 
-struct NativePushRegistryClient {
+@MainActor
+protocol NativePushRegistryServing {
+    func backgroundAnswerReady() async throws -> Bool
+    func register(deviceID: UUID, token: Data, consented: Bool) async throws -> NativePushRegistration
+    func revoke(deviceID: UUID) async throws
+}
+
+struct NativePushRegistryClient: NativePushRegistryServing {
     let session: NativeAccountWebSession
     let accountID: String
     var now: @Sendable () -> TimeInterval = { Date().timeIntervalSince1970 }
 
     func checkAvailability() async throws {
         _ = try await challenge()
+    }
+
+    func backgroundAnswerReady() async throws -> Bool {
+        let reply = try await challengeReply()
+        return reply.capabilities?.backgroundAnswerRecovery == true
     }
 
     func register(deviceID: UUID, token: Data, consented: Bool) async throws -> NativePushRegistration {
@@ -55,6 +67,10 @@ struct NativePushRegistryClient {
     }
 
     private func challenge() async throws -> String {
+        try await challengeReply().csrfToken
+    }
+
+    private func challengeReply() async throws -> Challenge {
         let reply = try JSONDecoder().decode(Challenge.self, from: await request())
         try validate(reply)
         guard reply.devices.count <= 8, Set(reply.devices.compactMap { UUID(uuidString: $0.device_id) }).count == reply.devices.count,
@@ -62,7 +78,7 @@ struct NativePushRegistryClient {
             throw NativePushRegistryFailure.invalidResponse
         }
         try Task.checkCancellation()
-        return reply.csrfToken
+        return reply
     }
 
     private func request(body: Data? = nil, csrf: String? = nil) async throws -> Data {
@@ -104,7 +120,9 @@ struct NativePushRegistryClient {
         let accountId: String
         let csrfToken: String
         let devices: [Device]
+        let capabilities: Capabilities?
     }
+    private struct Capabilities: Decodable { let backgroundAnswerRecovery: Bool }
     private struct Device: Decodable {
         let device_id: String
         let generation: String

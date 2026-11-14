@@ -101,6 +101,21 @@ final class NativePushRegistryTests: XCTestCase {
         XCTAssertEqual(String(reflecting: result), "NativePushRegistration(redacted)")
     }
 
+    func testRegistryAvailabilityDoesNotImplyBackgroundAnswerRecovery() async throws {
+        let service = try client()
+        for (fields, expected): ([String: Any], Bool) in [([:], false),
+            (["capabilities": ["backgroundAnswerRecovery": false]], false),
+            (["capabilities": ["backgroundAnswerRecovery": true]], true)] {
+            let data = try envelope(fields)
+            PushRegistryHTTPFixture.handler = { _, _ in (200, data) }
+            let ready = try await service.backgroundAnswerReady()
+            XCTAssertEqual(ready, expected)
+        }
+        let invalid = try envelope(["accountId": "other", "capabilities": ["backgroundAnswerRecovery": true]])
+        PushRegistryHTTPFixture.handler = { _, _ in (200, invalid) }
+        await assertFailure(.invalidResponse) { _ = try await service.backgroundAnswerReady() }
+    }
+
     func testNoConsentCookieInvalidIdentityOrTokenNeverMakesNetworkRequests() async throws {
         PushRegistryHTTPFixture.handler = { _, _ in XCTFail("Must not contact server"); return (500, Data()) }
         let service = try client()
