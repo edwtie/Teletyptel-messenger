@@ -857,6 +857,116 @@ final class NativeCloudSyncTests: XCTestCase {
     }
 
     @MainActor
+    func testCachedMessageChangesAbsentFromInitialCloudPageNeverBackfillAsNewInserts() async throws {
+        let cachedVersions: [String?] = [nil, version]
+        for cachedVersion in cachedVersions {
+            let previous = try message(id: "old-cached-row", text: "Retained local or archive body", version: cachedVersion)
+            var reacted = previous
+            reacted.fields["reactions"] = .object([owner: .array([.string("❤️")])])
+            var displayed = previous
+            displayed.fields["deliveryStatus"] = .string("read")
+            var retracted = previous
+            retracted.fields["text"] = .string("")
+            retracted.fields["retracted"] = .bool(true)
+            retracted.fields["status"] = .string("retracted")
+            let changes = [edited(previous, text: "Explicit edit of cached row"), reacted, displayed, retracted]
+            for candidate in changes {
+                try await withSync { sync, client in
+                    sync.record(candidate, previous: previous)
+                    try await self.waitUntil("initial policy GET for cached change") { await client.snapshot().fetches.count == 1 }
+                    let held = await client.snapshot()
+                    XCTAssertTrue(held.saves.isEmpty)
+                    try await client.completeFetch(0, with: .success(self.page()))
+                    try await self.waitUntil("cached change refused without cloud CAS base") {
+                        sync.state(peer: self.peer, kind: "contact").ready && sync.notice != nil
+                    }
+                    await self.settle()
+                    XCTAssertFalse(sync.state(peer: self.peer, kind: "contact").loading)
+                    XCTAssertNil(sync.state(peer: self.peer, kind: "contact").notice)
+                    XCTAssertNotNil(sync.notice)
+                    let snapshot = await client.snapshot()
+                    XCTAssertEqual(snapshot.fetches.count, 1)
+                    XCTAssertTrue(snapshot.saves.isEmpty)
+                }
+            }
+        }
+    }
+
+    @MainActor
+    func testReenablingAppOrServerSavingDoesNotBackfillRetainedOldRowWithoutKnownVersion() async throws {
+        for serverPolicyWasDisabled in [false, true] {
+            try await withSync { sync, client in
+                let retained = try self.message(id: "retained-before-disable", text: "Old offline row", version: self.version)
+                if !serverPolicyWasDisabled { sync.setSavingEnabled(false) }
+                sync.load(peer: self.peer, kind: "contact")
+                try await self.waitUntil("history GET while saving disabled") { await client.snapshot().fetches.count == 1 }
+                try await client.completeFetch(0, with: .success(self.page(saveChat: !serverPolicyWasDisabled)))
+                try await self.waitUntil("history available while saving disabled") {
+                    sync.state(peer: self.peer, kind: "contact").ready
+                }
+                sync.record(self.edited(retained, text: "Edit while saving disabled"), previous: retained)
+                await self.settle()
+                let disabled = await client.snapshot()
+                XCTAssertTrue(disabled.saves.isEmpty)
+
+                if serverPolicyWasDisabled {
+                    sync.load(peer: self.peer, kind: "contact", refresh: true)
+                    try await self.waitUntil("explicit server policy refresh") { await client.snapshot().fetches.count == 2 }
+                    try await client.completeFetch(1, with: .success(self.page()))
+                    try await self.waitUntil("server saving policy re-enabled") {
+                        !sync.state(peer: self.peer, kind: "contact").loading
+                    }
+                } else {
+                    sync.setSavingEnabled(true)
+                }
+                let previousNotice = sync.notice
+                let explicitEdit = self.edited(retained, text: "New explicit action on retained old row")
+                sync.record(explicitEdit, previous: retained)
+                try await self.waitUntil("retained old row refused after re-enabling") { sync.notice != previousNotice }
+                await self.settle()
+                XCTAssertNotNil(sync.notice)
+                XCTAssertTrue(sync.available)
+                XCTAssertTrue(sync.state(peer: self.peer, kind: "contact").ready)
+                XCTAssertNil(sync.state(peer: self.peer, kind: "contact").notice)
+                let snapshot = await client.snapshot()
+                XCTAssertEqual(snapshot.fetches.count, serverPolicyWasDisabled ? 2 : 1)
+                XCTAssertTrue(snapshot.saves.isEmpty)
+            }
+        }
+    }
+
+    @MainActor
+    func testAcceptedNewDisplayedMessageFactoryEmitsReadAndStillInsertsWithNoExpectedVersion() async throws {
+        try await withSync { sync, client in
+            var accepted = NativeChatMessage(id: UUID(), stanzaID: "new-accepted-row", peer: self.peer,
+                body: "Explicit newly accepted message", date: Date(timeIntervalSince1970: 1793528430.123), state: .submitted)
+            accepted.delivery = .displayed
+            let candidate = try XCTUnwrap(NativeCloudRecordFactory.direct(accepted, owner: self.owner))
+            XCTAssertEqual(candidate.messageID, "new-accepted-row")
+            XCTAssertEqual(candidate.deliveryStatus, "read")
+            XCTAssertNil(candidate.version)
+            let encoded = try JSONEncoder().encode(candidate)
+            let fields = try JSONDecoder().decode([String: NativeCloudValue].self, from: encoded)
+            XCTAssertEqual(fields["deliveryStatus"], .string("read"))
+
+            sync.record(candidate, previous: nil)
+            try await self.waitUntil("policy GET for newly accepted message") { await client.snapshot().fetches.count == 1 }
+            let held = await client.snapshot()
+            XCTAssertTrue(held.saves.isEmpty)
+            try await client.completeFetch(0, with: .success(self.page()))
+            try await self.waitUntil("new accepted message insert") { await client.snapshot().saves.count == 1 }
+            let snapshot = await client.snapshot()
+            XCTAssertEqual(snapshot.saves, [.init(message: candidate, expectedVersion: nil)])
+            try await client.completeSave(0, with: .success(self.saved(candidate, version: self.version)))
+            try await self.waitUntil("new accepted message confirmed") { sync.notice != nil }
+            await self.settle()
+            let completed = await client.snapshot()
+            XCTAssertEqual(completed.fetches.count, 1)
+            XCTAssertEqual(completed.saves.count, 1)
+        }
+    }
+
+    @MainActor
     func testStopIgnoresLateSaveCompletionAndDoesNotReplayQueuedWritesAfterReconfigure() async throws {
         try await withSync { sync, client in
             try await self.load(sync, client: client)

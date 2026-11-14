@@ -126,7 +126,7 @@ $bad['text'] = 'resurrected';
 nativeHistoryFails(fn() => nativeHistorySave($pdo, $session, $bad, $terminal['version']), 'cloud_history_conflict', 409);
 $terminal['deliveryStatus'] = 'displayed';
 $displayed = nativeHistorySave($pdo, $session, $terminal, $terminal['version']);
-nativeHistoryCheck($displayed['retracted'] && $displayed['deliveryStatus'] === 'displayed', 'Delivery may advance after retraction');
+nativeHistoryCheck($displayed['retracted'] && $displayed['deliveryStatus'] === 'read', 'Delivery may advance after retraction using canonical web read');
 nativeHistoryCheck(nativeHistorySave($pdo, $session, $displayed, $displayed['version']) === $displayed, 'No-op keeps version');
 $bad = $displayed;
 $bad['retraction'] = null;
@@ -293,6 +293,43 @@ NativeCloudHistory::sameOrigin($origin);
 NativeCloudHistory::sameOrigin($origin + ['HTTP_ORIGIN' => 'https://example.test:8443', 'HTTP_SEC_FETCH_SITE' => 'same-origin']);
 foreach ([['HTTP_ORIGIN' => 'https://evil.test'], ['HTTP_ORIGIN' => 'null'], ['HTTP_SEC_FETCH_SITE' => 'same-site']] as $bad) {
     nativeHistoryFails(fn() => NativeCloudHistory::sameOrigin($origin + $bad), 'cloud_history_origin_denied', 403);
+}
+$deliveryPdo = new PDO('sqlite::memory:', null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+nativeHistoryFixture($deliveryPdo);
+foreach (['read', 'displayed'] as $inputStatus) {
+    $readMessage = nativeHistoryMessage('insert-' . $inputStatus);
+    $readMessage['deliveryStatus'] = $inputStatus;
+    $readRecord = nativeHistorySave($deliveryPdo, $session, $readMessage);
+    nativeHistoryCheck($readRecord['deliveryStatus'] === 'read', 'New native rows canonicalize read alias: ' . $inputStatus);
+}
+$deliveryMessage = nativeHistoryMessage('delivery-advance');
+$deliveryMessage['deliveryStatus'] = 'delivered';
+$deliveryRecord = nativeHistorySave($deliveryPdo, $session, $deliveryMessage);
+$deliveryRecord['deliveryStatus'] = 'read';
+$readRecord = nativeHistorySave($deliveryPdo, $session, $deliveryRecord, $deliveryRecord['version']);
+nativeHistoryCheck($readRecord['deliveryStatus'] === 'read' && $readRecord['version'] !== $deliveryRecord['version'], 'Delivered advances to read');
+foreach (['read', 'displayed'] as $rawStatus) {
+    $deliveryPdo->prepare('UPDATE message_history SET delivery_status = ? WHERE message_id = ?')->execute([$rawStatus, 'delivery-advance']);
+    $rawDelivery = $deliveryPdo->query("SELECT * FROM message_history WHERE message_id = 'delivery-advance'")->fetch(PDO::FETCH_ASSOC);
+    $readRecord = historyRowToClient($rawDelivery) + ['version' => NativeCloudHistory::version($rawDelivery)];
+    nativeHistoryCheck(nativeHistorySave($deliveryPdo, $session, $readRecord, $readRecord['version']) === $readRecord,
+        'Exact no-op preserves raw delivery alias and version: ' . $rawStatus);
+    $aliasRecord = $readRecord;
+    $aliasRecord['deliveryStatus'] = $rawStatus === 'read' ? 'displayed' : 'read';
+    nativeHistoryCheck(nativeHistorySave($deliveryPdo, $session, $aliasRecord, $readRecord['version']) === $readRecord,
+        'Same-rank alias is no downgrade or rewrite: ' . $rawStatus);
+    $aliasRecord['deliveryStatus'] = 'read';
+    $aliasRecord['text'] = 'Body edit with read alias ' . $rawStatus;
+    $aliasRecord['reactions'] = ['one@example.test' => ['👍']];
+    $editedRead = nativeHistorySave($deliveryPdo, $session, $aliasRecord, $readRecord['version']);
+    nativeHistoryCheck($editedRead['edited'] && $editedRead['text'] === $aliasRecord['text']
+        && $editedRead['reactions'] === $aliasRecord['reactions'] && $editedRead['deliveryStatus'] === $rawStatus,
+        'Read body/reaction edits preserve raw read/displayed alias: ' . $rawStatus);
+    foreach (['', 'sent', 'delivered'] as $lowerStatus) {
+        $downgradedRead = $editedRead;
+        $downgradedRead['deliveryStatus'] = $lowerStatus;
+        nativeHistoryFails(fn() => nativeHistorySave($deliveryPdo, $session, $downgradedRead, $editedRead['version']), 'cloud_history_conflict', 409);
+    }
 }
 $webPdo = new PDO('sqlite::memory:', null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
 nativeHistoryFixture($webPdo);

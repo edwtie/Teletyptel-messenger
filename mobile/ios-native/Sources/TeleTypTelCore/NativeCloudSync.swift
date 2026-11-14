@@ -181,6 +181,10 @@ final class NativeCloudSync: ObservableObject {
                     }
                     continue
                 }
+                if !change.insertion && base?.version == nil {
+                    self.notice = "Online versie ontbreekt. Niet als nieuw bericht opgeslagen; haal de geschiedenis opnieuw op."
+                    continue
+                }
                 var message = base ?? change.message
                 for (field, value) in change.patch { message.fields[field] = value }
                 if !change.actorChanges.isEmpty {

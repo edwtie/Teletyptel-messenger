@@ -315,9 +315,10 @@ final class NativeCloudHistory
             } elseif ($field === 'text' || $field === 'status') {
                 $value = self::text($value, $field === 'text' ? self::MAX_TEXT_BYTES : 64);
             } elseif ($field === 'deliveryStatus') {
-                $value = self::choice($value, ['', 'sent', 'delivered', 'displayed']);
-                $rank = ['' => 0, 'sent' => 1, 'delivered' => 2, 'displayed' => 3];
+                $value = self::delivery($value);
+                $rank = ['' => 0, 'sent' => 1, 'delivered' => 2, 'read' => 3, 'displayed' => 3];
                 if (!isset($rank[$client[$field]]) || $rank[$value] < $rank[$client[$field]]) self::conflict();
+                if ($rank[$value] === $rank[$client[$field]]) continue;
             } elseif ($field === 'reactions') {
                 if (($row['reactions_json'] ?? '') !== '') {
                     self::reactions(json_decode($row['reactions_json'], true, 32, JSON_THROW_ON_ERROR));
@@ -356,7 +357,7 @@ final class NativeCloudHistory
             'text' => self::text($message['text'] ?? '', self::MAX_TEXT_BYTES), 'status' => self::text($message['status'] ?? '', 64),
             'styling_disabled' => (int)($message['stylingDisabled'] ?? false), 'edited' => (int)($message['edited'] ?? false),
             'retracted' => (int)($message['retracted'] ?? false),
-            'delivery_status' => self::choice($message['deliveryStatus'] ?? '', ['', 'sent', 'delivered', 'displayed']),
+            'delivery_status' => self::delivery($message['deliveryStatus'] ?? ''),
             'message_timestamp' => self::timestamp($message['timestamp'] ?? null)];
         foreach (['attachment' => 'attachment_json', 'location' => 'location_json', 'callInfo' => 'call_info_json',
             'jingleHistory' => 'jingle_history_json', 'retraction' => 'retraction_json', 'reactions' => 'reactions_json'] as $field => $column) {
@@ -368,6 +369,12 @@ final class NativeCloudHistory
             $row['text'] = 'Message retracted';
         } elseif ($row['status'] === 'retracted') self::invalid();
         return $row;
+    }
+
+    private static function delivery(mixed $value): string
+    {
+        $status = self::choice($value, ['', 'sent', 'delivered', 'read', 'displayed']);
+        return $status === 'displayed' ? 'read' : $status;
     }
 
     private static function canonical(mixed $value): string

@@ -60,6 +60,12 @@ alone never become trusted stanza IDs or occupant IDs, enable group actions,
 or send delivery/read receipts. Unknown or archived authors are not converted
 into real-user identities.
 
+Existing own web records may have an empty `from` field. Native accepts that
+only for an authenticated account's own messages, preserves the raw immutable
+identity for conditional updates, and uses the own display identity without
+inventing protocol authority. Both the web `read` and legacy `displayed`
+delivery-status representations mean the same terminal delivery level.
+
 Only accepted live messages and explicit accepted mutations enqueue online
 writes. Restoring the device cache, reading SQL/MAM history, editing drafts,
 hiding a local item and clearing the cache never backfill or erase the server.
@@ -68,6 +74,11 @@ opaque attachment/location/call metadata, keep retractions terminal, and never
 downgrade delivery state. A conflicting, interrupted or unconfirmed write is
 reported rather than blindly retried. Requests and late replies are scoped to
 the active account/generation and cancelled on background entry/logout.
+An edit or reaction without a known online version is refused rather than
+turned into an unintended insertion of an old cached message. Reading on open
+or explicit refresh is not a continuous cross-device SQL push subscription.
+The legacy web endpoint still has its existing upsert behavior; native CAS does
+not prevent a later independent legacy-web write from changing the same row.
 
 The native account page separates new online writes from encrypted local-cache
 storage. Disabling native online writes cancels queued uploads but permits
