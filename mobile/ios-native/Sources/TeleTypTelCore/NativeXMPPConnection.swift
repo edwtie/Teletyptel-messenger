@@ -106,7 +106,7 @@ private final class NativeSessionClosure {
     }
 }
 
-private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, NativeArchiveSending, NativeGroupManaging, NativeMessageChanging, NativeGroupMessageChanging, NativeJingleSending, @unchecked Sendable {
+private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, NativeArchiveSending, NativeGroupManaging, NativeMessageChanging, NativeGroupMessageChanging, NativeChatInteracting, NativeJingleSending, @unchecked Sendable {
     private let configuration: ServerConfiguration
     private let ownerJID: String
     private var boundJID: String?
@@ -269,6 +269,14 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
     func changeMessage(to peer: String, change: NativeMessageChange, identifier: String) async throws {
         try Task.checkCancellation()
         let frame = try NativeMessageActionCodec.encode(to: peer, change: change, identifier: identifier)
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            queue.async { self.enqueueMessage(frame, continuation: continuation) }
+        }
+    }
+
+    func interact(to peer: String, interaction: NativeChatInteraction, identifier: String) async throws {
+        try Task.checkCancellation()
+        let frame = try NativeInteractionCodec.encode(to: peer, interaction: interaction, identifier: identifier)
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             queue.async { self.enqueueMessage(frame, continuation: continuation) }
         }

@@ -39,7 +39,7 @@ public struct NativeGroupSnapshot: Equatable, Sendable {
     public var supportsRetraction = false
 }
 
-public struct NativeGroupText: Identifiable, Equatable, Sendable {
+public struct NativeGroupText: Identifiable, Codable, Equatable, Sendable {
     public let id: UUID
     public let room: String
     public let nickname: String

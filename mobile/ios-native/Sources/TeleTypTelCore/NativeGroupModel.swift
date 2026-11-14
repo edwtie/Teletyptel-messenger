@@ -19,7 +19,8 @@ public struct NativeGroupConversation: Identifiable, Equatable {
 public final class NativeGroupModel: ObservableObject {
     public let invitationModel = NativeGroupInvitationModel()
     public let management = NativeGroupManagementModel()
-    @Published public private(set) var rooms: [NativeGroupConversation] = []
+    @Published public private(set) var rooms: [NativeGroupConversation] = [] { didSet { historyChanged?() } }
+    var historyChanged: (() -> Void)?
     @Published public private(set) var error: String?
     @Published public private(set) var available = false
     private var sender: (any NativeGroupSending)?
@@ -30,6 +31,15 @@ public final class NativeGroupModel: ObservableObject {
     private var sends: [UUID: Task<Void, Never>] = [:]
 
     public init() {}
+    func restoreHistory(_ histories: [NativeGroupHistory], owner: String) {
+        guard histories.count <= 8, !available else { return }
+        self.owner = owner; rooms = histories.map(\.conversation)
+    }
+    func clearLocalHistory() {
+        for index in rooms.indices {
+            rooms[index].messages.removeAll(); rooms[index].draft = ""; rooms[index].retractionTombstones.removeAll()
+        }
+    }
     deinit { for task in joins.values { task.cancel() }; for task in sends.values { task.cancel() } }
 
     func attach(_ sender: any NativeGroupSending, owner: String) {

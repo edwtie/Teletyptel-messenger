@@ -92,7 +92,7 @@ struct NativeStartupView: View {
         }
         #endif
         _model = StateObject(wrappedValue: NativeStartupModel())
-        _loginModel = StateObject(wrappedValue: NativeLoginModel())
+        _loginModel = StateObject(wrappedValue: NativeLoginModel(history: NativeDeviceHistory()))
         _savedLogin = StateObject(wrappedValue: NativeSavedLoginModel(vault: NativeBiometricLoginVault()))
         fixtureName = nil
     }

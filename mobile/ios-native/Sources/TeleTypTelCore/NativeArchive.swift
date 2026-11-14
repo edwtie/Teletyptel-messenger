@@ -8,7 +8,7 @@ public protocol NativeArchiveSending: NativeChatSending {
     func fetchArchive(peer: String, before: String?) async throws -> NativeArchivePage
 }
 
-public struct NativeArchivedText: Equatable, Sendable {
+public struct NativeArchivedText: Codable, Equatable, Sendable {
     public let archiveID: String
     public let identifier: String?
     public let peer: String
@@ -17,6 +17,8 @@ public struct NativeArchivedText: Equatable, Sendable {
     public let outgoing: Bool
     public var change: NativeMessageChange? = nil
     public var retracted = false
+    public var interaction: NativeChatInteraction? = nil
+    public var markable = false
 }
 
 public struct NativeArchivePage: Equatable, Sendable {
@@ -113,6 +115,11 @@ struct NativeArchiveQuery {
         guard let from = message.attributes["from"].flatMap(NativeChatCodec.bareJID),
               let to = message.attributes["to"].flatMap(NativeChatCodec.bareJID),
               (from == owner && to == peer) || (from == peer && to == owner) else { throw NativeArchiveFailure.invalidResponse }
+        if NativeInteractionCodec.hasInteraction(message) {
+            guard !NativeMessageActionCodec.hasChange(message), let identifier = message.attributes["id"], NativeMessageActionCodec.validID(identifier),
+                  let value = NativeInteractionCodec.decode(message) else { throw NativeArchiveFailure.invalidResponse }
+            return NativeArchivedText(archiveID: archiveID, identifier: identifier, peer: peer, body: "", date: date, outgoing: from == owner, interaction: value)
+        }
         let tombstones = message.children.filter { $0.name == "retracted" && $0.namespace == NativeMessageActionCodec.retraction }
         if !tombstones.isEmpty {
             guard tombstones.count == 1, tombstones[0].children.isEmpty,
@@ -133,7 +140,8 @@ struct NativeArchiveQuery {
         guard body.children.isEmpty, NativeChatCodec.validBody(body.text) else { throw NativeArchiveFailure.invalidResponse }
         let identifier = message.attributes["id"].flatMap { Self.validID($0) ? $0 : nil }
         return NativeArchivedText(archiveID: archiveID, identifier: identifier, peer: peer,
-                                  body: body.text, date: date, outgoing: from == owner)
+                                  body: body.text, date: date, outgoing: from == owner,
+                                  markable: message.children.contains { $0.name == "markable" && $0.namespace == NativeInteractionCodec.markers && $0.children.isEmpty })
     }
 
     static func trustedArchiveID(_ root: ProbeElement, owner: String) -> String? {

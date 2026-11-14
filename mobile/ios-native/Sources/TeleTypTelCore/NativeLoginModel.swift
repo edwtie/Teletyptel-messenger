@@ -23,7 +23,14 @@ public final class NativeLoginModel: ObservableObject {
 
     @Published public private(set) var phase: Phase = .idle
     @Published public private(set) var roster: NativeRosterState = .idle
-    @Published public private(set) var chat = NativeChatStore()
+    @Published public private(set) var chat = NativeChatStore() { didSet { scheduleHistory() } }
+    @Published public private(set) var historyNotice: String?
+    @Published public private(set) var cachedContacts: [NativeContact] = []
+    private let history: (any NativeHistoryStoring)?
+    private var historyScope: NativeHistoryScope?
+    private var historySave: Task<Void, Never>?
+    private var restoringHistory = false
+    private var receiptsInFlight = 0
     @Published public private(set) var chatError: String?
     @Published public private(set) var isBackground = false
     @Published public private(set) var twoFactorError: String?
@@ -49,13 +56,16 @@ public final class NativeLoginModel: ObservableObject {
 
     public init(checker: any ServerChecking = XMPPAvailabilityClient(),
                 authenticator: any NativeAccountAuthenticating = NativeTwoFactorAccountClient(),
-                connection: any NativeXMPPConnecting = NativeXMPPConnection()) {
+                connection: any NativeXMPPConnecting = NativeXMPPConnection(), history: (any NativeHistoryStoring)? = nil) {
         self.checker = checker
         self.authenticator = authenticator
         self.connection = connection
+        self.history = history
+        groups.historyChanged = { [weak self] in self?.scheduleHistory() }
     }
 
     deinit {
+        historySave?.cancel()
         task?.cancel()
         secondFactorDeadline?.cancel()
         secondFactor?.session.cancel()
@@ -64,6 +74,8 @@ public final class NativeLoginModel: ObservableObject {
     }
 
     public var canSend: Bool { isConnected && sender != nil && !isBackground }
+    public var canReadCachedHistory: Bool { historyScope != nil && (!chat.messages.isEmpty || !groups.rooms.isEmpty) }
+    var currentOwner: String? { historyScope?.owner ?? resumableAccount?.jid }
     var activeWebSession: NativeAccountWebSession? { isConnected && !isBackground ? resumableAccount?.webSession : nil }
     var activeAccountID: String? { isConnected ? resumableAccount?.accountID : nil }
     var activeJingleSender: (any NativeJingleSending)? {
@@ -118,6 +130,91 @@ public final class NativeLoginModel: ObservableObject {
     public func hideMessage(_ identifier: UUID) {
         do { try chat.hide(identifier); chatError = nil }
         catch { chatError = "Verwijderen niet gestart. Wacht op de verzending of de sessielimiet is bereikt." }
+    }
+
+    public func setChatPreferences(_ preferences: NativeChatPreferences) {
+        chat.preferences = preferences
+        flushHistory()
+    }
+
+    public func clearLocalHistory() {
+        guard sendTasks.isEmpty, chat.pendingCount == 0 else { historyNotice = "Wacht tot lopende verzendingen klaar zijn."; return }
+        let preferences = chat.preferences
+        restoringHistory = true; chat = NativeChatStore(); chat.preferences = preferences; groups.clearLocalHistory(); restoringHistory = false
+        flushHistory()
+    }
+
+    public func react(_ identifier: UUID, emoji: String) {
+        guard canSend, let sender = sender as? any NativeChatInteracting, sendTasks.count < 8,
+              let owner = historyScope?.owner ?? resumableAccount?.jid, NativeInteractionCodec.picker.contains(emoji) else { return }
+        do {
+            let (message, request) = try chat.beginReaction(identifier)
+            guard let target = message.previousIDs.first ?? message.stanzaID else { throw NativeChatFailure.invalidMessage }
+            var values = message.reactions[owner] ?? []
+            if values.contains(emoji) { values.removeAll { $0 == emoji } } else if values.count < 16 { values.append(emoji) }
+            let interaction = NativeChatInteraction.reactions(target: target, values: values)
+            let attempt = generation
+            sendTasks[identifier] = Task { [weak self] in
+                var submitted = false
+                do { try await sender.interact(to: message.peer, interaction: interaction, identifier: request); submitted = true } catch { }
+                guard let self = self, self.generation == attempt else { return }
+                self.chat.finishReaction(identifier, request: request, actor: owner, values: values, submitted: submitted)
+                self.sendTasks[identifier] = nil
+            }
+        } catch { chatError = "Reactie niet gestart. Controleer de verbinding en het bericht." }
+    }
+
+    public func displayed(_ identifiers: [UUID]) {
+        guard canSend, chat.preferences.sendDisplayed else { return }
+        let visible = Set(identifiers)
+        if let message = chat.messages.last(where: { visible.contains($0.id) && $0.state == .incoming && $0.markable && !$0.displayedAttempted }) {
+            sendReceipt(message.id, displayed: true)
+        }
+    }
+
+    private func sendReceipt(_ identifier: UUID, displayed: Bool) {
+        guard canSend, receiptsInFlight < 8, let sender = sender as? any NativeChatInteracting,
+              let (peer, target) = chat.takeReceipt(identifier, displayed: displayed) else { return }
+        receiptsInFlight += 1
+        let attempt = generation
+        Task { [weak self] in
+            guard let self = self else { return }
+            defer { if self.generation == attempt { self.receiptsInFlight = max(0, self.receiptsInFlight - 1) } }
+            guard self.generation == attempt,
+                  displayed ? self.chat.preferences.sendDisplayed : self.chat.preferences.sendDelivery else { return }
+            do { try await sender.interact(to: peer, interaction: .receipt(target: target, displayed: displayed), identifier: UUID().uuidString) } catch { }
+        }
+    }
+
+    private func restoreHistory(_ account: NativeAuthenticatedAccount) {
+        guard let history = history, let scope = try? NativeHistoryScope(configuration: account.configuration, owner: account.jid), historyScope != scope else { return }
+        historyScope = scope; restoringHistory = true; defer { restoringHistory = false }
+        do {
+            if let snapshot = try history.load(scope) {
+                chat = snapshot.chat; chat.interrupt(); cachedContacts = snapshot.contacts.map { contact in var value = contact; value.presence = .unknown; value.callEndpoint = nil; return value }
+                groups.restoreHistory(snapshot.groups, owner: scope.owner)
+            }
+            historyNotice = nil
+        } catch { historyNotice = "Lokale geschiedenis niet ontgrendeld of beschadigd. Het bestaande bestand wordt niet automatisch overschreven."; historyScope = nil }
+    }
+
+    private func scheduleHistory() {
+        guard !restoringHistory, historyScope != nil, history != nil else { return }
+        historySave?.cancel()
+        historySave = Task { [weak self] in
+            do { try await Task.sleep(nanoseconds: 400_000_000) } catch { return }
+            self?.flushHistory()
+        }
+    }
+
+    public func flushHistory() {
+        historySave?.cancel(); historySave = nil
+        guard !restoringHistory, let history = history, let scope = historyScope else { return }
+        if case .ready(let contacts) = roster { cachedContacts = Array(contacts.prefix(128)) }
+        do {
+            try history.save(NativeHistorySnapshot(scope: scope, chat: chat, contacts: cachedContacts, groups: groups.rooms.map(NativeGroupHistory.init)))
+            historyNotice = chat.preferences.keepHistory ? "Geschiedenis versleuteld op dit apparaat bewaard." : "Lokale berichtopslag uitgeschakeld."
+        } catch { historyNotice = "Lokale geschiedenis niet opgeslagen. Het eerdere bestand blijft behouden; controleer opslagruimte en apparaatontgrendeling." }
     }
 
     public func changeMessage(_ identifier: UUID, correctedBody: String? = nil) {
@@ -331,6 +428,7 @@ public final class NativeLoginModel: ObservableObject {
                     return
                 }
                 self.phase = .connected(jid)
+                self.restoreHistory(account)
                 self.activateGroups()
             }
         }
@@ -402,10 +500,15 @@ public final class NativeLoginModel: ObservableObject {
         if case .ready(let contacts) = roster {
             let peer: String
             switch event {
-            case .message(let sender, _, _), .rejected(let sender, _), .archivedIdentity(let sender, _, _, _), .change(let sender, _, _): peer = sender
+            case .message(let sender, _, _), .rejected(let sender, _), .archivedIdentity(let sender, _, _, _), .change(let sender, _, _),
+                 .interaction(let sender, _, _), .trackedMessage(let sender, _, _, _, _, _): peer = sender
             }
             guard contacts.contains(where: { $0.jid == peer }) else { return }
             chat.receive(event)
+            if case .trackedMessage(_, let identifier, _, _, _, _) = event,
+               let message = chat.messages.last(where: { $0.peer == peer && $0.stanzaID == identifier && $0.state == .incoming }) {
+                sendReceipt(message.id, displayed: false)
+            }
         } else if roster == .loading, earlyMessages.count < 32 {
             earlyMessages.append(event)
         }
@@ -450,6 +553,9 @@ public final class NativeLoginModel: ObservableObject {
     }
 
     private func invalidate(clearChat: Bool = true, keepAccount: Bool = false) {
+        chat.interrupt()
+        flushHistory()
+        receiptsInFlight = 0
         generation = UUID()
         cancelHistory()
         groups.disconnect(clear: clearChat)
@@ -467,7 +573,10 @@ public final class NativeLoginModel: ObservableObject {
         sender = nil
         isBackground = false
         chat.interrupt()
-        if clearChat { chat = NativeChatStore(); chatError = nil; historyStates.removeAll() }
+        if clearChat {
+            historyScope = nil; cachedContacts = []; historyNotice = nil
+            chat = NativeChatStore(); chatError = nil; historyStates.removeAll()
+        }
         if !keepAccount {
             if let session = resumableAccount?.webSession { Task { await session.close() } }
             resumableAccount = nil

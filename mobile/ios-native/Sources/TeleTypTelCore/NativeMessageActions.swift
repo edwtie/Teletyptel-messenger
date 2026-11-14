@@ -1,7 +1,7 @@
 import Foundation
 import CryptoKit
 
-public enum NativeMessageChange: Equatable, Sendable {
+public enum NativeMessageChange: Codable, Equatable, Sendable {
     case correct(target: String, body: String)
     case retract(target: String)
 
@@ -17,7 +17,7 @@ public protocol NativeMessageChanging: NativeChatSending {
 enum NativeMessageActionCodec {
     static let correction = "urn:xmpp:message-correct:0"
     static let retraction = "urn:xmpp:message-retract:1"
-    static let features = ["http://jabber.org/protocol/disco#info", correction, retraction, "urn:xmpp:ping"].sorted()
+    static let features = ["http://jabber.org/protocol/disco#info", correction, retraction, "urn:xmpp:ping", NativeInteractionCodec.reactions, NativeInteractionCodec.receipts, NativeInteractionCodec.markers].sorted()
     static let node = "https://teletyptel.nl/native"
     static var verification: String {
         Data(Insecure.SHA1.hash(data: Data(("client/phone//TeleTypTel<" + features.joined(separator: "<") + "<").utf8))).base64EncodedString()

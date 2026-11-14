@@ -7,7 +7,7 @@ function checkMedia({ root, directory, reports, logged }) {
   const framework = findFramework(path.join(directory, "DerivedData/SourcePackages/artifacts"));
   const executable = path.join(directory, "native-media-loopback");
   const native = path.join(root, "mobile/ios-native");
-  const core = ["Startup.swift", "XMPPProbeStream.swift", "NativeIncomingCall.swift", "NativeCallCoordinator.swift", "NativeJingleMedia.swift", "NativeLocalMediaSDP.swift", "NativeChat.swift", "NativeMessageActions.swift", "NativeArchive.swift", "NativeJingleTransport.swift", "NativeJingleSession.swift"];
+  const core = ["Startup.swift", "XMPPProbeStream.swift", "NativeIncomingCall.swift", "NativeCallCoordinator.swift", "NativeJingleMedia.swift", "NativeLocalMediaSDP.swift", "NativeChat.swift", "NativeChatInteractions.swift", "NativeMessageActions.swift", "NativeArchive.swift", "NativeJingleTransport.swift", "NativeJingleSession.swift"];
   const sources = [...core.map(file => path.join(native, "Sources/TeleTypTelCore", file)),
     path.join(native, "App/NativeMediaPeer.swift"), path.join(native, "App/NativeActivePeerNegotiating.swift"),
     path.join(native, "App/NativeIncomingPeerNegotiator.swift"),

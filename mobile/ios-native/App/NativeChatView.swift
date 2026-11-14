@@ -38,12 +38,26 @@ struct NativeChatView: View {
                             if let error = model.chatError { Text(error).font(.caption).padding(6).accessibilityIdentifier("chat-error") }
                             if let error = translation.error { Text(error).font(.caption).padding(6) }
                             LazyVStack(spacing: 12) {
-                                ForEach(messages) { message in bubble(message).id(message.id) }
+                                ForEach(messages) { message in
+                                    bubble(message).id(message.id).background(GeometryReader { geometry in
+                                        Color.clear.preference(key: NativeMessageFramesKey.self, value: [message.id: geometry.frame(in: .named("native-chat-messages"))])
+                                    })
+                                }
                             }.padding(.horizontal, 14).padding(.top, 14)
                             Color.clear.frame(height: 1).id("chat-bottom")
                         }
                     }
                     .modifier(NativeChatBottomAnchor())
+                    .coordinateSpace(name: "native-chat-messages")
+                    .overlayPreferenceValue(NativeMessageFramesKey.self) { frames in
+                        GeometryReader { viewport in
+                            let visible = frames.filter { CGRect(origin: .zero, size: viewport.size).contains($0.value) }.map(\.key)
+                            let enabled = scenePhase == .active && model.canSend && model.chat.preferences.sendDisplayed
+                            Color.clear.allowsHitTesting(false).task(id: enabled ? visible.map(\.uuidString).sorted().joined() : "hidden") {
+                                if enabled { model.displayed(visible) }
+                            }
+                        }
+                    }
                     .clipped()
                     .background {
                         GeometryReader { geometry in
@@ -206,10 +220,10 @@ struct NativeChatView: View {
                     Text(message.date, style: .time).font(.caption2)
                     if message.edited { Text("bewerkt").font(.caption2) }
                     if message.state != .incoming {
-                        Image(systemName: message.state == .sending ? "clock" : message.state == .submitted ? "checkmark" : "exclamationmark.circle")
-                            .font(.caption2)
+                        NativeMessageTicks(message: message)
                     }
                 }.foregroundStyle(NativeWebStyle.muted)
+                NativeReactionChips(reactions: message.reactions, owner: model.currentOwner, enabled: model.canSend && !message.reactionPending) { model.react(message.id, emoji: $0) }
                 if let notice = message.actionNotice { Text(notice).font(.caption2).foregroundStyle(NativeWebStyle.muted) }
             }
             .overlay(alignment: .topTrailing) {
@@ -222,6 +236,8 @@ struct NativeChatView: View {
 
     @ViewBuilder private func messageActions(_ message: NativeChatMessage) -> some View {
         if !message.retracted {
+                Menu { ForEach(NativeInteractionCodec.picker, id: \.self) { emoji in Button(emoji) { model.react(message.id, emoji: emoji) } } } label: { Label("Reageren", systemImage: "face.smiling") }
+                    .disabled(!model.canSend || message.stanzaID == nil || message.reactionPending)
                 Button { model.setDraft("> " + message.body + "\n\n" + draft, peer: contact.jid) } label: { Label("Beantwoorden", systemImage: "arrowshape.turn.up.left") }
                     .disabled(!NativeChatCodec.validBody("> " + message.body + "\n\n" + draft))
                 Button { UIPasteboard.general.string = message.body } label: { Label("Kopiëren", systemImage: "doc.on.doc") }
@@ -241,7 +257,7 @@ struct NativeChatView: View {
     }
 
     private func accessibleMessage(_ message: NativeChatMessage) -> String {
-        var label = (message.state == .incoming ? contact.displayName : "Ik") + ": " + (message.retracted ? "Bericht ingetrokken" : message.body) + ". " + message.state.label
+        var label = (message.state == .incoming ? contact.displayName : "Ik") + ": " + (message.retracted ? "Bericht ingetrokken" : message.body) + ". " + message.statusLabel
         if !message.retracted, translation.isCurrent(key: message.id.uuidString, text: message.body), let result = translation.results[message.id.uuidString], translation.preferences.mode != "off", translation.sharingConsent {
             label += ". Vertaling: " + result.text
         }

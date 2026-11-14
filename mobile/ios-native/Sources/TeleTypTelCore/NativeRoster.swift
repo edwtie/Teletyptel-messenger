@@ -1,6 +1,6 @@
 import Foundation
 
-public enum NativeContactPresence: String, Equatable, Sendable {
+public enum NativeContactPresence: String, Codable, Equatable, Sendable {
     case unknown, offline, online, away, extendedAway, busy
 
     public var label: String {
@@ -15,7 +15,7 @@ public enum NativeContactPresence: String, Equatable, Sendable {
     }
 }
 
-public struct NativeContact: Identifiable, Equatable, Sendable {
+public struct NativeContact: Identifiable, Codable, Equatable, Sendable {
     public let jid: String
     public let name: String
     public let groups: [String]

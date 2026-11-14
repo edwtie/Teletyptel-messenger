@@ -8,7 +8,7 @@ public protocol NativeChatSending: Sendable {
     func sendMessage(to jid: String, body: String, identifier: String) async throws
 }
 
-public enum NativeMessageState: String, Equatable, Sendable {
+public enum NativeMessageState: String, Codable, Equatable, Sendable {
     case incoming, sending, submitted, uncertain, rejected
 
     public var label: String {
@@ -22,7 +22,7 @@ public enum NativeMessageState: String, Equatable, Sendable {
     }
 }
 
-public struct NativeChatMessage: Identifiable, Equatable, Sendable {
+public struct NativeChatMessage: Identifiable, Codable, Equatable, Sendable {
     public let id: UUID
     public var stanzaID: String?
     public let peer: String
@@ -37,9 +37,20 @@ public struct NativeChatMessage: Identifiable, Equatable, Sendable {
     public var actionRequestID: String? = nil
     public var actionPending = false
     public var actionNotice: String? = nil
+    public var delivery = NativeDeliveryStatus.unconfirmed
+    public var reactions: [String: [String]] = [:]
+    public var reactionRequest: String? = nil
+    public var reactionPending = false
+    public var receiptRequested = false
+    public var markable = false
+    public var deliveryAttempted = false
+    public var displayedAttempted = false
+    public var statusLabel: String { state == .submitted ? delivery.label : state.label }
 }
 
 public enum NativeChatEvent: Sendable {
+    case interaction(peer: String, identifier: String, value: NativeChatInteraction)
+    case trackedMessage(peer: String, identifier: String, body: String, receipt: Bool, markable: Bool, archiveID: String?)
     case change(peer: String, identifier: String, change: NativeMessageChange)
     case message(peer: String, identifier: String?, body: String)
     case rejected(peer: String, identifier: String)
@@ -71,7 +82,7 @@ enum NativeChatCodec {
         guard bareJID(jid) == jid, validBody(body), UUID(uuidString: identifier) != nil else {
             throw NativeChatFailure.invalidMessage
         }
-        return "<message xmlns='jabber:client' type='chat' to='\(escape(jid))' id='\(identifier)'><body>\(escape(body))</body></message>"
+        return "<message xmlns='jabber:client' type='chat' to='\(escape(jid))' id='\(identifier)'><body>\(escape(body))</body><request xmlns='urn:xmpp:receipts'/><markable xmlns='urn:xmpp:chat-markers:0'/></message>"
     }
 
     static func decode(_ root: ProbeElement, owner: String, boundJID: String) -> NativeChatEvent? {
@@ -85,6 +96,11 @@ enum NativeChatCodec {
         if root.children.contains(where: { $0.name == "x" && $0.namespace == "http://jabber.org/protocol/muc#user" &&
             $0.children.contains(where: { ["invite", "decline"].contains($0.name) && $0.namespace == "http://jabber.org/protocol/muc#user" }) }) { return nil }
         guard root.attributes["type"] == nil || root.attributes["type"] == "normal" || root.attributes["type"] == "chat" else { return nil }
+        if NativeInteractionCodec.hasInteraction(root) {
+            guard !NativeMessageActionCodec.hasChange(root), let identifier = identifier, NativeMessageActionCodec.validID(identifier),
+                  let value = NativeInteractionCodec.decode(root) else { return nil }
+            return .interaction(peer: peer, identifier: identifier, value: value)
+        }
         if NativeMessageActionCodec.hasChange(root) {
             guard let identifier = identifier, NativeMessageActionCodec.validID(identifier),
                   let change = NativeMessageActionCodec.decode(root), identifier != change.target else { return nil }
@@ -93,6 +109,14 @@ enum NativeChatCodec {
         let bodies = root.children.filter { $0.name == "body" && $0.namespace == "jabber:client" }
         guard let body = bodies.first(where: { $0.attributes["xml:lang"] == nil }) ?? bodies.first,
               body.children.isEmpty, validBody(body.text) else { return nil }
+        let receipts = root.children.filter { $0.name == "request" && $0.namespace == NativeInteractionCodec.receipts }
+        let markers = root.children.filter { $0.name == "markable" && $0.namespace == NativeInteractionCodec.markers }
+        if !receipts.isEmpty || !markers.isEmpty {
+            guard let identifier = identifier, NativeMessageActionCodec.validID(identifier), receipts.count <= 1, markers.count <= 1,
+                  (receipts + markers).allSatisfy({ $0.children.isEmpty }) else { return nil }
+            return .trackedMessage(peer: peer, identifier: identifier, body: body.text, receipt: !receipts.isEmpty, markable: !markers.isEmpty,
+                archiveID: NativeArchiveQuery.trustedArchiveID(root, owner: owner))
+        }
         if let archiveID = NativeArchiveQuery.trustedArchiveID(root, owner: owner) {
             return .archivedIdentity(peer: peer, identifier: identifier, body: body.text, archiveID: archiveID)
         }
@@ -106,10 +130,11 @@ enum NativeChatCodec {
     }
 }
 
-public struct NativeChatStore: Equatable {
+public struct NativeChatStore: Codable, Equatable {
     public private(set) var messages: [NativeChatMessage] = []
     public private(set) var drafts: [String: String] = [:]
     public private(set) var historyLimited = false
+    public var preferences = NativeChatPreferences()
     public var pendingCount: Int { messages.filter { $0.state == .sending }.count }
     private var retractionTombstones: [String: Set<String>] = [:]
     private var archivedChanges: [NativeArchivedText] = []
@@ -152,10 +177,22 @@ public struct NativeChatStore: Equatable {
             messages[index].actionPending = false
             messages[index].actionNotice = "Wijzigingsverzoek onzeker; niet automatisch opnieuw verzonden."
         }
+        for index in messages.indices where messages[index].reactionPending {
+            messages[index].reactionPending = false
+            messages[index].actionNotice = "Reactieverzoek onzeker; niet automatisch opnieuw verzonden."
+        }
     }
 
     mutating func receive(_ event: NativeChatEvent) {
         switch event {
+        case .trackedMessage(let peer, let identifier, let body, let receipt, let markable, let archiveID):
+            if let archive = archiveID { receive(.archivedIdentity(peer: peer, identifier: identifier, body: body, archiveID: archive)) }
+            else { receive(.message(peer: peer, identifier: identifier, body: body)) }
+            if let index = messages.firstIndex(where: { $0.peer == peer && $0.state == .incoming && $0.stanzaID == identifier }) {
+                messages[index].receiptRequested = receipt; messages[index].markable = markable
+            }
+        case .interaction(let peer, _, let value):
+            applyInteraction(value, peer: peer, actor: peer)
         case .change(let peer, let identifier, let change):
             guard NativeChatCodec.bareJID(peer) == peer, NativeMessageActionCodec.validID(identifier), NativeMessageActionCodec.validID(change.target) else { return }
             let matches = messages.indices.filter { messages[$0].peer == peer && messages[$0].state == .incoming &&
@@ -180,6 +217,9 @@ public struct NativeChatStore: Equatable {
             messages.append(NativeChatMessage(id: UUID(), stanzaID: identifier, peer: peer, body: body, date: Date(), state: .incoming))
             applyRememberedRetraction(to: messages.count - 1)
         case .rejected(let peer, let identifier):
+            if let index = messages.firstIndex(where: { $0.peer == peer && $0.reactionRequest == identifier }) {
+                messages[index].reactionPending = false; messages[index].actionNotice = "Reactieverzoek geweigerd."; return
+            }
             if let index = messages.firstIndex(where: { $0.peer == peer && $0.actionRequestID == identifier && $0.state != .incoming }) {
                 messages[index].actionPending = false
                 messages[index].actionNotice = "Wijzigingsverzoek geweigerd; verwerking bij de ander is niet bevestigd."
@@ -201,19 +241,20 @@ public struct NativeChatStore: Equatable {
 
     mutating func mergeArchive(_ page: NativeArchivePage) throws {
         guard page.messages.count <= NativeArchiveQuery.maximum, page.messages.allSatisfy({
-            $0.peer == page.peer && ($0.change != nil || $0.retracted || NativeChatCodec.validBody($0.body)) && NativeArchiveQuery.validID($0.archiveID)
+            $0.peer == page.peer && ($0.change != nil || $0.interaction != nil || $0.retracted || NativeChatCodec.validBody($0.body)) && NativeArchiveQuery.validID($0.archiveID)
         }) else { throw NativeArchiveFailure.invalidResponse }
         var changes = archivedChanges
-        for archived in page.messages where archived.change != nil {
+        for archived in page.messages where archived.change != nil || archived.interaction != nil {
             guard let identifier = archived.identifier, NativeMessageActionCodec.validID(identifier),
-                  let change = archived.change else { throw NativeArchiveFailure.invalidResponse }
-            _ = try NativeMessageActionCodec.encode(to: archived.peer, change: change, identifier: UUID().uuidString)
+                  archived.change != nil || archived.interaction != nil else { throw NativeArchiveFailure.invalidResponse }
+            if let change = archived.change { _ = try NativeMessageActionCodec.encode(to: archived.peer, change: change, identifier: UUID().uuidString) }
+            if let interaction = archived.interaction { _ = try NativeInteractionCodec.encode(to: archived.peer, interaction: interaction, identifier: UUID().uuidString) }
             if changes.contains(where: { $0.archiveID == archived.archiveID }) { continue }
             guard changes.count < 256 else { throw NativeChatFailure.historyFull }
             changes.append(archived)
         }
         var merged = messages
-        for archived in page.messages where archived.change == nil {
+        for archived in page.messages where archived.change == nil && archived.interaction == nil {
             if merged.contains(where: { $0.archiveID == archived.archiveID && ($0.peer != archived.peer || ($0.state != .incoming) != archived.outgoing) }) {
                 throw NativeArchiveFailure.invalidResponse
             }
@@ -221,28 +262,30 @@ public struct NativeChatStore: Equatable {
                 $0.peer == archived.peer && ($0.state != .incoming) == archived.outgoing &&
                 ($0.archiveID == archived.archiveID || (archived.identifier != nil && ($0.stanzaID == archived.identifier || $0.previousIDs.contains(archived.identifier!))))
             }) {
-                if archived.retracted { merged[index].body = ""; merged[index].retracted = true }
+                if archived.retracted { merged[index].body = ""; merged[index].retracted = true; merged[index].reactions.removeAll() }
                 if merged[index].retracted || merged[index].hidden { continue }
                 guard merged[index].body == archived.body else { continue }
                 merged[index].archiveID = archived.archiveID
                 merged[index].date = archived.date
+                merged[index].markable = merged[index].markable || archived.markable
             } else {
                 merged.append(NativeChatMessage(id: UUID(), stanzaID: archived.identifier, peer: archived.peer,
                     body: archived.retracted ? "" : archived.body, date: archived.date, state: archived.outgoing ? .submitted : .incoming,
-                    archiveID: archived.archiveID, retracted: archived.retracted))
+                    archiveID: archived.archiveID, retracted: archived.retracted, markable: archived.markable))
             }
         }
         merged = merged.enumerated().sorted {
             $0.element.date == $1.element.date ? $0.offset < $1.offset : $0.element.date < $1.element.date
         }.map(\.element)
         while merged.count > 200 {
-            guard let index = merged.firstIndex(where: { !$0.hidden && !$0.retracted && $0.previousIDs.isEmpty && !$0.actionPending && ($0.state == .incoming || $0.state == .submitted) }) else { throw NativeChatFailure.historyFull }
+            guard let index = merged.firstIndex(where: { !$0.hidden && !$0.retracted && $0.previousIDs.isEmpty && !$0.actionPending && !$0.reactionPending && ($0.state == .incoming || $0.state == .submitted) }) else { throw NativeChatFailure.historyFull }
             merged.remove(at: index)
             historyLimited = true
         }
         messages = merged
         archivedChanges = changes.sorted { $0.date < $1.date }
         for archived in archivedChanges {
+            if let interaction = archived.interaction { applyInteraction(interaction, peer: archived.peer, actor: archived.outgoing ? page.owner : archived.peer); continue }
             guard let change = archived.change, let identifier = archived.identifier else { continue }
             let matches = messages.indices.filter { messages[$0].peer == archived.peer &&
                 (messages[$0].state != .incoming) == archived.outgoing &&
@@ -317,7 +360,7 @@ public struct NativeChatStore: Equatable {
             if !messages[index].hidden { messages[index].body = body }
             messages[index].edited = true
         case .retract:
-            messages[index].body = ""; messages[index].retracted = true
+            messages[index].body = ""; messages[index].retracted = true; messages[index].reactions.removeAll()
         }
     }
 
@@ -332,15 +375,76 @@ public struct NativeChatStore: Equatable {
         let identifiers = messages[index].previousIDs + (messages[index].stanzaID.map { [$0] } ?? [])
         if messages[index].state == .incoming,
            identifiers.contains(where: { retractionTombstones[messages[index].peer]?.contains($0) == true }) {
-            messages[index].body = ""; messages[index].retracted = true
+            messages[index].body = ""; messages[index].retracted = true; messages[index].reactions.removeAll()
         }
     }
 
     private mutating func makeRoom() -> Bool {
         guard messages.count >= 200 else { return true }
-        guard let index = messages.firstIndex(where: { !$0.hidden && !$0.retracted && $0.previousIDs.isEmpty && !$0.actionPending && ($0.state == .incoming || $0.state == .submitted) }) else { return false }
+        guard let index = messages.firstIndex(where: { !$0.hidden && !$0.retracted && $0.previousIDs.isEmpty && !$0.actionPending && !$0.reactionPending && ($0.state == .incoming || $0.state == .submitted) }) else { return false }
         messages.remove(at: index)
         historyLimited = true
         return true
+    }
+
+    mutating func applyInteraction(_ value: NativeChatInteraction, peer: String, actor: String) {
+        let matches = messages.indices.filter { messages[$0].peer == peer &&
+            (messages[$0].stanzaID == value.target || messages[$0].previousIDs.contains(value.target)) }
+        guard matches.count == 1, let index = matches.first, !messages[index].hidden, !messages[index].retracted else { return }
+        switch value {
+        case .reactions(_, let values):
+            guard values.count <= 16, values.allSatisfy(NativeInteractionCodec.validReaction),
+                  messages[index].reactions[actor] != nil || messages[index].reactions.count < 64 else { return }
+            messages[index].reactions[actor] = values.isEmpty ? nil : Array(Set(values)).sorted()
+        case .receipt(_, let displayed):
+            guard messages[index].state != .incoming, actor == peer else { return }
+            for message in messages.indices where messages[message].peer == peer && messages[message].state != .incoming &&
+                (message == index || (displayed && message < index && messages[message].state == .submitted)) {
+                if displayed { messages[message].delivery = .displayed }
+                else if messages[message].delivery == .unconfirmed { messages[message].delivery = .delivered }
+                if message == index, messages[message].state == .uncertain { messages[message].state = .submitted }
+            }
+        }
+    }
+
+    mutating func beginReaction(_ identifier: UUID) throws -> (NativeChatMessage, String) {
+        guard let index = messages.firstIndex(where: { $0.id == identifier }), !messages[index].hidden, !messages[index].retracted,
+              !messages[index].reactionPending, [.incoming, .submitted].contains(messages[index].state),
+              messages[index].stanzaID.map(NativeMessageActionCodec.validID) == true else { throw NativeChatFailure.invalidMessage }
+        let request = UUID().uuidString
+        messages[index].reactionRequest = request; messages[index].reactionPending = true
+        return (messages[index], request)
+    }
+
+    mutating func finishReaction(_ identifier: UUID, request: String, actor: String, values: [String], submitted: Bool) {
+        guard let index = messages.firstIndex(where: { $0.id == identifier }), messages[index].reactionRequest == request,
+              messages[index].reactionPending else { return }
+        messages[index].reactionPending = false
+        if submitted, let target = messages[index].stanzaID { applyInteraction(.reactions(target: target, values: values), peer: messages[index].peer, actor: actor) }
+        else { messages[index].actionNotice = "Reactie niet bevestigd; niet automatisch opnieuw verzonden." }
+    }
+
+    mutating func takeReceipt(_ identifier: UUID, displayed: Bool) -> (String, String)? {
+        guard let index = messages.firstIndex(where: { $0.id == identifier }), messages[index].state == .incoming,
+              !messages[index].hidden, !messages[index].retracted, let target = messages[index].stanzaID,
+              NativeMessageActionCodec.validID(target) else { return nil }
+        if displayed {
+            guard preferences.sendDisplayed, messages[index].markable, !messages[index].displayedAttempted else { return nil }
+            messages[index].displayedAttempted = true
+        } else {
+            guard preferences.sendDelivery, messages[index].receiptRequested, !messages[index].deliveryAttempted else { return nil }
+            messages[index].deliveryAttempted = true
+        }
+        return (messages[index].peer, target)
+    }
+
+    var validHistory: Bool {
+        messages.count <= 200 && Set(messages.map(\.id)).count == messages.count && drafts.count <= 100 && archivedChanges.count <= 256 &&
+        retractionTombstones.values.reduce(0, { $0 + $1.count }) <= 256 && drafts.allSatisfy { NativeChatCodec.bareJID($0.key) == $0.key && $0.value.utf8.count <= 8192 } &&
+        messages.allSatisfy { message in
+            NativeChatCodec.bareJID(message.peer) == message.peer && message.previousIDs.count <= 16 &&
+            message.date.timeIntervalSince1970.isFinite && message.reactions.count <= 64 && message.reactions.values.allSatisfy { $0.count <= 16 && $0.allSatisfy(NativeInteractionCodec.validReaction) } &&
+            ((message.hidden || message.retracted) ? message.body.isEmpty : NativeChatCodec.validBody(message.body))
+        }
     }
 }
