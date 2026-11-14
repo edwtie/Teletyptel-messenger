@@ -157,6 +157,7 @@ struct NativeTotalConversationView: View {
             }
         }
         .rttPaneStyle()
+        .accessibilityIdentifier("tc-peer-pane")
     }
 
     private func ownRttPane(_ presentation: NativeCallPresentation) -> some View {
@@ -183,6 +184,7 @@ struct NativeTotalConversationView: View {
             }
         }
         .rttPaneStyle()
+        .accessibilityIdentifier("tc-own-pane")
     }
 
     private func liveKey(_ direction: String) -> String { "tc:" + (controller.presentation?.callID.uuidString ?? "none") + ":" + direction }

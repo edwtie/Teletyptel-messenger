@@ -309,7 +309,12 @@ struct NativeStartupView: View {
         )) {
             NativeTotalConversationView(controller: calls, translation: translation)
         }
-        .onAppear { calls.attach(loginModel) }
+        .onAppear {
+            calls.attach(loginModel)
+            #if DEBUG
+            if fixtureName == "connected" { calls.presentVisualFixture() }
+            #endif
+        }
         .task {
             if fixtureName == nil, savedLogin.canRestoreAutomatically, !loginModel.isWorking, !loginModel.isConnected {
                 unlockSavedLogin()

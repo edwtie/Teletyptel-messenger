@@ -289,6 +289,32 @@ final class NativeStartupUITests: XCTestCase {
         XCTAssertFalse(application.buttons["login-account"].isEnabled)
     }
 
+    func testWebStyleCallControlsAndRttPanesRemainReachableAcrossRotation() {
+        application.launchEnvironment["TELETYPTEL_NATIVE_UI_FIXTURE"] = "connected"
+        application.launchEnvironment["TELETYPTEL_NATIVE_CALL_VISUAL_FIXTURE"] = "total"
+        application.launch()
+        let controls = application.buttons["Gespreksbediening"]
+        let end = application.buttons["Gesprek beëindigen"]
+        XCTAssertTrue(controls.waitForExistence(timeout: 10))
+        XCTAssertTrue(end.isHittable)
+        XCTAssertFalse(application.keyboards.firstMatch.exists)
+        for orientation: UIDeviceOrientation in [.portrait, .landscapeLeft, .portrait] {
+            rotate(orientation)
+            XCTAssertTrue(controls.isHittable)
+            XCTAssertTrue(end.isHittable)
+            for identifier in ["tc-peer-pane", "tc-own-pane"] {
+                let pane = application.descendants(matching: .any)[identifier].firstMatch
+                XCTAssertTrue(pane.exists)
+                XCTAssertTrue(application.frame.contains(pane.frame), identifier)
+            }
+            snapshot(orientation == .landscapeLeft ? "tc-web-landscape" : "tc-web-portrait")
+        }
+        controls.tap()
+        XCTAssertTrue(application.buttons["Camera inschakelen"].waitForExistence(timeout: 5))
+        XCTAssertTrue(application.buttons["Microfoon dempen"].isHittable)
+        snapshot("tc-web-controls")
+    }
+
     private func snapshot(_ name: String) {
         let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         attachment.name = name

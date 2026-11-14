@@ -62,6 +62,18 @@ final class NativeCallController: ObservableObject {
 
     init() {}
 
+    #if DEBUG
+    func presentVisualFixture() {
+        guard ProcessInfo.processInfo.environment["TELETYPTEL_NATIVE_UI_FIXTURE"] == "connected",
+              ProcessInfo.processInfo.environment["TELETYPTEL_NATIVE_CALL_VISUAL_FIXTURE"] == "total",
+              presentation == nil else { return }
+        peerName = "Fictieve UI-test"
+        presentation = NativeCallPresentation(callID: UUID(), profile: .total, localVideo: nil,
+            remoteVideo: nil, ownText: "", remoteText: "Fictieve realtime tekst", rttReady: false,
+            cameraEnabled: false, canSwitchCamera: false)
+    }
+    #endif
+
     func attach(_ login: NativeLoginModel) {
         guard self.login !== login else { return }
         detach()
