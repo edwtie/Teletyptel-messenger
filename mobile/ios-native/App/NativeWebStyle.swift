@@ -51,6 +51,13 @@ struct NativeWebIconStyle: ButtonStyle {
     }
 }
 
+struct NativeCachedAvatar: View {
+    let name: String
+    let jid: String
+    @ObservedObject var cache: NativeAvatarCache
+    var body: some View { NativeWebAvatar(name: name, profile: cache.profiles[jid]) }
+}
+
 struct NativeWebAvatar: View {
     let name: String
     var size: CGFloat = 34

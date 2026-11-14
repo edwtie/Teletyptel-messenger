@@ -111,7 +111,6 @@ struct NativeMessengerView: View {
         .task(id: model.canSend) { loadAvatars() }
         .onChange(of: model.roster) { _ in loadAvatars() }
         .onChange(of: showAccount) { if !$0 { avatars.refreshOwner() } }
-        .onDisappear { avatars.detach() }
     }
 
     private var conversationLayout: some View {
@@ -145,7 +144,7 @@ struct NativeMessengerView: View {
                     ForEach(contacts) { contact in
                         NavigationLink(value: contact.jid) {
                             HStack(spacing: 8) {
-                                NativeWebAvatar(name: contact.displayName, profile: avatars.profiles[contact.jid])
+                                NativeCachedAvatar(name: contact.displayName, jid: contact.jid, cache: avatars)
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(contact.displayName).font(NativeWebStyle.font(14, weight: .bold)).lineLimit(1)
                                     if let last = model.chat.messages.last(where: { $0.peer == contact.jid && !$0.hidden }) {
@@ -247,7 +246,7 @@ struct NativeMessengerView: View {
     }
 
     private func loadAvatars() {
-        guard case .connected(let owner) = model.phase, case .ready(let roster) = model.roster else { avatars.detach(); return }
+        guard model.canSend, case .connected(let owner) = model.phase, case .ready(let roster) = model.roster else { avatars.detach(); return }
         avatars.connect(model.activeWebSession, owner: owner, contacts: roster)
     }
 
