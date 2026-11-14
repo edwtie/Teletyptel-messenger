@@ -201,7 +201,7 @@ struct NativeStartupView: View {
                     .padding()
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(NativeWebStyle.incoming, in: RoundedRectangle(cornerRadius: 8))
-                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(NativeWebStyle.line, lineWidth: 1))
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(NativeWebStyle.line, lineWidth: 1).allowsHitTesting(false))
                     if loginModel.isConnected {
                         contactsView
                     }
