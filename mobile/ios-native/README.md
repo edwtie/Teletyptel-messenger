@@ -5,7 +5,7 @@ Requested scope: the complete iPhone and iPad application, including native UI,
 authentication, messaging and Total Conversation. This is a staged rewrite, not a
 claim that those features already work in this target.
 
-## Existing MUC room participation increment (2026-11-13)
+## Existing MUC room participation increment (2026-11-14)
 
 The native main menu now opens a separate Groups screen. Enter an existing
 `room@conference.<account-domain>` address and a screen name; this limited preview
@@ -27,10 +27,45 @@ Logout/account changes clear group state and invalidate stale callbacks.
 
 An isolated ejabberd fixture creates a private members-only room for random test
 accounts, denies ordinary room creation, and includes a non-member rejection test.
-No local/production server or existing room is configured. Runtime and UI evidence
-for this increment is pending; earlier green runs below validate the earlier
-direct-chat baseline, not these new groups.
+No local/production server or existing room is configured. Groups currently use
+a separate native sheet; a unified contact/group sidebar and full web-feature
+parity are not claimed.
 Protocol reference: [XEP-0045](https://xmpp.org/extensions/xep-0045.html).
+
+Validation of app revision `1ca383e`:
+[unsigned run 43529259443](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43529259443)
+passed Release device compilation, Debug fixture exclusion, 189 Swift tests and
+fourteen UI tests (seven each on iPhone 16 Pro and iPad Pro 11-inch M4). Seventeen
+opt-in network tests were explicitly skipped here, not counted as passes. The
+four same-host native WebRTC profiles also passed within their existing synthetic
+media scope, not physical capture, audible speech, APNs or public-network testing.
+The new UI case opens a fictional group through the main menu, joins, receives,
+sends, rotates with the keyboard open and leaves; sending is then disabled.
+
+[Isolated server run 43524015538](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43524015538)
+passed seven TLS/session checks, seven native HTTP/XMPP login checks, Jingle,
+direct MAM and the new private MUC scenario on actual ejabberd 26.09, plus the
+post-revocation TLS rejection check. Its core revision is unchanged in the later
+UI-only commits. Two members exchange fictional room text; a third non-member
+cannot join or receive it, an unknown room cannot be created through the client,
+group text does not enter the direct-chat callback, and sending after leaving
+fails. The run verifies released sessions, temporary-file cleanup and temporary
+CA revocation/removal. It contacts no production server.
+
+The first server attempt (`43523485644`) failed because the affiliation CLI needs
+separate user/host arguments; two preview attempts (`43524606603`, `43525297403`)
+retained SwiftUI type-check failures. The command was corrected and the group
+screen/bubble split into smaller components before passing. Visual inspection of
+the first green preview (`43525844287`) additionally found the latest iPhone
+landscape bubble clipped despite the original weak geometry assertion. Compact
+status/composer spacing and a stricter top/bottom visibility assertion fixed it;
+the final green run was visually rechecked and confirms the complete bubble.
+Twelve fictional chat/contact/group screenshots are available in workflow
+evidence and locally under ignored `artifacts/native-ui-43529259443/`.
+Local Windows validation passes 40 Node checks with two macOS-only checks skipped.
+No TestFlight upload, provider registration, APNs activation or server changes
+are included. Manual VoiceOver, large text, dark mode and signed physical-device
+checks remain release gates, not inferred from these simulator tests.
 
 ## Recent direct-chat server history increment (2026-11-13)
 
@@ -135,7 +170,8 @@ Native parity status (do not confuse a visible layout with protocol support):
 | Audio/video/RTT/TC | Existing constrained native engine; public-network/physical-device tests remain |
 | Recent direct-chat MAM history | Read-only latest page, 50 stanzas per selected peer; server retention required; no older-page UI or legacy-history migration |
 | Durable local history, carbons, receipts/read markers | Not yet implemented in this native target; archive presence does not prove delivery/read state |
-| MUC/group chat, invitations and group calls | Not yet implemented in this native target |
+| Existing MUC room text chat | Manual same-domain room entry, membership/self-presence, participants, roles, sending/receiving and leaving implemented; separate room state |
+| Group discovery/bookmarks, invitations, administration and group calls | Not yet implemented in this native interface |
 | File/photo upload and download | Not yet implemented; composer does not pretend to send attachments |
 | Edit/delete/reactions/forwarding | Not yet implemented; context menu currently provides copy/translate only |
 | Add contacts/groups, profile/account management | Not yet implemented in the new native interface |
@@ -146,7 +182,7 @@ Native parity status (do not confuse a visible layout with protocol support):
 Remaining parity gates, in order:
 
 1. Extend recent MAM restoration with older-page navigation and, only with an explicit storage design, protected account-isolated offline history. Carbons and independently verified delivery/read states remain separate protocol work.
-2. Native group membership, invitations, roles and room-scoped messaging, with separate direct/group message identities and negative cross-room authorization tests.
+2. Extend existing-room participation with native room discovery/bookmarks, invitations, administration, group archives and protected group media. Group translation requires its own privacy/UI integration; it is not enabled by the direct-chat translation settings alone.
 3. Actual file/photo upload, download and previews using the existing authenticated APIs, bounded files and explicit user selection; no decorative send buttons without a working transfer.
 4. Edit/delete/reactions/forwarding and contact/profile management, with ownership checks, cancellation, offline errors and native UI tests for each action.
 5. Localized application strings and remaining web-style presentation, checked in both orientations, large text, dark mode and manual VoiceOver use. Message translation preferences remain separate from UI language.
