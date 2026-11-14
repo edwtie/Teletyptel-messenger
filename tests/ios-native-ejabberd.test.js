@@ -75,6 +75,9 @@ test("Jingle harness exercises real resource-bound IQ exchange without media or 
   const harness = fs.readFileSync(path.join(root, "scripts/check-ios-native-ejabberd.js"), "utf8");
   assert.match(harness, /runSwift\("NativeJingleIntegrationTests", "native-jingle-tests.txt"\)/);
   assert.match(harness, /nativeJingleTransportTested = true/);
+  assert.match(harness, /attempt < 10/);
+  assert.match(harness, /save\("remaining-sessions.txt", remaining\)/);
+  assert.match(harness, /if \(remaining\) \{[\s\S]*throw new Error\("A native XMPP session remained after cancellation"\)/);
 });
 
 test("MAM test restores isolated direct history with real two-account transports", () => {

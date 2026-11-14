@@ -255,7 +255,10 @@ async function run() {
       if (!remaining) break;
       await delay(500);
     }
-    if (remaining) throw new Error("A native XMPP session remained after cancellation");
+    if (remaining) {
+      save("remaining-sessions.txt", remaining);
+      throw new Error("A native XMPP session remained after cancellation");
+    }
     report.sessionsReleased = true;
     report.passed = true;
   } catch (error) {

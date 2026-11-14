@@ -424,6 +424,16 @@ test("Native web-style chat keeps translations private, off-gated and call-bound
   assert.match(web, /X-CSRF-Token/);
 });
 
+test("Native session cancellation closes the XMPP stream with bounded exactly-once teardown", () => {
+  const source = read("Sources/TeleTypTelCore/NativeXMPPConnection.swift");
+  assert.match(source, /let graceful = cancelled && stream.phase == \.online/);
+  assert.match(source, /socket\.send\(\.string\("<close xmlns='urn:ietf:params:xml:ns:xmpp-framing'\/>"\)\)/);
+  assert.match(source, /queue\.asyncAfter\(deadline: \.now\(\) \+ 2\) \{ self\.completeClosure\(\) \}/);
+  assert.match(source, /private func completeClosure\(\) \{\s+let operation = closing\s+closing = nil\s+operation\?\.complete\(\)/);
+  assert.match(source, /guard let continuation = continuation else \{ return \}\s+self\.continuation = nil\s+socket\.cancel/);
+  assert.match(source, /root\.name == "close", root\.namespace == "urn:ietf:params:xml:ns:xmpp-framing"/);
+});
+
 test("Native navigation source keeps sidebar visibility explicit and avoids duplicate back bars", () => {
   const messenger = read("App/NativeTranslationView.swift");
   const chat = read("App/NativeChatView.swift");

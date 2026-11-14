@@ -89,6 +89,23 @@ private final class NativeGroupOperation {
     }
 }
 
+private final class NativeSessionClosure {
+    let socket: URLSessionWebSocketTask
+    private let session: URLSession
+    private let error: Error
+    private var continuation: CheckedContinuation<Void, Error>?
+    init(socket: URLSessionWebSocketTask, session: URLSession, error: Error, continuation: CheckedContinuation<Void, Error>) {
+        self.socket = socket; self.session = session; self.error = error; self.continuation = continuation
+    }
+    func complete() {
+        guard let continuation = continuation else { return }
+        self.continuation = nil
+        socket.cancel(with: .normalClosure, reason: nil)
+        session.invalidateAndCancel()
+        continuation.resume(throwing: error)
+    }
+}
+
 private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, NativeArchiveSending, NativeGroupInviting, NativeJingleSending, @unchecked Sendable {
     private let configuration: ServerConfiguration
     private let ownerJID: String
@@ -100,6 +117,7 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
     private let queue = DispatchQueue(label: "nl.teletyptel.native.session")
     private var onConnected: (@Sendable (String) -> Void)?
     private var session: URLSession?
+    private var closing: NativeSessionClosure?
     private var socket: URLSessionWebSocketTask?
     private var continuation: CheckedContinuation<Void, Error>?
     private var deadline: DispatchWorkItem?
@@ -502,6 +520,7 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
 
     private func finish(_ error: Error) {
         guard !completed, let continuation = continuation else { return }
+        let graceful = cancelled && stream.phase == .online
         completed = true
         self.continuation = nil
         onConnected = nil
@@ -527,11 +546,26 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
         heartbeat?.cancel()
         heartbeat = nil
         stream.close()
+        if graceful, let socket = socket, let session = session {
+            closing = NativeSessionClosure(socket: socket, session: session, error: error, continuation: continuation)
+            self.socket = nil; self.session = nil
+            queue.asyncAfter(deadline: .now() + 2) { self.completeClosure() }
+            socket.send(.string("<close xmlns='urn:ietf:params:xml:ns:xmpp-framing'/>")) { error in
+                if error != nil { self.queue.async { self.completeClosure() } }
+            }
+            return
+        }
         socket?.cancel(with: .normalClosure, reason: nil)
         socket = nil
         session?.invalidateAndCancel()
         session = nil
         continuation.resume(throwing: error)
+    }
+
+    private func completeClosure() {
+        let operation = closing
+        closing = nil
+        operation?.complete()
     }
 
     private func send(_ frames: [String], completion: @escaping () -> Void) {
@@ -550,7 +584,15 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
         guard !completed, let socket = socket else { return }
         socket.receive { result in
             self.queue.async {
-                guard !self.completed else { return }
+                guard !self.completed else {
+                    switch result {
+                    case .failure: self.completeClosure()
+                    case .success(.string(let frame)):
+                        if let root = try? ProbeXML.parse(frame), root.name == "close", root.namespace == "urn:ietf:params:xml:ns:xmpp-framing" { self.completeClosure() }
+                    default: break
+                    }
+                    return
+                }
                 do {
                     guard case .string(let frame) = try result.get() else { throw ConnectionFailure.invalidResponse }
                     let output = try self.stream.receive(frame)
@@ -613,12 +655,12 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
     }
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
-        queue.async { self.finish(error ?? ConnectionFailure.offline) }
+        queue.async { self.completeClosure(); self.finish(error ?? ConnectionFailure.offline) }
     }
 
     func urlSession(_ session: URLSession, webSocketTask: URLSessionWebSocketTask,
                     didCloseWith closeCode: URLSessionWebSocketTask.CloseCode, reason: Data?) {
-        queue.async { self.finish(ConnectionFailure.offline) }
+        queue.async { self.completeClosure(); self.finish(ConnectionFailure.offline) }
     }
 
     func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
