@@ -499,7 +499,8 @@ test("Native web visual contract shares palette, shell, bubbles and reachable sy
   assert.match(theme, /userInterfaceStyle == \.dark/);
   assert.ok(projectText().project.includes("NativeWebStyle.swift"));
   const messenger = read("App/NativeTranslationView.swift");
-  assert.match(messenger, /safeAreaInset\(edge: \.top/);
+  assert.match(messenger, /brandHeader \}\s+conversationLayout/);
+  assert.match(messenger, /accessibilityElement\(children: \.contain\)\s+\.accessibilityIdentifier\("messenger-brand-header"\)/);
   assert.match(messenger, /messenger-brand-header/);
   assert.match(messenger, /Contacten en groepen toevoegen/);
   assert.match(messenger, /model.groups.rooms/);

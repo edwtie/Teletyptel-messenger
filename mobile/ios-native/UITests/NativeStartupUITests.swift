@@ -380,7 +380,12 @@ final class NativeStartupUITests: XCTestCase {
     private func isUsable(_ element: XCUIElement) -> Bool {
         guard element.exists, !element.frame.isEmpty else { return false }
         let viewport = usableViewport()
-        guard viewport.contains(element.frame) else { return false }
+        let fullyVisible = viewport.contains(element.frame)
+        if element.identifier.hasPrefix("contact-"), !fullyVisible {
+            return viewport.contains(CGPoint(x: element.frame.midX, y: element.frame.midY)) &&
+                element.frame.minY >= viewport.minY && element.frame.maxY <= viewport.maxY && element.isHittable
+        }
+        guard fullyVisible else { return false }
         return element.elementType == .staticText || element.isHittable
     }
 

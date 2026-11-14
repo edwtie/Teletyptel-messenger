@@ -99,6 +99,17 @@ struct NativeMessengerView: View {
     }
 
     var body: some View {
+        VStack(spacing: 0) {
+            if verticalSizeClass != .compact || selected == nil { brandHeader }
+            conversationLayout
+        }
+        .font(NativeWebStyle.font()).tint(NativeWebStyle.accent)
+        .sheet(isPresented: $showGroups) { NativeGroupsView(model: model.groups, login: model, translation: translation) }
+        .sheet(isPresented: $showAccount) { NativeAccountSettingsView(login: model, translation: translation) }
+        .sheet(isPresented: $showTranslation) { NativeTranslationSettingsView(model: translation) }
+    }
+
+    private var conversationLayout: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             VStack(spacing: 0) {
                 VStack(alignment: .leading, spacing: 10) {
@@ -198,13 +209,6 @@ struct NativeMessengerView: View {
             }
         }
         .navigationSplitViewStyle(.balanced)
-        .font(NativeWebStyle.font()).tint(NativeWebStyle.accent)
-        .safeAreaInset(edge: .top, spacing: 0) {
-            if verticalSizeClass != .compact || selected == nil { brandHeader }
-        }
-        .sheet(isPresented: $showGroups) { NativeGroupsView(model: model.groups, login: model, translation: translation) }
-        .sheet(isPresented: $showAccount) { NativeAccountSettingsView(login: model, translation: translation) }
-        .sheet(isPresented: $showTranslation) { NativeTranslationSettingsView(model: translation) }
     }
 
     private var brandHeader: some View {
@@ -231,6 +235,7 @@ struct NativeMessengerView: View {
         .frame(maxWidth: .infinity, minHeight: 58)
         .background(NativeWebStyle.panel)
         .overlay(alignment: .bottom) { NativeWebStyle.line.frame(height: 1) }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("messenger-brand-header")
     }
 
