@@ -39,6 +39,7 @@ struct NativeGroupsView: View {
                         }.accessibilityIdentifier("group-room-" + group.room)
                     }
                 }
+                if let login = login { NativeOnlineGroups(cloud: login.cloudHistory, groups: model, login: login, translation: translation) }
                 Section("Nieuwe groep") {
                     Button { confirmCreate = true } label: { Label("Nieuwe besloten groep maken", systemImage: "plus.bubble") }
                         .disabled(!model.available || !NativeMUCStream.validNickname(nickname) || room.isEmpty)
@@ -84,6 +85,8 @@ struct NativeGroupChatView: View {
                 messageList(group)
                 if let error = model.error { Text(error).font(.caption).foregroundStyle(.red).padding(4) }
                 composer(group)
+            } else {
+                Text(model.error ?? "Deze groep kan nog niet worden geopend. Ga terug en probeer opnieuw.").font(.callout).padding()
             }
         }
         .navigationTitle(room.components(separatedBy: "@")[0]).navigationBarTitleDisplayMode(.inline)
@@ -149,7 +152,7 @@ struct NativeGroupChatView: View {
                         }.padding(.horizontal, 14)
                     }
                     LazyVStack(spacing: 12) {
-                        if group.historyLimited { Text("Alleen de meest recente berichten passen in deze preview.").font(.caption) }
+                        if group.historyLimited { Text("Beperkt cachevenster · haal andere pagina’s op via Online geschiedenis.").font(.caption) }
                         ForEach(group.messages.filter { !$0.hidden && (search.isEmpty || $0.body.localizedCaseInsensitiveContains(search) || $0.nickname.localizedCaseInsensitiveContains(search)) }) { message in
                             NativeGroupBubble(message: message, translation: translation, session: login?.activeWebSession,
                                 canForward: login?.canSend == true,

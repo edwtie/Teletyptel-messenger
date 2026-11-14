@@ -56,14 +56,14 @@ enum NativeCloudMerge {
         guard (try? record.validate()) != nil else { return false }
         return NativeMessageActionCodec.validID(record.messageID) && record.messageID.utf8.count <= 150 &&
         record.date.timeIntervalSince1970.isFinite && (record.retracted || NativeChatCodec.validBody(record.text)) &&
-        ["self", "peer"].contains(record.direction) && ["", "sent", "delivered", "displayed"].contains(record.deliveryStatus) &&
+        ["self", "peer"].contains(record.direction) && ["", "sent", "delivered", "read", "displayed"].contains(record.deliveryStatus) &&
         record.reactions.count <= 64 && record.reactions.allSatisfy {
             NativeCloudMessage.validIdentifier($0.key, maximum: 1023) && $0.value.count <= 16 && $0.value.allSatisfy(NativeInteractionCodec.validReaction)
         }
     }
 
     static func delivery(_ value: String, retaining current: NativeDeliveryStatus) -> NativeDeliveryStatus {
-        if current == .displayed || value == "displayed" { return .displayed }
+        if current == .displayed || value == "displayed" || value == "read" { return .displayed }
         if current == .delivered || value == "delivered" { return .delivered }
         return .unconfirmed
     }
@@ -74,10 +74,6 @@ enum NativeCloudMerge {
         ![.incoming, .submitted].contains(message.state)
     }
 
-    static func protected(_ message: NativeGroupText) -> Bool {
-        message.hidden || message.retracted || message.actionPending || message.actionRequestID != nil || message.actionNotice != nil ||
-        ![.incoming, .submitted].contains(message.state)
-    }
 }
 
 public enum NativeChatEvent: Sendable {
@@ -177,7 +173,8 @@ public struct NativeChatStore: Codable, Equatable {
     mutating func mergeCloud(_ records: [NativeCloudMessage], owner: String, earlier: Bool = false) throws {
         guard records.count <= 50, NativeChatCodec.bareJID(owner) == owner, records.allSatisfy({ record in
             NativeCloudMerge.valid(record) && record.kind == "contact" && NativeChatCodec.bareJID(record.peer) == record.peer &&
-            record.peer != owner && NativeChatCodec.bareJID(record.sender) == (record.direction == "self" ? owner : record.peer)
+            record.peer != owner && ((record.direction == "self" && record.sender.isEmpty) ||
+                NativeChatCodec.bareJID(record.sender) == (record.direction == "self" ? owner : record.peer))
         }) else { throw NativeChatFailure.invalidMessage }
         var candidate = self
         var retained = Set<UUID>()
@@ -191,20 +188,22 @@ public struct NativeChatStore: Codable, Equatable {
             guard matches.count <= 1 else { throw NativeChatFailure.invalidMessage }
             if let index = matches.first {
                 retained.insert(candidate.messages[index].id)
-                if NativeCloudMerge.protected(candidate.messages[index]) { continue }
-                candidate.messages[index].cloudID = candidate.messages[index].cloudID ?? record.messageID
-                candidate.messages[index].delivery = NativeCloudMerge.delivery(record.deliveryStatus, retaining: candidate.messages[index].delivery)
                 if record.retracted {
                     candidate.messages[index].retracted = true
                     candidate.messages[index].body = ""
                     candidate.messages[index].reactions.removeAll()
-                } else {
-                    if record.edited || (!candidate.messages[index].edited && candidate.messages[index].stanzaID == nil) {
-                        candidate.messages[index].body = record.text
-                    }
-                    candidate.messages[index].edited = candidate.messages[index].edited || record.edited
-                    candidate.messages[index].reactions = record.reactions
+                    candidate.messages[index].actionPending = false
+                    candidate.messages[index].reactionPending = false
+                    continue
                 }
+                if NativeCloudMerge.protected(candidate.messages[index]) { continue }
+                candidate.messages[index].cloudID = candidate.messages[index].cloudID ?? record.messageID
+                candidate.messages[index].delivery = NativeCloudMerge.delivery(record.deliveryStatus, retaining: candidate.messages[index].delivery)
+                if record.edited || (!candidate.messages[index].edited && candidate.messages[index].stanzaID == nil) {
+                    candidate.messages[index].body = record.text
+                }
+                candidate.messages[index].edited = candidate.messages[index].edited || record.edited
+                candidate.messages[index].reactions = record.reactions
             } else {
                 candidate.messages.append(NativeChatMessage(id: UUID(), stanzaID: nil, cloudID: record.messageID, peer: record.peer,
                     body: record.retracted ? "" : record.text, date: record.date, state: outgoing ? .submitted : .incoming,

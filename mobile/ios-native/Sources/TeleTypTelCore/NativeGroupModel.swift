@@ -48,6 +48,22 @@ public final class NativeGroupModel: ObservableObject {
         }
     }
 
+    func openCloudConversation(_ conversation: NativeCloudConversation, owner: String) {
+        guard conversation.kind == "group", self.owner == owner, NativeChatCodec.bareJID(conversation.peer) == conversation.peer else { return }
+        guard reserveRoomSlot(conversation.peer) else { error = NativeGroupFailure.limit.label; return }
+        rememberCloudConversations([conversation], owner: owner)
+    }
+
+    private func reserveRoomSlot(_ room: String) -> Bool {
+        if rooms.contains(where: { $0.room == room }) || rooms.count < 8 { return true }
+        guard let replaced = rooms.firstIndex(where: {
+            $0.snapshot == nil && !$0.joining && $0.draft.isEmpty && $0.retractionTombstones.isEmpty &&
+                $0.messages.allSatisfy { !NativeCloudMerge.protected($0) }
+        }) else { return false }
+        rooms.remove(at: replaced)
+        return true
+    }
+
     func mergeCloud(_ records: [NativeCloudMessage], room: String, owner: String, earlier: Bool = false) throws {
         guard records.count <= 50, self.owner == owner, NativeChatCodec.bareJID(owner) == owner,
               NativeChatCodec.bareJID(room) == room, room != owner,
@@ -56,8 +72,13 @@ public final class NativeGroupModel: ObservableObject {
         var imported: [(NativeCloudMessage, String)] = []
         for record in records {
             guard NativeCloudMerge.valid(record), record.kind == "group", record.peer == room else { throw NativeGroupFailure.invalidRoom }
-            guard record.sender.hasPrefix(room + "/") else { throw NativeGroupFailure.invalidRoom }
-            let nickname = String(record.sender.dropFirst(room.count + 1))
+            let nickname: String
+            if record.direction == "self", record.sender.isEmpty {
+                nickname = group.nickname
+            } else {
+                guard record.sender.hasPrefix(room + "/") else { throw NativeGroupFailure.invalidRoom }
+                nickname = String(record.sender.dropFirst(room.count + 1))
+            }
             guard NativeMUCStream.validNickname(nickname) else { throw NativeGroupFailure.invalidRoom }
             imported.append((record, nickname))
         }
@@ -72,14 +93,15 @@ public final class NativeGroupModel: ObservableObject {
             guard matches.count <= 1 else { throw NativeGroupFailure.invalidRoom }
             if let message = matches.first {
                 retained.insert(merged[message].id)
-                if NativeCloudMerge.protected(merged[message]) { continue }
-                merged[message].cloudID = merged[message].cloudID ?? record.messageID
                 if record.retracted {
                     merged[message].body = ""; merged[message].retracted = true; merged[message].reactions.removeAll()
-                } else {
-                    if record.edited || merged[message].identifier == nil { merged[message].body = record.text }
-                    merged[message].reactions = record.reactions
+                    merged[message].actionPending = false
+                    continue
                 }
+                if NativeCloudMerge.protected(merged[message]) { continue }
+                merged[message].cloudID = merged[message].cloudID ?? record.messageID
+                if record.edited || merged[message].identifier == nil { merged[message].body = record.text }
+                merged[message].reactions = record.reactions
             } else {
                 merged.append(NativeGroupText(id: UUID(), room: room, nickname: nickname, identifier: nil, cloudID: record.messageID,
                     archiveID: nil, body: record.retracted ? "" : record.text, date: record.date, own: own,
@@ -171,7 +193,7 @@ public final class NativeGroupModel: ObservableObject {
         do { _ = try NativeMUCStream(room: room, nickname: nickname, boundJID: owner + "/validation") }
         catch { self.error = NativeGroupFailure.invalidRoom.label; return }
         guard rooms.first(where: { $0.room == room })?.snapshot == nil, joins[room] == nil else { return }
-        guard rooms.contains(where: { $0.room == room }) || rooms.count < 8 else { error = NativeGroupFailure.limit.label; return }
+        guard reserveRoomSlot(room) else { error = NativeGroupFailure.limit.label; return }
         if let index = rooms.firstIndex(where: { $0.room == room }) {
             rooms[index].joining = true; rooms[index].error = nil; rooms[index].nickname = nickname
         } else { rooms.append(NativeGroupConversation(room: room, nickname: nickname)) }

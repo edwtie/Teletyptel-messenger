@@ -160,6 +160,85 @@ final class NativeCloudHistoryTests: XCTestCase {
         }
     }
 
+    func testOnlySelfMessagesAllowEmptyStringSendersWithoutChangingIdentity() throws {
+        for kind in ["contact", "group"] {
+            let conversation = kind == "contact" ? peer : "room@conference.localhost"
+            let record = fields(["conversationKind": .string(kind), "conversationPeer": .string(conversation),
+                                 "direction": .string("self"), "from": .string("")])
+            let message = NativeCloudMessage(fields: record)
+            try message.validate()
+            try message.validate(owner: owner, peer: conversation, kind: kind, requireVersion: true)
+            XCTAssertEqual(message.sender, "")
+            XCTAssertEqual(try JSONDecoder().decode([String: NativeCloudValue].self, from: JSONEncoder().encode(message)), record)
+            for sender in [NativeCloudValue.null, .bool(false), .string(" ")] {
+                var invalid = record; invalid["from"] = sender
+                XCTAssertThrowsError(try NativeCloudMessage(fields: invalid).validate())
+            }
+            var missing = record; missing.removeValue(forKey: "from")
+            XCTAssertThrowsError(try NativeCloudMessage(fields: missing).validate())
+            var incoming = record; incoming["direction"] = .string("peer")
+            XCTAssertThrowsError(try NativeCloudMessage(fields: incoming).validate())
+            XCTAssertThrowsError(try NativeCloudMessage(fields: incoming).validate(owner: owner))
+            var normalized = message; normalized.fields["from"] = .string(kind == "contact" ? owner : conversation + "/invented")
+            XCTAssertThrowsError(try normalized.validate(owner: owner))
+        }
+    }
+
+    func testFetchOwnEmptySendersRequiresExactScopeAndRejectsIncomingEmptySenders() async throws {
+        let client = try client()
+        for kind in ["contact", "group"] {
+            let conversation = kind == "contact" ? peer : "room@conference.localhost"
+            let record = fields(["conversationKind": .string(kind), "conversationPeer": .string(conversation),
+                                 "direction": .string("self"), "from": .string("")])
+            CloudHistoryHTTPFixture.handler = { _, _ in (200, try self.page([record])) }
+            let result = try await client.fetch(peer: conversation, kind: kind, before: nil)
+            XCTAssertEqual(result.messages.first?.fields, record)
+            XCTAssertEqual(result.messages.first?.sender, "")
+            for changes in [["accountId": NativeCloudValue.string("other")], ["owner": .string("Owner@localhost")]] {
+                CloudHistoryHTTPFixture.handler = { _, _ in (200, try self.page([record], changes: changes)) }
+                await assertFailure(.invalidResponse) { _ = try await client.fetch(peer: conversation, kind: kind, before: nil) }
+            }
+            var incoming = record; incoming["direction"] = .string("peer")
+            CloudHistoryHTTPFixture.handler = { _, _ in (200, try self.page([incoming])) }
+            await assertFailure(.invalidResponse) { _ = try await client.fetch(peer: conversation, kind: kind, before: nil) }
+        }
+    }
+
+    func testFetchedOwnEmptySendersCASUpdatePreservesRawSenderAndMetadata() async throws {
+        let client = try client()
+        for kind in ["contact", "group"] {
+            let conversation = kind == "contact" ? peer : "room@conference.localhost"
+            let record = fields(["conversationKind": .string(kind), "conversationPeer": .string(conversation),
+                                 "direction": .string("self"), "from": .string("")])
+            var updated = record; updated["text"] = .string("Updated web message"); updated["edited"] = .bool(true)
+            var calls: [String] = []
+            CloudHistoryHTTPFixture.handler = { request, body in
+                calls.append((request.httpMethod ?? "") + " " + (request.url?.path ?? ""))
+                XCTAssertEqual(request.url?.host, "example.invalid")
+                XCTAssertEqual(request.value(forHTTPHeaderField: "Cookie"), "PHPSESSID=fiction")
+                if request.url?.path == "/api/native-profile.php" { return (200, try self.profile()) }
+                if request.httpMethod == "GET" { return (200, try self.page([record])) }
+                XCTAssertEqual(request.url?.path, "/api/native-history.php")
+                XCTAssertEqual(request.value(forHTTPHeaderField: "X-CSRF-Token"), self.digest)
+                let input = try JSONDecoder().decode([String: NativeCloudValue].self, from: body)
+                XCTAssertEqual(input["accountId"], .string("fiction"))
+                XCTAssertEqual(input["expectedVersion"], .string(self.digest))
+                XCTAssertEqual(input["message"], .object(updated))
+                var response = updated; response["version"] = .string(self.nextDigest)
+                return (200, try self.saved(response))
+            }
+            let page = try await client.fetch(peer: conversation, kind: kind, before: nil)
+            var candidate = try XCTUnwrap(page.messages.first)
+            candidate.fields["text"] = updated["text"]; candidate.fields["edited"] = updated["edited"]
+            let result = try await client.save(candidate, expectedVersion: candidate.version)
+            XCTAssertEqual(result.sender, ""); XCTAssertEqual(result.fields["from"], .string(""))
+            XCTAssertEqual(result.key, candidate.key); XCTAssertEqual(result.version, nextDigest)
+            var expected = updated; expected["version"] = .string(nextDigest)
+            XCTAssertEqual(result.fields, expected)
+            XCTAssertEqual(calls, ["GET /api/native-history.php", "GET /api/native-profile.php", "POST /api/native-history.php"])
+        }
+    }
+
     func testFetchUsesOnlyAuthenticatedHistoryRouteAndOpaqueCursor() async throws {
         let client = try client(); let cursor = "opaque+/=?&before=not-a-url"
         var requests = 0
@@ -297,6 +376,12 @@ final class NativeCloudHistoryTests: XCTestCase {
         await assertFailure(.invalidResponse) { _ = try await client.save(huge, expectedVersion: self.digest) }
         let wrongSender = NativeCloudMessage(fields: fields(["from": .string(owner)]))
         await assertFailure(.invalidResponse) { _ = try await client.save(wrongSender, expectedVersion: self.digest) }
+        for kind in ["contact", "group"] {
+            var emptySender = fields(["direction": .string("self"), "from": .string(""), "conversationKind": .string(kind)])
+            emptySender.removeValue(forKey: "version")
+            let insertion = NativeCloudMessage(fields: emptySender)
+            await assertFailure(.invalidResponse) { _ = try await client.save(insertion, expectedVersion: nil) }
+        }
         XCTAssertEqual(requests, 0)
     }
 

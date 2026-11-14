@@ -42,8 +42,15 @@ final class NativeFeatureFixture: URLProtocol {
                         "status": "history", "timestamp": earlier ? "2026-07-01 10:20:00" : "2026-11-01 10:20:30",
                         "edited": false, "retracted": false, "reactions": [:], "deliveryStatus": "sent", "version": String(repeating: "a", count: 64)], at: 0)
                 }
+                if cloudFixture && !earlier && kind == "contact" && peer == "archive-only@localhost" {
+                    records.append(["conversationPeer": peer, "conversationKind": kind, "conversationName": "Online archief",
+                        "messageId": "ui-cloud-own-web", "direction": "self", "from": "", "text": "Eigen online bericht van de webapp",
+                        "status": "message", "timestamp": "2026-11-01 10:21:00", "edited": false,
+                        "retracted": false, "reactions": [:], "deliveryStatus": "read", "version": String(repeating: "b", count: 64)])
+                }
                 value["messages"] = Array(records.prefix(50))
-                value["nextCursor"] = cloudFixture && !earlier ? "fixture-older" : NSNull()
+                if cloudFixture && !earlier { value["nextCursor"] = "fixture-older" }
+                else { value["nextCursor"] = NSNull() }
                 status = 200
             }
         }

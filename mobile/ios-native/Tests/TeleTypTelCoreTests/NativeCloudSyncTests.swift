@@ -727,6 +727,136 @@ final class NativeCloudSyncTests: XCTestCase {
     }
 
     @MainActor
+    func testPartialLiveReactionOverlaysOnlyChangedActorOnKnownServerReactionsWithCAS() async throws {
+        try await withSync { sync, client in
+            let stored = try self.message(version: self.version, metadata: [
+                "reactions": .object([self.peer: .array([.string("👍")])]),
+                "futureMetadata": .object(["serverOnly": .bool(true)]),
+                "attachment": .object(["opaque": .string("keep-server-attachment")])
+            ])
+            try await self.load(sync, client: client, messages: [stored])
+            let leanPrevious = try self.message()
+            XCTAssertTrue(leanPrevious.reactions.isEmpty)
+            var candidate = leanPrevious
+            candidate.fields["reactions"] = .object([self.owner: .array([.string("❤️")])])
+            sync.record(candidate, previous: leanPrevious)
+
+            try await self.waitUntil("actor-scoped reaction CAS save") { await client.snapshot().saves.count == 1 }
+            var expected = stored
+            expected.fields["reactions"] = .object([
+                self.peer: .array([.string("👍")]), self.owner: .array([.string("❤️")])
+            ])
+            let snapshot = await client.snapshot()
+            XCTAssertEqual(snapshot.saves, [.init(message: expected, expectedVersion: self.version)])
+            XCTAssertEqual(snapshot.saves[0].message.reactions, [self.peer: ["👍"], self.owner: ["❤️"]])
+            try await client.completeSave(0, with: .success(self.saved(expected, version: self.nextVersion)))
+            try await self.waitUntil("actor-scoped reaction confirmed") { sync.notice != nil }
+            await self.settle()
+            let completed = await client.snapshot()
+            XCTAssertEqual(completed.saves.count, 1)
+            XCTAssertEqual(completed.fetches.count, 1)
+        }
+    }
+
+    @MainActor
+    func testCoalescedInsertAndReactionDuringInitialGETRefusesUnbasedWriteThenUsesKnownCASForNextAction() async throws {
+        try await withSync { sync, client in
+            sync.load(peer: self.peer, kind: "contact")
+            try await self.waitUntil("initial GET before native insert") { await client.snapshot().fetches.count == 1 }
+            let native = try self.message(text: "Same body inserted by native and web")
+            sync.record(native, previous: nil)
+            var reacted = native
+            reacted.fields["reactions"] = .object([self.owner: .array([.string("❤️")])])
+            sync.record(reacted, previous: native)
+            await self.settle()
+            let held = await client.snapshot()
+            XCTAssertEqual(held.fetches.count, 1)
+            XCTAssertTrue(held.saves.isEmpty)
+
+            let web = try self.message(text: native.text, version: self.version, metadata: [
+                "reactions": .object([self.peer: .array([.string("👍")])]),
+                "attachment": .object(["opaque": .string("retain-web-attachment")]),
+                "futureMetadata": .object(["webOnly": .array([.string("retain"), .number(42)])])
+            ])
+            try await client.completeFetch(0, with: .success(self.page([web])))
+            try await self.waitUntil("initial GET resolves coalesced native insert") {
+                sync.state(peer: self.peer, kind: "contact").ready && !sync.state(peer: self.peer, kind: "contact").loading
+            }
+            await self.settle()
+            let refused = await client.snapshot()
+            XCTAssertTrue(refused.saves.isEmpty)
+            let refusalNotice = sync.notice
+            XCTAssertNotNil(refusalNotice)
+
+            let explicitEdit = self.edited(reacted, text: "Separate explicit action after refusal")
+            sync.record(explicitEdit, previous: reacted)
+            try await self.waitUntil("separate explicit action uses fetched CAS base") { await client.snapshot().saves.count == 1 }
+            let expected = self.edited(web, text: explicitEdit.text)
+            let snapshot = await client.snapshot()
+            XCTAssertEqual(snapshot.saves, [.init(message: expected, expectedVersion: self.version)])
+            XCTAssertEqual(snapshot.saves[0].message.reactions, web.reactions)
+            XCTAssertEqual(snapshot.fetches.count, 1)
+            try await client.completeSave(0, with: .success(self.saved(expected, version: self.nextVersion)))
+            try await self.waitUntil("separate explicit action confirmed") { sync.notice != refusalNotice }
+            await self.settle()
+            let completed = await client.snapshot()
+            XCTAssertEqual(completed.saves.count, 1)
+        }
+    }
+
+    @MainActor
+    func testServerDisabled403BlocksConversationUploadsAndDropsQueuedWritesBeforePolicyRefresh() async throws {
+        try await withSync { sync, client in
+            let stored = try self.message(version: self.version, metadata: [
+                "futureMetadata": .string("keep-known-server-base")
+            ])
+            try await self.load(sync, client: client, messages: [stored])
+            let inFlight = self.edited(stored, text: "Rejected because server disabled saving")
+            sync.record(inFlight, previous: stored)
+            try await self.waitUntil("save awaiting disabled response") { await client.snapshot().saves.count == 1 }
+            sync.record(self.edited(inFlight, text: "Drop queued edit after 403"), previous: inFlight)
+            sync.record(try self.message(id: "queued-before-403", text: "Drop queued insert after 403"), previous: nil)
+            try await client.completeSave(0, with: .failure(.disabled))
+            try await self.waitUntil("conversation saving disabled by server") {
+                sync.state(peer: self.peer, kind: "contact").notice != nil && sync.notice != nil
+            }
+            XCTAssertTrue(sync.state(peer: self.peer, kind: "contact").ready)
+            sync.record(try self.message(id: "blocked-after-403", text: "Policy must block subsequent insert"), previous: nil)
+            sync.record(self.edited(inFlight, text: "Policy must block subsequent edit"), previous: inFlight)
+            await self.settle()
+            let disabledNotice = sync.notice
+            let disabled = await client.snapshot()
+            XCTAssertEqual(disabled.saves, [.init(message: inFlight, expectedVersion: self.version)])
+            XCTAssertEqual(disabled.fetches.count, 1)
+
+            sync.load(peer: self.peer, kind: "contact", refresh: true)
+            try await self.waitUntil("explicit policy refresh after 403") { await client.snapshot().fetches.count == 2 }
+            try await client.completeFetch(1, with: .success(self.page()))
+            try await self.waitUntil("policy refresh completes without queue replay") {
+                !sync.state(peer: self.peer, kind: "contact").loading
+            }
+            await self.settle()
+            XCTAssertNil(sync.state(peer: self.peer, kind: "contact").notice)
+            let refreshed = await client.snapshot()
+            XCTAssertEqual(refreshed.saves.count, 1)
+
+            let explicitEdit = self.edited(stored, text: "New explicit action after policy refresh")
+            sync.record(explicitEdit, previous: stored)
+            try await self.waitUntil("new CAS save after policy refresh") { await client.snapshot().saves.count == 2 }
+            let snapshot = await client.snapshot()
+            XCTAssertEqual(snapshot.saves, [
+                .init(message: inFlight, expectedVersion: self.version),
+                .init(message: explicitEdit, expectedVersion: self.version)
+            ])
+            try await client.completeSave(1, with: .success(self.saved(explicitEdit, version: self.nextVersion)))
+            try await self.waitUntil("new action after disabled response confirmed") { sync.notice != disabledNotice }
+            await self.settle()
+            let completed = await client.snapshot()
+            XCTAssertEqual(completed.saves.count, 2)
+        }
+    }
+
+    @MainActor
     func testStopIgnoresLateSaveCompletionAndDoesNotReplayQueuedWritesAfterReconfigure() async throws {
         try await withSync { sync, client in
             try await self.load(sync, client: client)

@@ -98,6 +98,7 @@ struct NativeCloudMessage: Codable, Sendable, Equatable {
         } else if requireVersion || (fields["version"] != nil && fields["version"] != .null) {
             throw NativeCloudHistoryFailure.invalidResponse
         }
+        if direction == "self", sender.isEmpty { return }
         if self.kind == "contact" {
             guard let from = NativeChatCodec.bareJID(sender),
                   owner == nil || from == (direction == "self" ? owner : self.peer) else {

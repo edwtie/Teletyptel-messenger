@@ -49,6 +49,30 @@ final class NativeCloudMergeTests: XCTestCase {
         XCTAssertEqual(try JSONDecoder().decode(NativeChatStore.self, from: JSONEncoder().encode(store)), store)
     }
 
+    func testWebOwnEmptySenderDirectImportsWithoutWireIdentityOrChangingRawCASIdentity() throws {
+        var store = NativeChatStore()
+        store.setDraft("Keep draft", peer: peer)
+        let web = record("web-own", own: true, sender: "", delivery: "read")
+        let source = web.fields
+        try store.mergeCloud([web], owner: owner)
+        let identity = store.messages[0].id
+        try store.mergeCloud([web], owner: owner)
+        XCTAssertEqual(store.messages.count, 1); XCTAssertEqual(store.messages[0].id, identity)
+        let message = store.messages[0]
+        XCTAssertEqual(message.state, .submitted); XCTAssertEqual(message.cloudID, "web-own")
+        XCTAssertEqual(message.delivery, .displayed); XCTAssertEqual(message.peer, peer)
+        XCTAssertNil(message.stanzaID); XCTAssertNil(message.archiveID)
+        XCTAssertFalse(message.receiptRequested); XCTAssertFalse(message.markable)
+        XCTAssertFalse(store.canCorrect(identity)); XCTAssertFalse(store.canRetract(identity))
+        XCTAssertEqual(store.drafts[peer], "Keep draft")
+        XCTAssertEqual(web.fields, source); XCTAssertEqual(web.sender, "")
+        XCTAssertEqual(try JSONDecoder().decode(NativeCloudMessage.self, from: JSONEncoder().encode(web)).sender, "")
+        let before = store
+        XCTAssertThrowsError(try store.mergeCloud([record("peer-empty", sender: "")], owner: owner))
+        XCTAssertThrowsError(try store.mergeCloud([record("own-foreign", own: true, sender: "other@localhost")], owner: owner))
+        XCTAssertEqual(store, before)
+    }
+
     func testCloudThenLiveAndMAMEnrichSameUUIDWithoutOverwritingCloudEdit() throws {
         var store = NativeChatStore()
         try store.mergeCloud([record("original", text: "Edited remotely", edited: true)], owner: owner)
@@ -152,8 +176,8 @@ final class NativeCloudMergeTests: XCTestCase {
         _ = try store.beginChange(action.id, correctedBody: "Local correction")
         let protected = store.messages.filter { [pending.id, uncertain.id, action.id, hidden.id].contains($0.id) }
         try store.mergeCloud([record("gone", edited: true), record("hidden", text: "Resurrection"),
-            record(pending.stanzaID!, own: true, retracted: true), record(uncertain.stanzaID!, own: true, retracted: true),
-            record(action.stanzaID!, own: true, retracted: true)], owner: owner)
+            record(pending.stanzaID!, own: true, text: "Remote edit", edited: true), record(uncertain.stanzaID!, own: true, edited: true),
+            record(action.stanzaID!, own: true, edited: true)], owner: owner)
         XCTAssertEqual(store.drafts[peer], "Keep draft")
         XCTAssertEqual(store.messages.filter { [pending.id, uncertain.id, action.id, hidden.id].contains($0.id) }, protected)
         let gone = try XCTUnwrap(store.messages.first { $0.cloudID == "gone" })
@@ -161,6 +185,67 @@ final class NativeCloudMergeTests: XCTestCase {
         store.receive(.message(peer: peer, identifier: "gone", body: "Original"))
         XCTAssertEqual(store.messages.first { $0.id == gone.id }?.body, "")
         XCTAssertEqual(store.messages.count, 5)
+    }
+
+    func testCloudRetractionOverridesPreviouslyEditedAndHiddenDirectRowsWithoutChangingIDs() throws {
+        for hidden in [false, true] {
+            var store = NativeChatStore()
+            store.setDraft("Keep draft", peer: peer)
+            let original = try store.enqueueBody("Original", peer: peer)
+            store.finish(original.id, submitted: true)
+            let (_, change, request) = try store.beginChange(original.id, correctedBody: "Edited")
+            store.finishChange(original.id, change: change, request: request, submitted: true)
+            store.applyInteraction(.reactions(target: request, values: ["👍"]), peer: peer, actor: peer)
+            if hidden { try store.hide(original.id) }
+            let before = store.messages[0]
+            XCTAssertFalse(before.previousIDs.isEmpty)
+            try store.mergeCloud([record(original.stanzaID!, own: true, retracted: true)], owner: owner)
+            let after = store.messages[0]
+            XCTAssertEqual(after.id, before.id); XCTAssertEqual(after.stanzaID, before.stanzaID)
+            XCTAssertEqual(after.previousIDs, before.previousIDs); XCTAssertEqual(after.cloudID, before.cloudID)
+            XCTAssertEqual(after.archiveID, before.archiveID); XCTAssertEqual(after.hidden, hidden)
+            XCTAssertTrue(after.retracted); XCTAssertTrue(after.body.isEmpty); XCTAssertTrue(after.reactions.isEmpty)
+            XCTAssertEqual(store.drafts[peer], "Keep draft")
+        }
+    }
+
+    func testCloudRetractionCancelsPendingDirectActionsAndLateCompletionsCannotResurrect() throws {
+        var store = NativeChatStore()
+        let editing = try store.enqueueBody("Editing", peer: peer)
+        store.finish(editing.id, submitted: true)
+        let (_, change, editRequest) = try store.beginChange(editing.id, correctedBody: "Late edit")
+        let reacting = try store.enqueueBody("Reacting", peer: peer)
+        store.finish(reacting.id, submitted: true)
+        let (_, reactionRequest) = try store.beginReaction(reacting.id)
+        let failed = try store.enqueueBody("Failed edit", peer: peer)
+        store.finish(failed.id, submitted: true)
+        let (_, failedChange, failedRequest) = try store.beginChange(failed.id, correctedBody: "Uncertain edit")
+        store.finishChange(failed.id, change: failedChange, request: failedRequest, submitted: false)
+        let before = store.messages
+        try store.mergeCloud([editing, reacting, failed].map { record($0.stanzaID!, own: true, retracted: true) }, owner: owner)
+        for (message, original) in zip(store.messages, before) {
+            XCTAssertEqual(message.id, original.id); XCTAssertEqual(message.stanzaID, original.stanzaID)
+            XCTAssertEqual(message.actionRequestID, original.actionRequestID); XCTAssertEqual(message.reactionRequest, original.reactionRequest)
+            XCTAssertTrue(message.retracted); XCTAssertTrue(message.body.isEmpty); XCTAssertTrue(message.reactions.isEmpty)
+            XCTAssertFalse(message.actionPending); XCTAssertFalse(message.reactionPending)
+        }
+        let terminal = store
+        store.finishChange(editing.id, change: change, request: editRequest, submitted: true)
+        store.finishReaction(reacting.id, request: reactionRequest, actor: owner, values: ["👍"], submitted: true)
+        store.finishChange(failed.id, change: failedChange, request: failedRequest, submitted: true)
+        XCTAssertEqual(store, terminal)
+    }
+
+    func testCloudReadMapsToDisplayedWithoutFabricatingIncomingAcknowledgements() throws {
+        var store = NativeChatStore()
+        try store.mergeCloud([record("read-own", own: true, delivery: "read"), record("read-peer", delivery: "read")], owner: owner)
+        try store.mergeCloud([record("read-own", own: true, delivery: "sent")], owner: owner)
+        XCTAssertTrue(store.messages.allSatisfy { $0.delivery == .displayed })
+        let incoming = try XCTUnwrap(store.messages.first { $0.state == .incoming })
+        XCTAssertNil(incoming.stanzaID); XCTAssertNil(incoming.archiveID)
+        XCTAssertFalse(incoming.receiptRequested); XCTAssertFalse(incoming.markable)
+        XCTAssertNil(store.takeReceipt(incoming.id, displayed: false))
+        XCTAssertNil(store.takeReceipt(incoming.id, displayed: true))
     }
 
     func testDirectEarlierPagesTrimNewestAndRefreshTrimsOldestGlobally() throws {
@@ -227,6 +312,33 @@ final class NativeCloudMergeTests: XCTestCase {
     }
 
     @MainActor
+    func testWebOwnEmptySenderGroupUsesExistingNicknameForDisplayOnly() async throws {
+        let model = restoredGroup()
+        let before = model.rooms[0]
+        let web = record("web-own-group", peer: room, kind: "group", own: true, sender: "")
+        let source = web.fields
+        try model.mergeCloud([web], room: room, owner: owner)
+        let identity = model.rooms[0].messages[0].id
+        try model.mergeCloud([web], room: room, owner: owner)
+        XCTAssertEqual(model.rooms[0].messages.count, 1)
+        let message = model.rooms[0].messages[0]
+        XCTAssertEqual(message.id, identity); XCTAssertTrue(message.own); XCTAssertEqual(message.state, .submitted)
+        XCTAssertEqual(message.nickname, before.nickname); XCTAssertEqual(message.cloudID, "web-own-group")
+        XCTAssertNil(message.identifier); XCTAssertNil(message.archiveID); XCTAssertNil(message.occupantID)
+        XCTAssertNil(model.rooms[0].snapshot); XCTAssertFalse(model.rooms[0].joining); XCTAssertFalse(model.available)
+        XCTAssertEqual(model.rooms[0].draft, before.draft); XCTAssertEqual(model.rooms[0].subject, before.subject)
+        XCTAssertTrue(model.rooms[0].retractionTombstones.isEmpty)
+        XCTAssertFalse(model.canReact(room: room, identifier: identity)); XCTAssertFalse(model.canRetract(room: room, identifier: identity))
+        XCTAssertEqual(web.fields, source); XCTAssertEqual(web.sender, "")
+        XCTAssertEqual(try JSONDecoder().decode(NativeCloudMessage.self, from: JSONEncoder().encode(web)).sender, "")
+        let imported = model.rooms
+        XCTAssertThrowsError(try model.mergeCloud([
+            record("peer-empty", peer: room, kind: "group", sender: "")
+        ], room: room, owner: owner))
+        XCTAssertEqual(model.rooms, imported)
+    }
+
+    @MainActor
     func testAuthenticGroupEchoEnrichesSameUUIDAndAppliesRememberedRetraction() async throws {
         let fixture = CloudMergeGroupFixture()
         let model = restoredGroup(tombstones: ["server-peer": "stable-peer"])
@@ -247,6 +359,39 @@ final class NativeCloudMergeTests: XCTestCase {
         XCTAssertEqual(model.rooms[0].messages[1].body, "")
         try model.mergeCloud([groupRecord("peer", text: "Resurrection")], room: room, owner: owner)
         XCTAssertTrue(model.rooms[0].messages[1].retracted)
+        model.disconnect(clear: true)
+    }
+
+    @MainActor
+    func testCloudGroupRetractionCancelsPendingReactionWithoutInventingRoomAuthority() async throws {
+        let fixture = CloudMergeGroupFixture()
+        let original = NativeGroupText(id: UUID(), room: room, nickname: "Me", identifier: "own", archiveID: "server-own",
+            body: "Original", date: Date(), own: true, state: .submitted, occupantID: "stable-own", reactions: ["stable-own": ["👍"]])
+        let model = restoredGroup(messages: [original])
+        model.attach(fixture, owner: owner); model.join(room: room, nickname: "Me")
+        await wait { model.rooms[0].snapshot != nil }
+        model.react(room: room, identifier: original.id, emoji: "❤️")
+        XCTAssertTrue(model.rooms[0].messages[0].actionPending)
+        let before = model.rooms[0]
+        var accepted = 0
+        model.acceptedHistoryChange = { _, _ in accepted += 1 }
+        try model.mergeCloud([groupRecord("own", own: true, retracted: true)], room: room, owner: owner)
+        let terminal = model.rooms[0].messages[0]
+        XCTAssertEqual(terminal.id, original.id); XCTAssertEqual(terminal.identifier, original.identifier)
+        XCTAssertEqual(terminal.archiveID, original.archiveID); XCTAssertEqual(terminal.occupantID, original.occupantID)
+        XCTAssertEqual(terminal.cloudID, original.cloudID); XCTAssertEqual(terminal.actionRequestID, before.messages[0].actionRequestID)
+        XCTAssertTrue(terminal.retracted); XCTAssertTrue(terminal.body.isEmpty); XCTAssertTrue(terminal.reactions.isEmpty)
+        XCTAssertFalse(terminal.actionPending); XCTAssertTrue(model.rooms[0].retractionTombstones.isEmpty)
+        XCTAssertEqual(model.rooms[0].snapshot, before.snapshot); XCTAssertEqual(model.rooms[0].draft, before.draft)
+        await wait { !model.hasPendingSends }
+        await fixture.emit(.reactions(target: "server-own", occupantID: "stable-own", values: ["❤️"]), room: room)
+        await fixture.emit(.subject("Barrier"), room: room)
+        await wait { model.rooms[0].subject == "Barrier" }
+        XCTAssertEqual(model.rooms[0].messages[0], terminal); XCTAssertEqual(accepted, 0)
+        try model.mergeCloud([groupRecord("cloud-only", retracted: true)], room: room, owner: owner)
+        let imported = try XCTUnwrap(model.rooms[0].messages.first { $0.cloudID == "cloud-only" })
+        XCTAssertNil(imported.identifier); XCTAssertNil(imported.archiveID); XCTAssertNil(imported.occupantID)
+        XCTAssertTrue(model.rooms[0].retractionTombstones.isEmpty)
         model.disconnect(clear: true)
     }
 
@@ -330,6 +475,46 @@ final class NativeCloudMergeTests: XCTestCase {
         XCTAssertEqual(offline.rooms[0].nickname.utf8.count, 128)
         XCTAssertNil(offline.rooms[0].snapshot); XCTAssertFalse(offline.rooms[0].joining)
         XCTAssertFalse(offline.available)
+        model.disconnect(clear: true)
+    }
+
+    @MainActor
+    func testOpeningNinthCloudRoomEvictsOnlyInactiveUnprotectedRoomAndNeverDraftsOrRights() async throws {
+        let model = NativeGroupModel()
+        let addresses = (0..<8).map { "catalog\($0)@conference.localhost" }
+        let histories = addresses.enumerated().map { index, address -> NativeGroupHistory in
+            var group = NativeGroupConversation(room: address, nickname: "Me", snapshot: nil, joining: false)
+            var message = NativeGroupText(id: UUID(), room: address, nickname: "Peer", identifier: "m\(index)", archiveID: nil,
+                body: "Retained", date: Date(), own: false, state: .incoming)
+            switch index {
+            case 0: group.draft = "Do not drop draft"
+            case 1: message.hidden = true; message.body = ""
+            case 2: group.retractionTombstones = ["gone": "stable-peer"]
+            case 3: message.state = .uncertain
+            case 4: message.actionNotice = "Uncertain action"
+            case 5: message.retracted = true; message.body = ""
+            default: break
+            }
+            group.messages = [message]
+            return NativeGroupHistory(group)
+        }
+        model.restoreHistory(histories, owner: owner)
+        let fixture = CloudMergeGroupFixture()
+        model.attach(fixture, owner: owner); model.join(room: addresses[6], nickname: "Me")
+        await wait { model.rooms[6].snapshot != nil }
+        let protected = Array(model.rooms.prefix(7))
+        let ninth = NativeCloudConversation(peer: "ninth@conference.localhost", kind: "group", name: "Ninth")
+        model.openCloudConversation(ninth, owner: owner)
+        XCTAssertEqual(model.rooms.count, 8); XCTAssertEqual(Array(model.rooms.prefix(7)), protected)
+        XCTAssertFalse(model.rooms.contains { $0.room == addresses[7] })
+        let opened = try XCTUnwrap(model.rooms.first { $0.room == ninth.peer })
+        XCTAssertNil(opened.snapshot); XCTAssertFalse(opened.joining); XCTAssertTrue(opened.messages.isEmpty)
+        model.setDraft("Protect ninth draft", room: ninth.peer)
+        let full = model.rooms
+        model.openCloudConversation(NativeCloudConversation(peer: "tenth@conference.localhost", kind: "group", name: "Tenth"), owner: owner)
+        XCTAssertEqual(model.rooms, full); XCTAssertEqual(model.error, NativeGroupFailure.limit.label)
+        model.openCloudConversation(ninth, owner: owner)
+        XCTAssertEqual(model.rooms, full)
         model.disconnect(clear: true)
     }
 

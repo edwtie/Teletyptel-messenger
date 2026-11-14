@@ -48,6 +48,7 @@ struct NativeCloudHistoryClient: NativeCloudHistoryServing {
             try validateScope()
             try message.validate(owner: owner)
             guard expectedVersion.map(NativeCloudMessage.validVersion) ?? true,
+                  !message.sender.isEmpty || expectedVersion != nil,
                   message.version == nil || message.version == expectedVersion else { throw NativeCloudHistoryFailure.invalidResponse }
             guard await session.hasSessionCookie else { throw NativeCloudHistoryFailure.unavailable }
             let body = try JSONEncoder().encode(SaveRequest(accountId: accountID, message: message, expectedVersion: expectedVersion))

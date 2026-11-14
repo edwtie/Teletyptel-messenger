@@ -33,7 +33,7 @@ struct NativeChatView: View {
                         .accessibilityIdentifier("chat-connection")
                 }
                 if model.chat.historyLimited {
-                    Text("Alleen de meest recente berichten passen in deze preview.").font(.caption).padding(6)
+                    Text("Beperkt cachevenster · haal andere pagina’s op via Online geschiedenis.").font(.caption).padding(6)
                 }
                 if historyOnly { Text("Online archief · voeg dit contact eerst aan je contactenlijst toe om te chatten.").font(.caption).padding(6) }
                 ScrollViewReader { proxy in

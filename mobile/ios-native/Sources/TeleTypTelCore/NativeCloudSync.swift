@@ -24,7 +24,7 @@ final class NativeCloudSync: ObservableObject {
     private var reads: [String: Task<Void, Never>] = [:]
     private var readTokens: [String: UUID] = [:]
     private var known: [String: NativeCloudMessage] = [:]
-    private var pending: [String: (message: NativeCloudMessage, patch: [String: NativeCloudValue], insertion: Bool)] = [:]
+    private var pending: [String: (message: NativeCloudMessage, patch: [String: NativeCloudValue], insertion: Bool, actorChanges: [String: [String]], changed: Bool)] = [:]
     private var policies: [String: Bool] = [:]
     private var writer: Task<Void, Never>?
     private var writingKey: String?
@@ -101,7 +101,14 @@ final class NativeCloudSync: ObservableObject {
                 guard let self = self, self.generation == attempt, self.readTokens[key] == token else { return }
                 let applicable = page.messages.filter { self.pending[Self.key($0)] == nil && self.writingKey != Self.key($0) && (self.mutations[Self.key($0)] ?? 0) <= started }
                 try self.apply?(applicable, peer, kind, earlier)
-                for message in page.messages where self.writingKey != Self.key(message) && (self.mutations[Self.key(message)] ?? 0) <= started { self.remember(message) }
+                for message in page.messages {
+                    let messageKey = Self.key(message)
+                    guard self.writingKey != messageKey else { continue }
+                    if (self.mutations[messageKey] ?? 0) <= started ||
+                        (self.known[messageKey] == nil && self.pending[messageKey]?.insertion == true) {
+                        self.remember(message)
+                    }
+                }
                 self.policies[key] = page.saveChat
                 self.states[key] = NativeCloudState(ready: true, nextCursor: page.nextCursor,
                     notice: page.saveChat ? nil : "Online bewaren staat uit in je serverinstellingen.")
@@ -127,14 +134,21 @@ final class NativeCloudSync: ObservableObject {
             mutations.removeValue(forKey: evicted)
         }
         guard mutations[key] != nil || mutations.count < 512 else { return }
-        let mutable = ["text", "edited", "retracted", "reactions", "deliveryStatus", "status"]
+        let mutable = ["text", "edited", "retracted", "deliveryStatus", "status"]
         var patch = pending[key]?.patch ?? [:]
         for field in mutable where previous == nil || previous?.fields[field] != message.fields[field] {
             patch[field] = message.fields[field]
         }
-        guard !patch.isEmpty else { return }
+        var actors = pending[key]?.actorChanges ?? [:]
+        if let previous = previous {
+            for actor in Set(previous.reactions.keys).union(message.reactions.keys) where previous.reactions[actor] != message.reactions[actor] {
+                actors[actor] = message.reactions[actor] ?? []
+            }
+        }
+        guard !patch.isEmpty || !actors.isEmpty else { return }
         serial += 1; mutations[key] = serial
-        pending[key] = (message, patch, pending[key]?.insertion ?? (previous == nil))
+        pending[key] = (message, patch, pending[key]?.insertion ?? (previous == nil), actors,
+            (pending[key]?.changed ?? false) || previous != nil)
         let conversation = Self.key(message.peer, message.kind)
         if !state(peer: message.peer, kind: message.kind).ready { load(peer: message.peer, kind: message.kind) }
         else if policies[conversation] == false {
@@ -162,13 +176,18 @@ final class NativeCloudSync: ObservableObject {
                 self.pending.removeValue(forKey: key)
                 let base = self.known[key]
                 if change.insertion, let base = base {
-                    if base.text != change.message.text && !base.retracted {
+                    if change.changed || (base.text != change.message.text && !base.retracted) {
                         self.notice = "Online versie verschilt. Niet overschreven; haal de geschiedenis opnieuw op."
                     }
                     continue
                 }
                 var message = base ?? change.message
                 for (field, value) in change.patch { message.fields[field] = value }
+                if !change.actorChanges.isEmpty {
+                    var reactions = message.reactions
+                    for (actor, values) in change.actorChanges { reactions[actor] = values.isEmpty ? nil : values }
+                    message.fields["reactions"] = .object(reactions.mapValues { .array($0.map { .string($0) }) })
+                }
                 self.writingKey = key
                 do {
                     let saved = try await client.save(message, expectedVersion: base?.version)

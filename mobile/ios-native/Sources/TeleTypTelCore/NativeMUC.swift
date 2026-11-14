@@ -66,6 +66,13 @@ public struct NativeGroupText: Identifiable, Codable, Equatable, Sendable {
     public var cloudMessageID: String? { cloudID ?? identifier }
 }
 
+extension NativeCloudMerge {
+    static func protected(_ message: NativeGroupText) -> Bool {
+        message.hidden || message.retracted || message.actionPending || message.actionRequestID != nil || message.actionNotice != nil ||
+            ![.incoming, .submitted].contains(message.state)
+    }
+}
+
 public enum NativeGroupEvent: Sendable {
     case reactions(target: String, occupantID: String, values: [String])
     case retracted(target: String, occupantID: String)

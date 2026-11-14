@@ -19,7 +19,7 @@ function nativeHistoryFails(callable $action, string $code, int $status): void
     throw new RuntimeException('Expected ' . $code);
 }
 
-function nativeHistoryFixture(PDO $pdo, bool $preference = true): void
+function nativeHistoryFixture(PDO $pdo, bool $preference = true, bool $uniqueMessages = true): void
 {
     $pdo->exec('CREATE TABLE account_profiles (account_id TEXT PRIMARY KEY, jid TEXT, password_secret TEXT'
         . ($preference ? ', save_chat_history INTEGER DEFAULT 1' : '') . ')');
@@ -38,7 +38,8 @@ function nativeHistoryFixture(PDO $pdo, bool $preference = true): void
         retracted INTEGER NOT NULL DEFAULT 0, retraction_json TEXT, reactions_json TEXT,
         delivery_status TEXT NOT NULL DEFAULT "", message_timestamp TEXT NOT NULL,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP, updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        future_metadata TEXT DEFAULT "opaque future data", UNIQUE(account_id, message_id))');
+        future_metadata TEXT DEFAULT "opaque future data"'
+        . ($uniqueMessages ? ', UNIQUE(account_id, message_id)' : '') . ')');
 }
 
 function nativeHistoryMessage(string $id = 'message-1'): array
@@ -217,7 +218,7 @@ $oversize['attachment'] = ['opaque' => str_repeat('a', 32768)];
 nativeHistoryFails(fn() => nativeHistorySave($pdo, $session, $oversize), 'cloud_history_too_large', 413);
 $emptyFrom = nativeHistoryMessage('empty-from');
 $emptyFrom['from'] = '';
-nativeHistoryCheck(nativeHistorySave($pdo, $session, $emptyFrom)['from'] === '', 'Empty web sender remains representable and bound');
+nativeHistoryFails(fn() => nativeHistorySave($pdo, $session, $emptyFrom), 'cloud_history_invalid_request', 400);
 $invalidReactions = nativeHistoryMessage('invalid-reactions');
 $invalidReactions['reactions'] = ['peer@example.test' => ['future' => 'unknown']];
 nativeHistoryFails(fn() => nativeHistorySave($pdo, $session, $invalidReactions), 'cloud_history_invalid_request', 400);
@@ -293,4 +294,77 @@ NativeCloudHistory::sameOrigin($origin + ['HTTP_ORIGIN' => 'https://example.test
 foreach ([['HTTP_ORIGIN' => 'https://evil.test'], ['HTTP_ORIGIN' => 'null'], ['HTTP_SEC_FETCH_SITE' => 'same-site']] as $bad) {
     nativeHistoryFails(fn() => NativeCloudHistory::sameOrigin($origin + $bad), 'cloud_history_origin_denied', 403);
 }
-echo "Native cloud history: mapping, isolation, CAS, metadata, terminal state, preferences, cursors, discovery and byte bounds passed\n";
+$webPdo = new PDO('sqlite::memory:', null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+nativeHistoryFixture($webPdo);
+foreach (['contact', 'group'] as $kind) {
+    $webMessage = nativeHistoryMessage('web-empty-from-' . $kind);
+    $webMessage['conversationKind'] = $kind;
+    nativeHistorySave($webPdo, $session, $webMessage);
+    $webPdo->prepare('UPDATE message_history SET sender_jid = ? WHERE account_id = ? AND message_id = ?')
+        ->execute(['', 'one', $webMessage['messageId']]);
+    $rawWeb = $webPdo->query('SELECT * FROM message_history ORDER BY id DESC LIMIT 1')->fetch(PDO::FETCH_ASSOC);
+    $webRecord = NativeCloudHistory::read($webPdo, $session, nativeHistoryQuery(['kind' => $kind]))['messages'][0];
+    nativeHistoryCheck($webRecord['from'] === '' && $webRecord['direction'] === 'self'
+        && $webRecord['version'] === NativeCloudHistory::version($rawWeb), 'Read preserves real web empty sender and raw version: ' . $kind);
+    $webRecord['text'] = 'CAS edit of existing web self message';
+    $webRecord['status'] = 'edited';
+    $editedWeb = nativeHistorySave($webPdo, $session, $webRecord, $webRecord['version']);
+    nativeHistoryCheck($editedWeb['from'] === '' && $editedWeb['edited'] && $editedWeb['text'] === $webRecord['text'],
+        'CAS body edit allows existing empty self sender: ' . $kind);
+    $afterWeb = $webPdo->query('SELECT * FROM message_history ORDER BY id DESC LIMIT 1')->fetch(PDO::FETCH_ASSOC);
+    foreach ($rawWeb as $column => $value) {
+        if (in_array($column, ['text', 'edited', 'status', 'updated_at'], true)) continue;
+        nativeHistoryCheck($afterWeb[$column] === $value, 'Web CAS keeps raw identity/opaque metadata ' . $column . ': ' . $kind);
+    }
+    nativeHistoryFails(fn() => nativeHistorySave($webPdo, $session, $webRecord, $webRecord['version']), 'cloud_history_conflict', 409);
+    $forgedSender = $editedWeb;
+    $forgedSender['from'] = 'one@example.test';
+    nativeHistoryFails(fn() => nativeHistorySave($webPdo, $session, $forgedSender, $editedWeb['version']), 'cloud_history_conflict', 409);
+    $newEmpty = $webMessage;
+    $newEmpty['messageId'] = 'new-empty-' . $kind;
+    $newEmpty['from'] = '';
+    nativeHistoryFails(fn() => nativeHistorySave($webPdo, $session, $newEmpty), 'cloud_history_invalid_request', 400);
+    $missingEmpty = $newEmpty;
+    nativeHistoryFails(fn() => nativeHistorySave($webPdo, $session, $missingEmpty, $editedWeb['version']), 'cloud_history_conflict', 409);
+    $newEmpty['direction'] = 'peer';
+    nativeHistoryFails(fn() => nativeHistorySave($webPdo, $session, $newEmpty, $editedWeb['version']), 'cloud_history_invalid_request', 400);
+    nativeHistoryCheck($afterWeb === $webPdo->query('SELECT * FROM message_history ORDER BY id DESC LIMIT 1')->fetch(PDO::FETCH_ASSOC),
+        'Rejected empty-sender writes cannot modify data: ' . $kind);
+}
+nativeHistoryCheck((int)$webPdo->query('SELECT COUNT(*) FROM message_history')->fetchColumn() === 2,
+    'No new empty-sender row is inserted for contact or group');
+foreach ([
+    'missing' => null,
+    'nonunique' => 'CREATE INDEX legacy_lookup ON message_history (account_id, message_id)',
+    'account-only' => 'CREATE UNIQUE INDEX legacy_unique ON message_history (account_id)',
+    'message-only' => 'CREATE UNIQUE INDEX legacy_unique ON message_history (message_id)',
+    'wider' => 'CREATE UNIQUE INDEX legacy_unique ON message_history (account_id, message_id, direction)',
+    'expression' => 'CREATE UNIQUE INDEX legacy_unique ON message_history (lower(account_id), message_id)',
+    'prefix-expression' => 'CREATE UNIQUE INDEX legacy_unique ON message_history (substr(account_id, 1, 12), message_id)',
+    'partial' => 'CREATE UNIQUE INDEX legacy_unique ON message_history (account_id, message_id) WHERE direction = "self"',
+] as $label => $indexSql) {
+    $legacyPdo = new PDO('sqlite::memory:', null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+    nativeHistoryFixture($legacyPdo, true, false);
+    if ($indexSql !== null) $legacyPdo->exec($indexSql);
+    $schemaBefore = $legacyPdo->query('SELECT * FROM sqlite_master ORDER BY name')->fetchAll(PDO::FETCH_ASSOC);
+    nativeHistoryFails(fn() => nativeHistorySave($legacyPdo, $session, nativeHistoryMessage()), 'cloud_history_unavailable', 503);
+    nativeHistoryCheck((int)$legacyPdo->query('SELECT COUNT(*) FROM message_history')->fetchColumn() === 0,
+        'Index gate prevents inserting into ' . $label . ' legacy table');
+    nativeHistoryCheck(!$legacyPdo->inTransaction(), 'Index gate fails before transaction: ' . $label);
+    nativeHistoryCheck($schemaBefore === $legacyPdo->query('SELECT * FROM sqlite_master ORDER BY name')->fetchAll(PDO::FETCH_ASSOC),
+        'Index gate never repairs schema: ' . $label);
+    nativeHistoryCheck(NativeCloudHistory::read($legacyPdo, $session, nativeHistoryQuery())['messages'] === [],
+        'Read remains available without valid uniqueness: ' . $label);
+}
+$legacyPdo->exec('DROP INDEX legacy_unique');
+$legacyPdo->exec('CREATE UNIQUE INDEX "reversed\'quoted" ON message_history (message_id, account_id)');
+$indexed = nativeHistorySave($legacyPdo, $session, nativeHistoryMessage());
+nativeHistoryCheck($indexed['messageId'] === 'message-1', 'Full unique pair accepted in either order with quoted index name');
+$legacyPdo->exec('DROP INDEX "reversed\'quoted"');
+$rowsBefore = $legacyPdo->query('SELECT * FROM message_history')->fetchAll(PDO::FETCH_ASSOC);
+$indexed['text'] = 'must not update after index removal';
+nativeHistoryFails(fn() => nativeHistorySave($legacyPdo, $session, $indexed, $indexed['version']), 'cloud_history_unavailable', 503);
+nativeHistoryFails(fn() => nativeHistorySave($legacyPdo, $session, nativeHistoryMessage('must-not-insert')), 'cloud_history_unavailable', 503);
+nativeHistoryCheck($rowsBefore === $legacyPdo->query('SELECT * FROM message_history')->fetchAll(PDO::FETCH_ASSOC),
+    'Index is rechecked on every save; missing index cannot change existing rows');
+echo "Native cloud history: mapping, isolation, CAS, metadata, terminal state, preferences, cursors, discovery, byte bounds and unique-index gate passed\n";

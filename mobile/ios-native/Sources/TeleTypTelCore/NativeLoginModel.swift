@@ -556,6 +556,12 @@ public final class NativeLoginModel: ObservableObject {
         cloudHistory.load(peer: peer, kind: kind, earlier: earlier, refresh: refresh)
     }
 
+    func openCloudGroup(_ room: String) {
+        guard isConnected, !isBackground, let owner = resumableAccount?.jid,
+              let conversation = cloudHistory.conversations.first(where: { $0.kind == "group" && $0.peer == room }) else { return }
+        groups.openCloudConversation(conversation, owner: owner)
+    }
+
     private func queueCloudChanges(_ previous: [NativeChatMessage]) {
         guard isConnected, !isBackground, let owner = resumableAccount?.jid else { return }
         let old = Dictionary(uniqueKeysWithValues: previous.map { ($0.id, $0) })

@@ -33,7 +33,7 @@ struct NativeAccountSettingsView: View {
                     Toggle("Ontvangstbevestigingen versturen", isOn: preference(\.sendDelivery)).accessibilityIdentifier("send-delivery-receipts")
                     Toggle("Leesbevestigingen versturen", isOn: preference(\.sendDisplayed)).accessibilityIdentifier("send-displayed-markers")
                     Text("Leesstatus wordt alleen gedeeld voor berichten die volledig in de geopende chat in beeld staan. Een ontvangstbevestiging betekent niet dat iemand het bericht heeft gelezen.").font(.caption)
-                    Text("Online geschiedenis is de hoofdbron voor web en native. Online bewaren volgt je serverinstellingen; onderstaande schakelaar regelt alleen de versleutelde kopie op dit apparaat.").font(.caption)
+                    Text("Online geschiedenis is de hoofdbron voor web en native. Serverinstellingen en je appvoorkeur bepalen nieuwe online opslag; de lokale cache is een aparte keuze.").font(.caption)
                     Toggle("Nieuwe berichten online bewaren vanuit deze app", isOn: preference(\.saveOnlineHistory)).accessibilityIdentifier("save-online-history")
                     Text("Uitschakelen stopt nieuwe opslag vanuit deze app. Bestaande online berichten en door de server ingestelde archivering blijven bestaan; de webapp heeft daarnaast eigen voorkeuren.").font(.caption)
                     Toggle("Versleutelde lokale cache bewaren", isOn: preference(\.keepHistory)).accessibilityIdentifier("keep-local-history")

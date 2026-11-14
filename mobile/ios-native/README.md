@@ -32,6 +32,77 @@ Before switching the signed target to `com.tiedragon.teletyptel`:
 The existing signed/TestFlight workflow still builds the working wrapper. This
 step did not silently redirect it to the incomplete native target.
 
+## Shared online chat history (2026-11-14)
+
+The native target now uses the same `message_history` database as the web client:
+web uses `api/history.php`, while native uses the authenticated, bounded adapter
+`api/native-history.php`. This is storage on the configured TeleTypTel server,
+not iCloud, Google Drive or an end-to-end-encrypted cloud vault. The encrypted
+device store below is only a recent cache; clearing it does not delete online
+messages. This step does not upload camera/audio recordings, private machine
+translations, drafts or TC transcripts.
+
+After a confirmed XMPP bind and roster readiness, native discovers up to 32
+recent online conversations for the exact active account. Historical contacts
+outside the roster are explicitly read-only; importing a conversation never
+authorizes sending, adds a contact, or grants MUC membership. Historical groups
+start with no live membership snapshot or permissions. The bounded room cache
+can replace an inactive, unprotected, draft-free entry when another online group
+is explicitly opened, but never silently leaves a live room or drops protected
+local state. Online group history is also accessible from the group overview.
+
+Direct and group views fetch 50 records per page with account/peer/kind-bound
+timestamp/row-ID cursors. Older-page browsing preserves the message anchor and
+can shift the bounded 200-message cache window; returning to recent history
+does not require retaining every old message locally. XMPP MAM remains available
+as a fallback and for verified protocol identity enrichment. HTTP record IDs
+alone never become trusted stanza IDs or occupant IDs, enable group actions,
+or send delivery/read receipts. Unknown or archived authors are not converted
+into real-user identities.
+
+Only accepted live messages and explicit accepted mutations enqueue online
+writes. Restoring the device cache, reading SQL/MAM history, editing drafts,
+hiding a local item and clearing the cache never backfill or erase the server.
+Updates use the current record version and an atomic compare-and-swap, preserve
+opaque attachment/location/call metadata, keep retractions terminal, and never
+downgrade delivery state. A conflicting, interrupted or unconfirmed write is
+reported rather than blindly retried. Requests and late replies are scoped to
+the active account/generation and cancelled on background entry/logout.
+
+The native account page separates new online writes from encrypted local-cache
+storage. Disabling native online writes cancels queued uploads but permits
+reading existing history; it cannot undo a request already committed by the
+server. Existing browser-local `saveChat` preferences are not an account-wide
+setting and are not silently treated as synchronized. The API additionally
+honors `account_profiles.save_chat_history` when that existing column is present;
+otherwise its default matches the web client's default. MAM retention is still
+a server policy, not changed by either cache clearing or the native toggle.
+
+Deployment and acceptance boundaries:
+- Deploy the new adapter/service alongside the existing history endpoint before
+  enabling it in a signed device release. Normal web response semantics remain
+  unchanged; no schema migration, live database changes or deployment is run by
+  this implementation task. Exact active-account reads intentionally do not
+  inherit the old endpoint's broader alias discovery.
+- Writes require transactional storage and the existing unique
+  `(account_id,message_id)` identity constraint. Do not replace it with a
+  non-transactional table or infer that SQLite proves MySQL concurrency.
+- Native requests use the authenticated same-origin session, redirect rejection,
+  bounded responses and CSRF-protected writes. Reverse proxies must normalize
+  the public HTTPS origin through trusted server configuration; untrusted
+  forwarded headers are not accepted as proof. Direct TLS is supported.
+- Normal web writes use UTC ISO timestamps. Legacy rows which discarded a
+  different timezone's offset cannot be reliably repaired from their stored
+  wall clock alone; this code does not mass-rewrite their timestamps.
+- Native text remains bounded to 8 KiB, encoded records/requests to 32 KiB and
+  responses to 1 MiB. Unsupported oversized legacy content fails visibly rather
+  than being truncated or silently rewritten. Call-history/transcript migration,
+  unlimited conversation-index browsing, retention/deletion administration,
+  signed device upgrade and hardware acceptance remain separate work.
+
+Validation is recorded after the current native run finishes; earlier green
+builds below do not constitute evidence for this additional online-history code.
+
 ## Reactions, acknowledgements, device history and local SIP (2026-11-14)
 
 The native preview now has direct-chat and room reaction menus/chips using

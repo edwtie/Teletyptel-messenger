@@ -149,6 +149,7 @@ final class NativeCloudHistory
         $kind = self::choice($message['conversationKind'] ?? null, ['contact', 'group']);
         $direction = self::choice($message['direction'] ?? null, ['self', 'peer']);
         $from = self::text($message['from'] ?? null, 255);
+        if ($from === '' && ($version === null || $direction !== 'self')) self::invalid();
         if (isset($message['version']) && $message['version'] !== $version) self::conflict();
         if ($pdo->inTransaction()) throw new LogicException('History requires its own transaction');
         self::requireTransactionalStorage($pdo);
@@ -259,10 +260,31 @@ final class NativeCloudHistory
     private static function requireTransactionalStorage(PDO $pdo): void
     {
         $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
-        if ($driver === 'sqlite') return;
+        $indexes = [];
         if ($driver === 'mysql') {
             $statement = $pdo->query("SELECT ENGINE FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'message_history'");
-            if (strtolower((string)$statement->fetchColumn()) === 'innodb') return;
+            if (strtolower((string)$statement->fetchColumn()) !== 'innodb') {
+                throw new NativeCloudHistoryFailure('cloud_history_unavailable', 503);
+            }
+            foreach ($pdo->query('SHOW INDEX FROM message_history')->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                $name = (string)$row['Key_name'];
+                $indexes[$name] ??= ['columns' => [], 'valid' => true];
+                $indexes[$name]['columns'][] = $row['Column_name'] ?? null;
+                $indexes[$name]['valid'] = $indexes[$name]['valid'] && (int)$row['Non_unique'] === 0
+                    && array_key_exists('Sub_part', $row) && $row['Sub_part'] === null
+                    && ($row['Expression'] ?? null) === null;
+            }
+        } elseif ($driver === 'sqlite') {
+            foreach ($pdo->query('PRAGMA index_list("message_history")')->fetchAll(PDO::FETCH_ASSOC) as $index) {
+                if ((int)$index['unique'] !== 1 || (int)$index['partial'] !== 0) continue;
+                $columns = $pdo->query('PRAGMA index_info(' . $pdo->quote((string)$index['name']) . ')')->fetchAll(PDO::FETCH_ASSOC);
+                $indexes[] = ['columns' => array_column($columns, 'name'),
+                    'valid' => count(array_filter($columns, static fn(array $column): bool => (int)$column['cid'] < 0)) === 0];
+            }
+        }
+        foreach ($indexes as $index) {
+            sort($index['columns'], SORT_STRING);
+            if ($index['valid'] && $index['columns'] === ['account_id', 'message_id']) return;
         }
         throw new NativeCloudHistoryFailure('cloud_history_unavailable', 503);
     }

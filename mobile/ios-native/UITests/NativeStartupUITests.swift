@@ -37,6 +37,8 @@ final class NativeStartupUITests: XCTestCase {
         reveal(archivedContact); tapContact(archivedContact)
         let online = application.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "chat-message-", "Online bericht van de webapp")).firstMatch
         XCTAssertTrue(online.waitForExistence(timeout: 8))
+        let ownOnline = application.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "chat-message-", "Eigen online bericht van de webapp")).firstMatch
+        XCTAssertTrue(ownOnline.waitForExistence(timeout: 8))
         let draft = application.descendants(matching: .any)["chat-draft"].firstMatch
         XCTAssertFalse(draft.isEnabled)
         XCTAssertFalse(application.keyboards.firstMatch.exists)

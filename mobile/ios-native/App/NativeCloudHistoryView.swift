@@ -61,3 +61,25 @@ struct NativeCloudSaveStatus: View {
         if let notice = model.notice { Text(notice).font(.caption).accessibilityIdentifier("cloud-save-status") }
     }
 }
+
+struct NativeOnlineGroups: View {
+    @ObservedObject var cloud: NativeCloudSync
+    @ObservedObject var groups: NativeGroupModel
+    let login: NativeLoginModel
+    var translation: NativeTranslationModel?
+    var body: some View {
+        let previous = cloud.conversations.filter { $0.kind == "group" }
+        if !previous.isEmpty {
+            Section("Online groepsgeschiedenis") {
+                ForEach(previous, id: \.peer) { conversation in
+                    NavigationLink {
+                        NativeGroupChatView(model: groups, room: conversation.peer, login: login, translation: translation)
+                            .onAppear { login.openCloudGroup(conversation.peer) }
+                    } label: {
+                        Label(conversation.name.isEmpty ? conversation.peer : conversation.name, systemImage: "clock.arrow.circlepath")
+                    }.accessibilityIdentifier("cloud-group-" + conversation.peer)
+                }
+            }
+        }
+    }
+}
