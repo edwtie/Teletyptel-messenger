@@ -35,7 +35,7 @@ struct NativeForwardMessageView: View {
             .nativeWebForm().navigationTitle("Doorsturen")
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button { dismiss() } label: { Image(systemName: "xmark").frame(width: 44, height: 44) }.accessibilityLabel("Sluiten") } }
         }
-        .onChange(of: model.phase) { if !model.isConnected { dismiss() } }
+        .onChange(of: model.phase) { _ in if !model.isConnected { dismiss() } }
     }
 }
 
@@ -61,6 +61,6 @@ struct NativeEditMessageView: View {
             }.nativeWebForm().navigationTitle("Bericht bewerken")
                 .toolbar { ToolbarItem(placement: .cancellationAction) { Button { dismiss() } label: { Image(systemName: "xmark").frame(width: 44, height: 44) }.accessibilityLabel("Sluiten") } }
         }
-        .onChange(of: model.phase) { if !model.isConnected { dismiss() } }
+        .onChange(of: model.phase) { _ in if !model.isConnected { dismiss() } }
     }
 }

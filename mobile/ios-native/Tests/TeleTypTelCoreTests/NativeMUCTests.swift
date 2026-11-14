@@ -112,9 +112,11 @@ final class NativeMUCTests: XCTestCase {
     }
 }
 
-private actor GroupFixture: NativeGroupSending {
+private actor GroupFixture: NativeGroupMessageChanging {
     var callbacks: [String: @Sendable (NativeGroupEvent) -> Void] = [:]
     var sends = 0
+    var retractions = 0
+    func retractGroupMessage(room: String, target: String, identifier: String) async throws { retractions += 1 }
     func joinGroup(room: String, nickname: String, onEvent: @escaping @Sendable (NativeGroupEvent) -> Void) async throws {
         callbacks[room] = onEvent
         onEvent(.snapshot(NativeGroupSnapshot(room: room, nickname: nickname, participants: [nickname, "Peer"], canSpeak: true)))
@@ -130,6 +132,26 @@ private actor GroupFixture: NativeGroupSending {
 }
 
 final class NativeGroupModelTests: XCTestCase {
+    @MainActor
+    func testRoomRetractionCannotUseNicknameOrAnotherOccupantsIdentity() async {
+        let fixture = GroupFixture(); let model = NativeGroupModel()
+        let room = "room@conference.localhost"
+        model.attach(fixture, owner: "owner@localhost"); model.join(room: room, nickname: "Me")
+        await wait { model.rooms.first?.snapshot != nil }
+        let text = NativeGroupText(id: UUID(), room: room, nickname: "Peer", identifier: "client-id", archiveID: "server-id",
+            body: "Bewaren", date: Date(), own: false, state: .incoming, occupantID: "stable-peer")
+        await fixture.emit(.message(text), room: room)
+        await wait { model.rooms[0].messages.count == 1 }
+        await fixture.emit(.retracted(target: "server-id", occupantID: "attacker"), room: room)
+        await fixture.emit(.retracted(target: "client-id", occupantID: "stable-peer"), room: room)
+        for _ in 0..<10 { await Task.yield() }
+        XCTAssertEqual(model.rooms[0].messages[0].body, "Bewaren")
+        XCTAssertFalse(model.canRetract(room: room, identifier: text.id))
+        await fixture.emit(.retracted(target: "server-id", occupantID: "stable-peer"), room: room)
+        await wait { model.rooms[0].messages[0].retracted }
+        XCTAssertEqual(model.rooms[0].messages[0].body, "")
+        model.disconnect(clear: true)
+    }
     @MainActor
     private func wait(_ condition: () -> Bool) async {
         for _ in 0..<1000 { if condition() { return }; try? await Task.sleep(nanoseconds: 1_000_000) }

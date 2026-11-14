@@ -193,7 +193,7 @@ public struct NativeChatStore: Equatable {
 
     mutating func mergeArchive(_ page: NativeArchivePage) throws {
         guard page.messages.count <= NativeArchiveQuery.maximum, page.messages.allSatisfy({
-            $0.peer == page.peer && ($0.change != nil || NativeChatCodec.validBody($0.body)) && NativeArchiveQuery.validID($0.archiveID)
+            $0.peer == page.peer && ($0.change != nil || $0.retracted || NativeChatCodec.validBody($0.body)) && NativeArchiveQuery.validID($0.archiveID)
         }) else { throw NativeArchiveFailure.invalidResponse }
         var changes = archivedChanges
         for archived in page.messages where archived.change != nil {
@@ -213,12 +213,15 @@ public struct NativeChatStore: Equatable {
                 $0.peer == archived.peer && ($0.state != .incoming) == archived.outgoing &&
                 ($0.archiveID == archived.archiveID || (archived.identifier != nil && ($0.stanzaID == archived.identifier || $0.previousIDs.contains(archived.identifier!))))
             }) {
+                if archived.retracted { merged[index].body = ""; merged[index].retracted = true }
+                if merged[index].retracted || merged[index].hidden { continue }
                 guard merged[index].body == archived.body else { continue }
                 merged[index].archiveID = archived.archiveID
                 merged[index].date = archived.date
             } else {
                 merged.append(NativeChatMessage(id: UUID(), stanzaID: archived.identifier, peer: archived.peer,
-                    body: archived.body, date: archived.date, state: archived.outgoing ? .submitted : .incoming, archiveID: archived.archiveID))
+                    body: archived.retracted ? "" : archived.body, date: archived.date, state: archived.outgoing ? .submitted : .incoming,
+                    archiveID: archived.archiveID, retracted: archived.retracted))
             }
         }
         merged = merged.enumerated().sorted {

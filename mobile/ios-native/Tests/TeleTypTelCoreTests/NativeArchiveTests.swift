@@ -5,6 +5,21 @@ final class NativeArchiveTests: XCTestCase {
     private let owner = "owner@localhost"
     private let peer = "peer@localhost"
 
+    func testAuthenticatedArchiveTombstoneDoesNotRenderItsBodyOrRestoreOldText() throws {
+        var query = try query()
+        let xml = result(query).replacingOccurrences(of: "<body>Hallo 👋</body>", with: "<retracted xmlns='urn:xmpp:message-retract:1' id='retraction'/><body>Moet verborgen blijven</body>")
+        _ = try query.consume(xml)
+        let page = try XCTUnwrap(query.consume(fin(query)))
+        XCTAssertTrue(page.messages[0].retracted)
+        XCTAssertEqual(page.messages[0].body, "")
+        var store = NativeChatStore()
+        store.receive(.message(peer: peer, identifier: "original", body: "Oude tekst"))
+        try store.mergeArchive(page)
+        XCTAssertEqual(store.messages.count, 1)
+        XCTAssertTrue(store.messages[0].retracted)
+        XCTAssertEqual(store.messages[0].body, "")
+    }
+
     func testArchivedRetractionIsAnAuthorScopedChangeNotItsFallbackBody() throws {
         var query = try query()
         let xml = result(query).replacingOccurrences(of: "<body>Hallo 👋</body>", with: "<retract xmlns='urn:xmpp:message-retract:1' id='older'/><body>Untrusted fallback</body>")

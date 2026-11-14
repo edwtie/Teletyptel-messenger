@@ -16,6 +16,7 @@ public struct NativeArchivedText: Equatable, Sendable {
     public let date: Date
     public let outgoing: Bool
     public var change: NativeMessageChange? = nil
+    public var retracted = false
 }
 
 public struct NativeArchivePage: Equatable, Sendable {
@@ -112,6 +113,15 @@ struct NativeArchiveQuery {
         guard let from = message.attributes["from"].flatMap(NativeChatCodec.bareJID),
               let to = message.attributes["to"].flatMap(NativeChatCodec.bareJID),
               (from == owner && to == peer) || (from == peer && to == owner) else { throw NativeArchiveFailure.invalidResponse }
+        let tombstones = message.children.filter { $0.name == "retracted" && $0.namespace == NativeMessageActionCodec.retraction }
+        if !tombstones.isEmpty {
+            guard tombstones.count == 1, tombstones[0].children.isEmpty,
+                  let request = tombstones[0].attributes["id"], NativeMessageActionCodec.validID(request),
+                  let identifier = message.attributes["id"], NativeMessageActionCodec.validID(identifier),
+                  !message.children.contains(where: { $0.name == "retract" || $0.name == "replace" }) else { throw NativeArchiveFailure.invalidResponse }
+            return NativeArchivedText(archiveID: archiveID, identifier: identifier, peer: peer,
+                body: "", date: date, outgoing: from == owner, retracted: true)
+        }
         if NativeMessageActionCodec.hasChange(message) {
             guard let identifier = message.attributes["id"], NativeMessageActionCodec.validID(identifier),
                   let change = NativeMessageActionCodec.decode(message), identifier != change.target else { throw NativeArchiveFailure.invalidResponse }

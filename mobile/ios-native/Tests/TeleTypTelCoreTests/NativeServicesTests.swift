@@ -84,6 +84,25 @@ final class NativeServicesTests: XCTestCase {
         await session.close()
     }
 
+    func testAvatarCacheChecksIdentityAndClearsProfilesWhenDetached() async throws {
+        let session = NativeAccountWebSession(configuration: try configuration(), settings: settings())
+        let cache = NativeAvatarCache()
+        NativeServiceHTTPFixture.handler = { request in
+            let jid = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems?.first?.value ?? ""
+            return (200, ["ok": true, "profile": ["jid": jid == "peer@localhost" ? "wrong@localhost" : jid,
+                "displayName": "Fictieve gebruiker", "avatarColor": "#2563eb", "avatarDataUrl": ""]], [:])
+        }
+        let contact = NativeContact(jid: "peer@localhost", name: "Peer", groups: [], subscription: "both")
+        cache.connect(session, owner: "fixture@localhost", contacts: [contact])
+        try await eventually { cache.profiles["fixture@localhost"] != nil }
+        for _ in 0..<10 { await Task.yield() }
+        XCTAssertNil(cache.profiles["peer@localhost"])
+        XCTAssertNil(cache.profiles["wrong@localhost"])
+        cache.detach()
+        XCTAssertTrue(cache.profiles.isEmpty); XCTAssertNil(cache.owner)
+        await session.close()
+    }
+
     private func preferences(mode: String = "automatic", target: String = "en") -> NativeTranslationPreferences {
         var result = NativeTranslationPreferences()
         result.mode = mode

@@ -247,6 +247,10 @@ public final class NativeGroupModel: ObservableObject {
             for message in rooms[index].messages.indices where rooms[index].messages[message].state == .sending {
                 rooms[index].messages[message].state = .uncertain
             }
+            for message in rooms[index].messages.indices where rooms[index].messages[message].actionPending {
+                rooms[index].messages[message].actionPending = false
+                rooms[index].messages[message].actionNotice = "Intrekverzoek onzeker; deelname aan de groep is beëindigd."
+            }
         case .rejected(let identifier):
             invitationModel.rejected(identifier, room: room)
             if let message = rooms[index].messages.firstIndex(where: { $0.own && $0.actionRequestID == identifier }) {
