@@ -63,7 +63,7 @@ struct NativeWebAvatar: View {
     var body: some View {
         ZStack {
             if let image = image { Image(uiImage: image).resizable().scaledToFill() }
-            else { Text(String((profile.flatMap { $0.displayName.isEmpty ? nil : $0.displayName } ?? name).prefix(2)).uppercased())
+            else { Text(NativePublicAvatar.initials(profile.flatMap { $0.displayName.isEmpty ? nil : $0.displayName } ?? name))
             .font(NativeWebStyle.font(size > 34 ? 16 : 13, weight: .bold))
             .foregroundStyle(.white) }
         }.frame(width: size, height: size).background(avatarColor, in: Circle()).clipShape(Circle())

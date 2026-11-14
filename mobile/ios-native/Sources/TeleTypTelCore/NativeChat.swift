@@ -185,8 +185,9 @@ public struct NativeChatStore: Equatable {
                 messages[index].actionNotice = "Wijzigingsverzoek geweigerd; verwerking bij de ander is niet bevestigd."
                 return
             }
-            guard let index = messages.firstIndex(where: { $0.peer == peer && $0.stanzaID == identifier && $0.state != .incoming }) else { return }
+            guard let index = messages.firstIndex(where: { $0.peer == peer && $0.id.uuidString == identifier && $0.state != .incoming }) else { return }
             messages[index].state = .rejected
+            messages[index].actionPending = false
         case .archivedIdentity(let peer, let identifier, let body, let archiveID):
             guard NativeChatCodec.bareJID(peer) == peer, NativeChatCodec.validBody(body), NativeArchiveQuery.validID(archiveID) else { return }
             if messages.contains(where: { $0.peer == peer && $0.state == .incoming &&

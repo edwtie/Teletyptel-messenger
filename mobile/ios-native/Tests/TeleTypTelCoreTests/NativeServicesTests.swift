@@ -197,6 +197,15 @@ final class NativeServicesTests: XCTestCase {
         model.translate("Hallo", key: "message")
         try await eventually { model.results["message"]?.text == "Hello" }
         XCTAssertEqual(translations, 1)
+        XCTAssertTrue(model.isCurrent(key: "message", text: "Hallo"))
+        model.discardStale(key: "message", text: "Hallo")
+        XCTAssertNotNil(model.results["message"])
+        model.discardStale(key: "message", text: "Gecorrigeerd")
+        XCTAssertNil(model.results["message"])
+        XCTAssertFalse(model.isCurrent(key: "message", text: "Gecorrigeerd"))
+        model.translate("Hallo", key: "message")
+        try await eventually { model.results["message"]?.text == "Hello" }
+        XCTAssertEqual(translations, 2)
         model.setSharingConsent(false)
         XCTAssertTrue(model.results.isEmpty)
         XCTAssertEqual(model.pendingCount, 0)

@@ -112,6 +112,21 @@ final class NativeMessageActionsTests: XCTestCase {
         XCTAssertFalse(store.messages[0].actionPending)
     }
 
+    func testLateErrorForAnEarlierEditDoesNotRejectTheOriginalSend() throws {
+        var store = NativeChatStore()
+        let message = try submitted(&store)
+        let (_, edit, identifier) = try store.beginChange(message.id, correctedBody: "Nieuw")
+        store.finishChange(message.id, change: edit, request: identifier, submitted: true)
+        let (_, retract, request) = try store.beginChange(message.id, correctedBody: nil)
+        store.receive(.rejected(peer: peer, identifier: identifier))
+        XCTAssertEqual(store.messages[0].state, .submitted)
+        XCTAssertTrue(store.messages[0].actionPending)
+        store.receive(.rejected(peer: peer, identifier: message.id.uuidString))
+        store.finishChange(message.id, change: retract, request: request, submitted: true)
+        XCTAssertEqual(store.messages[0].state, .rejected)
+        XCTAssertFalse(store.messages[0].retracted)
+    }
+
     func testForwardEnqueuePreservesDraftAndEditsRemainBounded() throws {
         var store = NativeChatStore()
         store.setDraft("Mijn concept", peer: peer)
@@ -194,6 +209,9 @@ final class NativeMessageActionsTests: XCTestCase {
     }
 
     func testAvatarAcceptsOnlyBoundedRasterDataAndValidProfile() {
+        XCTAssertEqual(NativePublicAvatar.initials("Edward Tie"), "ET")
+        XCTAssertEqual(NativePublicAvatar.initials("Dovengroep"), "DO")
+        XCTAssertEqual(NativePublicAvatar.initials("  "), "?")
         let png = Data([137, 80, 78, 71, 13, 10, 26, 10])
         let profile = NativePublicAvatar(jid: peer, displayName: "Fictieve gebruiker", avatarColor: "#2563eb", avatarDataUrl: "data:image/png;base64," + png.base64EncodedString())
         XCTAssertTrue(profile.valid); XCTAssertEqual(profile.imageData, png)

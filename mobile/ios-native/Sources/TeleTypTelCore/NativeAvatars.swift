@@ -7,6 +7,12 @@ struct NativePublicAvatar: Decodable, Equatable {
     let avatarColor: String
     let avatarDataUrl: String
 
+    static func initials(_ name: String) -> String {
+        let words = name.split(whereSeparator: { $0.isWhitespace })
+        if words.count > 1 { return words.prefix(2).compactMap(\.first).map(String.init).joined().uppercased() }
+        return String(words.first?.prefix(2) ?? "?").uppercased()
+    }
+
     var valid: Bool {
         NativeChatCodec.bareJID(jid) == jid && displayName.utf8.count <= 120 &&
             avatarColor.range(of: #"\A#[a-fA-F0-9]{6}\z"#, options: .regularExpression) != nil && avatarDataUrl.utf8.count <= 524288
