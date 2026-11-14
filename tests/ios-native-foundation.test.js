@@ -67,6 +67,28 @@ test("Native simulator checks keep compilation and boot separate from the unchan
   }
 });
 
+test("Cloud history preflight cannot replace or weaken the full simulator suite", () => {
+  const calls = [];
+  const options = { common: ["CODE_SIGNING_ALLOWED=NO"], family: "iPhone", destination: "fixture", deviceID: "fixture",
+    resultBundle: "full.xcresult", smokeResultBundle: "cloud.xcresult" };
+  runSimulatorChecks({ ...options, logged: (...args) => calls.push(args) });
+  assert.equal(calls.length, 4);
+  assert.equal(calls[2][0], "iPhone-cloud-history-tests");
+  assert.equal(calls[2][3], 300000);
+  assert.ok(calls[2][2].includes("-only-testing:NativeStartupUITests/NativeStartupUITests/testCloudHistoryCatalogAndOlderPagesDoNotAuthorizeAnUnknownContact"));
+  assert.equal(calls[3][0], "iPhone-tests");
+  assert.equal(calls[3][3], 1200000);
+  assert.ok(!calls[3][2].some(argument => /only-testing|skip-testing|retry|test-iterations/.test(argument)));
+  assert.deepEqual(calls[3][2].slice(-3), ["-resultBundlePath", "full.xcresult", "test-without-building"]);
+  const failure = new Error("Cloud UI assertion failed");
+  const failed = [];
+  assert.throws(() => runSimulatorChecks({ ...options, logged: (...args) => {
+    failed.push(args);
+    if (args[0] === "iPhone-cloud-history-tests") throw failure;
+  } }), error => error === failure);
+  assert.equal(failed.length, 3);
+});
+
 test("Native simulator checks propagate build, boot and assertion failures without retry or fallback", () => {
   const stages = ["iPad-build", "iPad-boot", "iPad-tests"];
   for (const failedStage of stages) {

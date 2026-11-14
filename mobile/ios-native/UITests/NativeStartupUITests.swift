@@ -509,7 +509,7 @@ final class NativeStartupUITests: XCTestCase {
         }
         let viewport = usableViewport()
         let fullyVisible = viewport.contains(element.frame)
-        if element.identifier.hasPrefix("contact-"), !fullyVisible {
+        if (element.identifier.hasPrefix("contact-") || element.identifier.hasPrefix("cloud-contact-")), !fullyVisible {
             return viewport.contains(CGPoint(x: element.frame.midX, y: element.frame.midY)) &&
                 element.frame.minY >= viewport.minY && element.frame.maxY <= viewport.maxY
         }

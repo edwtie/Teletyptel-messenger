@@ -52,11 +52,16 @@ function simulatorFamilies(family) {
   return [family];
 }
 
-function runSimulatorChecks({ common, family, destination, deviceID, resultBundle, logged }) {
+function runSimulatorChecks({ common, family, destination, deviceID, resultBundle, smokeResultBundle, logged }) {
   const simulatorArguments = [...common, "-destination", destination,
     "-configuration", "Debug", "ONLY_ACTIVE_ARCH=YES", "-parallel-testing-enabled", "NO"];
   logged(family + "-build", "xcodebuild", [...simulatorArguments, "build-for-testing"]);
   logged(family + "-boot", "xcrun", ["simctl", "bootstatus", deviceID, "-b"]);
+  if (smokeResultBundle) {
+    logged(family + "-cloud-history-tests", "xcodebuild", [...simulatorArguments,
+      "-only-testing:NativeStartupUITests/NativeStartupUITests/testCloudHistoryCatalogAndOlderPagesDoNotAuthorizeAnUnknownContact",
+      "-resultBundlePath", smokeResultBundle, "test-without-building"], 300000);
+  }
   logged(family + "-tests", "xcodebuild", [...simulatorArguments,
     "-resultBundlePath", resultBundle, "test-without-building"], 1200000);
 }
@@ -96,14 +101,16 @@ function run() {
       const device = devices.find(device => device.name.startsWith(family));
       if (!device) throw new Error("Missing " + family + " simulator; do not silently skip device coverage");
       const resultBundle = path.join(reports, family + ".xcresult");
+      const smokeResultBundle = path.join(reports, family + "-cloud-history.xcresult");
       let passed = false;
       try {
-        runSimulatorChecks({ common, family, deviceID: device.udid, resultBundle, logged,
+        runSimulatorChecks({ common, family, deviceID: device.udid, resultBundle, smokeResultBundle, logged,
           destination: "platform=iOS Simulator,arch=" + (process.arch === "arm64" ? "arm64" : "x86_64") + ",id=" + device.udid });
         passed = true;
       } catch (error) {
         uiFailures.push(family + ": " + error.message);
       } finally {
+        collectTestResults(smokeResultBundle, { root, reports, family: family + "-cloud-history" });
         collectTestResults(resultBundle, { root, reports, family });
       }
       report.uiTests.push({ family, name: device.name, passed, orientations: ["portrait", "landscapeLeft"] });
