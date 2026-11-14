@@ -72,6 +72,8 @@ struct NativeGroupChatView: View {
     @FocusState private var searchFocused: Bool
     @State private var forwarding: NativeGroupText?
     @State private var deleting: NativeGroupText?
+    @State private var browsingOlder = false
+    @State private var preservedMessage: UUID?
     private var group: NativeGroupConversation? { model.rooms.first { $0.room == room } }
 
     var body: some View {
@@ -118,7 +120,7 @@ struct NativeGroupChatView: View {
                 }
             }
             Button("Annuleren", role: .cancel) { deleting = nil }
-        } message: { Text("Voor mij geldt voor deze sessie. Voor iedereen is alleen beschikbaar voor eigen berichten met door de groepsserver bevestigde auteur- en bericht-ID's. Externe kopieën kunnen blijven bestaan.") }
+        } message: { Text("Voor mij verbergt alleen de lokale kopie; de online geschiedenis blijft bestaan. Voor iedereen is alleen beschikbaar voor eigen berichten met door de groepsserver bevestigde auteur- en bericht-ID's. Externe kopieën kunnen blijven bestaan.") }
     }
 
     @ViewBuilder
@@ -139,6 +141,13 @@ struct NativeGroupChatView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(spacing: 0) {
+                    if let login = login {
+                        NativeCloudHistoryHeader(model: login.cloudHistory, peer: room, kind: "group") { earlier, refresh in
+                            browsingOlder = earlier
+                            if earlier { preservedMessage = group.messages.first?.id }
+                            login.loadCloudHistory(peer: room, kind: "group", earlier: earlier, refresh: refresh)
+                        }.padding(.horizontal, 14)
+                    }
                     LazyVStack(spacing: 12) {
                         if group.historyLimited { Text("Alleen de meest recente berichten passen in deze preview.").font(.caption) }
                         ForEach(group.messages.filter { !$0.hidden && (search.isEmpty || $0.body.localizedCaseInsensitiveContains(search) || $0.nickname.localizedCaseInsensitiveContains(search)) }) { message in
@@ -162,12 +171,15 @@ struct NativeGroupChatView: View {
                         .task(id: geometry.size) {
                             await Task.yield()
                             guard !Task.isCancelled else { return }
-                            proxy.scrollTo("group-bottom", anchor: .bottom)
+                            if !browsingOlder { proxy.scrollTo("group-bottom", anchor: .bottom) }
                         }
                 }
             }
             .clipped()
-            .onChange(of: group.messages.last) { message in if message != nil { proxy.scrollTo("group-bottom", anchor: .bottom) } }
+            .onChange(of: group.messages.last) { message in if message != nil && !browsingOlder { proxy.scrollTo("group-bottom", anchor: .bottom) } }
+            .onChange(of: group.messages.first?.id) { _ in
+                if let preservedMessage = preservedMessage { proxy.scrollTo(preservedMessage, anchor: .top); self.preservedMessage = nil }
+            }
             .onAppear { proxy.scrollTo("group-bottom", anchor: .bottom) }
         }
     }

@@ -11,6 +11,12 @@ on:
       - scripts/check-ios-native.js
       - scripts/check-ios-native-media.js
       - tests/ios-native-foundation.test.js
+      - tests/native-cloud-history.test.js
+      - php/lib/NativeCloudHistory.php
+      - php/public/api/native-history.php
+      - php/public/api/history.php
+      - php/tests/native-cloud-history-test.php
+      - php/tests/native-cloud-history-http-test.php
   workflow_dispatch:
 
 permissions:
@@ -40,6 +46,8 @@ jobs:
           echo "DEVELOPER_DIR=$XCODE_PATH/Contents/Developer" >> "$GITHUB_ENV"
       - name: Check isolated project generator
         run: node --test tests/ios-native-foundation.test.js
+      - name: Check shared online history API
+        run: node --test tests/native-cloud-history.test.js
       - name: Compile native app and test ${{ matrix.family }}
         run: node scripts/check-ios-native.js
       - name: Save native test evidence

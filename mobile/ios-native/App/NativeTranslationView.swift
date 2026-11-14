@@ -100,6 +100,17 @@ struct NativeMessengerView: View {
         return contacts.filter { search.isEmpty || $0.displayName.localizedCaseInsensitiveContains(search) || $0.jid.localizedCaseInsensitiveContains(search) }
     }
 
+    private var selectedContact: NativeContact? {
+        if let contact = contacts.first(where: { $0.jid == selected }) { return contact }
+        guard let previous = model.cloudHistory.conversations.first(where: { $0.peer == selected && $0.kind == "contact" }) else { return nil }
+        return NativeContact(jid: previous.peer, name: previous.name, groups: [], subscription: "none")
+    }
+
+    private var rosterJIDs: Set<String> {
+        if case .ready(let contacts) = model.roster { return Set(contacts.map(\.jid)) }
+        return []
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             if verticalSizeClass != .compact || selected == nil { brandHeader }
@@ -170,6 +181,7 @@ struct NativeMessengerView: View {
                         .listRowInsets(EdgeInsets(top: 0, leading: 12, bottom: 6, trailing: 12))
                         .listRowSeparator(.hidden).listRowBackground(Color.clear)
                     }
+                    NativeHistoricalContacts(cloud: model.cloudHistory, rosterJIDs: rosterJIDs, search: search)
                     ForEach(model.groups.rooms.filter { search.isEmpty || $0.room.localizedCaseInsensitiveContains(search) }) { group in
                         NavigationLink(value: group.room) {
                             HStack(spacing: 8) {
@@ -203,10 +215,11 @@ struct NativeMessengerView: View {
             .toolbar(.hidden, for: .navigationBar)
             .navigationSplitViewColumnWidth(min: 260, ideal: 300, max: 360)
         } detail: {
-            if let contact = contacts.first(where: { $0.jid == selected }) {
+            if let contact = selectedContact {
                 NativeChatView(model: model, calls: calls, translation: translation, contact: contact, onClose: { selected = nil },
                     contactProfile: avatars.profiles[contact.jid], ownProfile: avatars.owner.flatMap { avatars.profiles[$0] },
-                    allowReadMarkers: !showAccount && !showTranslation && !showGroups && !showDialer)
+                    allowReadMarkers: !showAccount && !showTranslation && !showGroups && !showDialer,
+                    historyOnly: !rosterJIDs.contains(contact.jid))
             } else if let room = model.groups.rooms.first(where: { $0.room == selected }) {
                 NativeGroupChatView(model: model.groups, room: room.room, login: model, translation: translation)
             } else {

@@ -83,7 +83,7 @@ function run() {
       "-destination", "generic/platform=iOS", "-configuration", "Release", "build"]);
     report.deviceCompiled = true;
     const executable = fs.readFileSync(path.join(directory, "DerivedData/Build/Products/Release-iphoneos/TeleTypTelNative.app/TeleTypTelNative"));
-    for (const marker of ["TELETYPTEL_NATIVE_UI_FIXTURE", "fixture-password"]) {
+    for (const marker of ["TELETYPTEL_NATIVE_UI_FIXTURE", "TELETYPTEL_NATIVE_CLOUD_UI_FIXTURE", "fixture-password"]) {
       if (executable.includes(Buffer.from(marker))) throw new Error("Test-only login fixture found in Release executable");
     }
     report.releaseFixtureExcluded = true;

@@ -49,7 +49,8 @@ public struct NativeGroupText: Identifiable, Codable, Equatable, Sendable {
     public let id: UUID
     public let room: String
     public let nickname: String
-    public let identifier: String?
+    public var identifier: String?
+    public var cloudID: String? = nil
     public var archiveID: String?
     public var body: String
     public let date: Date
@@ -62,6 +63,7 @@ public struct NativeGroupText: Identifiable, Codable, Equatable, Sendable {
     public var actionRequestID: String? = nil
     public var actionNotice: String? = nil
     public var reactions: [String: [String]] = [:]
+    public var cloudMessageID: String? { cloudID ?? identifier }
 }
 
 public enum NativeGroupEvent: Sendable {

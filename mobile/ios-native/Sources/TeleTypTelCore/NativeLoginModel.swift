@@ -36,6 +36,8 @@ public final class NativeLoginModel: ObservableObject {
     @Published public private(set) var twoFactorError: String?
     @Published public private(set) var historyStates: [String: NativeHistoryState] = [:]
     public let groups = NativeGroupModel()
+    let cloudHistory = NativeCloudSync()
+    private var cloudAccountID: String?
     private var historyTask: Task<Void, Never>?
     private var historyRequest = UUID()
     @Published private var sender: (any NativeChatSending)?
@@ -62,6 +64,15 @@ public final class NativeLoginModel: ObservableObject {
         self.connection = connection
         self.history = history
         groups.historyChanged = { [weak self] in self?.scheduleHistory() }
+        groups.acceptedHistoryChange = { [weak self] previous, current in
+            guard let self = self, self.canSend else { return }
+            let old = Dictionary(uniqueKeysWithValues: previous.map { ($0.id, $0) })
+            for message in current where old[message.id] != message {
+                if let record = NativeCloudRecordFactory.group(message) {
+                    self.cloudHistory.record(record, previous: old[message.id].flatMap { NativeCloudRecordFactory.group($0, includingPending: true) })
+                }
+            }
+        }
     }
 
     deinit {
@@ -120,7 +131,9 @@ public final class NativeLoginModel: ObservableObject {
             var submitted = false
             do { try await sender.sendMessage(to: message.peer, body: message.body, identifier: message.id.uuidString); submitted = true } catch { }
             guard let self = self, self.generation == attempt else { return }
+            let previous = self.chat.messages
             self.chat.finish(message.id, submitted: submitted)
+            if submitted { self.queueCloudChanges(previous) }
             self.sendTasks.removeValue(forKey: message.id)
         }
     }
@@ -135,6 +148,7 @@ public final class NativeLoginModel: ObservableObject {
 
     public func setChatPreferences(_ preferences: NativeChatPreferences) {
         chat.preferences = preferences
+        cloudHistory.setSavingEnabled(preferences.saveOnlineHistory)
         flushHistory()
     }
 
@@ -165,7 +179,9 @@ public final class NativeLoginModel: ObservableObject {
                 var submitted = false
                 do { try await sender.interact(to: message.peer, interaction: interaction, identifier: request); submitted = true } catch { }
                 guard let self = self, self.generation == attempt else { return }
+                let previous = self.chat.messages
                 self.chat.finishReaction(identifier, request: request, actor: owner, values: values, submitted: submitted)
+                if submitted { self.queueCloudChanges(previous) }
                 self.sendTasks[identifier] = nil
             }
         } catch { chatError = "Reactie niet gestart. Controleer de verbinding en het bericht." }
@@ -236,7 +252,9 @@ public final class NativeLoginModel: ObservableObject {
                 var submitted = false
                 do { try await sender.changeMessage(to: message.peer, change: change, identifier: request); submitted = true } catch { }
                 guard let self = self, self.generation == attempt else { return }
+                let previous = self.chat.messages
                 self.chat.finishChange(message.id, change: change, request: request, submitted: submitted)
+                if submitted { self.queueCloudChanges(previous) }
                 self.sendTasks.removeValue(forKey: message.id)
             }
         } catch { chatError = "Wijziging niet gestart. Alleen eigen verzonden berichten kunnen worden ingetrokken; bewerken geldt voor je laatste bericht." }
@@ -244,6 +262,7 @@ public final class NativeLoginModel: ObservableObject {
 
     public func beginBackground() {
         isBackground = true
+        cloudHistory.stop(); cloudAccountID = nil
         cancelHistory()
         groups.disconnect(clear: false)
     }
@@ -281,6 +300,7 @@ public final class NativeLoginModel: ObservableObject {
     public func resume() {
         isBackground = false
         activateGroups()
+        configureCloudHistory()
         guard phase == .suspended, let account = resumableAccount else { return }
         let attempt = generation
         phase = .checking
@@ -436,6 +456,7 @@ public final class NativeLoginModel: ObservableObject {
                 }
                 self.phase = .connected(jid)
                 self.restoreHistory(account)
+                self.configureCloudHistory()
                 self.activateGroups()
             }
         }
@@ -447,6 +468,7 @@ public final class NativeLoginModel: ObservableObject {
                 if case .ready(let contacts) = roster { self.groups.updateContacts(contacts, owner: jid) }
                 else if roster == .unavailable { self.groups.updateContacts([], owner: jid) }
                 if case .ready = roster {
+                    self.configureCloudHistory()
                     let pending = self.earlyMessages
                     self.earlyMessages.removeAll()
                     for event in pending { self.receiveChat(event) }
@@ -489,6 +511,61 @@ public final class NativeLoginModel: ObservableObject {
         groups.attach(sender, owner: owner)
     }
 
+    private func configureCloudHistory() {
+        guard isConnected, !isBackground, case .ready = roster, let account = resumableAccount,
+              let accountID = account.accountID, let session = account.webSession, cloudAccountID != accountID else { return }
+        cloudAccountID = accountID
+        cloudHistory.configure(NativeCloudHistoryClient(session: session, accountID: accountID, owner: account.jid), owner: account.jid)
+        cloudHistory.setSavingEnabled(chat.preferences.saveOnlineHistory)
+        let owner = account.jid
+        cloudHistory.applyConversations = { [weak self] catalog in
+            guard let self = self, self.isConnected, !self.isBackground, self.resumableAccount?.jid == owner,
+                  self.cloudAccountID == accountID else { return }
+            self.groups.rememberCloudConversations(catalog, owner: owner)
+        }
+        cloudHistory.unavailable = { [weak self] peer, kind in
+            guard kind == "contact" else { return }
+            self?.loadHistory(for: peer, refresh: true)
+        }
+        cloudHistory.apply = { [weak self] records, peer, kind, earlier in
+            guard let self = self, self.isConnected, !self.isBackground, self.resumableAccount?.jid == owner,
+                  self.cloudAccountID == accountID else { throw CancellationError() }
+            if kind == "contact" {
+                guard case .ready(let contacts) = self.roster,
+                      contacts.contains(where: { $0.jid == peer }) || self.cloudHistory.conversations.contains(where: { $0.peer == peer && $0.kind == "contact" }) else { throw NativeArchiveFailure.invalidResponse }
+                var copy = self.chat
+                try copy.mergeCloud(records, owner: owner, earlier: earlier)
+                self.chat = copy
+                if !earlier { self.loadHistory(for: peer, refresh: true) }
+            } else {
+                try self.groups.mergeCloud(records, room: peer, owner: owner, earlier: earlier)
+            }
+        }
+    }
+
+    func loadCloudHistory(peer: String, kind: String, earlier: Bool = false, refresh: Bool = false) {
+        guard isConnected, !isBackground else { return }
+        if kind == "contact" {
+            guard case .ready(let contacts) = roster,
+                  contacts.contains(where: { $0.jid == peer }) || cloudHistory.conversations.contains(where: { $0.peer == peer && $0.kind == "contact" }) else { return }
+        } else {
+            guard kind == "group", groups.rooms.contains(where: { $0.room == peer }) else { return }
+        }
+        configureCloudHistory()
+        if earlier { cancelHistory() }
+        cloudHistory.load(peer: peer, kind: kind, earlier: earlier, refresh: refresh)
+    }
+
+    private func queueCloudChanges(_ previous: [NativeChatMessage]) {
+        guard isConnected, !isBackground, let owner = resumableAccount?.jid else { return }
+        let old = Dictionary(uniqueKeysWithValues: previous.map { ($0.id, $0) })
+        for message in chat.messages where old[message.id] != message {
+            if let record = NativeCloudRecordFactory.direct(message, owner: owner) {
+                cloudHistory.record(record, previous: old[message.id].flatMap { NativeCloudRecordFactory.direct($0, owner: owner, includingPending: true) })
+            }
+        }
+    }
+
     private func receiveJingle(_ request: NativeJingleRequest, attempt: UUID) {
         guard generation == attempt, phase == .connecting || isConnected else { return }
         if let sender = jingleSender { onJingle?(request, sender) }
@@ -511,7 +588,9 @@ public final class NativeLoginModel: ObservableObject {
                  .interaction(let sender, _, _), .trackedMessage(let sender, _, _, _, _, _): peer = sender
             }
             guard contacts.contains(where: { $0.jid == peer }) else { return }
+            let previous = chat.messages
             chat.receive(event)
+            queueCloudChanges(previous)
             if case .trackedMessage(_, let identifier, _, _, _, _) = event,
                let message = chat.messages.last(where: { $0.peer == peer && $0.stanzaID == identifier && $0.state == .incoming }) {
                 sendReceipt(message.id, displayed: false)
@@ -560,6 +639,7 @@ public final class NativeLoginModel: ObservableObject {
     }
 
     private func invalidate(clearChat: Bool = true, keepAccount: Bool = false) {
+        cloudHistory.configure(nil, owner: nil); cloudAccountID = nil
         chat.interrupt()
         flushHistory()
         receiptsInFlight = 0

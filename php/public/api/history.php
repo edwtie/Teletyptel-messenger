@@ -5,6 +5,10 @@ require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPAR
 
 const TELETYPTEL_OAUTH_HANDOFF_TTL_SECONDS = 2592000;
 
+if (defined('TELETYPTEL_HISTORY_LIBRARY_ONLY') && TELETYPTEL_HISTORY_LIBRARY_ONLY === true) {
+    return;
+}
+
 session_start();
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');

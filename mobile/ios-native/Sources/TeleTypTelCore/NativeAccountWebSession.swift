@@ -6,6 +6,7 @@ enum NativeAccountRoute: String {
     case facebook = "api/auth/facebook/native.php"
     case translation = "api/translation.php"
     case profile = "api/native-profile.php"
+    case history = "api/native-history.php"
 }
 
 actor NativeAccountWebSession: CustomStringConvertible, CustomDebugStringConvertible {
@@ -34,19 +35,37 @@ actor NativeAccountWebSession: CustomStringConvertible, CustomDebugStringConvert
     var hasSessionCookie: Bool { !closed && cookie != nil }
 
     func request(_ route: NativeAccountRoute, body: Data? = nil, csrf: String? = nil,
-                 accountID: String? = nil, lookupJID: String? = nil) async throws -> Data {
+                 accountID: String? = nil, lookupJID: String? = nil,
+                 historyPeer: String? = nil, historyKind: String? = nil, historyBefore: String? = nil) async throws -> Data {
         try Task.checkCancellation()
         guard !closed, (body?.count ?? 0) <= 32768 else { throw NativeAccountFailure.rejected }
         let attempt = generation
         var components = URLComponents(url: configuration.origin.appendingPathComponent(route.rawValue), resolvingAgainstBaseURL: false)!
         if let accountID = accountID {
-            guard route == .account, !accountID.isEmpty, accountID.utf8.count <= 96 else { throw NativeAccountFailure.invalidResponse }
+            guard route == .account || route == .history, !accountID.isEmpty, accountID.utf8.count <= 96 else { throw NativeAccountFailure.invalidResponse }
             components.queryItems = [URLQueryItem(name: "accountId", value: accountID)]
         }
         if let lookupJID = lookupJID {
             guard route == .account, accountID == nil, body == nil, NativeChatCodec.bareJID(lookupJID) == lookupJID else { throw NativeAccountFailure.invalidResponse }
             components.queryItems = [URLQueryItem(name: "lookupJid", value: lookupJID)]
         }
+        if route == .history, body == nil {
+            guard accountID != nil, let kind = historyKind else { throw NativeAccountFailure.invalidResponse }
+            if kind == "conversations" {
+                guard historyPeer == nil, historyBefore == nil else { throw NativeAccountFailure.invalidResponse }
+                components.queryItems = (components.queryItems ?? []) + [URLQueryItem(name: "kind", value: kind), URLQueryItem(name: "limit", value: "32")]
+            } else {
+                guard let peer = historyPeer, NativeChatCodec.bareJID(peer) == peer,
+                      ["contact", "group"].contains(kind) else { throw NativeAccountFailure.invalidResponse }
+                components.queryItems = (components.queryItems ?? []) + [URLQueryItem(name: "peer", value: peer),
+                    URLQueryItem(name: "kind", value: kind), URLQueryItem(name: "limit", value: "50")]
+            }
+            if let before = historyBefore {
+                guard !before.isEmpty, before.utf8.count <= 1024,
+                      !before.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains) else { throw NativeAccountFailure.invalidResponse }
+                components.queryItems?.append(URLQueryItem(name: "before", value: before))
+            }
+        } else if historyPeer != nil || historyKind != nil || historyBefore != nil { throw NativeAccountFailure.invalidResponse }
         guard let url = components.url else { throw NativeAccountFailure.invalidResponse }
         var request = URLRequest(url: url)
         request.httpMethod = body == nil ? "GET" : "POST"
@@ -88,6 +107,12 @@ actor NativeAccountWebSession: CustomStringConvertible, CustomDebugStringConvert
             throw NativeWebServiceFailure(status: response.statusCode, code: error)
         }
         return data
+    }
+
+    func cloudHistory(body: Data? = nil, accountID: String, peer: String? = nil,
+                      kind: String? = nil, before: String? = nil, csrf: String? = nil) async throws -> Data {
+        try await request(.history, body: body, csrf: csrf, accountID: body == nil ? accountID : nil,
+                          historyPeer: peer, historyKind: kind, historyBefore: before)
     }
 
     func close() {

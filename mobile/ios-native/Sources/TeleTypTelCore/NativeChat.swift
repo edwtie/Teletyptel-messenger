@@ -25,6 +25,7 @@ public enum NativeMessageState: String, Codable, Equatable, Sendable {
 public struct NativeChatMessage: Identifiable, Codable, Equatable, Sendable {
     public let id: UUID
     public var stanzaID: String?
+    public var cloudID: String? = nil
     public let peer: String
     public var body: String
     public var date: Date
@@ -47,6 +48,36 @@ public struct NativeChatMessage: Identifiable, Codable, Equatable, Sendable {
     public var deliveryAttempted = false
     public var displayedAttempted = false
     public var statusLabel: String { state == .submitted ? delivery.label : state.label }
+    public var cloudMessageID: String? { previousIDs.first ?? cloudID ?? stanzaID }
+}
+
+enum NativeCloudMerge {
+    static func valid(_ record: NativeCloudMessage) -> Bool {
+        guard (try? record.validate()) != nil else { return false }
+        return NativeMessageActionCodec.validID(record.messageID) && record.messageID.utf8.count <= 150 &&
+        record.date.timeIntervalSince1970.isFinite && (record.retracted || NativeChatCodec.validBody(record.text)) &&
+        ["self", "peer"].contains(record.direction) && ["", "sent", "delivered", "displayed"].contains(record.deliveryStatus) &&
+        record.reactions.count <= 64 && record.reactions.allSatisfy {
+            NativeCloudMessage.validIdentifier($0.key, maximum: 1023) && $0.value.count <= 16 && $0.value.allSatisfy(NativeInteractionCodec.validReaction)
+        }
+    }
+
+    static func delivery(_ value: String, retaining current: NativeDeliveryStatus) -> NativeDeliveryStatus {
+        if current == .displayed || value == "displayed" { return .displayed }
+        if current == .delivered || value == "delivered" { return .delivered }
+        return .unconfirmed
+    }
+
+    static func protected(_ message: NativeChatMessage) -> Bool {
+        message.hidden || message.retracted || !message.previousIDs.isEmpty || message.actionPending || message.reactionPending ||
+        message.actionRequestID != nil || message.reactionRequest != nil || message.actionNotice != nil ||
+        ![.incoming, .submitted].contains(message.state)
+    }
+
+    static func protected(_ message: NativeGroupText) -> Bool {
+        message.hidden || message.retracted || message.actionPending || message.actionRequestID != nil || message.actionNotice != nil ||
+        ![.incoming, .submitted].contains(message.state)
+    }
 }
 
 public enum NativeChatEvent: Sendable {
@@ -143,6 +174,61 @@ public struct NativeChatStore: Codable, Equatable {
 
     public init() {}
 
+    mutating func mergeCloud(_ records: [NativeCloudMessage], owner: String, earlier: Bool = false) throws {
+        guard records.count <= 50, NativeChatCodec.bareJID(owner) == owner, records.allSatisfy({ record in
+            NativeCloudMerge.valid(record) && record.kind == "contact" && NativeChatCodec.bareJID(record.peer) == record.peer &&
+            record.peer != owner && NativeChatCodec.bareJID(record.sender) == (record.direction == "self" ? owner : record.peer)
+        }) else { throw NativeChatFailure.invalidMessage }
+        var candidate = self
+        var retained = Set<UUID>()
+        for record in records {
+            let outgoing = record.direction == "self"
+            let matches = candidate.messages.indices.filter {
+                let message = candidate.messages[$0]
+                return message.peer == record.peer && (message.state != .incoming) == outgoing &&
+                    (message.cloudID == record.messageID || message.stanzaID == record.messageID || message.previousIDs.contains(record.messageID))
+            }
+            guard matches.count <= 1 else { throw NativeChatFailure.invalidMessage }
+            if let index = matches.first {
+                retained.insert(candidate.messages[index].id)
+                if NativeCloudMerge.protected(candidate.messages[index]) { continue }
+                candidate.messages[index].cloudID = candidate.messages[index].cloudID ?? record.messageID
+                candidate.messages[index].delivery = NativeCloudMerge.delivery(record.deliveryStatus, retaining: candidate.messages[index].delivery)
+                if record.retracted {
+                    candidate.messages[index].retracted = true
+                    candidate.messages[index].body = ""
+                    candidate.messages[index].reactions.removeAll()
+                } else {
+                    if record.edited || (!candidate.messages[index].edited && candidate.messages[index].stanzaID == nil) {
+                        candidate.messages[index].body = record.text
+                    }
+                    candidate.messages[index].edited = candidate.messages[index].edited || record.edited
+                    candidate.messages[index].reactions = record.reactions
+                }
+            } else {
+                candidate.messages.append(NativeChatMessage(id: UUID(), stanzaID: nil, cloudID: record.messageID, peer: record.peer,
+                    body: record.retracted ? "" : record.text, date: record.date, state: outgoing ? .submitted : .incoming,
+                    retracted: record.retracted, edited: record.edited,
+                    delivery: NativeCloudMerge.delivery(record.deliveryStatus, retaining: .unconfirmed),
+                    reactions: record.retracted ? [:] : record.reactions))
+                retained.insert(candidate.messages[candidate.messages.count - 1].id)
+            }
+        }
+        for index in candidate.messages.indices { candidate.applyRememberedRetraction(to: index) }
+        candidate.messages = candidate.messages.enumerated().sorted {
+            $0.element.date == $1.element.date ? $0.offset < $1.offset : $0.element.date < $1.element.date
+        }.map(\.element)
+        while candidate.messages.count > 200 {
+            let eligible = candidate.messages.indices.filter {
+                !retained.contains(candidate.messages[$0].id) && !NativeCloudMerge.protected(candidate.messages[$0])
+            }
+            guard let index = earlier ? eligible.last : eligible.first else { throw NativeChatFailure.historyFull }
+            candidate.messages.remove(at: index)
+            candidate.historyLimited = true
+        }
+        self = candidate
+    }
+
     public mutating func setDraft(_ body: String, peer: String) {
         guard NativeChatCodec.bareJID(peer) == peer, body.utf8.count <= 8192,
               drafts[peer] != nil || drafts.count < 100 else { return }
@@ -197,7 +283,7 @@ public struct NativeChatStore: Codable, Equatable {
         case .change(let peer, let identifier, let change):
             guard NativeChatCodec.bareJID(peer) == peer, NativeMessageActionCodec.validID(identifier), NativeMessageActionCodec.validID(change.target) else { return }
             let matches = messages.indices.filter { messages[$0].peer == peer && messages[$0].state == .incoming &&
-                (messages[$0].stanzaID == change.target || messages[$0].previousIDs.contains(change.target)) }
+                (messages[$0].stanzaID == change.target || messages[$0].previousIDs.contains(change.target) || messages[$0].cloudID == change.target) }
             if case .retract = change {
                 guard rememberRetraction(peer: peer, target: change.target) else { historyLimited = true; return }
             }
@@ -210,10 +296,13 @@ public struct NativeChatStore: Codable, Equatable {
             }
             guard matches.count == 1, let index = matches.first, !messages[index].retracted else { return }
             guard messages[index].stanzaID != identifier, !messages[index].previousIDs.contains(identifier) else { return }
+            if case .correct = change, messages[index].stanzaID == nil, messages[index].cloudID == change.target {
+                messages[index].previousIDs.append(change.target)
+            }
             apply(change, at: index, identifier: identifier)
         case .message(let peer, let identifier, let body):
             guard NativeChatCodec.bareJID(peer) == peer, NativeChatCodec.validBody(body) else { return }
-            if let identifier = identifier, messages.contains(where: { $0.peer == peer && ($0.stanzaID == identifier || $0.previousIDs.contains(identifier)) && $0.state == .incoming }) { return }
+            if enrichIncoming(peer: peer, identifier: identifier, archiveID: nil) { return }
             guard makeRoom() else { historyLimited = true; return }
             messages.append(NativeChatMessage(id: UUID(), stanzaID: identifier, peer: peer, body: body, date: Date(), state: .incoming))
             applyRememberedRetraction(to: messages.count - 1)
@@ -231,13 +320,29 @@ public struct NativeChatStore: Codable, Equatable {
             messages[index].actionPending = false
         case .archivedIdentity(let peer, let identifier, let body, let archiveID):
             guard NativeChatCodec.bareJID(peer) == peer, NativeChatCodec.validBody(body), NativeArchiveQuery.validID(archiveID) else { return }
-            if messages.contains(where: { $0.peer == peer && $0.state == .incoming &&
-                ($0.archiveID == archiveID || (identifier != nil && ($0.stanzaID == identifier || $0.previousIDs.contains(identifier!)))) }) { return }
+            if enrichIncoming(peer: peer, identifier: identifier, archiveID: archiveID) { return }
             guard makeRoom() else { historyLimited = true; return }
             messages.append(NativeChatMessage(id: UUID(), stanzaID: identifier, peer: peer, body: body,
                                              date: Date(), state: .incoming, archiveID: archiveID))
             applyRememberedRetraction(to: messages.count - 1)
         }
+    }
+
+    private mutating func enrichIncoming(peer: String, identifier: String?, archiveID: String?) -> Bool {
+        let trustedID = identifier.flatMap { NativeMessageActionCodec.validID($0) ? $0 : nil }
+        let matches = messages.indices.filter {
+            let message = messages[$0]
+            return message.peer == peer && message.state == .incoming &&
+                ((archiveID != nil && message.archiveID == archiveID) ||
+                 (identifier != nil && (message.stanzaID == identifier || message.previousIDs.contains(identifier!))) ||
+                 (trustedID != nil && message.cloudID == trustedID))
+        }
+        guard !matches.isEmpty else { return false }
+        guard matches.count == 1, let index = matches.first else { return true }
+        if messages[index].stanzaID == nil { messages[index].stanzaID = trustedID }
+        if let archiveID = archiveID, messages[index].archiveID == nil { messages[index].archiveID = archiveID }
+        applyRememberedRetraction(to: index)
+        return true
     }
 
     mutating func mergeArchive(_ page: NativeArchivePage) throws {
@@ -259,10 +364,20 @@ public struct NativeChatStore: Codable, Equatable {
             if merged.contains(where: { $0.archiveID == archived.archiveID && ($0.peer != archived.peer || ($0.state != .incoming) != archived.outgoing) }) {
                 throw NativeArchiveFailure.invalidResponse
             }
-            if let index = merged.firstIndex(where: {
-                $0.peer == archived.peer && ($0.state != .incoming) == archived.outgoing &&
-                ($0.archiveID == archived.archiveID || (archived.identifier != nil && ($0.stanzaID == archived.identifier || $0.previousIDs.contains(archived.identifier!))))
-            }) {
+            let matches = merged.indices.filter {
+                let message = merged[$0]
+                return message.peer == archived.peer && (message.state != .incoming) == archived.outgoing &&
+                    (message.archiveID == archived.archiveID || (archived.identifier != nil &&
+                        (message.stanzaID == archived.identifier || message.previousIDs.contains(archived.identifier!) ||
+                         (NativeMessageActionCodec.validID(archived.identifier!) && message.cloudID == archived.identifier))))
+            }
+            guard matches.count <= 1 else { throw NativeArchiveFailure.invalidResponse }
+            if let index = matches.first {
+                let compatible = merged[index].body == archived.body || merged[index].retracted || archived.retracted
+                if compatible, merged[index].stanzaID == nil, let identifier = archived.identifier, NativeMessageActionCodec.validID(identifier) {
+                    merged[index].stanzaID = identifier
+                }
+                if compatible, merged[index].archiveID == nil { merged[index].archiveID = archived.archiveID }
                 if archived.retracted { merged[index].body = ""; merged[index].retracted = true; merged[index].reactions.removeAll() }
                 if merged[index].retracted || merged[index].hidden { continue }
                 guard merged[index].body == archived.body else { continue }
@@ -278,19 +393,21 @@ public struct NativeChatStore: Codable, Equatable {
         merged = merged.enumerated().sorted {
             $0.element.date == $1.element.date ? $0.offset < $1.offset : $0.element.date < $1.element.date
         }.map(\.element)
+        var limited = historyLimited
         while merged.count > 200 {
-            guard let index = merged.firstIndex(where: { !$0.hidden && !$0.retracted && $0.previousIDs.isEmpty && !$0.actionPending && !$0.reactionPending && ($0.state == .incoming || $0.state == .submitted) }) else { throw NativeChatFailure.historyFull }
+            guard let index = merged.firstIndex(where: { !NativeCloudMerge.protected($0) }) else { throw NativeChatFailure.historyFull }
             merged.remove(at: index)
-            historyLimited = true
+            limited = true
         }
         messages = merged
+        historyLimited = limited
         archivedChanges = changes.sorted { $0.date < $1.date }
         for archived in archivedChanges {
             if let interaction = archived.interaction { applyInteraction(interaction, peer: archived.peer, actor: archived.outgoing ? page.owner : archived.peer, archivedAt: archived.date); continue }
             guard let change = archived.change, let identifier = archived.identifier else { continue }
             let matches = messages.indices.filter { messages[$0].peer == archived.peer &&
                 (messages[$0].state != .incoming) == archived.outgoing &&
-                (messages[$0].stanzaID == change.target || messages[$0].previousIDs.contains(change.target)) }
+                (messages[$0].stanzaID == change.target || messages[$0].previousIDs.contains(change.target) || messages[$0].cloudID == change.target) }
             if matches.isEmpty, case .correct(let target, let body) = change {
                 guard !messages.contains(where: { $0.peer == archived.peer && ($0.state != .incoming) == archived.outgoing &&
                     ($0.stanzaID == identifier || $0.previousIDs.contains(identifier)) }) else { continue }
@@ -302,7 +419,10 @@ public struct NativeChatStore: Codable, Equatable {
             }
             guard matches.count == 1, let index = matches.first, !messages[index].retracted,
                   messages[index].stanzaID != identifier, !messages[index].previousIDs.contains(identifier) else { continue }
-            if case .correct = change, messages[index].stanzaID != change.target { continue }
+            if case .correct = change, messages[index].stanzaID != change.target {
+                guard messages[index].stanzaID == nil, messages[index].cloudID == change.target else { continue }
+                messages[index].previousIDs.append(change.target)
+            }
             apply(change, at: index, identifier: identifier)
         }
         for index in messages.indices { applyRememberedRetraction(to: index) }
@@ -374,7 +494,8 @@ public struct NativeChatStore: Codable, Equatable {
     }
 
     private mutating func applyRememberedRetraction(to index: Int) {
-        let identifiers = messages[index].previousIDs + (messages[index].stanzaID.map { [$0] } ?? [])
+        let identifiers = messages[index].previousIDs + (messages[index].stanzaID.map { [$0] } ?? []) +
+            (messages[index].cloudID.map { [$0] } ?? [])
         if messages[index].state == .incoming,
            identifiers.contains(where: { retractionTombstones[messages[index].peer]?.contains($0) == true }) {
             messages[index].body = ""; messages[index].retracted = true; messages[index].reactions.removeAll()
@@ -383,7 +504,7 @@ public struct NativeChatStore: Codable, Equatable {
 
     private mutating func makeRoom() -> Bool {
         guard messages.count >= 200 else { return true }
-        guard let index = messages.firstIndex(where: { !$0.hidden && !$0.retracted && $0.previousIDs.isEmpty && !$0.actionPending && !$0.reactionPending && ($0.state == .incoming || $0.state == .submitted) }) else { return false }
+        guard let index = messages.firstIndex(where: { !NativeCloudMerge.protected($0) }) else { return false }
         messages.remove(at: index)
         historyLimited = true
         return true

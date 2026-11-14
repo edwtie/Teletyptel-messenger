@@ -18,6 +18,9 @@ struct NativeChatView: View {
     @State private var forwarding: NativeChatMessage?
     @State private var editing: NativeChatMessage?
     @State private var deleting: NativeChatMessage?
+    var historyOnly = false
+    @State private var browsingOlder = false
+    @State private var preservedMessage: UUID?
 
     private var messages: [NativeChatMessage] { model.chat.messages.filter { $0.peer == contact.jid && !$0.hidden } }
     private var draft: String { model.chat.drafts[contact.jid] ?? "" }
@@ -32,9 +35,15 @@ struct NativeChatView: View {
                 if model.chat.historyLimited {
                     Text("Alleen de meest recente berichten passen in deze preview.").font(.caption).padding(6)
                 }
+                if historyOnly { Text("Online archief · voeg dit contact eerst aan je contactenlijst toe om te chatten.").font(.caption).padding(6) }
                 ScrollViewReader { proxy in
                     ScrollView {
                         VStack(spacing: 0) {
+                            NativeCloudHistoryHeader(model: model.cloudHistory, peer: contact.jid, kind: "contact") { earlier, refresh in
+                                browsingOlder = earlier
+                                if earlier { preservedMessage = messages.first?.id }
+                                model.loadCloudHistory(peer: contact.jid, kind: "contact", earlier: earlier, refresh: refresh)
+                            }.padding(.horizontal, 14)
                             historyHeader.padding(.horizontal, 14).padding(.vertical, 8)
                             if let error = model.chatError { Text(error).font(.caption).padding(6).accessibilityIdentifier("chat-error") }
                             if let error = translation.error { Text(error).font(.caption).padding(6) }
@@ -68,12 +77,15 @@ struct NativeChatView: View {
                                 .task(id: geometry.size) {
                                     await Task.yield()
                                     guard !Task.isCancelled else { return }
-                                    proxy.scrollTo("chat-bottom", anchor: .bottom)
+                                    if !browsingOlder { proxy.scrollTo("chat-bottom", anchor: .bottom) }
                                 }
                         }
                     }
                     .onChange(of: messages.last) { message in
-                        if message != nil { proxy.scrollTo("chat-bottom", anchor: .bottom) }
+                        if message != nil && !browsingOlder { proxy.scrollTo("chat-bottom", anchor: .bottom) }
+                    }
+                    .onChange(of: messages.first?.id) { _ in
+                        if let preservedMessage = preservedMessage { proxy.scrollTo(preservedMessage, anchor: .top); self.preservedMessage = nil }
                     }
                     .onAppear { proxy.scrollTo("chat-bottom", anchor: .bottom) }
                 }
@@ -85,7 +97,7 @@ struct NativeChatView: View {
                         }
                     }
                 }
-                composer
+                composer.disabled(historyOnly)
             }
             .navigationTitle(contact.displayName)
             .navigationBarTitleDisplayMode(.inline)
@@ -126,7 +138,7 @@ struct NativeChatView: View {
                             callButton("Spraak en video", icon: "video.fill", profile: .video)
                             callButton("Spraak en realtime tekst", icon: "teletype", profile: .audioRtt)
                             Button { showTranslation = true } label: { Label("Vertaling", systemImage: "globe") }
-                            Button { model.loadHistory(for: contact.jid, refresh: true) } label: { Label("Geschiedenis ophalen", systemImage: "clock.arrow.circlepath") }
+                            Button { model.loadHistory(for: contact.jid, refresh: true) } label: { Label("XMPP-archief ophalen", systemImage: "clock.arrow.circlepath") }
                                 .disabled(!model.canSend || model.historyStates[contact.jid] == .loading)
                         } label: { Image(systemName: "ellipsis").rotationEffect(.degrees(90)) }
                         .buttonStyle(NativeWebIconStyle())
@@ -146,7 +158,7 @@ struct NativeChatView: View {
                 }
             }
             Button("Annuleren", role: .cancel) { deleting = nil }
-        } message: { Text("Voor mij geldt voor deze sessie op dit apparaat. Voor iedereen is een verzoek: andere apparaten, archieven en kopieën kunnen het origineel behouden.") }
+        } message: { Text("Voor mij verbergt alleen de lokale kopie op dit apparaat; de online geschiedenis blijft bestaan. Voor iedereen is een verzoek: andere apparaten, archieven en kopieën kunnen het origineel behouden.") }
         .overlay { if scenePhase != .active { Color(uiColor: .systemBackground).ignoresSafeArea().overlay(Text("TeleTypTel")) } }
         .onChange(of: model.phase) { phase in
             if phase == .signedOut || phase == .idle { dismiss() }
@@ -154,9 +166,6 @@ struct NativeChatView: View {
         .task(id: automaticTranslationIdentity) {
             guard translation.preferences.mode == "automatic" else { return }
             await translation.automaticallyTranslate(Array(messages.suffix(12)))
-        }
-        .task(id: "\(contact.jid):\(model.canSend)") {
-            if model.canSend { model.loadHistory(for: contact.jid, refresh: true) }
         }
     }
 

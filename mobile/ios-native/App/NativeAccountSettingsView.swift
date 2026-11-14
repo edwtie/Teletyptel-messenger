@@ -33,10 +33,14 @@ struct NativeAccountSettingsView: View {
                     Toggle("Ontvangstbevestigingen versturen", isOn: preference(\.sendDelivery)).accessibilityIdentifier("send-delivery-receipts")
                     Toggle("Leesbevestigingen versturen", isOn: preference(\.sendDisplayed)).accessibilityIdentifier("send-displayed-markers")
                     Text("Leesstatus wordt alleen gedeeld voor berichten die volledig in de geopende chat in beeld staan. Een ontvangstbevestiging betekent niet dat iemand het bericht heeft gelezen.").font(.caption)
-                    Toggle("Geschiedenis op dit apparaat bewaren", isOn: preference(\.keepHistory)).accessibilityIdentifier("keep-local-history")
+                    Text("Online geschiedenis is de hoofdbron voor web en native. Online bewaren volgt je serverinstellingen; onderstaande schakelaar regelt alleen de versleutelde kopie op dit apparaat.").font(.caption)
+                    Toggle("Nieuwe berichten online bewaren vanuit deze app", isOn: preference(\.saveOnlineHistory)).accessibilityIdentifier("save-online-history")
+                    Text("Uitschakelen stopt nieuwe opslag vanuit deze app. Bestaande online berichten en door de server ingestelde archivering blijven bestaan; de webapp heeft daarnaast eigen voorkeuren.").font(.caption)
+                    Toggle("Versleutelde lokale cache bewaren", isOn: preference(\.keepHistory)).accessibilityIdentifier("keep-local-history")
                     Text("Versleuteld op dit apparaat, per server/account: tot 200 directe berichten, 100 concepten en 200 berichten per groep (maximaal 8 groepen), zonder iCloud-back-up. Uitschakelen verwijdert opgeslagen berichtinhoud; dit verwijdert geen serverarchief of gedeelde bestanden.").font(.caption)
                     Button(role: .destructive) { clearHistory = true } label: { Label("Lokale berichten en concepten wissen", systemImage: "trash") }
                     if let notice = login.historyNotice { Text(notice).font(.caption).accessibilityIdentifier("local-history-status") }
+                    NativeCloudSaveStatus(model: login.cloudHistory)
                     Button { showTranslation = true } label: { Label("Vertaalinstellingen", systemImage: "globe") }
                     Text("Face ID en Touch ID blijven een afzonderlijke keuze op het aanmeldscherm. Wachtwoorden en aanmeldproviders worden hier niet gewijzigd.").font(.caption)
                 }

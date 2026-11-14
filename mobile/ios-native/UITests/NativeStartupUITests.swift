@@ -28,6 +28,29 @@ final class NativeStartupUITests: XCTestCase {
         snapshot("login-web-style")
     }
 
+    func testOnlineHistoryCatalogAndOlderPagesDoNotAuthorizeAnUnknownContact() {
+        application.launchEnvironment["TELETYPTEL_NATIVE_CLOUD_UI_FIXTURE"] = "1"
+        signInFixture("connected")
+        waitForStatus("XMPP verbonden als fixture@localhost")
+        let archivedContact = application.descendants(matching: .any)["cloud-contact-archive-only@localhost"].firstMatch
+        XCTAssertTrue(archivedContact.waitForExistence(timeout: 8))
+        reveal(archivedContact); tapContact(archivedContact)
+        let online = application.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "chat-message-", "Online bericht van de webapp")).firstMatch
+        XCTAssertTrue(online.waitForExistence(timeout: 8))
+        let draft = application.descendants(matching: .any)["chat-draft"].firstMatch
+        XCTAssertFalse(draft.isEnabled)
+        XCTAssertFalse(application.keyboards.firstMatch.exists)
+        let earlier = application.buttons["cloud-history-earlier"]
+        reveal(earlier); earlier.tap()
+        let older = application.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "chat-message-", "Ouder online bericht van de webapp")).firstMatch
+        XCTAssertTrue(older.waitForExistence(timeout: 8))
+        snapshot("cloud-history-portrait")
+        rotate(.landscapeLeft)
+        XCTAssertTrue(older.exists)
+        XCTAssertFalse(draft.isEnabled)
+        snapshot("cloud-history-landscape")
+    }
+
     func testRotationPreservesConfigurationAndInvalidAddressShowsInlineError() {
         application.launch()
         let server = application.textFields["server-address"]

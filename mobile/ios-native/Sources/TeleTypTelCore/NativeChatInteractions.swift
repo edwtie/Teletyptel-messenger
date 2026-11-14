@@ -25,7 +25,16 @@ public struct NativeChatPreferences: Codable, Equatable, Sendable {
     public var keepHistory = true
     public var sendDelivery = true
     public var sendDisplayed = false
+    public var saveOnlineHistory = true
     public init() {}
+    private enum CodingKeys: String, CodingKey { case keepHistory, sendDelivery, sendDisplayed, saveOnlineHistory }
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        keepHistory = try values.decodeIfPresent(Bool.self, forKey: .keepHistory) ?? true
+        sendDelivery = try values.decodeIfPresent(Bool.self, forKey: .sendDelivery) ?? true
+        sendDisplayed = try values.decodeIfPresent(Bool.self, forKey: .sendDisplayed) ?? false
+        saveOnlineHistory = try values.decodeIfPresent(Bool.self, forKey: .saveOnlineHistory) ?? true
+    }
 }
 
 enum NativeInteractionCodec {
