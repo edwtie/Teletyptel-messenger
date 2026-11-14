@@ -76,6 +76,12 @@ while foregrounded and outside a call. A foreground timer checks every ten
 minutes and is cancelled on background entry or logout; it is not a background
 keepalive. Pending revocation is retried before ordinary foreground calling is
 reconnected for the same account.
+Local logout immediately disables registration and persists a pending revoke;
+it is not a claim of confirmed remote deletion. An offline/closed-session revoke
+needs a fresh authenticated same-account session or server-side lease expiry
+(currently up to 24 hours). A production release must also close this residual
+server-registration window rather than treating the local latch as an APNs-side
+revocation guarantee.
 
 This still is **not an activated background-call integration**. The shipping
 preview flag remains off. Even an enabled build requires an authenticated
@@ -160,7 +166,7 @@ their original scope; they are not proof of features added after those runs.
 | Translation | Private opt-in message/live-RTT translation model and captions | Own/remote/device tests, source=target suppression, opt-out and failure recovery with the deployed provider |
 | Interface languages | Dutch native UI and profile-language selection | Full UI localization; the profile language currently does not translate the native interface |
 | TC audio/video/RTT | Native Jingle/WebRTC and four media profiles | Physical camera/audio/routing, independent-network/TURN and interruption/long-call tests |
-| Telephone/SIP/DTMF | Private echo route and optionally negotiated native RTP events | Gateway event forwarding and actual Asterisk receipt, authorized routing/provider integration; no emergency-service readiness claim |
+| Telephone/SIP/DTMF | Private echo route, negotiated native RTP events, local gateway relay and confirmed browser-to-Asterisk DTMF receipt | Native-device-to-Asterisk receipt, independent endpoints and authorized routing/provider integration; no emergency-service readiness claim |
 | Background incoming calls | CallKit/PushKit engine, consent UI, Keychain registration/revocation lifecycle and bounded registry client | Cold-start/authoritative call recovery, deployed backend/worker, provisioning and signed locked-screen APNs tests |
 | Interpreter and three-party calling | No connected native three-party/interpreter workflow in this target | Authorized interpreter discovery/invite, three-party media topology, consent, interruption and leave/rejoin tests |
 | iOS address book | Explicit app consent plus Apple's single-phone-property picker; no broad `CNContactStore` request or upload | Real-device selection/cancel and accessibility checks; importing a number does not enable public calling |
