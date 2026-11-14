@@ -45,16 +45,25 @@ function collectTestResults(bundle, { root, reports, family, execute = execFileS
   }
 }
 
-function runSimulatorChecks({ common, family, destination, resultBundle, logged }) {
+function simulatorFamilies(family) {
+  const supported = ["iPhone", "iPad"];
+  if (family === undefined) return supported;
+  if (!supported.includes(family)) throw new Error("Unsupported native simulator family");
+  return [family];
+}
+
+function runSimulatorChecks({ common, family, destination, deviceID, resultBundle, logged }) {
   const simulatorArguments = [...common, "-destination", destination,
     "-configuration", "Debug", "ONLY_ACTIVE_ARCH=YES", "-parallel-testing-enabled", "NO"];
   logged(family + "-build", "xcodebuild", [...simulatorArguments, "build-for-testing"]);
+  logged(family + "-boot", "xcrun", ["simctl", "bootstatus", deviceID, "-b"]);
   logged(family + "-tests", "xcodebuild", [...simulatorArguments,
     "-resultBundlePath", resultBundle, "test-without-building"], 1200000);
 }
 
 function run() {
   if (process.platform !== "darwin") throw new Error("Native iOS compilation and UI tests require macOS/Xcode");
+  const families = simulatorFamilies(process.env.TELETYPTEL_NATIVE_TEST_FAMILY);
   const root = path.resolve(__dirname, "..");
   const directory = prepare("ios-native-check-" + Date.now());
   const reports = path.join(directory, "reports");
@@ -83,13 +92,13 @@ function run() {
     const devices = Object.entries(inventory.devices).filter(([runtime]) => runtime.includes("iOS"))
       .flatMap(([, values]) => values).filter(device => device.isAvailable);
     const uiFailures = [];
-    for (const family of ["iPhone", "iPad"]) {
+    for (const family of families) {
       const device = devices.find(device => device.name.startsWith(family));
       if (!device) throw new Error("Missing " + family + " simulator; do not silently skip device coverage");
       const resultBundle = path.join(reports, family + ".xcresult");
       let passed = false;
       try {
-        runSimulatorChecks({ common, family, resultBundle, logged,
+        runSimulatorChecks({ common, family, deviceID: device.udid, resultBundle, logged,
           destination: "platform=iOS Simulator,arch=" + (process.arch === "arm64" ? "arm64" : "x86_64") + ",id=" + device.udid });
         passed = true;
       } catch (error) {
@@ -110,4 +119,4 @@ function run() {
 }
 
 if (require.main === module) run();
-module.exports = { run, executeLogged, collectTestResults, runSimulatorChecks };
+module.exports = { run, executeLogged, collectTestResults, runSimulatorChecks, simulatorFamilies };

@@ -20,6 +20,12 @@ jobs:
   native-preview:
     runs-on: macos-15
     timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        family: [iPhone, iPad]
+    env:
+      TELETYPTEL_NATIVE_TEST_FAMILY: ${{ matrix.family }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -34,12 +40,12 @@ jobs:
           echo "DEVELOPER_DIR=$XCODE_PATH/Contents/Developer" >> "$GITHUB_ENV"
       - name: Check isolated project generator
         run: node --test tests/ios-native-foundation.test.js
-      - name: Compile native app and test iPhone and iPad
+      - name: Compile native app and test ${{ matrix.family }}
         run: node scripts/check-ios-native.js
       - name: Save native test evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: ios-native-preview-${{ github.run_id }}
+          name: ios-native-preview-${{ github.run_id }}-${{ matrix.family }}
           path: artifacts/ios-native-check-*/reports/
           retention-days: 3
