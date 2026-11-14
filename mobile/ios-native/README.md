@@ -1,9 +1,189 @@
 # TeleTypTel native iOS migration
 
-Status: first isolated implementation, not a replacement for the working TestFlight app.
+Status: isolated native implementation; not yet shipped over the working TestFlight app.
 Requested scope: the complete iPhone and iPad application, including native UI,
 authentication, messaging and Total Conversation. This is a staged rewrite, not a
 claim that those features already work in this target.
+
+Release direction confirmed on 2026-11-14: replace the existing TestFlight app,
+not create a second public/test application. The unsigned preview deliberately
+continues to use `com.tiedragon.teletyptel.nativepreview` until the release gates
+below are met. Its successful compilation does not authorize changing the live
+push topic or prove that existing users can migrate safely.
+
+Before switching the signed target to `com.tiedragon.teletyptel`:
+- Retain the existing App Store Connect record and signing team, and assign a
+  new monotonically increasing build number. Do not reuse preview version `0.1`.
+- Review the native dependency inventory and encryption/export declarations
+  before signing. CryptoKit/WebRTC use encryption; do not describe this target
+  as having none or copy the wrapper's answers without review.
+- Validate the existing Google/Facebook configuration against that exact bundle
+  identifier, its URL callbacks and the server's accepted client identities.
+- Wire push registration, revocation and authoritative call recovery to the
+  signed identity. Verify APNs environment/topic and provisioned capabilities;
+  never enable a flag just because a key exists on a developer's computer.
+- Decide and test migration of existing saved sign-in/history before updating
+  the installed wrapper. This native encrypted cache does not migrate WebView
+  storage, and lack of migrated history must not look like server deletion.
+- Test real-device start/sign-in, direct and room chat, local gateway media,
+  locked-screen incoming calls, logout/revocation and upgrade/recovery. Preserve
+  the last working build for rollback and document what rollback cannot restore.
+
+The existing signed/TestFlight workflow still builds the working wrapper. This
+step did not silently redirect it to the incomplete native target.
+
+## Reactions, acknowledgements, device history and local SIP (2026-11-14)
+
+The native preview now has direct-chat and room reaction menus/chips using
+[XEP-0444](https://xmpp.org/extensions/xep-0444.html). Each participant replaces
+their complete emoji set; an empty set removes it. Room actions require advertised
+stable room stanza IDs and occupant IDs, including the current occupant's ID.
+They target the room-assigned ID, never a reusable nickname or client-supplied ID.
+Unsupported rooms keep reactions disabled rather than guessing an identity.
+
+Direct messages request [XEP-0184 delivery receipts](https://xmpp.org/extensions/xep-0184.html)
+and [XEP-0333 displayed markers](https://xmpp.org/extensions/xep-0333.html).
+Socket submission, delivery and display have distinct labels and one/two ticks;
+only an authenticated matching peer/target can advance them. Blue ticks mean
+the other client reported display, not that a human understood the message.
+Sending displayed markers is **off by default**. After explicit opt-in it only
+occurs for fully visible incoming markable messages in the foreground chat, not
+under the app's settings/forward/edit/delete/TC presentations. Delivery sending
+can also be disabled. Archive loading never sends delivery receipts; receipt
+events do not create visible fallback messages or receipt loops. Group-wide
+read counts and per-member read UI are not implemented.
+
+Recent messages, reactions, drafts, hidden identities and chat privacy settings
+are saved per HTTPS origin, XMPP domain and confirmed account. AES-256-GCM binds
+the ciphertext to that scope; random keys stay in the non-synchronizing iOS
+Keychain (`WhenUnlockedThisDeviceOnly`). Atomic files use complete file protection
+and are excluded from backup. The history contains no account credentials, session cookies,
+translation output or downloaded attachment bytes. Corrupt/locked/missing-key
+files are not silently overwritten. Account content is loaded only after a
+verified XMPP bind, and logout clears the displayed state without erasing the
+device copy. Interrupted sends restore as uncertain and are **not** retransmitted.
+The settings page offers opt-out and explicit local clearing, separate from
+server deletion. Opt-out retains preferences but no cached message content.
+
+This is a **bounded recent-history cache**, not a full archival database: 200
+direct messages per account, 100 drafts, eight rooms with 200 messages each,
+bounded retained mutation identities and a 16 MiB plaintext limit (ciphertext adds
+the 28-byte AES-GCM nonce/tag overhead).
+The existing MAM latest-page retrieval remains separate. Arbitrarily old local
+pagination, a cold offline reader and migration from the wrapper's history
+are not implemented. File/Keychain/lock behavior still requires hardware tests.
+
+Active CallKit conversations no longer enter the ordinary idle-chat suspension
+path when backgrounded. The native target declares only the `audio` background
+mode; camera capture pauses on background entry and is serialized on return.
+Actual CallKit audio activation remains required; no silent audio/timer is used
+to keep idle chat alive. When the call ends in the background, ordinary bounded
+send completion and suspension resume. This is **not yet complete background
+incoming calling**: native preview APNs enrollment, authoritative call recovery,
+locked-device process-launch/relaunch and a signed physical-device test remain
+release gates. The live PushKit flag is still absent/disabled; no Apple key,
+server registry or production policy was activated by this work. Camera video
+must not be advertised as continuing while the ordinary app is backgrounded.
+See [Apple's VoIP notification flow](https://developer.apple.com/documentation/pushkit/responding-to-voip-notifications-from-pushkit).
+
+The native number panel has standard phone letters (2=ABC; 1 has no ABC),
+`* 0 #`, delete and visible hold-to-select letters. VoiceOver exposes the digit
+and individual letter actions. Vanity letters normalize to numbers, never RTT
+or DTMF text. A deliberately restricted local route calls the configured
+gateway's existing **600 echo** with native Jingle/TC. It requires a local HTTPS
+server, a same-domain full gateway JID and the gateway administrator's full-JID
+allowlist. The number is not sent as an arbitrary SIP destination: the existing
+lab gateway itself fixes extension 600. No provider, public number, emergency
+route or interpreter service is enabled. The native audio SDP profile still
+does **not negotiate telephone-event/DTMF**; a working number panel is not proof
+of SIP DTMF, incoming SIP or production interconnection.
+
+Validation so far:
+- [43599313915](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43599313915)
+  is **green** at `8518aee`: both mandatory macOS jobs pass unsigned device
+  Release compilation and fixture exclusion, 250 Swift tests (20 opt-in real
+  server tests skipped in this suite), and all fifteen UI tests per family.
+  Structured iPhone 16 Pro and iPad Pro 11-inch (M4) summaries, both iOS 18.5,
+  report zero failures and zero UI skips. Portrait/landscape scenarios cover
+  rotation, chat drafts, menus, uploads, rooms, reactions and the local keypad.
+  Each job also passes all four native media profiles (audio, video, audio-RTT,
+  Total Conversation), using same-host peers and synthetic video, not real
+  cameras, audible audio, APNs or public-network interoperability.
+  Selected screenshots were inspected for raster avatars, bubbles, the standard
+  keypad and reachable TC symbol controls/RTT panes across orientation changes.
+  Downloaded evidence is in `artifacts/native-selected-evidence-43599313915-iPhone/`
+  and `artifacts/native-selected-evidence-43599313915-iPad/`.
+  This successful run validates the current unsigned regression suite; it does
+  not prove every earlier simulator timeout's root cause is fixed or replace
+  the physical-device/release gates above.
+- [43589506150](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43589506150)
+  passes twenty isolated real-ejabberd checks at `ca7035c`, including two-account
+  reactions, delivery/display routing and MAM reaction restoration. No hardware
+  or production server was used.
+- [43590906518](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43590906518)
+  passes the same twenty real-server checks at `0d09ba7`, now including stable-ID
+  room reaction reflection with MAM explicitly enabled on the disposable room.
+  The preceding room fixture failure is retained in run `43590223064`; no
+  production room or verification guard was changed to make it pass.
+- The local existing Docker gateway fixture passes decoded PCMU/VP8 plus
+  reliable T.140 to SIP RTP/RED echo, Unicode edits, hangup and actual XMPP loss
+  cleanup. Twelve gateway unit/security checks pass. This is **browser** lab
+  evidence, not native iPhone-to-Asterisk or general provider interoperability.
+- The separate two-leg local SIP fixture passes bidirectional PCMU, encoded VP8,
+  T.140/RED and RFC 4733 digits `0–9`, `*`, `#`, with two distinct SIP dialogs and
+  RTP ports. A negative test rejects a call whose other leg refuses text and
+  verifies hangup/cleanup. That does not add DTMF negotiation to the native app.
+  Live ejabberd/Asterisk containers remain running, unchanged; test containers,
+  accounts, volumes and networks were removed. Local evidence is retained in
+  `artifacts/native-task-sip-gateway.txt`, `native-task-sip-two-leg.txt` and
+  `native-task-sip-reject-text.txt` (the latter two are also under `artifacts/`).
+- Local Node checks pass 128 tests with four explicit macOS-only skips (132
+  total); the macOS workflows execute the native checks rather than treating
+  those skips as iOS compilation evidence.
+- [43591804764](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43591804764)
+  at `95e9931` passes 250 Swift tests (20 opt-in integration tests skipped),
+  unsigned device Release compilation, fixture exclusion, all four native media
+  profiles, and all 15 iPad UI tests. Its iPhone run times out after fourteen
+  completed cases, during teardown of the fifteenth, so **the run is failed**.
+  The earlier run `43590780871` instead has a startup-button assertion failure
+  on iPad; neither failed run is counted as green. Their evidence is retained
+  under `artifacts/native-selected-evidence-<run-id>/`.
+  Subsequent source makes the decorative startup border non-hit-testable and
+  explicitly gives filled startup buttons white labels. A passing rerun alone
+  would not prove the root cause of the earlier missed startup tap.
+  Run `43594430331` at `55c76d2` completes all fifteen iPhone UI tests and its
+  iPad stdout reports all fifteen cases passed, but the combined iPad
+  build/test command reaches its deadline before finalizing its result bundle.
+  That run also remains **failed**, not an accepted complete iPad result.
+  Revision `a2a0e1f` separately builds each simulator target before running its
+  unchanged UI suite. The UI execution deadline stays twenty minutes, compilation
+  has its own bounded command, assertions are unchanged, and there are no test
+  filters/retries/fallback passes. Two Node tests verify this split and that
+  either a build failure or test failure still propagates.
+  Run `43595599672` confirms that compilation separation alone did not fix the
+  repeated timeout: its iPad suite passes all fifteen tests, but iPhone stops
+  during the fourteenth test. It remains failed. Revision `8518aee` additionally
+  boots each simulator before the test execution deadline and runs the two
+  families in separate macOS jobs. Both jobs remain mandatory, `fail-fast` is
+  disabled to retain both results, all fifteen UI cases still run per family,
+  and invalid family selections fail rather than silently narrowing coverage.
+  This is runner isolation, not evidence that a runtime defect was fixed.
+- The first room-reaction integration exposed that the disposable room had MAM
+  disabled and therefore did not advertise stable stanza IDs. The test-room
+  configuration now explicitly enables MAM; production feature guards remain
+  strict. Current unsigned iPhone/iPad and isolated room checks pass, but that
+  does not close the hardware, live APNs, native SIP or full-parity release gates.
+
+| Requested area | Implemented in this step | Not yet accepted as complete |
+| --- | --- | --- |
+| SIP | Native restricted local echo route; real local browser gateway and two-leg SIP tests | Native-to-PBX hardware media, incoming SIP, native DTMF, provider routing/NAT/TURN |
+| Background calls | Preserve actual active CallKit/media session; pause camera; suspend idle chat after call ends | APNs enrollment/recovery/server policy, cold launch, killed/locked device and network-change tests |
+| Reactions | Direct and stable-identity MUC sets, menus/chips, replace/remove and archive restoration | Wider-client interoperability and adversarial timing/clock-skew tests |
+| Read state | Exact-peer direct delivery/display distinction; explicit sending privacy settings | Per-member group read UI and physical two-device display/visibility tests |
+| Device history | Scoped authenticated encryption, bounded messages/drafts, opt-out, explicit clear/repair | Full local archive pagination, wrapper migration, physical Keychain/locked storage checks |
+| Web similarity | Shared artwork/palette, bubbles, avatars and symbol menus, native phone pad | Full feature/pixel parity, profile-photo editing, remaining contact workflows, native three-party interpreter media and independent usability/accessibility acceptance |
+
+No TestFlight upload or replacement of the working wrapper was performed.
 
 ## Avatars, bubbles and message actions (2026-11-14)
 
@@ -27,11 +207,12 @@ internal seam, light shadows and the existing web artwork/colour palette. A
 | Copy | Original, never the private translation | Same |
 | Forward | Explicit known-contact selection and confirmation, new direct message; preserves drafts | Same, from the selected room message |
 | Edit | Last own submitted text, correction request | Not offered in this step |
-| Delete for me | Hides and clears this session's item, preserving its identity against archive replay | Session-local hide |
+| Delete for me | Hides and clears the item, preserving its identity against archive replay | Same in that room |
 | Retract for everyone | Explicit request for own submitted messages | Only when the room advertises retraction and stable occupant IDs, and the own echo supplies room-owned stanza/occupant IDs |
 
-Local deletion is **session-local**, not a persistent device blocklist or an
-account deletion. Forwarding attachment links does not revoke their existing
+With device history enabled, local hidden identities now survive restart within
+the bounded cache described above; disabling it makes hiding session-local.
+This is not an account deletion. Forwarding attachment links does not revoke their existing
 access. Quoted replies are plain text, not a claim of XEP-0461 reply support.
 Edits use [XEP-0308](https://xmpp.org/extensions/xep-0308.html); requests use the
 current [XEP-0424 namespace `urn:xmpp:message-retract:1`](https://xmpp.org/extensions/xep-0424.html),
