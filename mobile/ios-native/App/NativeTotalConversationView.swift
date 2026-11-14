@@ -114,7 +114,7 @@ struct NativeTotalConversationView: View {
                 .buttonStyle(NativeWebIconStyle()).accessibilityLabel("Gespreksbediening")
                 .popover(isPresented: $controlsOpen, arrowEdge: .top) {
                     controls(presentation).padding(12).background(NativeWebStyle.callBackground)
-                        .presentationCompactAdaptation(.popover)
+                        .modifier(NativeWebCompactPopover())
                 }
             Button(action: controller.endCall) { Image(systemName: "phone.down.fill") }
                 .buttonStyle(NativeWebIconStyle(destructive: true)).accessibilityLabel("Gesprek beëindigen")
