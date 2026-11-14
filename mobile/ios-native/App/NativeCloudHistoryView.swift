@@ -47,7 +47,10 @@ struct NativeHistoricalContacts: View {
                                 Text(conversation.name.isEmpty ? conversation.peer : conversation.name).lineLimit(1)
                                 Text("Archief · niet in je contactenlijst").font(.caption)
                             }
-                        }.accessibilityIdentifier("cloud-contact-" + conversation.peer)
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 58, alignment: .leading)
+                        .contentShape(Rectangle())
+                        .accessibilityIdentifier("cloud-contact-" + conversation.peer)
                     }
                 }
             }
