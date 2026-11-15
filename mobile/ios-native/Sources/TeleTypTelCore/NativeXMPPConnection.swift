@@ -382,6 +382,12 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
         }
     }
 
+    func renameContact(jid: String, name: String, groups: [String]) async throws {
+        let identifier = "rename-" + UUID().uuidString
+        let frame = try NativeContactEditing.request(jid: jid, name: name, owner: ownerJID, identifier: identifier, groups: groups)
+        try await editContact(frame, identifier: identifier)
+    }
+
     func setBlocked(jid: String, blocked: Bool) async throws {
         let identifier = "block-" + UUID().uuidString
         let frame = try NativeContactEditing.blockRequest(jid: jid, blocked: blocked, owner: ownerJID, identifier: identifier)

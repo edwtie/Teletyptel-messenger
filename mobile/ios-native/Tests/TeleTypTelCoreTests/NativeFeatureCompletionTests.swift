@@ -56,6 +56,8 @@ final class NativeFeatureCompletionTests: XCTestCase {
         XCTAssertTrue(removed.contains("subscription='remove'"))
         XCTAssertThrowsError(try NativeContactEditing.blockRequest(jid: "owner@localhost", blocked: true, owner: "owner@localhost", identifier: "test"))
         XCTAssertThrowsError(try NativeContactEditing.removalRequest(jid: "peer@localhost/resource", owner: "owner@localhost", identifier: "test"))
+        let renamed = try NativeContactEditing.request(jid: "peer@localhost", name: "New", owner: "owner@localhost", identifier: "rename-test", groups: ["Friends & family"])
+        XCTAssertTrue(renamed.contains("<group>Friends &amp; family</group>"))
     }
 
     @MainActor
@@ -105,5 +107,21 @@ final class NativeFeatureCompletionTests: XCTestCase {
         XCTAssertThrowsError(try NativeUploadSelection(name: "video.html", data: Data([1])))
         XCTAssertThrowsError(try NativeUploadSelection(name: "../video.mp4", data: Data([1])))
         XCTAssertThrowsError(try NativeUploadSelection(name: "video.mp4", data: Data(repeating: 0, count: NativeUploadSelection.maximumBytes + 1)))
+    }
+
+    func testGroupUnreadCountsOnlyLiveVisibleUnretractedIncomingMessages() throws {
+        var group = NativeGroupConversation(room: "room@conference.localhost", nickname: "owner")
+        let incoming = NativeGroupText(id: UUID(), room: group.room, nickname: "peer", identifier: "one", archiveID: nil,
+            body: "Fictief", date: Date(), own: false, state: .incoming, locallyRead: false)
+        group.messages = [incoming]
+        XCTAssertEqual(group.unreadCount, 1)
+        group.messages[0].locallyRead = true
+        XCTAssertEqual(group.unreadCount, 0)
+        group.messages[0].locallyRead = false
+        group.messages[0].retracted = true
+        XCTAssertEqual(group.unreadCount, 0)
+        group.messages[0].retracted = false
+        group.messages[0].locallyRead = nil
+        XCTAssertEqual(group.unreadCount, 0)
     }
 }

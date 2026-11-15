@@ -42,7 +42,7 @@ struct NativeChatView: View {
                 }
                 if historyOnly { Text("Online archief · voeg dit contact eerst aan je contactenlijst toe om te chatten.").font(.caption).padding(6) }
                 if model.isBlocked(contact.jid) { Text("Contact geblokkeerd").font(.caption).padding(6) }
-                if let notice = model.contactActionNotice { Text(notice).font(.caption).padding(6).accessibilityIdentifier("contact-action-status") }
+                if let notice = model.contactActionNotice { Text(LocalizedStringKey(notice)).font(.caption).padding(6).accessibilityIdentifier("contact-action-status") }
                 ScrollViewReader { proxy in
                     ScrollView {
                         VStack(spacing: 0) {
@@ -69,7 +69,7 @@ struct NativeChatView: View {
                     .overlayPreferenceValue(NativeMessageFramesKey.self) { frames in
                         GeometryReader { viewport in
                             let visible = frames.filter { CGRect(origin: .zero, size: viewport.size).contains($0.value) }.map(\.key)
-                            let enabled = scenePhase == .active && allowReadMarkers && !showTranslation && forwarding == nil && editing == nil && deleting == nil && calls.presentation == nil && model.canSend && model.chat.preferences.sendDisplayed
+                            let enabled = scenePhase == .active && allowReadMarkers && !showTranslation && forwarding == nil && editing == nil && deleting == nil && calls.presentation == nil && (model.canSend || model.canReadCachedHistory)
                             Color.clear.allowsHitTesting(false).task(id: enabled ? visible.map(\.uuidString).sorted().joined() : "hidden") {
                                 if enabled { model.displayed(visible) }
                             }
@@ -123,7 +123,7 @@ struct NativeChatView: View {
                         NativeWebAvatar(name: contact.displayName, profile: contactProfile)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(contact.displayName).font(NativeWebStyle.font(16, weight: .bold)).lineLimit(1)
-                            Text(contact.presence.label).font(NativeWebStyle.font(12)).foregroundStyle(NativeWebStyle.muted)
+                            Text(LocalizedStringKey(contact.presence.label)).font(NativeWebStyle.font(12)).foregroundStyle(NativeWebStyle.muted)
                         }
                     }.accessibilityElement(children: .combine)
                         .accessibilityLabel((model.isConnected ? "Verbonden · " : "Niet verbonden · ") + contact.displayName + " · " + contact.presence.label)
@@ -142,10 +142,10 @@ struct NativeChatView: View {
                             Button { contactName = contact.displayName; renameContact = true } label: { Label("Naam wijzigen", systemImage: "pencil") }
                                 .disabled(!model.canSend || model.contactActionBusy)
                             Button { model.setMuted(contact.jid, muted: !model.chat.preferences.mutedPeers.contains(contact.jid)) } label: {
-                                Label(model.chat.preferences.mutedPeers.contains(contact.jid) ? "Meldingen aan" : "Meldingen dempen", systemImage: "bell.slash")
+                                Label(LocalizedStringKey(model.chat.preferences.mutedPeers.contains(contact.jid) ? "Meldingen aan" : "Meldingen dempen"), systemImage: "bell.slash")
                             }
                             Button { model.setBlocked(contact.jid, blocked: !model.isBlocked(contact.jid)) } label: {
-                                Label(model.isBlocked(contact.jid) ? "Deblokkeren" : "Blokkeren", systemImage: "hand.raised")
+                                Label(LocalizedStringKey(model.isBlocked(contact.jid) ? "Deblokkeren" : "Blokkeren"), systemImage: "hand.raised")
                             }.disabled(!model.canSend || model.contactActionBusy)
                             Button(role: .destructive) { removeContact = true } label: { Label("Contact verwijderen", systemImage: "person.crop.circle.badge.minus") }
                                 .disabled(!model.canSend || model.contactActionBusy)
@@ -169,6 +169,8 @@ struct NativeChatView: View {
             }
             .scrollDismissesKeyboard(.interactively)
         .sheet(isPresented: $showTranslation) { NativeTranslationSettingsView(model: translation) }
+        .onAppear { model.visibleConversation = contact.jid }
+        .onDisappear { if model.visibleConversation == contact.jid { model.visibleConversation = nil } }
         .alert("Naam wijzigen", isPresented: $renameContact) {
             TextField("Naam", text: $contactName)
             Button("Opslaan") { model.renameContact(contact.jid, name: contactName) }
@@ -333,7 +335,7 @@ struct NativeChatView: View {
     private func startCall(_ profile: NativeCallMedia) { calls.startCall(contact, profile: profile) }
 
     private func callButton(_ title: String, icon: String, profile: NativeCallMedia) -> some View {
-        Button { startCall(profile) } label: { Label(title, systemImage: icon) }
+        Button { startCall(profile) } label: { Label(LocalizedStringKey(title), systemImage: icon) }
             .disabled(contact.callEndpoint == nil || calls.status != .idle)
     }
 }

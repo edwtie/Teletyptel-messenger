@@ -62,6 +62,7 @@ public struct NativeGroupText: Identifiable, Codable, Equatable, Sendable {
     public var actionPending = false
     public var actionRequestID: String? = nil
     public var actionNotice: String? = nil
+    public var locallyRead: Bool? = nil
     public var reactions: [String: [String]] = [:]
     public var cloudMessageID: String? { cloudID ?? identifier }
 }
@@ -216,7 +217,8 @@ struct NativeMUCStream {
         }
         return NativeMUCOutput(events: [.message(NativeGroupText(id: UUID(), room: room, nickname: nick,
             identifier: messageID, archiveID: NativeArchiveQuery.trustedArchiveID(root, owner: room),
-            body: body.text, date: date, own: nick == nickname, state: nick == nickname ? .submitted : .incoming, occupantID: validOccupant))])
+            body: body.text, date: date, own: nick == nickname, state: nick == nickname ? .submitted : .incoming, occupantID: validOccupant,
+            locallyRead: delays.isEmpty && nick != nickname ? false : nil))])
     }
 
     private mutating func presence(_ root: ProbeElement, nick: String) -> NativeMUCOutput {

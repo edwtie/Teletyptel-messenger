@@ -139,7 +139,7 @@ struct NativeCaptureOptions: View {
         }
         .onChange(of: exclusion.callActive) { active in if active { cancel() } }
         .onChange(of: scenePhase) { phase in if phase == .background { cancel() } }
-        .onDisappear { cancel() }
+        .onDisappear { if cameraMode == nil { cancel() } else { voice.cancel() } }
     }
     private func cancel() { generation = UUID(); task?.cancel(); task = nil; voice.cancel(); cameraMode = nil }
     private func openCamera(video: Bool) {

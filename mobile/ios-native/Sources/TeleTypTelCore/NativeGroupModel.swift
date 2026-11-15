@@ -13,6 +13,7 @@ public struct NativeGroupConversation: Identifiable, Equatable {
     public var subject = ""
     var retractionTombstones: [String: String] = [:]
     public var id: String { room }
+    public var unreadCount: Int { messages.filter { !$0.own && $0.locallyRead == false && !$0.hidden && !$0.retracted }.count }
 }
 
 @MainActor
@@ -22,6 +23,7 @@ public final class NativeGroupModel: ObservableObject {
     @Published public private(set) var rooms: [NativeGroupConversation] = [] { didSet { historyChanged?() } }
     var historyChanged: (() -> Void)?
     var acceptedHistoryChange: (([NativeGroupText], [NativeGroupText]) -> Void)?
+    var receivedMessage: ((NativeGroupText) -> Void)?
     @Published public private(set) var error: String?
     @Published public private(set) var available = false
     private var sender: (any NativeGroupSending)?
@@ -33,6 +35,14 @@ public final class NativeGroupModel: ObservableObject {
     var hasPendingSends: Bool { !sends.isEmpty }
 
     public init() {}
+
+    public func markRead(room: String, identifiers: [UUID]) {
+        guard let index = rooms.firstIndex(where: { $0.room == room }) else { return }
+        let visible = Set(identifiers)
+        for message in rooms[index].messages.indices where visible.contains(rooms[index].messages[message].id) {
+            rooms[index].messages[message].locallyRead = true
+        }
+    }
 
     func rememberCloudConversations(_ catalog: [NativeCloudConversation], owner: String) {
         guard NativeChatCodec.bareJID(owner) == owner, self.owner == nil || self.owner == owner else { return }
@@ -431,6 +441,9 @@ public final class NativeGroupModel: ObservableObject {
             guard makeRoom(index) else { error = NativeGroupFailure.limit.label; return }
             rooms[index].messages.append(text)
             applyRememberedRetraction(index, message: rooms[index].messages.count - 1)
+            if let message = rooms[index].messages.last, !message.own, message.locallyRead == false, !message.hidden, !message.retracted {
+                receivedMessage?(message)
+            }
         }
     }
 

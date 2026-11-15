@@ -20,6 +20,7 @@ struct NativeConversationBackground: View {
 }
 
 struct NativeAppearanceView: View {
+    @AppStorage("teletyptel.native.interfaceLanguage") private var language = "system"
     @AppStorage("teletyptel.native.theme") private var theme = NativeInterfaceTheme.automatic.rawValue
     @AppStorage("teletyptel.native.background") private var background = NativeChatBackground.automatic.rawValue
     @Environment(\.dismiss) private var dismiss
@@ -27,11 +28,17 @@ struct NativeAppearanceView: View {
         NavigationStack {
             Form {
                 Section("Weergave") {
+                    Picker("App-taal", selection: $language) {
+                        Text("Systeemtaal").tag("system")
+                        Text("Nederlands").tag("nl")
+                        Text("Engels").tag("en")
+                    }.accessibilityIdentifier("interface-language")
+                    Text("De app-taal staat los van berichtvertaling; een taal kiezen geeft geen toestemming om berichten extern te vertalen.").font(.caption)
                     Picker("Thema", selection: $theme) {
-                        ForEach(NativeInterfaceTheme.allCases, id: \.rawValue) { Text($0.title).tag($0.rawValue) }
+                        ForEach(NativeInterfaceTheme.allCases, id: \.rawValue) { Text(LocalizedStringKey($0.title)).tag($0.rawValue) }
                     }
                     Picker("Chatachtergrond", selection: $background) {
-                        ForEach(NativeChatBackground.allCases, id: \.rawValue) { Text($0.title).tag($0.rawValue) }
+                        ForEach(NativeChatBackground.allCases, id: \.rawValue) { Text(LocalizedStringKey($0.title)).tag($0.rawValue) }
                     }
                     Text("Deze voorkeuren worden alleen op dit apparaat bewaard. Ze veranderen geen account-, privacy- of vertaalinstellingen.").font(.caption)
                 }

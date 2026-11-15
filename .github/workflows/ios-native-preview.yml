@@ -12,6 +12,8 @@ on:
       - scripts/check-ios-native-media.js
       - scripts/check-ios-native-codecs.js
       - scripts/check-ios-native-update.js
+      - scripts/ios-testflight/native-localization.js
+      - tests/native-feature-completion.test.js
       - tests/native-g722.test.js
       - tests/ios-native-foundation.test.js
       - tests/native-cloud-history.test.js
@@ -63,6 +65,8 @@ jobs:
       - name: Check focused update guard
         if: github.event_name == 'workflow_dispatch' && inputs.validation_mode != 'full'
         run: node --test tests/ios-native-update.test.js tests/native-g722.test.js
+      - name: Check native recovery, capture, privacy and localization contracts
+        run: node --test tests/native-feature-completion.test.js
       - name: Compile native app and test ${{ matrix.family }}
         run: |
           if [ "$TELETYPTEL_NATIVE_VALIDATION_MODE" = "focused-media" ]; then

@@ -17,6 +17,7 @@ coreFiles.push("NativeContactEditing.swift", "NativePresentationPreferences.swif
 coreFiles.push("NativeAccountLifecycle.swift");
 appFiles.push("App/NativeAccountLifecycleView.swift");
 appFiles.push("App/NativeCaptureAttachments.swift", "App/NativeLocationOptions.swift");
+appFiles.push("App/NativeMessageNotifications.swift");
 appFiles.push("App/NativeGroupManagementView.swift", "App/NativeAccountSettingsView.swift", "App/NativeAttachmentsView.swift", "App/NativeFeatureFixture.swift", "App/NativeWebStyle.swift", "App/NativeMessageActionsView.swift", "App/NativeDeviceHistory.swift", "App/NativeChatEnhancements.swift", "App/NativeDialerView.swift");
 appFiles.push("App/NativeCloudHistoryView.swift", "App/NativePushVault.swift", "App/NativePhoneContactPicker.swift");
 appFiles.push("App/NativeInterpreterMedia.swift", "App/NativeInterpreterCallView.swift");
@@ -43,6 +44,11 @@ function projectText() {
   const assets = object("assets", '{isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>";}');
   refs.push(assets);
   const assetBuild = object("assets-build", `{isa = PBXBuildFile; fileRef = ${assets};}`);
+  const translations = ["nl", "en"].map(language => object("locale-" + language,
+    `{isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ${language}; path = ${language}.lproj/Localizable.strings; sourceTree = "<group>";}`));
+  const translationGroup = object("localized-strings", `{isa = PBXVariantGroup; children = ${list(translations)}; name = Localizable.strings; sourceTree = "<group>";}`);
+  refs.push(translationGroup);
+  const translationBuild = object("localized-strings-build", `{isa = PBXBuildFile; fileRef = ${translationGroup};}`);
   const testRef = object("test-file", '{isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UITests/NativeStartupUITests.swift; sourceTree = "<group>";}');
   refs.push(testRef);
   const testBuild = object("test-build", `{isa = PBXBuildFile; fileRef = ${testRef};}`);
@@ -69,7 +75,7 @@ function projectText() {
       providerBuilds.push(object(name + "-build", `{isa = PBXBuildFile; productRef = ${product};}`));
     }
   }
-  const appPhases = [phase("sources", "PBXSourcesBuildPhase", buildFiles), phase("frameworks", "PBXFrameworksBuildPhase", [rtcBuild, ...providerBuilds]), phase("resources", "PBXResourcesBuildPhase", [assetBuild])];
+  const appPhases = [phase("sources", "PBXSourcesBuildPhase", buildFiles), phase("frameworks", "PBXFrameworksBuildPhase", [rtcBuild, ...providerBuilds]), phase("resources", "PBXResourcesBuildPhase", [assetBuild, translationBuild])];
   const testPhases = [phase("test-sources", "PBXSourcesBuildPhase", [testBuild]), phase("test-frameworks", "PBXFrameworksBuildPhase", []), phase("test-resources", "PBXResourcesBuildPhase", [])];
   const configurations = (name, settings) => {
     const configs = ["Debug", "Release"].map(mode => object(name + mode,
@@ -111,6 +117,7 @@ function prepare(name, { providers = null } = {}) {
     fs.writeFileSync(target, content);
   };
   for (const file of coreFiles) write("Core/" + file, fs.readFileSync(path.join(source, "Sources/TeleTypTelCore", file)));
+  for (const [language, content] of Object.entries(require("./ios-testflight/native-localization").catalog(root))) write(language + ".lproj/Localizable.strings", content);
   for (const file of mediaFiles) write("Media/" + file, fs.readFileSync(path.join(root, "scripts/ios-testflight", file)));
   for (const file of [...appFiles, "App/Info.plist", "UITests/NativeStartupUITests.swift"]) {
     const content = fs.readFileSync(path.join(source, file));

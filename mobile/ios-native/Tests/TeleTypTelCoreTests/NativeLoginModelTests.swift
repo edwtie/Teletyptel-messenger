@@ -2,7 +2,22 @@ import XCTest
 import CryptoKit
 @testable import TeleTypTelCore
 
-private actor LoginFixture: ServerChecking, NativeAccountAuthenticating, NativeXMPPConnecting, NativeArchiveSending {
+private actor LoginFixture: ServerChecking, NativeAccountAuthenticating, NativeXMPPConnecting, NativeArchiveSending, NativeContactManaging {
+    var rejectContactActions = false
+    func rejectContactChanges(_ enabled: Bool) { rejectContactActions = enabled }
+    func setBlocked(jid: String, blocked: Bool) async throws {
+        if rejectContactActions { throw NativeContactFailure.rejected }
+        events.append(blocked ? "blocked" : "unblocked")
+    }
+    func removeContact(jid: String) async throws {
+        if rejectContactActions { throw NativeContactFailure.rejected }
+        events.append("removed")
+    }
+    func setDoNotDisturb(_ enabled: Bool) async throws {
+        if rejectContactActions { throw NativeContactFailure.rejected }
+        events.append(enabled ? "dnd" : "available")
+    }
+    func addContact(jid: String, name: String, requestPresence: Bool) async throws { throw NativeContactFailure.unavailable }
     private struct Run {
         let account: NativeAuthenticatedAccount
         let ready: @Sendable (String) -> Void
@@ -637,6 +652,55 @@ final class NativeLoginModelTests: XCTestCase {
         XCTAssertTrue(sent.isEmpty)
         model.disconnect()
         XCTAssertEqual(model.reconnectAttempt, 0)
+    }
+
+    @MainActor
+    func testBlockRequiresServerConfirmationAndSuppressesIncomingAndOutgoingText() async {
+        let fixture = LoginFixture()
+        let model = model(fixture)
+        start(model)
+        await eventually { await fixture.runCount() == 1 }
+        await fixture.ready(0); await fixture.roster(0, state: contacts)
+        await eventually { model.canSend && model.roster == self.contacts }
+        await fixture.rejectContactChanges(true)
+        model.setBlocked("peer@localhost", blocked: true)
+        await eventually { !model.contactActionBusy }
+        XCTAssertFalse(model.isBlocked("peer@localhost"))
+        XCTAssertNotNil(model.contactActionNotice)
+        await fixture.rejectContactChanges(false)
+        model.setBlocked("peer@localhost", blocked: true)
+        await eventually { model.isBlocked("peer@localhost") }
+        XCTAssertTrue(model.isBlocked("PEER@localhost/phone"))
+        await fixture.message(0, event: .message(peer: "peer@localhost", identifier: "blocked", body: "Niet opnemen"))
+        model.setDraft("Niet verzenden", peer: "peer@localhost")
+        model.sendDraft(to: "peer@localhost")
+        XCTAssertFalse(model.forwardMessage("Fictief", to: "peer@localhost"))
+        try? await Task.sleep(nanoseconds: 20_000_000)
+        XCTAssertTrue(model.chat.messages.isEmpty)
+        let sent = await fixture.sentMessages()
+        XCTAssertTrue(sent.isEmpty)
+        model.setBlocked("peer@localhost", blocked: false)
+        await eventually { !model.isBlocked("peer@localhost") }
+        model.disconnect()
+    }
+
+    @MainActor
+    func testLocalReadingWorksWithReadReceiptsDisabledAndDNDKeepsIncomingText() async {
+        let fixture = LoginFixture()
+        let model = model(fixture)
+        start(model)
+        await eventually { await fixture.runCount() == 1 }
+        await fixture.ready(0); await fixture.roster(0, state: contacts)
+        await eventually { model.canSend && model.roster == self.contacts }
+        model.setDoNotDisturb(true)
+        await eventually { model.chat.preferences.doNotDisturb }
+        await fixture.message(0, event: .message(peer: "peer@localhost", identifier: "quiet", body: "Wel bewaren"))
+        await eventually { model.chat.unreadCount(peer: "peer@localhost") == 1 }
+        XCTAssertFalse(model.chat.preferences.sendDisplayed)
+        model.displayed(model.chat.messages.map(\.id))
+        XCTAssertEqual(model.chat.unreadCount(peer: "peer@localhost"), 0)
+        XCTAssertFalse(model.chat.messages[0].displayedAttempted)
+        model.disconnect()
     }
 
     @MainActor

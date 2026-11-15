@@ -36,7 +36,7 @@ struct NativeAccountEntryView: View {
                     }.disabled(model.busy || jid.isEmpty || (!recovery && (!consent || configuration.domain != "localhost" || password != repeated || !NativeAccountLifecycle.validPassword(password) || name.isEmpty)))
                 }
                 if model.busy { ProgressView() }
-                if let status = model.status { Text(status).accessibilityIdentifier("account-lifecycle-status") }
+                if let status = model.status { Text(LocalizedStringKey(status)).accessibilityIdentifier("account-lifecycle-status") }
             }.nativeWebForm().navigationTitle(recovery ? "Wachtwoord herstellen" : "Account aanmaken")
                 .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Sluiten") { dismiss() } } }
         }.onDisappear { task?.cancel(); model.detach(); password = ""; repeated = "" }
@@ -93,7 +93,7 @@ struct NativeAccountSecurityView: View {
                     Button("Beveiligingsstatus ophalen") { task = Task { await load() } }.disabled(model.busy)
                 }
                 if model.busy { ProgressView() }
-                if let status = model.status { Text(status) }
+                if let status = model.status { Text(LocalizedStringKey(status)) }
             }.nativeWebForm().navigationTitle("Accountbeveiliging")
                 .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Sluiten") { dismiss() } } }
         }.task { await load() }

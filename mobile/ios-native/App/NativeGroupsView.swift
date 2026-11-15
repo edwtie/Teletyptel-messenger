@@ -63,6 +63,7 @@ struct NativeGroupsView: View {
 }
 
 struct NativeGroupChatView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @ObservedObject var model: NativeGroupModel
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @Environment(\.dismiss) private var dismiss
@@ -95,6 +96,8 @@ struct NativeGroupChatView: View {
                 Text(model.error ?? "Deze groep kan nog niet worden geopend. Ga terug en probeer opnieuw.").font(.callout).padding()
             }
         }
+        .onAppear { login?.visibleConversation = room }
+        .onDisappear { if login?.visibleConversation == room { login?.visibleConversation = nil } }
         .navigationTitle(room.components(separatedBy: "@")[0]).navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
         .toolbarBackground(NativeWebStyle.panel, for: .navigationBar)
@@ -185,12 +188,24 @@ struct NativeGroupChatView: View {
                                 canReply: NativeChatCodec.validBody("> " + message.nickname + ": " + message.body + "\n\n" + group.draft), onForward: { forwarding = message },
                                 onReply: { model.setDraft("> " + message.nickname + ": " + message.body + "\n\n" + (self.group?.draft ?? ""), room: room) },
                                 onDelete: { deleting = message }).id(message.id)
+                                .background(GeometryReader { geometry in Color.clear.preference(key: NativeMessageFramesKey.self,
+                                    value: [message.id: geometry.frame(in: .named("native-group-messages"))]) })
                         }
                     }.padding(.horizontal, 14).padding(.top, 14)
                     Color.clear.frame(height: 1).id("group-bottom")
                 }
             }
             .modifier(NativeChatBottomAnchor())
+            .coordinateSpace(name: "native-group-messages")
+            .overlayPreferenceValue(NativeMessageFramesKey.self) { frames in
+                GeometryReader { viewport in
+                    let visible = frames.filter { CGRect(origin: .zero, size: viewport.size).contains($0.value) }.map(\.key)
+                    let enabled = scenePhase == .active && !showParticipants && !showInvite && forwarding == nil && deleting == nil
+                    Color.clear.allowsHitTesting(false).task(id: enabled ? visible.map(\.uuidString).sorted().joined() : "hidden") {
+                        if enabled { model.markRead(room: room, identifiers: visible) }
+                    }
+                }
+            }
             .background {
                 GeometryReader { geometry in
                     NativeConversationBackground()

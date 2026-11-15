@@ -191,7 +191,7 @@ struct NativeMessengerView: View {
                                     Text(contact.displayName).font(NativeWebStyle.font(14, weight: .bold)).lineLimit(1)
                                     if let last = model.chat.messages.last(where: { $0.peer == contact.jid && !$0.hidden }) {
                                         Text(last.retracted ? "Bericht ingetrokken" : last.body).font(NativeWebStyle.font(13)).lineLimit(1)
-                                    } else { Text(contact.presence.label).font(NativeWebStyle.font(13)) }
+                                    } else { Text(LocalizedStringKey(contact.presence.label)).font(NativeWebStyle.font(13)) }
                                 }
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 if model.chat.unreadCount(peer: contact.jid) > 0 {
@@ -227,6 +227,11 @@ struct NativeMessengerView: View {
                                     Text(group.messages.last?.body ?? "Groep").font(NativeWebStyle.font(13)).lineLimit(1)
                                 }.frame(maxWidth: .infinity, alignment: .leading)
                                 Circle().fill(Color.blue).frame(width: 10, height: 10).accessibilityLabel("Groep")
+                                if group.unreadCount > 0 {
+                                    Text(String(group.unreadCount)).font(.caption.bold()).padding(6)
+                                        .background(NativeWebStyle.accent, in: Capsule()).foregroundStyle(.white)
+                                        .accessibilityLabel("\(group.unreadCount) ongelezen groepsberichten")
+                                }
                             }.padding(10)
                                 .foregroundStyle(selected == group.room ? Color.white : NativeWebStyle.muted)
                                 .background(selected == group.room ? NativeWebStyle.accent : NativeWebStyle.button, in: RoundedRectangle(cornerRadius: 6))

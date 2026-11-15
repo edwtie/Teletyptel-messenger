@@ -2,9 +2,13 @@ import SwiftUI
 
 @main
 struct TeleTypTelNativeApp: App {
+    @AppStorage("teletyptel.native.interfaceLanguage") private var language = "system"
     @UIApplicationDelegateAdaptor(NativeProviderAppDelegate.self) private var providerDelegate
     var body: some Scene {
-        WindowGroup { NativeStartupView().font(NativeWebStyle.font()).tint(NativeWebStyle.accent) }
+        WindowGroup {
+            NativeStartupView().font(NativeWebStyle.font()).tint(NativeWebStyle.accent)
+                .environment(\.locale, language == "nl" || language == "en" ? Locale(identifier: language) : .current)
+        }
     }
 }
 
@@ -76,6 +80,8 @@ struct NativeStartupView: View {
     @State private var rememberLogin = false
     @State private var showRegistration = false
     @State private var showRecovery = false
+    @AppStorage("teletyptel.native.interfaceLanguage") private var interfaceLanguage = "system"
+    @StateObject private var messageNotifications = NativeMessageNotifications.shared
     @State private var restoredInput: RestoredInput?
     private let fixtureName: String?
 
@@ -114,6 +120,11 @@ struct NativeStartupView: View {
                         .accessibilityAddTraits(.isHeader)
                     Text("Gebruik je XMPP-account om je aan te melden bij TeleTypTel.")
                         .foregroundStyle(NativeWebStyle.muted)
+                    Picker("App-taal", selection: $interfaceLanguage) {
+                        Text("Systeemtaal").tag("system")
+                        Text("Nederlands").tag("nl")
+                        Text("Engels").tag("en")
+                    }.accessibilityIdentifier("login-interface-language")
                     if fixtureName != nil {
                         Text("TESTSCENARIO — geen echte serververbinding")
                             .font(.headline)
@@ -166,7 +177,7 @@ struct NativeStartupView: View {
                             ProgressView("Verbinding voorbereiden…")
                                 .tint(.blue)
                         }
-                        Text(statusText)
+                        Text(LocalizedStringKey(statusText))
                             .fixedSize(horizontal: false, vertical: true)
                             .accessibilityIdentifier("startup-status")
                         if let callStatusText = callStatusText {
@@ -340,6 +351,9 @@ struct NativeStartupView: View {
         .sheet(isPresented: $showRecovery) {
             if let configuration = try? ServerConfiguration(address: address, domain: domain) { NativeAccountEntryView(configuration: configuration, recovery: true) }
         }
+        .onAppear { messageNotifications.connect(loginModel) }
+        .onReceive(loginModel.$chat) { _ in Task { @MainActor in messageNotifications.updateBadge() } }
+        .onReceive(loginModel.groups.$rooms) { _ in Task { @MainActor in messageNotifications.updateBadge() } }
         .onChange(of: loginModel.phase) { phase in
             calls.synchronize(phase)
             if loginModel.isConnected { Task { await calls.synchronizePush() } }
@@ -353,7 +367,8 @@ struct NativeStartupView: View {
                 verificationCode = ""
                 savedLogin.cancel()
             }
-            if phase == .signedOut || phase == .idle { showMessenger = false }
+            if phase == .signedOut || phase == .idle { showMessenger = false; messageNotifications.clear() }
+            if case .failed = phase { messageNotifications.clear() }
             if !loginModel.isConnected { translation.detach() }
         }
         .onChange(of: scenePhase) { phase in

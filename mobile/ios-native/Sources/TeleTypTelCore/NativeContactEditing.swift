@@ -6,6 +6,7 @@ enum NativeContactFailure: Error { case invalid, unavailable, rejected, timedOut
 protocol NativeContactManaging: Sendable {
     func setBlocked(jid: String, blocked: Bool) async throws
     func removeContact(jid: String) async throws
+    func renameContact(jid: String, name: String, groups: [String]) async throws
     func setDoNotDisturb(_ enabled: Bool) async throws
     func addContact(jid: String, name: String, requestPresence: Bool) async throws
     func observeContactRequests(_ observer: @escaping @Sendable ([String]) -> Void) async
@@ -15,6 +16,7 @@ protocol NativeContactManaging: Sendable {
 extension NativeContactManaging {
     func setBlocked(jid: String, blocked: Bool) async throws { throw NativeContactFailure.unavailable }
     func removeContact(jid: String) async throws { throw NativeContactFailure.unavailable }
+    func renameContact(jid: String, name: String, groups: [String]) async throws { throw NativeContactFailure.unavailable }
     func setDoNotDisturb(_ enabled: Bool) async throws { throw NativeContactFailure.unavailable }
     func observeContactRequests(_ observer: @escaping @Sendable ([String]) -> Void) async { observer([]) }
     func respondToContactRequest(jid: String, allow: Bool) async throws { throw NativeContactFailure.unavailable }
@@ -39,9 +41,11 @@ enum NativeContactEditing {
             (name.isEmpty || NativeChatCodec.validBody(name)) &&
             !name.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains)
     }
-    static func request(jid: String, name: String, owner: String, identifier: String) throws -> String {
-        guard valid(jid: jid, name: name, owner: owner), NativeMessageActionCodec.validID(identifier) else { throw NativeContactFailure.invalid }
-        return "<iq xmlns='jabber:client' type='set' id='\(NativeMUCStream.escape(identifier))'><query xmlns='jabber:iq:roster'><item jid='\(NativeMUCStream.escape(jid))' name='\(NativeMUCStream.escape(name))'/></query></iq>"
+    static func request(jid: String, name: String, owner: String, identifier: String, groups: [String] = []) throws -> String {
+        guard valid(jid: jid, name: name, owner: owner), NativeMessageActionCodec.validID(identifier), groups.count <= 32,
+              Set(groups).count == groups.count, groups.allSatisfy({ NativeChatCodec.validBody($0) && $0.utf8.count <= 256 }) else { throw NativeContactFailure.invalid }
+        let content = groups.map { "<group>\(NativeMUCStream.escape($0))</group>" }.joined()
+        return "<iq xmlns='jabber:client' type='set' id='\(NativeMUCStream.escape(identifier))'><query xmlns='jabber:iq:roster'><item jid='\(NativeMUCStream.escape(jid))' name='\(NativeMUCStream.escape(name))'>\(content)</item></query></iq>"
     }
     static func response(_ root: ProbeElement, identifier: String, owner: String, bound: String?) -> Bool? {
         let server = owner.components(separatedBy: "@").last ?? ""

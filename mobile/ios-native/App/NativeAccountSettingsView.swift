@@ -11,6 +11,8 @@ struct NativeAccountSettingsView: View {
     @State private var showTranslation = false
     @State private var showAvatar = false
     @State private var showSecurity = false
+    @State private var confirmMessageNotifications = false
+    @StateObject private var messageNotifications = NativeMessageNotifications.shared
     @State private var clearHistory = false
     @State private var confirmPush = false
     @AppStorage(NativeAudioCodec.preferenceKey) private var audioCodec = NativeAudioCodec.pcmu.rawValue
@@ -47,6 +49,15 @@ struct NativeAccountSettingsView: View {
                     }.accessibilityIdentifier("call-audio-codec")
                 } header: { Text("Bellen en totale conversatie") } footer: {
                     Text("G.722 vereist ondersteuning aan beide kanten; er is geen automatische omschakeling. G.711 blijft de standaard voor compatibiliteit. Deze keuze geldt voor nieuwe uitgaande gesprekken; inkomende gesprekken volgen de aangeboden codec.")
+                }
+                Section("Berichtmeldingen") {
+                    Text("Meldingen tonen geen berichtinhoud. Ze werken alleen zolang de app berichten ontvangt; dit is nog geen APNs-bezorging na afsluiten of schermvergrendeling.").font(.caption)
+                    if messageNotifications.enabled {
+                        Button { messageNotifications.disable() } label: { Label("Berichtmeldingen uitschakelen", systemImage: "bell.slash") }
+                    } else {
+                        Button { confirmMessageNotifications = true } label: { Label("Berichtmeldingen inschakelen", systemImage: "bell") }
+                    }
+                    if let status = messageNotifications.status { Text(LocalizedStringKey(status)).font(.caption) }
                 }
                 Section("Inkomende achtergrondoproepen") {
                     Text(push.notice).accessibilityIdentifier("push-registration-status")
@@ -90,6 +101,10 @@ struct NativeAccountSettingsView: View {
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button { dismiss() } label: { Image(systemName: "xmark").frame(width: 44, height: 44) }.accessibilityLabel("Sluiten") } }
         }
         .task { await load() }
+        .alert("Berichtmeldingen toestaan?", isPresented: $confirmMessageNotifications) {
+            Button("Toestaan") { Task { await messageNotifications.enable() } }
+            Button("Annuleren", role: .cancel) {}
+        } message: { Text("iOS vraagt om toestemming voor banners en een badge. De melding bevat geen berichttekst. Je kunt dit op elk moment uitschakelen.") }
         .sheet(isPresented: $showSecurity) { NativeAccountSecurityView(login: login, credentialsChanged: credentialsChanged) }
         .onChange(of: login.phase) { _ in if !login.canSend { model.detach(); draft = nil; dismiss() } }
         .onDisappear { model.detach(); draft = nil }

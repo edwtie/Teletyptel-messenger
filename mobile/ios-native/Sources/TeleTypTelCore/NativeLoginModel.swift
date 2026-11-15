@@ -36,6 +36,7 @@ public final class NativeLoginModel: ObservableObject {
     @Published public private(set) var contactActionNotice: String?
     private var contactActionTask: Task<Void, Never>?
     public var onIncomingMessage: ((NativeChatMessage) -> Void)?
+    public var visibleConversation: String?
     @Published public private(set) var isBackground = false
     @Published public private(set) var reconnectAttempt = 0
     public var isReconnecting: Bool { reconnectAttempt > 0 && isWorking }
@@ -76,6 +77,12 @@ public final class NativeLoginModel: ObservableObject {
         self.connection = connection
         self.history = history
         self.reconnectWait = reconnectWait
+        groups.receivedMessage = { [weak self] message in
+            guard let self = self, !self.chat.preferences.doNotDisturb,
+                  !self.chat.preferences.mutedPeers.contains(message.room) else { return }
+            self.onIncomingMessage?(NativeChatMessage(id: message.id, stanzaID: message.identifier, peer: message.room,
+                body: message.body, date: message.date, state: .incoming))
+        }
         groups.historyChanged = { [weak self] in self?.scheduleHistory() }
         groups.acceptedHistoryChange = { [weak self] previous, current in
             guard let self = self, self.canSend else { return }
@@ -168,7 +175,8 @@ public final class NativeLoginModel: ObservableObject {
     }
 
     public func isBlocked(_ peer: String) -> Bool {
-        chat.preferences.blockedPeers.contains(NativeChatCodec.bareJID(peer) ?? peer)
+        let bare = NativeChatCodec.bareJID(peer) ?? peer
+        return chat.preferences.blockedPeers.contains { $0.caseInsensitiveCompare(bare) == .orderedSame }
     }
 
     public func setMuted(_ peer: String, muted: Bool) {
@@ -192,7 +200,8 @@ public final class NativeLoginModel: ObservableObject {
     }
 
     public func renameContact(_ peer: String, name: String) {
-        performContactAction { manager in try await manager.addContact(jid: peer, name: name, requestPresence: false) } accepted: { _ in }
+        guard case .ready(let contacts) = roster, let contact = contacts.first(where: { $0.jid == peer }) else { return }
+        performContactAction { manager in try await manager.renameContact(jid: peer, name: name, groups: contact.groups) } accepted: { _ in }
     }
 
     public func setDoNotDisturb(_ enabled: Bool) {
@@ -800,6 +809,7 @@ public final class NativeLoginModel: ObservableObject {
         isBackground = false
         chat.interrupt()
         if clearChat {
+            visibleConversation = nil
             historyScope = nil; cachedContacts = []; historyNotice = nil
             chat = NativeChatStore(); chatError = nil; historyStates.removeAll()
         }
