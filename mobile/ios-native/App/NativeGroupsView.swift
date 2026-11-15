@@ -200,6 +200,7 @@ struct NativeGroupChatView: View {
                                     value: [message.id: geometry.frame(in: .named("native-group-messages"))]) })
                         }
                     }.padding(.horizontal, 14).padding(.top, 14)
+                        .padding(.bottom, verticalSizeClass == .compact ? 4 : 12)
                     Color.clear.frame(height: 1).id("group-bottom")
                 }
             }

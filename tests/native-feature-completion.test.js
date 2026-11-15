@@ -40,6 +40,7 @@ test("Attachment review precedes optional capture rows and main-menu sheets wait
   assert.match(menu, /if model\.isReconnecting \{ return "Verbinding herstellen…" \}/);
   const groups = read("mobile/ios-native/App/NativeGroupsView.swift");
   assert.match(groups, /accessibilityIdentifier\("group-messages-" \+ room\)\s+\.contentShape\(Rectangle\(\)\)/);
+  assert.match(groups, /padding\(\.bottom, verticalSizeClass == \.compact \? 4 : 12\)/);
   assert.match(read("mobile/ios-native/App/NativeAppearanceView.swift"), /allowsHitTesting\(false\)\.accessibilityHidden\(true\)/);
   const style = read("mobile/ios-native/App/NativeWebStyle.swift");
   assert.match(style, /frame\(minWidth: 44, minHeight: 44\)\s+\.contentShape\(Rectangle\(\)\)/);
