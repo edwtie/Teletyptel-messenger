@@ -16,6 +16,9 @@ struct NativeNewContactView: View {
                         .accessibilityIdentifier("new-contact-jid")
                     TextField("Naam", text: $name).accessibilityIdentifier("new-contact-name")
                     Text("Gebruik het volledige XMPP-adres, bijvoorbeeld naam@chatserver.nl. Een telefoonnummer of gewoon e-mailadres is niet automatisch een Messenger-account.").font(.caption)
+                    if !NativeContactEditing.canAdd(address, roster: login.roster) {
+                        Text("Dit contact bestaat al, de contactenlijst is nog niet gereed, of de huidige limiet van 100 contacten is bereikt.").font(.caption)
+                    }
                 }.disabled(editor.busy || editor.saved)
                 Section("Online status") {
                     Toggle("Toestemming voor online status vragen", isOn: $requestPresence).disabled(editor.busy || editor.saved)
@@ -25,10 +28,11 @@ struct NativeNewContactView: View {
                 if editor.busy { ProgressView("Serverbevestiging afwachten…") }
                 if !editor.saved {
                     Button {
+                        guard NativeContactEditing.canAdd(address, roster: login.roster) else { return }
                         editor.add(jid: address, name: name.trimmingCharacters(in: .whitespacesAndNewlines), requestPresence: requestPresence,
                                    owner: login.currentOwner ?? "", sender: login.contactManager)
                     } label: { Label("Contact toevoegen", systemImage: "person.badge.plus") }
-                        .disabled(editor.busy || !login.canSend || !NativeContactEditing.valid(jid: address, name: name, owner: login.currentOwner ?? ""))
+                        .disabled(editor.busy || !login.canSend || !NativeContactEditing.canAdd(address, roster: login.roster) || !NativeContactEditing.valid(jid: address, name: name, owner: login.currentOwner ?? ""))
                         .accessibilityIdentifier("new-contact-save")
                 }
             }.nativeWebForm().navigationTitle("Nieuw contact")

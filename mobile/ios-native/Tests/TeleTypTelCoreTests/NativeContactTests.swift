@@ -16,6 +16,14 @@ private actor ContactSenderFixture: NativeContactManaging {
 }
 
 final class NativeContactTests: XCTestCase {
+    func testNewContactDoesNotRenameExistingContactsOrExceedRosterCapacity() {
+        let contact = NativeContact(jid: "peer@localhost", name: "Existing", groups: [], subscription: "none")
+        XCTAssertFalse(NativeContactEditing.canAdd("PEER@localhost", roster: .ready([contact])))
+        XCTAssertTrue(NativeContactEditing.canAdd("new@localhost", roster: .ready([contact])))
+        XCTAssertFalse(NativeContactEditing.canAdd("new@localhost", roster: .loading))
+        let full = (0..<100).map { NativeContact(jid: "peer\($0)@localhost", name: "Existing", groups: [], subscription: "none") }
+        XCTAssertFalse(NativeContactEditing.canAdd("new@localhost", roster: .ready(full)))
+    }
     func testRosterSetEscapesFieldsAndDoesNotGrantSubscription() throws {
         let xml = try NativeContactEditing.request(jid: "peer@localhost", name: "Naam <&'", owner: "owner@localhost", identifier: "contact-test")
         let root = try ProbeXML.parse(xml)

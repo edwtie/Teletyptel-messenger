@@ -15,6 +15,10 @@ extension NativeContactManaging {
 }
 
 enum NativeContactEditing {
+    static func canAdd(_ jid: String, roster: NativeRosterState) -> Bool {
+        guard case .ready(let contacts) = roster, contacts.count < 100 else { return false }
+        return !contacts.contains { $0.jid.caseInsensitiveCompare(jid) == .orderedSame }
+    }
     static func valid(jid: String, name: String, owner: String) -> Bool {
         NativeChatCodec.bareJID(owner) == owner && NativeChatCodec.bareJID(jid) == jid && NativeChatCodec.validBody(jid) && jid.caseInsensitiveCompare(owner) != .orderedSame && name.utf8.count <= 120 &&
             (name.isEmpty || NativeChatCodec.validBody(name)) &&
