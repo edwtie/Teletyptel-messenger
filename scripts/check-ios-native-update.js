@@ -23,6 +23,7 @@ function run() {
       "CODE_SIGNING_ALLOWED=NO", "-destination", "generic/platform=iOS", "-configuration", "Release", "build"]);
     result.deviceCompiled = true;
   } finally { fs.writeFileSync(path.join(reports, "result.json"), JSON.stringify(result, null, 2)); }
+  return { root, directory, reports, logged };
 }
 
 if (require.main === module) run();

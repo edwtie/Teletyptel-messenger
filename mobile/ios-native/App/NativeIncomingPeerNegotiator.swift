@@ -19,6 +19,7 @@ final class NativeIncomingPeerNegotiator: NativeActivePeerNegotiating {
     private let request: NativeJingleRequest
     private let profile: NativeCallMedia
     private let videoCodec: String
+    private let audioCodec: String
     private let signalling: any NativeJingleSending
     private let factory: RTCPeerConnectionFactory
     private let tracks: () throws -> (RTCAudioTrack, RTCVideoTrack?)
@@ -46,6 +47,7 @@ final class NativeIncomingPeerNegotiator: NativeActivePeerNegotiating {
         guard request.action == "session-initiate", NativeJingleTransport.fullJID(request.peer) else { throw NativeJingleFailure.invalidRequest }
         let offered = try NativeJingleMedia.decode(request.jingleElement(), sid: request.sid, action: request.action, profile: profile)
         self.videoCodec = offered.videoCodec
+        self.audioCodec = offered.audioCodec
         self.request = request
         self.profile = profile
         self.signalling = signalling
@@ -74,7 +76,7 @@ final class NativeIncomingPeerNegotiator: NativeActivePeerNegotiating {
         do {
             let (microphone, camera) = try tracks()
             let engine = try NativeMediaPeer(factory: factory, microphone: microphone, camera: camera,
-                profile: profile, sid: handle.sid, iceServers: iceServers, videoCodec: videoCodec, changed: { [weak self] in
+                profile: profile, sid: handle.sid, iceServers: iceServers, videoCodec: videoCodec, audioCodec: audioCodec, changed: { [weak self] in
                     guard self?.handle == handle else { return }
                     changed()
                 })

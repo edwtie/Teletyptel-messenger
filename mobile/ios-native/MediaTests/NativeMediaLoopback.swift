@@ -67,7 +67,7 @@ private final class FixturePeer {
     let capturer: RTCVideoCapturer?
     private var frames: Task<Void, Never>?
 
-    init(factory: RTCPeerConnectionFactory, profile: NativeCallMedia) throws {
+    init(factory: RTCPeerConnectionFactory, profile: NativeCallMedia, audioCodec: String = "PCMU") throws {
         let microphone = factory.audioTrack(withTrackId: "fixture-audio")
         microphone.isEnabled = false
         let source = profile.hasVideo ? factory.videoSource() : nil
@@ -75,7 +75,7 @@ private final class FixturePeer {
         capturer = source.map { RTCVideoCapturer(delegate: $0) }
         let camera = source.map { factory.videoTrack(with: $0, trackId: "fixture-video") }
         engine = try NativeMediaPeer(factory: factory, microphone: microphone, camera: camera,
-            profile: profile, sid: "media-loopback", diagnostic: { operation, error in
+            profile: profile, sid: "media-loopback", audioCodec: audioCodec, diagnostic: { operation, error in
                 FileHandle.standardError.write(Data("Synthetic peer \(operation): \(error.localizedDescription)\n".utf8))
             }, changed: {})
         if profile.contents.contains("rtt") {
@@ -118,10 +118,10 @@ enum NativeMediaLoopback {
         precondition(predicate(), label)
     }
 
-    private static func profile(_ profile: NativeCallMedia, factory: RTCPeerConnectionFactory) async throws {
+    private static func profile(_ profile: NativeCallMedia, factory: RTCPeerConnectionFactory, audioCodec: NativeAudioCodec = .pcmu) async throws {
         FileHandle.standardError.write(Data("Testing native media profile: \(profile.rawValue)\n".utf8))
-        let first = try FixturePeer(factory: factory, profile: profile)
-        let second = try FixturePeer(factory: factory, profile: profile)
+        let first = try FixturePeer(factory: factory, profile: profile, audioCodec: audioCodec.rawValue)
+        let second = try FixturePeer(factory: factory, profile: profile, audioCodec: audioCodec.rawValue)
         defer { first.close(); second.close() }
         let firstWire = MediaTestWire(owner: "first@localhost/phone"), secondWire = MediaTestWire(owner: "second@localhost/tablet")
         firstWire.remote = secondWire; secondWire.remote = firstWire
@@ -141,6 +141,7 @@ enum NativeMediaLoopback {
             first.engine.prepared.peer.connectionState == .connected && second.engine.prepared.peer.connectionState == .connected
         }
         for fixture in [first, second] {
+            precondition(fixture.engine.prepared.peer.localDescription?.sdp.contains("a=rtpmap:\(audioCodec.payload) \(audioCodec.rawValue)/8000") == true)
             precondition(fixture.engine.prepared.peer.transceivers.count == (profile.hasVideo ? 2 : 1))
             precondition(fixture.engine.prepared.peer.transceivers.allSatisfy { $0.direction == .sendRecv && $0.sender.track != nil })
             precondition(fixture.engine.prepared.peer.receivers.contains { $0.track is RTCAudioTrack })
@@ -175,16 +176,18 @@ enum NativeMediaLoopback {
         precondition(first.engine.prepared.peer.connectionState == .closed)
         do { _ = try await first.engine.createOffer(); preconditionFailure("closed peer reopened") }
         catch NativeMediaPeerFailure.state {}
-        print("Native media profile passed: \(profile.rawValue)")
+        print("\(audioCodec == .g722 ? "Native G722 media profile passed: " : "Native media profile passed: ")\(profile.rawValue)")
     }
 
     static func main() async throws {
         RTCInitializeSSL()
         let factory = RTCPeerConnectionFactory(encoderFactory: RTCDefaultVideoEncoderFactory(), decoderFactory: RTCDefaultVideoDecoderFactory())
         for mode in NativeCallMedia.allCases { try await profile(mode, factory: factory) }
+        for mode in NativeCallMedia.allCases { try await profile(mode, factory: factory, audioCodec: .g722) }
         try await NativeInterpreterLoopback.run(factory: factory)
         try await incomingProvider(factory: factory, remoteHangup: false)
         try await incomingProvider(factory: factory, remoteHangup: true)
+        try await incomingProvider(factory: factory, remoteHangup: true, audioCodec: "G722")
         let cancelled = try FixturePeer(factory: factory, profile: .total)
         let task = Task { try await cancelled.engine.createOffer() }
         task.cancel()
@@ -194,8 +197,8 @@ enum NativeMediaLoopback {
         print("Native audio/video/RTT negotiation loopback passed")
     }
 
-    private static func incomingProvider(factory: RTCPeerConnectionFactory, remoteHangup: Bool) async throws {
-        let caller = try FixturePeer(factory: factory, profile: .audioRtt)
+    private static func incomingProvider(factory: RTCPeerConnectionFactory, remoteHangup: Bool, audioCodec: String = "PCMU") async throws {
+        let caller = try FixturePeer(factory: factory, profile: .audioRtt, audioCodec: audioCodec)
         let firstWire = MediaTestWire(owner: "caller@localhost/phone"), secondWire = MediaTestWire(owner: "callee@localhost/tablet")
         firstWire.remote = secondWire; secondWire.remote = firstWire
         let binding = try await firstWire.bindCall(peer: secondWire.owner, sid: "media-loopback")
@@ -236,6 +239,7 @@ enum NativeMediaLoopback {
         }
         try await wait("provider negotiation completion") { accepted || failed }
         precondition(accepted && !failed)
+        precondition(prepared.peer.localDescription?.sdp.contains("a=rtpmap:\(audioCodec == "G722" ? "9" : "0") \(audioCodec)/8000") == true)
         try await wait("provider native RTT ready") { rtt.isReady && caller.rtt!.isReady }
         precondition(caller.rtt!.setText("Native provider test"))
         try await wait("provider receives conversational text") { rtt.remoteText == "Native provider test" }
@@ -251,5 +255,6 @@ enum NativeMediaLoopback {
         provider!.cancel()
         precondition(stopped == 1)
         print("Native incoming peer provider passed")
+        if audioCodec == "G722" { print("Native G722 incoming codec selection passed") }
     }
 }

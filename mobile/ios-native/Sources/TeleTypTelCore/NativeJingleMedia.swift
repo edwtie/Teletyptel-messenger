@@ -7,6 +7,13 @@ import Glibc
 
 enum NativeJingleMediaFailure: Error { case unsupported, invalidDescription(line: UInt), unsupportedField(String) }
 
+enum NativeAudioCodec: String, CaseIterable {
+    case pcmu = "PCMU", g722 = "G722"
+    static let preferenceKey = "teletyptel.native.call.audioCodec"
+    var payload: String { self == .g722 ? "9" : "0" }
+    var title: String { self == .g722 ? "Breedband (G.722)" : "Standaard (G.711)" }
+}
+
 struct NativeJingleMedia: CustomStringConvertible, CustomDebugStringConvertible {
     static let jingle = "urn:xmpp:jingle:1"
     static let rtp = "urn:xmpp:jingle:apps:rtp:1"
@@ -59,6 +66,7 @@ struct NativeJingleMedia: CustomStringConvertible, CustomDebugStringConvertible 
     var mids: [String] { contents.map(\.mid) }
     var supportsDTMF: Bool { contents.contains { $0.kind == "audio" && $0.telephoneEvent != nil } }
     var videoCodec: String { contents.first { $0.kind == "video" }?.codec ?? "VP8" }
+    var audioCodec: String { contents.first { $0.kind == "audio" }?.codec ?? "PCMU" }
     var description: String { "NativeJingleMedia(redacted)" }
     var debugDescription: String { description }
 
@@ -92,14 +100,14 @@ struct NativeJingleMedia: CustomStringConvertible, CustomDebugStringConvertible 
                 try require(media.attributes["media"] == kind && (media.children.count == 2 || (kind == "audio" && media.children.count == 3)))
                 try exact(try one(media, "rtcp-mux", rtp), [:])
                 let codecs = media.children.filter { $0.name == "payload-type" && $0.namespace == rtp }
-                let primary = codecs.filter { kind == "audio" ? $0.attributes["name"]?.uppercased() == "PCMU" : ["VP8", "H264"].contains($0.attributes["name"]?.uppercased() ?? "") }
+                let primary = codecs.filter { kind == "audio" ? NativeAudioCodec(rawValue: $0.attributes["name"]?.uppercased() ?? "") != nil : ["VP8", "H264"].contains($0.attributes["name"]?.uppercased() ?? "") }
                 try require(primary.count == 1 && codecs.count == media.children.count - 1)
                 let codec = primary[0]
                 codecName = codec.attributes["name"]?.uppercased() ?? ""
                 try node(codec, "payload-type", rtp, attributes: ["id", "name", "clockrate", "channels"])
                 payload = codec.attributes["id"] ?? ""
                 try require((codec.attributes["channels"] == nil || codec.attributes["channels"] == "1") &&
-                    (kind == "audio" ? codecName == "PCMU" : ["VP8", "H264"].contains(codecName)) &&
+                    (kind == "audio" ? NativeAudioCodec(rawValue: codecName) != nil : ["VP8", "H264"].contains(codecName)) &&
                     codec.attributes["clockrate"] == (kind == "audio" ? "8000" : "90000"))
                 for entry in codec.children {
                     if entry.name == "parameter" && entry.namespace == rtp {
@@ -206,8 +214,9 @@ struct NativeJingleMedia: CustomStringConvertible, CustomDebugStringConvertible 
                 try require(mappings.count == media.count - 3)
                 let codec = try once(section, "a=rtpmap:\(payload) ")
                 codecName = codec.components(separatedBy: "/")[0].uppercased()
-                try require((kind == "audio" ? codec.uppercased() == "PCMU/8000" : ["VP8/90000", "H264/90000"].contains(codec.uppercased())) ||
-                    (kind == "audio" && codec.uppercased() == "PCMU/8000/1"))
+                try require(kind == "audio" ? NativeAudioCodec(rawValue: codecName) != nil &&
+                    ["\(codecName)/8000", "\(codecName)/8000/1"].contains(codec.uppercased()) :
+                    ["VP8/90000", "H264/90000"].contains(codec.uppercased()))
                 if kind == "video" && codecName == "H264" {
                     try require(section.filter { $0.hasPrefix("a=fmtp:") }.count == 1)
                     parameters = try parseH264(once(section, "a=fmtp:\(payload) "))
@@ -334,7 +343,7 @@ struct NativeJingleMedia: CustomStringConvertible, CustomDebugStringConvertible 
             try Self.require(Self.matches(item.fingerprint, "(?:[0-9A-Fa-f]{2}:){31}[0-9A-Fa-f]{2}") &&
                 (action == "session-initiate" ? item.setup == "actpass" : ["active", "passive"].contains(item.setup)))
             try Self.require(item.kind == "rtt" ? Self.number(item.port, 1, 65535) :
-                (item.kind == "audio" ? item.payload == "0" : Self.number(item.payload, 96, 127)))
+                (item.kind == "audio" ? NativeAudioCodec(rawValue: item.codec)?.payload == item.payload : Self.number(item.payload, 96, 127)))
             if let event = item.telephoneEvent {
                 try Self.require(item.kind == "audio" && Self.number(event.payload, 96, 127) &&
                     event.payload != item.payload && ["0-15", "0-16"].contains(event.events))

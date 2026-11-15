@@ -17,18 +17,21 @@ function checkMedia({ root, directory, reports, logged }) {
     path.join(native, "App/NativeOutgoingPeerNegotiator.swift"),
     path.join(native, "MediaTests/NativeMediaLoopback.swift"),
     ...["NativeT140Session.swift", "NativeWebRTCChannel.swift"].map(file => path.join(root, "scripts/ios-testflight", file))];
-  const result = { passed: false, revision: sdk.revision, profiles: [],
+  const result = { passed: false, revision: sdk.revision, profiles: [], g722Profiles: [],
     scope: "same-host native peers; DTLS/ICE, audio negotiation (microphone disabled), synthetic VP8 decoding, bidirectional T140; no APNs, real camera, audible audio or public network" };
   try {
     logged("media-compile", "xcrun", ["swiftc", "-swift-version", "5", "-F", framework, "-framework", "WebRTC",
       "-Xlinker", "-rpath", "-Xlinker", framework, ...sources, "-o", executable]);
-    const output = logged("media-runtime", executable, [], 120000);
+    const output = logged("media-runtime", executable, [], 180000);
     for (const profile of ["audio", "video", "audio-rtt", "total"]) {
       if (!output.includes("Native media profile passed: " + profile + "\n")) throw new Error("Missing native media result: " + profile);
       result.profiles.push(profile);
+      if (!output.includes("Native G722 media profile passed: " + profile + "\n")) throw new Error("Missing native G722 media result: " + profile);
+      result.g722Profiles.push(profile);
     }
     if (!output.includes("Native audio/video/RTT negotiation loopback passed")) throw new Error("Native media test incomplete");
     if (!output.includes("Native incoming peer provider passed")) throw new Error("Native incoming provider test incomplete");
+    if (!output.includes("Native G722 incoming codec selection passed")) throw new Error("Native incoming G722 codec selection incomplete");
     if (!output.includes("Native interpreter three-party loopback passed:")) throw new Error("Native three-party interpreter media test incomplete");
     result.interpreterThreeParty = true;
     result.passed = true;

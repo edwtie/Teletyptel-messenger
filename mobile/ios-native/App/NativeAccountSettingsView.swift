@@ -11,6 +11,7 @@ struct NativeAccountSettingsView: View {
     @State private var showAvatar = false
     @State private var clearHistory = false
     @State private var confirmPush = false
+    @AppStorage(NativeAudioCodec.preferenceKey) private var audioCodec = NativeAudioCodec.pcmu.rawValue
     @Environment(\.dismiss) private var dismiss
     var body: some View {
         NavigationStack {
@@ -38,6 +39,13 @@ struct NativeAccountSettingsView: View {
                         .disabled(model.busy || !profile.valid).accessibilityIdentifier("profile-save")
                 }
                 if let status = model.status { Text(status).accessibilityIdentifier("profile-status") }
+                Section {
+                    Picker("Gespreksgeluid", selection: $audioCodec) {
+                        ForEach(NativeAudioCodec.allCases, id: \.rawValue) { codec in Text(codec.title).tag(codec.rawValue) }
+                    }.accessibilityIdentifier("call-audio-codec")
+                } header: { Text("Bellen en totale conversatie") } footer: {
+                    Text("G.722 vereist ondersteuning aan beide kanten; er is geen automatische omschakeling. G.711 blijft de standaard voor compatibiliteit. Deze keuze geldt voor nieuwe uitgaande gesprekken; inkomende gesprekken volgen de aangeboden codec.")
+                }
                 Section("Inkomende achtergrondoproepen") {
                     Text(push.notice).accessibilityIdentifier("push-registration-status")
                     if push.available && !push.consented {

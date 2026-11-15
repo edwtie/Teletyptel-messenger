@@ -1,5 +1,36 @@
 # TeleTypTel native iOS migration
 
+## Optional native G.722 audio (2026-11-15)
+
+Account settings now expose `Gespreksgeluid`: standard G.711/PCMU or explicit
+G.722 wideband for new outgoing audio, video, audio/RTT and Total Conversation
+calls. PCMU remains the default. The local preference is sampled before call
+setup; changing it does not modify a live call. Incoming calls follow the
+validated offered codec, independently of this outgoing preference.
+
+The native WebRTC peer filters real SDK capabilities before selecting G.722.
+Jingle/SDP preserves payload 9, mono `G722/8000` and the historical 8 kHz RTP
+clock, not a fictitious 16 kHz RTP clock. No G.711-to-G.722 upsampling or silent
+codec fallback is introduced. Unsupported devices/peers fail instead of
+advertising successful HD audio. Answer validation rejects codec substitution;
+telephone-event, RTT, video, CallKit and hold semantics remain unchanged.
+
+The additional Swift cases cover all call profiles, SDP/XML roundtrips,
+answer downgrade, incorrect clocks/payloads/channels/parameters and the
+bounded outgoing preference. The native same-host WebRTC fixture additionally
+requires all four G.722 profiles, DTMF negotiation, synthetic decoded VP8,
+RTT edits/cleanup and an incoming G.722 offer with automatic codec selection.
+Its microphone is disabled: it does not prove audible wideband quality, real
+iPhone/iPad hardware behavior, APNs or actual native-to-Asterisk calls.
+
+Unsigned validation is available with the existing `ios-native-preview.yml`
+workflow in `focused-media` mode. It runs the focused Swift/T.140 checks,
+generic iOS Release SDK compilation and the native media loopback. Neither
+this mode nor the source change signs an app, uploads to TestFlight, enables
+APNs or changes the live server. Actual run evidence must be recorded after
+the workflow finishes; local JavaScript source guards alone are not Swift or
+iPhone test results. TestFlight replacement remains a separate release step.
+
 ## Native CallKit/Jingle hold follow-up (2026-11-15)
 
 The native target now handles `CXSetHeldCallAction` through the current connected

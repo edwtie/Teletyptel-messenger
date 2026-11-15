@@ -10,6 +10,9 @@ on:
       - scripts/prepare-ios-native.js
       - scripts/check-ios-native.js
       - scripts/check-ios-native-media.js
+      - scripts/check-ios-native-codecs.js
+      - scripts/check-ios-native-update.js
+      - tests/native-g722.test.js
       - tests/ios-native-foundation.test.js
       - tests/native-cloud-history.test.js
       - php/lib/NativeCloudHistory.php
@@ -22,7 +25,7 @@ on:
       validation_mode:
         description: Full existing matrix or focused logic/SDK check without UI tests
         type: choice
-        options: [full, focused-update]
+        options: [full, focused-update, focused-media]
         default: full
 
 permissions:
@@ -52,17 +55,19 @@ jobs:
           test -n "$XCODE_PATH"
           echo "DEVELOPER_DIR=$XCODE_PATH/Contents/Developer" >> "$GITHUB_ENV"
       - name: Check isolated project generator
-        if: github.event_name != 'workflow_dispatch' || inputs.validation_mode != 'focused-update'
+        if: github.event_name != 'workflow_dispatch' || inputs.validation_mode == 'full'
         run: node --test tests/ios-native-foundation.test.js
       - name: Check shared online history API
-        if: github.event_name != 'workflow_dispatch' || inputs.validation_mode != 'focused-update'
+        if: github.event_name != 'workflow_dispatch' || inputs.validation_mode == 'full'
         run: node --test tests/native-cloud-history.test.js
       - name: Check focused update guard
-        if: github.event_name == 'workflow_dispatch' && inputs.validation_mode == 'focused-update'
-        run: node --test tests/ios-native-update.test.js
+        if: github.event_name == 'workflow_dispatch' && inputs.validation_mode != 'full'
+        run: node --test tests/ios-native-update.test.js tests/native-g722.test.js
       - name: Compile native app and test ${{ matrix.family }}
         run: |
-          if [ "$TELETYPTEL_NATIVE_VALIDATION_MODE" = "focused-update" ]; then
+          if [ "$TELETYPTEL_NATIVE_VALIDATION_MODE" = "focused-media" ]; then
+            node scripts/check-ios-native-codecs.js
+          elif [ "$TELETYPTEL_NATIVE_VALIDATION_MODE" = "focused-update" ]; then
             node scripts/check-ios-native-update.js
           else
             node scripts/check-ios-native.js

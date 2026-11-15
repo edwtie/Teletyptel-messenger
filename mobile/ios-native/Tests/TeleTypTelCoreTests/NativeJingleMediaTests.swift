@@ -29,6 +29,60 @@ final class NativeJingleMediaTests: XCTestCase {
         text.replacingOccurrences(of: "VP8/90000", with: "H264/90000\r\na=fmtp:96 packetization-mode=1;profile-level-id=42e01f;level-asymmetry-allowed=1")
     }
 
+    private func g722(_ text: String) -> String {
+        text.replacingOccurrences(of: "m=audio 9 UDP/TLS/RTP/SAVPF 0", with: "m=audio 9 UDP/TLS/RTP/SAVPF 9")
+            .replacingOccurrences(of: "a=rtpmap:0 PCMU/8000", with: "a=rtpmap:9 G722/8000")
+    }
+
+    func testG722RoundTripsAcrossEveryCallProfileWithEightKilohertzRtpClockAndDtmf() throws {
+        for profile in NativeCallMedia.allCases {
+            let source = g722(dtmf(fixture(profile)))
+            let proposed = try NativeJingleMedia.fromSDP(source, sid: "call-1", action: "session-initiate", profile: profile)
+            XCTAssertEqual(proposed.audioCodec, "G722")
+            XCTAssertTrue(proposed.supportsDTMF)
+            XCTAssertTrue(proposed.sdp.contains("a=rtpmap:9 G722/8000\r\n"))
+            XCTAssertTrue(proposed.sdp.contains("a=rtpmap:101 telephone-event/8000\r\n"))
+            XCTAssertEqual(try decode(proposed.xml, profile: profile).sdp, proposed.sdp)
+            let answer = try NativeJingleMedia.fromSDP(g722(dtmf(fixture(profile, answer: true))), sid: "call-1", action: "session-accept", profile: profile)
+            XCTAssertNoThrow(try answer.validateAnswer(to: proposed))
+        }
+    }
+
+    func testG722CannotDowngradeOrReplaceTheExistingG711Offer() throws {
+        let wide = try NativeJingleMedia.fromSDP(g722(fixture()), sid: "call-1", action: "session-initiate", profile: .total)
+        let wideAnswer = try NativeJingleMedia.fromSDP(g722(fixture(answer: true)), sid: "call-1", action: "session-accept", profile: .total)
+        let narrowAnswer = try NativeJingleMedia.fromSDP(fixture(answer: true), sid: "call-1", action: "session-accept", profile: .total)
+        XCTAssertThrowsError(try narrowAnswer.validateAnswer(to: wide))
+        XCTAssertThrowsError(try wideAnswer.validateAnswer(to: offer()))
+        XCTAssertEqual(try offer().audioCodec, "PCMU")
+    }
+
+    func testG722RejectsWrongClockPayloadChannelsParametersAndMixedPrimaryCodecs() throws {
+        let source = g722(dtmf(fixture()))
+        for changed in [source.replacingOccurrences(of: "G722/8000", with: "G722/16000"),
+            source.replacingOccurrences(of: "G722/8000", with: "G722/8000/2"),
+            source.replacingOccurrences(of: "a=rtpmap:9 G722", with: "a=rtpmap:0 G722"),
+            source.replacingOccurrences(of: "9 101\r\n", with: "9 0 101\r\n"),
+            source.replacingOccurrences(of: "a=fmtp:101 0-16", with: "a=fmtp:9 bitrate=48000"),
+            source.replacingOccurrences(of: "a=rtpmap:9 G722/8000", with: "a=rtpmap:9 G722/8000\r\na=rtpmap:0 PCMU/8000")] {
+            XCTAssertThrowsError(try NativeJingleMedia.fromSDP(changed, sid: "call-1", action: "session-initiate", profile: .total))
+        }
+        let xml = try NativeJingleMedia.fromSDP(source, sid: "call-1", action: "session-initiate", profile: .total).xml
+        for changed in [xml.replacingOccurrences(of: "id='9'", with: "id='0'"),
+            xml.replacingOccurrences(of: "name='G722' clockrate='8000'", with: "name='G722' clockrate='16000'"),
+            xml.replacingOccurrences(of: "name='G722'", with: "name='G7221'")] {
+            XCTAssertThrowsError(try decode(changed))
+        }
+    }
+
+    func testAudioPreferenceOnlyExposesExplicitG711AndG722Profiles() {
+        XCTAssertEqual(NativeAudioCodec.allCases.map(\.rawValue), ["PCMU", "G722"])
+        XCTAssertEqual(NativeAudioCodec.pcmu.payload, "0")
+        XCTAssertEqual(NativeAudioCodec.g722.payload, "9")
+        XCTAssertNil(NativeAudioCodec(rawValue: "G722/16000"))
+        XCTAssertEqual(NativeAudioCodec(rawValue: "corrupt-setting") ?? .pcmu, .pcmu)
+    }
+
     func testH264RoundTripsWithExplicitParametersAndRejectsCodecSubstitution() throws {
         let proposed = try NativeJingleMedia.fromSDP(h264(fixture()), sid: "call-1", action: "session-initiate", profile: .total)
         XCTAssertEqual(proposed.videoCodec, "H264")
