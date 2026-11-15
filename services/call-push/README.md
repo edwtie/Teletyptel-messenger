@@ -62,12 +62,39 @@ errors/cancellation abandon an attempted reservation. Success is `awaitingJingle
 not connected media. The registry client validates the returned UUID, SID, profile,
 video flag, state and deadline.
 
-**Remaining app integration:** this state machine is not yet called by the app's
-`NativeCallController`/CallKit media driver. Cold-launch bootstrap still needs
-narrowly scoped call credentials and revocation, matching the invitation to an
-authenticated proposal, then fresh Jingle negotiation and media. Do not copy chat/
-Face ID credentials into background storage as a shortcut. Existing login and
-the old status/end-only capability are unchanged.
+**Warm app integration (2026-11-15):** `NativeCallController` now connects the
+CallKit media driver through `NativeCallMediaGate` and `NativeWarmCallSession`.
+The incoming invitation is recorded in memory before the immediate CallKit report;
+no network requests or media preparation delay that report. Answering uses only
+the already authenticated account and HTTP session still in RAM. A separate XMPP
+connection skips roster, chat delivery, presence announcements and discovery.
+This client-side isolation is not a server-enforced call-only credential.
+
+The sequence is fresh bind, authenticated matching proposal, resource proof,
+authenticated reservation, authoritative caller/recipient comparison, proceed,
+fresh Jingle offer and the actual incoming WebRTC negotiator. Only the explicit
+`425 resource_proof_pending` is retried (at most twelve attempts); HTTP approval
+is still not media readiness. Logout/account changes, revoked consent, device
+generation changes, DND/block/mute, deadlines and cancellation stop preparation.
+Declining before answer also attempts authenticated registry cleanup. Offline
+cleanup may fail; existing server deadlines remain the fallback.
+
+Capture waits for verified negotiation preparation. The microphone stays disabled
+until CallKit audio activation; a late-created track inherits the current mute,
+hold and audio-session state. Background operation never presents new microphone
+or camera permission prompts, and the camera stays paused until foregrounded.
+The complete requested profile, ICE/tracks and RTT channel must still be ready
+before answering succeeds; the app never substitutes audio for requested TC.
+
+**Not a completed cold-launch release:** a fully terminated app still needs
+narrowly scoped background authentication/bootstrap and revocation. Do not copy
+chat/Face ID credentials into background storage as a shortcut. The regular
+outgoing call UI and privacy-policy synchronization still need the compatible JMI
+calling path. Native APNs
+enrollment and the backend recovery capability remain disabled: no live APNs,
+server settings, entitlements or provisioning were enabled by this change.
+The old status/end-only capability cannot log in or reserve an answer. Signed
+locked-screen/cold-start iPhone tests remain mandatory before activation.
 
 Deployment additionally needs `TELETYPTEL_CALL_SIGNALING_SPOOL`: an absolute,
 non-symlink directory outside all web roots/repositories, mode 0700. Events and
@@ -371,8 +398,9 @@ does not imply RTT. The durable `media_profile` is passed unchanged to APNs and
 native state, checked for consistency and immutable for a caller/SID. The explicit
 `--migrate` operation adds this column to old schemas; unknown historical profiles
 are not sent. No migration is performed by HTTP endpoints. The native answer bridge
-requires the negotiated profile and all its ready contents; the actual native
-Jingle/media adapter is still required before background TC can work.
+requires the negotiated profile and all its ready contents. The warm-memory
+Jingle/media adapter is wired as described above; cold launch and physical-device
+background TC behavior are not established by the unsigned tests.
 
 Run `php php/tests/call-push-media-test.php` for isolated media-profile checks and
 `node --test tests/native-call-media.test.js` for source guards and the macOS-only

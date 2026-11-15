@@ -75,6 +75,7 @@ final class NativeWebRTCCallMedia: NativeCallMediaDriver {
             self?.refresh()
         }
         prepared = created
+        created.microphone.isEnabled = audioActive && !muted && !held
         publishPresentation()
         if media.contents.contains("rtt") {
             let session = MessengerNativeRttSession(callId: handle.id, sid: handle.sid)

@@ -335,7 +335,8 @@ final class NativeCallController: ObservableObject, NativePushRegistering {
         pendingPush = invitation
         activeID = invitation.id
         status = .ringing("TeleTypTel")
-        guard let lease = login?.warmCallLease, let accountID = lease.account.accountID,
+        guard login?.chat.preferences.doNotDisturb == false,
+              let lease = login?.warmCallLease, let accountID = lease.account.accountID,
               lease.account.webSession != nil,
               pushRegistration.recoveryRegistration(for: NativePushScope(origin: lease.account.configuration.origin.absoluteString,
                   accountID: accountID)) != nil else { return }
@@ -357,16 +358,18 @@ final class NativeCallController: ObservableObject, NativePushRegistering {
         let recovery = NativeWarmCallSession(invitation: invitation, registration: registration, registry: registry)
         warmSession = recovery
         recovery.remoteEnded = { [weak self] in _ = self?.runtime?.platform.coordinator.end(id: handle.id, reason: .remoteEnded) }
-        let offer = try await recovery.prepare(account: lease.account, validatePeer: { [weak self] peer in
-            guard let self = self, self.login?.isBlocked(peer) == false,
-                  self.login?.chat.preferences.mutedPeers.contains(NativeChatCodec.bareJID(peer) ?? "") == false else { throw NativeJingleFailure.rejected }
-        }, validateContext: { [weak self] in
+        let validateContext: () throws -> Void = { [weak self] in
             guard let self = self, self.activeID == handle.id, self.pendingPush?.id == handle.id,
                   self.login?.permitsWarmCall(lease) == true,
                   self.pushRegistration.recoveryRegistration(for: NativePushScope(
                     origin: lease.account.configuration.origin.absoluteString, accountID: accountID))?.generation == registration.generation,
                   self.login?.chat.preferences.doNotDisturb == false else { throw NativeJingleFailure.rejected }
-        })
+        }
+        let validatePeer: (String) throws -> Void = { [weak self] peer in
+            guard let self = self, self.login?.isBlocked(peer) == false,
+                  self.login?.chat.preferences.mutedPeers.contains(NativeChatCodec.bareJID(peer) ?? "") == false else { throw NativeJingleFailure.rejected }
+        }
+        let offer = try await recovery.prepare(account: lease.account, validatePeer: validatePeer, validateContext: validateContext)
         try Task.checkCancellation()
         guard activeID == handle.id, warmSession === recovery,
               login?.isBlocked(offer.request.peer) != true,
@@ -376,6 +379,8 @@ final class NativeCallController: ObservableObject, NativePushRegistering {
                 guard let tracks = capture?.tracks else { throw NativeMediaCaptureFailure.unavailable }
                 return tracks
             }, stopCapture: { [weak capture] in capture?.stop() })
+        do { try validateContext(); try validatePeer(offer.request.peer) }
+        catch { provider.cancel(notifyPeer: true); throw error }
         guard !Task.isCancelled, activeID == handle.id, warmSession === recovery, activePeer == nil, router.install(provider) else {
             provider.cancel(notifyPeer: true)
             throw NativeJingleFailure.staleBinding

@@ -79,11 +79,11 @@ final class NativeWarmCallSession {
                 abandonReservation: { [weak self] in self?.endServerCall() })
             while requests.isEmpty { try await pause(deadline, validate: validateContext) }
             try current(deadline, validate: validateContext)
-            guard requests.count == 1, let request = requests.first,
+            guard requests.filter({ $0.action == "session-initiate" }).count == 1, let request = requests.first,
                   request.action == "session-initiate", request.peer == expectedPeer,
                   request.sid == invitation.sid else { throw NativeJingleFailure.invalidRequest }
             _ = try NativeJingleMedia.decode(request.jingleElement(), sid: invitation.sid, action: request.action, profile: invitation.media)
-            requests.removeAll()
+            requests.removeFirst()
             return NativeWarmCallOffer(request: request, sender: sender)
         } catch { cancel(); endServerCall(); throw error }
     }

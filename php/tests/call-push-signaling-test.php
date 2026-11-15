@@ -219,6 +219,12 @@ $check($fixture->pdo->query("SELECT COUNT(*) FROM call_signaling_resources WHERE
 
 $fixture = new CallSignalingFixture(); $fixture->seed(); $call = $fixture->call();
 $denied(fn() => $fixture->answer($call), 'HTTP/session identity alone cannot claim unproven resource');
+try {
+    $fixture->answer($call);
+    throw new RuntimeException('Missing proof unexpectedly accepted');
+} catch (CallPushFailure $error) {
+    $check($error->getMessage() === 'resource_proof_pending' && $error->status === 425, 'only verified current device gets retryable proof-pending response');
+}
 $proof = $fixture->proof($call);
 $denied(fn() => $fixture->event(array_replace($proof, ['generation' => str_repeat('0', 32)])), 'stale or invented device generation denied');
 $denied(fn() => $fixture->event(array_replace($proof, ['jid' => 'alice@example.test/browser'])), 'caller cannot supply recipient resource proof');

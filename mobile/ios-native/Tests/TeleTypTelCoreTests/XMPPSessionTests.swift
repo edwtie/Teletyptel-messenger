@@ -56,7 +56,8 @@ final class XMPPSessionTests: XCTestCase {
         XCTAssertNil(chat.chat)
         XCTAssertTrue(chat.frames.isEmpty)
         for namespace in ["http://jabber.org/protocol/disco#info", "urn:xmpp:ping"] {
-            let request = "<iq xmlns='jabber:client' from='peer@localhost/tablet' type='get' id='peer'><query xmlns='\(namespace)'/></iq>"
+            let element = namespace == "urn:xmpp:ping" ? "ping" : "query"
+            let request = "<iq xmlns='jabber:client' from='peer@localhost/tablet' type='get' id='peer'><\(element) xmlns='\(namespace)'/></iq>"
             XCTAssertTrue(try stream.receive(request).frames.isEmpty)
         }
         let ping = "<iq xmlns='jabber:client' from='localhost' type='get' id='server'><ping xmlns='urn:xmpp:ping'/></iq>"

@@ -12,6 +12,26 @@ const root = path.resolve(__dirname, "..");
 const native = path.join(root, "mobile/ios-native");
 const read = file => fs.readFileSync(path.join(native, file), "utf8");
 
+test("Native warm CallKit source wiring keeps recovery before capture and preserves audio activation privacy", () => {
+  const controller = read("App/NativeCallController.swift");
+  const runtime = read("App/NativeCallMedia.swift");
+  const capture = read("App/NativeMediaCapture.swift");
+  const gate = read("Sources/TeleTypTelCore/NativeCallMediaGate.swift");
+  assert.match(runtime, /platform = NativeCallPlatform\(media: gate\)/);
+  assert.match(controller, /runtime\.gate\.prepare =[\s\S]*self\.prepareMedia/);
+  assert.match(controller, /coordinator\.invitationReceived =[\s\S]*receivedInvitation/);
+  assert.match(controller, /coordinator\.ended =[\s\S]*self\?\.ended/);
+  assert.ok(gate.indexOf("try await prepare(handle, profile)") < gate.indexOf("self.media.start(handle:"));
+  assert.match(controller, /let offer = try await recovery\.prepare/);
+  assert.match(controller, /let provider = try await NativeIncomingPeerNegotiator/);
+  assert.match(controller, /try validateContext\(\); try validatePeer\(offer.request.peer\)/);
+  assert.match(runtime, /created\.microphone\.isEnabled = audioActive && !muted && !held/);
+  assert.match(runtime, /prepared\?\.microphone\.isEnabled = permitted && !muted && !held/);
+  assert.match(capture, /microphone\.isEnabled = false/);
+  assert.match(capture, /permission\(\.audio, mayPrompt: foreground\)/);
+  assert.match(capture, /if !foreground \{ camera\.isEnabled = false; restoreCamera = true; return \}/);
+});
+
 test("Native push lifecycle persists revocation and never treats basic registry availability as answer recovery", () => {
   for (const file of ["Core/NativePushRegistrationModel.swift", "App/NativePushVault.swift"]) assert.ok(projectText().project.includes(file));
   const model = read("Sources/TeleTypTelCore/NativePushRegistrationModel.swift");

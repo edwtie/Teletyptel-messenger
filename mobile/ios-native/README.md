@@ -2519,6 +2519,26 @@ Certificate lifecycle uses Apple's documented `add-trusted-cert -r deny` and
 | 7. Remaining parity | translation, interpreter, uploads, contacts, settings | Private opt-in translation of own/remote chat and RTT; no same-language translation or translation after opt-out. Consent-based address book, file/photo sending, staff/interpreter permissions and actual three-party media. External SIP/interpreter/112 connections remain separately gated. |
 | 8. Release migration | current TestFlight workflow and production bundle | Only replace existing app after feature parity, migration/rollback tests and physical iPhone/iPad approval. Existing identities/sessions must not be copied into this unsigned preview. Separate permission for signing and TestFlight. |
 
+## Warm-memory CallKit answer integration (2026-11-15)
+
+`NativeCallController` now routes CallKit answering through `NativeCallMediaGate`
+and `NativeWarmCallSession`, not just an isolated recovery helper. It uses an
+already authenticated RAM-only lease and separate call-focused XMPP connection;
+main chat stays suspended. Logout or switching accounts invalidates the lease.
+This is not limited-purpose server credentials and does not recover a terminated
+process. Registry consent/device generation and authoritative full caller/recipient
+JIDs are checked before proceed. A fresh Jingle offer must reach the real native
+incoming negotiator before capture starts. HTTP reservation alone cannot fulfill
+the CallKit answer; actual media/ICE/RTT readiness still governs it.
+
+The microphone requires actual CallKit audio activation. Camera capture remains
+paused in background; previously granted permissions are required without hidden
+prompts. Decline, cancellation, account revocation and failed recovery tear down
+the dedicated connection and attempt authenticated call cleanup. No APNs flag,
+server capability, provisioning or TestFlight upload is enabled by this increment.
+Cold-launch bootstrap, compatible outgoing JMI/privacy-policy adoption and signed physical-device
+background tests are still release gates. See `services/call-push/README.md`.
+
 ## Required evidence before replacing the existing app
 
 - iPhone and iPad, portrait and landscape, Dynamic Type, VoiceOver, hardware

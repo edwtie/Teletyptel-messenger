@@ -184,6 +184,57 @@ final class NativeCallCoordinatorTests: XCTestCase {
     }
 
     @MainActor
+    func testPushContextIsDeliveredBeforeCallKitReportAndDeclineCleansItWithoutMedia() throws {
+        let (coordinator, system, media, _) = fixture()
+        let id = UUID()
+        var context: UUID?
+        var ended: [UUID] = []
+        coordinator.invitationReceived = { invitation in
+            XCTAssertTrue(system.reports.isEmpty)
+            XCTAssertTrue(media.handles.isEmpty)
+            context = invitation.id
+        }
+        coordinator.ended = { handle in
+            XCTAssertNil(coordinator.currentHandle)
+            XCTAssertEqual(system.ended, [id])
+            ended.append(handle.id)
+        }
+        coordinator.receive(try payload(id: id), registration: coordinator.lifecycle.generation) {}
+        XCTAssertEqual(context, id)
+        system.reports[0].completion(true)
+        XCTAssertTrue(coordinator.end(id: id))
+        XCTAssertTrue(media.handles.isEmpty)
+        XCTAssertEqual(ended, [id])
+        XCTAssertFalse(coordinator.end(id: id))
+        XCTAssertEqual(ended, [id])
+    }
+
+    @MainActor
+    func testCallKitAnswerWaitsForGateAndActualCompleteMediaReadiness() async throws {
+        let system = CallSystemFixture(), media = CallMediaFixture(), clock = CallClockFixture()
+        let gate = NativeCallMediaGate(media: media)
+        let coordinator = NativeCallCoordinator(system: system, media: gate, clock: clock)
+        coordinator.configure(account: "fictional-account", consented: true)
+        var prepared: CheckedContinuation<Void, Error>?
+        gate.prepare = { _, _ in try await withCheckedThrowingContinuation { prepared = $0 } }
+        let id = try ring(coordinator, system)
+        var answers: [Bool] = []
+        coordinator.answer(id: id) { answers.append($0) }
+        for _ in 0..<100 { if prepared != nil { break }; await Task.yield() }
+        XCTAssertNotNil(prepared)
+        XCTAssertTrue(media.handles.isEmpty)
+        XCTAssertTrue(answers.isEmpty)
+        prepared?.resume(); prepared = nil
+        for _ in 0..<100 { if !media.handles.isEmpty { break }; await Task.yield() }
+        XCTAssertEqual(media.handles.count, 1)
+        XCTAssertTrue(answers.isEmpty)
+        media.callbacks[0](.ready(.total, contents: ["audio", "video", "rtt"], rttReady: true))
+        XCTAssertEqual(answers, [true])
+        XCTAssertTrue(coordinator.isConnected)
+        _ = coordinator.end(id: id)
+    }
+
+    @MainActor
     func testValidatedJingleInvitationReportsThroughTheSameCallKitGate() throws {
         let (coordinator, system, media, clock) = fixture()
         let invitation = try XCTUnwrap(NativeCallInvitation(sid: "jingle-call", expiresAt: 1045,

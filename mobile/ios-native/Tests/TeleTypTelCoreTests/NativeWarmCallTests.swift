@@ -12,10 +12,12 @@ private actor WarmCallConnection: NativeCallXMPPConnecting, NativeCallRecoverySe
     let offerProfile: NativeCallMedia
     let boundJID: String
     let proposes: Bool
+    let endsEarly: Bool
     init(profile: NativeCallMedia = .total, offerProfile: NativeCallMedia = .total,
-         boundJID: String = "bob@localhost/awakened", proposes: Bool = true) {
+         boundJID: String = "bob@localhost/awakened", proposes: Bool = true, endsEarly: Bool = false) {
         self.profile = profile; self.offerProfile = offerProfile
         self.boundJID = boundJID; self.proposes = proposes
+        self.endsEarly = endsEarly
     }
     func history() -> [String] { operations }
     func isConnected() -> Bool { connected }
@@ -47,6 +49,7 @@ private actor WarmCallConnection: NativeCallXMPPConnecting, NativeCallRecoverySe
         operations.append("proceed")
         let offer = try NativeJingleMedia.fromSDP(sdp(), sid: sid, action: "session-initiate", profile: offerProfile)
         try emit(offer.xml, identifier: "fresh-offer")
+        if endsEarly { try emitTermination() }
     }
     func emitTermination() throws {
         try emit("<jingle xmlns='urn:xmpp:jingle:1' action='session-terminate' sid='call-1'><reason><success/></reason></jingle>", identifier: "finished")
@@ -108,7 +111,7 @@ final class NativeWarmCallTests: XCTestCase {
 
     func testWarmRecoveryBindsFreshOfferForEveryProfileAndRoutesOnlyAfterInstallation() async throws {
         for profile in NativeCallMedia.allCases {
-            let registry = WarmCallRegistry(), connection = WarmCallConnection(profile: profile, offerProfile: profile)
+            let registry = WarmCallRegistry(), connection = WarmCallConnection(profile: profile, offerProfile: profile, endsEarly: profile == .total)
             let warm = try session(registry, profile: profile)
             let offer = try await warm.prepare(account: account(), connector: connection, validateContext: {})
             XCTAssertEqual(offer.request.peer, "alice@localhost/caller")
@@ -116,7 +119,7 @@ final class NativeWarmCallTests: XCTestCase {
             XCTAssertEqual(registry.accepts, 1)
             let history = await connection.history()
             XCTAssertEqual(history, ["bind", "proof", "proceed"])
-            try await connection.emitTermination()
+            if profile != .total { try await connection.emitTermination() }
             try await Task.sleep(nanoseconds: 20_000_000)
             var routed: [String] = []
             warm.receiveJingle = { request, _ in routed.append(request.action) }
