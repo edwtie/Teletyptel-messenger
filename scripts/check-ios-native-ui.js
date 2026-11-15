@@ -7,6 +7,7 @@ const selectedTests = Object.freeze([
   "testAttachmentUploadOnlyStagesLinkUntilExplicitSend",
   "testConnectionLossRecoversWithoutAnotherPasswordPrompt",
   "testGroupDiscoveryManagementAndSessionSearch",
+  "testExistingGroupJoinSendRotationAndLeave",
   "testEnglishStartupDoesNotTranslateUserDataOrRequestPermissions",
   "testAccountSettingsSaveWithoutChangingIdentity",
   "testNativeLoginAndDisconnectPreserveStateAcrossRotation"

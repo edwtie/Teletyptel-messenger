@@ -36,7 +36,7 @@ test("Native G722 evidence requires all runtime profiles and incoming selection 
   assert.match(loopback, /for mode in NativeCallMedia.allCases.*audioCodec: \.g722/);
   assert.match(loopback, /remoteHangup: true, audioCodec: "G722"/);
   const workflow = read(".github/workflows/ios-native-preview.yml");
-  assert.match(workflow, /options: \[full, focused-update, focused-media\]/);
+  assert.match(workflow, /options: \[full, focused-update, focused-media, focused-ui\]/);
   assert.match(workflow, /node scripts\/check-ios-native-codecs.js/);
   assert.doesNotMatch(read("scripts/check-ios-native-codecs.js"), /upload|signing|APNs/);
 });

@@ -398,7 +398,7 @@ final class NativeStartupUITests: XCTestCase {
         waitForStatus("XMPP verbonden als fixture@localhost")
         application.buttons["Hoofdmenu"].tap(); application.buttons["open-groups"].tap()
         let discovery = application.buttons["Beschikbare groepen ophalen"]
-        XCTAssertTrue(discovery.waitForExistence(timeout: 5)); reveal(discovery); discovery.tap()
+        reveal(discovery); XCTAssertTrue(discovery.waitForExistence(timeout: 5)); discovery.tap()
         let discovered = application.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Fictieve testgroep")).firstMatch
         XCTAssertTrue(discovered.waitForExistence(timeout: 5)); reveal(discovered); discovered.tap()
         let nickname = application.textFields["group-nickname"]; reveal(nickname); nickname.tap(); nickname.typeText("Testnaam")
@@ -420,7 +420,8 @@ final class NativeStartupUITests: XCTestCase {
         application.buttons["Deelnemers en groepsmenu"].tap(); application.buttons["Berichten zoeken"].tap()
         let search = application.textFields["group-search"]; XCTAssertTrue(search.waitForExistence(timeout: 5)); reveal(search); search.tap()
         XCTAssertTrue(application.keyboards.firstMatch.waitForExistence(timeout: 5)); search.typeText("onvindbaar")
-        XCTAssertFalse(application.staticTexts["Fictief groepsbericht"].exists)
+        expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: application.staticTexts["Fictief groepsbericht"])
+        waitForExpectations(timeout: 5)
     }
 
     func testConnectionLossRecoversWithoutAnotherPasswordPrompt() {

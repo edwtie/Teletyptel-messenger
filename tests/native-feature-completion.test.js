@@ -11,7 +11,7 @@ test("Focused simulator regression selects real assertions without pretending to
   const { selectedTests, run } = require("../scripts/check-ios-native-ui");
   const { runSimulatorChecks } = require("../scripts/check-ios-native");
   const methods = read("mobile/ios-native/UITests/NativeStartupUITests.swift");
-  assert.equal(selectedTests.length, 6);
+  assert.equal(selectedTests.length, 7);
   for (const name of selectedTests) assert.ok(methods.includes("func " + name + "()"), name);
   const calls = [];
   runSimulatorChecks({ common: ["CODE_SIGNING_ALLOWED=NO"], family: "iPad", destination: "fixture", deviceID: "fixture",

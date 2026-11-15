@@ -86,6 +86,10 @@ struct NativeGroupChatView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            if verticalSizeClass == .compact {
+                groupActions.frame(maxWidth: .infinity, alignment: .trailing)
+                    .padding(.horizontal, 12).padding(.vertical, 4).background(NativeWebStyle.panel)
+            }
             if let group = group {
                 status(group)
                 if searching { TextField("Zoek in deze groepssessie", text: $search).focused($searchFocused).textFieldStyle(.roundedBorder).frame(minHeight: 44).padding(.horizontal, 16).accessibilityIdentifier("group-search") }
@@ -105,6 +109,7 @@ struct NativeGroupChatView: View {
         .font(NativeWebStyle.font()).foregroundStyle(NativeWebStyle.text)
         .toolbar {
             ToolbarItem(placement: .principal) {
+                if verticalSizeClass != .compact {
                 HStack(spacing: 8) {
                     NativeWebAvatar(name: room)
                     VStack(alignment: .leading, spacing: 2) {
@@ -112,28 +117,10 @@ struct NativeGroupChatView: View {
                         Text("Groep").font(NativeWebStyle.font(12)).foregroundStyle(NativeWebStyle.muted)
                     }
                 }.accessibilityElement(children: .combine)
+                }
             }
-            ToolbarItemGroup(placement: .primaryAction) {
-                Button { showInvite = true } label: { Image(systemName: "person.badge.plus").frame(width: 44, height: 44) }
-                    .buttonStyle(NativeWebIconStyle())
-                    .disabled(group?.snapshot?.canSpeak != true).accessibilityLabel("Contact uitnodigen").accessibilityIdentifier("group-invite")
-                Menu {
-                    Button { showParticipants = true } label: { Label("Deelnemers en groepsbeheer", systemImage: "person.3") }
-                    if let archive = archive {
-                        Button {
-                            archive.set(peer: room, kind: "group", archived: !archive.contains(peer: room, kind: "group"))
-                            onArchive?(); dismiss()
-                        } label: { Label(archive.contains(peer: room, kind: "group") ? "Terugzetten" : "Archiveren", systemImage: "archivebox") }
-                    }
-                    Button {
-                        searching.toggle()
-                        if !searching { search = ""; searchFocused = false }
-                        else { Task { await Task.yield(); searchFocused = true } }
-                    } label: { Label("Berichten zoeken", systemImage: "magnifyingglass") }
-                } label: { Image(systemName: "person.3").frame(width: 44, height: 44) }
-                    .buttonStyle(NativeWebIconStyle()).accessibilityLabel("Deelnemers en groepsmenu")
-                Button { model.leave(room: room) } label: { Image(systemName: "rectangle.portrait.and.arrow.right").frame(width: 44, height: 44) }
-                    .buttonStyle(NativeWebIconStyle(destructive: true)).accessibilityLabel("Groep verlaten").accessibilityIdentifier("group-leave")
+            ToolbarItem(placement: .primaryAction) {
+                if verticalSizeClass != .compact { groupActions }
             }
         }
         .sheet(isPresented: $showParticipants) {
@@ -150,6 +137,31 @@ struct NativeGroupChatView: View {
             }
             Button("Annuleren", role: .cancel) { deleting = nil }
         } message: { Text("Voor mij verbergt alleen de lokale kopie; de online geschiedenis blijft bestaan. Voor iedereen is alleen beschikbaar voor eigen berichten met door de groepsserver bevestigde auteur- en bericht-ID's. Externe kopieën kunnen blijven bestaan.") }
+    }
+
+    private var groupActions: some View {
+        HStack(spacing: 8) {
+            Button { showInvite = true } label: { Image(systemName: "person.badge.plus").frame(width: 44, height: 44) }
+                .buttonStyle(NativeWebIconStyle())
+                .disabled(group?.snapshot?.canSpeak != true).accessibilityLabel("Contact uitnodigen").accessibilityIdentifier("group-invite")
+            Menu {
+                Button { showParticipants = true } label: { Label("Deelnemers en groepsbeheer", systemImage: "person.3") }
+                if let archive = archive {
+                    Button {
+                        archive.set(peer: room, kind: "group", archived: !archive.contains(peer: room, kind: "group"))
+                        onArchive?(); dismiss()
+                    } label: { Label(archive.contains(peer: room, kind: "group") ? "Terugzetten" : "Archiveren", systemImage: "archivebox") }
+                }
+                Button {
+                    searching.toggle()
+                    if !searching { search = ""; searchFocused = false }
+                    else { Task { await Task.yield(); searchFocused = true } }
+                } label: { Label("Berichten zoeken", systemImage: "magnifyingglass") }
+            } label: { Image(systemName: "person.3").frame(width: 44, height: 44) }
+                .buttonStyle(NativeWebIconStyle()).accessibilityLabel("Deelnemers en groepsmenu")
+            Button { model.leave(room: room) } label: { Image(systemName: "rectangle.portrait.and.arrow.right").frame(width: 44, height: 44) }
+                .buttonStyle(NativeWebIconStyle(destructive: true)).accessibilityLabel("Groep verlaten").accessibilityIdentifier("group-leave")
+        }
     }
 
     @ViewBuilder
