@@ -180,6 +180,31 @@ final class NativePushRegistryTests: XCTestCase {
         await assertFailure(.invalidResponse) { try await service.revoke(deviceID: self.deviceID) }
     }
 
+    func testAnswerNeedsFreshCSRFAndExactDeviceSessionMediaReservation() async throws {
+        let service = try client()
+        let invitation = try XCTUnwrap(NativeCallInvitation(sid: "live-call", expiresAt: current + 45, media: .total, now: current))
+        let device = NativePushRegistration(deviceID: deviceID, generation: generation, expiresAt: current + 100, controlCredential: nil)
+        let challenge = try envelope()
+        let call: [String: Any] = ["callId": invitation.id.uuidString, "sid": invitation.sid, "state": "accepted",
+            "hasVideo": true, "mediaProfile": "total", "expiresAt": invitation.expiresAt]
+        let accepted = try envelope(["call": call])
+        PushRegistryHTTPFixture.handler = { request, body in
+            if request.httpMethod == "GET" { return (200, challenge) }
+            XCTAssertEqual(request.value(forHTTPHeaderField: "X-CSRF-Token"), self.csrf)
+            let fields = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: String])
+            XCTAssertEqual(fields, ["action": "accept", "callId": invitation.id.uuidString.lowercased(),
+                "deviceId": self.deviceID.uuidString.lowercased(), "generation": self.generation, "fullJid": "bob@localhost/awakened"])
+            return (200, accepted)
+        }
+        try await service.accept(invitation: invitation, registration: device, fullJID: "bob@localhost/awakened")
+        for changed: [String: Any] in [["callId": UUID().uuidString], ["sid": "other"], ["state": "ringing"],
+            ["hasVideo": false], ["mediaProfile": "audio"], ["expiresAt": invitation.expiresAt + 1]] {
+            let invalid = try envelope(["call": call.merging(changed) { _, new in new }])
+            PushRegistryHTTPFixture.handler = { request, _ in (200, request.httpMethod == "GET" ? challenge : invalid) }
+            await assertFailure(.invalidResponse) { try await service.accept(invitation: invitation, registration: device, fullJID: "bob@localhost/awakened") }
+        }
+    }
+
     func testDisabledServerErrorsOversizedRepliesAndCancellationFailClosed() async throws {
         let service = try client()
         for (status, expected) in [(404, NativePushRegistryFailure.unavailable), (403, .rejected), (503, .rejected)] {

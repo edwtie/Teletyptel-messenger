@@ -7,7 +7,7 @@ require_once dirname(__DIR__, 2) . '/php/lib/CallPushSignaling.php';
 
 try {
     $mode = $argv[1] ?? '';
-    if (count($argv) !== 2 || !in_array($mode, ['--migrate', '--ingest', '--enqueue'], true)) throw new RuntimeException('Invalid command');
+    if (count($argv) !== 2 || !in_array($mode, ['--migrate', '--ingest', '--enqueue', '--drain'], true)) throw new RuntimeException('Invalid command');
     if (getenv('TELETYPTEL_CALL_SIGNALING') !== '1') throw new RuntimeException('Disabled');
     $pdo = Database::connect();
     $signaling = CallPushSignaling::configured($pdo);
@@ -22,6 +22,9 @@ try {
             $input = stream_get_contents(STDIN, 16385);
             if (!is_string($input)) throw new RuntimeException('Missing input');
             $result = $signaling->ingest($input);
+        } elseif ($mode === '--drain') {
+            require_once dirname(__DIR__, 2) . '/php/lib/CallPushSpool.php';
+            $result = (new CallPushSpool((string)getenv('TELETYPTEL_CALL_SIGNALING_SPOOL')))->drain($signaling);
         } else { $result = []; }
         echo json_encode($result + $signaling->enqueue($service), JSON_THROW_ON_ERROR) . "\n";
     }

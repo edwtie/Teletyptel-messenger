@@ -13,6 +13,13 @@ on:
       - php/tests/call-control-endpoint-test.php
       - services/call-push/**
       - tests/call-push-signaling.test.js
+      - scripts/check-call-signaling-ejabberd.js
+      - mobile/ios-native/Sources/TeleTypTelCore/NativeCallIntent.swift
+      - mobile/ios-native/Sources/TeleTypTelCore/NativeCallAnswerRecovery.swift
+      - mobile/ios-native/Sources/TeleTypTelCore/NativePushRegistry.swift
+      - mobile/ios-native/Sources/TeleTypTelCore/NativeXMPPConnection.swift
+      - mobile/ios-native/Tests/TeleTypTelCoreTests/NativeCallIntentTests.swift
+      - mobile/ios-native/Tests/TeleTypTelCoreTests/NativePushRegistryTests.swift
 
 permissions:
   contents: read
@@ -43,3 +50,20 @@ jobs:
           for source in php/lib/CallPush*.php php/public/api/call-{push,control}.php services/call-push/{signaling,worker}.php; do
             php -l "$source"
           done
+      - name: Check real disposable ejabberd to PHP and new-resource proof
+        run: node scripts/check-call-signaling-ejabberd.js
+
+  native-call-recovery:
+    runs-on: macos-15
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Select Xcode 26
+        run: |
+          XCODE_PATH=$(find /Applications -maxdepth 1 -name 'Xcode_26*.app' -type d | sort -r | head -n 1)
+          test -n "$XCODE_PATH"
+          echo "DEVELOPER_DIR=$XCODE_PATH/Contents/Developer" >> "$GITHUB_ENV"
+      - name: Check native intent, reservation, cancellation and binding logic
+        run: swift test --package-path mobile/ios-native --filter 'NativeCallIntentTests|NativeCallAnswerRecoveryTests|NativePushRegistryTests|NativeJingleTransportTests'

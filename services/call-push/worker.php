@@ -29,6 +29,10 @@ try {
         $signaling?->ensureSchema();
         echo "Call-push schema prepared. No pushes sent.\n";
     } else {
+        if ($signaling !== null && getenv('TELETYPTEL_CALL_SIGNALING_SPOOL') !== false) {
+            require_once dirname(__DIR__, 2) . '/php/lib/CallPushSpool.php';
+            (new CallPushSpool((string)getenv('TELETYPTEL_CALL_SIGNALING_SPOOL')))->drain($signaling);
+        }
         $signaling?->enqueue($service);
         echo json_encode($service->dispatchOne([CallPushTransport::class, 'send'](...)), JSON_THROW_ON_ERROR) . "\n";
     }

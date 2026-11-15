@@ -66,6 +66,24 @@ struct NativePushRegistryClient: NativePushRegistryServing {
         try Task.checkCancellation()
     }
 
+    func accept(invitation: NativeCallInvitation, registration: NativePushRegistration, fullJID: String) async throws {
+        guard NativeJingleTransport.fullJID(fullJID),
+              NativeChatCodec.bareJID(fullJID)?.hasSuffix("@" + session.configuration.domain) == true,
+              validExpiry(registration.expiresAt), invitation.expiresAt > now(),
+              Self.validDevice(registration.deviceID.uuidString), Self.validDevice(invitation.id.uuidString),
+              Self.matches(registration.generation, "[0-9a-f]{32}") else { throw NativePushRegistryFailure.rejected }
+        let csrf = try await challenge()
+        let body = try JSONSerialization.data(withJSONObject: ["action": "accept", "callId": invitation.id.uuidString.lowercased(),
+            "deviceId": registration.deviceID.uuidString.lowercased(), "generation": registration.generation, "fullJid": fullJID])
+        let reply = try JSONDecoder().decode(Accepted.self, from: await request(body: body, csrf: csrf))
+        try validate(reply)
+        guard reply.call.callId == invitation.id, reply.call.sid == invitation.sid,
+              reply.call.state == "accepted", reply.call.mediaProfile == invitation.media,
+              reply.call.hasVideo == invitation.media.hasVideo, reply.call.expiresAt == invitation.expiresAt,
+              invitation.expiresAt > now() else { throw NativePushRegistryFailure.invalidResponse }
+        try Task.checkCancellation()
+    }
+
     private func challenge() async throws -> String {
         try await challengeReply().csrfToken
     }
@@ -157,5 +175,19 @@ struct NativePushRegistryClient: NativePushRegistryServing {
         let accountId: String
         let csrfToken: String
         let revoked: Bool
+    }
+    private struct Accepted: Decodable, NativePushRegistryReply {
+        let ok: Bool
+        let accountId: String
+        let csrfToken: String
+        let call: Reservation
+    }
+    private struct Reservation: Decodable {
+        let callId: UUID
+        let sid: String
+        let state: String
+        let mediaProfile: NativeCallMedia
+        let hasVideo: Bool
+        let expiresAt: TimeInterval
     }
 }

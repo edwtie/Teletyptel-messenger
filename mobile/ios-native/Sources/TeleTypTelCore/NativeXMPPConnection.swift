@@ -106,7 +106,7 @@ private final class NativeSessionClosure {
     }
 }
 
-private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, NativeArchiveSending, NativeGroupManaging, NativeMessageChanging, NativeGroupMessageChanging, NativeGroupReacting, NativeChatInteracting, NativeJingleSending, NativeContactManaging, @unchecked Sendable {
+private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, NativeArchiveSending, NativeGroupManaging, NativeMessageChanging, NativeGroupMessageChanging, NativeGroupReacting, NativeChatInteracting, NativeJingleSending, NativeCallIntentSending, NativeContactManaging, @unchecked Sendable {
     private let configuration: ServerConfiguration
     private let ownerJID: String
     private var boundJID: String?
@@ -134,6 +134,8 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
     private var messageDeadlines: [UUID: DispatchWorkItem] = [:]
     private var onJingle: (@Sendable (NativeJingleRequest) -> Void)?
     private var onJingleSender: (@Sendable (any NativeJingleSending) -> Void)?
+    private var callIntentObserver: (@Sendable (NativeCallIntent) -> Void)?
+    private var earlyCallIntents: [NativeCallIntent] = []
     private var jingle: NativeJingleTransport?
     private var jingleDeadline: DispatchWorkItem?
     private var pendingJingle: [String: CheckedContinuation<Void, Error>] = [:]
@@ -157,6 +159,45 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
         self.onSender = onSender
         self.onJingle = onJingle
         self.onJingleSender = onJingleSender
+    }
+
+    func observeCallIntents(_ observer: @escaping @Sendable (NativeCallIntent) -> Void) async {
+        await withCheckedContinuation { continuation in
+            queue.async {
+                self.callIntentObserver = observer
+                let pending = self.earlyCallIntents
+                self.earlyCallIntents.removeAll()
+                for intent in pending { observer(intent) }
+                continuation.resume()
+            }
+        }
+    }
+
+    func sendCallIntent(action: NativeCallIntentAction, peer: String, sid: String, media: NativeCallMedia?) async throws {
+        let frame = try NativeCallIntent.frame(action: action, peer: peer, sid: sid, media: media)
+        try Task.checkCancellation()
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            queue.async { self.enqueueMessage(frame, continuation: continuation) }
+        }
+        try Task.checkCancellation()
+    }
+
+    func setCallPreferences(enabled: Bool, dnd: Bool, muted: Set<String>) async throws {
+        let identifier = "call-policy-" + UUID().uuidString
+        try await editContact(NativeCallIntent.preferences(owner: ownerJID, identifier: identifier,
+            enabled: enabled, dnd: dnd, muted: muted), identifier: identifier)
+    }
+
+    func proveCallResource(invitation: NativeCallInvitation, registration: NativePushRegistration) async throws {
+        let identifier = "call-proof-" + UUID().uuidString
+        try await editContact(NativeCallIntent.handoff(owner: ownerJID, identifier: identifier,
+            invitation: invitation, registration: registration), identifier: identifier)
+    }
+
+    private func receiveCallIntent(_ frame: String) {
+        guard let bound = boundJID, let intent = NativeCallIntent.decode(frame, owner: ownerJID, bound: bound) else { return }
+        if let observer = callIntentObserver { observer(intent) }
+        else if earlyCallIntents.count < 8 { earlyCallIntents.append(intent) }
     }
 
     func bindCall(peer: String, sid: String) async throws -> UUID {
@@ -756,6 +797,7 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
         onSender = nil
         onJingle = nil
         onJingleSender = nil
+        callIntentObserver = nil; earlyCallIntents.removeAll()
         if let token = archive?.token { completeArchive(token, result: .failure(error)) }
         invitationObserver = nil
         earlyInvitations.removeAll()
@@ -826,7 +868,7 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
                 do {
                     guard case .string(let frame) = try result.get() else { throw ConnectionFailure.invalidResponse }
                     let output = try self.stream.receive(frame)
-                    if self.stream.phase == .online { self.receiveArchive(frame); self.receiveGroups(frame); self.receiveInvitation(frame); self.receiveManagement(frame); self.receiveContactEdit(frame) }
+                    if self.stream.phase == .online { self.receiveArchive(frame); self.receiveGroups(frame); self.receiveInvitation(frame); self.receiveManagement(frame); self.receiveContactEdit(frame); self.receiveCallIntent(frame) }
                     self.send(output.frames) {
                         if let jid = output.connectedJID {
                             self.boundJID = jid
