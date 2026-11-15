@@ -55,7 +55,8 @@ struct NativeCachedAvatar: View {
     let name: String
     let jid: String
     @ObservedObject var cache: NativeAvatarCache
-    var body: some View { NativeWebAvatar(name: name, profile: cache.profiles[jid]) }
+    var size: CGFloat = 34
+    var body: some View { NativeWebAvatar(name: name, size: size, profile: cache.profiles[jid]) }
 }
 
 struct NativeWebAvatar: View {

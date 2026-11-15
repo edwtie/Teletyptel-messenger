@@ -5,6 +5,7 @@ struct NativeGroupsView: View {
     @ObservedObject var model: NativeGroupModel
     var login: NativeLoginModel? = nil
     var translation: NativeTranslationModel? = nil
+    var avatars: NativeAvatarCache? = nil
     @Environment(\.dismiss) private var dismiss
     @State private var room = ""
     @State private var nickname = ""
@@ -30,7 +31,7 @@ struct NativeGroupsView: View {
                 Section("Groepschats") {
                     if model.rooms.isEmpty { Text("Nog geen groepen geopend in deze sessie.") }
                     ForEach(model.rooms) { group in
-                        NavigationLink { NativeGroupChatView(model: model, room: group.room, login: login, translation: translation) } label: {
+                        NavigationLink { NativeGroupChatView(model: model, room: group.room, login: login, translation: translation, avatars: avatars) } label: {
                             VStack(alignment: .leading, spacing: 4) {
                                 Label(group.room, systemImage: "person.3.fill").lineLimit(2)
                                 Text(group.joining ? "Deelname controleren…" : group.snapshot == nil ? "Niet in de groep" : "Deelgenomen")
@@ -39,7 +40,7 @@ struct NativeGroupsView: View {
                         }.accessibilityIdentifier("group-room-" + group.room)
                     }
                 }
-                if let login = login { NativeOnlineGroups(cloud: login.cloudHistory, groups: model, login: login, translation: translation) }
+                if let login = login { NativeOnlineGroups(cloud: login.cloudHistory, groups: model, login: login, translation: translation, avatars: avatars) }
                 Section("Nieuwe groep") {
                     Button { confirmCreate = true } label: { Label("Nieuwe besloten groep maken", systemImage: "plus.bubble") }
                         .disabled(!model.available || !NativeMUCStream.validNickname(nickname) || room.isEmpty)
@@ -66,6 +67,7 @@ struct NativeGroupChatView: View {
     let room: String
     var login: NativeLoginModel? = nil
     var translation: NativeTranslationModel? = nil
+    var avatars: NativeAvatarCache? = nil
     @State private var showParticipants = false
     @State private var showInvite = false
     @State private var searching = false
@@ -95,8 +97,18 @@ struct NativeGroupChatView: View {
         .toolbarBackground(.visible, for: .navigationBar)
         .font(NativeWebStyle.font()).foregroundStyle(NativeWebStyle.text)
         .toolbar {
+            ToolbarItem(placement: .principal) {
+                HStack(spacing: 8) {
+                    NativeWebAvatar(name: room)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(room.components(separatedBy: "@")[0]).font(NativeWebStyle.font(16, weight: .bold)).lineLimit(1)
+                        Text("Groep").font(NativeWebStyle.font(12)).foregroundStyle(NativeWebStyle.muted)
+                    }
+                }.accessibilityElement(children: .combine)
+            }
             ToolbarItemGroup(placement: .primaryAction) {
                 Button { showInvite = true } label: { Image(systemName: "person.badge.plus").frame(width: 44, height: 44) }
+                    .buttonStyle(NativeWebIconStyle())
                     .disabled(group?.snapshot?.canSpeak != true).accessibilityLabel("Contact uitnodigen").accessibilityIdentifier("group-invite")
                 Menu {
                     Button { showParticipants = true } label: { Label("Deelnemers en groepsbeheer", systemImage: "person.3") }
@@ -105,16 +117,17 @@ struct NativeGroupChatView: View {
                         if !searching { search = ""; searchFocused = false }
                         else { Task { await Task.yield(); searchFocused = true } }
                     } label: { Label("Berichten zoeken", systemImage: "magnifyingglass") }
-                } label: { Image(systemName: "person.3").frame(width: 44, height: 44) }.accessibilityLabel("Deelnemers en groepsmenu")
+                } label: { Image(systemName: "person.3").frame(width: 44, height: 44) }
+                    .buttonStyle(NativeWebIconStyle()).accessibilityLabel("Deelnemers en groepsmenu")
                 Button { model.leave(room: room) } label: { Image(systemName: "rectangle.portrait.and.arrow.right").frame(width: 44, height: 44) }
-                    .tint(.red).accessibilityLabel("Groep verlaten").accessibilityIdentifier("group-leave")
+                    .buttonStyle(NativeWebIconStyle(destructive: true)).accessibilityLabel("Groep verlaten").accessibilityIdentifier("group-leave")
             }
         }
         .sheet(isPresented: $showParticipants) {
             NativeGroupManagementView(groups: model, model: model.management, room: room)
         }
         .sheet(isPresented: $showInvite) { NativeInviteContactView(groups: model, model: model.invitationModel, room: room) }
-        .sheet(item: $forwarding) { message in if let login = login { NativeForwardMessageView(model: login, text: message.body) } }
+        .sheet(item: $forwarding) { message in if let login = login { NativeForwardMessageView(model: login, text: message.body, avatars: avatars) } }
         .confirmationDialog("Groepsbericht verwijderen?", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }), titleVisibility: .visible) {
             if let message = deleting {
                 Button("Verwijderen voor mij", role: .destructive) { model.hideMessage(room: room, identifier: message.id); deleting = nil }
@@ -155,6 +168,7 @@ struct NativeGroupChatView: View {
                         if group.historyLimited { Text("Beperkt cachevenster · haal andere pagina’s op via Online geschiedenis.").font(.caption) }
                         ForEach(group.messages.filter { !$0.hidden && (search.isEmpty || $0.body.localizedCaseInsensitiveContains(search) || $0.nickname.localizedCaseInsensitiveContains(search)) }) { message in
                             NativeGroupBubble(message: message, translation: translation, session: login?.activeWebSession,
+                                avatars: avatars, ownJID: login?.currentOwner,
                                 canForward: login?.canSend == true,
                                 canReact: model.canReact(room: room, identifier: message.id), reactionOwner: group.snapshot?.ownOccupantID,
                                 onReact: { emoji in model.react(room: room, identifier: message.id, emoji: emoji) },
@@ -207,6 +221,8 @@ private struct NativeGroupBubble: View {
     let message: NativeGroupText
     var translation: NativeTranslationModel? = nil
     var session: NativeAccountWebSession? = nil
+    var avatars: NativeAvatarCache? = nil
+    var ownJID: String? = nil
     var canForward = false
     var canReact = false
     var reactionOwner: String?
@@ -234,7 +250,9 @@ private struct NativeGroupBubble: View {
             .accessibilityIdentifier("group-message-" + message.id.uuidString)
             .contextMenu { actions }
             if !message.own { Spacer(minLength: 36) }
-            else { NativeWebAvatar(name: message.nickname, size: 30) }
+            else if let avatars = avatars, let ownJID = ownJID {
+                NativeCachedAvatar(name: message.nickname, jid: ownJID, cache: avatars, size: 30)
+            } else { NativeWebAvatar(name: message.nickname, size: 30) }
         }
     }
 
@@ -272,6 +290,7 @@ private struct NativeGroupBubble: View {
                 .disabled(!canReply)
             Button { UIPasteboard.general.string = message.body } label: { Label("Kopiëren", systemImage: "doc.on.doc") }
             Button(action: onForward) { Label("Doorsturen", systemImage: "arrowshape.turn.up.right") }.disabled(!canForward)
+            if let translation = translation { NativeGroupTranslationAction(model: translation, message: message) }
         }
         Button(role: .destructive, action: onDelete) { Label("Verwijderen", systemImage: "trash") }
             .disabled(message.state == .sending || message.actionPending)
@@ -286,6 +305,18 @@ private struct NativeGroupBubble: View {
     }
 }
 
+private struct NativeGroupTranslationAction: View {
+    @ObservedObject var model: NativeTranslationModel
+    let message: NativeGroupText
+    var body: some View {
+        if model.preferences.mode != "off" {
+            Button { model.translate(message.body, key: "group:" + message.room + ":" + message.id.uuidString) } label: {
+                Label("Vertalen", systemImage: "globe")
+            }.disabled(!model.ready || !model.available || !model.sharingConsent)
+        }
+    }
+}
+
 private struct NativeGroupTranslationExtras: View {
     @ObservedObject var model: NativeTranslationModel
     let message: NativeGroupText
@@ -294,10 +325,6 @@ private struct NativeGroupTranslationExtras: View {
         VStack(alignment: .leading, spacing: 5) {
             Text(message.body)
             if model.preferences.mode != "off", model.sharingConsent, let result = model.results[key] { NativeTranslationCaption(result: result) }
-            if model.preferences.mode == "manual" {
-                Button("Vertalen") { model.translate(message.body, key: key) }.font(.caption)
-                    .disabled(!model.ready || !model.available || !model.sharingConsent)
-            }
         }
         .task(id: "\(model.preferences.mode):\(model.preferences.targetLanguage):\(model.sharingConsent):\(model.ready)") {
             if model.preferences.mode == "automatic" { model.translate(message.body, key: key, automatic: true) }

@@ -32,6 +32,40 @@ Before switching the signed target to `com.tiedragon.teletyptel`:
 The existing signed/TestFlight workflow still builds the working wrapper. This
 step did not silently redirect it to the incomplete native target.
 
+## Web UI comparison, presentation-only follow-up (2026-11-15)
+
+Scope agreed with the owner: compare the website and apps, change presentation
+where an existing action already exists, and do not rerun full functional or
+simulator suites for cosmetic changes. Backend/protocol behavior is outside this
+pass. The earlier successful build below predates these UI changes and must not
+be quoted as validation of their rendered layout.
+
+The reference is the current local `php/public/chat.html` and its styles/menu
+definitions, not a newly invented interface. Windows uses the existing WebView2
+web client; the Android shell points to the configured web server. That shared
+source is not proof that their installed bundles, viewport or native permissions
+match. The separate SwiftUI target has the following source-level differences:
+
+| Screen or element | Presentation aligned in this pass | Still different / not verified |
+| --- | --- | --- |
+| Empty conversation pane | Same logo, choose-conversation title and explanatory text as the web tablet placeholder; adaptive world background retained | Newly rendered phone/tablet sizes and Dynamic Type not inspected in this pass |
+| Main menu and tablet header | Symbol-labelled communication/settings sections, consistent number-call wording, visible number/settings shortcuts on regular-width layouts | Web View/theme/background selection, do-not-disturb and separate History/Archive panels do not have equivalent native controls |
+| Contacts and groups | Existing search, selection, plus button and avatar style retained | Native plus menu still lacks a working New contact workflow; contact/group ordering and recent previews are not fully equal |
+| Forward picker | Reuses the already-loaded roster avatar for the exact JID instead of always drawing fallback initials | No new profile requests or avatar-format support; uncached profiles still show initials |
+| Group chat header | Avatar/title/subtitle layout and the same framed symbol-button style; leave remains destructive/red | No invented group-photo source or unimplemented call buttons |
+| Own group-message avatar | Reuses the current owner's already-loaded image at message-avatar size, including groups opened through online history | Other members retain initials: a nickname is not proof of their real JID and must not select somebody else's private photo |
+| Message translation action | Group translation moved to the message menu, matching direct chat/web; no repeated manual button underneath each bubble | Existing translation eligibility, consent, result display and automatic actions are unchanged |
+| Dialog navigation | Translation settings now has the same labelled 44-point close symbol as the other native sheets | System sheets, contact pickers and context menus intentionally remain native rather than pixel-identical browser controls |
+| Message actions and composer | Existing reply/copy/forward/delete, attachment/emoji and TC/audio/video entry points compared; callbacks and permissions retained | Native correction/retraction eligibility and group attachment/call controls are not all equivalent to the web workflows |
+| Account and interface language | Existing account/privacy/translation entries retained | Photo editing/upload UI and complete UI localization remain missing; profile language does not translate the native interface |
+
+Review method: source/markup comparison, changed-view call-site review and a
+syntax-only parse of the edited Swift views. No new simulator/device screenshots,
+functional tests, server requests, signed builds or TestFlight upload are part
+of this pass. Reusing the in-memory avatar cache adds no new backend lookups.
+Full visual/web parity is therefore still open; missing workflows are listed
+instead of being represented by enabled-looking placeholder buttons.
+
 ## Native interpreter participants and avatar corrections (2026-11-15)
 
 The native caller and partner now have a consent-first interpreter workflow,

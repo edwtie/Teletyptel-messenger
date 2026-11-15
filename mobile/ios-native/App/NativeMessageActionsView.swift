@@ -3,6 +3,7 @@ import SwiftUI
 struct NativeForwardMessageView: View {
     @ObservedObject var model: NativeLoginModel
     let text: String
+    var avatars: NativeAvatarCache? = nil
     @Environment(\.dismiss) private var dismiss
     @State private var selected: String?
     @State private var search = ""
@@ -21,7 +22,13 @@ struct NativeForwardMessageView: View {
                     TextField("Contacten zoeken", text: $search)
                     ForEach(contacts) { contact in
                         Button { selected = contact.jid } label: {
-                            HStack { NativeWebAvatar(name: contact.displayName); Text(contact.displayName); Spacer(); if selected == contact.jid { Image(systemName: "checkmark.circle.fill") } }
+                            HStack(spacing: 10) {
+                                if let avatars = avatars { NativeCachedAvatar(name: contact.displayName, jid: contact.jid, cache: avatars) }
+                                else { NativeWebAvatar(name: contact.displayName) }
+                                Text(contact.displayName).foregroundStyle(NativeWebStyle.text)
+                                Spacer()
+                                if selected == contact.jid { Image(systemName: "checkmark.circle.fill") }
+                            }.frame(minHeight: 44)
                         }.accessibilityIdentifier("forward-contact-" + contact.jid)
                     }
                 }

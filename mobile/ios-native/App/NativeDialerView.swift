@@ -53,7 +53,7 @@ struct NativeDialerView: View {
                         .accessibilityIdentifier("sip-lab-call").disabled(route == nil || !login.canSend || calls.hasLiveCall)
                 }.padding(20).frame(maxWidth: 420).frame(maxWidth: .infinity)
             }
-            .nativeWebForm().navigationTitle("Nummerbellen")
+            .nativeWebForm().navigationTitle("Nummer bellen")
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button { dismiss() } label: { Image(systemName: "xmark").frame(width: 44, height: 44) }.accessibilityLabel("Sluiten") } }
         }
         .alert("Een contact kiezen?", isPresented: $contactConsent) {

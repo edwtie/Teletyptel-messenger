@@ -9,6 +9,7 @@ struct NativeChatView: View {
     var onClose: (() -> Void)? = nil
     var contactProfile: NativePublicAvatar? = nil
     var ownProfile: NativePublicAvatar? = nil
+    var avatars: NativeAvatarCache? = nil
     var allowReadMarkers = true
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
@@ -148,7 +149,7 @@ struct NativeChatView: View {
             }
             .scrollDismissesKeyboard(.interactively)
         .sheet(isPresented: $showTranslation) { NativeTranslationSettingsView(model: translation) }
-        .sheet(item: $forwarding) { NativeForwardMessageView(model: model, text: $0.body) }
+        .sheet(item: $forwarding) { NativeForwardMessageView(model: model, text: $0.body, avatars: avatars) }
         .sheet(item: $editing) { NativeEditMessageView(model: model, message: $0) }
         .confirmationDialog("Bericht verwijderen?", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }), titleVisibility: .visible) {
             if let message = deleting {

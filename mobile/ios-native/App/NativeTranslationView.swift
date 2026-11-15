@@ -73,7 +73,9 @@ struct NativeTranslationSettingsView: View {
             }
             .nativeWebForm()
             .navigationTitle("Vertaling")
-            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Gereed") { dismiss() } } }
+            .toolbar { ToolbarItem(placement: .cancellationAction) {
+                Button { dismiss() } label: { Image(systemName: "xmark").frame(width: 44, height: 44) }.accessibilityLabel("Sluiten")
+            } }
             .onAppear { preferences = model.preferences; consent = model.sharingConsent }
         }
     }
@@ -117,7 +119,7 @@ struct NativeMessengerView: View {
             conversationLayout
         }
         .font(NativeWebStyle.font()).tint(NativeWebStyle.accent)
-        .sheet(isPresented: $showGroups) { NativeGroupsView(model: model.groups, login: model, translation: translation) }
+        .sheet(isPresented: $showGroups) { NativeGroupsView(model: model.groups, login: model, translation: translation, avatars: avatars) }
         .sheet(isPresented: $showAccount) { NativeAccountSettingsView(login: model, translation: translation) }
         .sheet(isPresented: $showTranslation) { NativeTranslationSettingsView(model: translation) }
         .sheet(isPresented: $showDialer) { NativeDialerView(login: model, calls: calls) }
@@ -217,16 +219,27 @@ struct NativeMessengerView: View {
         } detail: {
             if let contact = selectedContact {
                 NativeChatView(model: model, calls: calls, translation: translation, contact: contact, onClose: { selected = nil },
-                    contactProfile: avatars.profiles[contact.jid], ownProfile: avatars.owner.flatMap { avatars.profiles[$0] },
+                    contactProfile: avatars.profiles[contact.jid], ownProfile: avatars.owner.flatMap { avatars.profiles[$0] }, avatars: avatars,
                     allowReadMarkers: !showAccount && !showTranslation && !showGroups && !showDialer,
                     historyOnly: !rosterJIDs.contains(contact.jid))
             } else if let room = model.groups.rooms.first(where: { $0.room == selected }) {
-                NativeGroupChatView(model: model.groups, room: room.room, login: model, translation: translation)
+                NativeGroupChatView(model: model.groups, room: room.room, login: model, translation: translation, avatars: avatars)
             } else {
                 GeometryReader { geometry in
                     Image(geometry.size.width > geometry.size.height ? "ChatBackgroundWide" : "ChatBackground")
                         .resizable().scaledToFill().frame(width: geometry.size.width, height: geometry.size.height).clipped()
-                        .overlay { Text("Kies een gesprek").font(.headline).padding().background(.regularMaterial, in: Capsule()) }
+                        .overlay {
+                            VStack(spacing: 16) {
+                                Image("TeleTypTelLogo").resizable().scaledToFit().frame(maxWidth: 300, maxHeight: 68)
+                                    .accessibilityLabel("TeleTypTel")
+                                Text("Kies een gesprek").font(NativeWebStyle.font(24, weight: .bold))
+                                Text("Kies links een contact om te chatten, bellen of Total Conversation te gebruiken.")
+                                    .multilineTextAlignment(.center).foregroundStyle(NativeWebStyle.muted)
+                            }
+                            .padding(24).frame(maxWidth: 440).foregroundStyle(NativeWebStyle.text)
+                            .background(NativeWebStyle.panel.opacity(0.94), in: RoundedRectangle(cornerRadius: 16))
+                            .padding(20).accessibilityIdentifier("messenger-choose-conversation")
+                        }
                 }
                 .toolbar(.hidden, for: .navigationBar)
             }
@@ -242,16 +255,26 @@ struct NativeMessengerView: View {
                 .accessibilityLabel(connectionStatus).accessibilityIdentifier("startup-status")
             Spacer(minLength: 0)
             if horizontalSizeClass == .regular {
+                Button { showDialer = true } label: { Image(systemName: "phone") }
+                    .buttonStyle(NativeWebIconStyle()).accessibilityLabel("Nummer bellen")
+                    .accessibilityIdentifier("toolbar-number-dialer")
+                Button { showAccount = true } label: { Image(systemName: "gearshape") }
+                    .buttonStyle(NativeWebIconStyle()).accessibilityLabel("Accountinstellingen")
+                    .accessibilityIdentifier("toolbar-account-settings")
                 Button(action: logout) { Image(systemName: "rectangle.portrait.and.arrow.right") }
                     .buttonStyle(NativeWebIconStyle(destructive: true))
                     .accessibilityLabel("Uitloggen").accessibilityIdentifier("disconnect-session")
             }
             Menu {
-                Button { showDialer = true } label: { Label("Nummerbellen · lokale test", systemImage: "circle.grid.3x3.fill") }.accessibilityIdentifier("open-number-dialer")
-                Button { showGroups = true } label: { Label("Groepschats", systemImage: "person.3") }.accessibilityIdentifier("open-groups")
-                Button { showAccount = true } label: { Label("Accountinstellingen", systemImage: "person.crop.circle") }.accessibilityIdentifier("open-account-settings")
-                Button { showTranslation = true } label: { Label("Vertaling", systemImage: "globe") }
-                Button(action: logout) { Label("Uitloggen", systemImage: "rectangle.portrait.and.arrow.right") }.accessibilityIdentifier("menu-logout")
+                Section("Communicatie") {
+                    Button { showDialer = true } label: { Label("Nummer bellen", systemImage: "phone") }.accessibilityIdentifier("open-number-dialer")
+                    Button { showGroups = true } label: { Label("Groepschats", systemImage: "person.3") }.accessibilityIdentifier("open-groups")
+                }
+                Section("Instellingen") {
+                    Button { showAccount = true } label: { Label("Accountinstellingen", systemImage: "gearshape") }.accessibilityIdentifier("open-account-settings")
+                    Button { showTranslation = true } label: { Label("Vertaling", systemImage: "globe") }
+                }
+                Button(role: .destructive, action: logout) { Label("Uitloggen", systemImage: "rectangle.portrait.and.arrow.right") }.accessibilityIdentifier("menu-logout")
             } label: { Image(systemName: "line.3.horizontal") }
                 .buttonStyle(NativeWebIconStyle()).accessibilityLabel("Hoofdmenu")
         }
