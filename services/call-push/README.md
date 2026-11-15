@@ -193,6 +193,19 @@ integration and 31 selected Swift tests passed in
 [run 43718394685](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43718394685).
 These are not real PushKit delivery or cold-launch audio/video tests.
 
+Follow-up evidence: [run 43718864843](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43718864843)
+passed the real server chain plus 32 Swift tests at `ef4e334`, including stream-
+pending invalidation and fresh intent delivery to the replacement resource.
+[Unsigned app run 43718867260](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43718867260)
+passed both iPhone/iPad matrix entries: 164 selected Swift tests, native RTT tests
+and an unsigned iOS SDK build in each entry. No simulator UI/media/physical device
+test or upload was performed by that focused workflow.
+[Run 43719254763](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43719254763)
+passed the server chain and 33 Swift tests at `dd8a5c2`, adding bare-JID retraction
+before any recipient resource has been selected. The SDK build above predates
+that internal targeting-rule/test-only follow-up; its public method signatures
+are unchanged. None of this opens the remaining app integration release gate.
+
 The older baseline below describes the original transport. Statements that no
 adapter exists refer to that baseline and are superseded by the opt-in producer,
 not a complete, activated ejabberd/PushKit integration.
