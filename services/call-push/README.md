@@ -96,6 +96,17 @@ server settings, entitlements or provisioning were enabled by this change.
 The old status/end-only capability cannot log in or reserve an answer. Signed
 locked-screen/cold-start iPhone tests remain mandatory before activation.
 
+Validation: source revision `c932d5b` passed the
+[unsigned iPhone/iPad SDK matrix](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43725280351):
+206 selected Swift tests with zero failures in each matrix job, the native RTT
+contract tests and the actual iOS device-SDK build. `uiTests` is empty; this is not
+a simulator camera/audio test or a signed physical-device result. The unchanged
+server/core source at `d473e5d` also passed the
+[isolated signaling checks](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43724972857),
+including 71 recovery/registry/stream tests and a real temporary ejabberd to PHP
+signed-spool/resource-proof chain. Local PHP signaling fixtures passed 92 checks.
+No real APNs request or TestFlight upload was made.
+
 Deployment additionally needs `TELETYPTEL_CALL_SIGNALING_SPOOL`: an absolute,
 non-symlink directory outside all web roots/repositories, mode 0700. Events and
 the separate signing-key file use 0600. Compile against the exact ejabberd version
