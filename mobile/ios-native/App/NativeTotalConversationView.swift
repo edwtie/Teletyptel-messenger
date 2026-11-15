@@ -303,6 +303,7 @@ struct NativeTotalConversationView: View {
 
 struct NativeVideoSurface: UIViewRepresentable {
     let track: RTCVideoTrack
+    var fit = false
 
     final class Coordinator {
         var track: RTCVideoTrack?
@@ -312,13 +313,14 @@ struct NativeVideoSurface: UIViewRepresentable {
 
     func makeUIView(context: Context) -> RTCMTLVideoView {
         let view = RTCMTLVideoView(frame: .zero)
-        view.videoContentMode = .scaleAspectFill
+        view.videoContentMode = fit ? .scaleAspectFit : .scaleAspectFill
         view.clipsToBounds = true
         view.backgroundColor = .black
         return view
     }
 
     func updateUIView(_ view: RTCMTLVideoView, context: Context) {
+        view.videoContentMode = fit ? .scaleAspectFit : .scaleAspectFill
         guard context.coordinator.track !== track else { return }
         context.coordinator.track?.remove(view)
         track.add(view)

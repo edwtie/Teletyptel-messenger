@@ -192,6 +192,7 @@ final class NativeInterpreterMedia: ObservableObject, NativeInterpreterMediaDriv
         try Task.checkCancellation()
         guard peer != nil, pendingID == nil else { throw NativeInterpreterFailure.media }
         let identifier = UUID()
+        let attempt = generation
         return try await withTaskCancellationHandler(operation: {
             try await withCheckedThrowingContinuation { continuation in
                 pendingID = identifier
@@ -210,6 +211,9 @@ final class NativeInterpreterMedia: ObservableObject, NativeInterpreterMediaDriv
                     continuation.resume(with: result)
                 } }
             }
-        }, onCancel: { Task { @MainActor [weak self] in self?.stop() } })
+        }, onCancel: { Task { @MainActor [weak self] in
+            guard let self = self, self.generation == attempt else { return }
+            self.stop()
+        } })
     }
 }

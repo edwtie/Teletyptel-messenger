@@ -224,6 +224,8 @@ test("Native interpreter preserves the primary call and uses authenticated conse
   const media = read("App/NativeInterpreterMedia.swift");
   assert.doesNotMatch(media, /capture\.stop|\.isEnabled\s*=|print\(|NSLog|PKPushRegistry|sip:/);
   assert.match(media, /channel\.bufferedAmount \+ UInt64\(data\.count\) <= 262144/);
+    assert.match(media, /onCancel: \{ Task \{ @MainActor \[weak self\] in\s+guard let self = self, self\.generation == attempt else \{ return \}/);
+    assert.match(read("App/NativeInterpreterCallView.swift"), /NativeVideoSurface\(track: video, fit: true\)/);
   assert.match(read("App/NativeInterpreterCallView.swift"), /\.alert\("Tolk laten meekijken en luisteren\?"/);
   assert.doesNotMatch(read("App/Info.plist"), /TeleTypTelNativeCallPushEnabled|aps-environment/);
 });

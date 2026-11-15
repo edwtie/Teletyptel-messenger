@@ -49,7 +49,7 @@ struct NativeInterpreterTile: View {
         if media.remoteVideo != nil || session.connected {
         VStack(alignment: .leading, spacing: 4) {
             if let video = media.remoteVideo {
-                NativeVideoSurface(track: video).frame(width: max(1, width - 16), height: max(1, width - 16) * 0.7).clipped()
+                NativeVideoSurface(track: video, fit: true).frame(width: max(1, width - 16), height: max(1, width - 16) * 0.7).clipped()
             }
             Text(session.interpreterName).font(.caption.bold())
             if !session.remoteText.isEmpty { Text(session.remoteText).font(.caption).lineLimit(4).textSelection(.enabled) }
