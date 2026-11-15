@@ -80,6 +80,21 @@ test("Jingle harness exercises real resource-bound IQ exchange without media or 
   assert.match(harness, /if \(remaining\) \{[\s\S]*throw new Error\("A native XMPP session remained after cancellation"\)/);
 });
 
+test("Native JMI fixture uses two real accounts and fresh resource-bound Jingle, not mock media", () => {
+  const root = path.resolve(__dirname, "..");
+  const source = fs.readFileSync(path.join(root, "mobile/ios-native/Tests/NativeXMPPIntegrationTests/NativeCallIntentIntegrationTests.swift"), "utf8");
+  assert.equal((source.match(/func test/g) || []).length, 1);
+  for (const required of ["XCTSkip", '"github-hosted"', "NativeXMPPConnection().run", "observeCallIntents",
+    "NativeOutgoingCallIntent", "NativeIncomingCallIntent", "setCallPreferences", ".unsupported", "selectedPeer, right.jid",
+    "replyJingle", "exchangeJingle", "received.peer, left.jid", "unbindCall", "remoteEnded"])
+    assert.ok(source.includes(required), required);
+  assert.doesNotMatch(source, /URLProtocol|SecTrust|PKPushRegistry|RTCPeerConnection|print\([^\n]*password/);
+  const harness = fs.readFileSync(path.join(root, "scripts/check-ios-native-ejabberd.js"), "utf8");
+  assert.match(harness, /runSwift\("NativeCallIntentIntegrationTests", "native-intent-tests.txt"\)/);
+  assert.match(harness, /nativeCallIntentTransportTested = true/);
+  assert.match(harness, /save\("native-intent-wire.txt", trace.slice\(-64000\)\)/);
+});
+
 test("MAM test restores isolated direct history with real two-account transports", () => {
   const root = path.resolve(__dirname, "..");
   const source = fs.readFileSync(path.join(root, "mobile/ios-native/Tests/NativeXMPPIntegrationTests/NativeArchiveIntegrationTests.swift"), "utf8");

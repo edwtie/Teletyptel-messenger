@@ -13,6 +13,7 @@ on:
       - php/tests/call-control-endpoint-test.php
       - services/call-push/**
       - tests/call-push-signaling.test.js
+      - tests/native-call-intent-routing.test.js
       - scripts/check-call-signaling-ejabberd.js
       - mobile/ios-native/Sources/TeleTypTelCore/NativeCallIntent.swift
       - mobile/ios-native/Sources/TeleTypTelCore/NativeCallPolicy.swift
@@ -47,7 +48,7 @@ jobs:
       - name: Require PHP fixture extensions
         run: php -r 'foreach (["pdo_sqlite", "openssl", "mbstring"] as $extension) { if (!extension_loaded($extension)) { exit(1); } }'
       - name: Check signed-event interoperability and source boundaries
-        run: node --test tests/call-push-signaling.test.js tests/call-push-transport.test.js tests/apns-call-push.test.js tests/native-call-control.test.js
+        run: node --test tests/call-push-signaling.test.js tests/call-push-transport.test.js tests/apns-call-push.test.js tests/native-call-control.test.js tests/native-call-intent-routing.test.js
       - name: Check registry, revocation and competing answer processes
         run: |
           for test in call-push-smoke call-push-reconcile-test call-push-control-test call-push-media-test call-push-endpoint-test call-control-endpoint-test; do

@@ -19,9 +19,11 @@ ownership. Do not expose its signing key or feed through a browser/mobile API.
 c2s ownership, XEP-0353 proposals, privacy/blocking and persisted call preferences.
 It writes signed metadata to a protected local spool consumed by `CallPushSpool`;
 neither module sends APNs itself. This producer handles message intents, not
-inspection of arbitrary existing Jingle IQ sessions. The app's direct-full-JID
-call UI still needs to adopt the intent/recovery transport before cold-start media
-can work. An old IQ is never replayed to a replacement resource.
+inspection of arbitrary existing Jingle IQ sessions. Native call buttons now use
+intent routing for supported local accounts after acknowledged privacy policy;
+foreground legacy fallback remains separate. Cold-start media still requires
+server-enforced scoped authentication and native bootstrap. An old IQ is never
+replayed to a replacement resource.
 [XEP-0353](https://xmpp.org/extensions/xep-0353.html) and
 [XEP-0357](https://xmpp.org/extensions/xep-0357.html) are relevant integration
 references; this is a bounded local-domain XEP-0353 subset, not a claim of complete
@@ -55,8 +57,10 @@ session/account ownership and access versions. Client-supplied `allowed` fields
 never substitute for these checks.
 
 The native XMPP connection now parses/buffers bounded live intents and can send
-policy, resource-proof and proceed messages. Archived/delayed messages, carbons,
+policy, resource-proof and proceed messages. Archived/delayed delivery, carbons,
 unknown recipients, session mismatches and media downgrades are rejected.
+An empty recipient-bound legacy archive marker attached by ejabberd to a live
+message is permitted; a marker is not a forwarded MAM result or delayed delivery.
 `NativeCallAnswerRecovery` sequences proof, authenticated reservation, then proceed;
 errors/cancellation abandon an attempted reservation. Success is `awaitingJingle`,
 not connected media. The registry client validates the returned UUID, SID, profile,
@@ -385,8 +389,11 @@ Do not enable the registration API before the migration is ready. The API return
 ## Remaining release blockers
 
 - Connect the server registry to actual authenticated ejabberd/Jingle signaling,
-  including authoritative blocking, DND and mute state. The policy gate exists;
-  its production adapter does not. No arbitrary client invitation may bypass it.
+  including deployment of the reviewed producer/journal adapter and authoritative
+  blocking, DND and mute state. Native policy synchronization and local intent
+  routing now exist, but are not live activation. Extend pending-offer handling
+  into an accepted/active-call lifecycle; a 45-second invitation is not an active
+  media lease. No arbitrary client invitation may bypass these checks.
 - Exercise the implemented native consent/token lifecycle on a real device.
   `native-call-push.js` binds it to login/logout with explicit settings consent,
   renewal and serialized revocation. Offline revocation is remembered natively;
@@ -395,7 +402,10 @@ Do not enable the registration API before the migration is ready. The API return
   An expired web session bounds registration by its 24-hour lease, not immediate
   session-store detection; revocation is not guaranteed while offline.
 - Recover a fresh XMPP resource after cold start. Existing Jingle discovery uses
-  online full JIDs; delivering an old IQ to a vanished resource is not a solution.
+  online full JIDs on the legacy path; the new native intent path selects a fresh
+  resource before Jingle. Cold bootstrap and server-enforced call/device/SID-scoped
+  credentials are still missing. Do not expose normal account credentials in
+  background storage or expand the existing status/end-only token into login.
 - Connect answer/decline/end events to the same verified call. Ringing/answer
   deadlines must hold across restarts; failed recovery must end the native call.
 - Validate native media and audio-session integration while locked. A WKWebView

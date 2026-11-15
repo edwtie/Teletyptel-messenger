@@ -2565,8 +2565,67 @@ paused in background; previously granted permissions are required without hidden
 prompts. Decline, cancellation, account revocation and failed recovery tear down
 the dedicated connection and attempt authenticated call cleanup. No APNs flag,
 server capability, provisioning or TestFlight upload is enabled by this increment.
-Cold-launch bootstrap, compatible outgoing JMI/privacy-policy adoption and signed physical-device
+Cold-launch bootstrap, the remaining server lifecycle work and signed physical-device
 background tests are still release gates. See `services/call-push/README.md`.
+
+## Native call-intent routing and privacy acknowledgement (2026-11-15)
+
+For supported local accounts the call buttons now propose to a bare recipient
+using the bounded XEP-0353 transport. A verified proceed selects one full resource;
+only then does the real outgoing Jingle negotiator bind and the media gate permit
+capture. Incoming foreground proposals report to CallKit before answering;
+answering binds the exact caller/SID, sends proceed and requires a fresh matching
+Jingle offer before installing the real incoming negotiator. The requested
+audio/video/RTT profile and selected audio/video codecs are preserved. Actual
+ICE, negotiated contents and RTT readiness still determine connected state.
+The invitation window is bounded to 45 seconds, followed by a separate media
+deadline; cancellation and changed login generations cannot revive an old call.
+The explicit private Asterisk echo route remains a separately validated full-JID
+gateway route, limited to extension 600; it is not converted into a bare proposal.
+
+Native block/mute/DND preferences now feed an independently correlated, bounded
+server-policy IQ. Calls wait for acknowledgement; coalesced privacy changes stay
+closed until the latest value is acknowledged. More than 256 combined local
+blocked/muted peers disables the policy instead of silently truncating it.
+An initial explicit unsupported response allows the existing online/full-resource
+foreground route. Timeout, rejection or failure after a successful policy exchange
+does not downgrade. Foreign-domain foreground calls retain the legacy route only
+when policy is usable. Queued proposals are age-limited and removed on retraction.
+Live ejabberd messages can carry a legacy `urn:xmpp:mam:tmp` archive marker. An
+empty, bounded marker belonging to the recipient does not mean archive replay and
+is accepted. Actual MAM wrappers, delay elements, carbons and foreign/malformed
+markers remain excluded from live call initiation.
+
+Push-consenting devices continue to wait for the authoritative APNs/registry UUID
+rather than creating a competing foreground call identity. This does not enable
+push: the server capability, native flag, provisioning and deployment remain off.
+The implementation is a local-domain subset, not full XEP-0353 interoperability:
+archive catch-up, carbon-based multi-device ring cancellation and simultaneous-call
+tie breaking still need explicit implementation and interoperability coverage.
+
+No ordinary account password, general web session or biometric bypass is added to
+background-accessible storage. A terminated app still needs CallKit bootstrap and
+a server-enforced, call/device/SID-limited authentication mechanism. The existing
+status/end-only control credential must not become a general login credential.
+The producer's pending-offer lease is not a complete accepted/active-call lifecycle.
+These are software release blockers, not checks that can be replaced by an iPhone
+test or a switch in configuration.
+
+Validation of the production-source changes at `ed1b681`: the
+[unsigned iPhone/iPad SDK matrix](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43735553134)
+passed 227 selected Swift unit tests, native RTT tests and actual iOS SDK compilation
+in each job. This mode does not run simulator UI, cameras or real device tests.
+The [isolated signaling check](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43733882551)
+passed 86 selected Swift recovery/policy/routing tests and the existing real
+ejabberd-to-PHP journal/resource-proof checks. Neither run enabled live APNs.
+The [actual Apple WSS interoperability run](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43735548931)
+also passed the new two-account native propose/proceed/fresh-Jingle/finish test,
+existing login, archive, group and invitation tests, session cleanup and temporary
+CA revocation. Its unmodified ejabberd 26.09 fixture explicitly rejects the custom
+policy IQ; the producer/journal checks are a separate fixture, not proof of a
+single native-to-APNs-to-media chain. The real live-message archive marker found
+in this test is covered by the new parser regression. No existing server, ordinary
+user account, APNs credential or signed TestFlight build was used.
 
 ## Required evidence before replacing the existing app
 
