@@ -1,26 +1,92 @@
 # iOS call-push transport (not activated)
 
-## Signed server-event journal (2026-11-15)
+## Authenticated ejabberd producer and signed journal (2026-11-15)
 
 There is now a concrete journal-backed policy adapter, not an always-true policy
 placeholder. `CallPushSignaling` accepts authenticated, short-lived metadata from
 one pinned producer, queues the existing encrypted invitation registry and
 requires a device/generation-bound proof before reserving a recipient resource.
-This is server-side preparation. **No running ejabberd producer has been connected,
-no live migration or worker activation was performed, and background answering
-is not enabled.** A valid signature proves possession of the producer key, not
-that arbitrary client JSON came from an authenticated XMPP session.
+An opt-in producer now exists in `ejabberd/mod_teletyptel_calls.erl` and has been
+exercised against a disposable real ejabberd and the actual PHP ledger.
+**It is not installed on the live server; no live migration, worker activation
+or APNs delivery was performed, and background answering remains disabled.**
+A signature alone proves key possession, not authenticated XMPP ownership.
 
 The producer must independently observe authenticated ejabberd sessions, actual
 Jingle call contents, current privacy/block/DND/mute decisions and resource
 ownership. Do not expose its signing key or feed through a browser/mobile API.
-`signaling-event.js` signs only allowlisted flat metadata; it neither connects to
-ejabberd nor sends notifications. A real ejabberd hook/broker remains necessary.
-The existing online-full-JID call path also still needs a genuine cold-start /
-new-resource negotiation flow, not replay of an IQ addressed to a vanished client.
+`signaling-event.js` is only a signing helper. The Erlang module observes actual
+c2s ownership, XEP-0353 proposals, privacy/blocking and persisted call preferences.
+It writes signed metadata to a protected local spool consumed by `CallPushSpool`;
+neither module sends APNs itself. This producer handles message intents, not
+inspection of arbitrary existing Jingle IQ sessions. The app's direct-full-JID
+call UI still needs to adopt the intent/recovery transport before cold-start media
+can work. An old IQ is never replayed to a replacement resource.
 [XEP-0353](https://xmpp.org/extensions/xep-0353.html) and
 [XEP-0357](https://xmpp.org/extensions/xep-0357.html) are relevant integration
-references, not features newly claimed as implemented by this journal.
+references; this is a bounded local-domain XEP-0353 subset, not a claim of complete
+XEP-0353/0357 conformance.
+
+### Producer, spool and native transport
+
+The module is off unless explicitly loaded and configured. It monitors bound c2s
+processes, emits offline transitions on termination or stream-management pending,
+and refreshes leases every ten seconds. An old replaced process cannot revoke the
+new resource. Privacy storage failures fail closed. Both directions and every
+online resource are checked, including active privacy lists and DND presence.
+An observed block/privacy change conservatively invalidates related pending calls
+without waiting for renewal. Already in-flight remote delivery cannot be recalled.
+
+An authenticated account can send an IQ to its own server with namespace
+`urn:teletyptel:call-recovery:1`. `preferences` has exact `enabled` and `dnd`
+boolean attributes and up to 256 empty `muted` children with local bare-JID `jid`
+attributes. Preferences persist in Mnesia; missing preferences deny calls. They
+express call policy, not APNs consent or a device registration. Legacy clients
+that do not synchronize this policy cannot use this push path.
+
+A live `propose` from an authenticated full caller JID to a local bare recipient
+is retained for at most 45 seconds after both owners' policy checks. Metadata
+preserves audio, video, audio-rtt and total; malformed/duplicate media is not an
+offer. A newly bound recipient receives a fresh proposal for the still-live intent
+at its new full resource. This is metadata reproposal, not replay of SDP/ICE or an
+old session-initiate IQ. A `handoff` IQ on that actual recipient connection supplies
+`callId`, `sid`, `deviceId` and `generation`; PHP independently verifies registration,
+session/account ownership and access versions. Client-supplied `allowed` fields
+never substitute for these checks.
+
+The native XMPP connection now parses/buffers bounded live intents and can send
+policy, resource-proof and proceed messages. Archived/delayed messages, carbons,
+unknown recipients, session mismatches and media downgrades are rejected.
+`NativeCallAnswerRecovery` sequences proof, authenticated reservation, then proceed;
+errors/cancellation abandon an attempted reservation. Success is `awaitingJingle`,
+not connected media. The registry client validates the returned UUID, SID, profile,
+video flag, state and deadline.
+
+**Remaining app integration:** this state machine is not yet called by the app's
+`NativeCallController`/CallKit media driver. Cold-launch bootstrap still needs
+narrowly scoped call credentials and revocation, matching the invitation to an
+authenticated proposal, then fresh Jingle negotiation and media. Do not copy chat/
+Face ID credentials into background storage as a shortcut. Existing login and
+the old status/end-only capability are unchanged.
+
+Deployment additionally needs `TELETYPTEL_CALL_SIGNALING_SPOOL`: an absolute,
+non-symlink directory outside all web roots/repositories, mode 0700. Events and
+the separate signing-key file use 0600. Compile against the exact ejabberd version
+and explicitly add `mod_teletyptel_calls: {}` alongside `mod_privacy`/`mod_blocking`.
+Mnesia tables are created on that explicit module activation, not by a public
+request. The producer and draining worker need the same protected filesystem
+identity; the web API need not access the spool. For different PHP/ejabberd users,
+provision protected verifier-key copies separately rather than making a secret
+group/world readable. No configuration or filesystem identity is installed here.
+
+`php services/call-push/signaling.php --drain` consumes at most 128 ordered events
+under a local consumer lock, verifies signatures and queues eligible invitations.
+Bad/obsolete events are rejected without printing contents; transient storage or
+rate-limit errors retain the current event. The configured worker drains the same
+bounded batch before one-job dispatch. Capacity is bounded, partial writes stay
+hidden, and a crash after ingest is safe to replay. Keep the drainer timely: leases
+expire instead of trusting a stalled producer. This is a single-node/local-domain
+adapter; cluster failover is not established.
 
 ### Event contract
 
@@ -105,8 +171,8 @@ state transitions, old-generation/revocation/expiry/reordering cases and two
 independent PHP answer processes. Run `node --test tests/call-push-signaling.test.js`
 or `php php/tests/call-push-signaling-test.php`. Mock dispatch is explicitly
 injected; no actual Apple request is made. Linux CI separately checks these
-server paths. Live MySQL migration, a real ejabberd producer, new-resource Jingle
-delivery, signed iOS integration and locked-device media acceptance remain open.
+server paths. Live MySQL migration, producer installation, native cold-launch
+bootstrap, fresh Jingle/media negotiation and locked-device acceptance remain open.
 
 Validation snapshot (2026-11-15): the Windows PHP fixture passed 89 assertions,
 including a two-process answer race, and the focused Node server selection
@@ -118,9 +184,18 @@ The same focused Linux checks passed in
 at `ee6fbd3`: 20 Node tests, zero failures/skips, the registry/reconciliation/
 control/media regression fixtures, endpoint guards and PHP syntax checks.
 
-The older baseline below describes the original transport. Its statements that
-no adapter exists are superseded only by the journal-backed policy above, not
-by a claim of a complete, activated ejabberd/PushKit integration.
+The new disposable integration runs with `node scripts/check-call-signaling-ejabberd.js`
+(Node 22+, PHP SQLite and Docker). It compiles the actual module in a digest-pinned
+ejabberd image, creates fake accounts, tests offline intent/new-resource proof with
+the actual PHP reservation, injects mock dispatch, checks DND/mute/XEP-0191,
+cancellation/spool tampering and removes its temporary container. The initial
+integration and 31 selected Swift tests passed in
+[run 43718394685](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43718394685).
+These are not real PushKit delivery or cold-launch audio/video tests.
+
+The older baseline below describes the original transport. Statements that no
+adapter exists refer to that baseline and are superseded by the opt-in producer,
+not a complete, activated ejabberd/PushKit integration.
 
 This directory contains the APNs VoIP transport and an opt-in, one-job CLI worker.
 `php/lib/CallPushService.php` provides a durable encrypted device/invitation/outbox

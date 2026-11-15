@@ -135,10 +135,15 @@ cases; it does not claim another complete Swift/media/device-SDK test run.
 
 ### Still open: the fifth release family
 
-The server now has an opt-in signed-event journal and device/resource-proof
-policy; see `services/call-push/README.md`. This is not yet an installed ejabberd
-event producer, cold-start XMPP runtime or activated background-answer path.
-The status/end-only native bearer has not gained login or answer privileges.
+The server has an opt-in ejabberd c2s/JMI producer, protected local spool, signed
+journal and device/resource-proof policy; see `services/call-push/README.md`.
+Disposable real ejabberd/PHP integration covers offline intent and proven new
+resource acceptance with mock dispatch. The native XMPP transport now supports
+live intent/proceed, policy and proof IQs; `NativeCallAnswerRecovery` tests proof,
+reservation, cancellation and awaiting-Jingle ordering. It is not yet called by
+the app's CallKit media driver, and cold-launch scoped credentials/bootstrap are
+still missing. No live producer, APNs or recovery capability was activated. The
+status/end-only native bearer has not gained login or answer privileges.
 
 Native background-call completion needs an authoritative server-side wake /
 answer / Jingle recovery adapter, cold-start runtime, correct signed identity

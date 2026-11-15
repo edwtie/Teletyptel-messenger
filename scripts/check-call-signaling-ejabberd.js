@@ -125,6 +125,10 @@ async function run() {
     alice.propose("cold-start-total"); await delay(400);
     assert.ok(events().some(event => event.type === "offer" && event.sid === "cold-start-total" && event.mediaProfile === "total"));
     const awakened = await connect("bob", "new-device");
+    const replay = await awakened.wait(/<propose[^>]+id=['"]cold-start-total['"]/);
+    assert.match(replay, /from=['"]alice@example.test\/caller['"]/);
+    assert.match(replay, /to=['"]bob@example.test\/new-device['"]/);
+    assert.doesNotMatch(replay, /urn:xmpp:delay/);
     const beforeHandoff = envelopes();
     const invitation = await registry.request({ action: "ingest", envelopes: beforeHandoff });
     assert.equal(invitation.ok, true);

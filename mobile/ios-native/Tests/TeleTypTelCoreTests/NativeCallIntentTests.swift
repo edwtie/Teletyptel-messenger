@@ -117,6 +117,14 @@ final class NativeCallAnswerRecoveryTests: XCTestCase {
         }
     }
 
+    func testCancellationAfterReservationAbandonsInsteadOfProceeding() async throws {
+        let fixture = CallRecoveryFixture(), recovery = NativeCallAnswerRecovery(now: { 100 })
+        fixture.reserve = { recovery.cancel() }
+        do { _ = try await recover(recovery, fixture: fixture); XCTFail("Must fail") } catch {}
+        XCTAssertEqual(fixture.operations, ["proof", "reserve", "abandon"])
+        XCTAssertEqual(recovery.phase, .failed)
+    }
+
     private func recover(_ recovery: NativeCallAnswerRecovery, fixture: CallRecoveryFixture, proposal: NativeCallIntent? = nil) async throws -> String {
         let invitation = try XCTUnwrap(NativeCallInvitation(sid: "session_1", expiresAt: 145, media: .total, now: 100))
         let registration = NativePushRegistration(deviceID: UUID(), generation: String(repeating: "a", count: 32), expiresAt: 200, controlCredential: nil)

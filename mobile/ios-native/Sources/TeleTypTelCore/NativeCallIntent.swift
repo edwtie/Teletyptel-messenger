@@ -20,7 +20,9 @@ struct NativeCallIntent: Equatable, Sendable, CustomStringConvertible, CustomDeb
               NativeJingleTransport.fullJID(peer), NativeChatCodec.bareJID(peer) != owner,
               root.attributes["to"] == owner || root.attributes["to"] == bound,
               root.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-              root.children.allSatisfy({ $0.namespace == namespace || $0.namespace == "urn:xmpp:hints" && $0.name == "store" && $0.children.isEmpty }),
+              root.children.allSatisfy({ $0.namespace == namespace
+                  || $0.namespace == "urn:xmpp:hints" && $0.name == "store" && $0.children.isEmpty
+                  || $0.namespace == "urn:xmpp:sid:0" && ["origin-id", "stanza-id"].contains($0.name) && $0.children.isEmpty }),
               root.children.contains(where: { $0.namespace == "urn:xmpp:hints" && $0.name == "store" }),
               root.children.filter({ $0.namespace == namespace }).count == 1,
               let element = root.children.first(where: { $0.namespace == namespace }),

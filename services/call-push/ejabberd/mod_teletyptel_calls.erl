@@ -6,7 +6,7 @@
 -include_lib("kernel/include/file.hrl").
 -export([start/2, stop/1, reload/3, depends/2, mod_options/1, mod_opt_type/1, mod_doc/0]).
 -export([init/1, terminate/2, handle_call/3, handle_cast/2, handle_info/2, code_change/3, format_status/1]).
--export([session_opened/1, session_closed/2, user_send/1, check_session/3]).
+-export([session_opened/1, session_closed/2, session_pending/1, user_send/1, check_session/3]).
 -define(NS, <<"urn:teletyptel:call-recovery:1">>).
 -define(JMI, <<"urn:xmpp:jingle-message:0">>).
 -define(RTP, <<"urn:xmpp:jingle:apps:rtp:1">>).
@@ -69,7 +69,8 @@ create_table(Table, Attributes) ->
 hooks(Action, Host) ->
     lists:foreach(fun({Name, Function}) ->
         apply(ejabberd_hooks, Action, [Name, Host, ?MODULE, Function, 90])
-    end, [{c2s_session_opened, session_opened}, {c2s_terminated, session_closed},
+    end, [{c2s_session_opened, session_opened}, {c2s_session_resumed, session_opened},
+          {c2s_session_pending, session_pending}, {c2s_terminated, session_closed},
           {user_send_packet, user_send}, {c2s_handle_call, check_session}]).
 
 session_opened(#{jid := JID, lserver := Host} = State) ->
@@ -78,6 +79,9 @@ session_opened(State) -> State.
 session_closed(#{jid := JID, lserver := Host} = State, _) ->
     cast(Host, {offline, self(), JID}), State;
 session_closed(State, _) -> State.
+session_pending(#{jid := JID, lserver := Host} = State) ->
+    cast(Host, {offline, self(), JID}), State;
+session_pending(State) -> State.
 
 cast(Host, Event) ->
     case whereis(proc(Host)) of
@@ -92,6 +96,9 @@ user_send({Packet, #{jid := JID, lserver := Host} = State} = Acc) ->
     try
         true = xmpp:get_from(Packet) =:= JID,
         case Packet of
+            #iq{type = set, sub_els = [#block{}]} -> cast(Host, {invalidate, JID}), Acc;
+            #iq{type = set, sub_els = [#privacy_query{}]} -> cast(Host, {invalidate, JID}), Acc;
+            #presence{show = dnd} -> cast(Host, {invalidate, JID}), Acc;
             #iq{type = set, to = #jid{luser = <<>>, lserver = Host}, sub_els = [Element]} ->
                 case xmpp:encode(Element) of
                     #xmlel{attrs = Attrs} = Raw ->
@@ -178,8 +185,12 @@ media_profile(Descriptions) ->
 
 privacy(StateOrJID, Packet, Direction) ->
     JID = case StateOrJID of #{jid := Value} -> Value; Value -> Value end,
-    case mod_privacy:get_user_list(JID#jid.luser, JID#jid.lserver, default) of
-        {error, _} -> deny;
+    Active = case StateOrJID of #{privacy_active_list := Name} when Name =/= none -> Name; _ -> default end,
+    case {mod_privacy:get_user_list(JID#jid.luser, JID#jid.lserver, default),
+          mod_privacy:get_user_list(JID#jid.luser, JID#jid.lserver, Active)} of
+        {{error, _}, _} -> deny;
+        {_, {error, _}} -> deny;
+        {_, error} when Active =/= default -> deny;
         _ -> ejabberd_hooks:run_fold(privacy_check_packet, JID#jid.lserver, allow, [StateOrJID, Packet, Direction])
     end.
 
@@ -202,10 +213,22 @@ handle_cast({online, Pid, JID}, #{resources := Resources} = State) when map_size
         _ ->
             Reference = erlang:monitor(process, Pid),
             emit(#{type => <<"resource">>, jid => Encoded, online => true, expiresAt => now() + 25}, State),
-            {noreply, State#{resources => Resources#{Encoded => {Pid, Reference}}}}
+            Next = State#{resources => Resources#{Encoded => {Pid, Reference}}},
+            replay_pending(JID, Next),
+            {noreply, Next}
     end;
 handle_cast({offline, Pid, JID}, State) -> {noreply, offline(Pid, jid:encode(JID), State)};
 handle_cast(refresh, State) -> {noreply, refresh(State)};
+handle_cast({invalidate, JID}, #{calls := Calls} = State) ->
+    Bare = jid:remove_resource(JID),
+    Kept = maps:filter(fun(_, Call) ->
+        Caller = maps:get(caller, Call), Recipient = maps:get(recipient, Call),
+        case jid:remove_resource(Caller) =:= Bare orelse Recipient =:= Bare of
+            true -> emit_pair(Caller, Recipient, false, State), false;
+            false -> true
+        end
+    end, Calls),
+    {noreply, State#{calls => Kept}};
 handle_cast({intent, Caller, Recipient, Action, SID, Profile, Observed}, State) ->
     Next = try
         true = now() - Observed >= 0 andalso now() - Observed =< 2,
@@ -240,7 +263,7 @@ process_intent(Caller, Recipient, <<"propose">>, SID, Profile, #{calls := Calls,
     emit_pair(Caller, Recipient, true, State),
     emit(#{type => <<"offer">>, caller => jid:encode(Caller), recipient => jid:encode(Recipient),
            sid => SID, mediaProfile => Profile, expiresAt => now() + 45}, State),
-    State#{calls => Calls#{Key => #{caller => Caller, recipient => Recipient, expires => now() + 45}}};
+    State#{calls => Calls#{Key => #{caller => Caller, recipient => Recipient, profile => Profile, expires => now() + 45}}};
 process_intent(Actor, Peer, Action, SID, _, #{calls := Calls} = State) ->
     Matches = [{Key, Call} || {Key = {_, CallSID}, Call} <- maps:to_list(Calls), CallSID =:= SID,
         ((maps:get(caller, Call) =:= Actor andalso maps:get(recipient, Call) =:= jid:remove_resource(Peer)) orelse
@@ -253,6 +276,26 @@ process_intent(Actor, Peer, Action, SID, _, #{calls := Calls} = State) ->
     State#{calls => lists:foldl(fun({Key, _}, Acc) -> maps:remove(Key, Acc) end, Calls, Matches)}.
 
 now() -> erlang:system_time(second).
+replay_pending(JID, #{calls := Calls}) ->
+    maps:foreach(fun({_, SID}, Call) ->
+        Caller = maps:get(caller, Call),
+        case maps:get(recipient, Call) =:= jid:remove_resource(JID) andalso maps:get(expires, Call) > now()
+            andalso pair_allowed(Caller, JID) of
+            true ->
+                Kinds = case maps:get(profile, Call) of
+                    <<"audio">> -> [audio]; <<"video">> -> [audio, video];
+                    <<"audio-rtt">> -> [audio, rtt]; <<"total">> -> [audio, video, rtt]
+                end,
+                Descriptions = [case Kind of
+                    rtt -> #xmlel{name = <<"description">>, attrs = [{<<"xmlns">>, ?RTT}]};
+                    _ -> #xmlel{name = <<"description">>, attrs = [{<<"xmlns">>, ?RTP}, {<<"media">>, atom_to_binary(Kind)}]}
+                end || Kind <- Kinds],
+                Intent = #xmlel{name = <<"propose">>, attrs = [{<<"xmlns">>, ?JMI}, {<<"id">>, SID}], children = Descriptions},
+                Store = #xmlel{name = <<"store">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:hints">>}]},
+                ejabberd_router:route(#message{type = chat, from = Caller, to = JID, sub_els = [Intent, Store]});
+            false -> ok
+        end
+    end, Calls).
 resource_live(#jid{luser = User, lserver = Host, lresource = Resource}) ->
     case ejabberd_sm:get_session_pid(User, Host, Resource) of Pid when is_pid(Pid) -> is_process_alive(Pid); _ -> false end.
 
