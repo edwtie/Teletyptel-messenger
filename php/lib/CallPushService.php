@@ -257,8 +257,13 @@ final class CallPushService
             if (count($this->rows('SELECT call_id FROM call_push_calls WHERE caller = ? AND created > ?', [$caller, $now - 60])) >= 5) {
                 throw new CallPushFailure('Te veel oproepen. Probeer later opnieuw.', 429);
             }
-            if ($this->rows("SELECT call_id FROM call_push_calls WHERE recipient = ? AND state IN ('ringing', 'accepted')", [$recipient])) {
-                throw new CallPushFailure('Ontvanger is bezet.', 409);
+            foreach ($this->rows("SELECT * FROM call_push_calls WHERE recipient = ? AND state IN ('ringing', 'accepted')", [$recipient]) as $pending) {
+                if (AccountAccess::versionAllowed($this->pdo, $pending['caller'], (int)$pending['caller_version'])
+                    && AccountAccess::versionAllowed($this->pdo, $pending['recipient'], (int)$pending['recipient_version'])) {
+                    throw new CallPushFailure('Ontvanger is bezet.', 409);
+                }
+                $this->write("UPDATE call_push_calls SET state = 'ended' WHERE call_id = ?", [$pending['call_id']]);
+                $this->write("UPDATE call_push_jobs SET state = 'skipped' WHERE call_id = ? AND state = 'pending'", [$pending['call_id']]);
             }
             $this->write('INSERT INTO call_push_calls (call_id, caller, recipient, caller_version, recipient_version, sid, has_video, media_profile, state, created, expires)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', array_values($call));
@@ -421,7 +426,8 @@ final class CallPushService
                 throw new CallPushFailure('Oproep is al aan een andere XMPP-verbinding gekoppeld.', 409);
             }
             $call['recipient_jid'] = $fullJid;
-            if (!$this->permitted($call, 'accept')) throw new CallPushFailure('XMPP-verbinding niet bevestigd.', 403);
+            $candidate = array_replace($call, ['accepted_device' => $deviceId, 'accepted_generation' => $generation]);
+            if (!$this->permitted($candidate, 'accept')) throw new CallPushFailure('XMPP-verbinding niet bevestigd.', 403);
             if ($call['state'] === 'accepted' && $call['accepted_device'] === $deviceId && $call['accepted_generation'] === $generation) {
                 return $this->publicCall($call);
             }

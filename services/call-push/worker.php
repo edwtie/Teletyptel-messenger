@@ -15,14 +15,21 @@ try {
     $environment = (string)getenv('TELETYPTEL_CALL_PUSH_ENVIRONMENT');
     $pdo = Database::connect();
     $policy = null;
+    $signaling = null;
     if ($mode === '--once') {
         $policy = CallPushPolicy::load($pdo);
+    }
+    if (getenv('TELETYPTEL_CALL_PUSH_POLICY') === 'signaling-v1') {
+        require_once dirname(__DIR__, 2) . '/php/lib/CallPushSignaling.php';
+        $signaling = CallPushSignaling::configured($pdo);
     }
     $service = new CallPushService($pdo, $key === false ? '' : $key, $environment, $policy);
     if ($mode === '--migrate') {
         $service->ensureSchema();
+        $signaling?->ensureSchema();
         echo "Call-push schema prepared. No pushes sent.\n";
     } else {
+        $signaling?->enqueue($service);
         echo json_encode($service->dispatchOne([CallPushTransport::class, 'send'](...)), JSON_THROW_ON_ERROR) . "\n";
     }
 } catch (Throwable $error) {

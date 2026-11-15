@@ -5,6 +5,10 @@ final class CallPushPolicy
 {
     public static function load(PDO $pdo): Closure
     {
+        if (getenv('TELETYPTEL_CALL_PUSH_POLICY') === 'signaling-v1') {
+            require_once __DIR__ . '/CallPushSignaling.php';
+            return CallPushSignaling::configured($pdo)->allows(...);
+        }
         $file = realpath((string)getenv('TELETYPTEL_CALL_PUSH_POLICY_FILE'));
         $normalize = static fn(string $path): string => PHP_OS_FAMILY === 'Windows'
             ? strtolower(str_replace('\\', '/', $path)) : $path;

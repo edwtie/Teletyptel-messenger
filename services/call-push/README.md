@@ -1,5 +1,117 @@
 # iOS call-push transport (not activated)
 
+## Signed server-event journal (2026-11-15)
+
+There is now a concrete journal-backed policy adapter, not an always-true policy
+placeholder. `CallPushSignaling` accepts authenticated, short-lived metadata from
+one pinned producer, queues the existing encrypted invitation registry and
+requires a device/generation-bound proof before reserving a recipient resource.
+This is server-side preparation. **No running ejabberd producer has been connected,
+no live migration or worker activation was performed, and background answering
+is not enabled.** A valid signature proves possession of the producer key, not
+that arbitrary client JSON came from an authenticated XMPP session.
+
+The producer must independently observe authenticated ejabberd sessions, actual
+Jingle call contents, current privacy/block/DND/mute decisions and resource
+ownership. Do not expose its signing key or feed through a browser/mobile API.
+`signaling-event.js` signs only allowlisted flat metadata; it neither connects to
+ejabberd nor sends notifications. A real ejabberd hook/broker remains necessary.
+The existing online-full-JID call path also still needs a genuine cold-start /
+new-resource negotiation flow, not replay of an IQ addressed to a vanished client.
+[XEP-0353](https://xmpp.org/extensions/xep-0353.html) and
+[XEP-0357](https://xmpp.org/extensions/xep-0357.html) are relevant integration
+references, not features newly claimed as implemented by this journal.
+
+### Event contract
+
+`signEvent(event, {key, environment, domain, issuer})` returns JSON fields
+`payload` (canonical base64 of a JSON envelope) and `signature` (HMAC-SHA256).
+The signed body contains `version:1`, the pinned issuer, integer Unix timestamp,
+a random 32-hex nonce and the event. Authentication separates domain, issuer,
+environment and protocol version. The PHP receiver admits at most 16 KiB, pins
+one local domain and uniquely resolves bare JIDs to existing accounts. It does
+not accept foreign-domain federation or arbitrary Unicode localparts in this
+initial adapter. No message body, RTT text, SDP, ICE or password is stored.
+
+| Type | Required event fields besides `type` | Meaning |
+| --- | --- | --- |
+| `resource` | `jid`, `online`, `revision`, `expiresAt` | Full JID observed on an authenticated connection; online is a boolean |
+| `policy` | `owner`, `peer`, `allowed`, `revision`, `expiresAt` | Current combined blocking/DND/mute/privacy decision for two local bare JIDs |
+| `offer` | `caller`, `recipient`, `sid`, `mediaProfile`, `revision`, `expiresAt` | Validated full caller JID, bare recipient and immutable `audio`, `video`, `audio-rtt` or `total` |
+| `end` | `caller`, `recipient`, `sid`, `actor`, `revision` | Cancellation from the original caller resource or an authorized recipient resource |
+| `handoff` | `callId`, `sid`, `jid`, `deviceId`, `generation`, `revision`, `expiresAt` | Resource proof observed from the authenticated recipient, bound to the current registration |
+
+Unknown fields are rejected, not silently retained. Events may be at most 30
+seconds old or five seconds ahead. Resource and policy leases last at most 30
+seconds, handoff proofs 15 seconds, and offers 60 seconds, bounded by both issue
+and receive time. Both directional privacy leases are required. The producer
+must refresh authoritative observations before expiry; no app timer can assert
+that a disconnected resource is still online. Revisions must increase for each
+resource, privacy pair, call or device handoff and survive producer restarts.
+Missing/stale/reordered observations fail closed. Exact envelope retries are
+idempotent; reusing a nonce for different content is rejected.
+
+Privacy decisions and resources are bound to account access versions. Blocking,
+logout/resource loss, a denial, an old registration generation or an expired
+lease cannot authorize a push. Denials cancel queued jobs under the registry's
+existing mutex. End-before-offer tombstones prevent delayed offers resurrecting
+a call. A status/end bearer capability is **not** promoted into XMPP or answer
+credentials. No additional VoIP push is sent to cancel a call, consistent with
+[Apple's VoIP notification lifecycle](https://developer.apple.com/documentation/pushkit/responding-to-voip-notifications-from-pushkit).
+
+Only the normal HTTPS/account/CSRF-authenticated registry route gains an `accept`
+action, and only with `TELETYPTEL_CALL_PUSH_POLICY=signaling-v1`. Its exact body
+is `action`, `callId`, `deviceId`, `generation`, `fullJid`. It additionally requires
+the matching signed handoff, current device lease and the same web-session
+binding. Competing devices select one winner atomically; a loser cannot replace
+the winning resource or end that reservation. Acceptance reserves signaling;
+it is not proof of media connection and retains the invitation deadline.
+The native status/end-only endpoint remains unchanged. No
+`backgroundAnswerRecovery:true` capability is advertised by this change.
+
+### Explicit operator setup (not executed on the live server)
+
+In addition to the existing independent storage key/environment, the new mode
+requires:
+
+- `TELETYPTEL_CALL_SIGNALING=1` and `TELETYPTEL_CALL_PUSH_POLICY=signaling-v1`.
+- `TELETYPTEL_CALL_SIGNALING_DOMAIN`: the actual local XMPP domain.
+- `TELETYPTEL_CALL_SIGNALING_ISSUER`: pinned producer identifier.
+- `TELETYPTEL_CALL_SIGNALING_KEY_FILE`: protected external file containing base64
+  of a separately generated 32-byte key, not the token-storage or Apple key.
+  The file must be outside the repository and every web root. Unix permissions
+  must exclude group/other access; equivalent Windows ACLs remain an operator
+  responsibility. Never put actual keys in these instructions or command lines.
+
+Reviewed deployment commands, using protected server configuration, are:
+
+```text
+php services/call-push/signaling.php --migrate
+php services/call-push/signaling.php --ingest < signed-server-event.json
+php services/call-push/signaling.php --enqueue
+```
+
+The CLI is not a public HTTP handler. Migration is explicit and creates the
+registry plus five journal tables; no HTTP request performs DDL. Ingest writes
+one authenticated event and queues at most eight eligible invitations. Enqueue
+repairs a crash between recording an offer and linking its registry UUID without
+creating a second invitation/job. The existing worker's `--once` also repairs
+this bounded queue when the new policy is selected, then dispatches at most one
+job. It does not automatically retry an unknown APNs delivery outcome. No daemon,
+scheduled task, firewall rule or service configuration is installed by this code.
+
+Local checks include real Node-to-PHP signature interoperability, isolated SQLite
+state transitions, old-generation/revocation/expiry/reordering cases and two
+independent PHP answer processes. Run `node --test tests/call-push-signaling.test.js`
+or `php php/tests/call-push-signaling-test.php`. Mock dispatch is explicitly
+injected; no actual Apple request is made. Linux CI separately checks these
+server paths. Live MySQL migration, a real ejabberd producer, new-resource Jingle
+delivery, signed iOS integration and locked-device media acceptance remain open.
+
+The older baseline below describes the original transport. Its statements that
+no adapter exists are superseded only by the journal-backed policy above, not
+by a claim of a complete, activated ejabberd/PushKit integration.
+
 This directory contains the APNs VoIP transport and an opt-in, one-job CLI worker.
 `php/lib/CallPushService.php` provides a durable encrypted device/invitation/outbox
 registry; `api/call-push.php` exposes authenticated registration/revocation and

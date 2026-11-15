@@ -1,0 +1,45 @@
+name: Call signaling server checks (isolated only)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/teletyptel-beta-polish]
+    paths:
+      - .github/workflows/call-push-signaling.yml
+      - php/lib/CallPush*.php
+      - php/public/api/call-push.php
+      - php/public/api/call-control.php
+      - php/tests/call-push*.php
+      - php/tests/call-control-endpoint-test.php
+      - services/call-push/**
+      - tests/call-push-signaling.test.js
+
+permissions:
+  contents: read
+
+jobs:
+  server-signaling:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+      - name: Require PHP fixture extensions
+        run: php -r 'foreach (["pdo_sqlite", "openssl", "mbstring"] as $extension) { if (!extension_loaded($extension)) { exit(1); } }'
+      - name: Check signed-event interoperability and source boundaries
+        run: node --test tests/call-push-signaling.test.js tests/call-push-transport.test.js tests/apns-call-push.test.js tests/native-call-control.test.js
+      - name: Check registry, revocation and competing answer processes
+        run: |
+          for test in call-push-smoke call-push-reconcile-test call-push-control-test call-push-media-test call-push-endpoint-test call-control-endpoint-test; do
+            php "php/tests/$test.php"
+          done
+          php php/tests/call-push-transport-test.php "$(command -v node)"
+      - name: Check PHP syntax
+        run: |
+          for source in php/lib/CallPush*.php php/public/api/call-{push,control}.php services/call-push/{signaling,worker}.php; do
+            php -l "$source"
+          done

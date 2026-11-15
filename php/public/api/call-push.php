@@ -39,6 +39,15 @@ try {
             if (getenv('TELETYPTEL_CALL_PUSH_NATIVE_CONTROL') === '1') {
                 $result['controlToken'] = $service->controlCredential($account, $binding, $input['deviceId']);
             }
+        } elseif (($input['action'] ?? '') === 'accept') {
+            if (getenv('TELETYPTEL_CALL_PUSH_POLICY') !== 'signaling-v1') {
+                throw new CallPushFailure('Geverifieerd oproepherstel is niet ingeschakeld.', 503);
+            }
+            require_once dirname(__DIR__, 2) . '/lib/CallPushSignaling.php';
+            $signaling = CallPushSignaling::configured($pdo);
+            $service = new CallPushService($pdo, $key === false ? '' : $key,
+                (string)getenv('TELETYPTEL_CALL_PUSH_ENVIRONMENT'), $signaling->allows(...));
+            $result = ['call' => $signaling->accept($service, $account, $binding, $input)];
         } elseif (($input['action'] ?? '') === 'reconcile') {
             if (!is_string($input['deviceId'] ?? null) || !is_array($input['calls'] ?? null)) {
                 throw new CallPushFailure('Toestelregistratie en oproepen zijn vereist.');

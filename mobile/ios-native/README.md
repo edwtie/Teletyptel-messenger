@@ -135,6 +135,11 @@ cases; it does not claim another complete Swift/media/device-SDK test run.
 
 ### Still open: the fifth release family
 
+The server now has an opt-in signed-event journal and device/resource-proof
+policy; see `services/call-push/README.md`. This is not yet an installed ejabberd
+event producer, cold-start XMPP runtime or activated background-answer path.
+The status/end-only native bearer has not gained login or answer privileges.
+
 Native background-call completion needs an authoritative server-side wake /
 answer / Jingle recovery adapter, cold-start runtime, correct signed identity
 and APNs capabilities, deployed worker/policy, revocation and locked-device
