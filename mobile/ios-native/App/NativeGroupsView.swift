@@ -65,6 +65,7 @@ struct NativeGroupsView: View {
 struct NativeGroupChatView: View {
     @ObservedObject var model: NativeGroupModel
     @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @Environment(\.dismiss) private var dismiss
     let room: String
     var login: NativeLoginModel? = nil
     var translation: NativeTranslationModel? = nil
