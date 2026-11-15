@@ -113,6 +113,10 @@ including a two-process answer race, and the focused Node server selection
 passed 20 tests with zero skips. PHP/Node transport rejection checks and syntax
 checks passed too. These results use synthetic registrations and do not establish
 live APNs delivery, MySQL concurrency or an answered call on a locked iPhone.
+The same focused Linux checks passed in
+[GitHub run 43715442019](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43715442019)
+at `ee6fbd3`: 20 Node tests, zero failures/skips, the registry/reconciliation/
+control/media regression fixtures, endpoint guards and PHP syntax checks.
 
 The older baseline below describes the original transport. Its statements that
 no adapter exists are superseded only by the journal-backed policy above, not
