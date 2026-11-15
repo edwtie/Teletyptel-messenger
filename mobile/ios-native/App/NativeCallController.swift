@@ -194,7 +194,8 @@ final class NativeCallController: ObservableObject, NativePushRegistering {
             }
             return
         }
-        guard request.action == "session-initiate", account != nil, prepareTask == nil else {
+        guard request.action == "session-initiate", account != nil, prepareTask == nil,
+              pendingPush == nil, !hasLiveCall else {
             Task { try? await sender.replyJingle(request, rejection: .serviceUnavailable) }
             return
         }
@@ -211,7 +212,7 @@ final class NativeCallController: ObservableObject, NativePushRegistering {
                         return tracks
                     }, stopCapture: { [weak capture] in capture?.stop() })
                 try Task.checkCancellation()
-                guard self.activePeer == nil, router.install(provider) else {
+                guard self.activePeer == nil, self.pendingPush == nil, !self.hasLiveCall, router.install(provider) else {
                     provider.cancel(notifyPeer: true)
                     throw NativeJingleFailure.busy
                 }
@@ -232,7 +233,7 @@ final class NativeCallController: ObservableObject, NativePushRegistering {
                     throw NativeJingleFailure.disconnected
                 }
             } catch {
-                guard !(error is CancellationError) else { return }
+                guard !Task.isCancelled, !(error is CancellationError) else { return }
                 self.status = .failed
             }
             self.prepareTask = nil
@@ -242,7 +243,7 @@ final class NativeCallController: ObservableObject, NativePushRegistering {
     func startCall(_ contact: NativeContact, profile: NativeCallMedia, videoCodec: String = "VP8") {
         guard login?.isBlocked(contact.jid) != true else { return }
         let audioCodec = NativeAudioCodec(rawValue: UserDefaults.standard.string(forKey: NativeAudioCodec.preferenceKey) ?? "") ?? .pcmu
-        guard activePeer == nil, prepareTask == nil, account != nil,
+        guard activePeer == nil, prepareTask == nil, account != nil, pendingPush == nil, !hasLiveCall,
               let endpoint = contact.callEndpoint,
               let sender = login?.activeJingleSender else {
             status = .failed
@@ -261,7 +262,7 @@ final class NativeCallController: ObservableObject, NativePushRegistering {
                         return tracks
                     }, stopCapture: { [weak capture] in capture?.stop() })
                 try Task.checkCancellation()
-                guard self.login?.activeJingleSender != nil, self.activePeer == nil,
+                guard self.login?.activeJingleSender != nil, self.activePeer == nil, self.pendingPush == nil, !self.hasLiveCall,
                       router.install(provider) else {
                     provider.cancel(notifyPeer: true)
                     throw NativeJingleFailure.disconnected
@@ -281,7 +282,7 @@ final class NativeCallController: ObservableObject, NativePushRegistering {
                 }
                 self.activeID = id
             } catch {
-                guard !(error is CancellationError) else { return }
+                guard !Task.isCancelled, !(error is CancellationError) else { return }
                 self.status = .failed
             }
             self.prepareTask = nil
@@ -332,6 +333,8 @@ final class NativeCallController: ObservableObject, NativePushRegistering {
 
     private func receivedInvitation(_ invitation: NativeCallInvitation) {
         guard activePeer == nil, pendingPush == nil else { return }
+        prepareTask?.cancel()
+        prepareTask = nil
         pendingPush = invitation
         activeID = invitation.id
         status = .ringing("TeleTypTel")

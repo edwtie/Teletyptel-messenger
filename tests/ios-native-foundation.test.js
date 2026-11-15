@@ -25,6 +25,8 @@ test("Native warm CallKit source wiring keeps recovery before capture and preser
   assert.match(controller, /let offer = try await recovery\.prepare/);
   assert.match(controller, /let provider = try await NativeIncomingPeerNegotiator/);
   assert.match(controller, /try validateContext\(\); try validatePeer\(offer.request.peer\)/);
+  assert.match(controller, /self\.activePeer == nil, self\.pendingPush == nil, !self\.hasLiveCall, router\.install\(provider\)/);
+  assert.match(controller, /prepareTask\?\.cancel\(\)[\s\S]*prepareTask = nil[\s\S]*pendingPush = invitation/);
   assert.match(runtime, /created\.microphone\.isEnabled = audioActive && !muted && !held/);
   assert.match(runtime, /prepared\?\.microphone\.isEnabled = permitted && !muted && !held/);
   assert.match(capture, /microphone\.isEnabled = false/);
