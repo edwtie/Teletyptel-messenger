@@ -40,7 +40,9 @@ Following the UI comparison, four missing workflows have now been implemented:
   contact or online presence. An outgoing presence request is optional and off
   by default. Incoming status requests require explicit Allow/Reject in the
   contacts pane; there is no silent mutual authorization. Timeouts are uncertain
-  outcomes and are not automatically retried. The protocol reference is
+  outcomes and are not automatically retried. New-contact actions require a
+  loaded roster below its existing 100-contact limit and do not rename an
+  existing contact. The protocol reference is
   [RFC 6121 sections 2.3 and 3](https://www.rfc-editor.org/rfc/rfc6121.html).
 - Appearance offers system/light/dark and all six web background choices using
   bundled assets, with a preview. These non-secret device preferences do not
@@ -67,7 +69,22 @@ Validation is deliberately focused because this step adds real contact and
 avatar logic: isolated PHP avatar/denial tests, selected Swift logic/HTTP-fixture
 cases and unsigned Apple SDK compilation. The optional `focused-update` dispatch
 mode does not run simulator/UI/media suites; normal push/full validation retains
-the existing full matrix. Apple SDK results are pending until recorded below.
+the existing full matrix.
+
+Recorded evidence for source `95cde60`:
+- [GitHub run 43687673506](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43687673506)
+  completed successfully after retrying a runner DNS failure fetching WebRTC.
+  Both matrix jobs passed the same 13 selected Swift tests with zero failures
+  and completed unsigned Release compilation against the generic iOS SDK.
+  Despite their iPhone/iPad job names, these are not device or simulator runs;
+  both reports contain `uiTests: []` and `uploaded: false`.
+- Local isolated PHP checks passed: 23 avatar-service cases and four endpoint
+  denial guards, without live profiles or a production database connection.
+  The two focused-runner/source checks also passed.
+- The earlier attempts exposed two UI compilation errors (group-sheet dismissal
+  binding and picker error-state shadowing); both were fixed before this source
+  revision. Those failed attempts are not counted as successful validation.
+
 No signed build, TestFlight upload, APNs activation, public SIP or live account
 test is included. Complete UI localization, independently verified photo/camera
 permissions, installed-device visuals and remaining call/group differences are
