@@ -23,12 +23,28 @@ DNS-SRV and SIP INFO remain gateway-side responsibilities; native DTMF remains
 negotiated WebRTC RTP events. There is no separate iOS SIP registrar or arbitrary
 number routing in this change. The existing route remains local echo 600.
 
-Validation is in progress: selected Swift session/coordinator/transport tests,
-the shared T.140 executable tests and unsigned generic iOS compilation are
-requested separately from simulator, physical-device, camera/audio, CallKit OS
-behavior and actual native-to-Asterisk media tests. No signed build, TestFlight
+Source `3ed6213` passed [unsigned run 43694425253](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43694425253):
+85 selected Swift tests, all five shared T.140 checks including the compiled
+Swift executable, and generic iOS Release SDK compilation passed in each of the
+two matrix jobs. The job labels are not simulator/device evidence; no UI,
+physical-device, camera/audio, CallKit OS behavior or actual native-to-Asterisk
+media tests ran. Evidence is retained locally in
+`artifacts/native-hold-43694425253/` (not committed).
+
+Separately, 53 local gateway tests passed, including ACK-committed incoming
+SIP hold notifications and session-bound Jingle hold control. The disposable
+real ejabberd/Asterisk H.264/INFO fixture passed native-shaped XMPP hold/unhold,
+duplicate suppression, paused RTP, preserved Unicode RTT, DNS discovery,
+incoming INFO and teardown. This executes a browser/test peer, not the Swift app.
+All temporary services/accounts/volumes were removed; existing servers stayed
+unchanged and gateway/Docker sources remain local and outside the native commit.
+
+Two pre-existing broad source-text assertions still fail locally (the old
+`ChatBackground` marker and the pre-H.264 `startCall` signature); they were not
+changed to disguise those unrelated failures. The hold-aware DTMF source guards
+and focused update tests pass. No signed build, TestFlight
 upload, live gateway deployment, APNs activation or public provider call is
-authorized by this validation step. A gateway/browser pass is not an iPhone pass.
+included in this validation step. A gateway/browser pass is not an iPhone pass.
 The current installed TestFlight app is not silently replaced by this native
 target. Hold signaling follows the bounded informational messages in
 [XEP-0167](https://xmpp.org/extensions/xep-0167.html#info-hold); this does not claim
