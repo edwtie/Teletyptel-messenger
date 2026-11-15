@@ -197,7 +197,7 @@ final class NativeCallController: ObservableObject, NativePushRegistering {
             }
             Task { [weak self] in
                 await provider.receive(request)
-                guard let self = self else { return }
+                guard let self = self, self.activePeer === provider else { return }
                 if provider.remoteEnded, let id = self.activeID {
                     _ = self.runtime?.platform.coordinator.end(id: id, reason: .remoteEnded)
                 }

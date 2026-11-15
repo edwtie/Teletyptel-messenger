@@ -15,6 +15,7 @@ test("Call intent signaling is installed before actual media capture, with codec
   assert.match(controller, /await intent.prepareSignaling/);
   assert.match(controller, /permitsCallIntent\(lease, peer: target\)/);
   assert.match(controller, /intentPeerAccepted\(id: handle.id\)/);
+  assert.match(controller, /await provider.receive\(request\)[\s\S]*self.activePeer === provider/);
   assert.match(controller, /pendingPush\?\.sid == intent.sid \|\| pushRegistration.consented/);
   const provider = app("NativeIntentPeerNegotiator");
   assert.match(provider, /await caller.prepare[\s\S]*await NativeOutgoingPeerNegotiator/);

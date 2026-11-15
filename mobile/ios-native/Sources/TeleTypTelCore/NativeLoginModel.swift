@@ -752,6 +752,11 @@ public final class NativeLoginModel: ObservableObject {
     private func receiveCallIntent(_ intent: NativeCallIntent, attempt: UUID) {
         guard generation == attempt, phase == .connecting || isConnected,
               let calls = jingleSender as? any NativeCallRecoverySending else { return }
+        if [.retract, .reject, .finish].contains(intent.action) {
+            earlyCallIntents.removeAll {
+                $0.intent.sid == intent.sid && NativeChatCodec.bareJID($0.intent.peer) == NativeChatCodec.bareJID(intent.peer)
+            }
+        }
         if phase == .connecting {
             if earlyCallIntents.count < 8 { earlyCallIntents.append((intent, Date().timeIntervalSince1970)) }
             return

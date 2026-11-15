@@ -109,4 +109,18 @@ final class NativeCallRoutingTests: XCTestCase {
         model.setMuted("alice@localhost", muted: true)
         XCTAssertFalse(model.permitsLegacyCall(to: "alice@localhost"))
     }
+
+    func testRetractedProposalCannotStartRingingAfterDelayedPrivacyAck() async {
+        let fixture = CallRoutingFixture(), model = login(fixture)
+        defer { model.disconnect() }
+        var delivered: [NativeCallIntent] = []
+        model.onCallIntent = { intent, _ in delivered.append(intent) }
+        await settle { await fixture.isWaitingAndObserving() }
+        await fixture.emit(NativeCallIntent(action: .propose, sid: "cancelled", peer: "alice@localhost/phone", media: .total))
+        await fixture.emit(NativeCallIntent(action: .retract, sid: "cancelled", peer: "alice@localhost/phone", media: nil))
+        await settle { delivered.contains { $0.action == .retract } }
+        await fixture.acknowledge()
+        await settle { model.callPolicyState == .ready }
+        XCTAssertFalse(delivered.contains { $0.action == .propose })
+    }
 }
