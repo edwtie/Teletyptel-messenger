@@ -27,9 +27,18 @@ Unsigned validation is available with the existing `ios-native-preview.yml`
 workflow in `focused-media` mode. It runs the focused Swift/T.140 checks,
 generic iOS Release SDK compilation and the native media loopback. Neither
 this mode nor the source change signs an app, uploads to TestFlight, enables
-APNs or changes the live server. Actual run evidence must be recorded after
-the workflow finishes; local JavaScript source guards alone are not Swift or
-iPhone test results. TestFlight replacement remains a separate release step.
+APNs or changes the live server. Source `8acf67c` passed
+[unsigned run 43699929606](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43699929606)
+in both matrix jobs: 89 selected Swift tests, all five shared T.140 checks
+including the compiled Swift runtime, generic iOS Release SDK compilation,
+the four existing and four G.722 native media profiles, automatic incoming
+G.722 selection and the existing three-party interpreter fixture. Evidence is
+retained in `artifacts/native-g722-43699929606/` (not committed).
+
+The matrix labels are not physical iPhone/iPad or simulator/UI evidence. The
+media runtime executes same-host macOS WebRTC peers with microphones disabled;
+real native-to-Asterisk audio, audible wideband quality, camera, APNs and device
+tests remain open. TestFlight replacement remains a separate release step.
 
 ## Native CallKit/Jingle hold follow-up (2026-11-15)
 
