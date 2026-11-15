@@ -301,7 +301,7 @@ struct NativeTotalConversationView: View {
     }
 }
 
-private struct NativeVideoSurface: UIViewRepresentable {
+struct NativeVideoSurface: UIViewRepresentable {
     let track: RTCVideoTrack
 
     final class Coordinator {
