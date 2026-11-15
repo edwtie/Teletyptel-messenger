@@ -798,7 +798,8 @@ test("CallKit/PushKit sources are included in preview but live registration stay
   assert.match(media, /presentationChanged: \(\(NativeCallPresentation\?\) -> Void\)\?/);
   assert.match(media, /prepared\.peer\.receivers\.compactMap \{ \$0\.track as\? RTCVideoTrack \}/);
   assert.match(conversation, /RTCMTLVideoView/);
-  assert.match(conversation, /videoContentMode = \.scaleAspectFill/);
+  assert.match(conversation, /var fit = false/);
+  assert.match(conversation, /videoContentMode = fit \? \.scaleAspectFit : \.scaleAspectFill/);
   assert.match(conversation, /TextField\("Typ realtime tekst"/);
   assert.match(conversation, /\.accessibilityLabel\("Gesprek beëindigen"\)|label: "Gesprek beëindigen"/);
   assert.match(conversation, /foregroundStyle\(\.white\)/);
