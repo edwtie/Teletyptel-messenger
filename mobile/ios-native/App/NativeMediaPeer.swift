@@ -50,9 +50,9 @@ final class NativeMediaPeer: NativeMediaNegotiating {
     private let diagnostic: ((String, Error) -> Void)?
 
     init(factory: RTCPeerConnectionFactory, microphone: RTCAudioTrack, camera: RTCVideoTrack?,
-         profile: NativeCallMedia, sid: String, iceServers: [RTCIceServer] = [],
+         profile: NativeCallMedia, sid: String, iceServers: [RTCIceServer] = [], videoCodec: String = "VP8",
          diagnostic: ((String, Error) -> Void)? = nil, changed: @escaping () -> Void) throws {
-        guard profile.hasVideo == (camera != nil), microphone.readyState == .live,
+        guard ["VP8", "H264"].contains(videoCodec), profile.hasVideo == (camera != nil), microphone.readyState == .live,
               sid.range(of: "\\A[A-Za-z0-9_-]{1,128}\\z", options: .regularExpression) != nil else {
             throw NativeMediaPeerFailure.configuration
         }
@@ -73,14 +73,15 @@ final class NativeMediaPeer: NativeMediaNegotiating {
         prepared = NativePreparedPeer(peer: peer, microphone: microphone, camera: camera)
         do {
             try Self.add(microphone, kind: "audio", codec: "PCMU", factory: factory, peer: peer)
-            if let camera = camera { try Self.add(camera, kind: "video", codec: "VP8", factory: factory, peer: peer) }
+            if let camera = camera { try Self.add(camera, kind: "video", codec: videoCodec, factory: factory, peer: peer) }
         } catch { peer.close(); throw error }
     }
 
     private static func add(_ track: RTCMediaStreamTrack, kind: String, codec: String,
                             factory: RTCPeerConnectionFactory, peer: RTCPeerConnection) throws {
         let codecs = factory.rtpSenderCapabilities(forKind: kind).codecs.filter {
-            $0.name.uppercased() == codec || (kind == "audio" && $0.name.lowercased() == "telephone-event" && $0.clockRate?.intValue == 8000)
+            ($0.name.uppercased() == codec && (codec != "H264" || $0.parameters == NativeJingleMedia.h264Parameters)) ||
+                (kind == "audio" && $0.name.lowercased() == "telephone-event" && $0.clockRate?.intValue == 8000)
         }
         guard codecs.contains(where: { $0.name.uppercased() == codec }), let sender = peer.add(track, streamIds: ["conversation"]),
               let transceiver = peer.transceivers.first(where: { $0.sender.senderId == sender.senderId }),

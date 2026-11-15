@@ -25,6 +25,34 @@ final class NativeJingleMediaTests: XCTestCase {
         try NativeJingleMedia.fromSDP(fixture(profile), sid: "call-1", action: "session-initiate", profile: profile)
     }
 
+    private func h264(_ text: String) -> String {
+        text.replacingOccurrences(of: "VP8/90000", with: "H264/90000\r\na=fmtp:96 packetization-mode=1;profile-level-id=42e01f;level-asymmetry-allowed=1")
+    }
+
+    func testH264RoundTripsWithExplicitParametersAndRejectsCodecSubstitution() throws {
+        let proposed = try NativeJingleMedia.fromSDP(h264(fixture()), sid: "call-1", action: "session-initiate", profile: .total)
+        XCTAssertEqual(proposed.videoCodec, "H264")
+        XCTAssertEqual(try decode(proposed.xml).sdp, proposed.sdp)
+        let answer = try NativeJingleMedia.fromSDP(h264(fixture(answer: true)), sid: "call-1", action: "session-accept", profile: .total)
+        XCTAssertNoThrow(try answer.validateAnswer(to: proposed))
+        XCTAssertThrowsError(try answer.validateAnswer(to: offer()))
+        let vp8 = try NativeJingleMedia.fromSDP(fixture(answer: true), sid: "call-1", action: "session-accept", profile: .total)
+        XCTAssertThrowsError(try vp8.validateAnswer(to: proposed))
+    }
+
+    func testH264CannotInventModesOrDuplicateParameters() throws {
+        let source = h264(fixture())
+        for replacement in ["packetization-mode=0;profile-level-id=42e01f;level-asymmetry-allowed=1",
+            "packetization-mode=1;profile-level-id=640c1f;level-asymmetry-allowed=1",
+            "packetization-mode=1;profile-level-id=42e01f", "profile-level-id=42e01f;profile-level-id=42e01f",
+            "sprop-parameter-sets=secret"] {
+            let changed = source.replacingOccurrences(of: "packetization-mode=1;profile-level-id=42e01f;level-asymmetry-allowed=1", with: replacement)
+            XCTAssertThrowsError(try NativeJingleMedia.fromSDP(changed, sid: "call-1", action: "session-initiate", profile: .total))
+        }
+        let xml = try NativeJingleMedia.fromSDP(source, sid: "call-1", action: "session-initiate", profile: .total).xml
+        XCTAssertThrowsError(try decode(xml.replacingOccurrences(of: "value='42e01f'", with: "value='42e01f'/><parameter name='profile-level-id' value='42e01f'")))
+    }
+
     private func dtmf(_ text: String, payload: String = "101", events: String = "0-16") -> String {
         text.replacingOccurrences(of: "m=audio 9 UDP/TLS/RTP/SAVPF 0\r\n", with: "m=audio 9 UDP/TLS/RTP/SAVPF 0 \(payload)\r\n")
             .replacingOccurrences(of: "a=rtpmap:0 PCMU/8000\r\n", with: "a=rtpmap:0 PCMU/8000\r\na=rtpmap:\(payload) telephone-event/8000\r\na=fmtp:\(payload) \(events)\r\n")

@@ -17,11 +17,26 @@ struct NativeJingleMedia: CustomStringConvertible, CustomDebugStringConvertible 
     static let sctp = "urn:xmpp:jingle:transports:dtls-sctp:1"
     static let channel = "urn:xmpp:jingle:transports:webrtc-datachannel:0"
     private static let feedbackValues: Set<String> = ["nack", "nack pli", "ccm fir", "goog-remb"]
+    static let h264Parameters = ["packetization-mode": "1", "profile-level-id": "42e01f", "level-asymmetry-allowed": "1"]
+    static func parseH264(_ value: String) throws -> [String: String] {
+        try require(value.utf8.count <= 160)
+        var result: [String: String] = [:]
+        for entry in value.components(separatedBy: ";") {
+            let pair = entry.trimmingCharacters(in: .whitespaces).components(separatedBy: "=")
+            try require(pair.count == 2)
+            try require(result[pair[0]] == nil && h264Parameters[pair[0]] == pair[1].lowercased())
+            result[pair[0]] = pair[1].lowercased()
+        }
+        try require(result == h264Parameters)
+        return result
+    }
 
     struct Content {
         let kind: String
         let mid: String
         let payload: String
+        let codec: String
+        let parameters: [String: String]
         let feedback: [String]
         let port: String
         let ufrag: String
@@ -43,6 +58,7 @@ struct NativeJingleMedia: CustomStringConvertible, CustomDebugStringConvertible 
     private let contents: [Content]
     var mids: [String] { contents.map(\.mid) }
     var supportsDTMF: Bool { contents.contains { $0.kind == "audio" && $0.telephoneEvent != nil } }
+    var videoCodec: String { contents.first { $0.kind == "video" }?.codec ?? "VP8" }
     var description: String { "NativeJingleMedia(redacted)" }
     var debugDescription: String { description }
 
@@ -64,6 +80,7 @@ struct NativeJingleMedia: CustomStringConvertible, CustomDebugStringConvertible 
                 (element.attributes["senders"] == nil || element.attributes["senders"] == "both") && element.children.count == 2)
             let media = try one(element, "description", kind == "rtt" ? rtt : rtp)
             var payload = "", feedback: [String] = [], port = ""
+            var codecName = kind == "audio" ? "PCMU" : "VP8", parameters: [String: String] = [:]
             var telephoneEvent: TelephoneEvent?
             if kind == "rtt" {
                 try node(media, "description", rtt, attributes: ["profile"])
@@ -75,19 +92,29 @@ struct NativeJingleMedia: CustomStringConvertible, CustomDebugStringConvertible 
                 try require(media.attributes["media"] == kind && (media.children.count == 2 || (kind == "audio" && media.children.count == 3)))
                 try exact(try one(media, "rtcp-mux", rtp), [:])
                 let codecs = media.children.filter { $0.name == "payload-type" && $0.namespace == rtp }
-                let primary = codecs.filter { $0.attributes["name"]?.uppercased() == (kind == "audio" ? "PCMU" : "VP8") }
+                let primary = codecs.filter { kind == "audio" ? $0.attributes["name"]?.uppercased() == "PCMU" : ["VP8", "H264"].contains($0.attributes["name"]?.uppercased() ?? "") }
                 try require(primary.count == 1 && codecs.count == media.children.count - 1)
                 let codec = primary[0]
+                codecName = codec.attributes["name"]?.uppercased() ?? ""
                 try node(codec, "payload-type", rtp, attributes: ["id", "name", "clockrate", "channels"])
                 payload = codec.attributes["id"] ?? ""
                 try require((codec.attributes["channels"] == nil || codec.attributes["channels"] == "1") &&
-                    codec.attributes["name"]?.uppercased() == (kind == "audio" ? "PCMU" : "VP8") &&
+                    (kind == "audio" ? codecName == "PCMU" : ["VP8", "H264"].contains(codecName)) &&
                     codec.attributes["clockrate"] == (kind == "audio" ? "8000" : "90000"))
                 for entry in codec.children {
+                    if entry.name == "parameter" && entry.namespace == rtp {
+                        try require(kind == "video" && codecName == "H264")
+                        try node(entry, "parameter", rtp, attributes: ["name", "value"])
+                        let name = entry.attributes["name"] ?? "", value = entry.attributes["value"] ?? ""
+                        try require(entry.children.isEmpty && parameters[name] == nil && h264Parameters[name] == value.lowercased())
+                        parameters[name] = value.lowercased()
+                        continue
+                    }
                     try node(entry, "rtcp-fb", Self.feedback, attributes: ["type", "subtype"])
                     try require(entry.children.isEmpty)
                     feedback.append([entry.attributes["type"], entry.attributes["subtype"]].compactMap { $0 }.joined(separator: " "))
                 }
+                try require(codecName == "H264" ? parameters == h264Parameters : parameters.isEmpty)
                 if codecs.count == 2 {
                     let event = codecs.first { $0 !== codec }!
                     try node(event, "payload-type", rtp, attributes: ["id", "name", "clockrate", "channels"])
@@ -118,7 +145,7 @@ struct NativeJingleMedia: CustomStringConvertible, CustomDebugStringConvertible 
             for candidate in candidates {
                 try exact(candidate, candidate.attributes)
             }
-            contents.append(Content(kind: kind, mid: element.attributes["name"] ?? "", payload: payload,
+            contents.append(Content(kind: kind, mid: element.attributes["name"] ?? "", payload: payload, codec: codecName, parameters: parameters,
                 feedback: feedback, port: port, ufrag: transport.attributes["ufrag"] ?? "", password: transport.attributes["pwd"] ?? "",
                 fingerprint: fingerprint.text.trimmingCharacters(in: .whitespacesAndNewlines), setup: fingerprint.attributes["setup"] ?? "",
                 candidates: candidates.map(\.attributes), telephoneEvent: telephoneEvent))
@@ -164,6 +191,7 @@ struct NativeJingleMedia: CustomStringConvertible, CustomDebugStringConvertible 
             try require(hash.hasPrefix("sha-256 "))
             let payload = kind == "rtt" ? "" : media[3]
             var feedback: [String] = [], port = ""
+            var codecName = kind == "audio" ? "PCMU" : "VP8", parameters: [String: String] = [:]
             var telephoneEvent: TelephoneEvent?
             if kind == "rtt" {
                 try require(media[3] == "webrtc-datachannel")
@@ -177,8 +205,13 @@ struct NativeJingleMedia: CustomStringConvertible, CustomDebugStringConvertible 
                 let mappings = section.filter { $0.hasPrefix("a=rtpmap:") }
                 try require(mappings.count == media.count - 3)
                 let codec = try once(section, "a=rtpmap:\(payload) ")
-                try require(codec.uppercased() == (kind == "audio" ? "PCMU/8000" : "VP8/90000") ||
+                codecName = codec.components(separatedBy: "/")[0].uppercased()
+                try require((kind == "audio" ? codec.uppercased() == "PCMU/8000" : ["VP8/90000", "H264/90000"].contains(codec.uppercased())) ||
                     (kind == "audio" && codec.uppercased() == "PCMU/8000/1"))
+                if kind == "video" && codecName == "H264" {
+                    try require(section.filter { $0.hasPrefix("a=fmtp:") }.count == 1)
+                    parameters = try parseH264(once(section, "a=fmtp:\(payload) "))
+                }
                 if media.count == 5 {
                     let eventPayload = media[4]
                     let mapping = try once(section, "a=rtpmap:\(eventPayload) ")
@@ -194,7 +227,7 @@ struct NativeJingleMedia: CustomStringConvertible, CustomDebugStringConvertible 
                     feedback.append(String(line.dropFirst(prefix.count)))
                 }
             }
-            try require(telephoneEvent != nil || !section.contains { $0.hasPrefix("a=fmtp:") })
+            try require(telephoneEvent != nil || codecName == "H264" || !section.contains { $0.hasPrefix("a=fmtp:") })
             let candidateLines = section.filter { $0.hasPrefix("a=candidate:") }
             try require(candidateLines.count <= 64)
             var candidates: [[String: String]] = []
@@ -219,7 +252,7 @@ struct NativeJingleMedia: CustomStringConvertible, CustomDebugStringConvertible 
                 }
                 candidates.append(candidate)
             }
-            contents.append(Content(kind: kind, mid: try once(section, "a=mid:"), payload: payload, feedback: feedback, port: port,
+            contents.append(Content(kind: kind, mid: try once(section, "a=mid:"), payload: payload, codec: codecName, parameters: parameters, feedback: feedback, port: port,
                 ufrag: try once(section, "a=ice-ufrag:"), password: try once(section, "a=ice-pwd:"),
                 fingerprint: String(hash.dropFirst(8)), setup: try once(section, "a=setup:"), candidates: candidates, telephoneEvent: telephoneEvent))
         }
@@ -232,7 +265,7 @@ struct NativeJingleMedia: CustomStringConvertible, CustomDebugStringConvertible 
     func validateAnswer(to offer: Self) throws {
         try Self.require(action == "session-accept" && offer.action == "session-initiate" && sid == offer.sid && profile == offer.profile && mids == offer.mids)
         for (answer, proposed) in zip(contents, offer.contents) {
-            try Self.require(answer.kind == proposed.kind && answer.payload == proposed.payload && Set(answer.feedback).isSubset(of: Set(proposed.feedback)))
+            try Self.require(answer.kind == proposed.kind && answer.payload == proposed.payload && answer.codec == proposed.codec && answer.parameters == proposed.parameters && Set(answer.feedback).isSubset(of: Set(proposed.feedback)))
             if let event = answer.telephoneEvent {
                 try Self.require(proposed.telephoneEvent?.payload == event.payload &&
                     (proposed.telephoneEvent?.events == event.events || (proposed.telephoneEvent?.events == "0-16" && event.events == "0-15")))
@@ -247,7 +280,8 @@ struct NativeJingleMedia: CustomStringConvertible, CustomDebugStringConvertible 
             if item.kind == "rtt" {
                 result += "<description xmlns='\(Self.rtt)' profile='dc-t140'><datachannel subprotocol='t140' reliability='reliable' order='in-order' label='rtt'/><rtt-sync role='conversation' source='human' sync-mode='co-session'/></description>"
             } else {
-                result += "<description xmlns='\(Self.rtp)' media='\(item.kind)'><payload-type id='\(item.payload)' name='\(item.kind == "audio" ? "PCMU" : "VP8")' clockrate='\(item.kind == "audio" ? "8000" : "90000")' channels='1'>"
+                result += "<description xmlns='\(Self.rtp)' media='\(item.kind)'><payload-type id='\(item.payload)' name='\(item.codec)' clockrate='\(item.kind == "audio" ? "8000" : "90000")' channels='1'>"
+                for name in item.parameters.keys.sorted() { result += "<parameter name='\(name)' value='\(item.parameters[name]!)'/>" }
                 for feedback in item.feedback {
                     let parts = feedback.components(separatedBy: " ")
                     result += "<rtcp-fb xmlns='\(Self.feedback)' type='\(parts[0])'" + (parts.count == 2 ? " subtype='\(parts[1])'" : "") + "/>"
@@ -277,7 +311,8 @@ struct NativeJingleMedia: CustomStringConvertible, CustomDebugStringConvertible 
             lines += [item.kind == "rtt" ? "m=application 9 UDP/DTLS/SCTP webrtc-datachannel" : "m=\(item.kind) 9 UDP/TLS/RTP/SAVPF \(payloads)", "c=IN IP4 0.0.0.0", "a=mid:\(item.mid)"]
             if item.kind == "rtt" { lines += ["a=sctp-port:\(item.port)", "a=max-message-size:4096"] }
             else {
-                lines += ["a=sendrecv", "a=rtcp-mux", "a=rtpmap:\(item.payload) \(item.kind == "audio" ? "PCMU/8000" : "VP8/90000")"]
+                lines += ["a=sendrecv", "a=rtcp-mux", "a=rtpmap:\(item.payload) \(item.codec)/\(item.kind == "audio" ? "8000" : "90000")"]
+                if !item.parameters.isEmpty { lines += ["a=fmtp:\(item.payload) " + item.parameters.keys.sorted().map { "\($0)=\(item.parameters[$0]!)" }.joined(separator: ";")] }
                 lines += item.feedback.map { "a=rtcp-fb:\(item.payload) \($0)" }
                 if let event = item.telephoneEvent { lines += ["a=rtpmap:\(event.payload) telephone-event/8000", "a=fmtp:\(event.payload) \(event.events)"] }
             }

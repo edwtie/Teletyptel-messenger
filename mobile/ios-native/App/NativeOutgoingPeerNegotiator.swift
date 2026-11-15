@@ -11,6 +11,7 @@ final class NativeOutgoingPeerNegotiator: NativeActivePeerNegotiating {
     private let tracks: () throws -> (RTCAudioTrack, RTCVideoTrack?)
     private let stopCapture: () -> Void
     private let iceServers: [RTCIceServer]
+    private let videoCodec: String
     private let binding: UUID
     private var handle: NativeCallHandle?
     private var engine: NativeMediaPeer?
@@ -24,7 +25,7 @@ final class NativeOutgoingPeerNegotiator: NativeActivePeerNegotiating {
 
     init(peerJID: String, sid: String, profile: NativeCallMedia,
          signalling: any NativeJingleSending, factory: RTCPeerConnectionFactory,
-         iceServers: [RTCIceServer] = [],
+         iceServers: [RTCIceServer] = [], videoCodec: String = "VP8",
          tracks: @escaping () throws -> (RTCAudioTrack, RTCVideoTrack?),
          stopCapture: @escaping () -> Void) async throws {
         guard NativeJingleTransport.fullJID(peerJID), NativeJingleTransport.validSID(sid) else {
@@ -36,6 +37,7 @@ final class NativeOutgoingPeerNegotiator: NativeActivePeerNegotiating {
         self.signalling = signalling
         self.factory = factory
         self.iceServers = iceServers
+        self.videoCodec = videoCodec
         self.tracks = tracks
         self.stopCapture = stopCapture
         binding = try await signalling.bindCall(peer: peerJID, sid: sid)
@@ -56,7 +58,7 @@ final class NativeOutgoingPeerNegotiator: NativeActivePeerNegotiating {
         do {
             let (microphone, camera) = try tracks()
             let engine = try NativeMediaPeer(factory: factory, microphone: microphone, camera: camera,
-                profile: profile, sid: sid, iceServers: iceServers, changed: { [weak self] in
+                profile: profile, sid: sid, iceServers: iceServers, videoCodec: videoCodec, changed: { [weak self] in
                     guard self?.handle == handle else { return }
                     changed()
                 })

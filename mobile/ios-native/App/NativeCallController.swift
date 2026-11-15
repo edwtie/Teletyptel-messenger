@@ -212,7 +212,7 @@ final class NativeCallController: ObservableObject, NativePushRegistering {
         }
     }
 
-    func startCall(_ contact: NativeContact, profile: NativeCallMedia) {
+    func startCall(_ contact: NativeContact, profile: NativeCallMedia, videoCodec: String = "VP8") {
         guard activePeer == nil, prepareTask == nil, account != nil,
               let endpoint = contact.callEndpoint,
               let sender = login?.activeJingleSender else {
@@ -227,7 +227,7 @@ final class NativeCallController: ObservableObject, NativePushRegistering {
                       let router = self.router else { throw NativeMediaPeerFailure.configuration }
                 let sid = UUID().uuidString.replacingOccurrences(of: "-", with: "")
                 let provider = try await NativeOutgoingPeerNegotiator(peerJID: endpoint, sid: sid,
-                    profile: profile, signalling: sender, factory: factory, tracks: { [weak capture] in
+                    profile: profile, signalling: sender, factory: factory, videoCodec: videoCodec, tracks: { [weak capture] in
                         guard let tracks = capture?.tracks else { throw NativeMediaCaptureFailure.unavailable }
                         return tracks
                     }, stopCapture: { [weak capture] in capture?.stop() })

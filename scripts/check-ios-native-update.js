@@ -9,8 +9,8 @@ function run() {
   const directory = prepare("ios-native-update-" + Date.now());
   const reports = path.join(directory, "reports");
   fs.mkdirSync(reports);
-  const result = { unsigned: true, uploaded: false, scope: "focused new-contact, presentation preferences and avatar logic; no simulator/UI/media tests",
-    swiftTestFilter: "NativeContactTests|NativePresentationTests|NativeServicesTests.testNativeAvatar", swiftUnitTests: false, deviceCompiled: false, uiTests: [] };
+  const result = { unsigned: true, uploaded: false, scope: "focused contacts, presentation, avatar and Jingle codec logic; no simulator/UI/media tests",
+    swiftTestFilter: "NativeContactTests|NativePresentationTests|NativeServicesTests.testNativeAvatar|NativeJingleMediaTests", swiftUnitTests: false, deviceCompiled: false, uiTests: [] };
   const logged = (name, command, args) => executeLogged(command, args, { root, reports, name });
   try {
     logged("swift-tests", "swift", ["test", "--package-path", path.join(root, "mobile/ios-native"),
