@@ -49,8 +49,14 @@ struct NativeCallIntent: Equatable, Sendable, CustomStringConvertible, CustomDeb
     }
 
     static func frame(action: NativeCallIntentAction, peer: String, sid: String, media: NativeCallMedia? = nil) throws -> String {
+        let validTarget: Bool
+        switch action {
+        case .propose: validTarget = NativeChatCodec.bareJID(peer) == peer && media != nil
+        case .retract: validTarget = NativeChatCodec.bareJID(peer) == peer && media == nil
+        case .proceed, .reject, .finish: validTarget = NativeJingleTransport.fullJID(peer) && media == nil
+        }
         guard NativeJingleTransport.validSID(sid), NativeChatCodec.bareJID(peer) != nil,
-              action == .propose ? NativeChatCodec.bareJID(peer) == peer && media != nil : NativeJingleTransport.fullJID(peer) && media == nil else {
+              validTarget else {
             throw NativeJingleFailure.invalidRequest
         }
         var content = ""

@@ -30,6 +30,13 @@ final class NativeCallIntentTests: XCTestCase {
         XCTAssertThrowsError(try NativeCallIntent.frame(action: .proceed, peer: bound, sid: "session_1", media: .audio))
     }
 
+    func testRetractionReachesBareRecipientBeforeAnyResourceIsSelected() throws {
+        let frame = try NativeCallIntent.frame(action: .retract, peer: owner, sid: "session_1")
+        XCTAssertTrue(frame.contains("to='bob@example.test'"))
+        XCTAssertEqual(NativeCallIntent.decode(received(frame), owner: owner, bound: bound)?.action, .retract)
+        XCTAssertThrowsError(try NativeCallIntent.frame(action: .retract, peer: owner, sid: "session_1", media: .audio))
+    }
+
     func testArchiveCarbonsWrongRecipientDuplicateMediaAndForgedStanzasAreNotLiveCalls() throws {
         let frame = received(try NativeCallIntent.frame(action: .propose, peer: owner, sid: "session_1", media: .total))
         for invalid in [frame.replacingOccurrences(of: "</message>", with: "<delay xmlns='urn:xmpp:delay' stamp='2026-11-15T00:00:00Z'/></message>"),
