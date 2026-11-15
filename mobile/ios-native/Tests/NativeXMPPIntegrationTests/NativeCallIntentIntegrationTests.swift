@@ -59,10 +59,15 @@ final class NativeCallIntentIntegrationTests: XCTestCase {
     func testNativeJMISelectsNewResourceAndRequiresFreshJingleOverTrustedWSS() async throws {
         let (callerAccount, recipientAccount) = try accounts()
         let left = IntentTransportObservation(), right = IntentTransportObservation()
+        var stage = "connecting"
+        defer {
+            print("Native JMI checkpoint: \(stage); caller actions: \(left.intents.map { $0.action.rawValue }); recipient actions: \(right.intents.map { $0.action.rawValue })")
+        }
         let leftConnection = connect(callerAccount, observation: left), rightConnection = connect(recipientAccount, observation: right)
         defer { leftConnection.cancel(); rightConnection.cancel() }
         try await wait { left.observing && right.observing && left.jid != nil && right.jid != nil }
         let callerSender = try XCTUnwrap(left.sender), recipientSender = try XCTUnwrap(right.sender)
+        stage = "unsupported-policy-response"
         do {
             try await recipientSender.setCallPreferences(enabled: true, dnd: false, muted: [])
             XCTFail("The unmodified fixture must not claim a recovery-policy module")
@@ -72,6 +77,7 @@ final class NativeCallIntentIntegrationTests: XCTestCase {
         left.onIntent = { caller.receive($0) }
         let proposing = Task { try await caller.prepare(sender: callerSender, validate: {}) }
         defer { proposing.cancel(); caller.cancel(); left.onIntent = nil; right.onIntent = nil; right.onJingle = nil }
+        stage = "waiting-for-proposal"
         try await wait { right.intents.contains { $0.sid == sid && $0.action == .propose } }
         let proposal = try XCTUnwrap(right.intents.first { $0.sid == sid && $0.action == .propose })
         XCTAssertEqual(proposal.peer, left.jid)
@@ -80,9 +86,11 @@ final class NativeCallIntentIntegrationTests: XCTestCase {
         right.onJingle = { await recipient.receive($0) }
         let answering = Task { try await recipient.prepare(validate: {}) }
         defer { answering.cancel(); recipient.cancel() }
+        stage = "waiting-for-proceed"
         let selectedPeer = try await proposing.value
         XCTAssertEqual(selectedPeer, right.jid)
         let binding = try await callerSender.bindCall(peer: selectedPeer, sid: sid)
+        stage = "waiting-for-fresh-offer"
         let offer = try NativeJingleMedia.fromSDP(sdp(), sid: sid, action: "session-initiate", profile: .audioRtt)
         let exchange = Task { try await callerSender.exchangeJingle(binding: binding, xml: offer.xml) }
         defer { exchange.cancel() }
@@ -93,12 +101,14 @@ final class NativeCallIntentIntegrationTests: XCTestCase {
         _ = try NativeJingleMedia.decode(received.jingleElement(), sid: sid, action: received.action, profile: .audioRtt)
         try await recipientSender.replyJingle(received, rejection: nil)
         try await exchange.value
+        stage = "waiting-for-finish"
         var remoteEnded = false
         recipient.remoteEnded = { remoteEnded = true }
         caller.cancel()
         try await wait { remoteEnded }
         recipient.cancel()
         await callerSender.unbindCall(binding)
+        stage = "cleanup"
         leftConnection.cancel(); rightConnection.cancel()
         _ = try? await leftConnection.value; _ = try? await rightConnection.value
     }
