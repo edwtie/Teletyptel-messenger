@@ -35,6 +35,9 @@ test("Attachment review precedes optional capture rows and main-menu sheets wait
   assert.match(menu, /afterMenu \{ showGroups = true \}/);
   assert.match(menu, /menuPresentation\?\.cancel\(\)/);
   assert.match(menu, /if model\.isReconnecting \{ return "Verbinding herstellen…" \}/);
+  const groups = read("mobile/ios-native/App/NativeGroupsView.swift");
+  assert.match(groups, /accessibilityIdentifier\("group-messages-" \+ room\)\s+\.contentShape\(Rectangle\(\)\)/);
+  assert.match(read("mobile/ios-native/App/NativeAppearanceView.swift"), /allowsHitTesting\(false\)\.accessibilityHidden\(true\)/);
 });
 
 test("Native static UI has complete Dutch/English resource coverage and an independent language preference", () => {

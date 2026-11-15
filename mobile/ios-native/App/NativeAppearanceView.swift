@@ -15,7 +15,7 @@ struct NativeConversationBackground: View {
             if let asset = background.asset(wide: geometry.size.width > geometry.size.height) {
                 Image(asset).resizable().scaledToFill().frame(width: geometry.size.width, height: geometry.size.height).clipped()
             } else { NativeWebStyle.panel }
-        }.accessibilityHidden(true)
+        }.allowsHitTesting(false).accessibilityHidden(true)
     }
 }
 

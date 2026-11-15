@@ -209,6 +209,8 @@ struct NativeGroupChatView: View {
             }
             .modifier(NativeChatBottomAnchor())
             .coordinateSpace(name: "native-group-messages")
+            .accessibilityIdentifier("group-messages-" + room)
+            .contentShape(Rectangle())
             .overlayPreferenceValue(NativeMessageFramesKey.self) { frames in
                 GeometryReader { viewport in
                     let visible = frames.filter { CGRect(origin: .zero, size: viewport.size).contains($0.value) }.map(\.key)
