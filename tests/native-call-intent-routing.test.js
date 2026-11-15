@@ -40,6 +40,10 @@ test("Policy is acknowledged separately from roster changes and cannot silently 
   assert.match(connection, /callControls.count < 2/);
   assert.match(connection, /NativeCallControlReply.decode/);
   assert.doesNotMatch(connection, /editContact\(NativeCallIntent/);
+  const intent = core("NativeCallIntent");
+  assert.match(intent, /liveArchiveMarker\(\$0, owner: owner\)/);
+  assert.match(intent, /element.attributes\["by"\] == owner/);
+  assert.match(intent, /identifier.utf8.count <= 256/);
 });
 
 test("The explicit local SIP lab route is not accidentally changed into a bare-JID proposal", () => {

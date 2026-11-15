@@ -52,6 +52,19 @@ final class NativeCallIntentTests: XCTestCase {
         }
     }
 
+    func testLiveEjabberdArchiveMarkerIsNotConfusedWithAnArchivedOrDelayedCall() throws {
+        let frame = received(try NativeCallIntent.frame(action: .propose, peer: owner, sid: "session_1", media: .audioRtt))
+            .replacingOccurrences(of: "<propose", with: "<archived xmlns='urn:xmpp:mam:tmp' by='\(owner)' id='1794759990133214'/><stanza-id xmlns='urn:xmpp:sid:0' by='\(owner)' id='1794759990133214'/><propose")
+        XCTAssertEqual(NativeCallIntent.decode(frame, owner: owner, bound: bound)?.media, .audioRtt)
+        for invalid in [
+            frame.replacingOccurrences(of: "</message>", with: "<delay xmlns='urn:xmpp:delay' stamp='2026-11-15T00:00:00Z'/></message>"),
+            frame.replacingOccurrences(of: "by='\(owner)'", with: "by='other@example.test'"),
+            frame.replacingOccurrences(of: "id='1794759990133214'/><stanza-id", with: "id=''/><stanza-id"),
+            "<message xmlns='jabber:client' from='\(owner)' to='\(bound)'><result xmlns='urn:xmpp:mam:2'><forwarded xmlns='urn:xmpp:forward:0'>\(frame)</forwarded></result></message>",
+            frame.replacingOccurrences(of: "</message>", with: "<received xmlns='urn:xmpp:carbons:2'/></message>")
+        ] { XCTAssertNil(NativeCallIntent.decode(invalid, owner: owner, bound: bound)) }
+    }
+
     func testPolicyAndHandoffAreSentOnlyToOwnServerWithBoundedMetadata() throws {
         let policy = try NativeCallIntent.preferences(owner: owner, identifier: "policy-1", enabled: true, dnd: true, muted: ["alice@example.test"])
         XCTAssertTrue(policy.contains("to='example.test'")); XCTAssertTrue(policy.contains("dnd='true'"))

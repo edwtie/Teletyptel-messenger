@@ -22,6 +22,7 @@ struct NativeCallIntent: Equatable, Sendable, CustomStringConvertible, CustomDeb
               root.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
               root.children.allSatisfy({ $0.namespace == namespace
                   || $0.namespace == "urn:xmpp:hints" && $0.name == "store" && $0.children.isEmpty
+                  || liveArchiveMarker($0, owner: owner)
                   || $0.namespace == "urn:xmpp:sid:0" && ["origin-id", "stanza-id"].contains($0.name) && $0.children.isEmpty }),
               root.children.contains(where: { $0.namespace == "urn:xmpp:hints" && $0.name == "store" }),
               root.children.filter({ $0.namespace == namespace }).count == 1,
@@ -46,6 +47,15 @@ struct NativeCallIntent: Equatable, Sendable, CustomStringConvertible, CustomDeb
         }
         guard let profile = NativeCallMedia.allCases.first(where: { $0.contents == media }) else { return nil }
         return Self(action: action, sid: sid, peer: peer, media: profile)
+    }
+
+    private static func liveArchiveMarker(_ element: ProbeElement, owner: String) -> Bool {
+        guard element.name == "archived", element.namespace == "urn:xmpp:mam:tmp", element.children.isEmpty,
+              element.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              Set(element.attributes.keys) == ["by", "id"], element.attributes["by"] == owner,
+              let identifier = element.attributes["id"], !identifier.isEmpty, identifier.utf8.count <= 256,
+              !identifier.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) else { return false }
+        return true
     }
 
     static func frame(action: NativeCallIntentAction, peer: String, sid: String, media: NativeCallMedia? = nil) throws -> String {
