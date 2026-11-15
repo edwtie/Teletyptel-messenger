@@ -33,6 +33,11 @@ final class NativeIncomingPeerNegotiator: NativeActivePeerNegotiating {
     private var changed: (() -> Void)?
     private(set) var remoteEnded = false
     var sid: String { request.sid }
+    var isRemoteHeld: Bool { session?.isRemotelyHeld ?? false }
+    func setHeld(_ held: Bool) async throws {
+        guard let session = session, handle != nil else { throw NativeJingleFailure.disconnected }
+        try await session.setHeld(held)
+    }
     private let deferred = NativeDeferredIncomingMedia()
 
     init(request: NativeJingleRequest, profile: NativeCallMedia, signalling: any NativeJingleSending,
@@ -112,6 +117,7 @@ final class NativeIncomingPeerNegotiator: NativeActivePeerNegotiating {
             return
         }
         await session.receive(request)
+        if self.session === session, session.phase == .negotiated { changed?() }
         guard self.session === session, session.phase == .ended else { return }
         remoteEnded = request.action == "session-terminate"
         finishCapture()

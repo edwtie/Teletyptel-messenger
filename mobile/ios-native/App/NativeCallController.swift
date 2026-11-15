@@ -7,6 +7,11 @@ private final class NativePeerRouter: NativePeerNegotiating {
     private var provider: (any NativePeerNegotiating)?
 
     var remoteEnded: Bool { provider?.remoteEnded ?? false }
+    var isRemoteHeld: Bool { provider?.isRemoteHeld ?? false }
+    func setHeld(_ held: Bool) async throws {
+        guard let provider = provider else { throw NativeJingleFailure.disconnected }
+        try await provider.setHeld(held)
+    }
 
     func install(_ provider: any NativePeerNegotiating) -> Bool {
         guard self.provider == nil else { return false }
@@ -49,6 +54,8 @@ final class NativeCallController: ObservableObject, NativePushRegistering {
     @Published private(set) var presentation: NativeCallPresentation?
     @Published private(set) var peerName: String?
     @Published private(set) var isMuted = false
+    @Published private(set) var isHeld = false
+    @Published private(set) var holdPending = false
     let interpreter = NativeInterpreterSession()
     @Published private(set) var interpreterMedia: NativeInterpreterMedia?
     private static let initializeWebRTC = RTCInitializeSSL()
@@ -277,6 +284,12 @@ final class NativeCallController: ObservableObject, NativePushRegistering {
             return
         }
         if coordinator.isConnected {
+            isHeld = coordinator.isHeld
+            holdPending = coordinator.holdPending
+            if let snapshot = presentation {
+                runtime?.platform.setDtmfEnabled(id: snapshot.callID, enabled: snapshot.canSendDtmf,
+                    hasVideo: snapshot.profile.hasVideo, canHold: snapshot.canHold)
+            }
             status = .active(activePeer?.sid ?? "")
             prepareInterpreter()
         }
@@ -292,7 +305,13 @@ final class NativeCallController: ObservableObject, NativePushRegistering {
     }
 
     func setRttText(_ text: String) {
-        if runtime?.media.setRttText(text) == true { interpreter.sendText(text) }
+        if runtime?.media.setRttText(text) == true, presentation?.isHeld != true { interpreter.sendText(text) }
+    }
+
+    func toggleHeld() {
+        guard let coordinator = runtime?.platform.coordinator, let id = coordinator.currentHandle?.id else { return }
+        let held = !coordinator.isHeld
+        runtime?.platform.requestHeld(id: id, held: held)
     }
 
     func toggleMuted() {
@@ -335,6 +354,8 @@ final class NativeCallController: ObservableObject, NativePushRegistering {
         peerName = nil
         presentation = nil
         isMuted = false
+        isHeld = false
+        holdPending = false
         if let id = id { _ = runtime?.platform.coordinator.end(id: id, reason: .failed) }
         if let provider = provider {
             provider.cancel(notifyPeer: true)
@@ -360,7 +381,7 @@ final class NativeCallController: ObservableObject, NativePushRegistering {
         runtime.media.presentationChanged = { [weak self] snapshot in
             self?.presentation = snapshot
             if let snapshot = snapshot {
-                self?.runtime?.platform.setDtmfEnabled(id: snapshot.callID, enabled: snapshot.canSendDtmf, hasVideo: snapshot.profile.hasVideo)
+                self?.runtime?.platform.setDtmfEnabled(id: snapshot.callID, enabled: snapshot.canSendDtmf, hasVideo: snapshot.profile.hasVideo, canHold: snapshot.canHold)
             }
         }
         runtime.platform.coordinator.changed = { [weak self] in self?.callChanged() }

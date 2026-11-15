@@ -22,6 +22,11 @@ final class NativeOutgoingPeerNegotiator: NativeActivePeerNegotiating {
     private var captureActive = false
     private var changed: (() -> Void)?
     private(set) var remoteEnded = false
+    var isRemoteHeld: Bool { session?.isRemotelyHeld ?? false }
+    func setHeld(_ held: Bool) async throws {
+        guard let session = session, handle != nil else { throw NativeJingleFailure.disconnected }
+        try await session.setHeld(held)
+    }
 
     init(peerJID: String, sid: String, profile: NativeCallMedia,
          signalling: any NativeJingleSending, factory: RTCPeerConnectionFactory,

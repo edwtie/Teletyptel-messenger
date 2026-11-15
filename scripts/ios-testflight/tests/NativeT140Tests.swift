@@ -47,6 +47,25 @@ enum NativeT140Tests {
         }
 
         let (blocked, congested) = make()
+        let (held, heldWire) = make()
+        precondition(held.setText("Hallo"))
+        precondition(held.setPaused(true))
+        let beforeHold = heldWire.packets.count
+        precondition(held.setText("Hallo 👋"))
+        precondition(held.setText("Dag 👋"))
+        precondition(held.transportChanged(heldWire, callId: id, sid: sid))
+        precondition(heldWire.packets.count == beforeHold && held.ownText == "Dag 👋" && held.hasPendingText)
+        precondition(held.receive(Data("Ik wacht".utf8), from: heldWire, callId: id, sid: sid))
+        precondition(held.remoteText == "Ik wacht")
+        precondition(held.setPaused(false) && !held.hasPendingText)
+        var heldText = MessengerT140Text()
+        for packet in heldWire.packets { heldText = heldText.applying(packet)! }
+        precondition(heldText.text == "Dag 👋")
+        precondition(held.setPaused(true))
+        precondition(held.setText("Niet na ophangen verzenden"))
+        held.close()
+        let afterClose = heldWire.packets.count
+        precondition(!held.setPaused(false) && heldWire.packets.count == afterClose)
         precondition(blocked.setText("oud"))
         congested.bufferedAmount = UInt64.max
         precondition(!blocked.setText("nieuw") && blocked.hasPendingText)

@@ -6,14 +6,20 @@ private actor SessionSignallingFixture: NativeJingleSending {
     var replies: [NativeJingleRejection?] = []
     var released: [UUID] = []
     var reject = false
+    var pause = false
+    var pendingExchange: CheckedContinuation<Void, Error>?
     func bindCall(peer: String, sid: String) async throws -> UUID { UUID() }
     func exchangeJingle(binding: UUID, xml: String) async throws {
         if reject { throw NativeJingleFailure.rejected }
         sent.append(xml)
+        if pause { try await withCheckedThrowingContinuation { pendingExchange = $0 } }
     }
     func replyJingle(_ request: NativeJingleRequest, rejection: NativeJingleRejection?) async throws { replies.append(rejection) }
     func unbindCall(_ binding: UUID) async { released.append(binding) }
     func fail() { reject = true }
+    func pauseExchange() { pause = true }
+    func finishExchange() { pause = false; pendingExchange?.resume(); pendingExchange = nil }
+    func hasPending() -> Bool { pendingExchange != nil }
 }
 
 @MainActor
@@ -85,6 +91,68 @@ final class NativeJingleSessionTests: XCTestCase {
             sid: "call-1", action: action, xml: frame, token: UUID(), identifier: identifier)
     }
     private var termination: String { "<jingle xmlns='urn:xmpp:jingle:1' sid='call-1' action='session-terminate'><reason><success/></reason></jingle>" }
+
+    private func holdInfo(_ info: String) -> String {
+        "<jingle xmlns='urn:xmpp:jingle:1' sid='call-1' action='session-info'>\(info)</jingle>"
+    }
+
+    @MainActor func testHoldWaitsForIQResultRejectsConcurrentAndKeepsRejectedState() async throws {
+        let (session, media, signalling) = try fixture()
+        do { try await session.setHeld(true); XCTFail("held before negotiation") } catch {}
+        await session.receive(request("session-initiate", try media.description(answer: false).xml))
+        try await session.accept()
+        await signalling.pauseExchange()
+        let operation = Task { try await session.setHeld(true) }
+        for _ in 0..<100 { if await signalling.hasPending() { break }; await Task.yield() }
+        XCTAssertFalse(session.isLocallyHeld)
+        do { try await session.setHeld(false); XCTFail("concurrent hold") } catch {}
+        await signalling.finishExchange()
+        try await operation.value
+        XCTAssertTrue(session.isLocallyHeld)
+        let sent = await signalling.sent
+        XCTAssertEqual(sent.last, holdInfo("<hold xmlns='urn:xmpp:jingle:apps:rtp:info:1'/>"))
+        await signalling.fail()
+        do { try await session.setHeld(false); XCTFail("rejected resume accepted") } catch {}
+        XCTAssertTrue(session.isLocallyHeld)
+        XCTAssertEqual(session.phase, .negotiated)
+        await session.stop()
+    }
+
+    @MainActor func testRemoteHoldValidatesPayloadAndPreservesIndependentLocalHold() async throws {
+        let (session, media, signalling) = try fixture()
+        await session.receive(request("session-initiate", try media.description(answer: false).xml))
+        try await session.accept()
+        let hold = holdInfo("<hold xmlns='urn:xmpp:jingle:apps:rtp:info:1'/>")
+        await session.receive(request("session-info", hold, wrongPeer: true))
+        XCTAssertFalse(session.isRemotelyHeld)
+        await session.receive(request("session-info", hold.replacingOccurrences(of: "info:1", with: "info:fake")))
+        XCTAssertFalse(session.isRemotelyHeld)
+        await session.receive(request("session-info", hold))
+        XCTAssertTrue(session.isRemotelyHeld)
+        try await session.setHeld(true)
+        await session.receive(request("session-info", holdInfo("<unhold xmlns='urn:xmpp:jingle:apps:rtp:info:1'/>")))
+        XCTAssertFalse(session.isRemotelyHeld)
+        XCTAssertTrue(session.isLocallyHeld)
+        await session.receive(request("session-info", holdInfo("<hold xmlns='urn:xmpp:jingle:apps:rtp:info:1' name='audio'/>")))
+        XCTAssertFalse(session.isRemotelyHeld)
+        let replies = await signalling.replies
+        XCTAssertEqual(replies.last!, .featureNotImplemented)
+        await session.stop()
+    }
+
+    @MainActor func testLateHoldAcknowledgementAfterSessionEndCannotRestoreState() async throws {
+        let (session, media, signalling) = try fixture()
+        await session.receive(request("session-initiate", try media.description(answer: false).xml))
+        try await session.accept()
+        await signalling.pauseExchange()
+        let operation = Task { try await session.setHeld(true) }
+        for _ in 0..<100 { if await signalling.hasPending() { break }; await Task.yield() }
+        await session.stop()
+        await signalling.finishExchange()
+        do { try await operation.value; XCTFail("late hold accepted") } catch {}
+        XCTAssertEqual(session.phase, .ended)
+        XCTAssertFalse(session.isLocallyHeld)
+    }
 
     @MainActor func testIncomingAcknowledgmentDoesNotStartMedia() async throws {
         let (session, media, signalling) = try fixture()

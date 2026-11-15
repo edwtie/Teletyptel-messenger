@@ -89,6 +89,7 @@ final class MessengerNativeRttSession {
     private var pending: [Unicode.Scalar]?
     private var pendingRevision = 0
     private var flushing = false
+    private var paused = false
     private(set) var status = "waiting"
 
     init(callId: UUID, sid: String) {
@@ -100,6 +101,14 @@ final class MessengerNativeRttSession {
     var ownText: String { String(String.UnicodeScalarView(pending ?? sent.scalars)) }
     var remoteText: String { received.text }
     var hasPendingText: Bool { pending != nil }
+
+    @discardableResult
+    func setPaused(_ paused: Bool) -> Bool {
+        precondition(Thread.isMainThread)
+        guard !closed else { return false }
+        self.paused = paused
+        return flush()
+    }
 
     @discardableResult
     func attach(_ candidate: MessengerT140Channel, callId: UUID, sid: String) -> Bool {
@@ -149,6 +158,7 @@ final class MessengerNativeRttSession {
 
     private func flush() -> Bool {
         guard !flushing, isReady, let channel = channel else { return false }
+        if paused { status = "held"; return true }
         guard let target = pending else { status = "open"; return true }
         flushing = true
         defer { flushing = false }
@@ -176,7 +186,7 @@ final class MessengerNativeRttSession {
     }
 
     private func send(_ block: Data, through channel: MessengerT140Channel) -> Bool {
-        guard isReady, block.count <= MessengerT140Text.maxBlockBytes,
+        guard isReady, !paused, block.count <= MessengerT140Text.maxBlockBytes,
               channel.bufferedAmount <= MessengerT140Text.maxBufferedBytes - UInt64(block.count),
               let next = sent.applying(block) else { status = "backpressure"; return false }
         guard channel.send(block) else {

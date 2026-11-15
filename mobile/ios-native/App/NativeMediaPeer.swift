@@ -12,11 +12,18 @@ struct NativePreparedPeer {
 @MainActor
 protocol NativePeerNegotiating: AnyObject {
     var remoteEnded: Bool { get }
+    var isRemoteHeld: Bool { get }
+    func setHeld(_ held: Bool) async throws
     func prepare(handle: NativeCallHandle, media: NativeCallMedia,
                  changed: @escaping () -> Void) throws -> NativePreparedPeer
     func accept(handle: NativeCallHandle, peer: RTCPeerConnection,
                 completion: @escaping (Result<NativeCallMedia, Error>) -> Void)
     func close(handle: NativeCallHandle)
+}
+
+extension NativePeerNegotiating {
+    var isRemoteHeld: Bool { false }
+    func setHeld(_ held: Bool) async throws { throw NativeJingleFailure.rejected }
 }
 
 private final class NativePeerEvents: NSObject, RTCPeerConnectionDelegate {

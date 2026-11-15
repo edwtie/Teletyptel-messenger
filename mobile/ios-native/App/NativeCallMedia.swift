@@ -13,6 +13,8 @@ struct NativeCallPresentation {
     let cameraEnabled: Bool
     let canSwitchCamera: Bool
     let canSendDtmf: Bool
+    var isHeld: Bool = false
+    var canHold: Bool = false
 }
 
 @MainActor
@@ -29,6 +31,10 @@ final class NativeWebRTCCallMedia: NativeCallMediaDriver {
     private var connected = false
     private var audioActive = false
     private var systemAudioActive = false
+    private var locallyHeld = false
+    private var holdPending = false
+    private var muted = false
+    private var held: Bool { locallyHeld || holdPending || negotiation.isRemoteHeld }
     private var startTask: Task<Void, Never>?
     private var reconnectDeadline: Task<Void, Never>?
     var presentationChanged: ((NativeCallPresentation?) -> Void)?
@@ -99,6 +105,9 @@ final class NativeWebRTCCallMedia: NativeCallMediaDriver {
         startTask = nil
         event = nil
         connected = false
+        locallyHeld = false
+        holdPending = false
+        muted = false
         negotiated = false
         reconnectDeadline?.cancel()
         reconnectDeadline = nil
@@ -120,7 +129,7 @@ final class NativeWebRTCCallMedia: NativeCallMediaDriver {
 
     func audioActivated(_ active: Bool) {
         systemAudioActive = active
-        let permitted = active && handle != nil
+        let permitted = active && handle != nil && !held
         guard audioActive != permitted else { return }
         audioActive = permitted
         let audio = RTCAudioSession.sharedInstance()
@@ -138,12 +147,42 @@ final class NativeWebRTCCallMedia: NativeCallMediaDriver {
 
     func setMuted(_ muted: Bool) -> Bool {
         guard let microphone = prepared?.microphone else { return false }
-        microphone.isEnabled = !muted
+        self.muted = muted
+        microphone.isEnabled = !muted && !held
         return true
     }
 
+    func setHeld(_ held: Bool) async -> Bool {
+        guard connected, !holdPending, let handle = handle, prepared?.peer.connectionState == .connected else { return false }
+        holdPending = true
+        applyHold()
+        do {
+            try await negotiation.setHeld(held)
+            guard self.handle == handle, prepared?.peer.connectionState == .connected else { return false }
+            locallyHeld = held
+            holdPending = false
+            applyHold()
+            return true
+        } catch {
+            guard self.handle == handle else { return false }
+            holdPending = false
+            applyHold()
+            if negotiation.remoteEnded || prepared?.peer.connectionState == .closed { event?(.failed) }
+            return false
+        }
+    }
+
+    private func applyHold() {
+        prepared?.microphone.isEnabled = !muted && !held
+        capture.setHeld(held)
+        _ = rtt?.setPaused(held)
+        if held { clearDtmf() }
+        audioActivated(systemAudioActive)
+        publishPresentation()
+    }
+
     private var dtmfSender: (any RTCDtmfSender)? {
-        guard connected, audioActive, prepared?.peer.connectionState == .connected else { return nil }
+        guard connected, !held, audioActive, prepared?.peer.connectionState == .connected else { return nil }
         return prepared?.peer.senders.first(where: { $0.track is RTCAudioTrack && $0.track?.readyState == .live })?.dtmfSender
     }
 
@@ -166,13 +205,13 @@ final class NativeWebRTCCallMedia: NativeCallMediaDriver {
     }
 
     func setCameraEnabled(_ enabled: Bool) -> Bool {
-        guard profile?.hasVideo == true, capture.setCameraEnabled(enabled) else { return false }
+        guard !held, profile?.hasVideo == true, capture.setCameraEnabled(enabled) else { return false }
         publishPresentation()
         return true
     }
 
     func switchCamera() async -> Bool {
-        guard profile?.hasVideo == true else { return false }
+        guard !held, profile?.hasVideo == true else { return false }
         let switched = await capture.switchCamera()
         publishPresentation()
         return switched
@@ -193,7 +232,7 @@ final class NativeWebRTCCallMedia: NativeCallMediaDriver {
 
     private func refresh() {
         guard let prepared = prepared, let profile = profile else { return }
-        publishPresentation()
+        applyHold()
         if negotiation.remoteEnded { event?(.ended); return }
         if prepared.peer.connectionState == .disconnected {
             clearDtmf()
@@ -248,7 +287,9 @@ final class NativeWebRTCCallMedia: NativeCallMediaDriver {
             rttReady: rtt?.isReady ?? false,
             cameraEnabled: capture.cameraEnabled,
             canSwitchCamera: capture.canSwitchCamera,
-            canSendDtmf: dtmfSender?.canInsertDtmf == true
+            canSendDtmf: dtmfSender?.canInsertDtmf == true,
+            isHeld: held,
+            canHold: connected && !holdPending && prepared.peer.connectionState == .connected
         ))
     }
 }

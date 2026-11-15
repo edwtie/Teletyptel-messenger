@@ -1,5 +1,39 @@
 # TeleTypTel native iOS migration
 
+## Native CallKit/Jingle hold follow-up (2026-11-15)
+
+The native target now handles `CXSetHeldCallAction` through the current connected
+call, native Jingle `session-info` hold/unhold and an acknowledged response.
+The app control requests a CallKit transaction too; it does not change an icon
+while bypassing CallKit. Pending/rejected operations are not reported as held,
+concurrent changes are refused and late results cannot revive an ended/new call.
+Remote hold and local hold are independent. Unsupported peers reject the request
+without inventing successful SIP support; uncertain signaling ends the session.
+
+The driver gates microphone/camera and DTMF while held or awaiting confirmation,
+preserves the previous mute/camera choice and buffers bounded RTT edits for
+resume. Receiving RTT remains possible. The shared T.140 channel retains its
+call identity and rejects post-close flushes. Native iPhone/iPad controls use
+symbols, accessibility labels and a visible pending/held status.
+
+The local experimental gateway translates authenticated full-JID/session-bound
+hold requests into SIP re-INVITE and replies only after validated SIP completion.
+It does not expose the test HTTP bearer token or SIP credentials to the app.
+DNS-SRV and SIP INFO remain gateway-side responsibilities; native DTMF remains
+negotiated WebRTC RTP events. There is no separate iOS SIP registrar or arbitrary
+number routing in this change. The existing route remains local echo 600.
+
+Validation is in progress: selected Swift session/coordinator/transport tests,
+the shared T.140 executable tests and unsigned generic iOS compilation are
+requested separately from simulator, physical-device, camera/audio, CallKit OS
+behavior and actual native-to-Asterisk media tests. No signed build, TestFlight
+upload, live gateway deployment, APNs activation or public provider call is
+authorized by this validation step. A gateway/browser pass is not an iPhone pass.
+The current installed TestFlight app is not silently replaced by this native
+target. Hold signaling follows the bounded informational messages in
+[XEP-0167](https://xmpp.org/extensions/xep-0167.html#info-hold); this does not claim
+full Jingle/SIP or Total Conversation conformity.
+
 Status: isolated native implementation; not yet shipped over the working TestFlight app.
 Requested scope: the complete iPhone and iPad application, including native UI,
 authentication, messaging and Total Conversation. This is a staged rewrite, not a

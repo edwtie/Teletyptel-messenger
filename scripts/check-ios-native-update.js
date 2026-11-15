@@ -9,13 +9,15 @@ function run() {
   const directory = prepare("ios-native-update-" + Date.now());
   const reports = path.join(directory, "reports");
   fs.mkdirSync(reports);
-  const result = { unsigned: true, uploaded: false, scope: "focused contacts, presentation, avatar and Jingle codec logic; no simulator/UI/media tests",
-    swiftTestFilter: "NativeContactTests|NativePresentationTests|NativeServicesTests.testNativeAvatar|NativeJingleMediaTests", swiftUnitTests: false, deviceCompiled: false, uiTests: [] };
+  const result = { unsigned: true, uploaded: false, scope: "focused contacts, presentation, avatar, Jingle codec and native hold logic; no simulator/UI/camera/audio tests",
+    swiftTestFilter: "NativeContactTests|NativePresentationTests|NativeServicesTests.testNativeAvatar|NativeJingleMediaTests|NativeJingleSessionTests|NativeCallCoordinatorTests|NativeJingleTransportTests", swiftUnitTests: false, nativeRttTests: false, deviceCompiled: false, uiTests: [] };
   const logged = (name, command, args) => executeLogged(command, args, { root, reports, name });
   try {
     logged("swift-tests", "swift", ["test", "--package-path", path.join(root, "mobile/ios-native"),
       "--scratch-path", path.join(directory, "SwiftBuild"), "--filter", result.swiftTestFilter]);
     result.swiftUnitTests = true;
+    logged("native-rtt-tests", "node", ["--test", "tests/native-t140.test.js"]);
+    result.nativeRttTests = true;
     logged("device-build", "xcodebuild", ["-project", path.join(directory, "TeleTypTelNative.xcodeproj"),
       "-scheme", "TeleTypTelNative", "-derivedDataPath", path.join(directory, "DerivedData"),
       "CODE_SIGNING_ALLOWED=NO", "-destination", "generic/platform=iOS", "-configuration", "Release", "build"]);

@@ -28,6 +28,9 @@ final class NativeJingleSession {
     private var offered: NativeJingleMedia?
     private var generation = UUID()
     private var released = false
+    private(set) var isLocallyHeld = false
+    private(set) var isRemotelyHeld = false
+    private var holdPending = false
 
     init(role: Role, binding: UUID, peer: String, sid: String, profile: NativeCallMedia,
          signalling: any NativeJingleSending, media: any NativeMediaNegotiating,
@@ -107,6 +110,23 @@ final class NativeJingleSession {
                 try? await signalling.replyJingle(request, rejection: .notAcceptable)
                 await stop()
             }
+        case "session-info":
+            guard phase == .negotiated else {
+                try? await signalling.replyJingle(request, rejection: .unexpectedRequest)
+                return
+            }
+            guard let element = try? request.jingleElement(),
+                  Set(element.attributes.keys).isSubset(of: ["sid", "action", "initiator", "responder"]),
+                  element.children.count == 1, let info = element.children.first,
+                  info.namespace == "urn:xmpp:jingle:apps:rtp:info:1",
+                  ["hold", "unhold", "active"].contains(info.name), info.attributes.isEmpty,
+                  info.children.isEmpty, info.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                try? await signalling.replyJingle(request, rejection: .featureNotImplemented)
+                return
+            }
+            isRemotelyHeld = info.name == "hold"
+            changed(.negotiated)
+            try? await signalling.replyJingle(request, rejection: nil)
         case "session-terminate":
             guard let element = try? request.jingleElement(), Self.validTermination(element, sid: sid) else {
                 try? await signalling.replyJingle(request, rejection: .badRequest)
@@ -135,6 +155,28 @@ final class NativeJingleSession {
         } catch { await stop(); throw error }
     }
 
+    func setHeld(_ held: Bool) async throws {
+        guard phase == .negotiated else { throw NativeJingleFailure.invalidRequest }
+        guard !holdPending else { throw NativeJingleFailure.busy }
+        guard isLocallyHeld != held else { return }
+        let attempt = generation
+        holdPending = true
+        defer { holdPending = false }
+        let info = held ? "hold" : "unhold"
+        let xml = "<jingle xmlns='urn:xmpp:jingle:1' sid='\(sid)' action='session-info'><\(info) xmlns='urn:xmpp:jingle:apps:rtp:info:1'/></jingle>"
+        do {
+            try await signalling.exchangeJingle(binding: binding, xml: xml)
+            try current(attempt)
+            isLocallyHeld = held
+            changed(.negotiated)
+        } catch {
+            if error as? NativeJingleFailure != .rejected && error as? NativeJingleFailure != .busy {
+                await stop(notifyPeer: true)
+            }
+            throw error
+        }
+    }
+
     func stop(notifyPeer: Bool = false) async {
         guard phase != .ended else { return }
         endMedia()
@@ -152,6 +194,8 @@ final class NativeJingleSession {
         generation = UUID()
         incoming = nil
         offered = nil
+        isLocallyHeld = false
+        isRemotelyHeld = false
         phase = .ended
         media.close()
         changed(.ended)

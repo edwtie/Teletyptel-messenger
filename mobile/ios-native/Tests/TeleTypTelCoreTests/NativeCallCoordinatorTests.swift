@@ -28,6 +28,10 @@ private final class CallMediaFixture: NativeCallMediaDriver {
     var muted: [Bool] = []
     var tones: [String] = []
     var dtmfAccepted = true
+    var holds: [Bool] = []
+    var holdAccepted = true
+    var pauseHold = false
+    var pendingHold: CheckedContinuation<Bool, Never>?
     func start(handle: NativeCallHandle, media: NativeCallMedia, event: @escaping (NativeCallMediaEvent) -> Void) {
         handles.append(handle)
         callbacks.append(event)
@@ -36,6 +40,11 @@ private final class CallMediaFixture: NativeCallMediaDriver {
     func audioActivated(_ active: Bool) { activation.append(active) }
     func setMuted(_ muted: Bool) -> Bool { self.muted.append(muted); return true }
     func sendDtmf(_ tone: String) -> Bool { tones.append(tone); return dtmfAccepted }
+    func setHeld(_ held: Bool) async -> Bool {
+        holds.append(held)
+        if pauseHold { return await withCheckedContinuation { pendingHold = $0 } }
+        return holdAccepted
+    }
 }
 
 @MainActor
@@ -66,6 +75,56 @@ private final class CallClockFixture: NativeCallScheduling {
 }
 
 final class NativeCallCoordinatorTests: XCTestCase {
+    @MainActor
+    func testHoldRequiresConnectedExactCallAndPreservesStateOnRejection() async throws {
+        let (coordinator, system, media, _) = fixture()
+        let identifier = try ring(coordinator, system)
+        let ringing = await coordinator.setHeld(id: identifier, held: true)
+        XCTAssertFalse(ringing)
+        coordinator.answer(id: identifier) { _ in }
+        media.callbacks.last?(.ready(.total, contents: ["audio", "video", "rtt"], rttReady: true))
+        let foreign = await coordinator.setHeld(id: UUID(), held: true)
+        XCTAssertFalse(foreign)
+        let held = await coordinator.setHeld(id: identifier, held: true)
+        XCTAssertTrue(held)
+        XCTAssertTrue(coordinator.isHeld)
+        XCTAssertFalse(coordinator.sendDtmf(id: identifier, tone: "1"))
+        media.holdAccepted = false
+        let rejected = await coordinator.setHeld(id: identifier, held: false)
+        XCTAssertFalse(rejected)
+        XCTAssertTrue(coordinator.isHeld)
+        media.holdAccepted = true
+        let resumed = await coordinator.setHeld(id: identifier, held: false)
+        XCTAssertTrue(resumed)
+        XCTAssertFalse(coordinator.isHeld)
+        XCTAssertTrue(coordinator.sendDtmf(id: identifier, tone: "#"))
+        _ = coordinator.end(id: identifier)
+    }
+
+    @MainActor
+    func testLateHoldAfterHangupCannotAffectANewCall() async throws {
+        let (coordinator, system, media, _) = fixture()
+        let identifier = try ring(coordinator, system)
+        coordinator.answer(id: identifier) { _ in }
+        media.callbacks.last?(.ready(.total, contents: ["audio", "video", "rtt"], rttReady: true))
+        media.pauseHold = true
+        let operation = Task { await coordinator.setHeld(id: identifier, held: true) }
+        for _ in 0..<100 where media.pendingHold == nil { await Task.yield() }
+        XCTAssertNotNil(media.pendingHold)
+        XCTAssertTrue(coordinator.holdPending)
+        let concurrent = await coordinator.setHeld(id: identifier, held: false)
+        XCTAssertFalse(concurrent)
+        XCTAssertFalse(coordinator.sendDtmf(id: identifier, tone: "1"))
+        _ = coordinator.end(id: identifier)
+        let next = try ring(coordinator, system)
+        media.pendingHold?.resume(returning: true)
+        media.pendingHold = nil
+        let late = await operation.value
+        XCTAssertFalse(late)
+        XCTAssertFalse(coordinator.isHeld)
+        XCTAssertFalse(coordinator.holdPending)
+        _ = coordinator.end(id: next)
+    }
     @MainActor
     func testDtmfRequiresTheExactConnectedCallAndAnAcceptedMediaOperation() async throws {
         let (coordinator, system, media, _) = fixture()

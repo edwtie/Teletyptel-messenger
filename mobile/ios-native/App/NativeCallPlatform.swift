@@ -43,11 +43,15 @@ private final class NativeCallKitSystem: NativeCallSystem {
         provider.reportOutgoingCall(with: id, connectedAt: Date())
     }
 
-    func setDtmfEnabled(id: UUID, enabled: Bool, hasVideo: Bool) {
+    func requestHeld(id: UUID, held: Bool) {
+        controller.request(CXTransaction(action: CXSetHeldCallAction(call: id, onHold: held))) { _ in }
+    }
+
+    func setDtmfEnabled(id: UUID, enabled: Bool, hasVideo: Bool, canHold: Bool) {
         let update = CXCallUpdate()
         update.supportsDTMF = enabled
         update.hasVideo = hasVideo
-        update.supportsHolding = false
+        update.supportsHolding = canHold
         update.supportsGrouping = false
         update.supportsUngrouping = false
         provider.reportCall(with: id, updated: update)
@@ -72,7 +76,7 @@ final class NativeCallPlatform: NSObject, PKPushRegistryDelegate, CXProviderDele
     private var registration: UUID?
     private var tokenChanged: ((Data?) -> Void)?
     private var account: String?
-    private var dtmfCapability: (id: UUID, enabled: Bool, hasVideo: Bool)?
+    private var dtmfCapability: (id: UUID, enabled: Bool, hasVideo: Bool, canHold: Bool)?
     private(set) var revocationRequired = false
 
     init(media: any NativeCallMediaDriver) {
@@ -151,12 +155,26 @@ final class NativeCallPlatform: NSObject, PKPushRegistryDelegate, CXProviderDele
         tokenChanged = nil
     }
 
-    func setDtmfEnabled(id: UUID, enabled: Bool, hasVideo: Bool) {
+    func setDtmfEnabled(id: UUID, enabled: Bool, hasVideo: Bool, canHold: Bool = false) {
         guard coordinator.currentHandle?.id == id else { return }
         let permitted = enabled && coordinator.isConnected
-        guard dtmfCapability?.id != id || dtmfCapability?.enabled != permitted || dtmfCapability?.hasVideo != hasVideo else { return }
-        dtmfCapability = (id, permitted, hasVideo)
-        system.setDtmfEnabled(id: id, enabled: permitted, hasVideo: hasVideo)
+        let holding = canHold && coordinator.isConnected && !coordinator.holdPending
+        guard dtmfCapability?.id != id || dtmfCapability?.enabled != permitted || dtmfCapability?.hasVideo != hasVideo || dtmfCapability?.canHold != holding else { return }
+        dtmfCapability = (id, permitted, hasVideo, holding)
+        system.setDtmfEnabled(id: id, enabled: permitted, hasVideo: hasVideo, canHold: holding)
+    }
+
+    func requestHeld(id: UUID, held: Bool) {
+        guard coordinator.currentHandle?.id == id, coordinator.isConnected, !coordinator.holdPending else { return }
+        system.requestHeld(id: id, held: held)
+    }
+
+    nonisolated func provider(_ provider: CXProvider, perform action: CXSetHeldCallAction) {
+        Task { @MainActor [weak self] in
+            guard let self = self else { action.fail(); return }
+            if await coordinator.setHeld(id: action.callUUID, held: action.isOnHold) { action.fulfill() }
+            else { action.fail() }
+        }
     }
 
     nonisolated func provider(_ provider: CXProvider, perform action: CXPlayDTMFCallAction) {

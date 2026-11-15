@@ -45,12 +45,12 @@ test("Native address-book selection is explicit and cannot silently upload or di
 test("Native DTMF uses negotiated RTP events and CallKit, never RTT or message signaling", () => {
   for (const source of ["Core/NativeDtmf.swift", "Core/NativePushRegistry.swift"]) assert.ok(projectText().project.includes(source));
   const media = read("App/NativeCallMedia.swift");
-  assert.match(media, /guard connected, audioActive, prepared\?\.peer\.connectionState == \.connected/);
+  assert.match(media, /guard connected, !held, audioActive, prepared\?\.peer\.connectionState == \.connected/);
   assert.match(media, /sender\.canInsertDtmf/);
   assert.match(media, /sender\.remainingTones\(\)/);
   assert.match(media, /return sender\.insertDtmf/);
   const coordinator = read("Sources/TeleTypTelCore/NativeCallCoordinator.swift");
-  assert.match(coordinator, /guard currentHandle\?\.id == id, isConnected, NativeDtmf\.appending/);
+  assert.match(coordinator, /guard currentHandle\?\.id == id, isConnected, !isHeld, !holdPending, NativeDtmf\.appending/);
   assert.match(read("App/NativeCallPlatform.swift"), /action\.type == \.singleTone, coordinator\.sendDtmf/);
   assert.match(read("App/NativeCallPlatform.swift"), /update\.hasVideo = hasVideo/);
   assert.match(read("App/NativeCallPlatform.swift"), /dtmfCapability\?\.enabled != permitted/);

@@ -24,10 +24,12 @@ protocol NativeCallMediaDriver: AnyObject {
     func audioActivated(_ active: Bool)
     func setMuted(_ muted: Bool) -> Bool
     func sendDtmf(_ tone: String) -> Bool
+    func setHeld(_ held: Bool) async -> Bool
 }
 
 extension NativeCallMediaDriver {
     func sendDtmf(_ tone: String) -> Bool { false }
+    func setHeld(_ held: Bool) async -> Bool { false }
 }
 
 @MainActor
@@ -86,6 +88,9 @@ final class NativeCallCoordinator {
     private var outgoing: OutgoingState?
     private var outgoingCompletion: ((Bool) -> Void)?
     var changed: (() -> Void)?
+    private(set) var isHeld = false
+    private(set) var holdPending = false
+    private var holdOperation: UUID?
 
     var currentHandle: NativeCallHandle? { lifecycle.current?.handle ?? outgoing?.handle }
     var isConnected: Bool {
@@ -278,8 +283,24 @@ final class NativeCallCoordinator {
     }
 
     func sendDtmf(id: UUID, tone: String) -> Bool {
-        guard currentHandle?.id == id, isConnected, NativeDtmf.appending(tone, to: "") != nil else { return false }
+        guard currentHandle?.id == id, isConnected, !isHeld, !holdPending, NativeDtmf.appending(tone, to: "") != nil else { return false }
         return media.sendDtmf(tone)
+    }
+
+    func setHeld(id: UUID, held: Bool) async -> Bool {
+        guard let handle = currentHandle, handle.id == id, isConnected, !holdPending else { return false }
+        guard isHeld != held else { return true }
+        let operation = UUID()
+        holdOperation = operation
+        holdPending = true
+        changed?()
+        let accepted = await media.setHeld(held)
+        guard currentHandle == handle, holdOperation == operation else { return false }
+        holdOperation = nil
+        holdPending = false
+        if accepted { isHeld = held }
+        changed?()
+        return accepted
     }
 
     func setMuted(id: UUID, muted: Bool) -> Bool {
@@ -330,6 +351,9 @@ final class NativeCallCoordinator {
     }
 
     private func cleanup(_ handle: NativeCallHandle, reason: NativeCallEndReason) {
+        holdOperation = nil
+        holdPending = false
+        isHeld = false
         deadline?.cancel()
         deadline = nil
         let callback = answerCompletion

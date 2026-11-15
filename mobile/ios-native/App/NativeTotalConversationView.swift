@@ -120,9 +120,10 @@ struct NativeTotalConversationView: View {
                 Text(controller.peerName ?? "TeleTypTel-contact")
                     .font(NativeWebStyle.font(18, weight: .bold))
                     .lineLimit(1)
-                Text(profileName(presentation.profile))
+                Text(controller.holdPending ? "Pauzestatus wordt bevestigd…" : presentation.isHeld ? "Gesprek gepauzeerd · RTT blijft bewaard" : profileName(presentation.profile))
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("call-hold-status")
             }
             Spacer()
             Button { controller.prepareInterpreter(); interpreterOpen = true } label: { Image(systemName: "person.2.wave.2") }
@@ -228,6 +229,11 @@ struct NativeTotalConversationView: View {
                        color: controller.isMuted ? NativeWebStyle.disabled : NativeWebStyle.enabled,
                        label: controller.isMuted ? "Microfoon inschakelen" : "Microfoon dempen",
                        action: controller.toggleMuted)
+            callButton(symbol: controller.holdPending ? "hourglass" : (controller.isHeld ? "play.fill" : "pause.fill"),
+                       color: presentation.isHeld ? NativeWebStyle.disabled : NativeWebStyle.enabled,
+                       label: controller.isHeld ? "Gesprek hervatten" : "Gesprek pauzeren", action: controller.toggleHeld)
+                .disabled(controller.holdPending || !presentation.canHold)
+                .accessibilityIdentifier("call-hold")
             callButton(symbol: "circle.grid.3x3.fill", color: presentation.canSendDtmf ? NativeWebStyle.enabled : NativeWebStyle.disabled,
                        label: "Telefoontoetsen tijdens gesprek") { controlsOpen = false; keypadNotice = nil; keypadOpen = true }
                 .disabled(!presentation.canSendDtmf)
