@@ -108,6 +108,12 @@ injected; no actual Apple request is made. Linux CI separately checks these
 server paths. Live MySQL migration, a real ejabberd producer, new-resource Jingle
 delivery, signed iOS integration and locked-device media acceptance remain open.
 
+Validation snapshot (2026-11-15): the Windows PHP fixture passed 89 assertions,
+including a two-process answer race, and the focused Node server selection
+passed 20 tests with zero skips. PHP/Node transport rejection checks and syntax
+checks passed too. These results use synthetic registrations and do not establish
+live APNs delivery, MySQL concurrency or an answered call on a locked iPhone.
+
 The older baseline below describes the original transport. Its statements that
 no adapter exists are superseded only by the journal-backed policy above, not
 by a claim of a complete, activated ejabberd/PushKit integration.
