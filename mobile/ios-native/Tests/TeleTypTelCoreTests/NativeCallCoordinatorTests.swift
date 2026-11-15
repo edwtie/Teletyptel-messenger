@@ -76,6 +76,33 @@ private final class CallClockFixture: NativeCallScheduling {
 
 final class NativeCallCoordinatorTests: XCTestCase {
     @MainActor
+    func testIntentAllowsBareRecipientButNeverClaimsConnectedBeforeMedia() throws {
+        let (coordinator, system, media, clock) = fixture()
+        XCTAssertNil(coordinator.startOutgoing(peer: "peer@example.test/phone", sid: "invalid-target", media: .total, usingIntent: true) { _ in })
+        let identifier = try XCTUnwrap(coordinator.startOutgoing(peer: "peer@example.test", sid: "call-intent", media: .total, usingIntent: true) { _ in })
+        system.starts[0].completion(true)
+        XCTAssertTrue(coordinator.performStart(id: identifier))
+        clock.advance(to: 1020)
+        XCTAssertNotNil(coordinator.currentHandle)
+        XCTAssertFalse(coordinator.isConnected)
+        media.callbacks[0](.ready(.total, contents: ["audio", "video", "rtt"], rttReady: true))
+        XCTAssertFalse(coordinator.isConnected)
+        coordinator.intentPeerAccepted(id: UUID())
+        XCTAssertEqual(clock.deadlines.last?.at, 1045)
+        coordinator.intentPeerAccepted(id: identifier)
+        XCTAssertEqual(clock.deadlines.last?.at, 1035)
+        clock.advance(to: 1025)
+        coordinator.intentPeerAccepted(id: identifier)
+        XCTAssertEqual(clock.deadlines.last?.at, 1035)
+        media.callbacks[0](.ready(.total, contents: ["audio", "video", "rtt"], rttReady: false))
+        XCTAssertFalse(coordinator.isConnected)
+        clock.advance(to: 1035)
+        media.callbacks[0](.ready(.total, contents: ["audio", "video", "rtt"], rttReady: true))
+        XCTAssertNil(coordinator.currentHandle)
+        XCTAssertTrue(system.connected.isEmpty)
+    }
+
+    @MainActor
     func testHoldRequiresConnectedExactCallAndPreservesStateOnRejection() async throws {
         let (coordinator, system, media, _) = fixture()
         let identifier = try ring(coordinator, system)

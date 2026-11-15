@@ -83,6 +83,7 @@ final class NativeCallController: ObservableObject, NativePushRegistering {
     private var pendingPush: NativeCallInvitation?
     private var warmLease: NativeWarmCallLease?
     private var warmSession: NativeWarmCallSession?
+    private var intentLease: NativeCallIntentLease?
     private var isForeground = true
     var backgroundCallEnded: (() -> Void)?
     var hasLiveCall: Bool { runtime?.platform.coordinator.currentHandle != nil }
@@ -143,6 +144,7 @@ final class NativeCallController: ObservableObject, NativePushRegistering {
         login.onJingle = { [weak self] request, sender in
             self?.receive(request, sender: sender)
         }
+        login.onCallIntent = { [weak self] intent, sender in self?.receive(intent, sender: sender) }
         synchronize(login.phase)
     }
 
@@ -180,6 +182,7 @@ final class NativeCallController: ObservableObject, NativePushRegistering {
     func detach() {
         pushRegistration.logout()
         login?.onJingle = nil
+        login?.onCallIntent = nil
         login = nil
         resetCall()
         account = nil
@@ -248,6 +251,11 @@ final class NativeCallController: ObservableObject, NativePushRegistering {
     }
 
     func startCall(_ contact: NativeContact, profile: NativeCallMedia, videoCodec: String = "VP8") {
+        if let lease = login?.callIntentLease(for: contact.jid) {
+            startIntentCall(contact, profile: profile, videoCodec: videoCodec, lease: lease)
+            return
+        }
+        guard login?.permitsLegacyCall(to: contact.jid) == true else { status = .failed; return }
         guard login?.isBlocked(contact.jid) != true else { return }
         let audioCodec = NativeAudioCodec(rawValue: UserDefaults.standard.string(forKey: NativeAudioCodec.preferenceKey) ?? "") ?? .pcmu
         guard activePeer == nil, prepareTask == nil, account != nil, pendingPush == nil, !hasLiveCall,
@@ -294,6 +302,64 @@ final class NativeCallController: ObservableObject, NativePushRegistering {
             }
             self.prepareTask = nil
         }
+    }
+
+    func canCall(_ contact: NativeContact) -> Bool {
+        guard status == .idle, login?.isConnected == true, login?.isBlocked(contact.jid) == false,
+              login?.chat.preferences.mutedPeers.contains(contact.jid) == false,
+              login?.chat.preferences.doNotDisturb == false else { return false }
+        if login?.callIntentLease(for: contact.jid) != nil { return true }
+        return login?.permitsLegacyCall(to: contact.jid) == true && contact.callEndpoint != nil
+    }
+
+    private func startIntentCall(_ contact: NativeContact, profile: NativeCallMedia, videoCodec: String, lease: NativeCallIntentLease) {
+        guard activePeer == nil, prepareTask == nil, pendingPush == nil, !hasLiveCall,
+              login?.permitsCallIntent(lease, peer: contact.jid) == true else { status = .failed; return }
+        let runtime = ensureRuntime()
+        guard let factory = factory, let capture = capture, let router = router else { status = .failed; return }
+        do {
+            let sid = UUID().uuidString.replacingOccurrences(of: "-", with: "")
+            let audioCodec = NativeAudioCodec(rawValue: UserDefaults.standard.string(forKey: NativeAudioCodec.preferenceKey) ?? "") ?? .pcmu
+            let provider = try NativeIntentPeerNegotiator(lease: lease, peer: contact.jid, sid: sid, profile: profile,
+                factory: factory, videoCodec: videoCodec, audioCodec: audioCodec.rawValue, tracks: { [weak capture] in
+                    guard let tracks = capture?.tracks else { throw NativeMediaCaptureFailure.unavailable }; return tracks
+                }, stopCapture: { [weak capture] in capture?.stop() })
+            guard router.install(provider) else { provider.cancel(notifyPeer: false); throw NativeJingleFailure.busy }
+            activePeer = provider; intentLease = lease; callPeerJID = contact.jid; peerName = contact.displayName
+            status = .calling(contact.displayName)
+            provider.intentEnded = { [weak self] in self?.endCall() }
+            guard let id = runtime.platform.startOutgoing(peer: contact.jid, sid: sid, media: profile, usingIntent: true,
+                completion: { [weak self] success in if !success { self?.resetCall() } }) else { throw NativeJingleFailure.disconnected }
+            activeID = id
+        } catch { resetCall(); status = .failed }
+    }
+
+    private func receive(_ intent: NativeCallIntent, sender: any NativeCallRecoverySending) {
+        if let provider = activePeer as? NativeIntentPeerNegotiator { provider.receive(intent); return }
+        guard intent.action == .propose else { return }
+        if pendingPush?.sid == intent.sid || pushRegistration.consented { return }
+        guard activePeer == nil, prepareTask == nil, !hasLiveCall, account != nil,
+              let peer = NativeChatCodec.bareJID(intent.peer), let profile = intent.media,
+              let lease = login?.callIntentLease(for: peer), login?.permitsCallIntent(lease, peer: peer) == true else {
+            Task { try? await sender.sendCallIntent(action: .reject, peer: intent.peer, sid: intent.sid, media: nil) }; return
+        }
+        let runtime = ensureRuntime()
+        guard let factory = factory, let capture = capture, let router = router else { return }
+        do {
+            let provider = try NativeIntentPeerNegotiator(lease: lease, peer: peer, sid: intent.sid, profile: profile,
+                proposal: intent, factory: factory, tracks: { [weak capture] in
+                    guard let tracks = capture?.tracks else { throw NativeMediaCaptureFailure.unavailable }; return tracks
+                }, stopCapture: { [weak capture] in capture?.stop() })
+            guard router.install(provider) else { provider.cancel(notifyPeer: true); throw NativeJingleFailure.busy }
+            let now = Date().timeIntervalSince1970
+            guard let invitation = NativeCallInvitation(sid: intent.sid, expiresAt: now + 45, media: profile, now: now) else {
+                provider.cancel(notifyPeer: true); router.clear(provider); throw NativeJingleFailure.invalidRequest
+            }
+            activePeer = provider; intentLease = lease; activeID = invitation.id; callPeerJID = peer; peerName = peer
+            status = .ringing(peer)
+            provider.intentEnded = { [weak self] in self?.endCall() }
+            guard runtime.platform.receive(invitation, completion: {}) else { throw NativeJingleFailure.disconnected }
+        } catch { resetCall(); status = .failed }
     }
 
     private func profile(_ request: NativeJingleRequest) throws -> NativeCallMedia {
@@ -356,6 +422,14 @@ final class NativeCallController: ObservableObject, NativePushRegistering {
     private func prepareMedia(handle: NativeCallHandle, profile: NativeCallMedia) async throws {
         if let peer = activePeer {
             guard activeID == handle.id, peer.sid == handle.sid else { throw NativeJingleFailure.staleBinding }
+            if let intent = peer as? NativeIntentPeerNegotiator, let lease = intentLease, let target = callPeerJID {
+                try await intent.prepareSignaling(validate: { [weak self] in
+                    guard let self = self, self.activeID == handle.id, self.activePeer === intent,
+                          self.login?.permitsCallIntent(lease, peer: target) == true else { throw NativeJingleFailure.rejected }
+                })
+                guard activeID == handle.id, activePeer === intent, !intent.remoteEnded else { throw NativeJingleFailure.staleBinding }
+                if intent.outgoing { runtime?.platform.coordinator.intentPeerAccepted(id: handle.id) }
+            }
             return
         }
         guard let invitation = pendingPush, invitation.id == handle.id, invitation.sid == handle.sid,
@@ -459,7 +533,7 @@ final class NativeCallController: ObservableObject, NativePushRegistering {
             let registry = NativePushRegistryClient(session: session, accountID: accountID)
             Task { try? await registry.end(invitation: invitation, registration: registration) }
         }
-        pendingPush = nil; warmLease = nil
+        pendingPush = nil; warmLease = nil; intentLease = nil
         prepareTask?.cancel()
         prepareTask = nil
         let id = activeID ?? runtime?.platform.coordinator.currentHandle?.id

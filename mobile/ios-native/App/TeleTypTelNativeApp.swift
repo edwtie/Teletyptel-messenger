@@ -512,8 +512,8 @@ struct NativeStartupView: View {
                                 .font(.title3)
                                 .frame(width: 44, height: 44)
                         }
-                        .disabled(contact.callEndpoint == nil || calls.status != .idle)
-                        .accessibilityLabel(contact.callEndpoint == nil
+                        .disabled(!calls.canCall(contact))
+                        .accessibilityLabel(!calls.canCall(contact)
                             ? "Oproepen niet beschikbaar voor \(contact.displayName)"
                             : "Bel \(contact.displayName)")
                     }

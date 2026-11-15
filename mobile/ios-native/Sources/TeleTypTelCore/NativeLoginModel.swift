@@ -23,7 +23,12 @@ public final class NativeLoginModel: ObservableObject {
 
     @Published public private(set) var phase: Phase = .idle
     @Published public private(set) var roster: NativeRosterState = .idle
-    @Published public private(set) var chat = NativeChatStore() { didSet { scheduleHistory() } }
+    @Published public private(set) var chat = NativeChatStore() { didSet { scheduleHistory(); synchronizeCallPolicy() } }
+    @Published private(set) var callPolicyState: NativeCallPolicyState = .idle
+    private let callPolicy = NativeCallPolicySync()
+    private var callIntentObservation: Task<Void, Never>?
+    private var earlyCallIntents: [(intent: NativeCallIntent, received: TimeInterval)] = []
+    var onCallIntent: ((NativeCallIntent, any NativeCallRecoverySending) -> Void)?
     @Published public private(set) var historyNotice: String?
     @Published public private(set) var cachedContacts: [NativeContact] = []
     private let history: (any NativeHistoryStoring)?
@@ -78,6 +83,10 @@ public final class NativeLoginModel: ObservableObject {
         self.connection = connection
         self.history = history
         self.reconnectWait = reconnectWait
+        callPolicy.changed = { [weak self] state in
+            self?.callPolicyState = state
+            if state == .ready { self?.flushCallIntents() }
+        }
         groups.receivedMessage = { [weak self] message in
             guard let self = self, !self.chat.preferences.doNotDisturb,
                   !self.chat.preferences.mutedPeers.contains(message.room) else { return }
@@ -126,6 +135,31 @@ public final class NativeLoginModel: ObservableObject {
     var activeJingleSender: (any NativeJingleSending)? {
         guard isConnected, !isBackground else { return nil }
         return jingleSender
+    }
+    var activeCallIntentSender: (any NativeCallRecoverySending)? {
+        guard canSend, callPolicy.usable else { return nil }
+        return jingleSender as? any NativeCallRecoverySending
+    }
+    func usesCallIntents(for peer: String) -> Bool {
+        guard let owner = resumableAccount?.jid, activeCallIntentSender != nil,
+              NativeChatCodec.bareJID(peer) == peer else { return false }
+        return peer.components(separatedBy: "@").last == owner.components(separatedBy: "@").last
+    }
+    func permitsLegacyCall(to peer: String) -> Bool {
+        guard canSend, !isBlocked(peer), !chat.preferences.doNotDisturb,
+              !chat.preferences.mutedPeers.contains(peer) else { return false }
+        if callPolicyState == .unsupported { return true }
+        guard callPolicy.usable, let owner = resumableAccount?.jid else { return false }
+        return peer.components(separatedBy: "@").last != owner.components(separatedBy: "@").last
+    }
+    func callIntentLease(for peer: String) -> NativeCallIntentLease? {
+        guard usesCallIntents(for: peer), let sender = activeCallIntentSender,
+              let owner = resumableAccount?.jid else { return nil }
+        return NativeCallIntentLease(sender: sender, owner: owner, epoch: generation)
+    }
+    func permitsCallIntent(_ lease: NativeCallIntentLease, peer: String) -> Bool {
+        isConnected && generation == lease.epoch && resumableAccount?.jid == lease.owner && callPolicy.usable &&
+            !isBlocked(peer) && !chat.preferences.mutedPeers.contains(peer)
     }
 
     public func setDraft(_ body: String, peer: String) {
@@ -563,6 +597,7 @@ public final class NativeLoginModel: ObservableObject {
                 self.restoreHistory(account)
                 self.configureCloudHistory()
                 self.activateGroups()
+                self.synchronizeCallPolicy()
                 if self.chat.preferences.doNotDisturb, let manager = self.sender as? any NativeContactManaging {
                     try? await manager.setDoNotDisturb(true)
                 }
@@ -682,7 +717,8 @@ public final class NativeLoginModel: ObservableObject {
 
     private func receiveJingle(_ request: NativeJingleRequest, attempt: UUID) {
         guard generation == attempt, phase == .connecting || isConnected else { return }
-        if request.action == "session-initiate", isBlocked(request.peer) || chat.preferences.doNotDisturb {
+        if request.action == "session-initiate", isBlocked(request.peer) || chat.preferences.doNotDisturb ||
+            chat.preferences.mutedPeers.contains(NativeChatCodec.bareJID(request.peer) ?? "") {
             if let sender = jingleSender { Task { try? await sender.replyJingle(request, rejection: .serviceUnavailable) } }
             return
         }
@@ -693,9 +729,54 @@ public final class NativeLoginModel: ObservableObject {
     private func setJingleSender(_ sender: any NativeJingleSending, attempt: UUID) {
         guard generation == attempt, phase == .connecting || isConnected else { return }
         jingleSender = sender
+        synchronizeCallPolicy()
+        if let calls = sender as? any NativeCallRecoverySending {
+            callIntentObservation?.cancel()
+            callIntentObservation = Task { [weak self] in
+                await calls.observeCallIntents { [weak self] intent in
+                    Task { @MainActor in self?.receiveCallIntent(intent, attempt: attempt) }
+                }
+            }
+        }
         let pending = earlyJingle
         earlyJingle.removeAll()
         for request in pending { onJingle?(request, sender) }
+    }
+
+    private func synchronizeCallPolicy() {
+        guard isConnected, let owner = resumableAccount?.jid, let sender = jingleSender else { return }
+        callPolicy.configure(sender: sender as? any NativeCallIntentSending, owner: owner,
+            session: generation, preferences: chat.preferences)
+    }
+
+    private func receiveCallIntent(_ intent: NativeCallIntent, attempt: UUID) {
+        guard generation == attempt, phase == .connecting || isConnected,
+              let calls = jingleSender as? any NativeCallRecoverySending else { return }
+        if phase == .connecting {
+            if earlyCallIntents.count < 8 { earlyCallIntents.append((intent, Date().timeIntervalSince1970)) }
+            return
+        }
+        if intent.action == .propose {
+            guard !isBackground, !isBlocked(intent.peer), !chat.preferences.doNotDisturb,
+                  !chat.preferences.mutedPeers.contains(NativeChatCodec.bareJID(intent.peer) ?? "") else {
+                Task { try? await calls.sendCallIntent(action: .reject, peer: intent.peer, sid: intent.sid, media: nil) }
+                return
+            }
+            if callPolicyState == .synchronizing {
+                if earlyCallIntents.count < 8 { earlyCallIntents.append((intent, Date().timeIntervalSince1970)) }
+                return
+            }
+            guard callPolicy.usable else { return }
+        }
+        onCallIntent?(intent, calls)
+    }
+
+    private func flushCallIntents() {
+        let pending = earlyCallIntents; earlyCallIntents.removeAll()
+        let now = Date().timeIntervalSince1970
+        for entry in pending where now >= entry.received && now - entry.received <= 5 {
+            receiveCallIntent(entry.intent, attempt: generation)
+        }
     }
 
     private func receiveChat(_ event: NativeChatEvent) {
@@ -816,6 +897,8 @@ public final class NativeLoginModel: ObservableObject {
         roster = .idle
         earlyMessages.removeAll()
         earlyJingle.removeAll()
+        callIntentObservation?.cancel(); callIntentObservation = nil
+        earlyCallIntents.removeAll(); callPolicy.reset()
         jingleSender = nil
         sender = nil
         isBackground = false

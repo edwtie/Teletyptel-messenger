@@ -109,9 +109,10 @@ final class NativeCallPlatform: NSObject, PKPushRegistryDelegate, CXProviderDele
 
     @discardableResult
     func startOutgoing(peer: String, sid: String, media: NativeCallMedia,
+                       usingIntent: Bool = false,
                        completion: @escaping (Bool) -> Void) -> UUID? {
         guard registration != nil else { completion(false); return nil }
-        return coordinator.startOutgoing(peer: peer, sid: sid, media: media, completion: completion)
+        return coordinator.startOutgoing(peer: peer, sid: sid, media: media, usingIntent: usingIntent, completion: completion)
     }
 
     @discardableResult

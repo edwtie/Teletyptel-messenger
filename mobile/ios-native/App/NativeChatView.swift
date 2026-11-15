@@ -136,7 +136,7 @@ struct NativeChatView: View {
                                 .frame(width: 44, height: 44)
                         }
                         .buttonStyle(NativeWebIconStyle(prominent: true))
-                        .disabled(contact.callEndpoint == nil || calls.status != .idle)
+                        .disabled(!calls.canCall(contact))
                         .accessibilityLabel("Totale conversatie starten")
                         Menu {
                             Button { contactName = contact.displayName; renameContact = true } label: { Label("Naam wijzigen", systemImage: "pencil") }
@@ -318,10 +318,10 @@ struct NativeChatView: View {
             if draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 Button { startCall(.video) } label: { Image(systemName: "video").frame(width: 40, height: 44) }
                     .buttonStyle(NativeWebIconStyle(round: true))
-                    .accessibilityLabel("Videogesprek starten").disabled(contact.callEndpoint == nil || calls.status != .idle)
+                    .accessibilityLabel("Videogesprek starten").disabled(!calls.canCall(contact))
                 Button { startCall(.audio) } label: { Image(systemName: "mic").frame(width: 40, height: 44) }
                     .buttonStyle(NativeWebIconStyle(round: true))
-                    .accessibilityLabel("Audiogesprek starten").disabled(contact.callEndpoint == nil || calls.status != .idle)
+                    .accessibilityLabel("Audiogesprek starten").disabled(!calls.canCall(contact))
             } else {
                 Button { model.sendDraft(to: contact.jid) } label: { Image(systemName: "paperplane").frame(width: 44, height: 44) }
                     .buttonStyle(NativeWebIconStyle(prominent: true, round: true))
@@ -336,7 +336,7 @@ struct NativeChatView: View {
 
     private func callButton(_ title: String, icon: String, profile: NativeCallMedia) -> some View {
         Button { startCall(profile) } label: { Label(LocalizedStringKey(title), systemImage: icon) }
-            .disabled(contact.callEndpoint == nil || calls.status != .idle)
+            .disabled(!calls.canCall(contact))
     }
 }
 

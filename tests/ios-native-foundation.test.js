@@ -854,7 +854,7 @@ test("CallKit/PushKit sources are included in preview but live registration stay
   assert.match(conversation, /TextField\("Typ realtime tekst"/);
   assert.match(conversation, /\.accessibilityLabel\("Gesprek beëindigen"\)|label: "Gesprek beëindigen"/);
   assert.match(conversation, /foregroundStyle\(\.white\)/);
-  assert.match(read("App/TeleTypTelNativeApp.swift"), /contact\.callEndpoint == nil/);
+  assert.match(read("App/TeleTypTelNativeApp.swift"), /!calls\.canCall\(contact\)/);
   assert.match(read("Sources/TeleTypTelCore/NativeLoginModel.swift"), /var activeJingleSender:/);
   assert.doesNotMatch(conversation, /\.textFieldStyle\(\.roundedBorder\)/);
   assert.doesNotMatch(platform + media, /print\(|NSLog|UserDefaults|setActive\(true/);

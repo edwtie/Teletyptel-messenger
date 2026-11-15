@@ -77,6 +77,8 @@ final class NativeCallCoordinator {
         let media: NativeCallMedia
         var phase: OutgoingPhase
         var deadline: TimeInterval
+        let usingIntent: Bool
+        var preparationCompleted = false
     }
 
     private(set) var lifecycle = NativeCallLifecycle()
@@ -117,15 +119,17 @@ final class NativeCallCoordinator {
 
     @discardableResult
     func startOutgoing(peer: String, sid: String, media requested: NativeCallMedia,
+                       usingIntent: Bool = false,
                        completion: @escaping (Bool) -> Void) -> UUID? {
         guard lifecycle.current == nil, outgoing == nil,
-              NativeJingleTransport.fullJID(peer), NativeJingleTransport.validSID(sid) else {
+              (usingIntent ? NativeChatCodec.bareJID(peer) == peer : NativeJingleTransport.fullJID(peer)),
+              NativeJingleTransport.validSID(sid) else {
             completion(false)
             return nil
         }
         let handle = NativeCallHandle(id: UUID(), sid: sid, generation: lifecycle.generation)
         outgoing = OutgoingState(handle: handle, peer: peer, media: requested,
-                                 phase: .requesting, deadline: clock.now + 20)
+                                 phase: .requesting, deadline: clock.now + (usingIntent ? 45 : 20), usingIntent: usingIntent)
         outgoingCompletion = completion
         scheduleOutgoing(handle)
         changed?()
@@ -150,7 +154,7 @@ final class NativeCallCoordinator {
     func performStart(id: UUID) -> Bool {
         guard var state = outgoing, state.handle.id == id, state.phase == .requesting else { return false }
         state.phase = .connecting
-        state.deadline = min(state.deadline, clock.now + 15)
+        state.deadline = min(state.deadline, clock.now + (state.usingIntent ? 45 : 15))
         outgoing = state
         scheduleOutgoing(state.handle)
         changed?()
@@ -159,6 +163,7 @@ final class NativeCallCoordinator {
             switch event {
             case .ready(let profile, let contents, let rttReady):
                 guard self.outgoing?.phase == .connecting else { return }
+                guard !state.usingIntent || self.outgoing?.preparationCompleted == true else { return }
                 guard self.ready(requested: state.media, negotiated: profile,
                                  contents: contents, rttReady: rttReady) else { return }
                 self.deadline?.cancel()
@@ -173,6 +178,15 @@ final class NativeCallCoordinator {
             }
         }
         return true
+    }
+
+    func intentPeerAccepted(id: UUID) {
+        guard var state = outgoing, state.handle.id == id, state.phase == .connecting,
+              state.usingIntent, !state.preparationCompleted else { return }
+        state.preparationCompleted = true
+        state.deadline = clock.now + 15
+        outgoing = state
+        scheduleOutgoing(state.handle)
     }
 
     func receive(_ data: Data, registration: UUID, completion: @escaping () -> Void) {

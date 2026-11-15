@@ -132,6 +132,7 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
     private var groups: [String: NativeGroupOperation] = [:]
     private var management: [String: (command: NativeGroupCommand, target: String, continuation: CheckedContinuation<NativeGroupReply, Error>, deadline: DispatchWorkItem)] = [:]
     private var contactEdits: [String: (continuation: CheckedContinuation<Void, Error>, deadline: DispatchWorkItem)] = [:]
+    private var callControls: [String: (continuation: CheckedContinuation<Void, Error>, deadline: DispatchWorkItem)] = [:]
     private var contactRequestObserver: (@Sendable ([String]) -> Void)?
     private var contactRequests = Set<String>()
     private var invitationObserver: (@Sendable (NativeGroupInvitationEvent) -> Void)?
@@ -210,13 +211,13 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
 
     func setCallPreferences(enabled: Bool, dnd: Bool, muted: Set<String>) async throws {
         let identifier = "call-policy-" + UUID().uuidString
-        try await editContact(NativeCallIntent.preferences(owner: ownerJID, identifier: identifier,
+        try await exchangeCallControl(NativeCallIntent.preferences(owner: ownerJID, identifier: identifier,
             enabled: enabled, dnd: dnd, muted: muted), identifier: identifier)
     }
 
     func proveCallResource(invitation: NativeCallInvitation, registration: NativePushRegistration) async throws {
         let identifier = "call-proof-" + UUID().uuidString
-        try await editContact(NativeCallIntent.handoff(owner: ownerJID, identifier: identifier,
+        try await exchangeCallControl(NativeCallIntent.handoff(owner: ownerJID, identifier: identifier,
             invitation: invitation, registration: registration), identifier: identifier)
     }
 
@@ -224,6 +225,42 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
         guard let bound = boundJID, let intent = NativeCallIntent.decode(frame, owner: ownerJID, bound: bound) else { return }
         if let observer = callIntentObserver { observer(intent) }
         else if earlyCallIntents.count < 8 { earlyCallIntents.append(intent) }
+    }
+
+    private func exchangeCallControl(_ frame: String, identifier: String) async throws {
+        try Task.checkCancellation()
+        let cancellation = NativeArchiveCancellation()
+        try await withTaskCancellationHandler(operation: {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                queue.async {
+                    guard !cancellation.isCancelled else { continuation.resume(throwing: CancellationError()); return }
+                    guard !self.completed, self.stream.phase == .online else { continuation.resume(throwing: NativeJingleFailure.disconnected); return }
+                    guard self.callControls.count < 2 else { continuation.resume(throwing: NativeCallPolicyFailure.busy); return }
+                    let deadline = DispatchWorkItem { [weak self] in self?.finishCallControl(identifier, error: NativeCallPolicyFailure.timedOut) }
+                    self.callControls[identifier] = (continuation, deadline)
+                    self.queue.asyncAfter(deadline: .now() + 3, execute: deadline)
+                    self.send([frame]) {}
+                }
+            }
+        }, onCancel: { cancellation.cancel(); self.queue.async { self.finishCallControl(identifier, error: CancellationError()) } })
+        try Task.checkCancellation()
+    }
+
+    private func finishCallControl(_ identifier: String, error: Error?) {
+        guard let value = callControls.removeValue(forKey: identifier) else { return }
+        value.deadline.cancel()
+        if let error = error { value.continuation.resume(throwing: error) }
+        else { value.continuation.resume() }
+    }
+
+    private func receiveCallControl(_ frame: String) {
+        guard !callControls.isEmpty, let root = try? ProbeXML.parse(frame), let identifier = root.attributes["id"],
+              callControls[identifier] != nil,
+              let result = NativeCallControlReply.decode(root, identifier: identifier, owner: ownerJID, bound: boundJID) else { return }
+        switch result {
+        case .success: finishCallControl(identifier, error: nil)
+        case .failure(let error): finishCallControl(identifier, error: error)
+        }
     }
 
     func bindCall(peer: String, sid: String) async throws -> UUID {
@@ -830,6 +867,7 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
         earlyInvitations.removeAll()
         for identifier in Array(management.keys) { finishManagement(identifier, result: .failure(error)) }
         for identifier in Array(contactEdits.keys) { finishContact(identifier, error: error) }
+        for identifier in Array(callControls.keys) { finishCallControl(identifier, error: error) }
         contactRequestObserver = nil; contactRequests.removeAll()
         for (room, entry) in Array(groups) { endGroup(room: room, token: entry.token, error: NativeGroupFailure.disconnected, sendLeave: false) }
         boundJID = nil
@@ -896,8 +934,8 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
                     guard case .string(let frame) = try result.get() else { throw ConnectionFailure.invalidResponse }
                     let output = try self.stream.receive(frame)
                     if self.stream.phase == .online {
-                        if !self.callOnly { self.receiveArchive(frame); self.receiveGroups(frame); self.receiveInvitation(frame); self.receiveManagement(frame) }
-                        self.receiveContactEdit(frame); self.receiveCallIntent(frame)
+                        if !self.callOnly { self.receiveArchive(frame); self.receiveGroups(frame); self.receiveInvitation(frame); self.receiveManagement(frame); self.receiveContactEdit(frame) }
+                        self.receiveCallControl(frame); self.receiveCallIntent(frame)
                     }
                     self.send(output.frames) {
                         if let jid = output.connectedJID {
