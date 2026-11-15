@@ -2519,6 +2519,25 @@ Certificate lifecycle uses Apple's documented `add-trusted-cert -r deny` and
 | 7. Remaining parity | translation, interpreter, uploads, contacts, settings | Private opt-in translation of own/remote chat and RTT; no same-language translation or translation after opt-out. Consent-based address book, file/photo sending, staff/interpreter permissions and actual three-party media. External SIP/interpreter/112 connections remain separately gated. |
 | 8. Release migration | current TestFlight workflow and production bundle | Only replace existing app after feature parity, migration/rollback tests and physical iPhone/iPad approval. Existing identities/sessions must not be copied into this unsigned preview. Separate permission for signing and TestFlight. |
 
+## Camera-off RTT layout (2026-11-15)
+
+Native TC now gives the two RTT panes the available call area only when both
+local and remote cameras are known to be off and no interpreter session/video
+needs to remain visible. Portrait stacks the panes; landscape places them next
+to each other. Both panes expand and scroll independently. Incoming text follows
+the latest update; the local editor has no five-line cap in the expanded layout.
+Re-enabling video restores the video layout without replacing the call, clearing
+RTT text, sending a chat message or changing the negotiated media profile.
+
+Remote video state comes from authenticated, exact-session
+[XEP-0167 mute/unmute information](https://xmpp.org/extensions/xep-0167.html#info-mute),
+not black pixels, lost packets or a missing first frame. Native peers now send
+their camera state after negotiation and subsequent changes, including background
+camera suspension. Sender role and negotiated RTP content names are checked;
+an audio mute never hides video or mutes RTT. An unknown/legacy peer state or
+an active interpreter conservatively keeps video space visible. This does not
+implement interpreter camera-state signaling or establish physical-device results.
+
 ## Warm-memory CallKit answer integration (2026-11-15)
 
 `NativeCallController` now routes CallKit answering through `NativeCallMediaGate`

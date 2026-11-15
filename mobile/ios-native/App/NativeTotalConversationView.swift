@@ -2,14 +2,22 @@ import SwiftUI
 import UIKit
 import WebRTC
 
+@MainActor
 struct NativeTotalConversationView: View {
     @ObservedObject var controller: NativeCallController
     @ObservedObject var translation: NativeTranslationModel
+    @ObservedObject private var interpreter: NativeInterpreterSession
     @FocusState private var rttFocused: Bool
     @State private var controlsOpen = false
     @State private var keypadOpen = false
     @State private var keypadNotice: String?
     @State private var interpreterOpen = false
+
+    init(controller: NativeCallController, translation: NativeTranslationModel) {
+        self.controller = controller
+        self.translation = translation
+        self.interpreter = controller.interpreter
+    }
 
     var body: some View {
         GeometryReader { geometry in
@@ -17,14 +25,14 @@ struct NativeTotalConversationView: View {
                 let landscape = geometry.size.width > geometry.size.height
                 let expandedRtt = presentation.profile.expandsRtt(cameraEnabled: presentation.cameraEnabled,
                     remoteCameraEnabled: presentation.remoteCameraEnabled,
-                    interpreterVideo: controller.interpreter.connected || controller.interpreterMedia?.remoteVideo != nil)
+                    interpreterVideo: interpreter.connected || controller.interpreterMedia?.remoteVideo != nil)
                 ZStack {
                     if !expandedRtt { videoCanvas(presentation) }
                     VStack(spacing: 0) {
                         header(presentation)
                         if !expandedRtt { Spacer(minLength: 12) }
                         if let media = controller.interpreterMedia {
-                            HStack { Spacer(); NativeInterpreterTile(session: controller.interpreter, media: media, width: min(190, geometry.size.width * 0.35)) }
+                            HStack { Spacer(); NativeInterpreterTile(session: interpreter, media: media, width: min(190, geometry.size.width * 0.35)) }
                                 .padding(.horizontal, 12)
                         }
                         if presentation.profile.contents.contains("rtt") {
@@ -62,6 +70,7 @@ struct NativeTotalConversationView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(NativeWebStyle.callBackground)
+                .accessibilityElement(children: .contain)
                 .accessibilityIdentifier(expandedRtt ? "tc-expanded-rtt" : "tc-video-layout")
                 .font(NativeWebStyle.font())
                 .statusBarHidden(landscape)
@@ -78,7 +87,7 @@ struct NativeTotalConversationView: View {
         .onChange(of: translation.preferences) { _ in translateCurrentText() }
         .onChange(of: translation.sharingConsent) { _ in translateCurrentText() }
         .sheet(isPresented: $keypadOpen) { callKeypad }
-        .sheet(isPresented: $interpreterOpen) { NativeInterpreterCallView(session: controller.interpreter) }
+        .sheet(isPresented: $interpreterOpen) { NativeInterpreterCallView(session: interpreter) }
         .onChange(of: controller.presentation?.callID) { _ in keypadOpen = false; keypadNotice = nil }
         #if DEBUG
         .onAppear {
@@ -110,8 +119,11 @@ struct NativeTotalConversationView: View {
                 VStack(spacing: 12) {
                     Image(systemName: presentation.profile.hasVideo ? "video.slash.fill" : "waveform")
                         .font(.system(size: 42, weight: .semibold))
-                    Text(presentation.profile.hasVideo ? (presentation.remoteCameraEnabled == false ? "Camera van gesprekspartner uit" : "Video wordt verbonden") : "Audiogesprek")
-                        .font(.headline)
+                    Group {
+                        if !presentation.profile.hasVideo { Text("Audiogesprek") }
+                        else if presentation.remoteCameraEnabled == false { Text("Camera van gesprekspartner uit") }
+                        else { Text("Video wordt verbonden") }
+                    }.font(.headline)
                 }
                 .foregroundStyle(.white.opacity(0.78))
                 .accessibilityElement(children: .combine)
@@ -183,7 +195,7 @@ struct NativeTotalConversationView: View {
                     rttContent(expanded: true, identifier: "tc-peer-scroll") { remoteRttText(presentation) }
                         .onAppear { scroll.scrollTo("tc-peer-tail", anchor: .bottom) }
                         .onChange(of: presentation.remoteText) { _ in scroll.scrollTo("tc-peer-tail", anchor: .bottom) }
-                    }
+                }
             } else { remoteRttText(presentation) }
         }
         .rttPaneStyle(expanded: expanded)
@@ -381,5 +393,6 @@ private extension View {
             .frame(maxWidth: .infinity, maxHeight: expanded ? .infinity : nil, alignment: .topLeading)
             .background(NativeWebStyle.callBackground.opacity(0.94), in: RoundedRectangle(cornerRadius: 8))
             .overlay(RoundedRectangle(cornerRadius: 8).stroke(NativeWebStyle.callLine, lineWidth: 2))
+            .accessibilityElement(children: .contain)
     }
 }

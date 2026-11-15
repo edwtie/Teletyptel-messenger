@@ -794,7 +794,8 @@ test("Camera-off native RTT fills available space only when every known video is
   assert.match(policy, /!cameraEnabled && !interpreterVideo && \(!hasVideo \|\| remoteCameraEnabled == false\)/);
   assert.match(view, /if !expandedRtt \{ videoCanvas\(presentation\) \}/);
   assert.match(view, /maxHeight: expanded \? \.infinity : nil/);
-  assert.match(view, /controller.interpreter.connected \|\| controller.interpreterMedia\?\.remoteVideo != nil/);
+  assert.match(view, /interpreter.connected \|\| controller.interpreterMedia\?\.remoteVideo != nil/);
+  assert.match(view, /@ObservedObject private var interpreter: NativeInterpreterSession/);
   assert.match(view, /presentation.localVideo, presentation.profile.hasVideo, presentation.cameraEnabled/);
   assert.match(view, /"tc-peer-scroll"/);
   assert.match(view, /"tc-own-scroll"/);
