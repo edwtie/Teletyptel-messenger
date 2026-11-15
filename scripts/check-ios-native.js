@@ -52,7 +52,11 @@ function simulatorFamilies(family) {
   return [family];
 }
 
-function runSimulatorChecks({ common, family, destination, deviceID, resultBundle, smokeResultBundle, logged }) {
+function runSimulatorChecks({ common, family, destination, deviceID, resultBundle, smokeResultBundle, tests, logged }) {
+  if (tests !== undefined && (!Array.isArray(tests) || tests.length === 0 ||
+      tests.some(name => typeof name !== "string" || !/^test[A-Za-z0-9]+$/.test(name)))) {
+    throw new Error("Explicit native UI selection must contain test method names");
+  }
   const simulatorArguments = [...common, "-destination", destination,
     "-configuration", "Debug", "ONLY_ACTIVE_ARCH=YES", "-parallel-testing-enabled", "NO"];
   logged(family + "-build", "xcodebuild", [...simulatorArguments, "build-for-testing"]);
@@ -63,6 +67,7 @@ function runSimulatorChecks({ common, family, destination, deviceID, resultBundl
       "-resultBundlePath", smokeResultBundle, "test-without-building"], 600000);
   }
   logged(family + "-tests", "xcodebuild", [...simulatorArguments,
+    ...(tests || []).map(name => "-only-testing:NativeStartupUITests/NativeStartupUITests/" + name),
     "-resultBundlePath", resultBundle, "test-without-building"], 1200000);
 }
 

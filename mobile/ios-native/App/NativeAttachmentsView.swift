@@ -42,10 +42,6 @@ private struct NativeAttachmentPicker: View {
                     Button { importFile = true } label: { Label("Document kiezen", systemImage: "doc") }.disabled(model.progress != nil)
                     Text("Maximaal 20 MB: foto's, PDF, DOC, DOCX, tekst, M4A en MP4. Foto's worden verkleind en zonder oorspronkelijke locatiemetadata als JPEG verstuurd.").font(.caption)
                 }
-                Section("Opnemen") {
-                    NativeCaptureOptions { value in selection = value; link = nil; error = nil }
-                }.disabled(model.progress != nil)
-                Section("Locatie") { NativeLocationOptions { text in stage(text); dismiss() } }
                 if let selected = selection {
                     Section("Controleer voor uploaden") {
                         Text(selected.name)
@@ -63,6 +59,10 @@ private struct NativeAttachmentPicker: View {
                         stage(link); dismiss()
                     } label: { Label("Link in bericht plaatsen", systemImage: "plus.message") }.accessibilityIdentifier("attachment-stage")
                 }
+                Section("Opnamen") {
+                    NativeCaptureOptions { value in selection = value; link = nil; error = nil }
+                }.disabled(model.progress != nil)
+                Section("Locatie") { NativeLocationOptions { text in stage(text); dismiss() } }
             }
             .nativeWebForm()
             .navigationTitle("Bijlage")

@@ -12,6 +12,7 @@ on:
       - scripts/check-ios-native-media.js
       - scripts/check-ios-native-codecs.js
       - scripts/check-ios-native-update.js
+      - scripts/check-ios-native-ui.js
       - scripts/ios-testflight/native-localization.js
       - tests/native-feature-completion.test.js
       - tests/native-g722.test.js
@@ -25,9 +26,9 @@ on:
   workflow_dispatch:
     inputs:
       validation_mode:
-        description: Full existing matrix or focused logic/SDK check without UI tests
+        description: Full matrix or explicitly scoped logic, media or UI regression
         type: choice
-        options: [full, focused-update, focused-media]
+        options: [full, focused-update, focused-media, focused-ui]
         default: full
 
 permissions:
@@ -73,6 +74,8 @@ jobs:
             node scripts/check-ios-native-codecs.js
           elif [ "$TELETYPTEL_NATIVE_VALIDATION_MODE" = "focused-update" ]; then
             node scripts/check-ios-native-update.js
+          elif [ "$TELETYPTEL_NATIVE_VALIDATION_MODE" = "focused-ui" ]; then
+            node scripts/check-ios-native-ui.js
           else
             node scripts/check-ios-native.js
           fi

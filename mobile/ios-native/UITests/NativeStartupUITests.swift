@@ -423,11 +423,16 @@ final class NativeStartupUITests: XCTestCase {
         XCTAssertFalse(application.staticTexts["Fictief groepsbericht"].exists)
     }
 
-    func testConnectionLossIsVisibleWithoutAutomaticRelogin() {
+    func testConnectionLossRecoversWithoutAnotherPasswordPrompt() {
         signInFixture("disconnect")
-        waitForStatus("De XMPP-server reageert niet meer")
-        XCTAssertFalse(application.buttons["disconnect-session"].exists)
-        XCTAssertFalse(application.buttons["login-account"].isEnabled)
+        waitForStatus("Verbinding herstellen…")
+        XCTAssertTrue(application.descendants(matching: .any)["messenger-brand-header"].firstMatch.exists)
+        XCTAssertFalse(application.buttons["login-account"].exists)
+        XCTAssertFalse(application.secureTextFields["account-password"].exists)
+        snapshot("connection-recovering")
+        waitForStatus("XMPP verbonden als fixture@localhost")
+        XCTAssertTrue(application.descendants(matching: .any)["contact-demo-contact@localhost"].firstMatch.exists)
+        XCTAssertFalse(application.buttons["login-account"].exists)
     }
 
     func testWebStyleCallControlsAndRttPanesRemainReachableAcrossRotation() {

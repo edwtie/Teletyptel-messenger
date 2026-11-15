@@ -7,6 +7,36 @@ const { catalog, permissions } = require("../scripts/ios-testflight/native-local
 const root = path.resolve(__dirname, "..");
 const read = file => fs.readFileSync(path.join(root, file), "utf8");
 
+test("Focused simulator regression selects real assertions without pretending to be a full acceptance run", () => {
+  const { selectedTests, run } = require("../scripts/check-ios-native-ui");
+  const { runSimulatorChecks } = require("../scripts/check-ios-native");
+  const methods = read("mobile/ios-native/UITests/NativeStartupUITests.swift");
+  assert.equal(selectedTests.length, 6);
+  for (const name of selectedTests) assert.ok(methods.includes("func " + name + "()"), name);
+  const calls = [];
+  runSimulatorChecks({ common: ["CODE_SIGNING_ALLOWED=NO"], family: "iPad", destination: "fixture", deviceID: "fixture",
+    resultBundle: "fixture.xcresult", tests: selectedTests, logged: (...args) => calls.push(args) });
+  assert.equal(calls.length, 3);
+  const argumentsForTests = calls[2][2];
+  assert.equal(argumentsForTests.filter(value => value.startsWith("-only-testing:")).length, selectedTests.length);
+  assert.ok(argumentsForTests.includes("test-without-building"));
+  assert.throws(() => runSimulatorChecks({ tests: ["../unsafe"], logged() { assert.fail("Must reject before running"); } }));
+  const source = read("scripts/check-ios-native-ui.js");
+  assert.match(source, /physicalDeviceTested: false/);
+  assert.match(source, /uploaded: false/);
+  assert.doesNotMatch(source, /altool|registerForRemoteNotifications|signingPackage|checkMedia\(/);
+  if (process.platform !== "darwin") assert.throws(run, /require macOS/);
+});
+
+test("Attachment review precedes optional capture rows and main-menu sheets wait for menu dismissal", () => {
+  const attachment = read("mobile/ios-native/App/NativeAttachmentsView.swift");
+  assert.ok(attachment.indexOf('accessibilityIdentifier("attachment-stage")') < attachment.indexOf('Section("Opnamen")'));
+  const menu = read("mobile/ios-native/App/NativeTranslationView.swift");
+  assert.match(menu, /afterMenu \{ showGroups = true \}/);
+  assert.match(menu, /menuPresentation\?\.cancel\(\)/);
+  assert.match(menu, /if model\.isReconnecting \{ return "Verbinding herstellen…" \}/);
+});
+
 test("Native static UI has complete Dutch/English resource coverage and an independent language preference", () => {
   const translations = catalog(root);
   for (const language of ["nl", "en"]) assert.ok(translations[language].split("\n").length > 300);

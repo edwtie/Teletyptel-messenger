@@ -91,7 +91,8 @@ struct NativeStartupView: View {
            ["connected", "two-factor", "disconnect", "invitations"].contains(scenario) {
             let fixture = NativeLoginUIFixture(scenario: scenario)
             _model = StateObject(wrappedValue: NativeStartupModel(checker: fixture))
-            _loginModel = StateObject(wrappedValue: NativeLoginModel(checker: fixture, authenticator: fixture, connection: fixture))
+            _loginModel = StateObject(wrappedValue: NativeLoginModel(checker: fixture, authenticator: fixture, connection: fixture,
+                reconnectWait: { _ in try await Task.sleep(nanoseconds: 2_000_000_000) }))
             _savedLogin = StateObject(wrappedValue: NativeSavedLoginModel(vault: NativeBiometricLoginVault(enabled: false)))
             _address = State(initialValue: "https://example.invalid")
             _domain = State(initialValue: "localhost")
@@ -590,8 +591,16 @@ struct NativeStartupView: View {
 }
 
 #if DEBUG
+private actor NativeLoginUIConnectionCount {
+    private var count = 0
+    func next() -> Int { count += 1; return count }
+}
+
 private struct NativeLoginUIFixture: ServerChecking, NativeAccountChallenging, NativeXMPPConnecting {
     let scenario: String
+    private let connections = NativeLoginUIConnectionCount()
+
+    init(scenario: String) { self.scenario = scenario }
 
     func begin(configuration: ServerConfiguration, jid: String, password: String) async throws -> NativeAccountLoginStep {
         if scenario == "two-factor" {
@@ -644,9 +653,10 @@ private struct NativeLoginUIFixture: ServerChecking, NativeAccountChallenging, N
     }
 
     func run(account: NativeAuthenticatedAccount, onConnected: @escaping @Sendable (String) -> Void) async throws {
+        let connectionNumber = await connections.next()
         try await Task.sleep(nanoseconds: 150_000_000)
         onConnected(account.jid + "/ui-fixture")
-        if scenario == "disconnect" {
+        if scenario == "disconnect", connectionNumber == 1 {
             try await Task.sleep(nanoseconds: 3_000_000_000)
             throw XMPPSessionFailure.heartbeatTimeout
         }

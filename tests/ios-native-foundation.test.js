@@ -431,7 +431,8 @@ test("Native login UI has cancellation, private input and Debug-only offline fix
     'loginModel.disconnect()', 'loginModel.suspend()', 'fixture-banner', 'geen echte serververbinding'])
     assert.ok(app.includes(required), required);
   assert.match(app, /#if DEBUG\s+if let scenario = ProcessInfo/);
-  assert.match(app, /#if DEBUG\s+private struct NativeLoginUIFixture/);
+  assert.match(app, /#if DEBUG\s+private actor NativeLoginUIConnectionCount[\s\S]*?private struct NativeLoginUIFixture/);
+  assert.match(app, /scenario == "disconnect", connectionNumber == 1/);
   for (const required of ['self.generation == attempt', 'self.phase == .connecting', 'task?.cancel()',
     'account.jid == jid', 'account.configuration == configuration', 'parts[0] == jid', 'Task.isCancelled'])
     assert.ok(model.includes(required), required);

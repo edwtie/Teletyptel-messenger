@@ -96,6 +96,7 @@ struct NativeMessengerView: View {
     @State private var showNewContact = false
     @State private var showAppearance = false
     @State private var historyBrowser: String?
+    @State private var menuPresentation: Task<Void, Never>?
     @StateObject private var avatars = NativeAvatarCache()
     @StateObject private var archive = NativeConversationArchive()
     @StateObject private var contactRequests = NativeContactRequests()
@@ -136,7 +137,7 @@ struct NativeMessengerView: View {
         .task(id: model.canSend) { loadAvatars() }
         .onChange(of: model.roster) { _ in loadAvatars() }
         .onChange(of: showAccount) { if !$0 { avatars.refreshOwner() } }
-        .onDisappear { NativeAvatarImages.clear() }
+        .onDisappear { menuPresentation?.cancel(); menuPresentation = nil; NativeAvatarImages.clear() }
         .task(id: model.canSend) { contactRequests.configure(model.contactManager) }
     }
 
@@ -306,15 +307,15 @@ struct NativeMessengerView: View {
             }
             Menu {
                 Section("Communicatie") {
-                    Button { showDialer = true } label: { Label("Nummer bellen", systemImage: "phone") }.accessibilityIdentifier("open-number-dialer")
-                    Button { showGroups = true } label: { Label("Groepschats", systemImage: "person.3") }.accessibilityIdentifier("open-groups")
-                    Button { historyBrowser = "history" } label: { Label("Geschiedenis", systemImage: "clock") }
-                    Button { historyBrowser = "archive" } label: { Label("Archief", systemImage: "archivebox") }
+                    Button { afterMenu { showDialer = true } } label: { Label("Nummer bellen", systemImage: "phone") }.accessibilityIdentifier("open-number-dialer")
+                    Button { afterMenu { showGroups = true } } label: { Label("Groepschats", systemImage: "person.3") }.accessibilityIdentifier("open-groups")
+                    Button { afterMenu { historyBrowser = "history" } } label: { Label("Geschiedenis", systemImage: "clock") }
+                    Button { afterMenu { historyBrowser = "archive" } } label: { Label("Archief", systemImage: "archivebox") }
                 }
                 Section("Instellingen") {
-                    Button { showAppearance = true } label: { Label("Weergave", systemImage: "circle.lefthalf.filled") }
-                    Button { showAccount = true } label: { Label("Accountinstellingen", systemImage: "gearshape") }.accessibilityIdentifier("open-account-settings")
-                    Button { showTranslation = true } label: { Label("Vertaling", systemImage: "globe") }
+                    Button { afterMenu { showAppearance = true } } label: { Label("Weergave", systemImage: "circle.lefthalf.filled") }
+                    Button { afterMenu { showAccount = true } } label: { Label("Accountinstellingen", systemImage: "gearshape") }.accessibilityIdentifier("open-account-settings")
+                    Button { afterMenu { showTranslation = true } } label: { Label("Vertaling", systemImage: "globe") }
                 }
                 Button(role: .destructive, action: logout) { Label("Uitloggen", systemImage: "rectangle.portrait.and.arrow.right") }.accessibilityIdentifier("menu-logout")
             } label: { Image(systemName: "line.3.horizontal") }
@@ -326,6 +327,16 @@ struct NativeMessengerView: View {
         .overlay(alignment: .bottom) { NativeWebStyle.line.frame(height: 1) }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("messenger-brand-header")
+    }
+
+    private func afterMenu(_ action: @escaping @MainActor () -> Void) {
+        menuPresentation?.cancel()
+        menuPresentation = Task { @MainActor in
+            do { try await Task.sleep(nanoseconds: 250_000_000) } catch { return }
+            guard !Task.isCancelled, model.currentOwner != nil else { return }
+            action()
+            menuPresentation = nil
+        }
     }
 
     private func loadAvatars() {
@@ -347,6 +358,7 @@ struct NativeMessengerView: View {
     }
 
     private var connectionStatus: String {
+        if model.isReconnecting { return "Verbinding herstellen…" }
         if case .connected(let jid) = model.phase { return "XMPP verbonden als " + jid }
         return "Niet verbonden"
     }
