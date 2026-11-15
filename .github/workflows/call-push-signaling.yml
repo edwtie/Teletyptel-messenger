@@ -24,6 +24,7 @@ on:
       - mobile/ios-native/Sources/TeleTypTelCore/NativeXMPPConnection.swift
       - mobile/ios-native/Tests/TeleTypTelCoreTests/NativeCallIntentTests.swift
       - mobile/ios-native/Tests/TeleTypTelCoreTests/NativeCallPolicyTests.swift
+      - mobile/ios-native/Tests/TeleTypTelCoreTests/NativeCallRoutingTests.swift
       - mobile/ios-native/Tests/TeleTypTelCoreTests/NativeCallIntentSessionTests.swift
       - mobile/ios-native/Tests/TeleTypTelCoreTests/NativePushRegistryTests.swift
       - mobile/ios-native/Tests/TeleTypTelCoreTests/NativeWarmCallTests.swift
@@ -74,4 +75,4 @@ jobs:
           test -n "$XCODE_PATH"
           echo "DEVELOPER_DIR=$XCODE_PATH/Contents/Developer" >> "$GITHUB_ENV"
       - name: Check native intent, reservation, cancellation and binding logic
-        run: swift test --package-path mobile/ios-native --filter 'NativeCallIntentTests|NativeCallPolicyTests|NativeCallIntentSessionTests|NativeCallAnswerRecoveryTests|NativePushRegistryTests|NativeJingleTransportTests|NativeWarmCallTests|NativeCallMediaGateTests|NativePushRegistrationModelTests|XMPPSessionTests'
+        run: swift test --package-path mobile/ios-native --filter 'NativeCallIntentTests|NativeCallPolicyTests|NativeCallRoutingTests|NativeCallIntentSessionTests|NativeCallAnswerRecoveryTests|NativePushRegistryTests|NativeJingleTransportTests|NativeWarmCallTests|NativeCallMediaGateTests|NativePushRegistrationModelTests|XMPPSessionTests'

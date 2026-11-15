@@ -48,7 +48,8 @@ final class NativeCallIntentSessionTests: XCTestCase {
                 lines += ["a=sendrecv", "a=rtcp-mux", kind == "audio" ? "a=rtpmap:0 PCMU/8000" : "a=rtpmap:96 VP8/90000"]
                 if kind == "video" { lines += ["a=rtcp-fb:96 nack", "a=rtcp-fb:96 nack pli"] }
             }
-            lines += ["a=ice-ufrag:abcd", "a=ice-pwd:abcdefghijklmnopqrstuv", "a=fingerprint:sha-256 " + Array(repeating: "AB", count: 32).joined(separator: ":"), "a=setup:actpass"]
+            lines += ["a=ice-ufrag:abcd", "a=ice-pwd:abcdefghijklmnopqrstuv", "a=fingerprint:sha-256 " + Array(repeating: "AB", count: 32).joined(separator: ":"), "a=setup:actpass",
+                "a=candidate:1 1 udp 2122260223 127.0.0.1 50000 typ host generation 0", "a=end-of-candidates"]
         }
         return (lines + [""]).joined(separator: "\r\n")
     }
