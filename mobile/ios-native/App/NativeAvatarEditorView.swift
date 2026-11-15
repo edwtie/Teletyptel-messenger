@@ -94,7 +94,7 @@ struct NativeAvatarEditorView: View {
                     guard !Task.isCancelled else { return }
                     guard let decoded = value.thumbnail() else { error = "Deze foto kan niet veilig worden verwerkt."; return }
                     image = decoded; zoom = 1; offset = .zero; dragStart = .zero
-                } catch { if !Task.isCancelled { error = "Foto niet geladen. Kies een andere foto van maximaal 20 MB." } }
+                } catch { if !Task.isCancelled { self.error = "Foto niet geladen. Kies een andere foto van maximaal 20 MB." } }
             }
         }
         .confirmationDialog("Profielfoto verwijderen?", isPresented: $deleting, titleVisibility: .visible) {
