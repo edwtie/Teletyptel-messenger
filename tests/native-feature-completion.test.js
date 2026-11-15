@@ -2,6 +2,7 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
+const { execFileSync } = require("node:child_process");
 const { catalog, permissions } = require("../scripts/ios-testflight/native-localization");
 const root = path.resolve(__dirname, "..");
 const read = file => fs.readFileSync(path.join(root, file), "utf8");
@@ -66,4 +67,21 @@ test("Reconnect is bounded, cancellable and cannot bypass certificate or authent
   assert.match(source, /let keepAccount = isConnected \|\| isReconnecting/);
   assert.doesNotMatch(source, /transient = .*certificate/);
   assert.match(source, /chat\.markRead\(identifiers\)\s+guard canSend, chat\.preferences\.sendDisplayed/);
+});
+
+test("Password changes use an authenticated preserving server action instead of generic profile save", context => {
+  const route = read("php/public/api/account.php");
+  const action = route.slice(route.indexOf("function changeAccountPassword"), route.indexOf("function createAccount"));
+  assert.match(action, /AccountAccess::guardSession/);
+  assert.match(action, /isCurrentServerSession/);
+  assert.match(action, /verifyAccountPassword/);
+  assert.match(action, /NativeAccountPasswordChange::input\(rowToAccount\(\$existing\), \$input\)/);
+  assert.match(read("mobile/ios-native/Sources/TeleTypTelCore/NativeAccountLifecycle.swift"), /"action": "change_password"/);
+  let php;
+  for (const candidate of [process.env.PHP_BINARY, "C:/wamp64/bin/php/php8.4.15/php.exe", "php"].filter(Boolean)) {
+    try { execFileSync(candidate, ["--version"], { timeout: 10000, stdio: "pipe" }); php = candidate; break; } catch {}
+  }
+  if (!php) { context.skip("PHP runtime unavailable; source guards still ran"); return; }
+  const output = execFileSync(php, [path.join(root, "php/tests/native-password-change-test.php")], { timeout: 10000, encoding: "utf8" });
+  assert.match(output, /preserves profile, avatar, provider, XMPP and storage settings/);
 });

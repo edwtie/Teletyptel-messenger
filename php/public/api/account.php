@@ -62,6 +62,11 @@ function writeAccount(): void
         return;
     }
 
+    if (($input['action'] ?? 'save') === 'change_password') {
+        changeAccountPassword($input);
+        return;
+    }
+
     if (($input['action'] ?? 'save') === 'request_password_reset') {
         requestPasswordReset($input);
         return;
@@ -318,6 +323,31 @@ function saveAccount(array $input): void
     }
     unset($account['password_secret']);
     echo json_encode(['ok' => true, 'account' => accountToClient($account)], JSON_UNESCAPED_SLASHES);
+}
+
+function changeAccountPassword(array $input): void
+{
+    $pdo = Database::connect();
+    AccountAccess::guardSession($pdo, $_SESSION);
+    ensureAccountProfileSchema($pdo);
+    $existing = findExistingAccount($pdo, $input);
+    $current = $input['currentPassword'] ?? null;
+    if (!$existing || !isCurrentServerSession((string)$existing['account_id'])
+        || !is_string($current) || $current === '' || strlen($current) > 1024
+        || !verifyAccountPassword($pdo, $existing, $current)) {
+        http_response_code(401);
+        echo json_encode(['ok' => false, 'error' => 'invalid_credentials']);
+        return;
+    }
+    require_once dirname(__DIR__, 2) . '/lib/NativeAccountPasswordChange.php';
+    try {
+        $preserved = NativeAccountPasswordChange::input(rowToAccount($existing), $input);
+    } catch (InvalidArgumentException) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'invalid_password_change']);
+        return;
+    }
+    saveAccount($preserved);
 }
 
 function createAccount(array $input): void

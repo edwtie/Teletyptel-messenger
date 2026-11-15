@@ -76,7 +76,7 @@ final class NativeAccountLifecycle: ObservableObject {
     }
 
     func confirmTwoFactor(session: NativeAccountWebSession, accountID: String, code: String) async {
-        guard setupSecret != nil, let expiry = setupExpiry, expiry > Date(), code.range(of: "\\A[0-9]{6}\\z", options: .regularExpression) != nil else {
+        guard twoFactorEnabled == false, setupExpiry == nil || setupExpiry! > Date(), code.range(of: "\\A[0-9]{6}\\z", options: .regularExpression) != nil else {
             setupSecret = nil; setupExpiry = nil; status = "Verificatie verlopen of code ongeldig. Haal de beveiligingsstatus opnieuw op."; return
         }
         _ = await perform {
@@ -91,8 +91,8 @@ final class NativeAccountLifecycle: ObservableObject {
     func changePassword(session: NativeAccountWebSession, accountID: String, jid: String, current: String, password: String) async -> Bool {
         await perform {
             guard !current.isEmpty, current.utf8.count <= 1024, current != password, Self.validPassword(password) else { throw NativeAccountFailure.rejected }
-            let data = try JSONSerialization.data(withJSONObject: ["action": "save", "accountId": accountID, "jid": jid,
-                "currentPassword": current, "password": password, "rememberPassword": false])
+            let data = try JSONSerialization.data(withJSONObject: ["action": "change_password", "accountId": accountID, "jid": jid,
+                "currentPassword": current, "password": password])
             let reply = try await self.fetch(session, body: data)
             guard reply.ok, reply.account?.accountId == accountID, reply.account?.jid == jid else { throw NativeAccountFailure.invalidResponse }
             return "Wachtwoord gewijzigd. Meld opnieuw aan; de oude bewaarde aanmelding wordt verwijderd."

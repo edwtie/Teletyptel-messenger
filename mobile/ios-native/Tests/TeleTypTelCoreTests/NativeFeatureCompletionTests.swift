@@ -16,6 +16,22 @@ private final class FeatureHTTPFixture: URLProtocol {
         } catch { client?.urlProtocol(self, didFailWithError: error) }
     }
     override func stopLoading() {}
+
+    static func body(_ request: URLRequest) throws -> [String: Any] {
+        var data = request.httpBody ?? Data()
+        if data.isEmpty, let stream = request.httpBodyStream {
+            stream.open()
+            defer { stream.close() }
+            var buffer = [UInt8](repeating: 0, count: 1024)
+            while true {
+                let count = stream.read(&buffer, maxLength: buffer.count)
+                guard count >= 0, data.count + count <= 32768 else { throw NativeAccountFailure.invalidResponse }
+                if count == 0 { break }
+                data.append(contentsOf: buffer.prefix(count))
+            }
+        }
+        return try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    }
 }
 
 final class NativeFeatureCompletionTests: XCTestCase {
@@ -123,5 +139,47 @@ final class NativeFeatureCompletionTests: XCTestCase {
         group.messages[0].retracted = false
         group.messages[0].locallyRead = nil
         XCTAssertEqual(group.unreadCount, 0)
+    }
+
+    @MainActor
+    func testPasswordChangeRequiresDedicatedServerActionAndDoesNotResaveProfile() async throws {
+        let settings = URLSessionConfiguration.ephemeral
+        settings.protocolClasses = [FeatureHTTPFixture.self]
+        let session = NativeAccountWebSession(configuration: try ServerConfiguration(address: "https://example.invalid", domain: "localhost"), settings: settings)
+        let model = NativeAccountLifecycle()
+        FeatureHTTPFixture.handler = { request in
+            let body = try FeatureHTTPFixture.body(request)
+            XCTAssertEqual(body["action"] as? String, "change_password")
+            XCTAssertEqual(body["currentPassword"] as? String, "OldFictional123!")
+            XCTAssertNil(body["displayName"])
+            XCTAssertNil(body["avatarDataUrl"])
+            XCTAssertNil(body["rememberPassword"])
+            return ["ok": true, "account": ["accountId": "fictional", "jid": "owner@localhost"]]
+        }
+        let changed = await model.changePassword(session: session, accountID: "fictional", jid: "owner@localhost", current: "OldFictional123!", password: "NewFictional123!")
+        XCTAssertTrue(changed)
+        FeatureHTTPFixture.handler = nil
+        await session.close()
+    }
+
+    @MainActor
+    func testReturningFromAuthenticatorCanConfirmExistingServerSetupWithoutReplacingKey() async throws {
+        let settings = URLSessionConfiguration.ephemeral
+        settings.protocolClasses = [FeatureHTTPFixture.self]
+        let session = NativeAccountWebSession(configuration: try ServerConfiguration(address: "https://example.invalid", domain: "localhost"), settings: settings)
+        let model = NativeAccountLifecycle()
+        FeatureHTTPFixture.handler = { _ in ["ok": true, "account": ["accountId": "fictional", "jid": "owner@localhost", "twoFactorEnabled": false]] }
+        await model.loadSecurity(session: session, accountID: "fictional", jid: "owner@localhost")
+        XCTAssertNil(model.setupSecret)
+        FeatureHTTPFixture.handler = { request in
+            let body = try FeatureHTTPFixture.body(request)
+            XCTAssertEqual(body["action"] as? String, "confirm_two_factor_setup")
+            XCTAssertEqual(body["code"] as? String, "123456")
+            return ["ok": true]
+        }
+        await model.confirmTwoFactor(session: session, accountID: "fictional", code: "123456")
+        XCTAssertEqual(model.twoFactorEnabled, true)
+        FeatureHTTPFixture.handler = nil
+        await session.close()
     }
 }

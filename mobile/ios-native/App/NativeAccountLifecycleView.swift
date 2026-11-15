@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct NativeAccountEntryView: View {
     let configuration: ServerConfiguration
@@ -83,6 +84,12 @@ struct NativeAccountSecurityView: View {
                     if let secret = model.setupSecret {
                         Text("Voer deze sleutel handmatig in je authenticator in. Deel hem niet.").font(.caption)
                         Text(secret).font(.system(.body, design: .monospaced)).privacySensitive()
+                        Button("Sleutel kopiëren") {
+                            UIPasteboard.general.setItems([[UIPasteboard.typeAutomatic: secret]], options: [.localOnly: true, .expirationDate: Date().addingTimeInterval(60)])
+                        }
+                    }
+                    if model.twoFactorEnabled == false {
+                        Text("Al een sleutel toegevoegd aan je authenticator? Bevestig de code zonder opnieuw een sleutel aan te vragen.").font(.caption)
                         SecureField("Zescijferige code", text: $code).keyboardType(.numberPad).textContentType(.oneTimeCode)
                         Button("Bevestigen") {
                             guard let session = login.activeWebSession, let account = login.activeAccountID else { return }

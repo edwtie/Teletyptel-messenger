@@ -8,6 +8,8 @@
   "Minimaal 10 tekens, met een kleine letter, hoofdletter, cijfer en speciaal teken. Na wijzigen meld je opnieuw aan.": "At least 10 characters, including a lowercase letter, uppercase letter, number and special character. Sign in again after changing it.",
   "Tweestapsverificatie": "Two-step verification",
   "Authenticator instellen": "Set up authenticator",
+  "Sleutel kopiëren": "Copy key",
+  "Al een sleutel toegevoegd aan je authenticator? Bevestig de code zonder opnieuw een sleutel aan te vragen.": "Already added a key to your authenticator? Confirm its code without requesting a new key.",
   "Voer deze sleutel handmatig in je authenticator in. Deel hem niet.": "Enter this key in your authenticator manually. Do not share it.",
   "Zescijferige code": "Six-digit code",
   "Bevestigen": "Confirm",
