@@ -8,10 +8,13 @@ const root = path.resolve(__dirname, "..");
 const read = file => fs.readFileSync(path.join(root, file), "utf8");
 
 test("Focused simulator regression selects real assertions without pretending to be a full acceptance run", () => {
-  const { selectedTests, run } = require("../scripts/check-ios-native-ui");
+  const { selectedTests, run, testsForScope } = require("../scripts/check-ios-native-ui");
   const { runSimulatorChecks } = require("../scripts/check-ios-native");
   const methods = read("mobile/ios-native/UITests/NativeStartupUITests.swift");
   assert.equal(selectedTests.length, 7);
+  assert.deepEqual(testsForScope(), selectedTests);
+  assert.deepEqual(testsForScope("groups"), ["testGroupDiscoveryManagementAndSessionSearch", "testExistingGroupJoinSendRotationAndLeave"]);
+  assert.throws(() => testsForScope("silently-skip"), /Unsupported/);
   for (const name of selectedTests) assert.ok(methods.includes("func " + name + "()"), name);
   const calls = [];
   runSimulatorChecks({ common: ["CODE_SIGNING_ALLOWED=NO"], family: "iPad", destination: "fixture", deviceID: "fixture",
@@ -38,6 +41,11 @@ test("Attachment review precedes optional capture rows and main-menu sheets wait
   const groups = read("mobile/ios-native/App/NativeGroupsView.swift");
   assert.match(groups, /accessibilityIdentifier\("group-messages-" \+ room\)\s+\.contentShape\(Rectangle\(\)\)/);
   assert.match(read("mobile/ios-native/App/NativeAppearanceView.swift"), /allowsHitTesting\(false\)\.accessibilityHidden\(true\)/);
+  const groupSearchTest = read("mobile/ios-native/UITests/NativeStartupUITests.swift")
+    .split("func testGroupDiscoveryManagementAndSessionSearch() {")[1].split("\n    func test")[0];
+  assert.match(groupSearchTest, /let messages = application\.scrollViews\["group-messages-fixture@conference\.localhost"\]/);
+  assert.match(groupSearchTest, /XCTAssertTrue\(messages\.staticTexts\["Fictief groepsbericht"\]\.waitForExistence/);
+  assert.match(groupSearchTest, /evaluatedWith: messages\.staticTexts/);
 });
 
 test("Native static UI has complete Dutch/English resource coverage and an independent language preference", () => {

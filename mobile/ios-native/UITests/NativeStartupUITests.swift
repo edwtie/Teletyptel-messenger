@@ -342,9 +342,6 @@ final class NativeStartupUITests: XCTestCase {
         reveal(accept); XCTAssertTrue(accept.isEnabled); accept.tap()
         let room = application.descendants(matching: .any)["group-room-fixture@conference.localhost"].firstMatch
         XCTAssertTrue(room.waitForExistence(timeout: 5)); reveal(room); room.tap()
-        let messages = application.scrollViews["group-messages-fixture@conference.localhost"].firstMatch
-        XCTAssertTrue(messages.waitForExistence(timeout: 5))
-        XCTAssertTrue(messages.staticTexts["Fictief groepsbericht"].waitForExistence(timeout: 5))
         XCTAssertTrue(application.staticTexts["group-status"].waitForExistence(timeout: 5))
         application.buttons["group-invite"].tap()
         let contact = application.buttons["invite-contact-demo-contact@localhost"]
@@ -408,6 +405,9 @@ final class NativeStartupUITests: XCTestCase {
         let join = application.buttons["group-join"]; reveal(join); join.tap()
         let room = application.descendants(matching: .any)["group-room-fixture@conference.localhost"].firstMatch
         XCTAssertTrue(room.waitForExistence(timeout: 5)); reveal(room); room.tap()
+        let messages = application.scrollViews["group-messages-fixture@conference.localhost"].firstMatch
+        XCTAssertTrue(messages.waitForExistence(timeout: 5))
+        XCTAssertTrue(messages.staticTexts["Fictief groepsbericht"].waitForExistence(timeout: 5))
         application.buttons["Deelnemers en groepsmenu"].tap(); application.buttons["Deelnemers en groepsbeheer"].tap()
         let settings = application.buttons["Instellingen ophalen"]
         reveal(settings); XCTAssertTrue(settings.waitForExistence(timeout: 5)); settings.tap()

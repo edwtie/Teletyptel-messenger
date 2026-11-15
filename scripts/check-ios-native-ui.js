@@ -13,8 +13,16 @@ const selectedTests = Object.freeze([
   "testNativeLoginAndDisconnectPreserveStateAcrossRotation"
 ]);
 
+function testsForScope(scope = "regression") {
+  if (scope === "regression") return selectedTests;
+  if (scope === "groups") return selectedTests.filter(name => name.includes("Group"));
+  throw new Error("Unsupported native UI scope");
+}
+
 function run() {
   if (process.platform !== "darwin") throw new Error("Native UI checks require macOS/Xcode");
+  const scope = process.env.TELETYPTEL_NATIVE_UI_SCOPE || "regression";
+  const tests = testsForScope(scope);
   const families = simulatorFamilies(process.env.TELETYPTEL_NATIVE_TEST_FAMILY);
   const root = path.resolve(__dirname, "..");
   const directory = prepare("ios-native-check-" + Date.now());
@@ -22,7 +30,7 @@ function run() {
   fs.mkdirSync(reports);
   const result = { unsigned: true, uploaded: false, physicalDeviceTested: false,
     scope: "focused simulator UI regression; not a full unit, media or device SDK run",
-    selectedTests, uiTests: [] };
+    uiScope: scope, selectedTests: tests, uiTests: [] };
   const logged = (name, command, args, timeout) => executeLogged(command, args, { root, reports, name, timeout });
   try {
     const inventory = JSON.parse(logged("simulator-inventory", "xcrun", ["simctl", "list", "devices", "available", "--json"]));
@@ -37,7 +45,7 @@ function run() {
       const resultBundle = path.join(reports, family + ".xcresult");
       let passed = false;
       try {
-        runSimulatorChecks({ common, family, deviceID: device.udid, resultBundle, tests: selectedTests, logged,
+        runSimulatorChecks({ common, family, deviceID: device.udid, resultBundle, tests, logged,
           destination: "platform=iOS Simulator,arch=" + (process.arch === "arm64" ? "arm64" : "x86_64") + ",id=" + device.udid });
         passed = true;
       } catch (error) { failures.push(family + ": " + error.message); }
@@ -55,4 +63,4 @@ function run() {
 }
 
 if (require.main === module) run();
-module.exports = { run, selectedTests };
+module.exports = { run, selectedTests, testsForScope };

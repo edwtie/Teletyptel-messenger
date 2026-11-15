@@ -30,6 +30,11 @@ on:
         type: choice
         options: [full, focused-update, focused-media, focused-ui]
         default: full
+      ui_scope:
+        description: Explicit test selection for focused-ui only
+        type: choice
+        options: [regression, groups]
+        default: regression
 
 permissions:
   contents: read
@@ -45,6 +50,7 @@ jobs:
     env:
       TELETYPTEL_NATIVE_TEST_FAMILY: ${{ matrix.family }}
       TELETYPTEL_NATIVE_VALIDATION_MODE: ${{ inputs.validation_mode || 'full' }}
+      TELETYPTEL_NATIVE_UI_SCOPE: ${{ inputs.ui_scope || 'regression' }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
