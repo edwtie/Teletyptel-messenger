@@ -146,11 +146,14 @@ public final class NativeLoginModel: ObservableObject {
         return peer.components(separatedBy: "@").last == owner.components(separatedBy: "@").last
     }
     func permitsLegacyCall(to peer: String) -> Bool {
-        guard canSend, !isBlocked(peer), !chat.preferences.doNotDisturb,
-              !chat.preferences.mutedPeers.contains(peer) else { return false }
+        guard permitsExplicitGatewayCall(to: peer) else { return false }
         if callPolicyState == .unsupported { return true }
-        guard callPolicy.usable, let owner = resumableAccount?.jid else { return false }
+        guard let owner = resumableAccount?.jid else { return false }
         return peer.components(separatedBy: "@").last != owner.components(separatedBy: "@").last
+    }
+    func permitsExplicitGatewayCall(to peer: String) -> Bool {
+        canSend && !isBlocked(peer) && !chat.preferences.doNotDisturb && !chat.preferences.mutedPeers.contains(peer) &&
+            (callPolicyState == .unsupported || callPolicy.usable)
     }
     func callIntentLease(for peer: String) -> NativeCallIntentLease? {
         guard usesCallIntents(for: peer), let sender = activeCallIntentSender,

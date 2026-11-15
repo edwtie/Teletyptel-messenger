@@ -60,15 +60,18 @@ final class NativeCallRoutingTests: XCTestCase {
         await settle { await fixture.pendingPolicies.count == 1 }
         XCTAssertNil(model.callIntentLease(for: "alice@localhost"))
         XCTAssertFalse(model.permitsLegacyCall(to: "alice@localhost"))
+        XCTAssertFalse(model.permitsExplicitGatewayCall(to: "gateway@localhost"))
         await fixture.acknowledge()
         await settle { model.callPolicyState == .ready }
         let lease = try XCTUnwrap(model.callIntentLease(for: "alice@localhost"))
         XCTAssertTrue(model.permitsCallIntent(lease, peer: "alice@localhost"))
+        XCTAssertTrue(model.permitsExplicitGatewayCall(to: "gateway@localhost"))
         XCTAssertFalse(model.permitsLegacyCall(to: "alice@localhost"))
         XCTAssertTrue(model.permitsLegacyCall(to: "remote@elsewhere.test"))
         model.setMuted("alice@localhost", muted: true)
         XCTAssertFalse(model.permitsCallIntent(lease, peer: "alice@localhost"))
         XCTAssertNil(model.callIntentLease(for: "alice@localhost"))
+        XCTAssertFalse(model.permitsExplicitGatewayCall(to: "gateway@localhost"))
         await settle { await fixture.pendingPolicies.count == 1 }
         let policy = await fixture.policies.last
         XCTAssertEqual(policy?.2, ["alice@localhost"])

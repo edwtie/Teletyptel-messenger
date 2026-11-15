@@ -32,13 +32,23 @@ test("Policy is acknowledged separately from roster changes and cannot silently 
   assert.match(core("NativeCallPolicy"), /peers.count <= 256/);
   assert.match(core("NativeCallPolicy"), /!self.recognized && error as\? NativeCallPolicyFailure == .unsupported/);
   assert.match(core("NativeCallPolicy"), /desired == applied, task == nil/);
-  assert.match(core("NativeLoginModel"), /guard callPolicy.usable, let owner/);
+  assert.match(core("NativeLoginModel"), /guard permitsExplicitGatewayCall\(to: peer\)/);
+  assert.match(core("NativeLoginModel"), /callPolicyState == .unsupported \|\| callPolicy.usable/);
   assert.match(core("NativeLoginModel"), /now - entry.received <= 5/);
   const connection = core("NativeXMPPConnection");
   assert.match(connection, /exchangeCallControl\(NativeCallIntent.preferences/);
   assert.match(connection, /callControls.count < 2/);
   assert.match(connection, /NativeCallControlReply.decode/);
   assert.doesNotMatch(connection, /editContact\(NativeCallIntent/);
+});
+
+test("The explicit local SIP lab route is not accidentally changed into a bare-JID proposal", () => {
+  const controller = app("NativeCallController");
+  assert.match(app("NativeDialerView"), /calls.startLabCall\(route\)/);
+  assert.match(controller, /NativeSIPLabRoute\(configuration: configuration, gateway: route.gateway, number: route.extensionNumber\)/);
+  assert.match(controller, /confirmed == route, login\?\.permitsExplicitGatewayCall/);
+  assert.match(controller, /startDirectCall\(route.contact, profile: .total, videoCodec: "VP8"\)/);
+  assert.match(core("NativeDialing"), /NativeDialing.normalized\(number\) == "600"/);
 });
 
 test("No ordinary login secrets, live push capability, or production activation is added", () => {

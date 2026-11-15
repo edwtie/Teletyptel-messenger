@@ -46,7 +46,7 @@ struct NativeDialerView: View {
                     if let notice = notice { Text(notice).font(.caption).accessibilityIdentifier("sip-lab-notice") }
                     Button {
                         guard let route = route, login.canSend, !calls.hasLiveCall else { notice = "Controleer de lokale HTTPS-server, gateway-resource en testnummer 600."; return }
-                        calls.startCall(route.contact, profile: .total)
+                        calls.startLabCall(route)
                         dismiss()
                     } label: { Image(systemName: "phone.fill").font(.title2).foregroundStyle(.white).frame(maxWidth: .infinity, minHeight: 52) }
                         .buttonStyle(.borderedProminent).tint(NativeWebStyle.enabled).accessibilityLabel("Lokale Asterisk-echo met TC bellen")

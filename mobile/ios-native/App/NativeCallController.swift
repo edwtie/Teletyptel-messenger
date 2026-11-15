@@ -256,7 +256,17 @@ final class NativeCallController: ObservableObject, NativePushRegistering {
             return
         }
         guard login?.permitsLegacyCall(to: contact.jid) == true else { status = .failed; return }
-        guard login?.isBlocked(contact.jid) != true else { return }
+        startDirectCall(contact, profile: profile, videoCodec: videoCodec)
+    }
+
+    func startLabCall(_ route: NativeSIPLabRoute) {
+        guard let configuration = login?.connectedConfiguration,
+              let confirmed = try? NativeSIPLabRoute(configuration: configuration, gateway: route.gateway, number: route.extensionNumber),
+              confirmed == route, login?.permitsExplicitGatewayCall(to: route.contact.jid) == true else { status = .failed; return }
+        startDirectCall(route.contact, profile: .total, videoCodec: "VP8")
+    }
+
+    private func startDirectCall(_ contact: NativeContact, profile: NativeCallMedia, videoCodec: String) {
         let audioCodec = NativeAudioCodec(rawValue: UserDefaults.standard.string(forKey: NativeAudioCodec.preferenceKey) ?? "") ?? .pcmu
         guard activePeer == nil, prepareTask == nil, account != nil, pendingPush == nil, !hasLiveCall,
               let endpoint = contact.callEndpoint,
