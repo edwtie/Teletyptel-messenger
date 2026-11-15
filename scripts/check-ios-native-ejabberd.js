@@ -236,7 +236,15 @@ async function run() {
     }
     report.nativeJingleTransportTested = true;
     report.nativeJingleTransportTests = 1;
-    const intentOutput = await runSwift("NativeCallIntentIntegrationTests", "native-intent-tests.txt");
+    let intentOutput;
+    control("set_loglevel", "debug");
+    try { intentOutput = await runSwift("NativeCallIntentIntegrationTests", "native-intent-tests.txt"); }
+    finally {
+      control("set_loglevel", "warning");
+      const trace = fs.readFileSync(certificate("server.log"), "utf8").split("\n")
+        .filter(line => /jingle-message|propose|proceed|store xmlns|stream.*error/.test(line)).slice(-100).join("\n");
+      save("native-intent-wire.txt", trace.slice(-64000));
+    }
     if (!/Executed 1 test, with 0 failures/.test(intentOutput) || /[1-9][0-9]* tests? skipped/i.test(intentOutput)) {
       throw new Error("Expected the real two-account native JMI selection and fresh-offer test without skips or failures");
     }
