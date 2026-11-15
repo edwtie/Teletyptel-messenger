@@ -57,6 +57,9 @@ private actor WarmCallConnection: NativeCallXMPPConnecting, NativeCallRecoverySe
     func finishIntent() {
         onIntent?(NativeCallIntent(action: .finish, sid: "call-1", peer: "alice@localhost/caller", media: nil))
     }
+    func retractIntent(peer: String, sid: String = "call-1") {
+        onIntent?(NativeCallIntent(action: .retract, sid: sid, peer: peer, media: nil))
+    }
     private func emit(_ element: String, identifier: String) throws {
         let stanza = "<iq xmlns='jabber:client' type='set' from='alice@localhost/caller' to='bob@localhost/awakened' id='\(identifier)'>\(element)</iq>"
         let request = try XCTUnwrap(transport.receive(stanza, now: 100).request)
@@ -196,6 +199,22 @@ final class NativeWarmCallTests: XCTestCase {
         var ended = false
         warm.remoteEnded = { ended = true }
         await connection.finishIntent()
+        await settle { ended }
+        warm.cancel(); warm.endServerCall()
+        await settle { registry.ends == 1 }
+    }
+
+    func testBareCallerRetractionMatchesTheSameCallButForeignPeerAndSessionDoNot() async throws {
+        let registry = WarmCallRegistry(), connection = WarmCallConnection()
+        let warm = try session(registry)
+        _ = try await warm.prepare(account: account(), connector: connection, validateContext: {})
+        var ended = false
+        warm.remoteEnded = { ended = true }
+        await connection.retractIntent(peer: "charlie@localhost")
+        await connection.retractIntent(peer: "alice@localhost", sid: "another-call")
+        try await Task.sleep(nanoseconds: 20_000_000)
+        XCTAssertFalse(ended)
+        await connection.retractIntent(peer: "alice@localhost")
         await settle { ended }
         warm.cancel(); warm.endServerCall()
         await settle { registry.ends == 1 }

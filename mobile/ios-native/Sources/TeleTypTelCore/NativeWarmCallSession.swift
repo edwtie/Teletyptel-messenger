@@ -89,21 +89,22 @@ final class NativeWarmCallSession {
     }
 
     private func receive(_ intent: NativeCallIntent, owner: String) {
-        guard !stopped, intent.sid == invitation.sid,
+        guard !stopped, !failed, intent.sid == invitation.sid,
               NativeChatCodec.bareJID(intent.peer) != owner else { return }
         if intent.action == .propose {
-            guard intent.media == invitation.media, proposal == nil || proposal?.peer == intent.peer else { failed = true; return }
+            guard intent.media == invitation.media, proposal == nil || proposal?.peer == intent.peer else { failConnection(); return }
             proposal = intent
-        } else if intent.peer == proposal?.peer, [.retract, .reject, .finish].contains(intent.action) {
+        } else if [.retract, .reject, .finish].contains(intent.action),
+                  intent.peer == proposal?.peer || intent.action == .retract && intent.peer == proposal.flatMap({ NativeChatCodec.bareJID($0.peer) }) {
             failed = true; remoteEnded?()
         }
     }
 
     private func receive(_ request: NativeJingleRequest) {
-        guard !stopped, request.sid == invitation.sid, request.peer == proposal?.peer else { return }
+        guard !stopped, !failed, request.sid == invitation.sid, request.peer == proposal?.peer else { return }
         if let route = receiveJingle, let sender = sender { route(request, sender) }
         else if requests.count < 4 { requests.append(request) }
-        else { failed = true }
+        else { failConnection() }
     }
 
     func activateRouting() {
@@ -112,7 +113,7 @@ final class NativeWarmCallSession {
         for request in pending { route(request, sender) }
     }
 
-    private func failConnection() { guard !stopped else { return }; failed = true; remoteEnded?() }
+    private func failConnection() { guard !stopped, !failed else { return }; failed = true; remoteEnded?() }
     private func current(_ deadline: TimeInterval, validate: () throws -> Void) throws {
         try Task.checkCancellation(); try validate()
         guard !stopped, !failed else { throw NativeJingleFailure.disconnected }
