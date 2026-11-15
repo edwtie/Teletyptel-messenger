@@ -1,5 +1,154 @@
 # TeleTypTel native iOS migration
 
+## Feature-gap implementation checkpoint (2026-11-15)
+
+This section supersedes older statements below that native registration,
+password recovery, recording, one-time location, language resources or unread
+indicators do not exist. It does **not** supersede the background-call,
+production-SIP, signing, migration or physical-device release gates.
+
+Implemented in `a635dc0`, `044cfbb`, `dee62e0`, `866b8d7`, `8610827`,
+`e854614`, `998cb2a`, `ef577a9`, `3cdf028`, `d97b3e3` and `53054ed`:
+
+- Bounded foreground reconnect after an authenticated session loses its
+  transport: five attempts with backoff, generation/cancellation guards,
+  stable-connection reset, retained drafts and uncertain-send handling. No
+  automatic resend, certificate bypass, authentication retry loop or claim of
+  XEP-0198 stream resumption. Disconnecting an uncertain call ends its old
+  media runtime rather than pretending it survived.
+- XMPP-confirmed blocking/unblocking and roster removal/rename, with existing
+  roster groups preserved during rename. Blocked direct text, reactions,
+  receipts and new incoming/outgoing calls are filtered locally too. Muting
+  and Do Not Disturb are account-scoped cached preferences; DND sends busy
+  presence, declines new calls and still receives messages. A server refusal
+  does not falsely confirm a block. Cross-resource blocklist refresh and
+  independent server/module interoperability acceptance remain to be added.
+- Native registration using the existing local-domain creation contract,
+  recovery-email requests, password changes followed by logout/credential
+  removal, security-state loading and explicit authenticator setup/confirmation.
+  Password changes use the new authenticated `change_password` server action,
+  not generic profile save: current password and account ownership are checked,
+  while avatar, provider, XMPP and storage preferences are preserved on the
+  server. Deploy the matching `api/account.php` and
+  `NativeAccountPasswordChange.php` with the native build. The native client
+  requires the advertised password-change capability from the same session,
+  account and JID; an older backend cannot silently fall through to generic
+  profile save. TOTP confirmation
+  can resume after visiting an authenticator app without replacing its pending
+  server key; explicit key-copy is device-local and expires after one minute.
+  Registration intentionally rejects domains for which the existing backend
+  would only save an external profile instead of creating an XMPP account.
+  Email delivery, verified recovery identities, TOTP interoperability and signed
+  provider flows still require deployed-server/device acceptance. Disabling an
+  existing second factor is not silently added or bypassed.
+- Explicitly initiated 60-second AAC voice recording, camera photo/video,
+  bounded MP4 export, media file selection and existing authenticated chunked
+  upload. Recordings are reviewed before upload and staged before sending.
+  Native upload policy now admits bounded M4A/MP4 containers, not arbitrary
+  executable types. Received supported media/PDF/photos can be downloaded
+  through the existing same-origin session and opened in a protected temporary
+  Quick Look preview. Recording/preview is excluded during calls and stopped
+  on backgrounding. Actual microphone/camera/recording/playback acceptance is
+  not proven by SDK compilation or synthetic container fixtures.
+- Foreground-only, one-shot location permission/request with a deadline, age
+  and accuracy checks, coordinate review, explicit staging and cancellation.
+  This shares a normal map link, not a live-location protocol, background
+  tracking or emergency-location service.
+- Independent system/Dutch/English interface selection on login and in
+  appearance settings, generated localized resources and localized system
+  permission descriptions. The build rejects missing English translations for
+  scanned static screen literals. This is not proof that every dynamically
+  composed diagnostic/status or VoiceOver sentence has been localized; a
+  language/device review is still needed. User message bodies are not localized
+  by this mechanism and changing app language never enables message translation.
+- Local unread state for direct and live group messages, independent of
+  outgoing read receipts. Delayed group history and imported cloud history are
+  not automatically made unread. Message banners/badges require explicit iOS
+  consent, show no message body, respect mute/DND/open-chat visibility and are
+  cleared on logout. They work only while the app actually receives messages:
+  **no remote chat APNs or killed-app delivery is claimed**. Unread state is
+  device-local, not cross-device synchronized read state.
+- Upload review and the explicit stage-link action precede optional capture
+  and location rows, keeping the current operation reachable in a lazy Form.
+  Main-menu presentations wait for menu dismissal. Icon borders are inset
+  inside explicit 44-point interaction bounds, keeping compact-landscape group
+  controls in one native toolbar instead of adding a second row over message
+  space. The recovery fixture drops one connection and proves
+  transport recovery without a second password prompt, not an endless mock
+  disconnect loop.
+
+Validation checkpoints: unsigned run `43702471938` on `a635dc0` passed 130
+selected Swift tests. Run `43703357855` on `044cfbb` passed 144 selected Swift
+tests, generated-language-resource SDK compilation and same-host native media
+fixtures in both iPhone/iPad-labelled jobs. Run `43704519496` on `866b8d7`
+passed 146 focused Swift tests and generic iOS SDK compilation in both jobs,
+including dedicated password-action and resumed-TOTP tests. Run `43705440747`
+on `8610827` passed 147 selected Swift tests and SDK compilation in both jobs,
+including the account/session-bound password capability guard. Locally, 100 native
+regression checks pass with three macOS-only skips; isolated PHP profile,
+avatar, upload and preserving-password tests pass. Synthetic FFmpeg AAC/MP4
+files are accepted by the actual upload policy and disguised non-media is
+rejected; these are not recordings from device hardware.
+Full run `43703698066` on `dee62e0` passed the 399-case Swift suite with
+20 explicit skips and no failures, generic SDK compilation, release-fixture
+exclusion and all eight same-host media profiles plus the interpreter leg.
+Its UI jobs did **not** pass: iPad had three failed cases and iPhone had four
+(attachment staging, the obsolete terminal-disconnect expectation, group
+discovery/search and iPhone compact-landscape leave hit-testing). English
+startup and the separate cloud-history smoke test passed on both simulators.
+These failures motivated the later UI fixes; the full run must not be called
+green. Run `43706635440` stopped at a stale workflow-choice source assertion
+before compiling; that assertion now includes the explicit focused-UI mode.
+Focused UI run `43706832872` on `998cb2a` passed six of seven iPad UI cases
+and five of seven iPhone cases. The remaining search assertion incorrectly
+included the untouched sidebar preview, so it now checks the active group
+message viewport, including a positive pre-search assertion. Compact-landscape
+leave still exposed hit testing outside the clipped message viewport; that
+viewport now has an explicit rectangular interaction shape and decorative
+backgrounds cannot intercept taps. Run `43708488002` on `ef577a9` caught a
+mis-scoped UI-test variable at compile time; no UI pass is claimed for it.
+The declaration is now inside the search test, with a source guard for that
+scope. Run `43708897049` on `3cdf028` passed both affected group cases on both
+iPhone and iPad. Subsequent compact-toolbar refinement removes the extra row
+and adds strict assertions that the latest bubble fits inside the actual
+message viewport and the leave button is fully inside the app bounds.
+Run `43709975746` on `d97b3e3` passed all seven focused UI cases on iPhone
+and six on iPad. The stricter viewport assertion caught approximately two
+points of group-bubble border clipping after iPad rotation. Adaptive bottom
+spacing now reserves room for that border without adding another toolbar row
+or relaxing the assertion. Run `43711508777` on `53054ed` passed both group
+cases on both families (two tests per family, no failures). Its exported
+iPad landscape screenshot also shows the complete latest bubble above the
+composer. This is a targeted final regression, not a claim that all seven
+cases or the full unit/media suite were rerun on `53054ed`.
+
+Isolated ejabberd run `43705083617` on `866b8d7` passed real loopback WSS
+transport/login, Jingle, archive, group and invitation tests against disposable
+ejabberd 26.09, with fictitious accounts and cleanup. The account HTTP service
+was a contract fixture: the report explicitly says `accountAPITested: false`.
+It is not proof of a deployed PHP account server or physical-device acceptance.
+
+Evidence is retained under `artifacts/native-gaps-*`,
+`artifacts/native-gap-final-regressions.txt` and the named GitHub run artifacts.
+The focused UI mode only compiles the simulator app and runs the listed UI
+cases; it does not claim another complete Swift/media/device-SDK test run.
+
+### Still open: the fifth release family
+
+Native background-call completion needs an authoritative server-side wake /
+answer / Jingle recovery adapter, cold-start runtime, correct signed identity
+and APNs capabilities, deployed worker/policy, revocation and locked-device
+acceptance. The existing status/end control credential is not an XMPP login
+credential. No chat password was copied into a less-protected background vault
+and no capability flag was invented to expose an unfinished feature.
+
+SIP routing remains the existing private local Asterisk echo-600 lab. Initial
+inbound SIP calls, production TLS/SRTP/TURN/RTCP/provider acceptance, real native
+device-to-gateway codec/DTMF testing and coordinated partner/emergency routing
+are not completed by these UI/account changes. No real provider or 112 calls,
+APNs activation, server restart, TestFlight upload or wrapper replacement was
+performed. The five families therefore must **not** all be marked complete.
+
 ## Optional native G.722 audio (2026-11-15)
 
 Account settings now expose `Gespreksgeluid`: standard G.711/PCMU or explicit
