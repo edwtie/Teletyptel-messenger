@@ -8,6 +8,8 @@ enum NativeAccountRoute: String {
     case profile = "api/native-profile.php"
     case history = "api/native-history.php"
     case callPush = "api/call-push.php"
+    case interpreter = "api/interpreter.php"
+    case rtc = "api/rtc-config.php"
 }
 
 actor NativeAccountWebSession: CustomStringConvertible, CustomDebugStringConvertible {
@@ -37,11 +39,17 @@ actor NativeAccountWebSession: CustomStringConvertible, CustomDebugStringConvert
 
     func request(_ route: NativeAccountRoute, body: Data? = nil, csrf: String? = nil,
                  accountID: String? = nil, lookupJID: String? = nil,
-                 historyPeer: String? = nil, historyKind: String? = nil, historyBefore: String? = nil) async throws -> Data {
+                 historyPeer: String? = nil, historyKind: String? = nil, historyBefore: String? = nil,
+                 interpreterRoom: String? = nil) async throws -> Data {
         try Task.checkCancellation()
         guard !closed, (body?.count ?? 0) <= 32768 else { throw NativeAccountFailure.rejected }
         let attempt = generation
         var components = URLComponents(url: configuration.origin.appendingPathComponent(route.rawValue), resolvingAgainstBaseURL: false)!
+        if let room = interpreterRoom {
+            guard route == .interpreter, body == nil, accountID == nil, lookupJID == nil,
+                  room.range(of: #"\A[a-f0-9]{48}\z"#, options: .regularExpression) != nil else { throw NativeAccountFailure.invalidResponse }
+            components.queryItems = [URLQueryItem(name: "room", value: room)]
+        }
         if let accountID = accountID {
             guard route == .account || route == .history, !accountID.isEmpty, accountID.utf8.count <= 96 else { throw NativeAccountFailure.invalidResponse }
             components.queryItems = [URLQueryItem(name: "accountId", value: accountID)]

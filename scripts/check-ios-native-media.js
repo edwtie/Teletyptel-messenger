@@ -9,6 +9,9 @@ function checkMedia({ root, directory, reports, logged }) {
   const native = path.join(root, "mobile/ios-native");
   const core = ["Startup.swift", "XMPPProbeStream.swift", "NativeIncomingCall.swift", "NativeCallCoordinator.swift", "NativeDtmf.swift", "NativeJingleMedia.swift", "NativeLocalMediaSDP.swift", "NativeChat.swift", "NativeChatInteractions.swift", "NativeMessageActions.swift", "NativeArchive.swift", "NativeJingleTransport.swift", "NativeJingleSession.swift", "NativeCloudRecord.swift"];
   const sources = [...core.map(file => path.join(native, "Sources/TeleTypTelCore", file)),
+    path.join(native, "Sources/TeleTypTelCore/NativeInterpreterProtocol.swift"),
+    path.join(native, "App/NativeInterpreterMedia.swift"),
+    path.join(native, "MediaTests/NativeInterpreterLoopback.swift"),
     path.join(native, "App/NativeMediaPeer.swift"), path.join(native, "App/NativeActivePeerNegotiating.swift"),
     path.join(native, "App/NativeIncomingPeerNegotiator.swift"),
     path.join(native, "App/NativeOutgoingPeerNegotiator.swift"),
@@ -26,6 +29,8 @@ function checkMedia({ root, directory, reports, logged }) {
     }
     if (!output.includes("Native audio/video/RTT negotiation loopback passed")) throw new Error("Native media test incomplete");
     if (!output.includes("Native incoming peer provider passed")) throw new Error("Native incoming provider test incomplete");
+    if (!output.includes("Native interpreter three-party loopback passed:")) throw new Error("Native three-party interpreter media test incomplete");
+    result.interpreterThreeParty = true;
     result.passed = true;
   } finally {
     fs.writeFileSync(path.join(reports, "native-media-result.json"), JSON.stringify(result, null, 2));

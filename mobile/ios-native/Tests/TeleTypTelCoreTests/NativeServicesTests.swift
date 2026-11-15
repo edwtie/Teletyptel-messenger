@@ -103,6 +103,56 @@ final class NativeServicesTests: XCTestCase {
         await session.close()
     }
 
+    func testInterpreterUsesBoundSessionFreshCSRFAndOnlyAnExplicitRoomQuery() async throws {
+        let session = NativeAccountWebSession(configuration: try configuration(), cookie: "PHPSESSID=fictional-session", settings: settings())
+        let client = NativeInterpreterAPI(session: session, account: "fiction")
+        let room = String(repeating: "a", count: 48)
+        var posts = 0
+        NativeServiceHTTPFixture.handler = { request in
+            XCTAssertEqual(request.url?.host, "example.invalid")
+            XCTAssertEqual(request.url?.path, "/api/interpreter.php")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Cookie"), "PHPSESSID=fictional-session")
+            if request.httpMethod == "POST" {
+                posts += 1
+                XCTAssertEqual(request.value(forHTTPHeaderField: "X-CSRF-Token"), self.csrf)
+                let body = try NativeServiceHTTPFixture.body(request)
+                XCTAssertEqual(body["action"] as? String, "request")
+                XCTAssertEqual(body["provider"] as? String, "internal")
+                XCTAssertEqual(body["callId"] as? String, "test-call")
+                return (200, ["ok": true, "csrfToken": self.csrf, "roomId": room], [:])
+            }
+            return (200, ["ok": true, "csrfToken": self.csrf, "accountId": "fiction", "jid": "fixture@localhost", "rooms": []], [:])
+        }
+        do { _ = try await client.request(peer: "peer@localhost", sid: "test-call"); XCTFail("Request before challenge") } catch {}
+        _ = try await client.dashboard()
+        let requested = try await client.request(peer: "peer@localhost", sid: "test-call")
+        XCTAssertEqual(requested, room)
+        XCTAssertEqual(posts, 1)
+        do { _ = try await session.request(.account, interpreterRoom: room); XCTFail("Foreign room route") } catch {}
+        do { _ = try await session.request(.interpreter, interpreterRoom: "../bad"); XCTFail("Room injection") } catch {}
+        await session.close()
+    }
+
+    func testAvatarRefreshReplacesAllowedProfilesWithoutLookingUpUnrelatedUsers() async throws {
+        let session = NativeAccountWebSession(configuration: try configuration(), settings: settings())
+        let cache = NativeAvatarCache()
+        var version = "Eerste naam"
+        var lookedUp: [String] = []
+        NativeServiceHTTPFixture.handler = { request in
+            let jid = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems?.first?.value ?? ""
+            lookedUp.append(jid)
+            return (200, ["ok": true, "profile": ["jid": jid, "displayName": version, "avatarColor": "#2563eb", "avatarDataUrl": ""]], [:])
+        }
+        cache.connect(session, owner: "fixture@localhost", contacts: [])
+        try await eventually { cache.profiles["fixture@localhost"]?.displayName == "Eerste naam" }
+        version = "Bijgewerkte naam"
+        cache.refreshOwner()
+        try await eventually { cache.profiles["fixture@localhost"]?.displayName == "Bijgewerkte naam" }
+        cache.refresh("unrelated@localhost")
+        XCTAssertEqual(lookedUp, ["fixture@localhost", "fixture@localhost"])
+        cache.detach(); await session.close()
+    }
+
     private func preferences(mode: String = "automatic", target: String = "en") -> NativeTranslationPreferences {
         var result = NativeTranslationPreferences()
         result.mode = mode

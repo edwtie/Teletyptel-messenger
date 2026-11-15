@@ -49,6 +49,8 @@ final class NativeCallController: ObservableObject, NativePushRegistering {
     @Published private(set) var presentation: NativeCallPresentation?
     @Published private(set) var peerName: String?
     @Published private(set) var isMuted = false
+    let interpreter = NativeInterpreterSession()
+    @Published private(set) var interpreterMedia: NativeInterpreterMedia?
     private static let initializeWebRTC = RTCInitializeSSL()
     private var factory: RTCPeerConnectionFactory?
     private var capture: NativeMediaCapture?
@@ -58,6 +60,7 @@ final class NativeCallController: ObservableObject, NativePushRegistering {
     private var account: String?
     private var activePeer: (any NativeActivePeerNegotiating)?
     private var activeID: UUID?
+    private var callPeerJID: String?
     private var prepareTask: Task<Void, Never>?
     private var isForeground = true
     var backgroundCallEnded: (() -> Void)?
@@ -88,6 +91,7 @@ final class NativeCallController: ObservableObject, NativePushRegistering {
 
     func setForeground(_ active: Bool) {
         isForeground = active
+        if !active { interpreter.stop() }
         pushRegistration.setForeground(active)
         Task { [weak self] in
             guard let self = self else { return }
@@ -192,6 +196,7 @@ final class NativeCallController: ObservableObject, NativePushRegistering {
                     throw NativeJingleFailure.invalidRequest
                 }
                 self.activePeer = provider
+                self.callPeerJID = NativeChatCodec.bareJID(request.peer)
                 self.activeID = invitation.id
                 self.peerName = request.peer
                 self.status = .ringing(request.peer)
@@ -233,6 +238,7 @@ final class NativeCallController: ObservableObject, NativePushRegistering {
                     throw NativeJingleFailure.disconnected
                 }
                 self.activePeer = provider
+                self.callPeerJID = NativeChatCodec.bareJID(endpoint)
                 self.peerName = contact.displayName
                 self.status = .calling(contact.displayName)
                 guard let id = runtime.platform.startOutgoing(peer: endpoint, sid: sid, media: profile,
@@ -270,11 +276,23 @@ final class NativeCallController: ObservableObject, NativePushRegistering {
             if !isForeground { backgroundCallEnded?() }
             return
         }
-        if coordinator.isConnected { status = .active(activePeer?.sid ?? "") }
+        if coordinator.isConnected {
+            status = .active(activePeer?.sid ?? "")
+            prepareInterpreter()
+        }
+    }
+
+    func prepareInterpreter() {
+        guard isForeground, runtime?.platform.coordinator.isConnected == true,
+              let session = login?.activeWebSession, let account = login?.activeAccountID,
+              let owner = login?.currentOwner, let peer = callPeerJID, let sid = activePeer?.sid,
+              let media = interpreterMedia else { return }
+        interpreter.connect(client: NativeInterpreterAPI(session: session, account: account), media: media,
+                            sid: sid, owner: owner, peer: peer, account: account)
     }
 
     func setRttText(_ text: String) {
-        _ = runtime?.media.setRttText(text)
+        if runtime?.media.setRttText(text) == true { interpreter.sendText(text) }
     }
 
     func toggleMuted() {
@@ -306,12 +324,14 @@ final class NativeCallController: ObservableObject, NativePushRegistering {
     }
 
     private func resetCall() {
+        interpreter.stop()
         prepareTask?.cancel()
         prepareTask = nil
         let id = activeID ?? runtime?.platform.coordinator.currentHandle?.id
         let provider = activePeer
         activePeer = nil
         activeID = nil
+        callPeerJID = nil
         peerName = nil
         presentation = nil
         isMuted = false
@@ -336,6 +356,7 @@ final class NativeCallController: ObservableObject, NativePushRegistering {
         self.capture = capture
         self.router = router
         self.runtime = runtime
+        self.interpreterMedia = NativeInterpreterMedia(factory: factory, tracks: { [weak capture] in capture?.tracks })
         runtime.media.presentationChanged = { [weak self] snapshot in
             self?.presentation = snapshot
             if let snapshot = snapshot {

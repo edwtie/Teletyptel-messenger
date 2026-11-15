@@ -212,7 +212,7 @@ struct NativeChatView: View {
             .accessibilityIdentifier("chat-message-" + message.id.uuidString)
             .contextMenu { messageActions(message) }
             if incoming { Spacer(minLength: 36) }
-            else { NativeWebAvatar(name: "Ik", size: 30, profile: ownProfile) }
+            else { NativeWebAvatar(name: model.currentOwner ?? "TX", size: 30, profile: ownProfile) }
         }
     }
 

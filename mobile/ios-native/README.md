@@ -32,6 +32,38 @@ Before switching the signed target to `com.tiedragon.teletyptel`:
 The existing signed/TestFlight workflow still builds the working wrapper. This
 step did not silently redirect it to the incomplete native target.
 
+## Native interpreter participants and avatar corrections (2026-11-15)
+
+The native caller and partner now have a consent-first interpreter workflow,
+using the existing authenticated `api/interpreter.php` service. The original
+Jingle conversation stays connected; separate WebRTC legs connect each customer
+to the authorized interpreter. The interpreter uses the existing web staff
+workplace, not a new native staff queue. Each participant must join explicitly
+before media starts. The side connection shares only existing microphone/camera
+tracks; a muted microphone or disabled camera is not silently enabled.
+
+The interpreter's compatibility data channel uses bounded `teletyptel-rtt` JSON
+snapshots, matching the existing web interpreter. This is separate from the main
+call's negotiated T.140/XEP-0517 transport and is not a claim that JSON snapshots
+implement that standard. Leaving, logout, background entry or the main call
+ending closes the interpreter legs and clears their text. Ordinary chat and
+the primary call are not forwarded as a transcript. This interpreter stage is
+foreground-only; APNs/background interpreter recovery and external Tolkcontact
+are not enabled.
+
+Avatar initials now follow the web name/JID separators, own-message fallbacks
+use the signed-in identity rather than `Ik`, and explicit owner refresh cancels
+stale in-flight loads. PNG/JPEG validation and authenticated-origin restrictions
+remain unchanged. This does not add every web avatar format or editor feature.
+
+Five isolated core tests passed for separate consent, identity/signal binding,
+unavailable service and bounded literal text. New Apple SDK checks additionally
+exercise three actual same-host participants with synthetic VP8/live text and
+verify that removing the interpreter preserves the primary Jingle/RTT call.
+Until the new unsigned run finishes, these Apple checks are pending, not passed.
+Live PHP/staff interoperability, physical audio/camera, TURN and device
+permission/rotation/leave/rejoin tests remain required before release.
+
 ## Remaining call work: negotiated DTMF and push registration (2026-11-14)
 
 The native RTP audio profile now optionally negotiates `telephone-event/8000`
@@ -196,7 +228,7 @@ their original scope; they are not proof of features added after those runs.
 | TC audio/video/RTT | Native Jingle/WebRTC and four media profiles | Physical camera/audio/routing, independent-network/TURN and interruption/long-call tests |
 | Telephone/SIP/DTMF | Private echo route, negotiated native RTP events, local gateway relay and confirmed browser-to-Asterisk DTMF receipt | Native-device-to-Asterisk receipt, independent endpoints and authorized routing/provider integration; no emergency-service readiness claim |
 | Background incoming calls | CallKit/PushKit engine, consent UI, Keychain registration/revocation lifecycle and bounded registry client | Cold-start/authoritative call recovery, deployed backend/worker, provisioning and signed locked-screen APNs tests |
-| Interpreter and three-party calling | No connected native three-party/interpreter workflow in this target | Authorized interpreter discovery/invite, three-party media topology, consent, interruption and leave/rejoin tests |
+| Interpreter and three-party calling | Consent-bound native customer legs to the existing web staff interpreter; primary call retained | New Apple SDK validation, live PHP/staff interoperability, physical media/TURN and leave/rejoin tests; foreground only, no external Tolkcontact |
 | iOS address book | Explicit app consent plus Apple's single-phone-property picker; no broad `CNContactStore` request or upload | Real-device selection/cancel and accessibility checks; importing a number does not enable public calling |
 
 The preview must not show enabled-looking shortcuts for missing workflows or

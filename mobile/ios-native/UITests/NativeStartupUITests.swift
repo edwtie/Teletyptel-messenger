@@ -426,6 +426,14 @@ final class NativeStartupUITests: XCTestCase {
         XCTAssertTrue(controls.waitForExistence(timeout: 10))
         XCTAssertTrue(end.isHittable)
         XCTAssertFalse(application.keyboards.firstMatch.exists)
+        let interpreter = application.buttons["call-interpreter"]
+        XCTAssertTrue(interpreter.isHittable); interpreter.tap()
+        let status = application.staticTexts["interpreter-status"]
+        XCTAssertTrue(status.waitForExistence(timeout: 5))
+        XCTAssertTrue(status.label.contains("Start of beantwoord"))
+        XCTAssertFalse(application.buttons["interpreter-request"].isEnabled)
+        snapshot("interpreter-consent-unavailable")
+        application.buttons["interpreter-close"].tap()
         for orientation: UIDeviceOrientation in [.portrait, .landscapeLeft, .portrait] {
             rotate(orientation)
             XCTAssertTrue(controls.isHittable)

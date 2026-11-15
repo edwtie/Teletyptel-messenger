@@ -12,8 +12,10 @@ const appFiles = ["App/TeleTypTelNativeApp.swift", "App/NativeInvitationViews.sw
 const mediaFiles = ["NativeT140Session.swift", "NativeWebRTCChannel.swift"];
 coreFiles.push("NativeGroupManagement.swift", "NativeAccountFeatures.swift", "NativeMessageActions.swift", "NativeAvatars.swift", "NativeChatInteractions.swift", "NativeHistory.swift", "NativeDialing.swift", "NativeDtmf.swift", "NativeCloudRecord.swift", "NativeCloudHistory.swift", "NativeCloudSync.swift");
 coreFiles.push("NativePushRegistry.swift", "NativePushRegistrationModel.swift");
+coreFiles.push("NativeInterpreterProtocol.swift", "NativeInterpreterSession.swift");
 appFiles.push("App/NativeGroupManagementView.swift", "App/NativeAccountSettingsView.swift", "App/NativeAttachmentsView.swift", "App/NativeFeatureFixture.swift", "App/NativeWebStyle.swift", "App/NativeMessageActionsView.swift", "App/NativeDeviceHistory.swift", "App/NativeChatEnhancements.swift", "App/NativeDialerView.swift");
 appFiles.push("App/NativeCloudHistoryView.swift", "App/NativePushVault.swift", "App/NativePhoneContactPicker.swift");
+appFiles.push("App/NativeInterpreterMedia.swift", "App/NativeInterpreterCallView.swift");
 
 function projectText() {
   const objects = new Map();

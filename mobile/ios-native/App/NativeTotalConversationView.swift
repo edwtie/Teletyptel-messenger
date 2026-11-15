@@ -9,6 +9,7 @@ struct NativeTotalConversationView: View {
     @State private var controlsOpen = false
     @State private var keypadOpen = false
     @State private var keypadNotice: String?
+    @State private var interpreterOpen = false
 
     var body: some View {
         GeometryReader { geometry in
@@ -19,6 +20,10 @@ struct NativeTotalConversationView: View {
                     VStack(spacing: 0) {
                         header(presentation)
                         Spacer(minLength: 12)
+                        if let media = controller.interpreterMedia {
+                            HStack { Spacer(); NativeInterpreterTile(session: controller.interpreter, media: media, width: min(190, geometry.size.width * 0.35)) }
+                                .padding(.horizontal, 12)
+                        }
                         if presentation.profile.contents.contains("rtt") {
                             rttPanes(presentation, landscape: landscape)
                                 .padding(.horizontal, landscape ? 16 : 12)
@@ -67,6 +72,7 @@ struct NativeTotalConversationView: View {
         .onChange(of: translation.preferences) { _ in translateCurrentText() }
         .onChange(of: translation.sharingConsent) { _ in translateCurrentText() }
         .sheet(isPresented: $keypadOpen) { callKeypad }
+        .sheet(isPresented: $interpreterOpen) { NativeInterpreterCallView(session: controller.interpreter) }
         .onChange(of: controller.presentation?.callID) { _ in keypadOpen = false; keypadNotice = nil }
         #if DEBUG
         .onAppear {
@@ -119,6 +125,9 @@ struct NativeTotalConversationView: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
+            Button { controller.prepareInterpreter(); interpreterOpen = true } label: { Image(systemName: "person.2.wave.2") }
+                .buttonStyle(NativeWebIconStyle()).accessibilityLabel("Gebarentolk oproepen")
+                .accessibilityIdentifier("call-interpreter")
             if presentation.profile.contents.contains("rtt") {
                 Image(systemName: presentation.rttReady ? "text.bubble.fill" : "text.bubble")
                     .foregroundStyle(presentation.rttReady ? .green : .orange)

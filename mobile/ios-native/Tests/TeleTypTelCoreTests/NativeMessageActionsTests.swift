@@ -211,7 +211,12 @@ final class NativeMessageActionsTests: XCTestCase {
     func testAvatarAcceptsOnlyBoundedRasterDataAndValidProfile() {
         XCTAssertEqual(NativePublicAvatar.initials("Edward Tie"), "ET")
         XCTAssertEqual(NativePublicAvatar.initials("Dovengroep"), "DO")
-        XCTAssertEqual(NativePublicAvatar.initials("  "), "?")
+        XCTAssertEqual(NativePublicAvatar.initials("  "), "TX")
+        XCTAssertEqual(NativePublicAvatar.initials("edward.tie@localhost"), "ET")
+        XCTAssertEqual(NativePublicAvatar.initials("edward-tie"), "ET")
+        XCTAssertEqual(NativePublicAvatar.initials("edward_tie"), "ET")
+        XCTAssertEqual(NativePublicAvatar.initials("@localhost"), "TX")
+        XCTAssertEqual(NativePublicAvatar.initials(" Zoë  李 "), "Z李")
         let png = Data([137, 80, 78, 71, 13, 10, 26, 10])
         let profile = NativePublicAvatar(jid: peer, displayName: "Fictieve gebruiker", avatarColor: "#2563eb", avatarDataUrl: "data:image/png;base64," + png.base64EncodedString())
         XCTAssertTrue(profile.valid); XCTAssertEqual(profile.imageData, png)

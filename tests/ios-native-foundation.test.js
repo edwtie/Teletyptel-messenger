@@ -191,7 +191,7 @@ test("Native media runner requires runtime results for every profile and keeps f
   fs.mkdirSync(reports);
   fs.mkdirSync(path.join(directory, "DerivedData/SourcePackages/artifacts/sdk/WebRTC.xcframework/macos-x86_64_arm64/WebRTC.framework"), { recursive: true });
   const complete = ["audio", "video", "audio-rtt", "total"].map(profile => "Native media profile passed: " + profile + "\n").join("") +
-    "Native incoming peer provider passed\nNative audio/video/RTT negotiation loopback passed\n";
+    "Native incoming peer provider passed\nNative audio/video/RTT negotiation loopback passed\nNative interpreter three-party loopback passed: synthetic fixture\n";
   const result = checkMedia({ root, directory, reports, logged: (name, command, args) => {
     if (name === "media-compile") {
       for (const required of ["NativeChat.swift", "NativeArchive.swift", "XMPPProbeStream.swift"]) {
@@ -202,10 +202,30 @@ test("Native media runner requires runtime results for every profile and keeps f
   } });
   assert.equal(result.passed, true);
   assert.equal(result.profiles.length, 4);
+  assert.equal(result.interpreterThreeParty, true);
+  assert.throws(() => checkMedia({ root, directory, reports, logged: name => name === "media-runtime"
+    ? complete.replace("Native interpreter three-party loopback passed:", "missing interpreter result:") : "compiled" }), /three-party interpreter media test incomplete/);
   assert.throws(() => checkMedia({ root, directory, reports, logged: () => "compiled" }), /Missing native media result/);
   assert.equal(JSON.parse(fs.readFileSync(path.join(reports, "native-media-result.json"))).passed, false);
   assert.throws(() => checkMedia({ root, directory, reports, logged: () => { throw new Error("compile failed"); } }), /compile failed/);
   assert.equal(JSON.parse(fs.readFileSync(path.join(reports, "native-media-result.json"))).passed, false);
+});
+
+test("Native interpreter preserves the primary call and uses authenticated consent-gated room signaling", () => {
+  for (const file of ["Core/NativeInterpreterProtocol.swift", "Core/NativeInterpreterSession.swift", "App/NativeInterpreterMedia.swift", "App/NativeInterpreterCallView.swift"]) {
+    assert.ok(projectText().project.includes(file), file);
+  }
+  const controller = read("App/NativeCallController.swift");
+  assert.match(controller, /if !active \{ interpreter\.stop\(\) \}/);
+  const model = read("Sources/TeleTypTelCore/NativeInterpreterSession.swift");
+  assert.match(model, /guard !needsConsent/);
+  assert.match(model, /snapshot\.valid\(for: expected, account: context\.account\)/);
+  assert.match(model, /joined, snapshot\.room\.status == "active"/);
+  const media = read("App/NativeInterpreterMedia.swift");
+  assert.doesNotMatch(media, /capture\.stop|\.isEnabled\s*=|print\(|NSLog|PKPushRegistry|sip:/);
+  assert.match(media, /channel\.bufferedAmount \+ UInt64\(data\.count\) <= 262144/);
+  assert.match(read("App/NativeInterpreterCallView.swift"), /\.alert\("Tolk laten meekijken en luisteren\?"/);
+  assert.doesNotMatch(read("App/Info.plist"), /TeleTypTelNativeCallPushEnabled|aps-environment/);
 });
 
 test("Native runner retains successful command output", () => {

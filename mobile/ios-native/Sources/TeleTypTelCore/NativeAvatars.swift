@@ -8,9 +8,10 @@ struct NativePublicAvatar: Decodable, Equatable {
     let avatarDataUrl: String
 
     static func initials(_ name: String) -> String {
-        let words = name.split(whereSeparator: { $0.isWhitespace })
+        let local = name.split(separator: "@", maxSplits: 1, omittingEmptySubsequences: false).first ?? ""
+        let words = local.split(whereSeparator: { $0.isWhitespace || "._-".contains($0) })
         if words.count > 1 { return words.prefix(2).compactMap(\.first).map(String.init).joined().uppercased() }
-        return String(words.first?.prefix(2) ?? "?").uppercased()
+        return String(words.first?.prefix(2) ?? "TX").uppercased()
     }
 
     var valid: Bool {
@@ -51,7 +52,13 @@ final class NativeAvatarCache: ObservableObject {
 
     func refreshOwner() {
         guard let owner = owner else { return }
-        attempted.remove(owner); profiles[owner] = nil; load(owner)
+        refresh(owner)
+    }
+
+    func refresh(_ jid: String) {
+        guard allowed.contains(jid) else { return }
+        tasks[jid]?.cancel(); tasks[jid] = nil
+        attempted.remove(jid); profiles[jid] = nil; load(jid)
     }
 
     private func load(_ jid: String) {

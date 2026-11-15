@@ -182,6 +182,7 @@ enum NativeMediaLoopback {
         RTCInitializeSSL()
         let factory = RTCPeerConnectionFactory(encoderFactory: RTCDefaultVideoEncoderFactory(), decoderFactory: RTCDefaultVideoDecoderFactory())
         for mode in NativeCallMedia.allCases { try await profile(mode, factory: factory) }
+        try await NativeInterpreterLoopback.run(factory: factory)
         try await incomingProvider(factory: factory, remoteHangup: false)
         try await incomingProvider(factory: factory, remoteHangup: true)
         let cancelled = try FixturePeer(factory: factory, profile: .total)
