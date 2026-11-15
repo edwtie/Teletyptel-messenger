@@ -34,6 +34,29 @@ step did not silently redirect it to the incomplete native target.
 
 ## Remaining web-workflow implementation (2026-11-15)
 
+### Subsequent bounded H.264 negotiation (2026-11-15)
+
+Native SDP/Jingle mapping now preserves one selected VP8 or H.264 primary codec.
+The optional H.264 profile requires `profile-level-id=42e01f`,
+`packetization-mode=1` and `level-asymmetry-allowed=1`; missing, duplicate or
+different parameters fail closed. An answer cannot silently switch codecs.
+Incoming calls select the validated offered codec before acquiring a peer;
+outgoing calls expose `videoCodec: "H264"` on the controller/negotiator API.
+Existing UI calls still use the VP8 default. This is not automatic multi-codec
+negotiation, a new settings switch, transcoding, H.263 support or evidence that
+an installed iPhone has completed an H.264 call. No TestFlight update or live
+PBX configuration is included.
+
+Source `5ff8b51` passed [unsigned run 43689455595](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43689455595):
+33 selected Swift tests (including both H.264 rejection/roundtrip tests) and
+generic iOS Release compilation passed in both matrix jobs. This did not run
+simulator/UI/media tests or upload a signed app. Separately, local browser tests
+decoded H.264 video and PCMU audio through disposable ejabberd/Asterisk with
+T.140/RED and verified DTMF receipt; the existing VP8 fixture also passed.
+Those web/gateway/isolated-PBX fixture edits remain local, separate from the
+published native changes. They do not prove native H.264 media on an iPhone,
+H.263, SIP INFO, DNS-SRV, re-INVITE or KPN/Tolkcontact interoperability.
+
 Following the UI comparison, four missing workflows have now been implemented:
 - New contact uses an actual bounded, cancellable roster-set request. It waits
   for the authenticated server's matching IQ result; it does not invent a local
