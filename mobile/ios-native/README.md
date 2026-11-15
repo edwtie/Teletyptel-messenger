@@ -56,13 +56,34 @@ use the signed-in identity rather than `Ik`, and explicit owner refresh cancels
 stale in-flight loads. PNG/JPEG validation and authenticated-origin restrictions
 remain unchanged. This does not add every web avatar format or editor feature.
 
-Five isolated core tests passed for separate consent, identity/signal binding,
-unavailable service and bounded literal text. New Apple SDK checks additionally
-exercise three actual same-host participants with synthetic VP8/live text and
-verify that removing the interpreter preserves the primary Jingle/RTT call.
-Until the new unsigned run finishes, these Apple checks are pending, not passed.
-Live PHP/staff interoperability, physical audio/camera, TURN and device
-permission/rotation/leave/rejoin tests remain required before release.
+Validation at source revision `b6c8ab5`:
+- [Unsigned Apple SDK run 43679172188](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43679172188)
+  passed both iPhone 16 Pro and iPad Pro 11-inch M4 families. Each passed 343
+  Swift cases, with 20 explicitly opt-in integrations skipped (363 total),
+  unsigned Release compilation and Release test-fixture exclusion.
+- Each family passed all 17 UI cases, without skips/failures, plus its separate
+  one-case cloud-history preflight. The TC case now checks the interpreter
+  entry, disabled unavailable-service action and closing the sheet before
+  portrait/landscape/portrait checks. Selected TC/consent screenshots were
+  inspected; this fixture does not simulate a connected real interpreter.
+- All four primary media profiles and the new three-party media fixture passed.
+  The latter uses shared synthetic VP8 tracks on three same-host participants,
+  both offerer roles, decoded frames and bounded live text in both directions.
+  Removing the interpreter clears its media/text while primary Jingle/RTT
+  remains connected and carries new text. Microphone capture is disabled;
+  this is not audible audio, physical cameras, TURN or public-network evidence.
+- Local selected Node checks passed 130 cases with four platform skips. Five
+  isolated Swift interpreter cases passed, plus a separate compatibility check
+  decoding actual in-memory SQLite `InterpreterService` waiting/ready/active/
+  ended output without rewriting its shapes. The existing PHP interpreter
+  smoke suite passed 49 checks, without live accounts or provider calls.
+- Initial run `43678289339` exposed a private shared video-view visibility
+  error; it is not a successful app build. Runs `43678718956` and `43679141702`
+  were cancelled after follow-ups superseded them, not counted as passing runs.
+
+Live PHP/staff media interoperability, physical audio/camera, TURN and device
+permission/rotation/leave/rejoin tests remain required before release. No signed
+build, TestFlight upload, APNs activation or live server change was included.
 
 ## Remaining call work: negotiated DTMF and push registration (2026-11-14)
 
@@ -228,7 +249,7 @@ their original scope; they are not proof of features added after those runs.
 | TC audio/video/RTT | Native Jingle/WebRTC and four media profiles | Physical camera/audio/routing, independent-network/TURN and interruption/long-call tests |
 | Telephone/SIP/DTMF | Private echo route, negotiated native RTP events, local gateway relay and confirmed browser-to-Asterisk DTMF receipt | Native-device-to-Asterisk receipt, independent endpoints and authorized routing/provider integration; no emergency-service readiness claim |
 | Background incoming calls | CallKit/PushKit engine, consent UI, Keychain registration/revocation lifecycle and bounded registry client | Cold-start/authoritative call recovery, deployed backend/worker, provisioning and signed locked-screen APNs tests |
-| Interpreter and three-party calling | Consent-bound native customer legs to the existing web staff interpreter; primary call retained | New Apple SDK validation, live PHP/staff interoperability, physical media/TURN and leave/rejoin tests; foreground only, no external Tolkcontact |
+| Interpreter and three-party calling | Consent-bound native customer legs to the existing web staff interpreter; three-party same-host media validated, primary call retained | Live PHP/staff interoperability, physical media/TURN and leave/rejoin tests; foreground only, no external Tolkcontact |
 | iOS address book | Explicit app consent plus Apple's single-phone-property picker; no broad `CNContactStore` request or upload | Real-device selection/cancel and accessibility checks; importing a number does not enable public calling |
 
 The preview must not show enabled-looking shortcuts for missing workflows or
