@@ -236,6 +236,12 @@ async function run() {
     }
     report.nativeJingleTransportTested = true;
     report.nativeJingleTransportTests = 1;
+    const intentOutput = await runSwift("NativeCallIntentIntegrationTests", "native-intent-tests.txt");
+    if (!/Executed 1 test, with 0 failures/.test(intentOutput) || /[1-9][0-9]* tests? skipped/i.test(intentOutput)) {
+      throw new Error("Expected the real two-account native JMI selection and fresh-offer test without skips or failures");
+    }
+    report.nativeCallIntentTransportTested = true;
+    report.nativeCallIntentTransportTests = 1;
     const archiveOutput = await runSwift("NativeArchiveIntegrationTests", "native-archive-tests.txt");
     if (!/Executed 3 tests, with 0 failures/.test(archiveOutput) || /[1-9][0-9]* tests? skipped/i.test(archiveOutput)) {
       throw new Error("Expected all three real two-account MAM, message-action and interaction tests without skips or failures");
