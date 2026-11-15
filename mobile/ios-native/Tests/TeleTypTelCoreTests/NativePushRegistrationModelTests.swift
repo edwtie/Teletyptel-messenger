@@ -86,6 +86,28 @@ final class NativePushRegistrationModelTests: XCTestCase {
         XCTAssertFalse(String(data: try JSONEncoder().encode(saved), encoding: .utf8)!.contains("2a2a2a2a"))
     }
 
+    func testRecoveryRequiresCurrentConsentScopeGenerationAndExpiry() async throws {
+        let store = PushStoreFixture(), driver = PushDriverFixture(), client = PushRegistryFixture()
+        var now = Date().timeIntervalSince1970
+        let model = NativePushRegistrationModel(enabled: true, store: store, driver: driver, now: { now })
+        XCTAssertNil(model.recoveryRegistration(for: scope))
+        await model.connect(client, scope: scope)
+        await model.enable(consented: true)
+        XCTAssertNil(model.recoveryRegistration(for: scope))
+        driver.changed?(Data(repeating: 42, count: 32))
+        await settle { !model.busy && client.requests.contains("register") }
+        let registration = try XCTUnwrap(model.recoveryRegistration(for: scope))
+        XCTAssertEqual(registration.generation, String(repeating: "a", count: 32))
+        XCTAssertNil(model.recoveryRegistration(for: NativePushScope(origin: scope.origin, accountID: "other")))
+        XCTAssertNil(model.recoveryRegistration(for: NativePushScope(origin: "https://elsewhere.invalid", accountID: scope.accountID)))
+        now = registration.expiresAt
+        XCTAssertNil(model.recoveryRegistration(for: scope))
+        now -= 1
+        XCTAssertNotNil(model.recoveryRegistration(for: scope))
+        model.logout()
+        XCTAssertNil(model.recoveryRegistration(for: scope))
+    }
+
     func testRevocationWaitsForRegistrationAndLateReplyCannotRestoreConsent() async throws {
         let store = PushStoreFixture(), driver = PushDriverFixture(), client = PushRegistryFixture()
         client.delayed = true

@@ -45,6 +45,24 @@ final class XMPPSessionTests: XCTestCase {
         }
     }
 
+    func testCallOnlyConnectionNeverAnnouncesPresenceOrLoadsChatRosterAndDiscovery() throws {
+        var stream = XMPPSessionStream(account: try account(), loadRoster: true, callOnly: true)
+        let identifier = try reachBinding(&stream)
+        let output = try stream.receive(bound(identifier))
+        XCTAssertEqual(output.connectedJID, "fixture@localhost/device")
+        XCTAssertTrue(output.frames.isEmpty)
+        XCTAssertNil(output.roster)
+        let chat = try stream.receive("<message xmlns='jabber:client' from='peer@localhost/tablet' type='chat'><body>Private</body></message>")
+        XCTAssertNil(chat.chat)
+        XCTAssertTrue(chat.frames.isEmpty)
+        for namespace in ["http://jabber.org/protocol/disco#info", "urn:xmpp:ping"] {
+            let request = "<iq xmlns='jabber:client' from='peer@localhost/tablet' type='get' id='peer'><query xmlns='\(namespace)'/></iq>"
+            XCTAssertTrue(try stream.receive(request).frames.isEmpty)
+        }
+        let ping = "<iq xmlns='jabber:client' from='localhost' type='get' id='server'><ping xmlns='urn:xmpp:ping'/></iq>"
+        XCTAssertEqual(try stream.receive(ping).frames.count, 1)
+    }
+
     func testDirectChatRoutesWithoutAcknowledgingHeartbeatAndStopsOnClose() throws {
         var stream = try online()
         let ping = try ProbeXML.parse(stream.heartbeat())

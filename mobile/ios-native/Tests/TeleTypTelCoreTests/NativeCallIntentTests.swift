@@ -73,7 +73,11 @@ private final class CallRecoveryFixture: NativeCallIntentSending, NativeCallRese
     func observeCallIntents(_ observer: @escaping @Sendable (NativeCallIntent) -> Void) async {}
     func setCallPreferences(enabled: Bool, dnd: Bool, muted: Set<String>) async throws {}
     func proveCallResource(invitation: NativeCallInvitation, registration: NativePushRegistration) async throws { operations.append("proof"); try prove?() }
-    func accept(invitation: NativeCallInvitation, registration: NativePushRegistration, fullJID: String) async throws { operations.append("reserve"); try reserve?() }
+    var reservedCaller = "alice@example.test/caller"
+    func accept(invitation: NativeCallInvitation, registration: NativePushRegistration, fullJID: String) async throws -> NativeCallReservation {
+        operations.append("reserve"); try reserve?()
+        return NativeCallReservation(callerJID: reservedCaller, recipientJID: fullJID)
+    }
     func sendCallIntent(action: NativeCallIntentAction, peer: String, sid: String, media: NativeCallMedia?) async throws {
         XCTAssertEqual(action, .proceed); XCTAssertEqual(peer, "alice@example.test/caller"); XCTAssertNil(media)
         operations.append("proceed"); try proceed?()
@@ -130,6 +134,44 @@ final class NativeCallAnswerRecoveryTests: XCTestCase {
         do { _ = try await recover(recovery, fixture: fixture); XCTFail("Must fail") } catch {}
         XCTAssertEqual(fixture.operations, ["proof", "reserve", "abandon"])
         XCTAssertEqual(recovery.phase, .failed)
+    }
+
+    func testUnconfirmedProposalPeerCannotReplaceAuthoritativeCaller() async throws {
+        let fixture = CallRecoveryFixture(), recovery = NativeCallAnswerRecovery(now: { 100 })
+        fixture.reservedCaller = "charlie@example.test/other"
+        do { _ = try await recover(recovery, fixture: fixture); XCTFail("Must fail") } catch {}
+        XCTAssertEqual(fixture.operations, ["proof", "reserve", "abandon"])
+    }
+
+    func testOnlyPendingProofIsRetriedAndRetryBudgetIsBounded() async throws {
+        for exhausted in [false, true] {
+            var pauses = 0
+            let fixture = CallRecoveryFixture()
+            let recovery = NativeCallAnswerRecovery(now: { 100 }, waitForProof: { pauses += 1 })
+            fixture.reserve = {
+                if exhausted || pauses < 2 { throw NativePushRegistryFailure.proofPending }
+            }
+            do {
+                _ = try await recover(recovery, fixture: fixture)
+                XCTAssertFalse(exhausted)
+                XCTAssertEqual(pauses, 2)
+                XCTAssertEqual(fixture.operations.last, "proceed")
+            } catch {
+                XCTAssertTrue(exhausted)
+                XCTAssertEqual(pauses, 11)
+                XCTAssertEqual(fixture.operations.filter { $0 == "reserve" }.count, 12)
+                XCTAssertEqual(fixture.operations.last, "abandon")
+            }
+        }
+    }
+
+    func testCancellingDuringProofRetryPreventsProceed() async throws {
+        let fixture = CallRecoveryFixture()
+        var recovery: NativeCallAnswerRecovery!
+        recovery = NativeCallAnswerRecovery(now: { 100 }, waitForProof: { recovery.cancel() })
+        fixture.reserve = { throw NativePushRegistryFailure.proofPending }
+        do { _ = try await recover(recovery, fixture: fixture); XCTFail("Must fail") } catch {}
+        XCTAssertEqual(fixture.operations, ["proof", "reserve", "abandon"])
     }
 
     private func recover(_ recovery: NativeCallAnswerRecovery, fixture: CallRecoveryFixture, proposal: NativeCallIntent? = nil) async throws -> String {

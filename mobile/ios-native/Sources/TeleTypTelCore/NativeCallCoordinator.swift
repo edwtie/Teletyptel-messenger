@@ -88,6 +88,8 @@ final class NativeCallCoordinator {
     private var outgoing: OutgoingState?
     private var outgoingCompletion: ((Bool) -> Void)?
     var changed: (() -> Void)?
+    var invitationReceived: ((NativeCallInvitation) -> Void)?
+    var ended: ((NativeCallHandle) -> Void)?
     private(set) var isHeld = false
     private(set) var holdPending = false
     private var holdOperation: UUID?
@@ -209,6 +211,7 @@ final class NativeCallCoordinator {
 
     private func report(_ handle: NativeCallHandle, invitation: NativeCallInvitation,
                         complete: NativeCallOnce) {
+        invitationReceived?(invitation)
         schedule(handle)
         var reported = false
         system.report(id: handle.id, hasVideo: invitation.media.hasVideo) { [weak self, system] success in
@@ -363,6 +366,7 @@ final class NativeCallCoordinator {
         media.stop(handle: handle)
         media.audioActivated(false)
         system.end(id: handle.id, reason: reason)
+        ended?(handle)
         callback?(false)
         outgoingCallback?(false)
         changed?()

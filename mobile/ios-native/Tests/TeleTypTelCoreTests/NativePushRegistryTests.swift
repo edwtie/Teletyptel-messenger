@@ -186,7 +186,8 @@ final class NativePushRegistryTests: XCTestCase {
         let device = NativePushRegistration(deviceID: deviceID, generation: generation, expiresAt: current + 100, controlCredential: nil)
         let challenge = try envelope()
         let call: [String: Any] = ["callId": invitation.id.uuidString, "sid": invitation.sid, "state": "accepted",
-            "hasVideo": true, "mediaProfile": "total", "expiresAt": invitation.expiresAt]
+            "hasVideo": true, "mediaProfile": "total", "expiresAt": invitation.expiresAt,
+            "callerJid": "alice@localhost/caller", "recipientJid": "bob@localhost/awakened"]
         let accepted = try envelope(["call": call])
         PushRegistryHTTPFixture.handler = { request, body in
             if request.httpMethod == "GET" { return (200, challenge) }
@@ -196,12 +197,54 @@ final class NativePushRegistryTests: XCTestCase {
                 "deviceId": self.deviceID.uuidString.lowercased(), "generation": self.generation, "fullJid": "bob@localhost/awakened"])
             return (200, accepted)
         }
-        try await service.accept(invitation: invitation, registration: device, fullJID: "bob@localhost/awakened")
+        let reservation = try await service.accept(invitation: invitation, registration: device, fullJID: "bob@localhost/awakened")
+        XCTAssertEqual(reservation.callerJID, "alice@localhost/caller")
         for changed: [String: Any] in [["callId": UUID().uuidString], ["sid": "other"], ["state": "ringing"],
-            ["hasVideo": false], ["mediaProfile": "audio"], ["expiresAt": invitation.expiresAt + 1]] {
+            ["hasVideo": false], ["mediaProfile": "audio"], ["expiresAt": invitation.expiresAt + 1],
+            ["callerJid": "alice@elsewhere.test/caller"], ["callerJid": "alice@localhost"],
+            ["recipientJid": "bob@localhost/wrong"], ["callerJid": "bob@localhost/other"]] {
             let invalid = try envelope(["call": call.merging(changed) { _, new in new }])
             PushRegistryHTTPFixture.handler = { request, _ in (200, request.httpMethod == "GET" ? challenge : invalid) }
-            await assertFailure(.invalidResponse) { try await service.accept(invitation: invitation, registration: device, fullJID: "bob@localhost/awakened") }
+            await assertFailure(.invalidResponse) { _ = try await service.accept(invitation: invitation, registration: device, fullJID: "bob@localhost/awakened") }
+        }
+    }
+
+    func testProofRetryIsOnlyAllowedForExactAuthenticatedPendingResponse() async throws {
+        let service = try client()
+        let invitation = try XCTUnwrap(NativeCallInvitation(sid: "live-call", expiresAt: current + 45, media: .total, now: current))
+        let device = NativePushRegistration(deviceID: deviceID, generation: generation, expiresAt: current + 100, controlCredential: nil)
+        let challenge = try envelope()
+        for (status, code, expected) in [(425, "resource_proof_pending", NativePushRegistryFailure.proofPending),
+                                        (403, "resource_proof_pending", .rejected), (425, "access_denied", .rejected)] {
+            let failure = try JSONSerialization.data(withJSONObject: ["ok": false, "error": code])
+            PushRegistryHTTPFixture.handler = { request, _ in request.httpMethod == "GET" ? (200, challenge) : (status, failure) }
+            await assertFailure(expected) { _ = try await service.accept(invitation: invitation, registration: device, fullJID: "bob@localhost/awakened") }
+        }
+    }
+
+    func testDeclineUsesAuthenticatedReconcileAndRequiresExactTerminalCall() async throws {
+        let service = try client()
+        let invitation = try XCTUnwrap(NativeCallInvitation(sid: "live-call", expiresAt: current + 45, media: .total, now: current))
+        let device = NativePushRegistration(deviceID: deviceID, generation: generation, expiresAt: current + 100, controlCredential: "not-a-login-token")
+        let challenge = try envelope()
+        for state in ["ended", "expired", "unavailable", "answered-elsewhere", "accepted", "ringing"] {
+            let reply = try envelope(["calls": [["callId": invitation.id.uuidString, "sid": invitation.sid, "state": state]]])
+            PushRegistryHTTPFixture.handler = { request, body in
+                if request.httpMethod == "GET" { return (200, challenge) }
+                XCTAssertEqual(request.value(forHTTPHeaderField: "X-CSRF-Token"), self.csrf)
+                XCTAssertEqual(request.value(forHTTPHeaderField: "Cookie"), "PHPSESSID=fiction")
+                XCTAssertFalse(String(decoding: body, as: UTF8.self).contains("not-a-login-token"))
+                let fields = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+                XCTAssertEqual(fields["action"] as? String, "reconcile")
+                XCTAssertEqual(fields["deviceId"] as? String, self.deviceID.uuidString.lowercased())
+                let call = try XCTUnwrap((fields["calls"] as? [[String: Any]])?.first)
+                XCTAssertEqual(call["callId"] as? String, invitation.id.uuidString.lowercased())
+                XCTAssertEqual(call["end"] as? Bool, true)
+                return (200, reply)
+            }
+            if state == "accepted" || state == "ringing" {
+                await assertFailure(.invalidResponse) { try await service.end(invitation: invitation, registration: device) }
+            } else { try await service.end(invitation: invitation, registration: device) }
         }
     }
 

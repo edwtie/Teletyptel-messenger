@@ -33,12 +33,14 @@ struct XMPPSessionStream {
     private var pingID: String?
     private var handshakeBytes = 0
     private var roster: NativeRosterStream?
+    private let callOnly: Bool
 
-    init(account: NativeAuthenticatedAccount, loadRoster: Bool = false) {
+    init(account: NativeAuthenticatedAccount, loadRoster: Bool = false, callOnly: Bool = false) {
         self.account = account
+        self.callOnly = callOnly
         configuration = account.configuration
         expectedJID = account.jid
-        if loadRoster { roster = NativeRosterStream(owner: account.jid) }
+        if loadRoster && !callOnly { roster = NativeRosterStream(owner: account.jid) }
     }
 
     var opening: String { XMPPProbeStream.opening(for: configuration) }
@@ -128,7 +130,7 @@ struct XMPPSessionStream {
             }
             boundJID = jid.text
             phase = .online
-            return XMPPSessionOutput(frames: (roster.map { [$0.request] } ?? []) + [NativeMessageActionCodec.presence],
+            return XMPPSessionOutput(frames: (roster.map { [$0.request] } ?? []) + (callOnly ? [] : [NativeMessageActionCodec.presence]),
                                      connectedJID: jid.text, roster: roster == nil ? nil : .loading)
         case .online:
             guard root.namespace == "jabber:client", ["message", "presence", "iq"].contains(root.name) else {
@@ -140,10 +142,11 @@ struct XMPPSessionStream {
                 return XMPPSessionOutput(roster: update.state)
             }
             if root.name == "message", let boundJID = boundJID {
+                if callOnly { return XMPPSessionOutput() }
                 return XMPPSessionOutput(chat: NativeChatCodec.decode(root, owner: expectedJID, boundJID: boundJID))
             }
             if root.name == "iq" {
-                if let bound = boundJID, let reply = NativeMessageActionCodec.discovery(root, owner: expectedJID, bound: bound) {
+                if !callOnly, let bound = boundJID, let reply = NativeMessageActionCodec.discovery(root, owner: expectedJID, bound: bound) {
                     return XMPPSessionOutput(frames: [reply])
                 }
                 if let update = roster?.receive(root), update.state != nil || !update.frames.isEmpty {
@@ -157,6 +160,7 @@ struct XMPPSessionStream {
                     return XMPPSessionOutput(heartbeatAcknowledged: true)
                 }
                 if root.attributes["type"] == "get", root.children.count == 1,
+                   !callOnly || trustedSender,
                    let ping = root.children.first, ping.name == "ping", ping.namespace == "urn:xmpp:ping",
                    ping.children.isEmpty, let identifier = root.attributes["id"], !identifier.isEmpty {
                     let destination = sender.map { " to='\(Self.escape($0))'" } ?? ""

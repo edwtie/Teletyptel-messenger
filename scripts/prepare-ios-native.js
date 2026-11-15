@@ -13,6 +13,7 @@ const mediaFiles = ["NativeT140Session.swift", "NativeWebRTCChannel.swift"];
 coreFiles.push("NativeGroupManagement.swift", "NativeAccountFeatures.swift", "NativeMessageActions.swift", "NativeAvatars.swift", "NativeChatInteractions.swift", "NativeHistory.swift", "NativeDialing.swift", "NativeDtmf.swift", "NativeCloudRecord.swift", "NativeCloudHistory.swift", "NativeCloudSync.swift");
 coreFiles.push("NativePushRegistry.swift", "NativePushRegistrationModel.swift");
 coreFiles.push("NativeCallIntent.swift", "NativeCallAnswerRecovery.swift");
+coreFiles.push("NativeCallMediaGate.swift", "NativeWarmCallSession.swift");
 coreFiles.push("NativeInterpreterProtocol.swift", "NativeInterpreterSession.swift");
 coreFiles.push("NativeContactEditing.swift", "NativePresentationPreferences.swift", "NativeAvatarEditing.swift");
 coreFiles.push("NativeAccountLifecycle.swift");

@@ -16,10 +16,14 @@ on:
       - scripts/check-call-signaling-ejabberd.js
       - mobile/ios-native/Sources/TeleTypTelCore/NativeCallIntent.swift
       - mobile/ios-native/Sources/TeleTypTelCore/NativeCallAnswerRecovery.swift
+      - mobile/ios-native/Sources/TeleTypTelCore/NativeCallMediaGate.swift
+      - mobile/ios-native/Sources/TeleTypTelCore/NativeWarmCallSession.swift
       - mobile/ios-native/Sources/TeleTypTelCore/NativePushRegistry.swift
       - mobile/ios-native/Sources/TeleTypTelCore/NativeXMPPConnection.swift
       - mobile/ios-native/Tests/TeleTypTelCoreTests/NativeCallIntentTests.swift
       - mobile/ios-native/Tests/TeleTypTelCoreTests/NativePushRegistryTests.swift
+      - mobile/ios-native/Tests/TeleTypTelCoreTests/NativeWarmCallTests.swift
+      - mobile/ios-native/Tests/TeleTypTelCoreTests/NativeCallMediaGateTests.swift
 
 permissions:
   contents: read
@@ -66,4 +70,4 @@ jobs:
           test -n "$XCODE_PATH"
           echo "DEVELOPER_DIR=$XCODE_PATH/Contents/Developer" >> "$GITHUB_ENV"
       - name: Check native intent, reservation, cancellation and binding logic
-        run: swift test --package-path mobile/ios-native --filter 'NativeCallIntentTests|NativeCallAnswerRecoveryTests|NativePushRegistryTests|NativeJingleTransportTests'
+        run: swift test --package-path mobile/ios-native --filter 'NativeCallIntentTests|NativeCallAnswerRecoveryTests|NativePushRegistryTests|NativeJingleTransportTests|NativeWarmCallTests|NativeCallMediaGateTests|NativePushRegistrationModelTests|XMPPSessionTests'

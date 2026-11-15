@@ -52,6 +52,7 @@ public final class NativeLoginModel: ObservableObject {
     @Published private var sender: (any NativeChatSending)?
     var onJingle: ((NativeJingleRequest, any NativeJingleSending) -> Void)?
     private var resumableAccount: NativeAuthenticatedAccount?
+    private var callAuthorization = UUID()
     private var sendTasks: [UUID: Task<Void, Never>] = [:]
     private var earlyMessages: [NativeChatEvent] = []
     private var earlyJingle: [NativeJingleRequest] = []
@@ -111,6 +112,17 @@ public final class NativeLoginModel: ObservableObject {
     var currentOwner: String? { historyScope?.owner ?? resumableAccount?.jid }
     var activeWebSession: NativeAccountWebSession? { isConnected && !isBackground ? resumableAccount?.webSession : nil }
     var activeAccountID: String? { isConnected ? resumableAccount?.accountID : nil }
+    var warmCallLease: NativeWarmCallLease? {
+        guard isConnected || phase == .suspended || phase == .checking || phase == .connecting,
+              let account = resumableAccount,
+              account.accountID != nil, account.webSession != nil else { return nil }
+        return NativeWarmCallLease(account: account, authorization: callAuthorization)
+    }
+    func permitsWarmCall(_ lease: NativeWarmCallLease) -> Bool {
+        lease.authorization == callAuthorization && resumableAccount?.jid == lease.account.jid
+            && resumableAccount?.accountID == lease.account.accountID
+            && resumableAccount?.webSession === lease.account.webSession
+    }
     var activeJingleSender: (any NativeJingleSending)? {
         guard isConnected, !isBackground else { return nil }
         return jingleSender
@@ -814,6 +826,7 @@ public final class NativeLoginModel: ObservableObject {
             chat = NativeChatStore(); chatError = nil; historyStates.removeAll()
         }
         if !keepAccount {
+            callAuthorization = UUID()
             if let session = resumableAccount?.webSession { Task { await session.close() } }
             resumableAccount = nil
         }

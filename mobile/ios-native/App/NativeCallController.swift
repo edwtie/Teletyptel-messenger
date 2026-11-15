@@ -75,6 +75,9 @@ final class NativeCallController: ObservableObject, NativePushRegistering {
     private var activeID: UUID?
     private var callPeerJID: String?
     private var prepareTask: Task<Void, Never>?
+    private var pendingPush: NativeCallInvitation?
+    private var warmLease: NativeWarmCallLease?
+    private var warmSession: NativeWarmCallSession?
     private var isForeground = true
     var backgroundCallEnded: (() -> Void)?
     var hasLiveCall: Bool { runtime?.platform.coordinator.currentHandle != nil }
@@ -139,11 +142,17 @@ final class NativeCallController: ObservableObject, NativePushRegistering {
     func synchronize(_ phase: NativeLoginModel.Phase) {
         switch phase {
         case .connected(let jid):
+            if let lease = warmLease, hasLiveCall, login?.permitsWarmCall(lease) == true,
+               NativeChatCodec.bareJID(jid) == lease.account.jid {
+                account = jid
+                return
+            }
             guard account != jid else { return }
             resetCall()
             account = jid
             if ensureRuntime().platform.connectForeground(account: jid) == nil { status = .failed }
         case .checking, .authenticating, .connecting, .awaitingSecondFactor:
+            if let lease = warmLease, hasLiveCall, login?.permitsWarmCall(lease) == true { return }
             if login?.isReconnecting == true {
                 resetCall()
                 account = nil
@@ -306,6 +315,10 @@ final class NativeCallController: ObservableObject, NativePushRegistering {
             status = .active(activePeer?.sid ?? "")
             prepareInterpreter()
         }
+        if coordinator.lifecycle.current?.phase == .ringing, let pending = pendingPush,
+           pending.id == coordinator.currentHandle?.id, warmLease == nil {
+            _ = coordinator.end(id: pending.id, reason: .failed)
+        }
     }
 
     func prepareInterpreter() {
@@ -315,6 +328,68 @@ final class NativeCallController: ObservableObject, NativePushRegistering {
               let media = interpreterMedia else { return }
         interpreter.connect(client: NativeInterpreterAPI(session: session, account: account), media: media,
                             sid: sid, owner: owner, peer: peer, account: account)
+    }
+
+    private func receivedInvitation(_ invitation: NativeCallInvitation) {
+        guard activePeer == nil, pendingPush == nil else { return }
+        pendingPush = invitation
+        activeID = invitation.id
+        status = .ringing("TeleTypTel")
+        guard let lease = login?.warmCallLease, let accountID = lease.account.accountID,
+              lease.account.webSession != nil,
+              pushRegistration.recoveryRegistration(for: NativePushScope(origin: lease.account.configuration.origin.absoluteString,
+                  accountID: accountID)) != nil else { return }
+        warmLease = lease
+    }
+
+    private func prepareMedia(handle: NativeCallHandle, profile: NativeCallMedia) async throws {
+        if let peer = activePeer {
+            guard activeID == handle.id, peer.sid == handle.sid else { throw NativeJingleFailure.staleBinding }
+            return
+        }
+        guard let invitation = pendingPush, invitation.id == handle.id, invitation.sid == handle.sid,
+              invitation.media == profile, let lease = warmLease, let accountID = lease.account.accountID,
+              let session = lease.account.webSession, login?.permitsWarmCall(lease) == true,
+              let registration = pushRegistration.recoveryRegistration(for: NativePushScope(
+                  origin: lease.account.configuration.origin.absoluteString, accountID: accountID)),
+              let factory = factory, let capture = capture, let router = router else { throw NativeJingleFailure.disconnected }
+        let registry = NativePushRegistryClient(session: session, accountID: accountID)
+        let recovery = NativeWarmCallSession(invitation: invitation, registration: registration, registry: registry)
+        warmSession = recovery
+        recovery.remoteEnded = { [weak self] in _ = self?.runtime?.platform.coordinator.end(id: handle.id, reason: .remoteEnded) }
+        let offer = try await recovery.prepare(account: lease.account, validatePeer: { [weak self] peer in
+            guard let self = self, self.login?.isBlocked(peer) == false,
+                  self.login?.chat.preferences.mutedPeers.contains(NativeChatCodec.bareJID(peer) ?? "") == false else { throw NativeJingleFailure.rejected }
+        }, validateContext: { [weak self] in
+            guard let self = self, self.activeID == handle.id, self.pendingPush?.id == handle.id,
+                  self.login?.permitsWarmCall(lease) == true,
+                  self.pushRegistration.recoveryRegistration(for: NativePushScope(
+                    origin: lease.account.configuration.origin.absoluteString, accountID: accountID))?.generation == registration.generation,
+                  self.login?.chat.preferences.doNotDisturb == false else { throw NativeJingleFailure.rejected }
+        })
+        try Task.checkCancellation()
+        guard activeID == handle.id, warmSession === recovery,
+              login?.isBlocked(offer.request.peer) != true,
+              login?.chat.preferences.mutedPeers.contains(NativeChatCodec.bareJID(offer.request.peer) ?? "") != true else { throw NativeJingleFailure.rejected }
+        let provider = try await NativeIncomingPeerNegotiator(request: offer.request, profile: profile,
+            signalling: offer.sender, factory: factory, tracks: { [weak capture] in
+                guard let tracks = capture?.tracks else { throw NativeMediaCaptureFailure.unavailable }
+                return tracks
+            }, stopCapture: { [weak capture] in capture?.stop() })
+        guard !Task.isCancelled, activeID == handle.id, warmSession === recovery, activePeer == nil, router.install(provider) else {
+            provider.cancel(notifyPeer: true)
+            throw NativeJingleFailure.staleBinding
+        }
+        activePeer = provider
+        callPeerJID = NativeChatCodec.bareJID(offer.request.peer)
+        peerName = callPeerJID
+        recovery.receiveJingle = { [weak self] request, sender in self?.receive(request, sender: sender) }
+        recovery.activateRouting()
+    }
+
+    private func ended(_ handle: NativeCallHandle) {
+        guard activeID == handle.id || pendingPush?.id == handle.id else { return }
+        resetCall()
     }
 
     func setRttText(_ text: String) {
@@ -357,6 +432,19 @@ final class NativeCallController: ObservableObject, NativePushRegistering {
 
     private func resetCall() {
         interpreter.stop()
+        let recovered = warmSession
+        warmSession = nil
+        recovered?.cancel()
+        recovered?.endServerCall()
+        if recovered == nil, let invitation = pendingPush, let lease = warmLease,
+           login?.permitsWarmCall(lease) == true, let accountID = lease.account.accountID,
+           let session = lease.account.webSession,
+           let registration = pushRegistration.recoveryRegistration(for: NativePushScope(
+               origin: lease.account.configuration.origin.absoluteString, accountID: accountID)) {
+            let registry = NativePushRegistryClient(session: session, accountID: accountID)
+            Task { try? await registry.end(invitation: invitation, registration: registration) }
+        }
+        pendingPush = nil; warmLease = nil
         prepareTask?.cancel()
         prepareTask = nil
         let id = activeID ?? runtime?.platform.coordinator.currentHandle?.id
@@ -390,6 +478,12 @@ final class NativeCallController: ObservableObject, NativePushRegistering {
         self.capture = capture
         self.router = router
         self.runtime = runtime
+        runtime.gate.prepare = { [weak self] handle, profile in
+            guard let self = self else { throw NativeJingleFailure.disconnected }
+            try await self.prepareMedia(handle: handle, profile: profile)
+        }
+        runtime.platform.coordinator.invitationReceived = { [weak self] invitation in self?.receivedInvitation(invitation) }
+        runtime.platform.coordinator.ended = { [weak self] handle in self?.ended(handle) }
         self.interpreterMedia = NativeInterpreterMedia(factory: factory, tracks: { [weak capture] in capture?.tracks })
         runtime.media.presentationChanged = { [weak self] snapshot in
             self?.presentation = snapshot

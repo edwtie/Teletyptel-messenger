@@ -225,6 +225,8 @@ $denied(fn() => $fixture->event(array_replace($proof, ['jid' => 'alice@example.t
 $denied(fn() => $fixture->event(array_replace($proof, ['jid' => 'bob@example.test/vanished'])), 'offline resource proof denied');
 $fixture->event($proof); $fixture->event($fixture->proof($call, true));
 $check($fixture->answer($call)['state'] === 'accepted', 'verified device and rebound resource reserve call');
+$check($fixture->answer($call)['callerJid'] === 'alice@example.test/browser', 'answer returns authoritative full caller resource');
+$check($fixture->answer($call)['recipientJid'] === 'bob@example.test/phone', 'answer returns verified winning recipient resource');
 $check($fixture->answer($call)['state'] === 'accepted', 'same device/resource reservation idempotent');
 $denied(fn() => $fixture->answer($call, true), 'second device cannot win reservation');
 $denied(fn() => $fixture->event(array_replace($fixture->proof($call, true), ['revision' => 2])), 'losing device cannot replace reservation proof');

@@ -384,9 +384,28 @@ final class CallPushSignaling
             || !is_string($input['generation']) || !preg_match('/\A[0-9a-f]{32}\z/', $input['generation'])) {
             throw new CallPushFailure('Ongeldige antwoordaanvraag.');
         }
-        $this->account($input['fullJid'], true);
-        return $service->acceptVerified($account, $binding, self::uuid($input['callId']),
+        $owner = $this->account($input['fullJid'], true);
+        if ($owner['account_id'] !== $account) throw new CallPushFailure('Oproep niet beschikbaar.', 403);
+        $callId = self::uuid($input['callId']); $deviceId = self::uuid($input['deviceId']);
+        $candidate = $this->rows('SELECT * FROM call_push_calls WHERE call_id = ?', [$callId])[0] ?? null;
+        $devices = array_filter($service->devices($account, $binding), static fn(array $device): bool =>
+            $device['device_id'] === $deviceId && hash_equals($device['generation'], $input['generation']));
+        if (!$candidate || !$devices) throw new CallPushFailure('Oproep niet beschikbaar.', 403);
+        $status = $service->reconcileDevice($account, $binding, $deviceId,
+            [['callId' => $callId, 'sid' => $candidate['sid'], 'end' => false]])[0]['state'];
+        if (!in_array($status, ['ringing', 'accepted'], true)) throw new CallPushFailure('Oproep niet beschikbaar.', 409);
+        $proof = $this->rows('SELECT full_jid FROM call_signaling_handoffs WHERE scope_id = ? AND call_id = ? AND device_id = ? AND generation = ?',
+            [$this->scope, $callId, $deviceId, $input['generation']])[0] ?? null;
+        if (!$proof) throw new CallPushFailure('resource_proof_pending', 425);
+        $result = $service->acceptVerified($account, $binding, self::uuid($input['callId']),
             self::uuid($input['deviceId']), $input['generation'], $input['fullJid']);
+        $call = $this->rows('SELECT * FROM call_push_calls WHERE call_id = ?', [$result['callId']])[0] ?? null;
+        $record = $call ? ($this->rows('SELECT caller_jid FROM call_signaling_calls WHERE scope_id = ? AND caller = ? AND sid = ?',
+            [$this->scope, $call['caller'], $call['sid']])[0] ?? null) : null;
+        if (!$call || !$record || $call['recipient_jid'] !== $input['fullJid'] || !$this->allows($call, 'read')) {
+            throw new CallPushFailure('Oproep niet meer beschikbaar.', 409);
+        }
+        return $result + ['callerJid' => $record['caller_jid'], 'recipientJid' => $call['recipient_jid']];
     }
 
     private function cleanupInside(int $now): void

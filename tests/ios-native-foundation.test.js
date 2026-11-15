@@ -413,7 +413,7 @@ test("Native login session exposes bounded Jingle delivery only while connected"
   const login = read("Sources/TeleTypTelCore/NativeLoginModel.swift");
   const roster = read("Sources/TeleTypTelCore/NativeRoster.swift");
   assert.match(connection, /protocol NativeJingleXMPPConnecting/);
-  assert.match(connection, /acceptIncomingInitiates: self\.onJingle != nil/);
+  assert.match(connection, /acceptIncomingInitiates: !self\.callOnly && self\.onJingle != nil/);
   assert.match(transport, /acceptIncomingInitiates, action == "session-initiate"/);
   assert.match(login, /earlyJingle\.count < 8/);
   assert.match(login, /generation == attempt/);

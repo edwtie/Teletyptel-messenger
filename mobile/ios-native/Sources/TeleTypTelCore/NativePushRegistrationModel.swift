@@ -60,6 +60,16 @@ final class NativePushRegistrationModel: ObservableObject {
     }
     deinit { renewal?.cancel() }
 
+    func recoveryRegistration(for expected: NativePushScope) -> NativePushRegistration? {
+        guard enabled, consented, available, scope == expected, let value = record,
+              value.scope == expected, value.consented, !value.pendingRevocation,
+              let generation = value.generation,
+              generation.range(of: "\\A[0-9a-f]{32}\\z", options: .regularExpression) != nil,
+              let expiry = value.expiresAt, expiry.isFinite, expiry > now() else { return nil }
+        return NativePushRegistration(deviceID: value.deviceID, generation: generation,
+            expiresAt: expiry, controlCredential: value.controlCredential)
+    }
+
     func connect(_ client: (any NativePushRegistryServing)?, scope: NativePushScope?) async {
         guard enabled, let client = client, let scope = scope else { return }
         guard self.scope != scope || self.client == nil || !available else { flushToken(); return }

@@ -34,8 +34,26 @@ protocol NativeJingleXMPPConnecting: NativeXMPPConnecting {
              onJingleSender: @escaping @Sendable (any NativeJingleSending) -> Void) async throws
 }
 
-public struct NativeXMPPConnection: NativeXMPPConnecting, NativeJingleXMPPConnecting {
+protocol NativeCallRecoverySending: NativeJingleSending, NativeCallIntentSending {}
+
+protocol NativeCallXMPPConnecting {
+    func runCall(account: NativeAuthenticatedAccount, onConnected: @escaping @Sendable (String) -> Void,
+                 onSender: @escaping @Sendable (any NativeCallRecoverySending) -> Void,
+                 onIntent: @escaping @Sendable (NativeCallIntent) -> Void,
+                 onJingle: @escaping @Sendable (NativeJingleRequest) -> Void) async throws
+}
+
+public struct NativeXMPPConnection: NativeXMPPConnecting, NativeJingleXMPPConnecting, NativeCallXMPPConnecting {
     public init() {}
+
+    func runCall(account: NativeAuthenticatedAccount, onConnected: @escaping @Sendable (String) -> Void,
+                 onSender: @escaping @Sendable (any NativeCallRecoverySending) -> Void,
+                 onIntent: @escaping @Sendable (NativeCallIntent) -> Void,
+                 onJingle: @escaping @Sendable (NativeJingleRequest) -> Void) async throws {
+        let operation = SessionOperation(account: account, onConnected: onConnected, onJingle: onJingle,
+            callOnly: true, onCallSender: onSender, onCallIntent: onIntent)
+        try await withTaskCancellationHandler(operation: { try await operation.run() }, onCancel: { operation.cancel() })
+    }
 
     public func run(account: NativeAuthenticatedAccount, onConnected: @escaping @Sendable (String) -> Void,
                     onRoster: @escaping @Sendable (NativeRosterState) -> Void,
@@ -106,7 +124,7 @@ private final class NativeSessionClosure {
     }
 }
 
-private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, NativeArchiveSending, NativeGroupManaging, NativeMessageChanging, NativeGroupMessageChanging, NativeGroupReacting, NativeChatInteracting, NativeJingleSending, NativeCallIntentSending, NativeContactManaging, @unchecked Sendable {
+private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, NativeArchiveSending, NativeGroupManaging, NativeMessageChanging, NativeGroupMessageChanging, NativeGroupReacting, NativeChatInteracting, NativeCallRecoverySending, NativeContactManaging, @unchecked Sendable {
     private let configuration: ServerConfiguration
     private let ownerJID: String
     private var boundJID: String?
@@ -136,6 +154,8 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
     private var onJingleSender: (@Sendable (any NativeJingleSending) -> Void)?
     private var callIntentObserver: (@Sendable (NativeCallIntent) -> Void)?
     private var earlyCallIntents: [NativeCallIntent] = []
+    private let callOnly: Bool
+    private var onCallSender: (@Sendable (any NativeCallRecoverySending) -> Void)?
     private var jingle: NativeJingleTransport?
     private var jingleDeadline: DispatchWorkItem?
     private var pendingJingle: [String: CheckedContinuation<Void, Error>] = [:]
@@ -149,10 +169,16 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
          onChat: (@Sendable (NativeChatEvent) -> Void)? = nil,
          onSender: (@Sendable (any NativeChatSending) -> Void)? = nil,
          onJingle: (@Sendable (NativeJingleRequest) -> Void)? = nil,
-         onJingleSender: (@Sendable (any NativeJingleSending) -> Void)? = nil) {
+         onJingleSender: (@Sendable (any NativeJingleSending) -> Void)? = nil,
+         callOnly: Bool = false,
+         onCallSender: (@Sendable (any NativeCallRecoverySending) -> Void)? = nil,
+         onCallIntent: (@Sendable (NativeCallIntent) -> Void)? = nil) {
         configuration = account.configuration
         ownerJID = account.jid
-        stream = XMPPSessionStream(account: account, loadRoster: onRoster != nil)
+        self.callOnly = callOnly
+        self.onCallSender = onCallSender
+        callIntentObserver = onCallIntent
+        stream = XMPPSessionStream(account: account, loadRoster: !callOnly && onRoster != nil, callOnly: callOnly)
         self.onConnected = onConnected
         self.onRoster = onRoster
         self.onChat = onChat
@@ -797,6 +823,7 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
         onSender = nil
         onJingle = nil
         onJingleSender = nil
+        onCallSender = nil
         callIntentObserver = nil; earlyCallIntents.removeAll()
         if let token = archive?.token { completeArchive(token, result: .failure(error)) }
         invitationObserver = nil
@@ -868,12 +895,15 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
                 do {
                     guard case .string(let frame) = try result.get() else { throw ConnectionFailure.invalidResponse }
                     let output = try self.stream.receive(frame)
-                    if self.stream.phase == .online { self.receiveArchive(frame); self.receiveGroups(frame); self.receiveInvitation(frame); self.receiveManagement(frame); self.receiveContactEdit(frame); self.receiveCallIntent(frame) }
+                    if self.stream.phase == .online {
+                        if !self.callOnly { self.receiveArchive(frame); self.receiveGroups(frame); self.receiveInvitation(frame); self.receiveManagement(frame) }
+                        self.receiveContactEdit(frame); self.receiveCallIntent(frame)
+                    }
                     self.send(output.frames) {
                         if let jid = output.connectedJID {
                             self.boundJID = jid
                             self.jingle = NativeJingleTransport(owner: jid,
-                                acceptIncomingInitiates: self.onJingle != nil)
+                                acceptIncomingInitiates: !self.callOnly && self.onJingle != nil)
                             self.deadline?.cancel()
                             self.deadline = nil
                             self.onConnected?(jid)
@@ -882,6 +912,8 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
                             self.onSender = nil
                             self.onJingleSender?(self)
                             self.onJingleSender = nil
+                            self.onCallSender?(self)
+                            self.onCallSender = nil
                             self.scheduleHeartbeat()
                         }
                         if output.heartbeatAcknowledged {

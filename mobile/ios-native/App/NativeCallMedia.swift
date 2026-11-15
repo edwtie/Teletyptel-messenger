@@ -132,6 +132,7 @@ final class NativeWebRTCCallMedia: NativeCallMediaDriver {
         let permitted = active && handle != nil && !held
         guard audioActive != permitted else { return }
         audioActive = permitted
+        prepared?.microphone.isEnabled = permitted && !muted && !held
         let audio = RTCAudioSession.sharedInstance()
         audio.useManualAudio = true
         if permitted {
@@ -148,7 +149,7 @@ final class NativeWebRTCCallMedia: NativeCallMediaDriver {
     func setMuted(_ muted: Bool) -> Bool {
         guard let microphone = prepared?.microphone else { return false }
         self.muted = muted
-        microphone.isEnabled = !muted && !held
+        microphone.isEnabled = !muted && !held && audioActive
         return true
     }
 
@@ -173,7 +174,7 @@ final class NativeWebRTCCallMedia: NativeCallMediaDriver {
     }
 
     private func applyHold() {
-        prepared?.microphone.isEnabled = !muted && !held
+        prepared?.microphone.isEnabled = !muted && !held && audioActive
         capture.setHeld(held)
         _ = rtt?.setPaused(held)
         if held { clearDtmf() }
@@ -298,11 +299,14 @@ final class NativeWebRTCCallMedia: NativeCallMediaDriver {
 final class NativeCallRuntime {
     let media: NativeWebRTCCallMedia
     let platform: NativeCallPlatform
+    let gate: NativeCallMediaGate
 
     init(negotiation: any NativePeerNegotiating, capture: NativeMediaCapture) {
         let media = NativeWebRTCCallMedia(negotiation: negotiation, capture: capture)
         self.media = media
-        platform = NativeCallPlatform(media: media)
+        let gate = NativeCallMediaGate(media: media)
+        self.gate = gate
+        platform = NativeCallPlatform(media: gate)
     }
 
     func logout() { platform.disable() }

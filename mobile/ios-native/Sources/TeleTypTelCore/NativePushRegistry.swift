@@ -1,6 +1,6 @@
 import Foundation
 
-enum NativePushRegistryFailure: Error, Equatable { case unavailable, invalidResponse, rejected }
+enum NativePushRegistryFailure: Error, Equatable { case unavailable, invalidResponse, rejected, proofPending }
 
 private protocol NativePushRegistryReply {
     var ok: Bool { get }
@@ -66,7 +66,7 @@ struct NativePushRegistryClient: NativePushRegistryServing {
         try Task.checkCancellation()
     }
 
-    func accept(invitation: NativeCallInvitation, registration: NativePushRegistration, fullJID: String) async throws {
+    func accept(invitation: NativeCallInvitation, registration: NativePushRegistration, fullJID: String) async throws -> NativeCallReservation {
         guard NativeJingleTransport.fullJID(fullJID),
               NativeChatCodec.bareJID(fullJID)?.hasSuffix("@" + session.configuration.domain) == true,
               validExpiry(registration.expiresAt), invitation.expiresAt > now(),
@@ -80,7 +80,22 @@ struct NativePushRegistryClient: NativePushRegistryServing {
         guard reply.call.callId == invitation.id, reply.call.sid == invitation.sid,
               reply.call.state == "accepted", reply.call.mediaProfile == invitation.media,
               reply.call.hasVideo == invitation.media.hasVideo, reply.call.expiresAt == invitation.expiresAt,
-              invitation.expiresAt > now() else { throw NativePushRegistryFailure.invalidResponse }
+              invitation.expiresAt > now(), reply.call.recipientJid == fullJID,
+              NativeJingleTransport.fullJID(reply.call.callerJid),
+              NativeChatCodec.bareJID(reply.call.callerJid)?.hasSuffix("@" + session.configuration.domain) == true,
+              NativeChatCodec.bareJID(reply.call.callerJid) != NativeChatCodec.bareJID(fullJID) else { throw NativePushRegistryFailure.invalidResponse }
+        try Task.checkCancellation()
+        return NativeCallReservation(callerJID: reply.call.callerJid, recipientJID: reply.call.recipientJid)
+    }
+
+    func end(invitation: NativeCallInvitation, registration: NativePushRegistration) async throws {
+        let csrf = try await challenge()
+        let body = try JSONSerialization.data(withJSONObject: ["action": "reconcile", "deviceId": registration.deviceID.uuidString.lowercased(),
+            "calls": [["callId": invitation.id.uuidString.lowercased(), "sid": invitation.sid, "end": true]]])
+        let reply = try JSONDecoder().decode(Reconciled.self, from: await request(body: body, csrf: csrf))
+        try validate(reply)
+        guard reply.calls.count == 1, let call = reply.calls.first, call.callId == invitation.id, call.sid == invitation.sid,
+              ["ended", "expired", "unavailable", "answered-elsewhere"].contains(call.state) else { throw NativePushRegistryFailure.invalidResponse }
         try Task.checkCancellation()
     }
 
@@ -109,6 +124,7 @@ struct NativePushRegistryClient: NativePushRegistryServing {
             guard data.count <= 16384 else { throw NativePushRegistryFailure.invalidResponse }
             return data
         } catch let error as NativeWebServiceFailure {
+            if error.status == 425, error.code == "resource_proof_pending" { throw NativePushRegistryFailure.proofPending }
             if error.status == 404 { throw NativePushRegistryFailure.unavailable }
             throw NativePushRegistryFailure.rejected
         }
@@ -189,5 +205,18 @@ struct NativePushRegistryClient: NativePushRegistryServing {
         let mediaProfile: NativeCallMedia
         let hasVideo: Bool
         let expiresAt: TimeInterval
+        let callerJid: String
+        let recipientJid: String
+    }
+    private struct Reconciled: Decodable, NativePushRegistryReply {
+        let ok: Bool
+        let accountId: String
+        let csrfToken: String
+        let calls: [EndedCall]
+    }
+    private struct EndedCall: Decodable {
+        let callId: UUID
+        let sid: String
+        let state: String
     }
 }

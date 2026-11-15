@@ -34,12 +34,18 @@ final class NativeMediaCapture {
 
     func prepare(_ profile: NativeCallMedia) async throws {
         guard microphone == nil, camera == nil, capturer == nil else { throw NativeMediaCaptureFailure.busy }
-        guard await Self.permission(.audio) else { throw NativeMediaCaptureFailure.permissionDenied }
-        if profile.hasVideo, !(await Self.permission(.video)) { throw NativeMediaCaptureFailure.permissionDenied }
+        if !foreground {
+            guard AVCaptureDevice.authorizationStatus(for: .audio) == .authorized,
+                  !profile.hasVideo || AVCaptureDevice.authorizationStatus(for: .video) == .authorized else {
+                throw NativeMediaCaptureFailure.permissionDenied
+            }
+        }
+        guard await Self.permission(.audio, mayPrompt: foreground) else { throw NativeMediaCaptureFailure.permissionDenied }
+        if profile.hasVideo, !(await Self.permission(.video, mayPrompt: foreground)) { throw NativeMediaCaptureFailure.permissionDenied }
         try Task.checkCancellation()
 
         let microphone = factory.audioTrack(withTrackId: "teletyptel-microphone-\(UUID().uuidString)")
-        microphone.isEnabled = true
+        microphone.isEnabled = false
         self.microphone = microphone
         guard profile.hasVideo else { return }
 
@@ -120,10 +126,11 @@ final class NativeMediaCapture {
         }
     }
 
-    private static func permission(_ type: AVMediaType) async -> Bool {
+    private static func permission(_ type: AVMediaType, mayPrompt: Bool) async -> Bool {
         switch AVCaptureDevice.authorizationStatus(for: type) {
         case .authorized: return true
         case .notDetermined:
+            guard mayPrompt else { return false }
             return await withCheckedContinuation { continuation in
                 AVCaptureDevice.requestAccess(for: type) { continuation.resume(returning: $0) }
             }

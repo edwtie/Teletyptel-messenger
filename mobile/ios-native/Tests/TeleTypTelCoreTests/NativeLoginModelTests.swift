@@ -42,10 +42,11 @@ private actor LoginFixture: ServerChecking, NativeAccountAuthenticating, NativeX
     private var pendingArchives: [(CheckedContinuation<NativeArchivePage, Error>, NativeArchivePage)] = []
     private let holdArchive: Bool
     private let wrongArchiveOwner: Bool
+    private let warmAccount: Bool
 
     init(accountError: NativeAccountFailure? = nil, probeError: ConnectionFailure? = nil,
          holdAuthentication: Bool = false, wrongAccount: Bool = false, holdSends: Bool = false,
-         holdArchive: Bool = false, wrongArchiveOwner: Bool = false) {
+         holdArchive: Bool = false, wrongArchiveOwner: Bool = false, warmAccount: Bool = false) {
         self.accountError = accountError
         self.probeError = probeError
         self.holdAuthentication = holdAuthentication
@@ -53,6 +54,7 @@ private actor LoginFixture: ServerChecking, NativeAccountAuthenticating, NativeX
         self.holdSends = holdSends
         self.holdArchive = holdArchive
         self.wrongArchiveOwner = wrongArchiveOwner
+        self.warmAccount = warmAccount
     }
 
     func history() -> [String] { events }
@@ -97,8 +99,12 @@ private actor LoginFixture: ServerChecking, NativeAccountAuthenticating, NativeX
     func login(configuration: ServerConfiguration, jid: String, password: String) async throws -> NativeAuthenticatedAccount {
         events.append("account")
         if let accountError = accountError { throw accountError }
-        let account = NativeAuthenticatedAccount(configuration: configuration,
+        var account = NativeAuthenticatedAccount(configuration: configuration,
                                                  jid: wrongAccount ? "wrong@localhost" : jid, password: password)
+        if warmAccount {
+            account.accountID = "fixture"
+            account.webSession = NativeAccountWebSession(configuration: configuration, cookie: "PHPSESSID=fiction")
+        }
         if holdAuthentication {
             pendingAccount = account
             return try await withCheckedThrowingContinuation { pendingAuthentication = $0 }
@@ -504,6 +510,33 @@ final class NativeLoginModelTests: XCTestCase {
     @MainActor
     private func start(_ model: NativeLoginModel, jid: String = "fixture@localhost") {
         model.login(address: "https://example.invalid", domain: "localhost", jid: jid, password: "fake-only")
+    }
+
+    @MainActor
+    func testWarmCallLeaseSurvivesSuspensionWithoutUnlockingChatAndDiesOnLogout() async throws {
+        let fixture = LoginFixture(warmAccount: true), login = model(fixture)
+        XCTAssertNil(login.warmCallLease)
+        start(login)
+        await eventually { await fixture.runCount() == 1 }
+        await fixture.ready(0)
+        await eventually { login.canSend }
+        let lease = try XCTUnwrap(login.warmCallLease)
+        XCTAssertTrue(login.permitsWarmCall(lease))
+        XCTAssertEqual(String(reflecting: lease), "NativeWarmCallLease(redacted)")
+        login.suspend()
+        XCTAssertFalse(login.canSend)
+        XCTAssertNil(login.activeWebSession)
+        XCTAssertTrue(login.permitsWarmCall(lease))
+        XCTAssertNotNil(login.warmCallLease)
+        login.disconnect()
+        XCTAssertFalse(login.permitsWarmCall(lease))
+        XCTAssertNil(login.warmCallLease)
+        start(login)
+        await eventually { await fixture.runCount() == 2 }
+        await fixture.ready(1)
+        await eventually { login.canSend }
+        XCTAssertFalse(login.permitsWarmCall(lease))
+        login.disconnect()
     }
 
     @MainActor
