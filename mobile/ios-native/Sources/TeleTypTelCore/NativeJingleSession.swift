@@ -31,6 +31,9 @@ final class NativeJingleSession {
     private(set) var isLocallyHeld = false
     private(set) var isRemotelyHeld = false
     private var holdPending = false
+    private var rtpNames: [String: String] = [:]
+    private var remotelyMuted = Set<String>()
+    var isRemoteVideoMuted: Bool { remotelyMuted.contains("video") }
 
     init(role: Role, binding: UUID, peer: String, sid: String, profile: NativeCallMedia,
          signalling: any NativeJingleSending, media: any NativeMediaNegotiating,
@@ -56,6 +59,7 @@ final class NativeJingleSession {
             try current(attempt)
             guard offer.sid == sid, offer.profile == profile, offer.action == "session-initiate" else { throw NativeJingleFailure.invalidRequest }
             offered = offer
+            rtpNames = offer.rtpContentNames
             transition(.waiting)
             try await signalling.exchangeJingle(binding: binding, xml: offer.xml)
             try current(attempt)
@@ -79,6 +83,7 @@ final class NativeJingleSession {
                 return
             }
             incoming = offer
+            rtpNames = offer.rtpContentNames
             transition(.preparing)
             do {
                 try await signalling.replyJingle(request, rejection: nil)
@@ -119,12 +124,24 @@ final class NativeJingleSession {
                   Set(element.attributes.keys).isSubset(of: ["sid", "action", "initiator", "responder"]),
                   element.children.count == 1, let info = element.children.first,
                   info.namespace == "urn:xmpp:jingle:apps:rtp:info:1",
-                  ["hold", "unhold", "active"].contains(info.name), info.attributes.isEmpty,
                   info.children.isEmpty, info.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 try? await signalling.replyJingle(request, rejection: .featureNotImplemented)
                 return
             }
-            isRemotelyHeld = info.name == "hold"
+            if ["hold", "unhold", "active"].contains(info.name), info.attributes.isEmpty {
+                isRemotelyHeld = info.name == "hold"
+                if info.name == "active" { remotelyMuted.removeAll() }
+            } else if ["mute", "unmute"].contains(info.name),
+                      Set(info.attributes.keys).isSubset(of: ["creator", "name"]),
+                      info.attributes["creator"] == (role == .initiator ? "responder" : "initiator"),
+                      info.attributes["name"] == nil || rtpNames.values.contains(info.attributes["name"] ?? "") {
+                let kinds = Set(rtpNames.filter { info.attributes["name"] == nil || $0.value == info.attributes["name"] }.keys)
+                if info.name == "mute" { remotelyMuted.formUnion(kinds) }
+                else { remotelyMuted.subtract(kinds) }
+            } else {
+                try? await signalling.replyJingle(request, rejection: .featureNotImplemented)
+                return
+            }
             changed(.negotiated)
             try? await signalling.replyJingle(request, rejection: nil)
         case "session-terminate":
@@ -153,6 +170,16 @@ final class NativeJingleSession {
             incoming = nil
             transition(.negotiated)
         } catch { await stop(); throw error }
+    }
+
+    func setVideoEnabled(_ enabled: Bool) async throws {
+        guard phase == .negotiated, let name = rtpNames["video"] else { throw NativeJingleFailure.invalidRequest }
+        let attempt = generation
+        let info = enabled ? "unmute" : "mute"
+        let creator = role == .initiator ? "initiator" : "responder"
+        let xml = "<jingle xmlns='urn:xmpp:jingle:1' sid='\(sid)' action='session-info'><\(info) xmlns='urn:xmpp:jingle:apps:rtp:info:1' creator='\(creator)' name='\(NativeJingleTransport.escape(name))'/></jingle>"
+        try await signalling.exchangeJingle(binding: binding, xml: xml)
+        try current(attempt)
     }
 
     func setHeld(_ held: Bool) async throws {
@@ -196,6 +223,8 @@ final class NativeJingleSession {
         offered = nil
         isLocallyHeld = false
         isRemotelyHeld = false
+        remotelyMuted.removeAll()
+        rtpNames.removeAll()
         phase = .ended
         media.close()
         changed(.ended)

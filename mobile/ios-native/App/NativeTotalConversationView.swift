@@ -15,22 +15,26 @@ struct NativeTotalConversationView: View {
         GeometryReader { geometry in
             if let presentation = controller.presentation {
                 let landscape = geometry.size.width > geometry.size.height
+                let expandedRtt = presentation.profile.expandsRtt(cameraEnabled: presentation.cameraEnabled,
+                    remoteCameraEnabled: presentation.remoteCameraEnabled,
+                    interpreterVideo: controller.interpreter.connected || controller.interpreterMedia?.remoteVideo != nil)
                 ZStack {
-                    videoCanvas(presentation)
+                    if !expandedRtt { videoCanvas(presentation) }
                     VStack(spacing: 0) {
                         header(presentation)
-                        Spacer(minLength: 12)
+                        if !expandedRtt { Spacer(minLength: 12) }
                         if let media = controller.interpreterMedia {
                             HStack { Spacer(); NativeInterpreterTile(session: controller.interpreter, media: media, width: min(190, geometry.size.width * 0.35)) }
                                 .padding(.horizontal, 12)
                         }
                         if presentation.profile.contents.contains("rtt") {
-                            rttPanes(presentation, landscape: landscape)
+                            rttPanes(presentation, landscape: landscape, expanded: expandedRtt)
                                 .padding(.horizontal, landscape ? 16 : 12)
+                                .padding(.top, expandedRtt ? 12 : 0)
                                 .padding(.bottom, 10)
                         }
                     }
-                    if let localVideo = presentation.localVideo, presentation.profile.hasVideo {
+                    if let localVideo = presentation.localVideo, presentation.profile.hasVideo, presentation.cameraEnabled {
                         NativeVideoSurface(track: localVideo)
                             .frame(width: min(landscape ? 220 : 150, geometry.size.width * 0.34),
                                    height: min(landscape ? 138 : 190, geometry.size.height * 0.25))
@@ -42,7 +46,7 @@ struct NativeTotalConversationView: View {
                             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
                             .accessibilityLabel("Eigen camerabeeld")
                     }
-                    if presentation.profile.hasVideo, presentation.canSwitchCamera {
+                    if presentation.profile.hasVideo, presentation.canSwitchCamera, presentation.cameraEnabled {
                         Button(action: controller.switchCamera) {
                             Image(systemName: "arrow.triangle.2.circlepath.camera.fill")
                                 .font(.system(size: 22, weight: .semibold))
@@ -56,7 +60,9 @@ struct NativeTotalConversationView: View {
                         .accessibilityLabel("Camera wisselen")
                     }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(NativeWebStyle.callBackground)
+                .accessibilityIdentifier(expandedRtt ? "tc-expanded-rtt" : "tc-video-layout")
                 .font(NativeWebStyle.font())
                 .statusBarHidden(landscape)
             }
@@ -94,7 +100,7 @@ struct NativeTotalConversationView: View {
 
     @ViewBuilder
     private func videoCanvas(_ presentation: NativeCallPresentation) -> some View {
-        if let remoteVideo = presentation.remoteVideo, presentation.profile.hasVideo {
+        if let remoteVideo = presentation.remoteVideo, presentation.profile.hasVideo, presentation.remoteCameraEnabled != false {
             NativeVideoSurface(track: remoteVideo)
                 .ignoresSafeArea(edges: .bottom)
                 .accessibilityLabel("Videobeeld van gesprekspartner")
@@ -104,7 +110,7 @@ struct NativeTotalConversationView: View {
                 VStack(spacing: 12) {
                     Image(systemName: presentation.profile.hasVideo ? "video.slash.fill" : "waveform")
                         .font(.system(size: 42, weight: .semibold))
-                    Text(presentation.profile.hasVideo ? "Video wordt verbonden" : "Audiogesprek")
+                    Text(presentation.profile.hasVideo ? (presentation.remoteCameraEnabled == false ? "Camera van gesprekspartner uit" : "Video wordt verbonden") : "Audiogesprek")
                         .font(.headline)
                 }
                 .foregroundStyle(.white.opacity(0.78))
@@ -151,25 +157,41 @@ struct NativeTotalConversationView: View {
     }
 
     @ViewBuilder
-    private func rttPanes(_ presentation: NativeCallPresentation, landscape: Bool) -> some View {
+    private func rttPanes(_ presentation: NativeCallPresentation, landscape: Bool, expanded: Bool) -> some View {
         if landscape {
-            HStack(alignment: .bottom, spacing: 12) {
-                remoteRttPane(presentation)
-                ownRttPane(presentation)
+            HStack(alignment: .top, spacing: 12) {
+                remoteRttPane(presentation, expanded: expanded)
+                ownRttPane(presentation, expanded: expanded)
             }
+            .frame(maxHeight: expanded ? .infinity : nil)
         } else {
             VStack(spacing: 10) {
-                remoteRttPane(presentation)
-                ownRttPane(presentation)
+                remoteRttPane(presentation, expanded: expanded)
+                ownRttPane(presentation, expanded: expanded)
             }
+            .frame(maxHeight: expanded ? .infinity : nil)
         }
     }
 
-    private func remoteRttPane(_ presentation: NativeCallPresentation) -> some View {
+    private func remoteRttPane(_ presentation: NativeCallPresentation, expanded: Bool) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(controller.peerName ?? "Gesprekspartner")
                 .font(.caption.bold())
                 .foregroundStyle(Color(red: 0.55, green: 0.75, blue: 1))
+            if expanded {
+                ScrollViewReader { scroll in
+                    rttContent(expanded: true, identifier: "tc-peer-scroll") { remoteRttText(presentation) }
+                        .onAppear { scroll.scrollTo("tc-peer-tail", anchor: .bottom) }
+                        .onChange(of: presentation.remoteText) { _ in scroll.scrollTo("tc-peer-tail", anchor: .bottom) }
+                    }
+            } else { remoteRttText(presentation) }
+        }
+        .rttPaneStyle(expanded: expanded)
+        .accessibilityIdentifier("tc-peer-pane")
+    }
+
+    private func remoteRttText(_ presentation: NativeCallPresentation) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
             Text(presentation.remoteText.isEmpty ? "…" : presentation.remoteText)
                 .font(.title3)
                 .foregroundStyle(.white)
@@ -179,36 +201,49 @@ struct NativeTotalConversationView: View {
             if let result = translation.results[liveKey("peer")], translation.preferences.mode != "off", translation.sharingConsent {
                 NativeTranslationCaption(result: result).foregroundStyle(.white)
             }
+            Color.clear.frame(height: 1).id("tc-peer-tail").accessibilityHidden(true)
         }
-        .rttPaneStyle()
-        .accessibilityIdentifier("tc-peer-pane")
     }
 
-    private func ownRttPane(_ presentation: NativeCallPresentation) -> some View {
+    private func ownRttPane(_ presentation: NativeCallPresentation, expanded: Bool) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Ik")
                 .font(.caption.bold())
                 .foregroundStyle(Color(red: 0.55, green: 0.75, blue: 1))
-            TextField("Typ realtime tekst", text: Binding(
-                get: { controller.presentation?.ownText ?? "" },
-                set: controller.setRttText
-            ), prompt: Text("Typ realtime tekst").foregroundColor(Color.white.opacity(0.65)), axis: .vertical)
-            .lineLimit(2...5)
-            .textFieldStyle(.plain)
-            .font(.title3)
-            .foregroundStyle(.white)
-            .tint(.blue)
-            .focused($rttFocused)
-            .disabled(!presentation.rttReady)
-            .accessibilityLabel("Eigen realtime tekst")
-            .accessibilityHint(presentation.rttReady ? "Tekst wordt direct tijdens het gesprek verzonden" :
-                               "Wacht totdat realtime tekst is verbonden")
-            if let result = translation.results[liveKey("self")], translation.preferences.mode != "off", translation.sharingConsent {
-                NativeTranslationCaption(result: result).foregroundStyle(.white)
+            rttContent(expanded: expanded, identifier: "tc-own-scroll") {
+                VStack(alignment: .leading, spacing: 6) {
+                    TextField("Typ realtime tekst", text: Binding(
+                        get: { controller.presentation?.ownText ?? "" },
+                        set: controller.setRttText
+                    ), prompt: Text("Typ realtime tekst").foregroundColor(Color.white.opacity(0.65)), axis: .vertical)
+                    .lineLimit(expanded ? nil : 5)
+                    .frame(minHeight: 44, alignment: .topLeading)
+                    .textFieldStyle(.plain)
+                    .font(.title3)
+                    .foregroundStyle(.white)
+                    .tint(.blue)
+                    .focused($rttFocused)
+                    .disabled(!presentation.rttReady)
+                    .accessibilityLabel("Eigen realtime tekst")
+                    .accessibilityHint(presentation.rttReady ? "Tekst wordt direct tijdens het gesprek verzonden" :
+                                       "Wacht totdat realtime tekst is verbonden")
+                    if let result = translation.results[liveKey("self")], translation.preferences.mode != "off", translation.sharingConsent {
+                        NativeTranslationCaption(result: result).foregroundStyle(.white)
+                    }
+                }
             }
         }
-        .rttPaneStyle()
+        .rttPaneStyle(expanded: expanded)
         .accessibilityIdentifier("tc-own-pane")
+    }
+
+    @ViewBuilder
+    private func rttContent<Content: View>(expanded: Bool, identifier: String, @ViewBuilder content: () -> Content) -> some View {
+        if expanded {
+            ScrollView { content().frame(maxWidth: .infinity, alignment: .topLeading) }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .accessibilityIdentifier(identifier)
+        } else { content() }
     }
 
     private func liveKey(_ direction: String) -> String { "tc:" + (controller.presentation?.callID.uuidString ?? "none") + ":" + direction }
@@ -340,10 +375,10 @@ struct NativeVideoSurface: UIViewRepresentable {
 }
 
 private extension View {
-    func rttPaneStyle() -> some View {
+    func rttPaneStyle(expanded: Bool) -> some View {
         self
             .padding(10)
-            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .frame(maxWidth: .infinity, maxHeight: expanded ? .infinity : nil, alignment: .topLeading)
             .background(NativeWebStyle.callBackground.opacity(0.94), in: RoundedRectangle(cornerRadius: 8))
             .overlay(RoundedRectangle(cornerRadius: 8).stroke(NativeWebStyle.callLine, lineWidth: 2))
     }

@@ -33,7 +33,7 @@ on:
       ui_scope:
         description: Explicit test selection for focused-ui only
         type: choice
-        options: [regression, groups]
+        options: [regression, groups, tc]
         default: regression
 
 permissions:

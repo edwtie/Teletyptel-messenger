@@ -16,6 +16,10 @@ enum NativeCallMedia: String, Codable, CaseIterable {
     }
 
     var hasVideo: Bool { contents.contains("video") }
+
+    func expandsRtt(cameraEnabled: Bool, remoteCameraEnabled: Bool?, interpreterVideo: Bool) -> Bool {
+        contents.contains("rtt") && !cameraEnabled && !interpreterVideo && (!hasVideo || remoteCameraEnabled == false)
+    }
 }
 
 struct NativeCallInvitation: Equatable {

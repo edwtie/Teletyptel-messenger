@@ -3,6 +3,18 @@ import XCTest
 @testable import TeleTypTelCore
 
 final class NativePresentationTests: XCTestCase {
+    func testExpandedRttRequiresAllKnownCamerasOffAndNeverHidesAnInterpreter() {
+        XCTAssertTrue(NativeCallMedia.total.expandsRtt(cameraEnabled: false, remoteCameraEnabled: false, interpreterVideo: false))
+        XCTAssertTrue(NativeCallMedia.audioRtt.expandsRtt(cameraEnabled: false, remoteCameraEnabled: nil, interpreterVideo: false))
+        for remote in [true, nil] as [Bool?] {
+            XCTAssertFalse(NativeCallMedia.total.expandsRtt(cameraEnabled: false, remoteCameraEnabled: remote, interpreterVideo: false))
+        }
+        XCTAssertFalse(NativeCallMedia.total.expandsRtt(cameraEnabled: true, remoteCameraEnabled: false, interpreterVideo: false))
+        XCTAssertFalse(NativeCallMedia.total.expandsRtt(cameraEnabled: false, remoteCameraEnabled: false, interpreterVideo: true))
+        XCTAssertFalse(NativeCallMedia.audio.expandsRtt(cameraEnabled: false, remoteCameraEnabled: false, interpreterVideo: false))
+        XCTAssertFalse(NativeCallMedia.video.expandsRtt(cameraEnabled: false, remoteCameraEnabled: false, interpreterVideo: false))
+    }
+
     func testBackgroundOptionsMapOnlyToBundledAssets() {
         XCTAssertNil(NativeChatBackground.none.asset(wide: true))
         XCTAssertEqual(NativeChatBackground.automatic.asset(wide: true), "ChatBackgroundWide")

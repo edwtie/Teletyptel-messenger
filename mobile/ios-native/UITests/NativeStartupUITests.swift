@@ -464,11 +464,22 @@ final class NativeStartupUITests: XCTestCase {
             rotate(orientation)
             XCTAssertTrue(controls.isHittable)
             XCTAssertTrue(end.isHittable)
+            XCTAssertTrue(application.descendants(matching: .any)["tc-expanded-rtt"].firstMatch.exists)
             for identifier in ["tc-peer-pane", "tc-own-pane"] {
                 let pane = application.descendants(matching: .any)[identifier].firstMatch
                 XCTAssertTrue(pane.exists)
                 XCTAssertTrue(application.frame.contains(pane.frame), identifier)
             }
+            let remote = application.descendants(matching: .any)["tc-peer-pane"].firstMatch.frame
+            let own = application.descendants(matching: .any)["tc-own-pane"].firstMatch.frame
+            if orientation == .landscapeLeft {
+                XCTAssertGreaterThan(remote.width + own.width, application.frame.width * 0.7)
+                XCTAssertGreaterThan(min(remote.height, own.height), application.frame.height * 0.45)
+            } else {
+                XCTAssertGreaterThan(remote.height + own.height, application.frame.height * 0.5)
+            }
+            XCTAssertTrue(application.scrollViews["tc-peer-scroll"].exists)
+            XCTAssertTrue(application.scrollViews["tc-own-scroll"].exists)
             snapshot(orientation == .landscapeLeft ? "tc-web-landscape" : "tc-web-portrait")
         }
         controls.tap()
@@ -478,6 +489,24 @@ final class NativeStartupUITests: XCTestCase {
         XCTAssertTrue(keypad.exists)
         XCTAssertFalse(keypad.isEnabled)
         snapshot("tc-web-controls")
+    }
+
+    func testPeerCameraOnOrUnknownDoesNotEnterTextOnlyLayout() {
+        for camera in ["on", "unknown"] {
+            application.launchEnvironment["TELETYPTEL_NATIVE_UI_FIXTURE"] = "connected"
+            application.launchEnvironment["TELETYPTEL_NATIVE_CALL_VISUAL_FIXTURE"] = "total"
+            application.launchEnvironment["TELETYPTEL_NATIVE_CALL_REMOTE_CAMERA_FIXTURE"] = camera
+            application.launch()
+            XCTAssertTrue(application.buttons["Gespreksbediening"].waitForExistence(timeout: 10))
+            for orientation: UIDeviceOrientation in [.portrait, .landscapeLeft] {
+                rotate(orientation)
+                XCTAssertTrue(application.descendants(matching: .any)["tc-video-layout"].firstMatch.exists)
+                XCTAssertFalse(application.descendants(matching: .any)["tc-expanded-rtt"].firstMatch.exists)
+            }
+            snapshot("tc-camera-" + camera)
+            application.terminate()
+            rotate(.portrait)
+        }
     }
 
     func testUnsupportedCallKeypadKeepsPhoneKeysReachableAcrossRotationWithoutKeyboard() {

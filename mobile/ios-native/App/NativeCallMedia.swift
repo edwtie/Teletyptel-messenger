@@ -15,6 +15,7 @@ struct NativeCallPresentation {
     let canSendDtmf: Bool
     var isHeld: Bool = false
     var canHold: Bool = false
+    var remoteCameraEnabled: Bool? = nil
 }
 
 @MainActor
@@ -37,6 +38,8 @@ final class NativeWebRTCCallMedia: NativeCallMediaDriver {
     private var held: Bool { locallyHeld || holdPending || negotiation.isRemoteHeld }
     private var startTask: Task<Void, Never>?
     private var reconnectDeadline: Task<Void, Never>?
+    private var cameraSignalTask: Task<Void, Never>?
+    private var announcedCamera: Bool?
     var presentationChanged: ((NativeCallPresentation?) -> Void)?
 
     init(negotiation: any NativePeerNegotiating, capture: NativeMediaCapture) {
@@ -105,6 +108,7 @@ final class NativeWebRTCCallMedia: NativeCallMediaDriver {
         startTask?.cancel()
         startTask = nil
         event = nil
+        cameraSignalTask?.cancel(); cameraSignalTask = nil; announcedCamera = nil
         connected = false
         locallyHeld = false
         holdPending = false
@@ -278,6 +282,7 @@ final class NativeWebRTCCallMedia: NativeCallMediaDriver {
             presentationChanged?(nil)
             return
         }
+        synchronizeCameraState(handle)
         let remoteVideo = prepared.peer.receivers.compactMap { $0.track as? RTCVideoTrack }.first
         presentationChanged?(NativeCallPresentation(
             callID: handle.id,
@@ -291,8 +296,28 @@ final class NativeWebRTCCallMedia: NativeCallMediaDriver {
             canSwitchCamera: capture.canSwitchCamera,
             canSendDtmf: dtmfSender?.canInsertDtmf == true,
             isHeld: held,
-            canHold: connected && !holdPending && prepared.peer.connectionState == .connected
+            canHold: connected && !holdPending && prepared.peer.connectionState == .connected,
+            remoteCameraEnabled: profile.hasVideo ? !negotiation.isRemoteVideoMuted : false
         ))
+    }
+
+    private func synchronizeCameraState(_ handle: NativeCallHandle) {
+        guard negotiated, profile?.hasVideo == true, cameraSignalTask == nil,
+              announcedCamera != capture.cameraEnabled else { return }
+        let enabled = capture.cameraEnabled
+        cameraSignalTask = Task { [weak self] in
+            guard let self = self else { return }
+            do {
+                try await self.negotiation.setVideoEnabled(enabled)
+                guard !Task.isCancelled, self.handle == handle else { return }
+                self.announcedCamera = enabled
+                self.cameraSignalTask = nil
+                if self.capture.cameraEnabled != enabled { self.synchronizeCameraState(handle) }
+            } catch {
+                guard self.handle == handle else { return }
+                self.cameraSignalTask = nil
+            }
+        }
     }
 }
 

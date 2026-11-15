@@ -29,6 +29,7 @@ private final class SessionMediaFixture: NativeMediaNegotiating {
     var applied = 0
     var fail = false
     var pauseOffer = false
+    var profile: NativeCallMedia = .audio
     var pending: CheckedContinuation<NativeJingleMedia, Error>?
     func createOffer() async throws -> NativeJingleMedia {
         if pauseOffer { return try await withCheckedThrowingContinuation { pending = $0 } }
@@ -46,12 +47,19 @@ private final class SessionMediaFixture: NativeMediaNegotiating {
     func close() { closed += 1 }
     func description(answer: Bool) throws -> NativeJingleMedia {
         let fingerprint = Array(repeating: "AB", count: 32).joined(separator: ":")
-        let lines = ["v=0", "o=- 1 1 IN IP4 0.0.0.0", "s=-", "t=0 0", "m=audio 9 UDP/TLS/RTP/SAVPF 0",
+        var lines = ["v=0", "o=- 1 1 IN IP4 0.0.0.0", "s=-", "t=0 0", "m=audio 9 UDP/TLS/RTP/SAVPF 0",
             "c=IN IP4 0.0.0.0", "a=mid:audio", "a=sendrecv", "a=rtcp-mux", "a=rtpmap:0 PCMU/8000",
             "a=ice-ufrag:abcd", "a=ice-pwd:abcdefghijklmnopqrstuv", "a=fingerprint:sha-256 \(fingerprint)",
             "a=setup:\(answer ? "active" : "actpass")", "a=candidate:1 1 udp 2122260223 127.0.0.1 50000 typ host generation 0", ""]
+        if profile.hasVideo {
+            lines.removeLast()
+            lines += ["m=video 9 UDP/TLS/RTP/SAVPF 96", "c=IN IP4 0.0.0.0", "a=mid:video", "a=sendrecv", "a=rtcp-mux",
+                "a=rtpmap:96 VP8/90000", "a=rtcp-fb:96 nack", "a=rtcp-fb:96 nack pli", "a=ice-ufrag:abcd",
+                "a=ice-pwd:abcdefghijklmnopqrstuv", "a=fingerprint:sha-256 \(fingerprint)", "a=setup:\(answer ? "active" : "actpass")",
+                "a=candidate:1 1 udp 2122260223 127.0.0.1 50002 typ host generation 0", ""]
+        }
         return try NativeJingleMedia.fromSDP(lines.joined(separator: "\r\n"), sid: "call-1",
-            action: answer ? "session-accept" : "session-initiate", profile: .audio)
+            action: answer ? "session-accept" : "session-initiate", profile: profile)
     }
 }
 
@@ -78,9 +86,10 @@ final class NativeJingleSessionTests: XCTestCase {
     private let binding = UUID()
     private let peer = "other@localhost/phone"
     @MainActor
-    private func fixture(_ role: NativeJingleSession.Role = .responder, clock: JingleClockFixture? = nil) throws -> (NativeJingleSession, SessionMediaFixture, SessionSignallingFixture) {
+    private func fixture(_ role: NativeJingleSession.Role = .responder, clock: JingleClockFixture? = nil, profile: NativeCallMedia = .audio) throws -> (NativeJingleSession, SessionMediaFixture, SessionSignallingFixture) {
         let media = SessionMediaFixture(), signalling = SessionSignallingFixture()
-        return (try NativeJingleSession(role: role, binding: binding, peer: peer, sid: "call-1", profile: .audio,
+        media.profile = profile
+        return (try NativeJingleSession(role: role, binding: binding, peer: peer, sid: "call-1", profile: profile,
             signalling: signalling, media: media, clock: clock), media, signalling)
     }
     private func request(_ action: String, _ xml: String, wrongPeer: Bool = false, wrongBinding: Bool = false) -> NativeJingleRequest {
@@ -94,6 +103,60 @@ final class NativeJingleSessionTests: XCTestCase {
 
     private func holdInfo(_ info: String) -> String {
         "<jingle xmlns='urn:xmpp:jingle:1' sid='call-1' action='session-info'>\(info)</jingle>"
+    }
+
+    @MainActor func testCameraAnnouncementsAreScopedAndDoNotChangeHoldOrAudio() async throws {
+        let (session, media, signalling) = try fixture(profile: .video)
+        await session.receive(request("session-initiate", try media.description(answer: false).xml))
+        try await session.accept()
+        await session.receive(request("session-info", holdInfo("<hold xmlns='urn:xmpp:jingle:apps:rtp:info:1'/>")))
+        let mute = holdInfo("<mute xmlns='urn:xmpp:jingle:apps:rtp:info:1' creator='initiator' name='video'/>")
+        for invalid in [mute.replacingOccurrences(of: "initiator", with: "responder"),
+                        mute.replacingOccurrences(of: "name='video'", with: "name='rtt'"),
+                        mute.replacingOccurrences(of: "info:1", with: "info:fake"),
+                        mute.replacingOccurrences(of: "creator='initiator'", with: "extra='true'")] {
+            await session.receive(request("session-info", invalid))
+            XCTAssertFalse(session.isRemoteVideoMuted)
+        }
+        await session.receive(request("session-info", mute, wrongPeer: true))
+        XCTAssertFalse(session.isRemoteVideoMuted)
+        await session.receive(request("session-info", mute))
+        XCTAssertTrue(session.isRemoteVideoMuted)
+        XCTAssertTrue(session.isRemotelyHeld)
+        await session.receive(request("session-info", holdInfo("<unmute xmlns='urn:xmpp:jingle:apps:rtp:info:1' creator='initiator' name='audio'/>")))
+        XCTAssertTrue(session.isRemoteVideoMuted)
+        await session.receive(request("session-info", mute.replacingOccurrences(of: "<mute", with: "<unmute")))
+        XCTAssertFalse(session.isRemoteVideoMuted)
+        await session.receive(request("session-info", holdInfo("<mute xmlns='urn:xmpp:jingle:apps:rtp:info:1' creator='initiator'/>")))
+        XCTAssertTrue(session.isRemoteVideoMuted)
+        await session.receive(request("session-info", holdInfo("<active xmlns='urn:xmpp:jingle:apps:rtp:info:1'/>")))
+        XCTAssertFalse(session.isRemoteVideoMuted)
+        XCTAssertFalse(session.isRemotelyHeld)
+        XCTAssertEqual(media.closed, 0)
+        let replies = await signalling.replies
+        XCTAssertNil(replies.last!)
+        await session.stop()
+    }
+
+    @MainActor func testCameraOffAndOnAreAnnouncedForBothCallerRoles() async throws {
+        for role in [NativeJingleSession.Role.initiator, .responder] {
+            let (session, media, signalling) = try fixture(role, profile: .video)
+            if role == .initiator {
+                try await session.start()
+                await session.receive(request("session-accept", try media.description(answer: true).xml))
+            } else {
+                await session.receive(request("session-initiate", try media.description(answer: false).xml))
+                try await session.accept()
+            }
+            try await session.setVideoEnabled(false)
+            try await session.setVideoEnabled(true)
+            let sent = await signalling.sent
+            let creator = role == .initiator ? "initiator" : "responder"
+            XCTAssertTrue(sent[sent.count - 2].contains("<mute xmlns='urn:xmpp:jingle:apps:rtp:info:1' creator='\(creator)' name='video'/>") )
+            XCTAssertTrue(sent.last!.contains("<unmute xmlns='urn:xmpp:jingle:apps:rtp:info:1' creator='\(creator)' name='video'/>") )
+            XCTAssertEqual(session.phase, .negotiated)
+            await session.stop()
+        }
     }
 
     @MainActor func testHoldWaitsForIQResultRejectsConcurrentAndKeepsRejectedState() async throws {

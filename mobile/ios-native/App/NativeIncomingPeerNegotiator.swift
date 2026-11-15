@@ -35,6 +35,11 @@ final class NativeIncomingPeerNegotiator: NativeActivePeerNegotiating {
     private(set) var remoteEnded = false
     var sid: String { request.sid }
     var isRemoteHeld: Bool { session?.isRemotelyHeld ?? false }
+    var isRemoteVideoMuted: Bool { session?.isRemoteVideoMuted ?? false }
+    func setVideoEnabled(_ enabled: Bool) async throws {
+        guard let session = session, handle != nil else { throw NativeJingleFailure.disconnected }
+        try await session.setVideoEnabled(enabled)
+    }
     func setHeld(_ held: Bool) async throws {
         guard let session = session, handle != nil else { throw NativeJingleFailure.disconnected }
         try await session.setHeld(held)

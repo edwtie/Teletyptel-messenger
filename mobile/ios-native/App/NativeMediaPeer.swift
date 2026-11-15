@@ -13,6 +13,8 @@ struct NativePreparedPeer {
 protocol NativePeerNegotiating: AnyObject {
     var remoteEnded: Bool { get }
     var isRemoteHeld: Bool { get }
+    var isRemoteVideoMuted: Bool { get }
+    func setVideoEnabled(_ enabled: Bool) async throws
     func setHeld(_ held: Bool) async throws
     func prepare(handle: NativeCallHandle, media: NativeCallMedia,
                  changed: @escaping () -> Void) throws -> NativePreparedPeer
@@ -23,6 +25,8 @@ protocol NativePeerNegotiating: AnyObject {
 
 extension NativePeerNegotiating {
     var isRemoteHeld: Bool { false }
+    var isRemoteVideoMuted: Bool { false }
+    func setVideoEnabled(_ enabled: Bool) async throws { throw NativeJingleFailure.rejected }
     func setHeld(_ held: Bool) async throws { throw NativeJingleFailure.rejected }
 }
 

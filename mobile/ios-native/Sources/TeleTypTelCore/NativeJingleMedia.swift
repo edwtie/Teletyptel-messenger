@@ -64,6 +64,7 @@ struct NativeJingleMedia: CustomStringConvertible, CustomDebugStringConvertible 
     let profile: NativeCallMedia
     private let contents: [Content]
     var mids: [String] { contents.map(\.mid) }
+    var rtpContentNames: [String: String] { Dictionary(uniqueKeysWithValues: contents.filter { $0.kind != "rtt" }.map { ($0.kind, $0.mid) }) }
     var supportsDTMF: Bool { contents.contains { $0.kind == "audio" && $0.telephoneEvent != nil } }
     var videoCodec: String { contents.first { $0.kind == "video" }?.codec ?? "VP8" }
     var audioCodec: String { contents.first { $0.kind == "audio" }?.codec ?? "PCMU" }

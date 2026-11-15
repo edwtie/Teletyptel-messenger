@@ -16,6 +16,7 @@ const selectedTests = Object.freeze([
 function testsForScope(scope = "regression") {
   if (scope === "regression") return selectedTests;
   if (scope === "groups") return selectedTests.filter(name => name.includes("Group"));
+  if (scope === "tc") return ["testWebStyleCallControlsAndRttPanesRemainReachableAcrossRotation", "testPeerCameraOnOrUnknownDoesNotEnterTextOnlyLayout"];
   throw new Error("Unsupported native UI scope");
 }
 

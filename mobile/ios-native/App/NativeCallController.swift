@@ -8,6 +8,11 @@ private final class NativePeerRouter: NativePeerNegotiating {
 
     var remoteEnded: Bool { provider?.remoteEnded ?? false }
     var isRemoteHeld: Bool { provider?.isRemoteHeld ?? false }
+    var isRemoteVideoMuted: Bool { provider?.isRemoteVideoMuted ?? false }
+    func setVideoEnabled(_ enabled: Bool) async throws {
+        guard let provider = provider else { throw NativeJingleFailure.disconnected }
+        try await provider.setVideoEnabled(enabled)
+    }
     func setHeld(_ held: Bool) async throws {
         guard let provider = provider else { throw NativeJingleFailure.disconnected }
         try await provider.setHeld(held)
@@ -123,9 +128,11 @@ final class NativeCallController: ObservableObject, NativePushRegistering {
               ProcessInfo.processInfo.environment["TELETYPTEL_NATIVE_CALL_VISUAL_FIXTURE"] == "total",
               presentation == nil else { return }
         peerName = "Fictieve UI-test"
+        let camera = ProcessInfo.processInfo.environment["TELETYPTEL_NATIVE_CALL_REMOTE_CAMERA_FIXTURE"]
         presentation = NativeCallPresentation(callID: UUID(), profile: .total, localVideo: nil,
             remoteVideo: nil, ownText: "", remoteText: "Fictieve realtime tekst", rttReady: false,
-            cameraEnabled: false, canSwitchCamera: false, canSendDtmf: false)
+            cameraEnabled: false, canSwitchCamera: false, canSendDtmf: false,
+            remoteCameraEnabled: camera == "unknown" ? nil : camera == "on")
     }
     #endif
 

@@ -214,7 +214,7 @@ struct NativeJingleTransport {
         return "<iq xmlns='jabber:client' type='\(type)' to='\(escape(peer))' id='\(escape(identifier))'>\(payload)</iq>"
     }
 
-    private static func escape(_ value: String) -> String {
+    static func escape(_ value: String) -> String {
         value.replacingOccurrences(of: "&", with: "&amp;").replacingOccurrences(of: "'", with: "&apos;")
             .replacingOccurrences(of: "\"", with: "&quot;").replacingOccurrences(of: "<", with: "&lt;").replacingOccurrences(of: ">", with: "&gt;")
     }
