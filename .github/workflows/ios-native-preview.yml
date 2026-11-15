@@ -18,6 +18,12 @@ on:
       - php/tests/native-cloud-history-test.php
       - php/tests/native-cloud-history-http-test.php
   workflow_dispatch:
+    inputs:
+      validation_mode:
+        description: Full existing matrix or focused logic/SDK check without UI tests
+        type: choice
+        options: [full, focused-update]
+        default: full
 
 permissions:
   contents: read
@@ -32,6 +38,7 @@ jobs:
         family: [iPhone, iPad]
     env:
       TELETYPTEL_NATIVE_TEST_FAMILY: ${{ matrix.family }}
+      TELETYPTEL_NATIVE_VALIDATION_MODE: ${{ inputs.validation_mode || 'full' }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -45,15 +52,27 @@ jobs:
           test -n "$XCODE_PATH"
           echo "DEVELOPER_DIR=$XCODE_PATH/Contents/Developer" >> "$GITHUB_ENV"
       - name: Check isolated project generator
+        if: github.event_name != 'workflow_dispatch' || inputs.validation_mode != 'focused-update'
         run: node --test tests/ios-native-foundation.test.js
       - name: Check shared online history API
+        if: github.event_name != 'workflow_dispatch' || inputs.validation_mode != 'focused-update'
         run: node --test tests/native-cloud-history.test.js
+      - name: Check focused update guard
+        if: github.event_name == 'workflow_dispatch' && inputs.validation_mode == 'focused-update'
+        run: node --test tests/ios-native-update.test.js
       - name: Compile native app and test ${{ matrix.family }}
-        run: node scripts/check-ios-native.js
+        run: |
+          if [ "$TELETYPTEL_NATIVE_VALIDATION_MODE" = "focused-update" ]; then
+            node scripts/check-ios-native-update.js
+          else
+            node scripts/check-ios-native.js
+          fi
       - name: Save native test evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: ios-native-preview-${{ github.run_id }}-${{ matrix.family }}
-          path: artifacts/ios-native-check-*/reports/
+          path: |
+            artifacts/ios-native-check-*/reports/
+            artifacts/ios-native-update-*/reports/
           retention-days: 3

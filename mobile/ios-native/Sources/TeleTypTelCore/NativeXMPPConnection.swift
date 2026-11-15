@@ -106,13 +106,16 @@ private final class NativeSessionClosure {
     }
 }
 
-private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, NativeArchiveSending, NativeGroupManaging, NativeMessageChanging, NativeGroupMessageChanging, NativeGroupReacting, NativeChatInteracting, NativeJingleSending, @unchecked Sendable {
+private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, NativeArchiveSending, NativeGroupManaging, NativeMessageChanging, NativeGroupMessageChanging, NativeGroupReacting, NativeChatInteracting, NativeJingleSending, NativeContactManaging, @unchecked Sendable {
     private let configuration: ServerConfiguration
     private let ownerJID: String
     private var boundJID: String?
     private var archive: (query: NativeArchiveQuery, token: UUID, continuation: CheckedContinuation<NativeArchivePage, Error>, deadline: DispatchWorkItem)?
     private var groups: [String: NativeGroupOperation] = [:]
     private var management: [String: (command: NativeGroupCommand, target: String, continuation: CheckedContinuation<NativeGroupReply, Error>, deadline: DispatchWorkItem)] = [:]
+    private var contactEdits: [String: (continuation: CheckedContinuation<Void, Error>, deadline: DispatchWorkItem)] = [:]
+    private var contactRequestObserver: (@Sendable ([String]) -> Void)?
+    private var contactRequests = Set<String>()
     private var invitationObserver: (@Sendable (NativeGroupInvitationEvent) -> Void)?
     private var earlyInvitations: [NativeGroupInvitationEvent] = []
     private let queue = DispatchQueue(label: "nl.teletyptel.native.session")
@@ -362,6 +365,80 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
             cancellation.cancel()
             self.queue.async { self.endGroup(room: room, token: token, error: CancellationError(), sendLeave: true) }
         })
+    }
+
+    func addContact(jid: String, name: String, requestPresence: Bool) async throws {
+        try Task.checkCancellation()
+        let identifier = "contact-" + UUID().uuidString
+        let frame = try NativeContactEditing.request(jid: jid, name: name, owner: ownerJID, identifier: identifier)
+        let cancellation = NativeArchiveCancellation()
+        try await withTaskCancellationHandler(operation: {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                queue.async {
+                    guard !cancellation.isCancelled else { continuation.resume(throwing: CancellationError()); return }
+                    guard !self.completed, self.stream.phase == .online, self.contactEdits.isEmpty else {
+                        continuation.resume(throwing: NativeContactFailure.unavailable); return
+                    }
+                    let deadline = DispatchWorkItem { [weak self] in self?.finishContact(identifier, error: NativeContactFailure.timedOut) }
+                    self.contactEdits[identifier] = (continuation, deadline)
+                    self.queue.asyncAfter(deadline: .now() + 10, execute: deadline)
+                    self.send([frame]) {}
+                }
+            }
+        }, onCancel: { cancellation.cancel(); self.queue.async { self.finishContact(identifier, error: CancellationError()) } })
+        try Task.checkCancellation()
+        if requestPresence {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                queue.async {
+                    self.enqueueMessage("<presence xmlns='jabber:client' to='\(NativeMUCStream.escape(jid))' type='subscribe'/>", continuation: continuation)
+                }
+            }
+        }
+    }
+
+    func observeContactRequests(_ observer: @escaping @Sendable ([String]) -> Void) async {
+        let cancellation = NativeArchiveCancellation()
+        await withTaskCancellationHandler(operation: {
+            await withCheckedContinuation { continuation in
+                queue.async {
+                    if !self.completed, !cancellation.isCancelled { self.contactRequestObserver = observer; observer(self.contactRequests.sorted()) }
+                    continuation.resume()
+                }
+            }
+        }, onCancel: { cancellation.cancel() })
+    }
+
+    func respondToContactRequest(jid: String, allow: Bool) async throws {
+        try Task.checkCancellation()
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            queue.async {
+                guard self.contactRequests.contains(jid), NativeContactEditing.valid(jid: jid, name: "", owner: self.ownerJID) else {
+                    continuation.resume(throwing: NativeContactFailure.invalid); return
+                }
+                let type = allow ? "subscribed" : "unsubscribed"
+                self.enqueueMessage("<presence xmlns='jabber:client' to='\(NativeMUCStream.escape(jid))' type='\(type)'/>", continuation: continuation)
+            }
+        }
+        queue.async {
+            self.contactRequests.remove(jid); self.contactRequestObserver?(self.contactRequests.sorted())
+        }
+    }
+
+    private func finishContact(_ identifier: String, error: Error?) {
+        guard let pending = contactEdits.removeValue(forKey: identifier) else { return }
+        pending.deadline.cancel()
+        if let error = error { pending.continuation.resume(throwing: error) }
+        else { pending.continuation.resume() }
+    }
+
+    private func receiveContactEdit(_ frame: String) {
+        if let root = try? ProbeXML.parse(frame), let peer = NativeContactEditing.subscriptionRequest(root, owner: ownerJID, bound: boundJID), contactRequests.count < 32 {
+            contactRequests.insert(peer); contactRequestObserver?(contactRequests.sorted())
+        }
+        guard !contactEdits.isEmpty, let root = try? ProbeXML.parse(frame), let identifier = root.attributes["id"],
+              contactEdits[identifier] != nil,
+              let result = NativeContactEditing.response(root, identifier: identifier, owner: ownerJID, bound: boundJID) else { return }
+        finishContact(identifier, error: result ? nil : NativeContactFailure.rejected)
     }
 
     func manageGroup(_ command: NativeGroupCommand) async throws -> NativeGroupReply {
@@ -650,6 +727,8 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
         invitationObserver = nil
         earlyInvitations.removeAll()
         for identifier in Array(management.keys) { finishManagement(identifier, result: .failure(error)) }
+        for identifier in Array(contactEdits.keys) { finishContact(identifier, error: error) }
+        contactRequestObserver = nil; contactRequests.removeAll()
         for (room, entry) in Array(groups) { endGroup(room: room, token: entry.token, error: NativeGroupFailure.disconnected, sendLeave: false) }
         boundJID = nil
         for identifier in Array(pendingJingle.keys) { completeJingle(identifier, error: error) }
@@ -714,7 +793,7 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
                 do {
                     guard case .string(let frame) = try result.get() else { throw ConnectionFailure.invalidResponse }
                     let output = try self.stream.receive(frame)
-                    if self.stream.phase == .online { self.receiveArchive(frame); self.receiveGroups(frame); self.receiveInvitation(frame); self.receiveManagement(frame) }
+                    if self.stream.phase == .online { self.receiveArchive(frame); self.receiveGroups(frame); self.receiveInvitation(frame); self.receiveManagement(frame); self.receiveContactEdit(frame) }
                     self.send(output.frames) {
                         if let jid = output.connectedJID {
                             self.boundJID = jid

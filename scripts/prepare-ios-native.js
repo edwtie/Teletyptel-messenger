@@ -13,9 +13,11 @@ const mediaFiles = ["NativeT140Session.swift", "NativeWebRTCChannel.swift"];
 coreFiles.push("NativeGroupManagement.swift", "NativeAccountFeatures.swift", "NativeMessageActions.swift", "NativeAvatars.swift", "NativeChatInteractions.swift", "NativeHistory.swift", "NativeDialing.swift", "NativeDtmf.swift", "NativeCloudRecord.swift", "NativeCloudHistory.swift", "NativeCloudSync.swift");
 coreFiles.push("NativePushRegistry.swift", "NativePushRegistrationModel.swift");
 coreFiles.push("NativeInterpreterProtocol.swift", "NativeInterpreterSession.swift");
+coreFiles.push("NativeContactEditing.swift", "NativePresentationPreferences.swift", "NativeAvatarEditing.swift");
 appFiles.push("App/NativeGroupManagementView.swift", "App/NativeAccountSettingsView.swift", "App/NativeAttachmentsView.swift", "App/NativeFeatureFixture.swift", "App/NativeWebStyle.swift", "App/NativeMessageActionsView.swift", "App/NativeDeviceHistory.swift", "App/NativeChatEnhancements.swift", "App/NativeDialerView.swift");
 appFiles.push("App/NativeCloudHistoryView.swift", "App/NativePushVault.swift", "App/NativePhoneContactPicker.swift");
 appFiles.push("App/NativeInterpreterMedia.swift", "App/NativeInterpreterCallView.swift");
+appFiles.push("App/NativeNewContactView.swift", "App/NativeAppearanceView.swift", "App/NativeHistoryBrowserView.swift", "App/NativeAvatarEditorView.swift");
 
 function projectText() {
   const objects = new Map();
@@ -114,7 +116,7 @@ function prepare(name, { providers = null } = {}) {
   write("Assets.xcassets/Contents.json", JSON.stringify({ info: { author: "xcode", version: 1 } }));
   write("Assets.xcassets/TeleTypTelLogo.imageset/logo.png", fs.readFileSync(path.join(root, "php/public/assets/brand/teletyptel-logo-header@2x.png")));
   write("Assets.xcassets/TeleTypTelLogo.imageset/Contents.json", JSON.stringify({ images: [{ idiom: "universal", filename: "logo.png", scale: "2x" }], info: { author: "xcode", version: 1 } }));
-  for (const [name, file] of [["ChatBackground", "teletyptel-bg-mobile.png"], ["ChatBackgroundWide", "teletyptel-bg-wide-1.png"]]) {
+  for (const [name, file] of [["ChatBackground", "teletyptel-bg-mobile.png"], ["ChatBackgroundWide", "teletyptel-bg-wide-1.png"], ["ChatBackgroundOpen", "teletyptel-bg-wide-2.png"], ["ChatBackgroundRight", "teletyptel-bg-wide-3.png"]]) {
     write(`Assets.xcassets/${name}.imageset/background.png`, fs.readFileSync(path.join(root, "php/public/assets/backgrounds", file)));
     write(`Assets.xcassets/${name}.imageset/Contents.json`, JSON.stringify({ images: [{ idiom: "universal", filename: "background.png" }], info: { author: "xcode", version: 1 } }));
   }

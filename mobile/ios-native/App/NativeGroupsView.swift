@@ -6,6 +6,7 @@ struct NativeGroupsView: View {
     var login: NativeLoginModel? = nil
     var translation: NativeTranslationModel? = nil
     var avatars: NativeAvatarCache? = nil
+    var archive: NativeConversationArchive? = nil
     @Environment(\.dismiss) private var dismiss
     @State private var room = ""
     @State private var nickname = ""
@@ -31,7 +32,7 @@ struct NativeGroupsView: View {
                 Section("Groepschats") {
                     if model.rooms.isEmpty { Text("Nog geen groepen geopend in deze sessie.") }
                     ForEach(model.rooms) { group in
-                        NavigationLink { NativeGroupChatView(model: model, room: group.room, login: login, translation: translation, avatars: avatars) } label: {
+                        NavigationLink { NativeGroupChatView(model: model, room: group.room, login: login, translation: translation, avatars: avatars, archive: archive) } label: {
                             VStack(alignment: .leading, spacing: 4) {
                                 Label(group.room, systemImage: "person.3.fill").lineLimit(2)
                                 Text(group.joining ? "Deelname controleren…" : group.snapshot == nil ? "Niet in de groep" : "Deelgenomen")
@@ -40,7 +41,7 @@ struct NativeGroupsView: View {
                         }.accessibilityIdentifier("group-room-" + group.room)
                     }
                 }
-                if let login = login { NativeOnlineGroups(cloud: login.cloudHistory, groups: model, login: login, translation: translation, avatars: avatars) }
+                if let login = login { NativeOnlineGroups(cloud: login.cloudHistory, groups: model, login: login, translation: translation, avatars: avatars, archive: archive) }
                 Section("Nieuwe groep") {
                     Button { confirmCreate = true } label: { Label("Nieuwe besloten groep maken", systemImage: "plus.bubble") }
                         .disabled(!model.available || !NativeMUCStream.validNickname(nickname) || room.isEmpty)
@@ -68,6 +69,8 @@ struct NativeGroupChatView: View {
     var login: NativeLoginModel? = nil
     var translation: NativeTranslationModel? = nil
     var avatars: NativeAvatarCache? = nil
+    var archive: NativeConversationArchive? = nil
+    var onArchive: (() -> Void)? = nil
     @State private var showParticipants = false
     @State private var showInvite = false
     @State private var searching = false
@@ -112,6 +115,12 @@ struct NativeGroupChatView: View {
                     .disabled(group?.snapshot?.canSpeak != true).accessibilityLabel("Contact uitnodigen").accessibilityIdentifier("group-invite")
                 Menu {
                     Button { showParticipants = true } label: { Label("Deelnemers en groepsbeheer", systemImage: "person.3") }
+                    if let archive = archive {
+                        Button {
+                            archive.set(peer: room, kind: "group", archived: !archive.contains(peer: room, kind: "group"))
+                            onArchive?(); dismiss()
+                        } label: { Label(archive.contains(peer: room, kind: "group") ? "Terugzetten" : "Archiveren", systemImage: "archivebox") }
+                    }
                     Button {
                         searching.toggle()
                         if !searching { search = ""; searchFocused = false }
@@ -183,8 +192,7 @@ struct NativeGroupChatView: View {
             .modifier(NativeChatBottomAnchor())
             .background {
                 GeometryReader { geometry in
-                    Image(geometry.size.width > geometry.size.height ? "ChatBackgroundWide" : "ChatBackground")
-                        .resizable().scaledToFill().frame(width: geometry.size.width, height: geometry.size.height).clipped()
+                    NativeConversationBackground()
                         .task(id: geometry.size) {
                             await Task.yield()
                             guard !Task.isCancelled else { return }

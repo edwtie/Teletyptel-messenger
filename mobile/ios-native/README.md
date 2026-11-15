@@ -32,7 +32,48 @@ Before switching the signed target to `com.tiedragon.teletyptel`:
 The existing signed/TestFlight workflow still builds the working wrapper. This
 step did not silently redirect it to the incomplete native target.
 
-## Web UI comparison, presentation-only follow-up (2026-11-15)
+## Remaining web-workflow implementation (2026-11-15)
+
+Following the UI comparison, four missing workflows have now been implemented:
+- New contact uses an actual bounded, cancellable roster-set request. It waits
+  for the authenticated server's matching IQ result; it does not invent a local
+  contact or online presence. An outgoing presence request is optional and off
+  by default. Incoming status requests require explicit Allow/Reject in the
+  contacts pane; there is no silent mutual authorization. Timeouts are uncertain
+  outcomes and are not automatically retried. The protocol reference is
+  [RFC 6121 sections 2.3 and 3](https://www.rfc-editor.org/rfc/rfc6121.html).
+- Appearance offers system/light/dark and all six web background choices using
+  bundled assets, with a preview. These non-secret device preferences do not
+  change the account language, privacy/translation consent or call media.
+- History and Archive have separate searchable panels. They reuse the loaded
+  roster, session messages and existing cloud catalog/read flows. Archive hides
+  conversations and can restore them without deleting messages, leaving rooms
+  or blocking contacts. Flags are local, scoped by hashed server/domain/account
+  history identity, bounded to 512 entries, and are not cloud-synchronized.
+  Summaries show dates/previews only when messages have actually been loaded;
+  the current catalog does not provide complete cross-device recency metadata.
+- The profile-photo editor uses Apple's single-photo picker, bounded input and
+  a thumbnail, movable/zoomable square crop with accessible arrow buttons, and
+  explicit Save/Remove. It exports a fresh 256-pixel JPEG without the source
+  metadata, rather than uploading the original. `api/native-avatar.php` uses
+  the authenticated account, the existing native CSRF mechanism, strict raster
+  MIME/size/dimension validation and an avatar-only field whitelist. Passwords,
+  other profile fields and other users are not writable through this route.
+  Deploy this endpoint and `NativeAvatarService.php` with the native build;
+  the installed old server cannot supply the new editor merely through an app
+  update. Existing schema, infrastructure and live user records are untouched.
+
+Validation is deliberately focused because this step adds real contact and
+avatar logic: isolated PHP avatar/denial tests, selected Swift logic/HTTP-fixture
+cases and unsigned Apple SDK compilation. The optional `focused-update` dispatch
+mode does not run simulator/UI/media suites; normal push/full validation retains
+the existing full matrix. Apple SDK results are pending until recorded below.
+No signed build, TestFlight upload, APNs activation, public SIP or live account
+test is included. Complete UI localization, independently verified photo/camera
+permissions, installed-device visuals and remaining call/group differences are
+not claimed complete by this implementation.
+
+## Earlier web UI comparison, presentation-only follow-up (2026-11-15)
 
 Scope agreed with the owner: compare the website and apps, change presentation
 where an existing action already exists, and do not rerun full functional or
@@ -40,7 +81,8 @@ simulator suites for cosmetic changes. Backend/protocol behavior is outside this
 pass. The earlier successful build below predates these UI changes and must not
 be quoted as validation of their rendered layout.
 
-The reference is the current local `php/public/chat.html` and its styles/menu
+This earlier source inventory is superseded where the implementation above
+adds the missing workflows. The reference was local `php/public/chat.html` and its styles/menu
 definitions, not a newly invented interface. Windows uses the existing WebView2
 web client; the Android shell points to the configured web server. That shared
 source is not proof that their installed bundles, viewport or native permissions

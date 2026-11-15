@@ -35,8 +35,9 @@ struct NativeHistoricalContacts: View {
     let rosterJIDs: Set<String>
     let search: String
     let selected: String?
+    var archived = Set<String>()
     var body: some View {
-        let previous = cloud.conversations.filter { $0.kind == "contact" && !rosterJIDs.contains($0.peer) &&
+        let previous = cloud.conversations.filter { $0.kind == "contact" && !rosterJIDs.contains($0.peer) && !archived.contains(NativeConversationArchive.key(peer: $0.peer, kind: "contact")) &&
             (search.isEmpty || $0.name.localizedCaseInsensitiveContains(search) || $0.peer.localizedCaseInsensitiveContains(search)) }
         if !previous.isEmpty {
             Section("Eerdere online gesprekken") {
@@ -75,13 +76,14 @@ struct NativeOnlineGroups: View {
     let login: NativeLoginModel
     var translation: NativeTranslationModel?
     var avatars: NativeAvatarCache? = nil
+    var archive: NativeConversationArchive? = nil
     var body: some View {
         let previous = cloud.conversations.filter { $0.kind == "group" }
         if !previous.isEmpty {
             Section("Online groepsgeschiedenis") {
                 ForEach(previous, id: \.peer) { conversation in
                     NavigationLink {
-                        NativeGroupChatView(model: groups, room: conversation.peer, login: login, translation: translation, avatars: avatars)
+                        NativeGroupChatView(model: groups, room: conversation.peer, login: login, translation: translation, avatars: avatars, archive: archive)
                             .onAppear { login.openCloudGroup(conversation.peer) }
                     } label: {
                         Label(conversation.name.isEmpty ? conversation.peer : conversation.name, systemImage: "clock.arrow.circlepath")

@@ -10,6 +10,7 @@ struct NativeChatView: View {
     var contactProfile: NativePublicAvatar? = nil
     var ownProfile: NativePublicAvatar? = nil
     var avatars: NativeAvatarCache? = nil
+    var archive: NativeConversationArchive? = nil
     var allowReadMarkers = true
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
@@ -72,9 +73,7 @@ struct NativeChatView: View {
                     .clipped()
                     .background {
                         GeometryReader { geometry in
-                            Image(geometry.size.width > geometry.size.height ? "ChatBackgroundWide" : "ChatBackground")
-                                .resizable().scaledToFill()
-                                .frame(width: geometry.size.width, height: geometry.size.height).clipped()
+                            NativeConversationBackground()
                                 .task(id: geometry.size) {
                                     await Task.yield()
                                     guard !Task.isCancelled else { return }
@@ -139,6 +138,12 @@ struct NativeChatView: View {
                             callButton("Spraak en video", icon: "video.fill", profile: .video)
                             callButton("Spraak en realtime tekst", icon: "teletype", profile: .audioRtt)
                             Button { showTranslation = true } label: { Label("Vertaling", systemImage: "globe") }
+                            if let archive = archive {
+                                Button {
+                                    archive.set(peer: contact.jid, kind: "contact", archived: !archive.contains(peer: contact.jid, kind: "contact"))
+                                    onClose?(); dismiss()
+                                } label: { Label(archive.contains(peer: contact.jid, kind: "contact") ? "Terugzetten" : "Archiveren", systemImage: "archivebox") }
+                            }
                             Button { model.loadHistory(for: contact.jid, refresh: true) } label: { Label("XMPP-archief ophalen", systemImage: "clock.arrow.circlepath") }
                                 .disabled(!model.canSend || model.historyStates[contact.jid] == .loading)
                         } label: { Image(systemName: "ellipsis").rotationEffect(.degrees(90)) }

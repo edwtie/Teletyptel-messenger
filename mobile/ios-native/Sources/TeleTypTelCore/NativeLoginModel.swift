@@ -55,6 +55,7 @@ public final class NativeLoginModel: ObservableObject {
     private let checker: any ServerChecking
     private let authenticator: any NativeAccountAuthenticating
     private let connection: any NativeXMPPConnecting
+    var contactManager: (any NativeContactManaging)? { canSend ? sender as? any NativeContactManaging : nil }
 
     public init(checker: any ServerChecking = XMPPAvailabilityClient(),
                 authenticator: any NativeAccountAuthenticating = NativeTwoFactorAccountClient(),

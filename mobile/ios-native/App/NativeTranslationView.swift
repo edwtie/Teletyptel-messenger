@@ -93,13 +93,18 @@ struct NativeMessengerView: View {
     @State private var showGroups = false
     @State private var showAccount = false
     @State private var showDialer = false
+    @State private var showNewContact = false
+    @State private var showAppearance = false
+    @State private var historyBrowser: String?
     @StateObject private var avatars = NativeAvatarCache()
+    @StateObject private var archive = NativeConversationArchive()
+    @StateObject private var contactRequests = NativeContactRequests()
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     private var contacts: [NativeContact] {
         guard case .ready(let contacts) = model.roster else { return [] }
-        return contacts.filter { search.isEmpty || $0.displayName.localizedCaseInsensitiveContains(search) || $0.jid.localizedCaseInsensitiveContains(search) }
+        return contacts.filter { !archive.contains(peer: $0.jid, kind: "contact") && (search.isEmpty || $0.displayName.localizedCaseInsensitiveContains(search) || $0.jid.localizedCaseInsensitiveContains(search)) }
     }
 
     private var selectedContact: NativeContact? {
@@ -119,14 +124,20 @@ struct NativeMessengerView: View {
             conversationLayout
         }
         .font(NativeWebStyle.font()).tint(NativeWebStyle.accent)
-        .sheet(isPresented: $showGroups) { NativeGroupsView(model: model.groups, login: model, translation: translation, avatars: avatars) }
-        .sheet(isPresented: $showAccount) { NativeAccountSettingsView(login: model, translation: translation) }
+        .sheet(isPresented: $showGroups) { NativeGroupsView(model: model.groups, login: model, translation: translation, avatars: avatars, archive: archive) }
+        .sheet(isPresented: $showAccount) { NativeAccountSettingsView(login: model, translation: translation, avatars: avatars) }
         .sheet(isPresented: $showTranslation) { NativeTranslationSettingsView(model: translation) }
         .sheet(isPresented: $showDialer) { NativeDialerView(login: model, calls: calls) }
+        .sheet(isPresented: $showNewContact) { NativeNewContactView(login: model) }
+        .sheet(isPresented: $showAppearance) { NativeAppearanceView() }
+        .sheet(isPresented: Binding(get: { historyBrowser != nil }, set: { if !$0 { historyBrowser = nil } })) {
+            NativeHistoryBrowserView(login: model, calls: calls, translation: translation, archive: archive, avatars: avatars, archivedOnly: historyBrowser == "archive")
+        }
         .task(id: model.canSend) { loadAvatars() }
         .onChange(of: model.roster) { _ in loadAvatars() }
         .onChange(of: showAccount) { if !$0 { avatars.refreshOwner() } }
         .onDisappear { NativeAvatarImages.clear() }
+        .task(id: model.canSend) { contactRequests.configure(model.contactManager) }
     }
 
     private var conversationLayout: some View {
@@ -144,6 +155,21 @@ struct NativeMessengerView: View {
                     .overlay(RoundedRectangle(cornerRadius: 8).stroke(NativeWebStyle.line, lineWidth: 1))
                 }.padding(12)
                 NativeInvitationNotice(model: model.groups.invitationModel) { showGroups = true }
+                if !contactRequests.peers.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Statusverzoeken").font(.headline)
+                        ForEach(contactRequests.peers, id: \.self) { peer in
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(peer + " vraagt toestemming om jouw online status te zien.").font(.caption)
+                                HStack {
+                                    Button { Task { await contactRequests.respond(peer, allow: true) } } label: { Label("Toestaan", systemImage: "checkmark") }
+                                    Button(role: .destructive) { Task { await contactRequests.respond(peer, allow: false) } } label: { Label("Weigeren", systemImage: "xmark") }
+                                }.disabled(contactRequests.busy)
+                            }
+                        }
+                        if let notice = contactRequests.notice { Text(notice).font(.caption) }
+                    }.padding(12)
+                }
                 List(selection: $selected) {
                     switch model.roster {
                     case .idle, .loading:
@@ -182,9 +208,12 @@ struct NativeMessengerView: View {
                         }
                         .listRowInsets(EdgeInsets(top: 0, leading: 12, bottom: 6, trailing: 12))
                         .listRowSeparator(.hidden).listRowBackground(Color.clear)
+                        .contextMenu {
+                            Button { archive.set(peer: contact.jid, kind: "contact", archived: true); if selected == contact.jid { selected = nil } } label: { Label("Archiveren", systemImage: "archivebox") }
+                        }
                     }
-                    NativeHistoricalContacts(cloud: model.cloudHistory, rosterJIDs: rosterJIDs, search: search, selected: selected)
-                    ForEach(model.groups.rooms.filter { search.isEmpty || $0.room.localizedCaseInsensitiveContains(search) }) { group in
+                    NativeHistoricalContacts(cloud: model.cloudHistory, rosterJIDs: rosterJIDs, search: search, selected: selected, archived: archive.entries)
+                    ForEach(model.groups.rooms.filter { !archive.contains(peer: $0.room, kind: "group") && (search.isEmpty || $0.room.localizedCaseInsensitiveContains(search)) }) { group in
                         NavigationLink(value: group.room) {
                             HStack(spacing: 8) {
                                 NativeWebAvatar(name: group.room)
@@ -205,6 +234,7 @@ struct NativeMessengerView: View {
                 HStack {
                     Spacer()
                     Menu {
+                        Button { showNewContact = true } label: { Label("Nieuw contact", systemImage: "person.badge.plus") }
                         Button { showGroups = true } label: { Label("Groepschats openen of maken", systemImage: "person.3") }
                     } label: { Image(systemName: "plus").frame(width: 52, height: 52) }
                         .buttonStyle(NativeWebIconStyle(prominent: true, round: true))
@@ -219,15 +249,14 @@ struct NativeMessengerView: View {
         } detail: {
             if let contact = selectedContact {
                 NativeChatView(model: model, calls: calls, translation: translation, contact: contact, onClose: { selected = nil },
-                    contactProfile: avatars.profiles[contact.jid], ownProfile: avatars.owner.flatMap { avatars.profiles[$0] }, avatars: avatars,
-                    allowReadMarkers: !showAccount && !showTranslation && !showGroups && !showDialer,
+                    contactProfile: avatars.profiles[contact.jid], ownProfile: avatars.owner.flatMap { avatars.profiles[$0] }, avatars: avatars, archive: archive,
+                    allowReadMarkers: !showAccount && !showTranslation && !showGroups && !showDialer && !showNewContact && !showAppearance && historyBrowser == nil,
                     historyOnly: !rosterJIDs.contains(contact.jid))
             } else if let room = model.groups.rooms.first(where: { $0.room == selected }) {
-                NativeGroupChatView(model: model.groups, room: room.room, login: model, translation: translation, avatars: avatars)
+                NativeGroupChatView(model: model.groups, room: room.room, login: model, translation: translation, avatars: avatars, archive: archive, onArchive: { selected = nil })
             } else {
                 GeometryReader { geometry in
-                    Image(geometry.size.width > geometry.size.height ? "ChatBackgroundWide" : "ChatBackground")
-                        .resizable().scaledToFill().frame(width: geometry.size.width, height: geometry.size.height).clipped()
+                    NativeConversationBackground()
                         .overlay {
                             VStack(spacing: 16) {
                                 Image("TeleTypTelLogo").resizable().scaledToFit().frame(maxWidth: 300, maxHeight: 68)
@@ -269,8 +298,11 @@ struct NativeMessengerView: View {
                 Section("Communicatie") {
                     Button { showDialer = true } label: { Label("Nummer bellen", systemImage: "phone") }.accessibilityIdentifier("open-number-dialer")
                     Button { showGroups = true } label: { Label("Groepschats", systemImage: "person.3") }.accessibilityIdentifier("open-groups")
+                    Button { historyBrowser = "history" } label: { Label("Geschiedenis", systemImage: "clock") }
+                    Button { historyBrowser = "archive" } label: { Label("Archief", systemImage: "archivebox") }
                 }
                 Section("Instellingen") {
+                    Button { showAppearance = true } label: { Label("Weergave", systemImage: "circle.lefthalf.filled") }
                     Button { showAccount = true } label: { Label("Accountinstellingen", systemImage: "gearshape") }.accessibilityIdentifier("open-account-settings")
                     Button { showTranslation = true } label: { Label("Vertaling", systemImage: "globe") }
                 }
@@ -287,6 +319,9 @@ struct NativeMessengerView: View {
     }
 
     private func loadAvatars() {
+        if let configuration = model.connectedConfiguration, let owner = model.currentOwner {
+            archive.configure(try? NativeHistoryScope(configuration: configuration, owner: owner))
+        } else { archive.configure(nil) }
         guard model.canSend, case .connected(let owner) = model.phase, case .ready(let roster) = model.roster else { avatars.detach(); return }
         avatars.connect(model.activeWebSession, owner: owner, contacts: roster)
     }

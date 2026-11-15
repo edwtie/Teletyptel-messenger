@@ -3,10 +3,12 @@ import SwiftUI
 struct NativeAccountSettingsView: View {
     @ObservedObject var login: NativeLoginModel
     @ObservedObject var translation: NativeTranslationModel
+    var avatars: NativeAvatarCache? = nil
     @EnvironmentObject private var push: NativePushRegistrationModel
     @StateObject private var model = NativeAccountSettingsModel()
     @State private var draft: NativeAccountProfile?
     @State private var showTranslation = false
+    @State private var showAvatar = false
     @State private var clearHistory = false
     @State private var confirmPush = false
     @Environment(\.dismiss) private var dismiss
@@ -16,6 +18,11 @@ struct NativeAccountSettingsView: View {
                 if model.busy { ProgressView("Accountinstellingen ophalen…") }
                 if let profile = draft {
                     Section("Account") {
+                        HStack(spacing: 16) {
+                            if let avatars = avatars { NativeCachedAvatar(name: profile.displayName, jid: profile.jid, cache: avatars, size: 72) }
+                            else { NativeWebAvatar(name: profile.displayName, size: 72) }
+                            Button { showAvatar = true } label: { Label("Profielfoto wijzigen", systemImage: "camera") }
+                        }
                         LabeledContent("XMPP", value: profile.jid)
                             .accessibilityElement(children: .combine)
                             .accessibilityIdentifier("profile-jid")
@@ -67,6 +74,7 @@ struct NativeAccountSettingsView: View {
         .onChange(of: login.phase) { _ in if !login.canSend { model.detach(); draft = nil; dismiss() } }
         .onDisappear { model.detach(); draft = nil }
         .sheet(isPresented: $showTranslation) { NativeTranslationSettingsView(model: translation) }
+        .sheet(isPresented: $showAvatar) { NativeAvatarEditorView(login: login, onSaved: { avatars?.refreshOwner() }) }
         .alert("Toestemming voor oproepmeldingen", isPresented: $confirmPush) {
             Button("Inschakelen") { Task { await push.enable(consented: true) } }
             Button("Annuleren", role: .cancel) {}

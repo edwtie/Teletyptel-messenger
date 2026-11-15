@@ -1,0 +1,27 @@
+const fs = require("node:fs");
+const path = require("node:path");
+const { prepare } = require("./prepare-ios-native");
+const { executeLogged } = require("./check-ios-native");
+
+function run() {
+  if (process.platform !== "darwin") throw new Error("This unsigned SDK check requires macOS/Xcode");
+  const root = path.resolve(__dirname, "..");
+  const directory = prepare("ios-native-update-" + Date.now());
+  const reports = path.join(directory, "reports");
+  fs.mkdirSync(reports);
+  const result = { unsigned: true, uploaded: false, scope: "focused new-contact, presentation preferences and avatar logic; no simulator/UI/media tests",
+    swiftTestFilter: "NativeContactTests|NativePresentationTests|NativeServicesTests.testNativeAvatar", swiftUnitTests: false, deviceCompiled: false, uiTests: [] };
+  const logged = (name, command, args) => executeLogged(command, args, { root, reports, name });
+  try {
+    logged("swift-tests", "swift", ["test", "--package-path", path.join(root, "mobile/ios-native"),
+      "--scratch-path", path.join(directory, "SwiftBuild"), "--filter", result.swiftTestFilter]);
+    result.swiftUnitTests = true;
+    logged("device-build", "xcodebuild", ["-project", path.join(directory, "TeleTypTelNative.xcodeproj"),
+      "-scheme", "TeleTypTelNative", "-derivedDataPath", path.join(directory, "DerivedData"),
+      "CODE_SIGNING_ALLOWED=NO", "-destination", "generic/platform=iOS", "-configuration", "Release", "build"]);
+    result.deviceCompiled = true;
+  } finally { fs.writeFileSync(path.join(reports, "result.json"), JSON.stringify(result, null, 2)); }
+}
+
+if (require.main === module) run();
+module.exports = { run };

@@ -302,6 +302,7 @@ struct NativeStartupView: View {
             } else { startupContent }
         }
         .background(NativeProviderPresenter(sdk: providerSDK).frame(width: 0, height: 0))
+        .modifier(NativeAppearancePresentation())
         .environmentObject(calls.pushRegistration)
         .onOpenURL { providerSDK.handle($0) }
         .fullScreenCover(isPresented: Binding(

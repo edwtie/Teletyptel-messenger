@@ -153,6 +153,62 @@ final class NativeServicesTests: XCTestCase {
         cache.detach(); await session.close()
     }
 
+    func testNativeAvatarSaveUsesFreshCSRFAndOnlyUpdatesTheBoundOwner() async throws {
+        let session = NativeAccountWebSession(configuration: try configuration(), cookie: "PHPSESSID=fictional-session", settings: settings())
+        let model = NativeAvatarEditor()
+        let image = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6lvkAAAAASUVORK5CYII="
+        var stored = "", reads = 0, posts = 0
+        NativeServiceHTTPFixture.handler = { request in
+            XCTAssertEqual(request.url?.path, "/api/native-avatar.php")
+            XCTAssertNil(request.url?.query)
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Cookie"), "PHPSESSID=fictional-session")
+            if request.httpMethod == "GET" { reads += 1 }
+            else {
+                posts += 1; XCTAssertEqual(request.value(forHTTPHeaderField: "X-CSRF-Token"), self.csrf)
+                let body = try NativeServiceHTTPFixture.body(request)
+                XCTAssertEqual(Set(body.keys), ["avatarDataUrl"])
+                stored = try XCTUnwrap(body["avatarDataUrl"] as? String)
+            }
+            return (200, ["ok": true, "accountId": "fiction", "csrfToken": self.csrf,
+                "profile": ["jid": "fixture@localhost", "displayName": "Fixture", "avatarColor": "#2563eb", "avatarDataUrl": stored]], [:])
+        }
+        await model.configure(session: session, account: "fiction", owner: "fixture@localhost")
+        let saved = await model.save(image)
+        XCTAssertTrue(saved); XCTAssertEqual(reads, 2); XCTAssertEqual(posts, 1)
+        XCTAssertEqual(model.profile?.avatarDataUrl, image)
+        let invalid = await model.save("data:image/svg+xml;base64,PHN2Zz4=")
+        XCTAssertFalse(invalid); XCTAssertEqual(posts, 1)
+        let removed = await model.save("")
+        XCTAssertTrue(removed); XCTAssertEqual(model.profile?.avatarDataUrl, "")
+        model.detach(); await session.close()
+    }
+    func testNativeAvatarRejectsChangedAccountBeforeUpload() async throws {
+        let session = NativeAccountWebSession(configuration: try configuration(), settings: settings()), model = NativeAvatarEditor()
+        var count = 0
+        NativeServiceHTTPFixture.handler = { request in
+            count += 1; XCTAssertEqual(request.httpMethod, "GET")
+            return (200, ["ok": true, "accountId": count == 1 ? "fiction" : "other", "csrfToken": self.csrf,
+                "profile": ["jid": "fixture@localhost", "displayName": "Fixture", "avatarColor": "#2563eb", "avatarDataUrl": ""]], [:])
+        }
+        await model.configure(session: session, account: "fiction", owner: "fixture@localhost")
+        let saved = await model.save("")
+        XCTAssertFalse(saved); XCTAssertEqual(count, 2); XCTAssertNotNil(model.notice)
+        model.detach(); await session.close()
+    }
+    func testNativeAvatarBodyAllowanceDoesNotWidenOtherRoutes() async throws {
+        let session = NativeAccountWebSession(configuration: try configuration(), settings: settings())
+        var requests = 0
+        NativeServiceHTTPFixture.handler = { request in
+            requests += 1; XCTAssertEqual(request.url?.path, "/api/native-avatar.php")
+            return (200, ["ok": true], [:])
+        }
+        do { _ = try await session.request(.profile, body: Data(repeating: 0, count: 40000)); XCTFail("Profile body widened") } catch {}
+        _ = try await session.request(.avatar, body: Data(repeating: 0, count: 40000))
+        do { _ = try await session.request(.avatar, body: Data(repeating: 0, count: 525313)); XCTFail("Oversized avatar") } catch {}
+        do { _ = try await session.request(.avatar, accountID: "other"); XCTFail("Foreign avatar query") } catch {}
+        XCTAssertEqual(requests, 1); await session.close()
+    }
+
     private func preferences(mode: String = "automatic", target: String = "en") -> NativeTranslationPreferences {
         var result = NativeTranslationPreferences()
         result.mode = mode

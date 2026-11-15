@@ -6,6 +6,7 @@ enum NativeAccountRoute: String {
     case facebook = "api/auth/facebook/native.php"
     case translation = "api/translation.php"
     case profile = "api/native-profile.php"
+    case avatar = "api/native-avatar.php"
     case history = "api/native-history.php"
     case callPush = "api/call-push.php"
     case interpreter = "api/interpreter.php"
@@ -42,7 +43,7 @@ actor NativeAccountWebSession: CustomStringConvertible, CustomDebugStringConvert
                  historyPeer: String? = nil, historyKind: String? = nil, historyBefore: String? = nil,
                  interpreterRoom: String? = nil) async throws -> Data {
         try Task.checkCancellation()
-        guard !closed, (body?.count ?? 0) <= 32768 else { throw NativeAccountFailure.rejected }
+        guard !closed, (body?.count ?? 0) <= (route == .avatar ? 525312 : 32768) else { throw NativeAccountFailure.rejected }
         let attempt = generation
         var components = URLComponents(url: configuration.origin.appendingPathComponent(route.rawValue), resolvingAgainstBaseURL: false)!
         if let room = interpreterRoom {
