@@ -39,6 +39,7 @@
   "Versleuteld op dit apparaat, per server/account: tot 200 directe berichten, 100 concepten en 200 berichten per groep (maximaal 8 groepen), zonder iCloud-back-up. Uitschakelen verwijdert opgeslagen berichtinhoud; dit verwijdert geen serverarchief of gedeelde bestanden.": "Encrypted on this device per server/account: up to 200 direct messages, 100 drafts and 200 messages per group (up to 8 groups), without iCloud backup. Turning this off removes cached message content, not server archives or shared files.",
   "Lokale berichten en concepten wissen": "Clear local messages and drafts",
   "Wachtwoord en tweestapsverificatie": "Password and two-step verification",
+  "Werk eerst de server bij voor veilig wijzigen van het wachtwoord.": "Update the server first to change your password safely.",
   "Face ID en Touch ID blijven een afzonderlijke keuze op het aanmeldscherm.": "Face ID and Touch ID remain a separate choice on the sign-in screen.",
   "Opnieuw ophalen": "Reload",
   "Accountinstellingen": "Account settings",

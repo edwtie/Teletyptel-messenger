@@ -6,9 +6,11 @@ final class NativeAccountLifecycle: ObservableObject {
     @Published private(set) var busy = false
     @Published private(set) var status: String?
     @Published private(set) var twoFactorEnabled: Bool?
+    @Published private(set) var canChangePassword = false
     @Published private(set) var setupSecret: String?
     private var generation = UUID()
     private var setupExpiry: Date?
+    private var passwordScope: (session: NativeAccountWebSession, accountID: String, jid: String)?
 
     static func validPassword(_ password: String) -> Bool {
         password.count >= 10 && password.utf8.count <= 1024 &&
@@ -53,11 +55,15 @@ final class NativeAccountLifecycle: ObservableObject {
     }
 
     func loadSecurity(session: NativeAccountWebSession, accountID: String, jid: String) async {
+        canChangePassword = false
+        passwordScope = nil
         _ = await perform {
             let reply = try await self.fetch(session, accountID: accountID)
             guard reply.ok, reply.account?.accountId == accountID, reply.account?.jid == jid,
                   let enabled = reply.account?.twoFactorEnabled else { throw NativeAccountFailure.invalidResponse }
             self.twoFactorEnabled = enabled
+            self.canChangePassword = reply.capabilities?.nativePasswordChange == true
+            if self.canChangePassword { self.passwordScope = (session, accountID, jid) }
             return enabled ? "Tweestapsverificatie is ingeschakeld." : "Tweestapsverificatie is uitgeschakeld."
         }
     }
@@ -89,7 +95,9 @@ final class NativeAccountLifecycle: ObservableObject {
     }
 
     func changePassword(session: NativeAccountWebSession, accountID: String, jid: String, current: String, password: String) async -> Bool {
-        await perform {
+        guard canChangePassword, let scope = passwordScope, scope.session === session,
+              scope.accountID == accountID, scope.jid == jid else { status = "Werk eerst de server bij voor veilig wijzigen van het wachtwoord."; return false }
+        return await perform {
             guard !current.isEmpty, current.utf8.count <= 1024, current != password, Self.validPassword(password) else { throw NativeAccountFailure.rejected }
             let data = try JSONSerialization.data(withJSONObject: ["action": "change_password", "accountId": accountID, "jid": jid,
                 "currentPassword": current, "password": password])
@@ -99,7 +107,7 @@ final class NativeAccountLifecycle: ObservableObject {
         }
     }
 
-    func detach() { generation = UUID(); busy = false; setupSecret = nil; setupExpiry = nil; twoFactorEnabled = nil; status = nil }
+    func detach() { generation = UUID(); busy = false; setupSecret = nil; setupExpiry = nil; twoFactorEnabled = nil; canChangePassword = false; passwordScope = nil; status = nil }
 
     private func fetch(_ session: NativeAccountWebSession, body: Data? = nil, accountID: String? = nil) async throws -> Reply {
         let attempt = generation
@@ -131,6 +139,8 @@ final class NativeAccountLifecycle: ObservableObject {
         let account: Account?
         let method: String?
         let manualSecret: String?
+        let capabilities: Capabilities?
     }
+    private struct Capabilities: Decodable { let nativePasswordChange: Bool? }
     private struct Account: Decodable { let accountId: String?; let jid: String; let twoFactorEnabled: Bool? }
 }

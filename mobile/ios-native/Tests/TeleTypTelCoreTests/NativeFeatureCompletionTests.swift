@@ -148,6 +148,10 @@ final class NativeFeatureCompletionTests: XCTestCase {
         let session = NativeAccountWebSession(configuration: try ServerConfiguration(address: "https://example.invalid", domain: "localhost"), settings: settings)
         let model = NativeAccountLifecycle()
         FeatureHTTPFixture.handler = { request in
+            if request.httpMethod == "GET" {
+                return ["ok": true, "account": ["accountId": "fictional", "jid": "owner@localhost", "twoFactorEnabled": false],
+                    "capabilities": ["nativePasswordChange": true]]
+            }
             let body = try FeatureHTTPFixture.body(request)
             XCTAssertEqual(body["action"] as? String, "change_password")
             XCTAssertEqual(body["currentPassword"] as? String, "OldFictional123!")
@@ -156,8 +160,27 @@ final class NativeFeatureCompletionTests: XCTestCase {
             XCTAssertNil(body["rememberPassword"])
             return ["ok": true, "account": ["accountId": "fictional", "jid": "owner@localhost"]]
         }
+        await model.loadSecurity(session: session, accountID: "fictional", jid: "owner@localhost")
         let changed = await model.changePassword(session: session, accountID: "fictional", jid: "owner@localhost", current: "OldFictional123!", password: "NewFictional123!")
         XCTAssertTrue(changed)
+        FeatureHTTPFixture.handler = nil
+        await session.close()
+    }
+
+    @MainActor
+    func testOlderServerCannotFallBackToDestructiveGenericProfileSave() async throws {
+        let settings = URLSessionConfiguration.ephemeral
+        settings.protocolClasses = [FeatureHTTPFixture.self]
+        let session = NativeAccountWebSession(configuration: try ServerConfiguration(address: "https://example.invalid", domain: "localhost"), settings: settings)
+        let model = NativeAccountLifecycle()
+        FeatureHTTPFixture.handler = { request in
+            XCTAssertEqual(request.httpMethod, "GET")
+            return ["ok": true, "account": ["accountId": "fictional", "jid": "owner@localhost", "twoFactorEnabled": false]]
+        }
+        await model.loadSecurity(session: session, accountID: "fictional", jid: "owner@localhost")
+        XCTAssertFalse(model.canChangePassword)
+        let changed = await model.changePassword(session: session, accountID: "fictional", jid: "owner@localhost", current: "OldFictional123!", password: "NewFictional123!")
+        XCTAssertFalse(changed)
         FeatureHTTPFixture.handler = nil
         await session.close()
     }

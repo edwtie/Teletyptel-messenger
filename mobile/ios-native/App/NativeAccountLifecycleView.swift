@@ -72,7 +72,8 @@ struct NativeAccountSecurityView: View {
                                 credentialsChanged(); dismiss()
                             }
                         }
-                    }.disabled(model.busy || current.isEmpty || current == password || password != repeated || !NativeAccountLifecycle.validPassword(password))
+                    }.disabled(model.busy || !model.canChangePassword || current.isEmpty || current == password || password != repeated || !NativeAccountLifecycle.validPassword(password))
+                    if !model.busy && model.twoFactorEnabled != nil && !model.canChangePassword { Text("Werk eerst de server bij voor veilig wijzigen van het wachtwoord.").font(.caption) }
                 }
                 Section("Tweestapsverificatie") {
                     if model.twoFactorEnabled == false && model.setupSecret == nil {

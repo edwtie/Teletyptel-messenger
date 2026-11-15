@@ -77,6 +77,8 @@ test("Password changes use an authenticated preserving server action instead of 
   assert.match(action, /verifyAccountPassword/);
   assert.match(action, /NativeAccountPasswordChange::input\(rowToAccount\(\$existing\), \$input\)/);
   assert.match(read("mobile/ios-native/Sources/TeleTypTelCore/NativeAccountLifecycle.swift"), /"action": "change_password"/);
+  assert.match(read("mobile/ios-native/Sources/TeleTypTelCore/NativeAccountLifecycle.swift"), /scope\.session === session/);
+  assert.match(route, /'capabilities' => \['nativePasswordChange' => true\]/);
   let php;
   for (const candidate of [process.env.PHP_BINARY, "C:/wamp64/bin/php/php8.4.15/php.exe", "php"].filter(Boolean)) {
     try { execFileSync(candidate, ["--version"], { timeout: 10000, stdio: "pipe" }); php = candidate; break; } catch {}

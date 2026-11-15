@@ -150,7 +150,8 @@ function readAccount(): void
     }
 
     $row = ensureProviderXmppPassword($pdo, $row);
-    echo json_encode(['ok' => true, 'account' => rowToAccount($row)], JSON_UNESCAPED_SLASHES);
+    echo json_encode(['ok' => true, 'account' => rowToAccount($row),
+        'capabilities' => ['nativePasswordChange' => true]], JSON_UNESCAPED_SLASHES);
 }
 
 function logoutAccountSession(): void
