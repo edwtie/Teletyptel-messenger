@@ -16,7 +16,7 @@ struct NativeAccountEntryView: View {
             Form {
                 Section(recovery ? "Wachtwoord vergeten" : "Nieuwe gebruiker") {
                     Text(configuration.origin.host ?? "").font(.caption)
-                    TextField("XMPP-account", text: $jid).textInputAutocapitalization(.never).autocorrectionDisabled()
+                    TextField(recovery ? "XMPP-account of geverifieerde e-mail" : "XMPP-account", text: $jid).textInputAutocapitalization(.never).autocorrectionDisabled()
                     if !recovery {
                         TextField("Naam", text: $name)
                         SecureField("Nieuw wachtwoord", text: $password).textContentType(.newPassword)

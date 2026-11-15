@@ -1,5 +1,6 @@
 {
   "XMPP-account": "XMPP account",
+  "XMPP-account of geverifieerde e-mail": "XMPP account or verified email",
   "Naam": "Name",
   "Minimaal 10 tekens, met een kleine letter, hoofdletter, cijfer en speciaal teken.": "At least 10 characters, including a lowercase letter, uppercase letter, number and special character.",
   "Deze server ondersteunt via de bestaande API nog geen nieuwe lokale XMPP-accounts voor dit domein.": "This server's existing API does not support creating local XMPP accounts for this domain yet.",
@@ -273,6 +274,7 @@
   "Aanmelden gebruikt het ingevulde HTTPS-adres. Zonder toestemming blijven inloggegevens alleen in het werkgeheugen. Biometrisch aanmelden bewaart ze in de beveiligde iOS-sleutelhanger, niet in iCloud. Vertaling gebruikt alleen jouw eigen toestemming. Achtergrondoproepen blijven apart in ontwikkeling.": "Sign-in uses the HTTPS address you entered. Without consent, credentials stay only in memory. Biometric sign-in stores them in the secure iOS Keychain, not iCloud. Translation uses only your own consent. Background calls remain a separate development task.",
   "Kies een contact om te chatten. De status komt van XMPP; onbekend betekent niet offline. Groepsgesprekken volgen later.": "Choose a contact to chat. Presence comes from XMPP; unknown does not mean offline. Group calling remains a separate feature.",
   "Contacten konden niet worden opgehaald. Je XMPP-verbinding kan nog actief zijn. Verbreek de verbinding en meld opnieuw aan om het opnieuw te proberen.": "Contacts could not be loaded. Your XMPP connection may still be active. Disconnect and sign in again to retry.",
+  "Bijlage bekijken of afspelen": "View or play attachment",
   "Berichtmeldingen": "Message notifications",
   "Meldingen tonen geen berichtinhoud. Ze werken alleen zolang de app berichten ontvangt; dit is nog geen APNs-bezorging na afsluiten of schermvergrendeling.": "Notifications do not show message content. They work only while the app receives messages; this is not APNs delivery after closing the app or locking the screen.",
   "Berichtmeldingen uitschakelen": "Disable message notifications",

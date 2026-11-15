@@ -7,6 +7,7 @@ final class NativeStartupUITests: XCTestCase {
         continueAfterFailure = false
         XCUIDevice.shared.orientation = .portrait
         application = XCUIApplication()
+        application.launchArguments = ["-teletyptel.native.interfaceLanguage", "nl"]
     }
 
     override func tearDownWithError() throws {
@@ -26,6 +27,18 @@ final class NativeStartupUITests: XCTestCase {
         XCTAssertTrue(application.staticTexts["startup-status"].exists)
         XCTAssertFalse(application.staticTexts["Native iPhone- en iPad-app"].exists)
         snapshot("login-web-style")
+    }
+
+    func testEnglishStartupDoesNotTranslateUserDataOrRequestPermissions() {
+        application.launchArguments = ["-teletyptel.native.interfaceLanguage", "en"]
+        application.launch()
+        XCTAssertTrue(application.textFields["server-address"].waitForExistence(timeout: 10))
+        XCTAssertTrue(application.staticTexts["Sign in"].exists)
+        XCTAssertTrue(application.staticTexts["Use your XMPP account to sign in to TeleTypTel."].exists)
+        XCTAssertFalse(application.keyboards.firstMatch.exists)
+        XCTAssertTrue(application.alerts.allElementsBoundByIndex.isEmpty)
+        XCTAssertFalse(application.buttons["check-connection"].isEnabled)
+        snapshot("english-login")
     }
 
     func testCloudHistoryCatalogAndOlderPagesDoNotAuthorizeAnUnknownContact() {

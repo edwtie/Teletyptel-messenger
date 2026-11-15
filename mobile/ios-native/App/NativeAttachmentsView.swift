@@ -3,6 +3,7 @@ import PhotosUI
 import UniformTypeIdentifiers
 import ImageIO
 import UIKit
+import QuickLook
 
 struct NativeAttachmentButton: View {
     @ObservedObject var login: NativeLoginModel
@@ -133,9 +134,26 @@ struct NativeFileMessageButton: View {
     @State private var busy = false
     @State private var error: String?
     @State private var task: Task<Void, Never>?
+    @State private var previewURL: URL?
+    @Environment(\.scenePhase) private var scenePhase
+    @ObservedObject private var exclusion = NativeCaptureExclusion.shared
     var body: some View {
         VStack(alignment: .leading) {
             if let session = session, let reference = NativeFileReference.inMessage(bodyText, configuration: session.configuration) {
+                Button {
+                    busy = true; error = nil
+                    task = Task {
+                        defer { busy = false }
+                        do {
+                            let bytes = try await session.downloadFile(reference)
+                            guard !Task.isCancelled, !exclusion.callActive else { return }
+                            let extensionName = try NativeReceivedFilePreview.fileExtension(bytes)
+                            let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + "." + extensionName)
+                            guard FileManager.default.createFile(atPath: url.path, contents: bytes, attributes: [.protectionKey: FileProtectionType.complete]) else { throw NativeAccountFailure.rejected }
+                            clearPreview(); previewURL = url
+                        } catch { if !Task.isCancelled { self.error = "Voorbeeld niet beschikbaar. Gebruik Bestand opslaan om dit bestand zelf te openen." } }
+                    }
+                } label: { Label("Bijlage bekijken of afspelen", systemImage: "play.rectangle") }.disabled(busy || exclusion.callActive)
                 Button {
                     busy = true; error = nil
                     task = Task {
@@ -151,11 +169,49 @@ struct NativeFileMessageButton: View {
             }
         }
         .fileExporter(isPresented: $exporting, document: document, contentType: .data, defaultFilename: filename) { _ in document = nil }
-        .onDisappear { task?.cancel(); document = nil }
+        .sheet(isPresented: Binding(get: { previewURL != nil }, set: { if !$0 { clearPreview() } }), onDismiss: clearPreview) {
+            if let url = previewURL { NativeReceivedFilePreview(url: url).ignoresSafeArea() }
+        }
+        .onChange(of: exclusion.callActive) { active in if active { task?.cancel(); clearPreview() } }
+        .onChange(of: scenePhase) { phase in if phase == .background { task?.cancel(); clearPreview() } }
+        .onDisappear { task?.cancel(); document = nil; clearPreview() }
+    }
+    private func clearPreview() {
+        if let url = previewURL { try? FileManager.default.removeItem(at: url) }
+        previewURL = nil
     }
     private var filename: String {
         let first = bodyText.components(separatedBy: "\n").first ?? "bestand"
         let proposed = first.replacingOccurrences(of: "Bestand: ", with: "").replacingOccurrences(of: "Shared file: ", with: "")
         return String((proposed as NSString).lastPathComponent.prefix(160)).replacingOccurrences(of: ":", with: "-")
+    }
+}
+
+private struct NativeReceivedFilePreview: UIViewControllerRepresentable {
+    let url: URL
+    static func fileExtension(_ bytes: Data) throws -> String {
+        guard !bytes.isEmpty, bytes.count <= NativeUploadSelection.maximumBytes else { throw NativeAccountFailure.rejected }
+        if bytes.starts(with: Data("%PDF-".utf8)) { return "pdf" }
+        if bytes.starts(with: [0xff, 0xd8, 0xff]) { return "jpg" }
+        if bytes.starts(with: [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]) { return "png" }
+        if bytes.count >= 16, bytes[4..<8] == Data("ftyp".utf8) {
+            let brand = String(data: bytes[8..<12], encoding: .ascii)
+            guard let brand = brand, ["M4A ", "M4B ", "M4V ", "isom", "iso2", "mp41", "mp42", "avc1"].contains(brand) else { throw NativeAccountFailure.rejected }
+            return ["M4A ", "M4B "].contains(brand) ? "m4a" : "mp4"
+        }
+        throw NativeAccountFailure.rejected
+    }
+    func makeCoordinator() -> Coordinator { Coordinator(url) }
+    func makeUIViewController(context: Context) -> QLPreviewController {
+        let controller = QLPreviewController()
+        controller.dataSource = context.coordinator
+        return controller
+    }
+    func updateUIViewController(_ controller: QLPreviewController, context: Context) {}
+    final class Coordinator: NSObject, QLPreviewControllerDataSource {
+        let url: URL
+        init(_ url: URL) { self.url = url }
+        func numberOfPreviewItems(in controller: QLPreviewController) -> Int { 1 }
+        func previewController(_ controller: QLPreviewController, previewItemAt index: Int) -> QLPreviewItem { url as NSURL }
     }
 }

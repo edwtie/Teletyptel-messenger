@@ -2,7 +2,7 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const { catalog } = require("../scripts/ios-testflight/native-localization");
+const { catalog, permissions } = require("../scripts/ios-testflight/native-localization");
 const root = path.resolve(__dirname, "..");
 const read = file => fs.readFileSync(path.join(root, file), "utf8");
 
@@ -19,6 +19,9 @@ test("Native static UI has complete Dutch/English resource coverage and an indep
   assert.match(generator, /native-localization/);
   assert.match(read("mobile/ios-native/App/NativeAppearanceView.swift"), /interface-language/);
   assert.match(read("mobile/ios-native/App/TeleTypTelNativeApp.swift"), /environment\(\\\.locale/);
+  assert.match(permissions(root).en, /NSLocationWhenInUseUsageDescription/);
+  assert.match(permissions(root).en, /no background tracking/);
+  assert.match(permissions(root).nl, /geen achtergrondtracking/);
 });
 
 test("Message notifications request consent, redact content and never masquerade as APNs", () => {
@@ -45,6 +48,13 @@ test("Recording and one-time location have bounded capture, explicit review and 
   assert.match(location, /60/);
   assert.doesNotMatch(location, /requestAlwaysAuthorization|startUpdatingLocation|allowsBackgroundLocationUpdates/);
   assert.match(read("mobile/ios-native/App/Info.plist"), /NSLocationWhenInUseUsageDescription/);
+  const attachment = read("mobile/ios-native/App/NativeAttachmentsView.swift");
+  assert.match(attachment, /QLPreviewController/);
+  assert.match(attachment, /session\.downloadFile\(reference\)/);
+  assert.match(attachment, /FileProtectionType.complete/);
+  assert.match(attachment, /clearPreview/);
+  assert.match(attachment, /!exclusion.callActive/);
+  assert.doesNotMatch(attachment, /WKWebView|URLSession\.shared/);
 });
 
 test("Reconnect is bounded, cancellable and cannot bypass certificate or authentication errors", () => {

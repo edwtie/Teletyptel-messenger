@@ -27,4 +27,19 @@ function catalog(root) {
     .map(key => `${quoted(key)} = ${quoted(language === "nl" ? key : entries[key])};`).join("\n") + "\n"]));
 }
 
-module.exports = { catalog };
+function permissions(root) {
+  const source = fs.readFileSync(path.join(root, "mobile/ios-native/App/Info.plist"), "utf8");
+  const english = {
+    NSLocalNetworkUsageDescription: "Only at your request does TeleTypTel check whether your specified local chat server is reachable.",
+    NSMicrophoneUsageDescription: "Only at your request does TeleTypTel use the microphone for a call or voice/video recording. Recordings are uploaded only after your confirmation.",
+    NSCameraUsageDescription: "Only at your request does TeleTypTel use the camera for a call, photo or video recording. Recordings are uploaded only after your confirmation.",
+    NSLocationWhenInUseUsageDescription: "Only at your request does TeleTypTel fetch a one-time location. You review it before adding it to a message. There is no background tracking.",
+    NSFaceIDUsageDescription: "Only with your consent does Face ID unlock your saved sign-in on this device. TeleTypTel receives no facial data."
+  };
+  const dutch = Object.fromEntries([...source.matchAll(/<key>(NS\w+UsageDescription)<\/key><string>([^<]+)<\/string>/g)].map(match => [match[1], match[2]]));
+  for (const key of Object.keys(dutch)) if (!english[key]) throw new Error("Missing English permission: " + key);
+  return Object.fromEntries([["nl", dutch], ["en", english]].map(([language, entries]) => [language,
+    Object.entries(entries).map(([key, value]) => `${JSON.stringify(key)} = ${JSON.stringify(value)};`).join("\n") + "\n"]));
+}
+
+module.exports = { catalog, permissions };

@@ -12,6 +12,7 @@ final class NativeAccountLifecycle: ObservableObject {
 
     static func validPassword(_ password: String) -> Bool {
         password.count >= 10 && password.utf8.count <= 1024 &&
+            password == password.trimmingCharacters(in: .whitespacesAndNewlines) &&
             password.range(of: "[a-z]", options: .regularExpression) != nil &&
             password.range(of: "[A-Z]", options: .regularExpression) != nil &&
             password.range(of: "[0-9]", options: .regularExpression) != nil &&
@@ -21,7 +22,8 @@ final class NativeAccountLifecycle: ObservableObject {
 
     static func registration(configuration: ServerConfiguration, jid: String, name: String, password: String) throws -> Data {
         guard configuration.domain == "localhost", NativeAuthenticatedAccount.validJID(jid, domain: configuration.domain),
-              NativeChatCodec.validBody(name), name.utf8.count <= 120, validPassword(password) else { throw NativeAccountFailure.rejected }
+              NativeChatCodec.validBody(name), name.utf8.count <= 120,
+              !name.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains), validPassword(password) else { throw NativeAccountFailure.rejected }
         return try JSONSerialization.data(withJSONObject: ["action": "create", "jid": jid, "displayName": name,
             "password": password, "rememberPassword": false, "xmppDomain": configuration.domain,
             "xmppWebSocket": configuration.webSocket.absoluteString, "xmppTlsMode": "websocket"])
@@ -41,7 +43,7 @@ final class NativeAccountLifecycle: ObservableObject {
     func requestRecovery(configuration: ServerConfiguration, jid: String) async {
         let session = NativeAccountWebSession(configuration: configuration)
         _ = await perform {
-            guard NativeAuthenticatedAccount.validJID(jid, domain: configuration.domain) else { throw NativeAccountFailure.rejected }
+            guard NativeChatCodec.bareJID(jid) == jid, jid.utf8.count <= 255 else { throw NativeAccountFailure.rejected }
             let data = try JSONSerialization.data(withJSONObject: ["action": "request_password_reset", "jid": jid])
             let reply = try await self.fetch(session, body: data)
             guard reply.ok else { throw NativeAccountFailure.rejected }

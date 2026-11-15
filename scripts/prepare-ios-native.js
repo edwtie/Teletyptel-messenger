@@ -49,6 +49,11 @@ function projectText() {
   const translationGroup = object("localized-strings", `{isa = PBXVariantGroup; children = ${list(translations)}; name = Localizable.strings; sourceTree = "<group>";}`);
   refs.push(translationGroup);
   const translationBuild = object("localized-strings-build", `{isa = PBXBuildFile; fileRef = ${translationGroup};}`);
+  const permissionTranslations = ["nl", "en"].map(language => object("permissions-" + language,
+    `{isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ${language}; path = ${language}.lproj/InfoPlist.strings; sourceTree = "<group>";}`));
+  const permissionGroup = object("localized-permissions", `{isa = PBXVariantGroup; children = ${list(permissionTranslations)}; name = InfoPlist.strings; sourceTree = "<group>";}`);
+  refs.push(permissionGroup);
+  const permissionBuild = object("localized-permissions-build", `{isa = PBXBuildFile; fileRef = ${permissionGroup};}`);
   const testRef = object("test-file", '{isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UITests/NativeStartupUITests.swift; sourceTree = "<group>";}');
   refs.push(testRef);
   const testBuild = object("test-build", `{isa = PBXBuildFile; fileRef = ${testRef};}`);
@@ -75,7 +80,7 @@ function projectText() {
       providerBuilds.push(object(name + "-build", `{isa = PBXBuildFile; productRef = ${product};}`));
     }
   }
-  const appPhases = [phase("sources", "PBXSourcesBuildPhase", buildFiles), phase("frameworks", "PBXFrameworksBuildPhase", [rtcBuild, ...providerBuilds]), phase("resources", "PBXResourcesBuildPhase", [assetBuild, translationBuild])];
+  const appPhases = [phase("sources", "PBXSourcesBuildPhase", buildFiles), phase("frameworks", "PBXFrameworksBuildPhase", [rtcBuild, ...providerBuilds]), phase("resources", "PBXResourcesBuildPhase", [assetBuild, translationBuild, permissionBuild])];
   const testPhases = [phase("test-sources", "PBXSourcesBuildPhase", [testBuild]), phase("test-frameworks", "PBXFrameworksBuildPhase", []), phase("test-resources", "PBXResourcesBuildPhase", [])];
   const configurations = (name, settings) => {
     const configs = ["Debug", "Release"].map(mode => object(name + mode,
@@ -118,6 +123,7 @@ function prepare(name, { providers = null } = {}) {
   };
   for (const file of coreFiles) write("Core/" + file, fs.readFileSync(path.join(source, "Sources/TeleTypTelCore", file)));
   for (const [language, content] of Object.entries(require("./ios-testflight/native-localization").catalog(root))) write(language + ".lproj/Localizable.strings", content);
+  for (const [language, content] of Object.entries(require("./ios-testflight/native-localization").permissions(root))) write(language + ".lproj/InfoPlist.strings", content);
   for (const file of mediaFiles) write("Media/" + file, fs.readFileSync(path.join(root, "scripts/ios-testflight", file)));
   for (const file of [...appFiles, "App/Info.plist", "UITests/NativeStartupUITests.swift"]) {
     const content = fs.readFileSync(path.join(source, file));
