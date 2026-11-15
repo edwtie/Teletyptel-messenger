@@ -313,14 +313,18 @@ final class NativeStartupUITests: XCTestCase {
         XCTAssertTrue(outgoing.waitForExistence(timeout: 5))
         snapshot("group-portrait")
         rotate(.landscapeLeft)
+        let viewport = application.scrollViews["group-messages-fixture@conference.localhost"].firstMatch
         let latestVisible = NSPredicate { _, _ in
-            outgoing.exists && outgoing.isHittable && outgoing.frame.maxY <= draft.frame.minY &&
-                outgoing.frame.minY >= self.application.navigationBars["fixture"].frame.maxY - 1
+            outgoing.exists && outgoing.isHittable && viewport.exists &&
+                viewport.frame.contains(outgoing.frame) && outgoing.frame.maxY <= draft.frame.minY
         }
         expectation(for: latestVisible, evaluatedWith: outgoing)
         waitForExpectations(timeout: 10)
         snapshot("group-landscape")
-        application.buttons["group-leave"].tap()
+        let leave = application.buttons["group-leave"]
+        XCTAssertTrue(leave.isHittable)
+        XCTAssertTrue(application.frame.contains(leave.frame))
+        leave.tap()
         XCTAssertTrue(application.buttons["Opnieuw deelnemen"].waitForExistence(timeout: 5))
         XCTAssertFalse(application.buttons["group-send"].isEnabled)
     }

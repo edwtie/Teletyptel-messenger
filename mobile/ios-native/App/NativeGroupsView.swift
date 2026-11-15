@@ -86,10 +86,6 @@ struct NativeGroupChatView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if verticalSizeClass == .compact {
-                groupActions.frame(maxWidth: .infinity, alignment: .trailing)
-                    .padding(.horizontal, 12).padding(.vertical, 4).background(NativeWebStyle.panel)
-            }
             if let group = group {
                 status(group)
                 if searching { TextField("Zoek in deze groepssessie", text: $search).focused($searchFocused).textFieldStyle(.roundedBorder).frame(minHeight: 44).padding(.horizontal, 16).accessibilityIdentifier("group-search") }
@@ -120,7 +116,7 @@ struct NativeGroupChatView: View {
                 }
             }
             ToolbarItem(placement: .primaryAction) {
-                if verticalSizeClass != .compact { groupActions }
+                groupActions
             }
         }
         .sheet(isPresented: $showParticipants) {
