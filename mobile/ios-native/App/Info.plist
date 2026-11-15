@@ -24,8 +24,9 @@
     <key>UISupportedInterfaceOrientations~ipad</key>
     <array><string>UIInterfaceOrientationPortrait</string><string>UIInterfaceOrientationPortraitUpsideDown</string><string>UIInterfaceOrientationLandscapeLeft</string><string>UIInterfaceOrientationLandscapeRight</string></array>
     <key>NSLocalNetworkUsageDescription</key><string>Alleen na jouw opdracht controleert TeleTypTel of de opgegeven lokale chatserver bereikbaar is.</string>
-    <key>NSMicrophoneUsageDescription</key><string>TeleTypTel gebruikt de microfoon alleen tijdens een gesprek dat je zelf start of aanneemt.</string>
-    <key>NSCameraUsageDescription</key><string>TeleTypTel gebruikt de camera alleen tijdens een videogesprek dat je zelf start of aanneemt.</string>
+    <key>NSMicrophoneUsageDescription</key><string>Alleen na jouw opdracht gebruikt TeleTypTel de microfoon voor een gesprek of een spraak- of video-opname. Opnamen worden pas na jouw bevestiging geüpload.</string>
+    <key>NSCameraUsageDescription</key><string>Alleen na jouw opdracht gebruikt TeleTypTel de camera voor een gesprek, foto of video-opname. Opnamen worden pas na jouw bevestiging geüpload.</string>
+    <key>NSLocationWhenInUseUsageDescription</key><string>Alleen op jouw verzoek haalt TeleTypTel een eenmalige locatie op. Jij controleert de locatie voordat deze in een bericht wordt geplaatst. Er is geen achtergrondtracking.</string>
     <key>NSFaceIDUsageDescription</key><string>Alleen met jouw toestemming ontgrendelt Face ID je bewaarde aanmelding op dit apparaat. TeleTypTel ontvangt geen gezichtsgegevens.</string>
 </dict>
 </plist>

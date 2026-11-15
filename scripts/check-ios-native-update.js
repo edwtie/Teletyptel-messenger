@@ -10,7 +10,7 @@ function run() {
   const reports = path.join(directory, "reports");
   fs.mkdirSync(reports);
   const result = { unsigned: true, uploaded: false, scope: "focused contacts, presentation, avatar, Jingle codec and native hold logic; no simulator/UI/camera/audio tests",
-    swiftTestFilter: "NativeContactTests|NativePresentationTests|NativeServicesTests.testNativeAvatar|NativeJingleMediaTests|NativeJingleSessionTests|NativeCallCoordinatorTests|NativeJingleTransportTests", swiftUnitTests: false, nativeRttTests: false, deviceCompiled: false, uiTests: [] };
+    swiftTestFilter: "NativeContactTests|NativePresentationTests|NativeServicesTests.testNativeAvatar|NativeJingleMediaTests|NativeJingleSessionTests|NativeCallCoordinatorTests|NativeJingleTransportTests|NativeLoginModelTests|NativeChatInteractionsTests|NativeFeatureCompletionTests", swiftUnitTests: false, nativeRttTests: false, deviceCompiled: false, uiTests: [] };
   const logged = (name, command, args) => executeLogged(command, args, { root, reports, name });
   try {
     logged("swift-tests", "swift", ["test", "--package-path", path.join(root, "mobile/ios-native"),

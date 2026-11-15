@@ -371,6 +371,40 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
         try Task.checkCancellation()
         let identifier = "contact-" + UUID().uuidString
         let frame = try NativeContactEditing.request(jid: jid, name: name, owner: ownerJID, identifier: identifier)
+        try await editContact(frame, identifier: identifier)
+        try Task.checkCancellation()
+        if requestPresence {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                queue.async {
+                    self.enqueueMessage("<presence xmlns='jabber:client' to='\(NativeMUCStream.escape(jid))' type='subscribe'/>", continuation: continuation)
+                }
+            }
+        }
+    }
+
+    func setBlocked(jid: String, blocked: Bool) async throws {
+        let identifier = "block-" + UUID().uuidString
+        let frame = try NativeContactEditing.blockRequest(jid: jid, blocked: blocked, owner: ownerJID, identifier: identifier)
+        try await editContact(frame, identifier: identifier)
+    }
+
+    func removeContact(jid: String) async throws {
+        let identifier = "remove-" + UUID().uuidString
+        let frame = try NativeContactEditing.removalRequest(jid: jid, owner: ownerJID, identifier: identifier)
+        try await editContact(frame, identifier: identifier)
+    }
+
+    func setDoNotDisturb(_ enabled: Bool) async throws {
+        try Task.checkCancellation()
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            queue.async {
+                self.enqueueMessage(enabled ? "<presence xmlns='jabber:client'><show>dnd</show></presence>" : "<presence xmlns='jabber:client'/>", continuation: continuation)
+            }
+        }
+    }
+
+    private func editContact(_ frame: String, identifier: String) async throws {
+        try Task.checkCancellation()
         let cancellation = NativeArchiveCancellation()
         try await withTaskCancellationHandler(operation: {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
@@ -387,13 +421,6 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
             }
         }, onCancel: { cancellation.cancel(); self.queue.async { self.finishContact(identifier, error: CancellationError()) } })
         try Task.checkCancellation()
-        if requestPresence {
-            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-                queue.async {
-                    self.enqueueMessage("<presence xmlns='jabber:client' to='\(NativeMUCStream.escape(jid))' type='subscribe'/>", continuation: continuation)
-                }
-            }
-        }
     }
 
     func observeContactRequests(_ observer: @escaping @Sendable ([String]) -> Void) async {

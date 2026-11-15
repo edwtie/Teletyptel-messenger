@@ -50,7 +50,13 @@ private final class NativePeerRouter: NativePeerNegotiating {
 final class NativeCallController: ObservableObject, NativePushRegistering {
     enum Status: Equatable { case idle, calling(String), ringing(String), active(String), failed }
 
-    @Published private(set) var status: Status = .idle
+    @Published private(set) var status: Status = .idle {
+        didSet {
+            let active = status != .idle && status != .failed
+            if active { NativeCaptureExclusion.shared.cancelRecording?() }
+            NativeCaptureExclusion.shared.callActive = active
+        }
+    }
     @Published private(set) var presentation: NativeCallPresentation?
     @Published private(set) var peerName: String?
     @Published private(set) var isMuted = false
@@ -138,6 +144,11 @@ final class NativeCallController: ObservableObject, NativePushRegistering {
             account = jid
             if ensureRuntime().platform.connectForeground(account: jid) == nil { status = .failed }
         case .checking, .authenticating, .connecting, .awaitingSecondFactor:
+            if login?.isReconnecting == true {
+                resetCall()
+                account = nil
+                runtime?.logout()
+            }
             break
         case .suspended:
             if !hasLiveCall { resetCall() }
@@ -220,6 +231,7 @@ final class NativeCallController: ObservableObject, NativePushRegistering {
     }
 
     func startCall(_ contact: NativeContact, profile: NativeCallMedia, videoCodec: String = "VP8") {
+        guard login?.isBlocked(contact.jid) != true else { return }
         let audioCodec = NativeAudioCodec(rawValue: UserDefaults.standard.string(forKey: NativeAudioCodec.preferenceKey) ?? "") ?? .pcmu
         guard activePeer == nil, prepareTask == nil, account != nil,
               let endpoint = contact.callEndpoint,

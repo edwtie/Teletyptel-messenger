@@ -608,10 +608,75 @@ final class NativeLoginModelTests: XCTestCase {
         await fixture.ready(0)
         await eventually { model.isConnected }
         await fixture.fail(0, error: XMPPSessionFailure.heartbeatTimeout)
-        await eventually { model.phase == .failed(.xmpp(.heartbeatTimeout)) }
+        await eventually { model.isReconnecting }
         await fixture.ready(0)
         await Task.yield()
         XCTAssertFalse(model.isConnected)
+        model.disconnect()
+    }
+
+    @MainActor
+    func testTransientFailureReconnectsWithoutReauthenticatingOrResendingDraft() async {
+        let fixture = LoginFixture()
+        let model = NativeLoginModel(checker: fixture, authenticator: fixture, connection: fixture, reconnectWait: { _ in })
+        start(model)
+        await eventually { await fixture.runCount() == 1 }
+        await fixture.ready(0); await fixture.roster(0, state: contacts)
+        await eventually { model.canSend }
+        model.setDraft("Niet automatisch versturen", peer: "peer@localhost")
+        await fixture.fail(0, error: XMPPSessionFailure.heartbeatTimeout)
+        await eventually { await fixture.runCount() == 2 }
+        XCTAssertTrue(model.isReconnecting)
+        XCTAssertFalse(model.canSend)
+        await fixture.ready(1); await fixture.roster(1, state: contacts)
+        await eventually { model.canSend }
+        XCTAssertEqual(model.chat.drafts["peer@localhost"], "Niet automatisch versturen")
+        let history = await fixture.history()
+        let sent = await fixture.sentMessages()
+        XCTAssertEqual(history.filter { $0 == "account" }.count, 1)
+        XCTAssertTrue(sent.isEmpty)
+        model.disconnect()
+        XCTAssertEqual(model.reconnectAttempt, 0)
+    }
+
+    @MainActor
+    func testReconnectIsBoundedAndCannotReviveAfterLogout() async {
+        let fixture = LoginFixture()
+        let model = NativeLoginModel(checker: fixture, authenticator: fixture, connection: fixture, reconnectWait: { _ in })
+        start(model)
+        await eventually { await fixture.runCount() == 1 }
+        await fixture.ready(0)
+        await eventually { model.isConnected }
+        for index in 0...5 {
+            await fixture.fail(index, error: XMPPSessionFailure.streamClosed)
+            if index < 5 { await eventually { await fixture.runCount() == index + 2 } }
+        }
+        await eventually { model.phase == .failed(.xmpp(.streamClosed)) }
+        XCTAssertFalse(model.canSend)
+        model.disconnect()
+        await fixture.ready(5)
+        await Task.yield()
+        XCTAssertEqual(model.phase, .signedOut)
+        let count = await fixture.runCount()
+        XCTAssertEqual(count, 6)
+    }
+
+    @MainActor
+    func testCertificateAndAuthenticationFailuresNeverAutoRetry() async {
+        for error in [ConnectionFailure.certificate as Error, XMPPSessionFailure.authenticationRejected as Error] {
+            let fixture = LoginFixture()
+            let model = NativeLoginModel(checker: fixture, authenticator: fixture, connection: fixture, reconnectWait: { _ in })
+            start(model)
+            await eventually { await fixture.runCount() == 1 }
+            await fixture.ready(0)
+            await eventually { model.isConnected }
+            await fixture.fail(0, error: error)
+            await eventually { if case .failed = model.phase { return true }; return false }
+            XCTAssertFalse(model.isReconnecting)
+            let count = await fixture.runCount()
+            XCTAssertEqual(count, 1)
+            model.disconnect()
+        }
     }
 
     @MainActor

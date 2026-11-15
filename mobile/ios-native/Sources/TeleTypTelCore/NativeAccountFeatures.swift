@@ -70,7 +70,7 @@ struct NativeUploadSelection: Equatable, Sendable {
     let mime: String
     init(name: String, data: Data) throws {
         let types = ["jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png", "heic": "image/heic",
-            "pdf": "application/pdf", "doc": "application/msword", "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "txt": "text/plain"]
+            "pdf": "application/pdf", "doc": "application/msword", "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "txt": "text/plain", "m4a": "audio/mp4", "mp4": "video/mp4"]
         guard !data.isEmpty, data.count <= Self.maximumBytes, name.utf8.count <= 160, !name.isEmpty,
               !name.contains("/"), !name.contains("\\"), !name.contains("\""),
               !name.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains),

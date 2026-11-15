@@ -20,6 +20,9 @@ struct NativeChatView: View {
     @State private var forwarding: NativeChatMessage?
     @State private var editing: NativeChatMessage?
     @State private var deleting: NativeChatMessage?
+    @State private var removeContact = false
+    @State private var renameContact = false
+    @State private var contactName = ""
     var historyOnly = false
     @State private var browsingOlder = false
     @State private var preservedMessage: UUID?
@@ -30,7 +33,7 @@ struct NativeChatView: View {
     var body: some View {
             VStack(spacing: 0) {
                 if !model.isConnected {
-                    Text(model.isConnected ? "Verbonden · één-op-één chat" : "Niet verbonden · tekst blijft in deze sessie bewaard")
+                    Text(model.isReconnecting ? "Verbinding herstellen (\(model.reconnectAttempt)/5)… Je tekst blijft bewaard." : "Niet verbonden · tekst blijft in deze sessie bewaard")
                         .font(.caption).foregroundStyle(.secondary).padding(6)
                         .accessibilityIdentifier("chat-connection")
                 }
@@ -38,6 +41,8 @@ struct NativeChatView: View {
                     Text("Beperkt cachevenster · haal andere pagina’s op via Online geschiedenis.").font(.caption).padding(6)
                 }
                 if historyOnly { Text("Online archief · voeg dit contact eerst aan je contactenlijst toe om te chatten.").font(.caption).padding(6) }
+                if model.isBlocked(contact.jid) { Text("Contact geblokkeerd").font(.caption).padding(6) }
+                if let notice = model.contactActionNotice { Text(notice).font(.caption).padding(6).accessibilityIdentifier("contact-action-status") }
                 ScrollViewReader { proxy in
                     ScrollView {
                         VStack(spacing: 0) {
@@ -134,6 +139,16 @@ struct NativeChatView: View {
                         .disabled(contact.callEndpoint == nil || calls.status != .idle)
                         .accessibilityLabel("Totale conversatie starten")
                         Menu {
+                            Button { contactName = contact.displayName; renameContact = true } label: { Label("Naam wijzigen", systemImage: "pencil") }
+                                .disabled(!model.canSend || model.contactActionBusy)
+                            Button { model.setMuted(contact.jid, muted: !model.chat.preferences.mutedPeers.contains(contact.jid)) } label: {
+                                Label(model.chat.preferences.mutedPeers.contains(contact.jid) ? "Meldingen aan" : "Meldingen dempen", systemImage: "bell.slash")
+                            }
+                            Button { model.setBlocked(contact.jid, blocked: !model.isBlocked(contact.jid)) } label: {
+                                Label(model.isBlocked(contact.jid) ? "Deblokkeren" : "Blokkeren", systemImage: "hand.raised")
+                            }.disabled(!model.canSend || model.contactActionBusy)
+                            Button(role: .destructive) { removeContact = true } label: { Label("Contact verwijderen", systemImage: "person.crop.circle.badge.minus") }
+                                .disabled(!model.canSend || model.contactActionBusy)
                             callButton("Spraak", icon: "phone.fill", profile: .audio)
                             callButton("Spraak en video", icon: "video.fill", profile: .video)
                             callButton("Spraak en realtime tekst", icon: "teletype", profile: .audioRtt)
@@ -154,6 +169,15 @@ struct NativeChatView: View {
             }
             .scrollDismissesKeyboard(.interactively)
         .sheet(isPresented: $showTranslation) { NativeTranslationSettingsView(model: translation) }
+        .alert("Naam wijzigen", isPresented: $renameContact) {
+            TextField("Naam", text: $contactName)
+            Button("Opslaan") { model.renameContact(contact.jid, name: contactName) }
+            Button("Annuleren", role: .cancel) {}
+        }
+        .confirmationDialog("Contact verwijderen?", isPresented: $removeContact, titleVisibility: .visible) {
+            Button("Contact verwijderen", role: .destructive) { model.removeContact(contact.jid) }
+            Button("Annuleren", role: .cancel) {}
+        } message: { Text("Dit verwijdert het contact uit je XMPP-lijst, niet de berichtgeschiedenis. Gebruik blokkeren om berichten en oproepen te weigeren.") }
         .sheet(item: $forwarding) { NativeForwardMessageView(model: model, text: $0.body, avatars: avatars) }
         .sheet(item: $editing) { NativeEditMessageView(model: model, message: $0) }
         .confirmationDialog("Bericht verwijderen?", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }), titleVisibility: .visible) {

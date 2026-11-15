@@ -74,6 +74,8 @@ struct NativeStartupView: View {
     @State private var password = ""
     @State private var verificationCode = ""
     @State private var rememberLogin = false
+    @State private var showRegistration = false
+    @State private var showRecovery = false
     @State private var restoredInput: RestoredInput?
     private let fixtureName: String?
 
@@ -274,6 +276,11 @@ struct NativeStartupView: View {
                                 providerButton(.google, title: "Google")
                                 providerButton(.facebook, title: "Facebook")
                             }
+                            HStack {
+                                Button("Nieuwe gebruiker") { showRegistration = true }
+                                Spacer()
+                                Button("Wachtwoord vergeten?") { showRecovery = true }
+                            }.disabled(loginModel.isWorking || (try? ServerConfiguration(address: address, domain: domain)) == nil)
                             if !providerSDK.configured(.google) || !providerSDK.configured(.facebook) {
                                 Text("Google/Facebook vereisen providerinstellingen voor de bundle-ID van deze native build. De bestaande web- en TestFlight-aanmelding blijft ongewijzigd.")
                                     .font(.caption).foregroundStyle(.secondary)
@@ -326,6 +333,12 @@ struct NativeStartupView: View {
         .onChange(of: domain) { _ in resetConfiguration() }
         .onChange(of: jid) { _ in
             if !matchesRestoredInput { savedLogin.cancel(); loginModel.reset() }
+        }
+        .sheet(isPresented: $showRegistration) {
+            if let configuration = try? ServerConfiguration(address: address, domain: domain) { NativeAccountEntryView(configuration: configuration, recovery: false) }
+        }
+        .sheet(isPresented: $showRecovery) {
+            if let configuration = try? ServerConfiguration(address: address, domain: domain) { NativeAccountEntryView(configuration: configuration, recovery: true) }
         }
         .onChange(of: loginModel.phase) { phase in
             calls.synchronize(phase)

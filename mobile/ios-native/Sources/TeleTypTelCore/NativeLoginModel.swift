@@ -32,7 +32,15 @@ public final class NativeLoginModel: ObservableObject {
     private var restoringHistory = false
     private var receiptsInFlight = 0
     @Published public private(set) var chatError: String?
+    @Published public private(set) var contactActionBusy = false
+    @Published public private(set) var contactActionNotice: String?
+    private var contactActionTask: Task<Void, Never>?
+    public var onIncomingMessage: ((NativeChatMessage) -> Void)?
     @Published public private(set) var isBackground = false
+    @Published public private(set) var reconnectAttempt = 0
+    public var isReconnecting: Bool { reconnectAttempt > 0 && isWorking }
+    private let reconnectWait: @Sendable (Int) async throws -> Void
+    private var stableConnection: Task<Void, Never>?
     @Published public private(set) var twoFactorError: String?
     @Published public private(set) var historyStates: [String: NativeHistoryState] = [:]
     public let groups = NativeGroupModel()
@@ -59,11 +67,15 @@ public final class NativeLoginModel: ObservableObject {
 
     public init(checker: any ServerChecking = XMPPAvailabilityClient(),
                 authenticator: any NativeAccountAuthenticating = NativeTwoFactorAccountClient(),
-                connection: any NativeXMPPConnecting = NativeXMPPConnection(), history: (any NativeHistoryStoring)? = nil) {
+                connection: any NativeXMPPConnecting = NativeXMPPConnection(), history: (any NativeHistoryStoring)? = nil,
+                reconnectWait: @escaping @Sendable (Int) async throws -> Void = { attempt in
+                    try await Task.sleep(nanoseconds: UInt64(1 << min(attempt - 1, 4)) * 1_000_000_000)
+                }) {
         self.checker = checker
         self.authenticator = authenticator
         self.connection = connection
         self.history = history
+        self.reconnectWait = reconnectWait
         groups.historyChanged = { [weak self] in self?.scheduleHistory() }
         groups.acceptedHistoryChange = { [weak self] previous, current in
             guard let self = self, self.canSend else { return }
@@ -80,6 +92,8 @@ public final class NativeLoginModel: ObservableObject {
         historySave?.cancel()
         task?.cancel()
         secondFactorDeadline?.cancel()
+        stableConnection?.cancel()
+        contactActionTask?.cancel()
         secondFactor?.session.cancel()
         for send in sendTasks.values { send.cancel() }
         historyTask?.cancel()
@@ -105,7 +119,7 @@ public final class NativeLoginModel: ObservableObject {
     }
 
     public func sendDraft(to peer: String) {
-        guard canSend, let sender = sender,
+        guard canSend, !isBlocked(peer), let sender = sender,
               case .ready(let contacts) = roster, contacts.contains(where: { $0.jid == peer }) else {
             chatError = "Niet verbonden met dit contact. Je tekst blijft bewaard."
             return
@@ -119,7 +133,7 @@ public final class NativeLoginModel: ObservableObject {
     }
 
     public func forwardMessage(_ body: String, to peer: String) -> Bool {
-        guard canSend, let sender = sender, case .ready(let contacts) = roster,
+        guard canSend, !isBlocked(peer), let sender = sender, case .ready(let contacts) = roster,
               contacts.contains(where: { $0.jid == peer }), NativeChatCodec.validBody(body) else { return false }
         do { submit(try chat.enqueueBody("Doorgestuurd:\n" + body, peer: peer), sender: sender); return true }
         catch { chatError = "Doorsturen niet gestart. Controleer de lengte en wacht op eerdere verzendingen."; return false }
@@ -153,6 +167,64 @@ public final class NativeLoginModel: ObservableObject {
         flushHistory()
     }
 
+    public func isBlocked(_ peer: String) -> Bool {
+        chat.preferences.blockedPeers.contains(NativeChatCodec.bareJID(peer) ?? peer)
+    }
+
+    public func setMuted(_ peer: String, muted: Bool) {
+        guard NativeChatCodec.bareJID(peer) == peer, chat.preferences.mutedPeers.count < 256 || !muted else { return }
+        var preferences = chat.preferences
+        if muted { preferences.mutedPeers.insert(peer) } else { preferences.mutedPeers.remove(peer) }
+        setChatPreferences(preferences)
+    }
+
+    public func setBlocked(_ peer: String, blocked: Bool) {
+        guard chat.preferences.blockedPeers.count < 256 || !blocked else { return }
+        performContactAction { manager in try await manager.setBlocked(jid: peer, blocked: blocked) } accepted: { model in
+            var preferences = model.chat.preferences
+            if blocked { preferences.blockedPeers.insert(peer) } else { preferences.blockedPeers.remove(peer) }
+            model.setChatPreferences(preferences)
+        }
+    }
+
+    public func removeContact(_ peer: String) {
+        performContactAction { manager in try await manager.removeContact(jid: peer) } accepted: { _ in }
+    }
+
+    public func renameContact(_ peer: String, name: String) {
+        performContactAction { manager in try await manager.addContact(jid: peer, name: name, requestPresence: false) } accepted: { _ in }
+    }
+
+    public func setDoNotDisturb(_ enabled: Bool) {
+        performContactAction { manager in try await manager.setDoNotDisturb(enabled) } accepted: { model in
+            var preferences = model.chat.preferences
+            preferences.doNotDisturb = enabled
+            model.setChatPreferences(preferences)
+        }
+    }
+
+    private func performContactAction(_ action: @escaping @Sendable (any NativeContactManaging) async throws -> Void,
+                                      accepted: @escaping @MainActor (NativeLoginModel) -> Void) {
+        guard !contactActionBusy, let manager = contactManager else { return }
+        contactActionBusy = true
+        contactActionNotice = nil
+        let attempt = generation
+        contactActionTask = Task { [weak self] in
+            do {
+                try await action(manager)
+                guard !Task.isCancelled, let self = self, self.generation == attempt else { return }
+                accepted(self)
+                self.contactActionNotice = "Wijziging bevestigd."
+            } catch {
+                guard !Task.isCancelled, let self = self, self.generation == attempt else { return }
+                self.contactActionNotice = "Wijziging niet bevestigd. Controleer de verbinding en probeer bewust opnieuw."
+            }
+            guard let self = self, self.generation == attempt else { return }
+            self.contactActionBusy = false
+            self.contactActionTask = nil
+        }
+    }
+
     public func clearLocalHistory() {
         guard sendTasks.isEmpty, chat.pendingCount == 0, !groups.hasPendingSends else { historyNotice = "Wacht tot lopende verzendingen klaar zijn."; return }
         if let history = history {
@@ -167,6 +239,7 @@ public final class NativeLoginModel: ObservableObject {
     }
 
     public func react(_ identifier: UUID, emoji: String) {
+        guard let target = chat.messages.first(where: { $0.id == identifier }), !isBlocked(target.peer) else { return }
         guard canSend, let sender = sender as? any NativeChatInteracting, sendTasks.count < 8,
               let owner = historyScope?.owner ?? resumableAccount?.jid, NativeInteractionCodec.picker.contains(emoji) else { return }
         do {
@@ -189,6 +262,8 @@ public final class NativeLoginModel: ObservableObject {
     }
 
     public func displayed(_ identifiers: [UUID]) {
+        guard !isBackground else { return }
+        chat.markRead(identifiers)
         guard canSend, chat.preferences.sendDisplayed else { return }
         let visible = Set(identifiers)
         if let message = chat.messages.last(where: { visible.contains($0.id) && $0.state == .incoming && $0.markable && !$0.displayedAttempted }) {
@@ -197,6 +272,7 @@ public final class NativeLoginModel: ObservableObject {
     }
 
     private func sendReceipt(_ identifier: UUID, displayed: Bool) {
+        guard let message = chat.messages.first(where: { $0.id == identifier }), !isBlocked(message.peer) else { return }
         guard canSend, receiptsInFlight < 8, let sender = sender as? any NativeChatInteracting,
               let (peer, target) = chat.takeReceipt(identifier, displayed: displayed) else { return }
         receiptsInFlight += 1
@@ -242,6 +318,7 @@ public final class NativeLoginModel: ObservableObject {
     }
 
     public func changeMessage(_ identifier: UUID, correctedBody: String? = nil) {
+        guard let target = chat.messages.first(where: { $0.id == identifier }), !isBlocked(target.peer) else { return }
         guard canSend, let sender = sender as? any NativeMessageChanging, sendTasks.count < 8 else {
             chatError = "Niet verbonden; het wijzigingsverzoek is niet verstuurd."; return
         }
@@ -456,9 +533,18 @@ public final class NativeLoginModel: ObservableObject {
                     return
                 }
                 self.phase = .connected(jid)
+                self.stableConnection?.cancel()
+                self.stableConnection = Task { [weak self] in
+                    try? await Task.sleep(nanoseconds: 30_000_000_000)
+                    guard !Task.isCancelled, let self = self, self.generation == attempt, self.isConnected else { return }
+                    self.reconnectAttempt = 0
+                }
                 self.restoreHistory(account)
                 self.configureCloudHistory()
                 self.activateGroups()
+                if self.chat.preferences.doNotDisturb, let manager = self.sender as? any NativeContactManaging {
+                    try? await manager.setDoNotDisturb(true)
+                }
             }
         }
         let rosterChanged: @Sendable (NativeRosterState) -> Void = { [weak self] roster in
@@ -575,6 +661,10 @@ public final class NativeLoginModel: ObservableObject {
 
     private func receiveJingle(_ request: NativeJingleRequest, attempt: UUID) {
         guard generation == attempt, phase == .connecting || isConnected else { return }
+        if request.action == "session-initiate", isBlocked(request.peer) || chat.preferences.doNotDisturb {
+            if let sender = jingleSender { Task { try? await sender.replyJingle(request, rejection: .serviceUnavailable) } }
+            return
+        }
         if let sender = jingleSender { onJingle?(request, sender) }
         else if earlyJingle.count < 8 { earlyJingle.append(request) }
     }
@@ -594,9 +684,14 @@ public final class NativeLoginModel: ObservableObject {
             case .message(let sender, _, _), .rejected(let sender, _), .archivedIdentity(let sender, _, _, _), .change(let sender, _, _),
                  .interaction(let sender, _, _), .trackedMessage(let sender, _, _, _, _, _): peer = sender
             }
-            guard contacts.contains(where: { $0.jid == peer }) else { return }
+            guard !isBlocked(peer), contacts.contains(where: { $0.jid == peer }) else { return }
             let previous = chat.messages
             chat.receive(event)
+            if !chat.preferences.doNotDisturb, !chat.preferences.mutedPeers.contains(peer),
+               let message = chat.messages.last, message.state == .incoming,
+               !previous.contains(where: { $0.id == message.id }), !message.hidden, !message.retracted {
+                onIncomingMessage?(message)
+            }
             queueCloudChanges(previous)
             if case .trackedMessage(_, let identifier, _, _, _, _) = event,
                let message = chat.messages.last(where: { $0.peer == peer && $0.stanzaID == identifier && $0.state == .incoming }) {
@@ -609,6 +704,36 @@ public final class NativeLoginModel: ObservableObject {
 
     private func fail(_ error: Error, attempt: UUID) {
         guard !Task.isCancelled, generation == attempt else { return }
+        let transient: Bool
+        if let failure = error as? XMPPSessionFailure {
+            transient = failure == .streamClosed || failure == .heartbeatTimeout
+        } else if error is NativeAccountFailure || error is CancellationError {
+            transient = false
+        } else if let failure = error as? ConnectionFailure {
+            transient = failure == .offline || failure == .timeout
+        } else {
+            let failure = error as NSError
+            transient = failure.domain == NSURLErrorDomain && [NSURLErrorTimedOut, NSURLErrorNetworkConnectionLost,
+                NSURLErrorNotConnectedToInternet, NSURLErrorCannotConnectToHost, NSURLErrorCannotFindHost,
+                NSURLErrorDNSLookupFailed].contains(failure.code)
+        }
+        if transient, !isBackground, reconnectAttempt < 5, let account = resumableAccount {
+            let next = reconnectAttempt + 1
+            invalidate(clearChat: false, keepAccount: true, keepReconnect: true)
+            reconnectAttempt = next
+            phase = .connecting
+            let retry = generation
+            task = Task { [weak self, checker, reconnectWait] in
+                do {
+                    try await reconnectWait(next)
+                    guard !Task.isCancelled, self?.generation == retry else { return }
+                    _ = try await checker.check(account.configuration)
+                    guard !Task.isCancelled, self?.generation == retry else { return }
+                    try await self?.runSession(account, attempt: retry)
+                } catch { self?.fail(error, attempt: retry) }
+            }
+            return
+        }
         invalidate(clearChat: false)
         if let failure = error as? NativeAccountFailure { phase = .failed(.account(failure)) }
         else if let failure = error as? XMPPSessionFailure { phase = .failed(.xmpp(failure)) }
@@ -627,7 +752,7 @@ public final class NativeLoginModel: ObservableObject {
 
     public func suspend() {
         guard isWorking || isConnected || isAwaitingSecondFactor else { return }
-        let keepAccount = isConnected
+        let keepAccount = isConnected || isReconnecting
         invalidate(clearChat: false, keepAccount: keepAccount)
         phase = .suspended
     }
@@ -645,7 +770,14 @@ public final class NativeLoginModel: ObservableObject {
         for key in Array(historyStates.keys) where historyStates[key] == .loading { historyStates[key] = .idle }
     }
 
-    private func invalidate(clearChat: Bool = true, keepAccount: Bool = false) {
+    private func invalidate(clearChat: Bool = true, keepAccount: Bool = false, keepReconnect: Bool = false) {
+        contactActionTask?.cancel()
+        contactActionTask = nil
+        contactActionBusy = false
+        contactActionNotice = nil
+        stableConnection?.cancel()
+        stableConnection = nil
+        if !keepReconnect { reconnectAttempt = 0 }
         cloudHistory.configure(nil, owner: nil); cloudAccountID = nil
         chat.interrupt()
         flushHistory()

@@ -14,6 +14,9 @@ coreFiles.push("NativeGroupManagement.swift", "NativeAccountFeatures.swift", "Na
 coreFiles.push("NativePushRegistry.swift", "NativePushRegistrationModel.swift");
 coreFiles.push("NativeInterpreterProtocol.swift", "NativeInterpreterSession.swift");
 coreFiles.push("NativeContactEditing.swift", "NativePresentationPreferences.swift", "NativeAvatarEditing.swift");
+coreFiles.push("NativeAccountLifecycle.swift");
+appFiles.push("App/NativeAccountLifecycleView.swift");
+appFiles.push("App/NativeCaptureAttachments.swift", "App/NativeLocationOptions.swift");
 appFiles.push("App/NativeGroupManagementView.swift", "App/NativeAccountSettingsView.swift", "App/NativeAttachmentsView.swift", "App/NativeFeatureFixture.swift", "App/NativeWebStyle.swift", "App/NativeMessageActionsView.swift", "App/NativeDeviceHistory.swift", "App/NativeChatEnhancements.swift", "App/NativeDialerView.swift");
 appFiles.push("App/NativeCloudHistoryView.swift", "App/NativePushVault.swift", "App/NativePhoneContactPicker.swift");
 appFiles.push("App/NativeInterpreterMedia.swift", "App/NativeInterpreterCallView.swift");

@@ -11,7 +11,7 @@ struct NativeAttachmentButton: View {
     var body: some View {
         Button { show = true } label: { Image(systemName: "plus").frame(width: 40, height: 44) }
             .buttonStyle(NativeWebIconStyle(round: true))
-            .accessibilityLabel("Foto of bestand toevoegen").accessibilityIdentifier("attachment-picker")
+            .accessibilityLabel("Bijlage, opname of locatie toevoegen").accessibilityIdentifier("attachment-picker")
             .disabled(!login.canSend || login.activeWebSession == nil)
             .sheet(isPresented: $show) { NativeAttachmentPicker(login: login, stage: stage) }
     }
@@ -39,8 +39,12 @@ private struct NativeAttachmentPicker: View {
                     #endif
                     PhotosPicker(selection: $photo, matching: .images) { Label("Foto kiezen", systemImage: "photo") }.disabled(model.progress != nil)
                     Button { importFile = true } label: { Label("Document kiezen", systemImage: "doc") }.disabled(model.progress != nil)
-                    Text("Maximaal 20 MB: foto's, PDF, DOC, DOCX en tekst. Geselecteerde foto's worden verkleind en zonder oorspronkelijke locatiemetadata als JPEG verstuurd.").font(.caption)
+                    Text("Maximaal 20 MB: foto's, PDF, DOC, DOCX, tekst, M4A en MP4. Foto's worden verkleind en zonder oorspronkelijke locatiemetadata als JPEG verstuurd.").font(.caption)
                 }
+                Section("Opnemen") {
+                    NativeCaptureOptions { value in selection = value; link = nil; error = nil }
+                }.disabled(model.progress != nil)
+                Section("Locatie") { NativeLocationOptions { text in stage(text); dismiss() } }
                 if let selected = selection {
                     Section("Controleer voor uploaden") {
                         Text(selected.name)
@@ -63,7 +67,7 @@ private struct NativeAttachmentPicker: View {
             .navigationTitle("Bijlage")
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button { dismiss() } label: { Image(systemName: "xmark").frame(width: 44, height: 44) }.accessibilityLabel("Sluiten") } }
         }
-        .fileImporter(isPresented: $importFile, allowedContentTypes: [.pdf, .plainText, UTType(filenameExtension: "doc") ?? .data, UTType(filenameExtension: "docx") ?? .data, .jpeg, .png], allowsMultipleSelection: false) { result in
+        .fileImporter(isPresented: $importFile, allowedContentTypes: [.pdf, .plainText, UTType(filenameExtension: "doc") ?? .data, UTType(filenameExtension: "docx") ?? .data, .jpeg, .png, .mpeg4Movie, .mpeg4Audio], allowsMultipleSelection: false) { result in
             do {
                 guard let url = try result.get().first else { return }
                 let access = url.startAccessingSecurityScopedResource(); defer { if access { url.stopAccessingSecurityScopedResource() } }

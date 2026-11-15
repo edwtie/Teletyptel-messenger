@@ -5,6 +5,13 @@ $path = tempnam(sys_get_temp_dir(), 'teletyptel-native-test-');
 try {
     file_put_contents($path, 'Fictieve gewone tekst');
     NativeUploadPolicy::validate($path, 'test.txt', 'text/plain');
+    foreach ([['test.m4a', 'audio/mp4'], ['test.mp4', 'video/mp4']] as [$name, $mime]) {
+        try { NativeUploadPolicy::validate($path, $name, $mime); throw new RuntimeException('Disguised text accepted as media'); } catch (InvalidArgumentException $expected) {}
+    }
+    file_put_contents($path, pack('N', 16) . 'ftyp' . 'isom' . pack('N', 0));
+    NativeUploadPolicy::validate($path, 'test.mp4', 'video/mp4');
+    NativeUploadPolicy::validate($path, 'test.m4a', 'audio/mp4');
+    file_put_contents($path, 'Fictieve gewone tekst');
     foreach ([['test.pdf', 'text/html'], ['test.txt', 'text/html'], ['test.php', 'text/plain'], ['test.jpg', 'text/plain']] as [$name, $mime]) {
         try { NativeUploadPolicy::validate($path, $name, $mime); throw new RuntimeException('Unsafe type accepted'); } catch (InvalidArgumentException $expected) {}
     }

@@ -4,17 +4,32 @@ import Combine
 enum NativeContactFailure: Error { case invalid, unavailable, rejected, timedOut }
 
 protocol NativeContactManaging: Sendable {
+    func setBlocked(jid: String, blocked: Bool) async throws
+    func removeContact(jid: String) async throws
+    func setDoNotDisturb(_ enabled: Bool) async throws
     func addContact(jid: String, name: String, requestPresence: Bool) async throws
     func observeContactRequests(_ observer: @escaping @Sendable ([String]) -> Void) async
     func respondToContactRequest(jid: String, allow: Bool) async throws
 }
 
 extension NativeContactManaging {
+    func setBlocked(jid: String, blocked: Bool) async throws { throw NativeContactFailure.unavailable }
+    func removeContact(jid: String) async throws { throw NativeContactFailure.unavailable }
+    func setDoNotDisturb(_ enabled: Bool) async throws { throw NativeContactFailure.unavailable }
     func observeContactRequests(_ observer: @escaping @Sendable ([String]) -> Void) async { observer([]) }
     func respondToContactRequest(jid: String, allow: Bool) async throws { throw NativeContactFailure.unavailable }
 }
 
 enum NativeContactEditing {
+    static func blockRequest(jid: String, blocked: Bool, owner: String, identifier: String) throws -> String {
+        guard valid(jid: jid, name: "", owner: owner), NativeMessageActionCodec.validID(identifier) else { throw NativeContactFailure.invalid }
+        let action = blocked ? "block" : "unblock"
+        return "<iq xmlns='jabber:client' type='set' id='\(NativeMUCStream.escape(identifier))'><\(action) xmlns='urn:xmpp:blocking'><item jid='\(NativeMUCStream.escape(jid))'/></\(action)></iq>"
+    }
+    static func removalRequest(jid: String, owner: String, identifier: String) throws -> String {
+        guard valid(jid: jid, name: "", owner: owner), NativeMessageActionCodec.validID(identifier) else { throw NativeContactFailure.invalid }
+        return "<iq xmlns='jabber:client' type='set' id='\(NativeMUCStream.escape(identifier))'><query xmlns='jabber:iq:roster'><item jid='\(NativeMUCStream.escape(jid))' subscription='remove'/></query></iq>"
+    }
     static func canAdd(_ jid: String, roster: NativeRosterState) -> Bool {
         guard case .ready(let contacts) = roster, contacts.count < 100 else { return false }
         return !contacts.contains { $0.jid.caseInsensitiveCompare(jid) == .orderedSame }

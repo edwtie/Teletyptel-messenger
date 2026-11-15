@@ -125,7 +125,7 @@ struct NativeMessengerView: View {
         }
         .font(NativeWebStyle.font()).tint(NativeWebStyle.accent)
         .sheet(isPresented: $showGroups) { NativeGroupsView(model: model.groups, login: model, translation: translation, avatars: avatars, archive: archive) }
-        .sheet(isPresented: $showAccount) { NativeAccountSettingsView(login: model, translation: translation, avatars: avatars) }
+        .sheet(isPresented: $showAccount) { NativeAccountSettingsView(login: model, translation: translation, avatars: avatars, credentialsChanged: logout) }
         .sheet(isPresented: $showTranslation) { NativeTranslationSettingsView(model: translation) }
         .sheet(isPresented: $showDialer) { NativeDialerView(login: model, calls: calls) }
         .sheet(isPresented: $showNewContact) { NativeNewContactView(login: model) }
@@ -194,6 +194,11 @@ struct NativeMessengerView: View {
                                     } else { Text(contact.presence.label).font(NativeWebStyle.font(13)) }
                                 }
                                 .frame(maxWidth: .infinity, alignment: .leading)
+                                if model.chat.unreadCount(peer: contact.jid) > 0 {
+                                    Text(String(model.chat.unreadCount(peer: contact.jid))).font(.caption.bold())
+                                        .padding(6).background(NativeWebStyle.accent, in: Capsule()).foregroundStyle(.white)
+                                        .accessibilityLabel("\(model.chat.unreadCount(peer: contact.jid)) ongelezen berichten")
+                                }
                                 if let last = model.chat.messages.last(where: { $0.peer == contact.jid && !$0.hidden }) {
                                     Text(last.date, style: .time).font(NativeWebStyle.font(10)).lineLimit(1)
                                 }

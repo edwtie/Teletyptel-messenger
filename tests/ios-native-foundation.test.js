@@ -190,8 +190,8 @@ test("Native media runner requires runtime results for every profile and keeps f
   const reports = path.join(directory, "reports");
   fs.mkdirSync(reports);
   fs.mkdirSync(path.join(directory, "DerivedData/SourcePackages/artifacts/sdk/WebRTC.xcframework/macos-x86_64_arm64/WebRTC.framework"), { recursive: true });
-  const complete = ["audio", "video", "audio-rtt", "total"].map(profile => "Native media profile passed: " + profile + "\n").join("") +
-    "Native incoming peer provider passed\nNative audio/video/RTT negotiation loopback passed\nNative interpreter three-party loopback passed: synthetic fixture\n";
+  const complete = ["audio", "video", "audio-rtt", "total"].map(profile => "Native media profile passed: " + profile + "\nNative G722 media profile passed: " + profile + "\n").join("") +
+    "Native incoming peer provider passed\nNative G722 incoming codec selection passed\nNative audio/video/RTT negotiation loopback passed\nNative interpreter three-party loopback passed: synthetic fixture\n";
   const result = checkMedia({ root, directory, reports, logged: (name, command, args) => {
     if (name === "media-compile") {
       for (const required of ["NativeChat.swift", "NativeArchive.swift", "XMPPProbeStream.swift"]) {
@@ -202,6 +202,10 @@ test("Native media runner requires runtime results for every profile and keeps f
   } });
   assert.equal(result.passed, true);
   assert.equal(result.profiles.length, 4);
+  assert.equal(result.g722Profiles.length, 4);
+  for (const marker of ["Native G722 incoming codec selection passed", ...["audio", "video", "audio-rtt", "total"].map(profile => "Native G722 media profile passed: " + profile + "\n")]) {
+    assert.throws(() => checkMedia({ root, directory, reports, logged: name => name === "media-runtime" ? complete.replace(marker, "missing") : "compiled" }), /G722/);
+  }
   assert.equal(result.interpreterThreeParty, true);
   assert.throws(() => checkMedia({ root, directory, reports, logged: name => name === "media-runtime"
     ? complete.replace("Native interpreter three-party loopback passed:", "missing interpreter result:") : "compiled" }), /three-party interpreter media test incomplete/);
@@ -605,7 +609,9 @@ test("Native web-style chat keeps translations private, off-gated and call-bound
     'sameLanguage(reply.translation.sourceLanguage, target)', 'liveRttConsent', 'ownLiveRttConsent', 'tasks.count < 4'])
     assert.ok(model.includes(token), token);
   assert.doesNotMatch(model, /sendMessage|UserDefaults|print\(|NSLog|apiKey/);
-  assert.match(chat, /ChatBackground/);
+  assert.match(chat, /NativeConversationBackground\(\)/);
+  assert.match(read("App/NativeAppearanceView.swift"), /background\.asset\(wide:/);
+  assert.match(read("Sources/TeleTypTelCore/NativePresentationPreferences.swift"), /ChatBackground/);
   assert.match(chat, /contextMenu/);
   assert.match(chat, /NativeTranslationCaption/);
   assert.match(tc, /presentation\?\.callID.uuidString/);
@@ -789,7 +795,7 @@ test("CallKit/PushKit sources are included in preview but live registration stay
   assert.match(controller, /NativeIncomingPeerNegotiator/);
   assert.match(controller, /NativeOutgoingPeerNegotiator/);
   assert.match(controller, /login\?\.activeJingleSender/);
-  assert.match(controller, /func startCall\(_ contact: NativeContact, profile: NativeCallMedia\)/);
+  assert.match(controller, /func startCall\(_ contact: NativeContact, profile: NativeCallMedia, videoCodec: String = "VP8"\)/);
   assert.match(read("App/NativeChatView.swift"), /startCall\(\.total\)/);
   assert.match(read("App/NativeChatView.swift"), /calls\.startCall\(contact, profile: profile\)/);
   assert.match(controller, /runtime\.platform\.receive\(invitation/);

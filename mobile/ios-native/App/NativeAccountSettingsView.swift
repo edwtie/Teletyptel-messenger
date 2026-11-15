@@ -4,11 +4,13 @@ struct NativeAccountSettingsView: View {
     @ObservedObject var login: NativeLoginModel
     @ObservedObject var translation: NativeTranslationModel
     var avatars: NativeAvatarCache? = nil
+    var credentialsChanged: () -> Void = {}
     @EnvironmentObject private var push: NativePushRegistrationModel
     @StateObject private var model = NativeAccountSettingsModel()
     @State private var draft: NativeAccountProfile?
     @State private var showTranslation = false
     @State private var showAvatar = false
+    @State private var showSecurity = false
     @State private var clearHistory = false
     @State private var confirmPush = false
     @AppStorage(NativeAudioCodec.preferenceKey) private var audioCodec = NativeAudioCodec.pcmu.rawValue
@@ -58,6 +60,14 @@ struct NativeAccountSettingsView: View {
                     }
                 }
                 Section("Privacy en vertaling") {
+                    Toggle("Niet storen", isOn: Binding(get: { login.chat.preferences.doNotDisturb }, set: { login.setDoNotDisturb($0) }))
+                        .disabled(!login.canSend || login.contactActionBusy).accessibilityIdentifier("do-not-disturb")
+                    Text("Niet storen weigert nieuwe oproepen en dempt berichtmeldingen. Contacten zien een bezet-status; berichten blijven binnenkomen.").font(.caption)
+                    if let notice = login.contactActionNotice { Text(notice).font(.caption) }
+                    ForEach(login.chat.preferences.blockedPeers.sorted(), id: \.self) { peer in
+                        Button { login.setBlocked(peer, blocked: false) } label: { Label("Deblokkeren: " + peer, systemImage: "hand.raised.slash") }
+                            .disabled(!login.canSend || login.contactActionBusy)
+                    }
                     Toggle("Ontvangstbevestigingen versturen", isOn: preference(\.sendDelivery)).accessibilityIdentifier("send-delivery-receipts")
                     Toggle("Leesbevestigingen versturen", isOn: preference(\.sendDisplayed)).accessibilityIdentifier("send-displayed-markers")
                     Text("Leesstatus wordt alleen gedeeld voor berichten die volledig in de geopende chat in beeld staan. Een ontvangstbevestiging betekent niet dat iemand het bericht heeft gelezen.").font(.caption)
@@ -70,7 +80,8 @@ struct NativeAccountSettingsView: View {
                     if let notice = login.historyNotice { Text(notice).font(.caption).accessibilityIdentifier("local-history-status") }
                     NativeCloudSaveStatus(model: login.cloudHistory)
                     Button { showTranslation = true } label: { Label("Vertaalinstellingen", systemImage: "globe") }
-                    Text("Face ID en Touch ID blijven een afzonderlijke keuze op het aanmeldscherm. Wachtwoorden en aanmeldproviders worden hier niet gewijzigd.").font(.caption)
+                    Button { showSecurity = true } label: { Label("Wachtwoord en tweestapsverificatie", systemImage: "lock.shield") }
+                    Text("Face ID en Touch ID blijven een afzonderlijke keuze op het aanmeldscherm.").font(.caption)
                 }
                 Button { Task { await load() } } label: { Label("Opnieuw ophalen", systemImage: "arrow.clockwise") }.disabled(model.busy)
             }
@@ -79,6 +90,7 @@ struct NativeAccountSettingsView: View {
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button { dismiss() } label: { Image(systemName: "xmark").frame(width: 44, height: 44) }.accessibilityLabel("Sluiten") } }
         }
         .task { await load() }
+        .sheet(isPresented: $showSecurity) { NativeAccountSecurityView(login: login, credentialsChanged: credentialsChanged) }
         .onChange(of: login.phase) { _ in if !login.canSend { model.detach(); draft = nil; dismiss() } }
         .onDisappear { model.detach(); draft = nil }
         .sheet(isPresented: $showTranslation) { NativeTranslationSettingsView(model: translation) }

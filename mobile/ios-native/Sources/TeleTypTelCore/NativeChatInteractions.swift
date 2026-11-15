@@ -26,14 +26,20 @@ public struct NativeChatPreferences: Codable, Equatable, Sendable {
     public var sendDelivery = true
     public var sendDisplayed = false
     public var saveOnlineHistory = true
+    public var blockedPeers: Set<String> = []
+    public var mutedPeers: Set<String> = []
+    public var doNotDisturb = false
     public init() {}
-    private enum CodingKeys: String, CodingKey { case keepHistory, sendDelivery, sendDisplayed, saveOnlineHistory }
+    private enum CodingKeys: String, CodingKey { case keepHistory, sendDelivery, sendDisplayed, saveOnlineHistory, blockedPeers, mutedPeers, doNotDisturb }
     public init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         keepHistory = try values.decodeIfPresent(Bool.self, forKey: .keepHistory) ?? true
         sendDelivery = try values.decodeIfPresent(Bool.self, forKey: .sendDelivery) ?? true
         sendDisplayed = try values.decodeIfPresent(Bool.self, forKey: .sendDisplayed) ?? false
         saveOnlineHistory = try values.decodeIfPresent(Bool.self, forKey: .saveOnlineHistory) ?? true
+        blockedPeers = Set((try values.decodeIfPresent(Set<String>.self, forKey: .blockedPeers) ?? []).filter { NativeChatCodec.bareJID($0) == $0 }.sorted().prefix(256))
+        mutedPeers = Set((try values.decodeIfPresent(Set<String>.self, forKey: .mutedPeers) ?? []).filter { NativeChatCodec.bareJID($0) == $0 }.sorted().prefix(256))
+        doNotDisturb = try values.decodeIfPresent(Bool.self, forKey: .doNotDisturb) ?? false
     }
 }
 

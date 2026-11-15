@@ -47,6 +47,7 @@ public struct NativeChatMessage: Identifiable, Codable, Equatable, Sendable {
     public var markable = false
     public var deliveryAttempted = false
     public var displayedAttempted = false
+    public var locallyRead: Bool? = nil
     public var statusLabel: String { state == .submitted ? delivery.label : state.label }
     public var cloudMessageID: String? { previousIDs.first ?? cloudID ?? stanzaID }
 }
@@ -170,6 +171,17 @@ public struct NativeChatStore: Codable, Equatable {
 
     public init() {}
 
+    public func unreadCount(peer: String) -> Int {
+        messages.filter { $0.peer == peer && $0.state == .incoming && $0.locallyRead == false && !$0.hidden && !$0.retracted }.count
+    }
+
+    mutating func markRead(_ identifiers: [UUID]) {
+        let visible = Set(identifiers)
+        for index in messages.indices where messages[index].state == .incoming && visible.contains(messages[index].id) {
+            messages[index].locallyRead = true
+        }
+    }
+
     mutating func mergeCloud(_ records: [NativeCloudMessage], owner: String, earlier: Bool = false) throws {
         guard records.count <= 50, NativeChatCodec.bareJID(owner) == owner, records.allSatisfy({ record in
             NativeCloudMerge.valid(record) && record.kind == "contact" && NativeChatCodec.bareJID(record.peer) == record.peer &&
@@ -270,6 +282,12 @@ public struct NativeChatStore: Codable, Equatable {
     }
 
     mutating func receive(_ event: NativeChatEvent) {
+        let previousIDs = Set(messages.map(\.id))
+        defer {
+            for index in messages.indices where !previousIDs.contains(messages[index].id) && messages[index].state == .incoming {
+                messages[index].locallyRead = false
+            }
+        }
         switch event {
         case .trackedMessage(let peer, let identifier, let body, let receipt, let markable, let archiveID):
             if let archive = archiveID { receive(.archivedIdentity(peer: peer, identifier: identifier, body: body, archiveID: archive)) }
