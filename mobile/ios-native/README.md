@@ -2538,6 +2538,16 @@ an audio mute never hides video or mutes RTT. An unknown/legacy peer state or
 an active interpreter conservatively keeps video space visible. This does not
 implement interpreter camera-state signaling or establish physical-device results.
 
+Evidence at `f29b43b`: the
+[unsigned SDK matrix](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43729271123)
+passed 209 selected Swift tests, native RTT tests and iOS compilation in both jobs.
+The [focused TC simulator matrix](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43729273852)
+passed both UI cases on iPhone 16 Pro and iPad Pro 11-inch (M4), including portrait,
+landscape, expanded pane bounds, accessible pane/scroll identifiers, no startup
+keyboard, control reachability and the on/unknown camera guard. Screenshots were
+visually inspected. These use fictional media state, not real remote cameras,
+an interpreter call or a signed TestFlight installation; those remain device tests.
+
 ## Warm-memory CallKit answer integration (2026-11-15)
 
 `NativeCallController` now routes CallKit answering through `NativeCallMediaGate`
