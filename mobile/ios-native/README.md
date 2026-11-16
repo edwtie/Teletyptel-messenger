@@ -2988,16 +2988,28 @@ with fictitious accounts. Source/generator checks alone are not iOS compilation,
 visual acceptance or device testing; the focused iPhone/iPad simulator run is
 the next validation gate. This presentation change is not yet a TestFlight build.
 
+Validation evidence for source `95ce9e4`: local checks passed 70 tests, with one
+macOS-only test skipped. In [focused unsigned run 43938573255](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43938573255),
+the iPad Pro 11-inch (M4), iOS 18.5 simulator passed all 11 selected UI tests.
+Exported portrait and landscape login screenshots were visually inspected: the
+account fields remain on the login page, server fields are absent, and the gear
+and bottom actions remain visible. No startup keyboard appeared. The initial
+iPhone job never acquired a hosted runner; GitHub reported macOS arm64 capacity
+constraints, not a compilation or app assertion failure. A separate iPhone job
+retry was requested; iPhone validation remains pending until it actually runs.
+The evidence does not cover real Google/Facebook authentication, physical devices
+or a new signed TestFlight upload.
+
 ## Native workflow action runtimes (2026-11-16)
 
-The native workflow is locally prepared to use immutable commits for checkout
+The published native workflow uses immutable commits for checkout
 v5.1.0, setup-node v6.5.0 and upload-artifact v6.0.0. Each upstream `action.yml`
 was checked at its exact commit and declares `runs.using: node24`. Merely changing
 `node-version` does not upgrade an action's embedded runtime: the existing Node
 22 build toolchain stays unchanged. No warning-suppression override, signing
 permission, release gate, secret or artifact overwrite is added. Legacy workflows
 are outside this focused change. A running workflow uses its original source;
-this local patch neither restarts it nor changes its upload outcome.
+this patch neither restarts it nor changes its upload outcome.
 
 Sources: [checkout v5.1.0](https://github.com/actions/checkout/releases/tag/v5.1.0),
 [setup-node v6.5.0](https://github.com/actions/setup-node/releases/tag/v6.5.0), and
