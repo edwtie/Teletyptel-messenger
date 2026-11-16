@@ -12,6 +12,8 @@ on:
       - scripts/check-ios-native-media.js
       - scripts/check-ios-native-codecs.js
       - scripts/check-ios-native-update.js
+      - scripts/check-ios-native-archive.js
+      - scripts/native-archive-config.js
       - scripts/check-ios-native-ui.js
       - scripts/ios-testflight/native-localization.js
       - tests/native-feature-completion.test.js
@@ -26,13 +28,13 @@ on:
   workflow_dispatch:
     inputs:
       native_push_test:
-        description: Explicit unsigned production-APNs native staging (focused-update only; no upload)
+        description: Explicit unsigned production-APNs native staging (focused-update or focused-archive; no upload)
         type: boolean
         default: false
       validation_mode:
         description: Full matrix or explicitly scoped logic, media or UI regression
         type: choice
-        options: [full, focused-update, focused-media, focused-ui]
+        options: [full, focused-update, focused-media, focused-ui, focused-archive]
         default: full
       ui_scope:
         description: Explicit test selection for focused-ui only
@@ -71,8 +73,13 @@ jobs:
       - name: Check explicitly requested native push staging
         if: inputs.native_push_test == true
         run: |
-          test "$TELETYPTEL_NATIVE_VALIDATION_MODE" = focused-update
+          case "$TELETYPTEL_NATIVE_VALIDATION_MODE" in focused-update|focused-archive) ;; *) exit 1 ;; esac
           node --test --test-name-pattern='Native push|Production APNs|APNs production' tests/native-push-activation.test.js
+      - name: Check isolated native archive packaging
+        if: inputs.validation_mode == 'focused-archive'
+        run: |
+          test "$TELETYPTEL_NATIVE_PUSH_TEST" = 1
+          node --test tests/native-archive.test.js
       - name: Check isolated project generator
         if: github.event_name != 'workflow_dispatch' || inputs.validation_mode == 'full'
         run: node --test tests/ios-native-foundation.test.js
@@ -86,7 +93,9 @@ jobs:
         run: node --test tests/native-feature-completion.test.js
       - name: Compile native app and test ${{ matrix.family }}
         run: |
-          if [ "$TELETYPTEL_NATIVE_VALIDATION_MODE" = "focused-media" ]; then
+          if [ "$TELETYPTEL_NATIVE_VALIDATION_MODE" = "focused-archive" ]; then
+            node scripts/check-ios-native-archive.js
+          elif [ "$TELETYPTEL_NATIVE_VALIDATION_MODE" = "focused-media" ]; then
             node scripts/check-ios-native-codecs.js
           elif [ "$TELETYPTEL_NATIVE_VALIDATION_MODE" = "focused-update" ]; then
             node scripts/check-ios-native-update.js
@@ -103,4 +112,5 @@ jobs:
           path: |
             artifacts/ios-native-check-*/reports/
             artifacts/ios-native-update-*/reports/
+            artifacts/ios-native-archive-*/reports/
           retention-days: 3

@@ -4,6 +4,7 @@ const crypto = require("node:crypto");
 const webRTC = require("./ios-testflight/native-webrtc");
 const { providerPlist } = require("./native-provider-config");
 const callPush = require("./native-call-push-config");
+const nativeArchive = require("./native-archive-config");
 
 const root = path.resolve(__dirname, "..");
 const source = path.join(root, "mobile/ios-native");
@@ -29,8 +30,9 @@ appFiles.push("App/NativeCloudHistoryView.swift", "App/NativePushVault.swift", "
 appFiles.push("App/NativeInterpreterMedia.swift", "App/NativeInterpreterCallView.swift");
 appFiles.push("App/NativeNewContactView.swift", "App/NativeAppearanceView.swift", "App/NativeHistoryBrowserView.swift", "App/NativeAvatarEditorView.swift");
 
-function projectText({ pushTest = null } = {}) {
+function projectText({ pushTest = null, archive = null } = {}) {
   callPush.validate(pushTest);
+  nativeArchive.validate(archive, pushTest);
   const objects = new Map();
   const identifier = name => crypto.createHash("sha256").update("teletyptel-native:" + name).digest("hex").slice(0, 24).toUpperCase();
   const quote = value => JSON.stringify(value);
@@ -98,7 +100,8 @@ function projectText({ pushTest = null } = {}) {
   const projectConfigs = configurations("project", common);
   const appConfigs = configurations("app", 'PRODUCT_NAME = TeleTypTelNative; PRODUCT_BUNDLE_IDENTIFIER = '
     + (pushTest ? 'com.tiedragon.teletyptel' : 'com.tiedragon.teletyptel.nativepreview')
-    + '; INFOPLIST_FILE = App/Info.plist;' + (pushTest ? ' CODE_SIGN_ENTITLEMENTS = App/NativeCallPush.entitlements;' : ''));
+    + '; INFOPLIST_FILE = App/Info.plist;' + (pushTest ? ' CODE_SIGN_ENTITLEMENTS = App/NativeCallPush.entitlements;' : '')
+    + (archive ? ' SKIP_INSTALL = NO; INSTALL_PATH = "$(LOCAL_APPS_DIR)"; ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;' : ''));
   const testConfigs = configurations("test", 'PRODUCT_NAME = NativeStartupUITests; PRODUCT_BUNDLE_IDENTIFIER = com.tiedragon.teletyptel.nativepreview.uitests; GENERATE_INFOPLIST_FILE = YES; TEST_TARGET_NAME = TeleTypTelNative;');
   const proxy = object("proxy", `{isa = PBXContainerItemProxy; containerPortal = ${identifier("project")}; proxyType = 1; remoteGlobalIDString = ${identifier("target")}; remoteInfo = TeleTypTelNative;}`);
   const dependency = object("test-dependency", `{isa = PBXTargetDependency; target = ${identifier("target")}; targetProxy = ${proxy};}`);
@@ -111,17 +114,19 @@ function projectText({ pushTest = null } = {}) {
   const scheme = `<?xml version="1.0" encoding="UTF-8"?>
 <Scheme LastUpgradeVersion="1600" version="1.3">
 <BuildAction parallelizeBuildables="YES" buildImplicitDependencies="YES"><BuildActionEntries>
-<BuildActionEntry buildForTesting="YES" buildForRunning="YES" buildForProfiling="NO" buildForArchiving="NO" buildForAnalyzing="YES">${appReference}</BuildActionEntry>
+<BuildActionEntry buildForTesting="YES" buildForRunning="YES" buildForProfiling="NO" buildForArchiving="${archive ? "YES" : "NO"}" buildForAnalyzing="YES">${appReference}</BuildActionEntry>
 </BuildActionEntries></BuildAction>
 <TestAction buildConfiguration="Debug" selectedDebuggerIdentifier="Xcode.DebuggerFoundation.Debugger.LLDB" selectedLauncherIdentifier="Xcode.IDEFoundation.Launcher.LLDB" shouldUseLaunchSchemeArgsEnv="YES"><Testables><TestableReference skipped="NO">${reference(testTarget, "NativeStartupUITests.xctest", "NativeStartupUITests")}</TestableReference></Testables></TestAction>
 <LaunchAction buildConfiguration="Debug" selectedDebuggerIdentifier="Xcode.DebuggerFoundation.Debugger.LLDB" selectedLauncherIdentifier="Xcode.IDEFoundation.Launcher.LLDB" launchStyle="0" useCustomWorkingDirectory="NO" ignoresPersistentStateOnLaunch="NO" debugDocumentVersioning="YES" allowLocationSimulation="NO"><BuildableProductRunnable runnableDebuggingMode="0">${appReference}</BuildableProductRunnable></LaunchAction>
 <AnalyzeAction buildConfiguration="Debug"/>
+${archive ? '<ArchiveAction buildConfiguration="Release" revealArchiveInOrganizer="NO"/>' : ''}
 </Scheme>`;
   return { project, scheme };
 }
 
-function prepare(name, { providers = null, pushTest = null } = {}) {
+function prepare(name, { providers = null, pushTest = null, archive = null } = {}) {
   callPush.validate(pushTest);
+  nativeArchive.validate(archive, pushTest);
   if (pushTest && providers) throw new Error("Production provider configuration needs separate signed-build validation before combining with native push");
   if (!/^ios-native-[a-z0-9-]+$/.test(name || "")) throw new Error("Use an isolated ios-native-* staging name");
   const directory = path.join(root, "artifacts", name);
@@ -138,17 +143,21 @@ function prepare(name, { providers = null, pushTest = null } = {}) {
   for (const file of mediaFiles) write("Media/" + file, fs.readFileSync(path.join(root, "scripts/ios-testflight", file)));
   for (const file of [...appFiles, "App/Info.plist", "UITests/NativeStartupUITests.swift"]) {
     const content = fs.readFileSync(path.join(source, file));
-    write(file, file === "App/Info.plist" ? callPush.plist(providerPlist(content.toString("utf8"), providers), pushTest) : content);
+    write(file, file === "App/Info.plist" ? nativeArchive.plist(callPush.plist(providerPlist(content.toString("utf8"), providers), pushTest), archive) : content);
   }
   if (pushTest) write("App/NativeCallPush.entitlements", callPush.entitlements(pushTest));
   write("Assets.xcassets/Contents.json", JSON.stringify({ info: { author: "xcode", version: 1 } }));
+  if (archive) {
+    write("Assets.xcassets/AppIcon.appiconset/icon.png", fs.readFileSync(path.join(root, "ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png")));
+    write("Assets.xcassets/AppIcon.appiconset/Contents.json", JSON.stringify({ images: [{ filename: "icon.png", idiom: "universal", platform: "ios", size: "1024x1024" }], info: { author: "xcode", version: 1 } }));
+  }
   write("Assets.xcassets/TeleTypTelLogo.imageset/logo.png", fs.readFileSync(path.join(root, "php/public/assets/brand/teletyptel-logo-header@2x.png")));
   write("Assets.xcassets/TeleTypTelLogo.imageset/Contents.json", JSON.stringify({ images: [{ idiom: "universal", filename: "logo.png", scale: "2x" }], info: { author: "xcode", version: 1 } }));
   for (const [name, file] of [["ChatBackground", "teletyptel-bg-mobile.png"], ["ChatBackgroundWide", "teletyptel-bg-wide-1.png"], ["ChatBackgroundOpen", "teletyptel-bg-wide-2.png"], ["ChatBackgroundRight", "teletyptel-bg-wide-3.png"]]) {
     write(`Assets.xcassets/${name}.imageset/background.png`, fs.readFileSync(path.join(root, "php/public/assets/backgrounds", file)));
     write(`Assets.xcassets/${name}.imageset/Contents.json`, JSON.stringify({ images: [{ idiom: "universal", filename: "background.png" }], info: { author: "xcode", version: 1 } }));
   }
-  const generated = projectText({ pushTest });
+  const generated = projectText({ pushTest, archive });
   write("TeleTypTelNative.xcodeproj/project.pbxproj", generated.project);
   write("TeleTypTelNative.xcodeproj/xcshareddata/xcschemes/TeleTypTelNative.xcscheme", generated.scheme);
   return directory;

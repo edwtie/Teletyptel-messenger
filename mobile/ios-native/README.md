@@ -1,5 +1,35 @@
 # TeleTypTel native iOS migration
 
+## Explicit unsigned archive validation (2026-11-16)
+
+The native preview workflow now has an explicit `focused-archive` mode, requiring
+`native_push_test=true`. It stages the real app bundle ID, a branded opaque
+1024-pixel app icon, archive-enabled Release scheme and explicit version/build
+metadata, then actually runs `xcodebuild archive` for generic iOS with signing
+disabled. The archive's installed app, executable/assets, bundle identity,
+iPhone/iPad families, version and push/background flags are checked. Defaults
+remain the separate non-archiving preview. Only reports are published as CI
+artifacts, never signing assets or an installable IPA.
+
+The test metadata `1.0 (17.0)` is not a reserved or uploaded TestFlight build.
+An archive report always records `unsigned: true`, `uploaded: false` and
+`releaseReady: false`. Archive validation is an additional packaging gate, not
+proof of signing, App Store acceptance, production social login or APNs delivery.
+The production profile, encryption declaration, app/SDK privacy manifests,
+deployed background-call services and physical-device acceptance must still be
+reviewed. This change does not copy provider registrations from the different
+preview bundle, import secrets or replace the user's installed version 16.9.
+
+The server/core revalidation of the scoped logout and pilot-health implementation
+on `068bc43` now passes both jobs in
+[run 43885375403](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43885375403).
+That is isolated ejabberd/PHP/Swift validation, not live APNs activation.
+
+Apple documents the archive step in
+[Create an archive](https://help.apple.com/xcode/mac/current/en.lproj/devf37a1db04.html)
+and the separate app/SDK reason-API obligations in
+[Describing use of required reason API](https://developer.apple.com/documentation/bundleresources/describing-use-of-required-reason-api).
+
 ## Explicit APNs build staging (2026-11-16)
 
 The existing unsigned preview workflow's explicit `native_push_test` input stages the

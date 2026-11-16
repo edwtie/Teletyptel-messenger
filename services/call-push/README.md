@@ -105,7 +105,8 @@ passes the logout integration before the additional pilot-health check; its
 separate macOS job was later canceled without executing any steps, so that
 workflow as a whole is not green. The isolated revalidation of `068bc43` is
 [run 43885375403](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43885375403);
-it was queued at the time of this record, not yet counted as passed.
+both server-signaling and native-call-recovery jobs now pass. This updates the
+earlier queued status; no live APNs or production deployment is inferred.
 
 The supplied local production key has been copied to the protected operator
 directory and verified for P-256 signing. A real certificate-verified HTTP/2 TLS
