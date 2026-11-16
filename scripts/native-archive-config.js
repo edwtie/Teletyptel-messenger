@@ -41,4 +41,14 @@ function inspect({ app, archive, expected }) {
       "deploy background-call server chain", "physical-device PushKit/CallKit/media acceptance"] };
 }
 
-module.exports = { validate, plist, inspect };
+function readProperties(file, execute) {
+  const script = ["import sys,plistlib,json", "with open(sys.argv[1], 'rb') as stream:",
+    "    properties = plistlib.load(stream).get('ApplicationProperties')",
+    "if not isinstance(properties, dict): raise ValueError('Missing application properties')",
+    "values = {key:properties.get(key) for key in ['ApplicationPath','CFBundleIdentifier']}",
+    "if not all(isinstance(value, str) for value in values.values()): raise ValueError('Invalid application properties')",
+    "print(json.dumps(values))"].join("\n");
+  return JSON.parse(execute("python3", ["-c", script, file]));
+}
+
+module.exports = { validate, plist, inspect, readProperties };

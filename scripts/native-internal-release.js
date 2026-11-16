@@ -135,7 +135,7 @@ function run() {
     stage = "verify signed app";
     const appPath = path.join(archive, "Products/Applications/TeleTypTelNative.app");
     const app = plist(path.join(appPath, "Info.plist"));
-    const properties = JSON.parse(command("plutil", ["-extract", "ApplicationProperties", "json", "-o", "-", path.join(archive, "Info.plist")]));
+    const properties = metadata.readProperties(path.join(archive, "Info.plist"), command);
     metadata.inspect({ app, archive: { ApplicationProperties: properties }, expected });
     validateApp(app, configured); validatePrivacy(plist(path.join(appPath, "PrivacyInfo.xcprivacy")));
     command("codesign", ["--verify", "--deep", "--strict", appPath]);

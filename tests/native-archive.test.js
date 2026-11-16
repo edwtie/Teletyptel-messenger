@@ -3,6 +3,8 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
+const os = require("node:os");
+const { spawnSync } = require("node:child_process");
 const { randomBytes } = require("node:crypto");
 const { prepare, projectText } = require("../scripts/prepare-ios-native");
 const metadata = require("../scripts/native-archive-config");
@@ -61,10 +63,28 @@ test("Archive workflow never receives signing secrets, exports an IPA or sends A
   assert.match(checker, /"CODE_SIGNING_ALLOWED=NO", "archive"/);
   assert.match(checker, /Products\/Applications\/TeleTypTelNative.app/);
   assert.match(checker, /hasAlpha: no/);
-  assert.match(checker, /"-extract", "ApplicationProperties", "json"/);
+  assert.match(checker, /archiveConfig.readProperties\(path.join\(archive, "Info.plist"\)/);
   assert.doesNotMatch(checker, /readPlist\("archive-metadata"/);
   assert.doesNotMatch(checker, /altool|exportArchive|process\.env\.IOS_|sendIncoming|rejectUnauthorized/);
   const workflow = fs.readFileSync(path.join(root, ".github/workflows/ios-native-preview.yml"), "utf8");
   assert.match(workflow, /focused-archive/);
   assert.doesNotMatch(workflow.split("  internal-native-upload:")[0], /secrets\.|environment: ios-testflight/);
+});
+
+test("Real binary archive plists with dates and data retain only strictly typed application identifiers", () => {
+  const python = process.platform === "win32" ? "python" : "python3";
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "tc-archive-plist-"));
+  const file = path.join(temporary, "Info.plist");
+  const execute = (_, args) => {
+    const reply = spawnSync(python, args, { encoding: "utf8", timeout: 10000 });
+    if (reply.status !== 0) throw new Error("Plist fixture failed: " + reply.stderr);
+    return reply.stdout;
+  };
+  try {
+    const write = value => execute(python, ["-c", "import plistlib,datetime,sys; properties={'ApplicationPath':'Applications/TeleTypTelNative.app','CFBundleIdentifier':sys.argv[2],'NestedData':b'fixture','NestedDate':datetime.datetime(2026,11,16)}; plistlib.dump({'CreationDate':datetime.datetime(2026,11,16),'ApplicationProperties':properties},open(sys.argv[1],'wb'),fmt=plistlib.FMT_BINARY)", file, value]);
+    write("com.tiedragon.teletyptel");
+    assert.deepEqual(metadata.readProperties(file, execute), { ApplicationPath: "Applications/TeleTypTelNative.app", CFBundleIdentifier: "com.tiedragon.teletyptel" });
+    execute(python, ["-c", "import plistlib,sys; plistlib.dump({'ApplicationProperties':{'ApplicationPath':b'not-a-string','CFBundleIdentifier':'com.tiedragon.teletyptel'}},open(sys.argv[1],'wb'))", file]);
+    assert.throws(() => metadata.readProperties(file, execute));
+  } finally { if (fs.existsSync(file)) fs.unlinkSync(file); fs.rmdirSync(temporary); }
 });
