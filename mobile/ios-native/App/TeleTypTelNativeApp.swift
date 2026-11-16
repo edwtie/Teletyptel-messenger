@@ -337,9 +337,7 @@ struct NativeStartupView: View {
             #endif
         }
         .task {
-            if fixtureName == nil, savedLogin.canRestoreAutomatically, !loginModel.isWorking, !loginModel.isConnected {
-                unlockSavedLogin()
-            }
+            restoreSavedLoginIfForeground()
         }
         .onChange(of: address) { _ in resetConfiguration() }
         .onChange(of: domain) { _ in resetConfiguration() }
@@ -388,6 +386,7 @@ struct NativeStartupView: View {
                 calls.backgroundCallEnded = nil
                 calls.setForeground(true)
                 background.returnToForeground(loginModel)
+                restoreSavedLoginIfForeground()
             }
         }
         .onDisappear {
@@ -437,9 +436,17 @@ struct NativeStartupView: View {
         return address == restored.address && domain == restored.domain && jid == restored.jid
     }
 
+    private func restoreSavedLoginIfForeground() {
+        guard fixtureName == nil, scenePhase == .active, !calls.hasLiveCall,
+              savedLogin.canRestoreAutomatically, !savedLogin.isWorking,
+              !loginModel.isWorking, !loginModel.isConnected else { return }
+        unlockSavedLogin()
+    }
+
     private func unlockSavedLogin() {
+        guard scenePhase == .active, !calls.hasLiveCall else { return }
         savedLogin.unlock { value in
-            guard scenePhase != .background, !loginModel.isWorking, !loginModel.isConnected else { return }
+            guard scenePhase != .background, !calls.hasLiveCall, !loginModel.isWorking, !loginModel.isConnected else { return }
             restoredInput = RestoredInput(address: value.address, domain: value.domain, jid: value.jid)
             address = value.address
             domain = value.domain

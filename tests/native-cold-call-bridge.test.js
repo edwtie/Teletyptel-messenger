@@ -22,10 +22,13 @@ test("App delegate and SwiftUI share a single CallKit owner before receiving a p
   assert.match(app("NativeCallController"), /static let shared = NativeCallController\(\)/);
   assert.match(app("NativeProviderSDK"), /didFinishLaunchingWithOptions[\s\S]*NativeCallController.shared.restoreBackgroundCalls\(\)/);
   assert.match(app("TeleTypTelNativeApp"), /@StateObject private var calls = NativeCallController.shared/);
+  assert.match(app("TeleTypTelNativeApp"), /guard scenePhase == .active, !calls.hasLiveCall else \{ return \}/);
   assert.match(app("NativeCallController"), /TeleTypTelNativeCallRecoveryLabEnabled/);
   assert.match(app("NativeCallController"), /recovery.prepare\(bootstrap: grant/);
   assert.match(app("NativeCallController"), /NativeIncomingPeerNegotiator\(request: offer.request/);
   assert.match(app("NativeCallController"), /recovery.activateRouting\(\)/);
+  assert.match(app("NativeCallController"), /login\?\.activeWebSession\?\.configuration.origin.absoluteString == context.scope.origin/);
+  assert.match(app("NativeCallController"), /client.end\(invitation: invitation, registration: context.registration\)/);
   assert.match(app("NativeCallMedia"), /created.microphone.isEnabled = audioActive && !muted && !held/);
   assert.match(app("NativeCallPlatform"), /coordinator.audioActivated\(true\)/);
 });

@@ -166,10 +166,14 @@ final class NativeCallController: ObservableObject, NativePushRegistering {
     func synchronize(_ phase: NativeLoginModel.Phase) {
         switch phase {
         case .connected(let jid):
-            if let context = coldContext, NativeChatCodec.bareJID(jid) == context.authorization.owner,
-               login?.activeAccountID == context.scope.accountID {
-                account = jid
-                return
+            if let context = coldContext {
+                if NativeChatCodec.bareJID(jid) == context.authorization.owner,
+                   login?.activeAccountID == context.scope.accountID,
+                   login?.activeWebSession?.configuration.origin.absoluteString == context.scope.origin {
+                    account = jid
+                    return
+                }
+                coldContext = nil; pushRegistration.logout(); resetCall(); runtime?.logout(); account = nil
             }
             if let lease = warmLease, hasLiveCall, login?.permitsWarmCall(lease) == true,
                NativeChatCodec.bareJID(jid) == lease.account.jid {
@@ -605,6 +609,10 @@ final class NativeCallController: ObservableObject, NativePushRegistering {
         warmSession = nil
         recovered?.cancel()
         recovered?.endServerCall()
+        if recovered == nil, let invitation = pendingPush, let context = coldContext {
+            let client = NativeCallRecoveryClient(context: context)
+            Task { try? await client.end(invitation: invitation, registration: context.registration) }
+        }
         if recovered == nil, let invitation = pendingPush, let lease = warmLease,
            login?.permitsWarmCall(lease) == true, let accountID = lease.account.accountID,
            let session = lease.account.webSession,
