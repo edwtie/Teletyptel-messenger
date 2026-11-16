@@ -29,6 +29,8 @@ test("App delegate and SwiftUI share a single CallKit owner before receiving a p
   assert.match(app("NativeCallController"), /recovery.activateRouting\(\)/);
   assert.match(app("NativeCallController"), /login\?\.activeWebSession\?\.configuration.origin.absoluteString == context.scope.origin/);
   assert.match(app("NativeCallController"), /client.end\(invitation: invitation, registration: context.registration\)/);
+  assert.match(app("NativeCallController"), /callPeerJID = NativeChatCodec.bareJID\(grant.peer\)/);
+  assert.match(app("NativeCallController"), /self.login\?\.chat.preferences.mutedPeers.contains\(peer\) != true/);
   assert.match(app("NativeCallMedia"), /created.microphone.isEnabled = audioActive && !muted && !held/);
   assert.match(app("NativeCallPlatform"), /coordinator.audioActivated\(true\)/);
 });

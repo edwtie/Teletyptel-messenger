@@ -53,6 +53,7 @@ final class CallPushRecovery
     }
 
     private function aad(): string { return 'teletyptel-call-device-v1:' . $this->environment . ':' . $this->domain . ':' . $this->issuer; }
+    private function deviceKey(): string { return hash_hmac('sha256', 'teletyptel-device-encryption-key-v1:' . $this->aad(), $this->key, true); }
 
     public function enroll(string $account, string $binding, string $deviceId): array
     {
@@ -63,7 +64,7 @@ final class CallPushRecovery
             $claims = ['scope' => 'call-device-v1', 'account' => $account, 'binding' => $binding, 'device' => $deviceId,
                 'generation' => $device['generation'], 'expires' => min((int)$device['expires'], ($this->clock)() + 86400)];
             $iv = random_bytes(12); $tag = '';
-            $cipher = openssl_encrypt(json_encode($claims, JSON_THROW_ON_ERROR), 'aes-256-gcm', $this->key, OPENSSL_RAW_DATA, $iv, $tag, $this->aad());
+            $cipher = openssl_encrypt(json_encode($claims, JSON_THROW_ON_ERROR), 'aes-256-gcm', $this->deviceKey(), OPENSSL_RAW_DATA, $iv, $tag, $this->aad());
             if ($cipher === false || strlen($tag) !== 16) throw new CallPushFailure('Oproepherstel kan niet worden voorbereid.', 503);
             return ['version' => 1, 'credential' => 'tcd1.' . rtrim(strtr(base64_encode($iv . $tag . $cipher), '+/', '-_'), '='),
                 'owner' => $profile['jid'], 'domain' => $this->domain, 'issuer' => $this->issuer, 'environment' => $this->environment,
@@ -76,7 +77,7 @@ final class CallPushRecovery
     {
         if (!preg_match('/\Atcd1\.([A-Za-z0-9_-]{40,1800})\z/', $credential, $match)) throw new CallPushFailure('Oproeptoegang vereist.', 401);
         $raw = base64_decode(strtr($match[1], '-_', '+/') . str_repeat('=', (4 - strlen($match[1]) % 4) % 4), true);
-        $plain = is_string($raw) && strlen($raw) > 28 ? openssl_decrypt(substr($raw, 28), 'aes-256-gcm', $this->key,
+        $plain = is_string($raw) && strlen($raw) > 28 ? openssl_decrypt(substr($raw, 28), 'aes-256-gcm', $this->deviceKey(),
             OPENSSL_RAW_DATA, substr($raw, 0, 12), substr($raw, 12, 16), $this->aad()) : false;
         $claims = $plain === false ? null : json_decode($plain, true);
         if (!is_array($claims) || array_keys($claims) !== ['scope', 'account', 'binding', 'device', 'generation', 'expires']

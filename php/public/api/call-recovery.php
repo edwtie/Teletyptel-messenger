@@ -19,6 +19,9 @@ try {
 } catch (CallPushFailure $error) {
     http_response_code($error->status);
     echo json_encode(['error' => 'Oproepherstel niet beschikbaar.', 'code' => $error->status === 425 ? 'resource_proof_pending' : 'rejected']);
+} catch (AccountAccessDenied $error) {
+    http_response_code(403);
+    echo json_encode(['error' => 'Oproepherstel niet beschikbaar.', 'code' => 'rejected']);
 } catch (Throwable $error) {
     http_response_code(503);
     echo json_encode(['error' => 'Oproepherstel tijdelijk niet beschikbaar.']);

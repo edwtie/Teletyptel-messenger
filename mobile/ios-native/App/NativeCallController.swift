@@ -534,10 +534,15 @@ final class NativeCallController: ObservableObject, NativePushRegistering {
                   current.registration.deviceID == context.registration.deviceID,
                   current.registration.generation == context.registration.generation,
                   self.login?.chat.preferences.doNotDisturb != true else { throw NativeJingleFailure.rejected }
+            if let peer = self.callPeerJID {
+                guard self.login?.isBlocked(peer) != true,
+                      self.login?.chat.preferences.mutedPeers.contains(peer) != true else { throw NativeJingleFailure.rejected }
+            }
         }
         try validate()
         let client = NativeCallRecoveryClient(context: context)
         let grant = try await client.bootstrap(invitation: invitation, registration: context.registration)
+        callPeerJID = NativeChatCodec.bareJID(grant.peer)
         try validate(); try Task.checkCancellation()
         let recovery = NativeWarmCallSession(invitation: invitation, registration: context.registration, registry: client)
         warmSession = recovery
