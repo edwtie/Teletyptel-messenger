@@ -271,10 +271,11 @@ final class NativeStartupUITests: XCTestCase {
             rotate(orientation)
             assertConversationHeader("chat", actions: ["chat-start-total", "chat-menu"])
             XCTAssertTrue(messageMenu.isHittable)
-            XCTAssertGreaterThanOrEqual(messageMenu.frame.width, 44)
-            XCTAssertGreaterThanOrEqual(messageMenu.frame.height, 44)
-            XCTAssertTrue(outgoing.frame.contains(messageMenu.frame))
-            XCTAssertLessThanOrEqual(messageMenu.frame.maxY, metadata.frame.minY)
+            let menuFrame = messageMenu.frame
+            XCTAssertGreaterThanOrEqual(menuFrame.width, 44)
+            XCTAssertGreaterThanOrEqual(menuFrame.height, 44)
+            XCTAssertTrue(outgoing.frame.contains(menuFrame))
+            XCTAssertLessThanOrEqual(menuFrame.maxY, metadata.frame.minY)
             application.buttons["chat-menu"].tap()
             XCTAssertTrue(application.buttons["Spraak en video"].waitForExistence(timeout: 5))
             snapshot(orientation == .landscapeLeft ? "chat-menu-landscape" : "chat-menu-portrait")
@@ -428,8 +429,9 @@ final class NativeStartupUITests: XCTestCase {
         snapshot("group-portrait")
         rotate(.landscapeLeft)
         let viewport = application.scrollViews["group-messages-fixture@conference.localhost"].firstMatch
+        let outgoingMenu = application.buttons["group-message-menu-" + String(outgoing.identifier.dropFirst("group-message-".count))]
         let latestVisible = NSPredicate { _, _ in
-            outgoing.exists && outgoing.isHittable && viewport.exists &&
+            outgoing.exists && outgoingMenu.isHittable && viewport.exists &&
                 viewport.frame.contains(outgoing.frame) && outgoing.frame.maxY <= draft.frame.minY
         }
         expectation(for: latestVisible, evaluatedWith: outgoing)
@@ -666,19 +668,23 @@ final class NativeStartupUITests: XCTestCase {
         let identity = application.descendants(matching: .any)[identifier + "-connection"].firstMatch
         let back = application.buttons[identifier + "-back"]
         let buttons = [back] + actions.map { application.buttons[$0] }
+        let headerFrame = header.frame
+        let identityFrame = identity.frame
+        let buttonFrames = buttons.map(\.frame)
         XCTAssertTrue(header.exists)
-        XCTAssertTrue(application.frame.contains(header.frame))
-        XCTAssertTrue(header.frame.contains(identity.frame))
-        for button in buttons {
-            XCTAssertTrue(button.isHittable)
-            XCTAssertGreaterThanOrEqual(button.frame.width, 44)
-            XCTAssertGreaterThanOrEqual(button.frame.height, 44)
-            XCTAssertTrue(header.frame.contains(button.frame))
-            XCTAssertFalse(button.frame.intersects(identity.frame))
+        XCTAssertTrue(application.frame.contains(headerFrame))
+        XCTAssertTrue(headerFrame.contains(identityFrame))
+        for index in buttons.indices {
+            XCTAssertTrue(buttons[index].isHittable)
+            let buttonFrame = buttonFrames[index]
+            XCTAssertGreaterThanOrEqual(buttonFrame.width, 44)
+            XCTAssertGreaterThanOrEqual(buttonFrame.height, 44)
+            XCTAssertTrue(headerFrame.contains(buttonFrame))
+            XCTAssertFalse(buttonFrame.intersects(identityFrame))
         }
         for first in buttons.indices {
             for second in buttons.indices where second > first {
-                XCTAssertFalse(buttons[first].frame.intersects(buttons[second].frame))
+                XCTAssertFalse(buttonFrames[first].intersects(buttonFrames[second]))
             }
         }
     }

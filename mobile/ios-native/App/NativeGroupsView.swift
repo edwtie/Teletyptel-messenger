@@ -282,6 +282,7 @@ private struct NativeGroupBubble: View {
             VStack(alignment: .leading, spacing: 3) {
             HStack(alignment: .top, spacing: 6) {
                 Text(message.nickname).font(.caption.bold())
+                Spacer(minLength: 0)
                 Menu { actions } label: { Image(systemName: "ellipsis").frame(width: 44, height: 44) }
                     .buttonStyle(.plain).accessibilityLabel("Berichtmenu").accessibilityIdentifier("group-message-menu-" + message.id.uuidString)
             }

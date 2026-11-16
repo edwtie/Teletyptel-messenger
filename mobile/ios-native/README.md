@@ -3030,10 +3030,11 @@ body and timestamp. Copy, reply, forward, edit, translation, reaction and deleti
 permissions are unchanged. This is a presentation correction, not a claim of
 complete feature or pixel parity with web/16.9; system menu styling remains native.
 
-The unsigned `focused-ui` / `menus` scope selects seven simulator tests, including
+The unsigned `focused-ui` / `menus` scope selects four simulator tests, including
 long contact names, nonintersecting button/identity rectangles, minimum touch
-targets, short-message metadata clearance, menu actions, save/cancel settings and
-portrait/landscape rotation. It explicitly uses the existing Intel macOS runner
+targets, short-message metadata clearance, menu actions, group leave and
+portrait/landscape rotation. The broader regression scope retains the login and
+save/cancel settings tests. The menu scope explicitly uses the existing Intel macOS runner
 label used for archive checks, avoiding the arm64 acquisition failures seen in
 the previous login run. Other validation modes, signing/upload gates and server
 configuration are unchanged. Local source/generator checks pass; actual simulator
@@ -3045,6 +3046,14 @@ build-process timeout while compiling sources, without reporting a Swift error.
 For this menu-only scope the build-process budget is now explicitly twenty
 minutes; the existing test and job time limits remain bounded and unchanged.
 This timeout is not counted as a passed compile or UI test.
+In that run the iPad overlap and main-menu checks passed individually, but group
+visibility still expected a message container itself to be hittable. The exported
+hierarchy showed its complete rectangle inside the viewport; the visibility check
+now also requires the actual message-menu button to be hittable instead. It still
+requires the whole message to fit above the composer. The first test process
+timed out before completion, so the run is not reported as passing. The focused
+menu scope excludes repeated login checks to stay within the unchanged test
+budget; they remain selected by the broader regression scope.
 
 ## Primary references
 

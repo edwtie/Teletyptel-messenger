@@ -22,9 +22,7 @@ const selectedTests = Object.freeze([
 
 function testsForScope(scope = "regression") {
   if (scope === "regression") return selectedTests;
-  if (scope === "menus") return ["testStartupDoesNotOpenKeyboardOrShowAuthenticatedState",
-    "testLoginSettingsAreSeparateAndPreserveDraftsOnCancel", "testLoginSettingsSaveAndRotateWithoutOpeningKeyboard",
-    "testChatHeaderAndMessageMenuDoNotOverlapAcrossRotation", "testMainMenuRemainsSeparateFromConversationMenu",
+  if (scope === "menus") return ["testChatHeaderAndMessageMenuDoNotOverlapAcrossRotation", "testMainMenuRemainsSeparateFromConversationMenu",
     "testMessageMenuEditForwardAndBothDeletionOptions", "testExistingGroupJoinSendRotationAndLeave"];
   if (scope === "groups") return selectedTests.filter(name => name.includes("Group"));
   if (scope === "tc") return ["testWebStyleCallControlsAndRttPanesRemainReachableAcrossRotation", "testPeerCameraOnOrUnknownDoesNotEnterTextOnlyLayout"];

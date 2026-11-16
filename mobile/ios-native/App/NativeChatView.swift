@@ -235,6 +235,7 @@ struct NativeChatView: View {
         VStack(alignment: .leading, spacing: 5) {
                 HStack(alignment: .top, spacing: 6) {
                     Text(message.retracted ? "Bericht ingetrokken" : message.body).accessibilityIdentifier("message-body-" + message.id.uuidString)
+                    Spacer(minLength: 0)
                     Menu { messageActions(message) } label: { Image(systemName: "ellipsis").frame(width: 44, height: 44) }
                         .buttonStyle(.plain).accessibilityLabel("Berichtmenu").accessibilityIdentifier("message-menu-" + message.id.uuidString)
                 }

@@ -54,10 +54,10 @@ test("Menu simulator scope measures hit targets and overlap for both orientation
   const { testsForScope } = require("../scripts/check-ios-native-ui");
   const methods = read("mobile/ios-native/UITests/NativeStartupUITests.swift");
   const selected = testsForScope("menus");
-  assert.equal(selected.length, 7);
+  assert.equal(selected.length, 4);
   for (const name of selected) assert.ok(methods.includes("func " + name + "()"), name);
-  for (const value of ["assertConversationHeader", "button.frame.intersects(identity.frame)",
-    "buttons[first].frame.intersects(buttons[second].frame)", "messageMenu.frame.maxY, metadata.frame.minY",
+  for (const value of ["assertConversationHeader", "buttonFrame.intersects(identityFrame)",
+    "buttonFrames[first].intersects(buttonFrames[second])", "menuFrame.maxY, metadata.frame.minY", "outgoingMenu.isHittable",
     'snapshot("main-menu-symbols")', '"chat-menu-landscape" : "chat-menu-portrait"',
     'TELETYPTEL_NATIVE_LONG_CONTACT_NAME', '.portrait, .landscapeLeft, .portrait']) assert.ok(methods.includes(value), value);
   const workflow = read(".github/workflows/ios-native-preview.yml");
