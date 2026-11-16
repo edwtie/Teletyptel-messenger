@@ -140,7 +140,8 @@ claims(Credential, User, Host) ->
 auth_result(#{auth_module := ?MODULE} = State, true, _) ->
     case {erase({?MODULE, grant}), maps:get(stream_encrypted, State, false) orelse maps:get(teletyptel_wss_verified, State, false)} of
         {Claims, true} when is_map(Claims) ->
-            erlang:send_after(max(1, (maps:get(<<"expiresAt">>, Claims) - erlang:system_time(second)) * 1000), self(), {teletyptel_scope_expired, maps:get(<<"nonce">>, Claims)}),
+            erlang:send_after(max(1, (maps:get(<<"expiresAt">>, Claims) - erlang:system_time(second)) * 1000), self(),
+                {teletyptel_scope_expired, maps:get(<<"nonce">>, Claims), maps:get(<<"expiresAt">>, Claims)}),
             {stop, State#{teletyptel_scope => Claims, teletyptel_out => #{}, teletyptel_in => #{}}};
         _ -> {stop, close(State)}
     end;
@@ -181,7 +182,7 @@ authenticated(#{auth_module := ?MODULE, teletyptel_scope := Claims, lserver := H
             mnesia:write({?TABLE, Key, Pid, Device, Generation, Expires})
         end),
         erlang:send_after(max(1, (Expires - erlang:system_time(second)) * 1000), self(),
-            {teletyptel_scope_expired, maps:get(<<"nonce">>, Claims)}),
+            {teletyptel_scope_expired, maps:get(<<"nonce">>, Claims), Expires}),
         Pending = maps:get(teletyptel_out, State), false = maps:is_key(Id, Pending), true = map_size(Pending) < 32,
         Extended = State#{teletyptel_scope => Renewed, teletyptel_out => Pending#{Id => Host}},
         {stop, ejabberd_c2s:send(Extended, xmpp:make_iq_result(IQ))}
@@ -235,8 +236,11 @@ unbound(#{auth_module := ?MODULE} = State, _) -> {stop, close(State)};
 unbound(State, _) -> State.
 inline({#{auth_module := ?MODULE} = State, _, _}) -> {stop, {close(State), [], []}};
 inline(Value) -> Value.
-info(#{auth_module := ?MODULE} = State, {teletyptel_scope_expired, _}) ->
-    case valid(State) of true -> {stop, State}; false -> {stop, close(State)} end;
+info(#{auth_module := ?MODULE, teletyptel_scope := Claims} = State, {teletyptel_scope_expired, Nonce, Expires}) ->
+    case {maps:get(<<"nonce">>, Claims), maps:get(<<"expiresAt">>, Claims)} of
+        {Nonce, Expires} -> {stop, close(State)};
+        _ -> {stop, State}
+    end;
 info(State, _) -> State.
 terminated(#{auth_module := ?MODULE} = State, _) -> erase({?MODULE, grant}), State;
 terminated(State, _) -> State.

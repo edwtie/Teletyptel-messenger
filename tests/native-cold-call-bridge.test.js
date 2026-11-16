@@ -69,3 +69,25 @@ test("Only server-verified TLS can attest the special WebSocket listener", () =>
   assert.doesNotMatch(endpoint, /session_start|ensureSchema|controlCredential/);
   assert.match(read("php/lib/CallPushRecovery.php"), /openssl_decrypt/);
 });
+
+test("Active continuation requires a trusted producer, a fresh broker lease and a server acknowledgement", () => {
+  const producer = read("services/call-push/ejabberd/mod_teletyptel_calls.erl");
+  assert.match(producer, /teletyptel_answered := true, teletyptel_scope := Claims/);
+  assert.match(producer, /resource_live\(Caller\) andalso resource_live\(JID\) andalso pair_allowed\(Caller, JID\)/);
+  assert.match(producer, /not maps:is_key\(full, Call\)/);
+  const backend = read("services/call-push/ejabberd/ejabberd_auth_teletyptel_calls.erl");
+  assert.match(backend, /active_lease\(Token, Claims, Host\)/);
+  assert.match(backend, /teletyptel_scope_expired, Nonce, Expires/);
+  assert.match(backend, /Expires =< Issued \+ 25/);
+  const session = core("NativeWarmCallSession");
+  assert.match(session, /await sender.keepCallAlive\(\)/);
+  assert.match(session, /await sender.authorizeActiveCallLease\(lease\)/);
+  assert.match(session, /self.failConnection\(\); self.endServerCall\(\); self.connection\?\.cancel\(\)/);
+  assert.match(session, /renewal\?\.cancel\(\)/);
+  const transport = core("NativeXMPPConnection");
+  assert.match(transport, /self.stream.applyAcknowledgedCallLease\(lease\)/);
+  assert.match(transport, /self.scopeExpiry == expiry/);
+  const fixture = read("scripts/check-call-active-ejabberd.js");
+  assert.match(fixture, /Date.now\(\) - started > 45000/);
+  assert.doesNotMatch(fixture, /rejectUnauthorized|NODE_TLS_REJECT_UNAUTHORIZED|APNs_KEY/);
+});
