@@ -30,6 +30,16 @@ Apple documents the archive step in
 and the separate app/SDK reason-API obligations in
 [Describing use of required reason API](https://developer.apple.com/documentation/bundleresources/describing-use-of-required-reason-api).
 
+Local validation passes 74 Node checks with one macOS-only skip, plus the ten
+isolated worker-loop checks. The first real archive run created the iOS app with
+the expected bundle ID, version `1.0 (17.0)`, AppIcon, iPhone/iPad families and
+push/recovery flags, but its post-check failed while converting the archive's
+date-containing plist to JSON. This is not a successful overall archive check.
+The fixed reader extracts only `ApplicationProperties`, retaining the validation
+instead of ignoring the failure. The revised source `81cd2b9` is being checked in
+[run 43896894934](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43896894934);
+it was queued at this checkpoint and is not yet counted as passed.
+
 ## Explicit APNs build staging (2026-11-16)
 
 The existing unsigned preview workflow's explicit `native_push_test` input stages the
