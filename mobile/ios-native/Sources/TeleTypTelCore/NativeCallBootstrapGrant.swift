@@ -1,6 +1,7 @@
 import Foundation
 
 struct NativeCallBootstrapGrant: CustomStringConvertible, CustomDebugStringConvertible {
+    private static let fields: Set<String> = ["version", "scope", "environment", "domain", "issuer", "owner", "peer", "callId", "sid", "deviceId", "generation", "profile", "nonce", "resource", "issuedAt", "expiresAt"]
     private struct Claims: Decodable, Equatable {
         let version: Int
         var scope: String
@@ -48,8 +49,7 @@ struct NativeCallBootstrapGrant: CustomStringConvertible, CustomDebugStringConve
         guard let payload = Data(base64Encoded: encoded + String(repeating: "=", count: (4 - encoded.count % 4) % 4)),
               payload.base64EncodedString().replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "") == pieces[1],
               let decoded = try JSONSerialization.jsonObject(with: payload) as? [String: Any] else { throw NativePushRegistryFailure.invalidResponse }
-        let fields: Set<String> = ["version", "scope", "environment", "domain", "issuer", "owner", "peer", "callId", "sid", "deviceId", "generation", "profile", "nonce", "resource", "issuedAt", "expiresAt"]
-        guard Set(metadata.keys) == fields, Set(decoded.keys) == fields else { throw NativePushRegistryFailure.invalidResponse }
+        guard Set(metadata.keys) == Self.fields, Set(decoded.keys) == Self.fields else { throw NativePushRegistryFailure.invalidResponse }
         let claims = try JSONDecoder().decode(Claims.self, from: payload)
         let copy = try JSONDecoder().decode(Claims.self, from: JSONSerialization.data(withJSONObject: metadata))
         guard claims == copy, claims.version == 1, claims.scope == "call-xmpp-bootstrap-v1",
@@ -81,7 +81,7 @@ struct NativeCallBootstrapGrant: CustomStringConvertible, CustomDebugStringConve
         guard let payload = Data(base64Encoded: encoded + String(repeating: "=", count: (4 - encoded.count % 4) % 4)),
               payload.base64EncodedString().replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "") == pieces[1],
               let decoded = try JSONSerialization.jsonObject(with: payload) as? [String: Any],
-              Set(decoded.keys) == Set(metadata.keys), Set(decoded.keys).count == 17 else { throw NativePushRegistryFailure.invalidResponse }
+              Set(decoded.keys) == Self.fields, Set(metadata.keys) == Self.fields else { throw NativePushRegistryFailure.invalidResponse }
         let claims = try JSONDecoder().decode(Claims.self, from: payload)
         var pinned = claims
         pinned.scope = authority.scope; pinned.issuedAt = authority.issuedAt; pinned.expiresAt = authority.expiresAt

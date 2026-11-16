@@ -162,6 +162,8 @@ final class NativeCallBootstrapTests: XCTestCase {
         }
         XCTAssertThrowsError(try bootstrap.activeLease(data, registrationExpiry: 134, now: 110))
         XCTAssertThrowsError(try bootstrap.activeLease(data, registrationExpiry: 200, now: 135))
+        var extended = active; extended["unexpected"] = true
+        XCTAssertThrowsError(try bootstrap.activeLease(body(extended, prefix: "tcl1"), registrationExpiry: 200, now: 110))
     }
 
     func testAcknowledgedLeaseExtendsOnlyAnUnexpiredBoundCallStream() throws {
