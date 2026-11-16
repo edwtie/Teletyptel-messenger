@@ -52,7 +52,8 @@ by this helper. `node services/call-push/check-apns.js` checks the key and a
 certificate-verified Apple HTTP/2 connection, **not provider authentication or
 device delivery**. It sends no VoIP invitation or fake device token.
 
-The separate `ios-native-push-test.yml` workflow compiles an explicitly opted-in,
+The existing `ios-native-preview.yml` workflow's explicit `native_push_test=true`
+input with `validation_mode=focused-update` compiles an opted-in,
 unsigned native push-test target for `com.tiedragon.teletyptel`, with production
 APNs entitlements, audio/VoIP modes and the existing cold-call laboratory gate.
 It does not sign, upload or replace TestFlight. Defaults remain the isolated

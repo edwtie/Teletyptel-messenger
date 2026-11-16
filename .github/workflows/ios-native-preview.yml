@@ -25,6 +25,10 @@ on:
       - php/tests/native-cloud-history-http-test.php
   workflow_dispatch:
     inputs:
+      native_push_test:
+        description: Explicit unsigned production-APNs native staging (focused-update only; no upload)
+        type: boolean
+        default: false
       validation_mode:
         description: Full matrix or explicitly scoped logic, media or UI regression
         type: choice
@@ -49,6 +53,7 @@ jobs:
         family: [iPhone, iPad]
     env:
       TELETYPTEL_NATIVE_TEST_FAMILY: ${{ matrix.family }}
+      TELETYPTEL_NATIVE_PUSH_TEST: ${{ inputs.native_push_test && '1' || '0' }}
       TELETYPTEL_NATIVE_VALIDATION_MODE: ${{ inputs.validation_mode || 'full' }}
       TELETYPTEL_NATIVE_UI_SCOPE: ${{ inputs.ui_scope || 'regression' }}
     steps:
@@ -63,6 +68,11 @@ jobs:
           XCODE_PATH=$(find /Applications -maxdepth 1 -name 'Xcode_26*.app' -type d | sort -r | head -n 1)
           test -n "$XCODE_PATH"
           echo "DEVELOPER_DIR=$XCODE_PATH/Contents/Developer" >> "$GITHUB_ENV"
+      - name: Check explicitly requested native push staging
+        if: inputs.native_push_test == true
+        run: |
+          test "$TELETYPTEL_NATIVE_VALIDATION_MODE" = focused-update
+          node --test --test-name-pattern='Native push|Production APNs|APNs production' tests/native-push-activation.test.js
       - name: Check isolated project generator
         if: github.event_name != 'workflow_dispatch' || inputs.validation_mode == 'full'
         run: node --test tests/ios-native-foundation.test.js

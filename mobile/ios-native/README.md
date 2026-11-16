@@ -2,7 +2,7 @@
 
 ## Explicit APNs build staging (2026-11-16)
 
-The separate `Native iOS APNs build checks (unsigned only)` workflow stages the
+The existing unsigned preview workflow's explicit `native_push_test` input stages the
 actual app bundle ID with production APNs entitlements, audio/VoIP background
 modes and both native push/recovery flags. It is an explicit internal test target,
 not the default preview or a signed TestFlight release. Consent, Keychain scope,
