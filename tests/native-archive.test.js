@@ -66,5 +66,5 @@ test("Archive workflow never receives signing secrets, exports an IPA or sends A
   assert.doesNotMatch(checker, /altool|exportArchive|process\.env\.IOS_|sendIncoming|rejectUnauthorized/);
   const workflow = fs.readFileSync(path.join(root, ".github/workflows/ios-native-preview.yml"), "utf8");
   assert.match(workflow, /focused-archive/);
-  assert.doesNotMatch(workflow, /secrets\.|environment: ios-testflight/);
+  assert.doesNotMatch(workflow.split("  internal-native-upload:")[0], /secrets\.|environment: ios-testflight/);
 });

@@ -1,13 +1,19 @@
 const bundleId = "com.tiedragon.teletyptel.nativepreview";
 
-function providerPlist(source, config) {
+function providerPlist(source, config, { expectedBundleId = bundleId } = {}) {
   if (!config) return source;
-  if (config.bundleId !== bundleId || Object.keys(config).some(key => !["bundleId", "google", "facebook"].includes(key))) {
+  if (![bundleId, "com.tiedragon.teletyptel"].includes(expectedBundleId)
+      || config.bundleId !== expectedBundleId || Object.keys(config).some(key => !["bundleId", "google", "facebook"].includes(key))) {
     throw new Error("Use provider registrations specifically for the isolated native preview bundle");
+  }
+  if (expectedBundleId === "com.tiedragon.teletyptel") {
+    const google = require("./ios-testflight/google-signin");
+    if (config.google?.clientId !== google.clientId || config.google?.serverClientId !== google.serverClientId
+        || config.facebook?.appId !== "926375633763307") throw new Error("Review production provider registrations for TeleTypTel");
   }
   const escape = value => value.replace(/[&<>"']/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" })[character]);
   const entry = (key, value) => `<key>${key}</key><string>${escape(value)}</string>\n`;
-  let additions = entry("TeleTypTelProviderBundleID", bundleId);
+  let additions = entry("TeleTypTelProviderBundleID", expectedBundleId);
   const schemes = [];
   if (config.google) {
     const { clientId, serverClientId } = config.google;

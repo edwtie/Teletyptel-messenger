@@ -34,7 +34,7 @@ test("Production APNs staging refuses unrelated bundle, environment, providers o
     assert.throws(() => projectText({ pushTest: { ...config, ...changes } }));
   }
   assert.throws(() => prepare("ios-native-forbidden-push", { pushTest: config, providers: {} }));
-  const profile = { TeamIdentifier: ["H29RTRBD9D"], DeveloperCertificates: ["fixture"], ExpirationDate: "2030-01-01T00:00:00Z",
+  const profile = { UUID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", TeamIdentifier: ["H29RTRBD9D"], DeveloperCertificates: ["fixture"], ExpirationDate: "2030-01-01T00:00:00Z",
     Entitlements: { "aps-environment": "production", "application-identifier": "H29RTRBD9D.com.tiedragon.teletyptel",
       "com.apple.developer.team-identifier": "H29RTRBD9D", "get-task-allow": false } };
   assert.doesNotThrow(() => push.validateProfile(profile, 1800000000000));

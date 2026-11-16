@@ -1,4 +1,4 @@
-name: Native iOS preview (unsigned only)
+name: Native iOS validation and internal TestFlight
 
 on:
   push:
@@ -14,6 +14,9 @@ on:
       - scripts/check-ios-native-update.js
       - scripts/check-ios-native-archive.js
       - scripts/native-archive-config.js
+      - scripts/native-internal-release.js
+      - scripts/native-provider-config.js
+      - tests/native-internal-release.test.js
       - scripts/check-ios-native-ui.js
       - scripts/ios-testflight/native-localization.js
       - tests/native-feature-completion.test.js
@@ -27,6 +30,14 @@ on:
       - php/tests/native-cloud-history-http-test.php
   workflow_dispatch:
     inputs:
+      internal_upload:
+        description: Explicit signed internal TestFlight upload after unsigned archive checks (no public release)
+        type: boolean
+        default: false
+      build_number:
+        description: Unique Apple build number required for an internal upload
+        type: string
+        required: false
       native_push_test:
         description: Explicit unsigned production-APNs native staging (focused-update or focused-archive; no upload)
         type: boolean
@@ -58,6 +69,7 @@ jobs:
       TELETYPTEL_NATIVE_PUSH_TEST: ${{ inputs.native_push_test && '1' || '0' }}
       TELETYPTEL_NATIVE_VALIDATION_MODE: ${{ inputs.validation_mode || 'full' }}
       TELETYPTEL_NATIVE_UI_SCOPE: ${{ inputs.ui_scope || 'regression' }}
+      TELETYPTEL_NATIVE_BUILD_NUMBER: ${{ inputs.build_number || '' }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -70,6 +82,12 @@ jobs:
           XCODE_PATH=$(find /Applications -maxdepth 1 -name 'Xcode_26*.app' -type d | sort -r | head -n 1)
           test -n "$XCODE_PATH"
           echo "DEVELOPER_DIR=$XCODE_PATH/Contents/Developer" >> "$GITHUB_ENV"
+      - name: Validate explicit internal release request
+        if: inputs.internal_upload == true
+        run: |
+          test "$TELETYPTEL_NATIVE_VALIDATION_MODE" = focused-archive
+          test "$TELETYPTEL_NATIVE_PUSH_TEST" = 1
+          node -e 'require("./scripts/native-archive-config").validate({version:"1.0",buildNumber:process.env.TELETYPTEL_NATIVE_BUILD_NUMBER},{bundleId:"com.tiedragon.teletyptel",environment:"production",testOnly:true})'
       - name: Check explicitly requested native push staging
         if: inputs.native_push_test == true
         run: |
@@ -79,7 +97,7 @@ jobs:
         if: inputs.validation_mode == 'focused-archive'
         run: |
           test "$TELETYPTEL_NATIVE_PUSH_TEST" = 1
-          node --test tests/native-archive.test.js
+          node --test tests/native-archive.test.js tests/native-internal-release.test.js
       - name: Check isolated project generator
         if: github.event_name != 'workflow_dispatch' || inputs.validation_mode == 'full'
         run: node --test tests/ios-native-foundation.test.js
@@ -114,3 +132,43 @@ jobs:
             artifacts/ios-native-update-*/reports/
             artifacts/ios-native-archive-*/reports/
           retention-days: 3
+
+  internal-native-upload:
+    needs: native-preview
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/codex/teletyptel-beta-polish' && inputs.internal_upload == true && inputs.native_push_test == true && inputs.validation_mode == 'focused-archive'
+    environment: ios-testflight
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+      - name: Select Xcode 26
+        run: |
+          XCODE_PATH=$(find /Applications -maxdepth 1 -name 'Xcode_26*.app' -type d | sort -r | head -n 1)
+          test -n "$XCODE_PATH"
+          echo "DEVELOPER_DIR=$XCODE_PATH/Contents/Developer" >> "$GITHUB_ENV"
+      - name: Check native release contracts without credentials
+        run: node --test tests/native-internal-release.test.js
+      - name: Sign and upload native internal candidate
+        env:
+          TELETYPTEL_NATIVE_BUILD_NUMBER: ${{ inputs.build_number }}
+          IOS_NATIVE_PROVISION_PROFILE_BASE64: ${{ secrets.IOS_NATIVE_PROVISION_PROFILE_BASE64 }}
+          IOS_DISTRIBUTION_P12_BASE64: ${{ secrets.IOS_DISTRIBUTION_P12_BASE64 }}
+          IOS_DISTRIBUTION_P12_PASSWORD: ${{ secrets.IOS_DISTRIBUTION_P12_PASSWORD }}
+          IOS_ASC_KEY_P8: ${{ secrets.IOS_ASC_KEY_P8 }}
+          IOS_ASC_KEY_ID: ${{ secrets.IOS_ASC_KEY_ID }}
+          IOS_ASC_ISSUER_ID: ${{ secrets.IOS_ASC_ISSUER_ID }}
+          IOS_FACEBOOK_APP_ID: ${{ secrets.IOS_FACEBOOK_APP_ID }}
+          IOS_FACEBOOK_CLIENT_TOKEN: ${{ secrets.IOS_FACEBOOK_CLIENT_TOKEN }}
+        run: node scripts/native-internal-release.js --upload-internal
+      - name: Save non-secret native upload status
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: native-internal-upload-${{ github.run_id }}
+          path: artifacts/ios-native-internal-*/reports/result.json
+          retention-days: 7

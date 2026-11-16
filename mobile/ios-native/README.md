@@ -1,5 +1,37 @@
 # TeleTypTel native iOS migration
 
+## Explicit native internal-release path (2026-11-16)
+
+`ios-native-preview.yml` now additionally supports the explicit dispatch inputs
+`internal_upload=true`, `native_push_test=true`, `validation_mode=focused-archive`
+and a unique `build_number`. Both unsigned archive jobs must succeed before the
+separate `ios-testflight` environment job may sign or upload. Ordinary pushes and
+preview runs cannot activate this job. The existing web-shell release workflow
+and its provisioning secret remain unchanged.
+
+`native-internal-release.js --upload-internal` uses the dedicated protected
+`IOS_NATIVE_PROVISION_PROFILE_BASE64`, matching existing distribution certificate
+and App Store Connect upload credentials. It verifies the production APNs
+profile, certificate identity, archived app and embedded profile, actual signed
+entitlements and provider settings before exporting an internal-only package.
+Signing settings apply only to the app target, not every third-party package.
+Temporary keys/profiles/keychain are cleaned up; only a bounded non-secret result
+JSON is published, not the IPA, private build logs, provider plist or signing
+material. No APNs provider key is sent to GitHub.
+
+Production Google/Facebook registrations are accepted only for this explicit
+real-bundle archive; the differently registered preview remains isolated. Provider
+tracking flags remain disabled. The app-level privacy manifest documents observed
+app-only UserDefaults use and elapsed-time timers (CA92.1 and 35F9.1). It does not
+claim that no user data is collected or replace SDK manifests/App Store privacy
+answers. The build does not silently declare encryption exempt. Apple processing
+and export-compliance review may still block TestFlight availability after upload.
+
+An uploaded result is not proof of delivered APNs, locked-screen CallKit/media,
+privacy conformance or successful real-device Google/Facebook sign-in. Server
+pilot deployment and explicit device consent/token registration remain required.
+No public App Store release or automatic configuration of other accounts is made.
+
 ## Explicit unsigned archive validation (2026-11-16)
 
 The native preview workflow now has an explicit `focused-archive` mode, requiring

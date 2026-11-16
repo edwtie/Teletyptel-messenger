@@ -53,6 +53,9 @@ function projectText({ pushTest = null, archive = null } = {}) {
   const assets = object("assets", '{isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>";}');
   refs.push(assets);
   const assetBuild = object("assets-build", `{isa = PBXBuildFile; fileRef = ${assets};}`);
+  const privacy = object("privacy", '{isa = PBXFileReference; lastKnownFileType = text.xml; path = App/PrivacyInfo.xcprivacy; sourceTree = "<group>";}');
+  refs.push(privacy);
+  const privacyBuild = object("privacy-build", `{isa = PBXBuildFile; fileRef = ${privacy};}`);
   const translations = ["nl", "en"].map(language => object("locale-" + language,
     `{isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ${language}; path = ${language}.lproj/Localizable.strings; sourceTree = "<group>";}`));
   const translationGroup = object("localized-strings", `{isa = PBXVariantGroup; children = ${list(translations)}; name = Localizable.strings; sourceTree = "<group>";}`);
@@ -89,7 +92,7 @@ function projectText({ pushTest = null, archive = null } = {}) {
       providerBuilds.push(object(name + "-build", `{isa = PBXBuildFile; productRef = ${product};}`));
     }
   }
-  const appPhases = [phase("sources", "PBXSourcesBuildPhase", buildFiles), phase("frameworks", "PBXFrameworksBuildPhase", [rtcBuild, ...providerBuilds]), phase("resources", "PBXResourcesBuildPhase", [assetBuild, translationBuild, permissionBuild])];
+  const appPhases = [phase("sources", "PBXSourcesBuildPhase", buildFiles), phase("frameworks", "PBXFrameworksBuildPhase", [rtcBuild, ...providerBuilds]), phase("resources", "PBXResourcesBuildPhase", [assetBuild, translationBuild, permissionBuild, privacyBuild])];
   const testPhases = [phase("test-sources", "PBXSourcesBuildPhase", [testBuild]), phase("test-frameworks", "PBXFrameworksBuildPhase", []), phase("test-resources", "PBXResourcesBuildPhase", [])];
   const configurations = (name, settings) => {
     const configs = ["Debug", "Release"].map(mode => object(name + mode,
@@ -127,7 +130,7 @@ ${archive ? '<ArchiveAction buildConfiguration="Release" revealArchiveInOrganize
 function prepare(name, { providers = null, pushTest = null, archive = null } = {}) {
   callPush.validate(pushTest);
   nativeArchive.validate(archive, pushTest);
-  if (pushTest && providers) throw new Error("Production provider configuration needs separate signed-build validation before combining with native push");
+  if (pushTest && providers && !archive) throw new Error("Production provider configuration needs explicit archive validation before combining with native push");
   if (!/^ios-native-[a-z0-9-]+$/.test(name || "")) throw new Error("Use an isolated ios-native-* staging name");
   const directory = path.join(root, "artifacts", name);
   if (fs.existsSync(directory)) throw new Error("Staging already exists; choose a fresh name");
@@ -141,9 +144,10 @@ function prepare(name, { providers = null, pushTest = null, archive = null } = {
   for (const [language, content] of Object.entries(require("./ios-testflight/native-localization").catalog(root))) write(language + ".lproj/Localizable.strings", content);
   for (const [language, content] of Object.entries(require("./ios-testflight/native-localization").permissions(root))) write(language + ".lproj/InfoPlist.strings", content);
   for (const file of mediaFiles) write("Media/" + file, fs.readFileSync(path.join(root, "scripts/ios-testflight", file)));
-  for (const file of [...appFiles, "App/Info.plist", "UITests/NativeStartupUITests.swift"]) {
+  for (const file of [...appFiles, "App/Info.plist", "App/PrivacyInfo.xcprivacy", "UITests/NativeStartupUITests.swift"]) {
     const content = fs.readFileSync(path.join(source, file));
-    write(file, file === "App/Info.plist" ? nativeArchive.plist(callPush.plist(providerPlist(content.toString("utf8"), providers), pushTest), archive) : content);
+    write(file, file === "App/Info.plist" ? nativeArchive.plist(callPush.plist(providerPlist(content.toString("utf8"), providers,
+      { expectedBundleId: pushTest && archive ? pushTest.bundleId : "com.tiedragon.teletyptel.nativepreview" }), pushTest), archive) : content);
   }
   if (pushTest) write("App/NativeCallPush.entitlements", callPush.entitlements(pushTest));
   write("Assets.xcassets/Contents.json", JSON.stringify({ info: { author: "xcode", version: 1 } }));

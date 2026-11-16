@@ -42,6 +42,7 @@ function validateProfile(profile, now = Date.now()) {
       || profile.Entitlements["com.apple.developer.team-identifier"] !== "H29RTRBD9D"
       || profile.Entitlements["get-task-allow"] !== false || profile.ProvisionedDevices || profile.ProvisionsAllDevices
       || !profile.TeamIdentifier?.includes("H29RTRBD9D") || !profile.DeveloperCertificates?.length
+      || !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(profile.UUID ?? "")
       || !Number.isFinite(Date.parse(profile.ExpirationDate)) || Date.parse(profile.ExpirationDate) <= now) {
     throw new Error("A current production-APNs App Store provisioning profile for TeleTypTel is required");
   }
