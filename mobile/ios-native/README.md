@@ -13,8 +13,12 @@ This result establishes a verified signed upload, not Apple processing or tester
 availability. The report explicitly retains `processingAndCompliancePending`,
 `privacyReviewRequired` and `exportComplianceReviewRequired`, with
 `apnsActivated: false` and `physicalDeviceTested: false`. The first read-only App
-Store Connect build query after upload did not yet list build 17.1. Do not repeat
-the upload or silently answer encryption/privacy declarations to bypass processing.
+Store Connect query did not yet list 17.1; a subsequent read-only query confirms
+`processingState: VALID`, `expired: false`, internal state
+`MISSING_EXPORT_COMPLIANCE` and external state `NOT_APPLICABLE`. Apple's encryption
+declaration is still unset. No declaration or tester-group change was made by
+these queries. Do not repeat the successful upload or silently answer encryption/
+privacy declarations to bypass the remaining availability gate.
 
 Before the locked-screen test, finish the private server pilot deployment,
 including the Docker-to-Windows signed signaling journal bridge, scoped ejabberd

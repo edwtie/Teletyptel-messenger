@@ -159,8 +159,10 @@ directory and verified for P-256 signing. A real certificate-verified HTTP/2 TLS
 connection to Apple succeeds. Native candidate `1.0 (17.1)` is now signed and
 uploaded for internal TestFlight in
 [run 43904501035](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43904501035).
-Its report still records Apple processing/compliance pending, APNs not activated
-and no physical-device test. No provider-authenticated push, registration token
+Its upload report records processing/compliance pending; a subsequent read-only
+Apple query confirms processing `VALID` but internal availability still
+`MISSING_EXPORT_COMPLIANCE`. APNs remains unactivated and no physical-device test
+has been performed. No provider-authenticated push, registration token
 or live server-module installation has been established. The installed version
 last reported by the user is 16.9; that old web-shell build is not the native
 push target. Private journal transfer between the existing Linux Docker producer
