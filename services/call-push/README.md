@@ -8,11 +8,12 @@ call-push/control/recovery to return an HTML parse error before their JSON guard
 ran. A status of HTTP 200 alone is therefore not evidence that these APIs work.
 The separate public-auth configuration could still return valid JSON.
 
-The SSL-vhost configuration is now prepared for the tested PHP 8.4.15 CGI runtime,
+The SSL-vhost configuration now uses the tested PHP 8.4.15 CGI runtime,
 using a TeleTypTel-specific version macro instead of changing other WAMP hosts.
 A protected backup was made before editing and Apache reports `Syntax OK`.
-The attempted reload did not change the observed live PHP version; a deliberate
-WAMP restart and repeat HTTPS verification remain required at this checkpoint.
+The first checks still observed old workers after the reload. A subsequent fresh,
+certificate-verified HTTPS request confirms `PHP/8.4.15`, JSON content type and
+the expected disabled HTTP 404 response instead of the earlier HTML parse error.
 No APNs flags, credentials, registry migration or production modules were enabled
 as a substitute for fixing that runtime prerequisite. Successful verification
 requires the expected JSON content type/schema and a disabled or authenticated
