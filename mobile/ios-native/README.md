@@ -1,5 +1,22 @@
 # TeleTypTel native iOS migration
 
+## Explicit APNs build staging (2026-11-16)
+
+The separate `Native iOS APNs build checks (unsigned only)` workflow stages the
+actual app bundle ID with production APNs entitlements, audio/VoIP background
+modes and both native push/recovery flags. It is an explicit internal test target,
+not the default preview or a signed TestFlight release. Consent, Keychain scope,
+CallKit-before-network reporting, answer authorization, active leases and the
+camera/audio media gates remain mandatory. Provider registrations from the
+different preview bundle cannot be implicitly reused in this target.
+
+PHP logout/device revocation now has a transactional outbox and an authenticated
+TLS path to the actual ejabberd scope backend. Server installation/flags and a
+signed native build are still needed before any real device can exercise it.
+An Apple HTTP/2 TLS preflight is not proof of APNs provider/topic acceptance or
+locked-screen media delivery. See `services/call-push/README.md` for configuration,
+failure/retry semantics and the combined isolated logout test.
+
 ## Active scoped-call continuation (2026-11-16)
 
 The gated cold path now requests a separate short active-call lease before its

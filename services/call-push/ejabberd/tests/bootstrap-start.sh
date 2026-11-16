@@ -9,7 +9,7 @@ cat /tmp/tc/tls.key /tmp/tc/tls.crt > /tmp/tc/tls.pem
 export ERL_LIBS=/home/ejabberd/lib
 erl -boot /home/ejabberd/bin/start_clean -boot_var RELEASE_LIB /home/ejabberd/lib \
     -pa /home/ejabberd/lib/*/ebin -noshell -eval \
-    'lists:foreach(fun(File) -> case compile:file(File, [report, {outdir,"/tmp/tc/ebin"}]) of {ok,_} -> ok; _ -> halt(1) end end, ["/source/ejabberd_auth_teletyptel_calls.erl", "/source/teletyptel_call_ws.erl", "/source/mod_teletyptel_calls.erl"]), halt(0).'
+    'lists:foreach(fun(File) -> case compile:file(File, [report, {outdir,"/tmp/tc/ebin"}]) of {ok,_} -> ok; _ -> halt(1) end end, ["/source/ejabberd_auth_teletyptel_calls.erl", "/source/teletyptel_call_ws.erl", "/source/teletyptel_call_revoke.erl", "/source/mod_teletyptel_calls.erl"]), halt(0).'
 printf 'ERL_OPTIONS="-pa /tmp/tc/ebin"\n' > /tmp/tc/ejabberdctl.cfg
 cat > /tmp/tc/ejabberd.yml <<'CONFIG'
 hosts: [example.test]
@@ -23,12 +23,14 @@ listen:
     module: ejabberd_http
     tls: true
     request_handlers:
+      /call-revocations: teletyptel_call_revoke
       /xmpp-call-websocket: teletyptel_call_ws
       /xmpp-websocket: ejabberd_http_ws
   - port: 5444
     ip: "0.0.0.0"
     module: ejabberd_http
     request_handlers:
+      /call-revocations: teletyptel_call_revoke
       /xmpp-call-websocket: teletyptel_call_ws
       /xmpp-websocket: ejabberd_http_ws
   - port: 5223
@@ -61,4 +63,5 @@ export TELETYPTEL_CALL_SCOPED_DOMAIN=example.test
 export TELETYPTEL_CALL_SCOPED_ENVIRONMENT=production
 export TELETYPTEL_CALL_SCOPED_ISSUER=fixture
 export TELETYPTEL_CALL_SCOPED_KEY_FILE=/tmp/tc/bootstrap.key
+export TELETYPTEL_CALL_SCOPE_REVOCATION=1
 exec ejabberdctl -c /tmp/tc/ejabberdctl.cfg -f /tmp/tc/ejabberd.yml foreground

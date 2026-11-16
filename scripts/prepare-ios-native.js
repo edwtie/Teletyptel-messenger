@@ -3,6 +3,7 @@ const path = require("node:path");
 const crypto = require("node:crypto");
 const webRTC = require("./ios-testflight/native-webrtc");
 const { providerPlist } = require("./native-provider-config");
+const callPush = require("./native-call-push-config");
 
 const root = path.resolve(__dirname, "..");
 const source = path.join(root, "mobile/ios-native");
@@ -28,7 +29,8 @@ appFiles.push("App/NativeCloudHistoryView.swift", "App/NativePushVault.swift", "
 appFiles.push("App/NativeInterpreterMedia.swift", "App/NativeInterpreterCallView.swift");
 appFiles.push("App/NativeNewContactView.swift", "App/NativeAppearanceView.swift", "App/NativeHistoryBrowserView.swift", "App/NativeAvatarEditorView.swift");
 
-function projectText() {
+function projectText({ pushTest = null } = {}) {
+  callPush.validate(pushTest);
   const objects = new Map();
   const identifier = name => crypto.createHash("sha256").update("teletyptel-native:" + name).digest("hex").slice(0, 24).toUpperCase();
   const quote = value => JSON.stringify(value);
@@ -94,7 +96,9 @@ function projectText() {
   };
   const common = 'IPHONEOS_DEPLOYMENT_TARGET = 16.0; SDKROOT = iphoneos; SWIFT_VERSION = 5.0; CLANG_ENABLE_MODULES = YES; TARGETED_DEVICE_FAMILY = "1,2"; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; CODE_SIGNING_ALLOWED = NO;';
   const projectConfigs = configurations("project", common);
-  const appConfigs = configurations("app", 'PRODUCT_NAME = TeleTypTelNative; PRODUCT_BUNDLE_IDENTIFIER = com.tiedragon.teletyptel.nativepreview; INFOPLIST_FILE = App/Info.plist;');
+  const appConfigs = configurations("app", 'PRODUCT_NAME = TeleTypTelNative; PRODUCT_BUNDLE_IDENTIFIER = '
+    + (pushTest ? 'com.tiedragon.teletyptel' : 'com.tiedragon.teletyptel.nativepreview')
+    + '; INFOPLIST_FILE = App/Info.plist;' + (pushTest ? ' CODE_SIGN_ENTITLEMENTS = App/NativeCallPush.entitlements;' : ''));
   const testConfigs = configurations("test", 'PRODUCT_NAME = NativeStartupUITests; PRODUCT_BUNDLE_IDENTIFIER = com.tiedragon.teletyptel.nativepreview.uitests; GENERATE_INFOPLIST_FILE = YES; TEST_TARGET_NAME = TeleTypTelNative;');
   const proxy = object("proxy", `{isa = PBXContainerItemProxy; containerPortal = ${identifier("project")}; proxyType = 1; remoteGlobalIDString = ${identifier("target")}; remoteInfo = TeleTypTelNative;}`);
   const dependency = object("test-dependency", `{isa = PBXTargetDependency; target = ${identifier("target")}; targetProxy = ${proxy};}`);
@@ -116,7 +120,9 @@ function projectText() {
   return { project, scheme };
 }
 
-function prepare(name, { providers = null } = {}) {
+function prepare(name, { providers = null, pushTest = null } = {}) {
+  callPush.validate(pushTest);
+  if (pushTest && providers) throw new Error("Production provider configuration needs separate signed-build validation before combining with native push");
   if (!/^ios-native-[a-z0-9-]+$/.test(name || "")) throw new Error("Use an isolated ios-native-* staging name");
   const directory = path.join(root, "artifacts", name);
   if (fs.existsSync(directory)) throw new Error("Staging already exists; choose a fresh name");
@@ -132,8 +138,9 @@ function prepare(name, { providers = null } = {}) {
   for (const file of mediaFiles) write("Media/" + file, fs.readFileSync(path.join(root, "scripts/ios-testflight", file)));
   for (const file of [...appFiles, "App/Info.plist", "UITests/NativeStartupUITests.swift"]) {
     const content = fs.readFileSync(path.join(source, file));
-    write(file, file === "App/Info.plist" ? providerPlist(content.toString("utf8"), providers) : content);
+    write(file, file === "App/Info.plist" ? callPush.plist(providerPlist(content.toString("utf8"), providers), pushTest) : content);
   }
+  if (pushTest) write("App/NativeCallPush.entitlements", callPush.entitlements(pushTest));
   write("Assets.xcassets/Contents.json", JSON.stringify({ info: { author: "xcode", version: 1 } }));
   write("Assets.xcassets/TeleTypTelLogo.imageset/logo.png", fs.readFileSync(path.join(root, "php/public/assets/brand/teletyptel-logo-header@2x.png")));
   write("Assets.xcassets/TeleTypTelLogo.imageset/Contents.json", JSON.stringify({ images: [{ idiom: "universal", filename: "logo.png", scale: "2x" }], info: { author: "xcode", version: 1 } }));
@@ -141,7 +148,7 @@ function prepare(name, { providers = null } = {}) {
     write(`Assets.xcassets/${name}.imageset/background.png`, fs.readFileSync(path.join(root, "php/public/assets/backgrounds", file)));
     write(`Assets.xcassets/${name}.imageset/Contents.json`, JSON.stringify({ images: [{ idiom: "universal", filename: "background.png" }], info: { author: "xcode", version: 1 } }));
   }
-  const generated = projectText();
+  const generated = projectText({ pushTest });
   write("TeleTypTelNative.xcodeproj/project.pbxproj", generated.project);
   write("TeleTypTelNative.xcodeproj/xcshareddata/xcschemes/TeleTypTelNative.xcscheme", generated.scheme);
   return directory;

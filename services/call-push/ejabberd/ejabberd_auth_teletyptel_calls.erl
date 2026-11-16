@@ -4,7 +4,7 @@
 -include_lib("kernel/include/file.hrl").
 -export([start/1, stop/1, check_password/4, store_type/1, plain_password_required/1, user_exists/2, use_cache/1]).
 -export([auth_result/3, bind/1, send_packet/1, filter_send/1, authenticated/2, unbound/2, inline/1, info/2, terminated/2,
-         stream_started/2, revoke_device/3, attest_websocket/1, init_transport/2]).
+         stream_started/2, revoke_device/3, attest_websocket/1, init_transport/2, signed_revocation/2]).
 -define(TABLE, teletyptel_call_bootstrap).
 -define(NS, <<"urn:teletyptel:call-recovery:1">>).
 -define(JMI, <<"urn:xmpp:jingle-message:0">>).
@@ -366,3 +366,29 @@ revoke_device(Host, Device, Generation) ->
         [Pid || {?TABLE, _, Pid, _, _, _} <- Records, is_pid(Pid)]
     end),
     lists:foreach(fun ejabberd_c2s:stop_async/1, Processes), ok.
+
+signed_revocation(Payload, Signature) ->
+    true = os:getenv("TELETYPTEL_CALL_SCOPE_REVOCATION") =:= "1",
+    Host = list_to_binary(os:getenv("TELETYPTEL_CALL_SCOPED_DOMAIN", "")),
+    true = byte_size(Payload) =< 1024,
+    match = re:run(Payload, <<"\\A[A-Za-z0-9_-]+\\z">>, [{capture, none}]),
+    match = re:run(Signature, <<"\\A[0-9a-f]{64}\\z">>, [{capture, none}]),
+    #{key := Key, environment := Environment, issuer := Issuer} = persistent_term:get({?MODULE, Host}),
+    Expected = string:lowercase(binary:encode_hex(crypto:mac(hmac, sha256, Key,
+        <<"teletyptel-call-revoke-v1:", Environment/binary, ":", Host/binary, ":", Issuer/binary, ":", Payload/binary>>))),
+    true = crypto:hash_equals(Expected, Signature),
+    Translated = binary:replace(binary:replace(Payload, <<"-">>, <<"+">>, [global]), <<"_">>, <<"/">>, [global]),
+    Claims = jiffy:decode(base64:decode(<<Translated/binary, (binary:copy(<<"=">>, (4 - byte_size(Translated) rem 4) rem 4))/binary>>), [return_maps]),
+    true = lists:sort(maps:keys(Claims)) =:= lists:sort([<<"version">>, <<"environment">>, <<"domain">>, <<"issuer">>,
+        <<"eventId">>, <<"deviceId">>, <<"generation">>, <<"issuedAt">>, <<"expiresAt">>]),
+    1 = maps:get(<<"version">>, Claims), Environment = maps:get(<<"environment">>, Claims),
+    Host = maps:get(<<"domain">>, Claims), Issuer = maps:get(<<"issuer">>, Claims),
+    lists:foreach(fun(Name) -> match = re:run(maps:get(Name, Claims), <<"\\A[0-9a-f]{32}\\z">>, [{capture, none}]) end,
+        [<<"eventId">>, <<"generation">>]),
+    Device = maps:get(<<"deviceId">>, Claims),
+    match = re:run(Device, <<"\\A[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\z">>, [{capture, none}]),
+    Issued = maps:get(<<"issuedAt">>, Claims), Expires = maps:get(<<"expiresAt">>, Claims), Now = erlang:system_time(second),
+    true = is_integer(Issued) andalso is_integer(Expires) andalso Issued =< Now andalso Now - Issued =< 30
+        andalso Expires > Now andalso Expires =< Issued + 30,
+    ok = revoke_device(Host, Device, maps:get(<<"generation">>, Claims)),
+    maps:get(<<"eventId">>, Claims).

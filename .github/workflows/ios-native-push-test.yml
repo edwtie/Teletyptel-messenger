@@ -1,0 +1,38 @@
+name: Native iOS APNs build checks (unsigned only)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native-push-build:
+    runs-on: macos-15
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        family: [iPhone, iPad]
+    env:
+      TELETYPTEL_NATIVE_PUSH_TEST: "1"
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+      - name: Select Xcode 26
+        run: |
+          XCODE_PATH=$(find /Applications -maxdepth 1 -name 'Xcode_26*.app' -type d | sort -r | head -n 1)
+          test -n "$XCODE_PATH"
+          echo "DEVELOPER_DIR=$XCODE_PATH/Contents/Developer" >> "$GITHUB_ENV"
+      - name: Check explicit native push staging and revocation guards
+        run: node --test tests/native-push-activation.test.js tests/ios-native-update.test.js
+      - name: Compile push-enabled native app and run core tests
+        run: node scripts/check-ios-native-update.js
+      - name: Save unsigned evidence only
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: native-push-build-${{ github.run_id }}-${{ matrix.family }}
+          path: artifacts/ios-native-update-*/reports/
+          retention-days: 7

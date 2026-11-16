@@ -1,8 +1,12 @@
 "use strict";
 const assert = require("node:assert/strict");
 const path = require("node:path");
+const fs = require("node:fs");
+const os = require("node:os");
+const https = require("node:https");
+const http = require("node:http");
 const { execFileSync } = require("node:child_process");
-const { randomBytes } = require("node:crypto");
+const { randomBytes, createHmac } = require("node:crypto");
 const { BootstrapClient } = require("./check-call-bootstrap-ejabberd");
 const { RegistryFixture } = require("./check-call-signaling-ejabberd");
 const root = path.resolve(__dirname, "..");
@@ -13,10 +17,11 @@ async function run() {
   const image = "ejabberd/ecs@sha256:3d120adff1ba1f2993d1ededed6c1eb7f5f6d9c9ad645d32b3e505e8dedeec35";
   const execute = args => execFileSync("docker", args, { cwd: root, encoding: "utf8", timeout: 90000, maxBuffer: 2097152, stdio: "pipe" });
   const control = args => execute(["exec", name, "ejabberdctl", "-c", "/tmp/tc/ejabberdctl.cfg", "-f", "/tmp/tc/ejabberd.yml", ...args]);
-  const clients = []; let created = false; let registry; let stage = "startup"; let checks = 0;
-  const check = (value, label) => { assert.ok(value, label); checks++; };
+  const clients = []; let created = false; let registry; let stage = "startup"; let checks = 0; let temporary;
+  let lastCheck = "startup";
+  const check = (value, label) => { lastCheck = label; assert.ok(value, label); checks++; };
   try {
-    execute(["run", "-d", "--name", name, "--publish", "127.0.0.1::5223", "--env", "TELETYPTEL_CALL_ACTIVE_FIXTURE=1",
+    execute(["run", "-d", "--name", name, "--publish", "127.0.0.1::5223", "--publish", "127.0.0.1::5443", "--publish", "127.0.0.1::5444", "--env", "TELETYPTEL_CALL_ACTIVE_FIXTURE=1",
       "--mount", `type=bind,source=${path.join(root, "services/call-push/ejabberd")},target=/source,readonly`,
       "--entrypoint", "sh", image, "/source/tests/bootstrap-start.sh"]);
     created = true;
@@ -36,8 +41,40 @@ async function run() {
     const bootstrapKey = Buffer.from(execute(["exec", name, "cat", "/tmp/tc/bootstrap.key"]).trim(), "base64");
     const password = randomBytes(24).toString("hex");
     for (const user of ["alice", "bob"]) control(["register", user, "example.test", password]);
-    registry = new RegistryFixture(signingKey, bootstrapKey);
+    temporary = fs.mkdtempSync(path.join(os.tmpdir(), "tc-active-revocation-"));
+    const keyFile = path.join(temporary, "bootstrap.key"), caFile = path.join(temporary, "ca.pem");
+    fs.writeFileSync(keyFile, bootstrapKey.toString("base64"), { mode: 0o600 });
+    fs.writeFileSync(caFile, ca, { mode: 0o600 });
+    const httpsPort = Number(execute(["port", name, "5443/tcp"]).trim().split(":").at(-1));
+    const httpPort = Number(execute(["port", name, "5444/tcp"]).trim().split(":").at(-1));
+    registry = new RegistryFixture(signingKey, bootstrapKey, { keyFile, caFile, url: `https://127.0.0.1:${httpsPort}/call-revocations` });
     const registration = await registry.reply();
+    stage = "revocation ingress guards";
+    const revokeBody = changes => {
+      const now = Math.floor(Date.now() / 1000);
+      const payload = Buffer.from(JSON.stringify({ version: 1, environment: "production", domain: "example.test", issuer: "fixture",
+        eventId: randomBytes(16).toString("hex"), deviceId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd", generation: "a".repeat(32),
+        issuedAt: now, expiresAt: now + 30, ...changes })).toString("base64url");
+      return JSON.stringify({ payload, signature: createHmac("sha256", bootstrapKey).update("teletyptel-call-revoke-v1:production:example.test:fixture:" + payload).digest("hex") });
+    };
+    const request = (body, encrypted = true, method = "POST") => new Promise((resolve, reject) => {
+      const transport = encrypted ? https : http;
+      const operation = transport.request({ hostname: "127.0.0.1", port: encrypted ? httpsPort : httpPort,
+        path: "/call-revocations", method, ca, headers: { "Content-Type": "application/json", "X-Forwarded-Proto": "https" } }, response => {
+        response.resume(); response.on("end", () => resolve(response.statusCode));
+      });
+      operation.on("error", () => reject(new Error("Revocation fixture transport failed")));
+      operation.setTimeout(2000, () => operation.destroy(new Error("Revocation fixture timed out"))); operation.end(body);
+    });
+    check(await request(revokeBody({}), false) === 403, "Cleartext and spoofed forwarding header cannot revoke");
+    check(await request("{}") === 403, "Unsigned revocation denied");
+    check(await request(revokeBody({ environment: "sandbox" })) === 403, "Wrong environment denied");
+    check(await request(revokeBody({ expiresAt: Math.floor(Date.now() / 1000) + 3600 })) === 403, "Long-lived revocation permission denied");
+    check(await request(revokeBody({}), true, "GET") === 403, "GET cannot change a call scope");
+    const tampered = JSON.parse(revokeBody({})); tampered.signature = "0".repeat(64);
+    check(await request(JSON.stringify(tampered)) === 403, "Forged revocation signature denied");
+    const idempotent = revokeBody({});
+    check(await request(idempotent) === 200 && await request(idempotent) === 200, "Authenticated generation revocation is safely idempotent");
     const connect = async (user, secret, resource) => {
       const client = new BootstrapClient(port, ca); clients.push(client);
       check(await client.authenticate(user, secret), "Encrypted c2s authenticated");
@@ -96,19 +133,24 @@ async function run() {
       check(!scoped.closed, "Renewal survives older expiry timers");
     }
     check(Date.now() - started > 45000, "Accepted call lasts beyond both bootstrap and invitation deadlines");
-    stage = "policy revocation";
-    await iq(owner, "<preferences xmlns='urn:teletyptel:call-recovery:1' enabled='false' dnd='false'/>");
+    stage = "direct logout revocation";
+    const beforeLogout = Date.now();
+    const logout = await registry.request({ action: "web-logout" });
+    check(logout.ok && logout.result.signedOut && logout.result.pending === 0, "Actual PHP logout synchronously delivers and acknowledges durable scope revocation");
     for (let attempt = 0; attempt < 100 && !scoped.closed; attempt++) await delay(25);
-    check(scoped.closed, "Server policy revocation closes the actual active scoped stream");
+    check(scoped.closed && Date.now() - beforeLogout < 3000, "Logout closes the actual active stream without waiting for its 25-second lease");
     await delay(150); await ingest();
     check(!(await recover("lease", full)).ok, "Ended or revoked active call cannot renew");
+    await iq(owner, "<preferences xmlns='urn:teletyptel:call-recovery:1' enabled='true' dnd='false'/>");
+    check(!owner.closed && !alice.closed, "Logout revokes only that device generation, not other authenticated sessions");
     process.stdout.write(`Active call integration: ${checks} checks passed; real TLS, producer, PHP broker and repeated scope renewal beyond 45 seconds; no APNs.\n`);
   } catch (error) {
-    throw new Error("Isolated active call failed at " + stage + ": " + (stage === "startup" ? error.message : error.name));
+    throw new Error("Isolated active call failed at " + stage + ": " + (stage === "startup" ? error.message : error.name + " (" + lastCheck + ")"));
   } finally {
     for (const client of clients) client.close();
     registry?.close();
     if (created) execute(["rm", "-f", name]);
+    if (temporary) { fs.unlinkSync(path.join(temporary, "bootstrap.key")); fs.unlinkSync(path.join(temporary, "ca.pem")); fs.rmdirSync(temporary); }
   }
 }
 if (require.main === module) run().catch(error => { process.stderr.write(error.message + "\n"); process.exitCode = 1; });

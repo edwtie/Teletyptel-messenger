@@ -1,5 +1,68 @@
 # iOS call-push transport (not activated)
 
+## Logout revocation and production-APNs preparation (2026-11-16)
+
+PHP logout/session replacement, explicit device revocation and registration
+rotation can now durably enqueue the exact old device generation in the same
+transaction that removes/replaces its registration. After commit, a bounded
+HTTPS request asks the actual scoped ejabberd backend to revoke that generation;
+the backend stops its live c2s processes and denies unused bootstrap nonces.
+Other generations and ordinary account sessions remain untouched. Network I/O
+never holds the registration transaction. A missing queue prevents a false
+successful logout; an unavailable remote server leaves a durable pending event
+for retry rather than claiming remote delivery.
+
+The opt-in is `TELETYPTEL_CALL_SCOPE_REVOCATION=1` on PHP and ejabberd, with
+`TELETYPTEL_CALL_SCOPE_REVOCATION_URL=https://<internal-host>:<tls-port>/call-revocations`.
+The listener handler is `teletyptel_call_revoke`. Keep this operator route on a
+private listener/firewall, not the public chat route. It requires actual TLS,
+bounded POST data and a purpose-separated HMAC under the protected bootstrap
+key. Client forwarding headers, generic account authentication, expired/altered
+permissions and GET requests cannot revoke anything. The acknowledgement pins
+the event ID. Authenticated retries are idempotent. Configure
+`TELETYPTEL_CALL_SCOPE_CA_FILE` for a private trusted CA; certificate validation
+is never disabled. Provision the queue explicitly through the registry migration
+or `php services/call-push/revocations.php --migrate`. The latter's `--once`, or
+the opted-in push worker, retries pending events; schedule it at short intervals.
+
+With a healthy listener, logout does not wait for a 25-second media lease to
+expire. During a transport failure it is **not immediate remote revocation**:
+the generation is removed locally and new leases are denied, but an already
+issued lease remains the bounded fallback. Process/network failures cannot be
+described as guaranteed immediate delivery. This does not yet add an immediate
+outbox event to every independent admin account-blocking implementation.
+
+The combined `check-call-active-ejabberd.js` fixture now performs actual PHP
+web-session logout after more than 45 seconds of accepted-call renewal. It
+verifies synchronous HTTPS acknowledgement, c2s closure within three seconds,
+refused renewal and survival of the other account sessions. It also exercises
+cleartext, forwarding-header, signature, environment, method and lifetime
+rejection. `php php/tests/call-scope-revocation-test.php` covers durable rollback,
+transport failure/retry, rotation and acknowledgement correlation. These tests
+use generated keys, an isolated database and a disposable server, never real
+users or Apple delivery.
+
+`scripts/configure-apns-local.ps1` verifies the chosen APNs P-256 signing key and
+copies it to an ACL-protected directory outside source/web roots. It writes only
+operator metadata and the protected key path to `apns-production.json`. Set
+`TELETYPTEL_CALL_PUSH_APNS_CONFIG_FILE` to that file in the worker environment;
+the sender then loads the production configuration without publishing the key.
+No global Windows environment, Apache configuration or running worker is changed
+by this helper. `node services/call-push/check-apns.js` checks the key and a
+certificate-verified Apple HTTP/2 connection, **not provider authentication or
+device delivery**. It sends no VoIP invitation or fake device token.
+
+The separate `ios-native-push-test.yml` workflow compiles an explicitly opted-in,
+unsigned native push-test target for `com.tiedragon.teletyptel`, with production
+APNs entitlements, audio/VoIP modes and the existing cold-call laboratory gate.
+It does not sign, upload or replace TestFlight. Defaults remain the isolated
+non-push preview, and the normal TestFlight workflow is unchanged. Production
+provider settings cannot silently be copied from the different preview bundle.
+Actual activation still requires deployment of this server chain, a signed native
+test build using the correct production profile, explicit device consent and a
+real PushKit token. Only a real incoming call can establish Apple/topic/device
+acceptance and locked-screen CallKit/media behavior.
+
 ## Active-call lease continuation (2026-11-16)
 
 The disabled laboratory bridge now has a separate `tcl1` active-call permission.
@@ -53,8 +116,8 @@ does not use native WebRTC, CallKit hardware or APNs. PHP lifecycle guards are
 include both `CallPushSignaling::ensureSchema()` and
 `CallPushBootstrap::ensureSchema()`; HTTP requests still do not migrate tables.
 
-Still required: durable immediate server revocation from PHP logout/device/account
-events, deployment-specific key/schema/worker setup, a combined native-media
+Still required: deployment of the logout/device revocation path described above,
+immediate independent admin account-event integration, key/schema/worker setup, a combined native-media
 transport run and signed physical-device acceptance. SQL logout already prevents
 new leases, but an issued lease can remain usable for up to 25 seconds unless the
 live server is explicitly notified. Do not describe that as immediate revocation.

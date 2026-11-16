@@ -7,6 +7,7 @@ on:
     paths:
       - .github/workflows/call-push-signaling.yml
       - php/lib/CallPush*.php
+      - php/lib/CallScopeRevocation.php
       - php/public/api/call-push.php
       - php/public/api/call-control.php
       - php/public/api/call-recovery.php
@@ -14,6 +15,7 @@ on:
       - php/tests/call-bootstrap*.php
       - php/tests/call-recovery*.php
       - php/tests/call-active*.php
+      - php/tests/call-scope*.php
       - php/tests/call-control-endpoint-test.php
       - services/call-push/**
       - tests/call-push-signaling.test.js
@@ -62,16 +64,16 @@ jobs:
       - name: Require PHP fixture extensions
         run: php -r 'foreach (["pdo_sqlite", "openssl", "mbstring"] as $extension) { if (!extension_loaded($extension)) { exit(1); } }'
       - name: Check signed-event interoperability and source boundaries
-        run: node --test tests/call-push-signaling.test.js tests/call-push-transport.test.js tests/apns-call-push.test.js tests/native-call-control.test.js tests/native-call-intent-routing.test.js tests/call-bootstrap.test.js tests/native-cold-call-bridge.test.js
+        run: node --test tests/call-push-signaling.test.js tests/call-push-transport.test.js tests/apns-call-push.test.js tests/native-call-control.test.js tests/native-call-intent-routing.test.js tests/call-bootstrap.test.js tests/native-cold-call-bridge.test.js tests/native-push-activation.test.js
       - name: Check registry, revocation and competing answer processes
         run: |
-          for test in call-push-smoke call-push-reconcile-test call-push-control-test call-push-media-test call-push-endpoint-test call-control-endpoint-test call-bootstrap-test call-recovery-test call-recovery-endpoint-test call-active-lease-test; do
+          for test in call-push-smoke call-push-reconcile-test call-push-control-test call-push-media-test call-push-endpoint-test call-control-endpoint-test call-bootstrap-test call-recovery-test call-recovery-endpoint-test call-active-lease-test call-scope-revocation-test; do
             php "php/tests/$test.php"
           done
           php php/tests/call-push-transport-test.php "$(command -v node)"
       - name: Check PHP syntax
         run: |
-          for source in php/lib/CallPush*.php php/public/api/call-{push,control,recovery}.php services/call-push/{signaling,worker}.php; do
+          for source in php/lib/CallPush*.php php/lib/CallScopeRevocation.php php/public/api/call-{push,control,recovery}.php services/call-push/{signaling,worker,revocations}.php; do
             php -l "$source"
           done
       - name: Check real disposable ejabberd to PHP and new-resource proof

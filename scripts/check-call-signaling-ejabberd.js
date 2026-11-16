@@ -48,7 +48,7 @@ class FixtureClient {
 }
 
 class RegistryFixture {
-  constructor(key, bootstrapKey) {
+  constructor(key, bootstrapKey, revocation) {
     const php = process.env.TELETYPTEL_PHP || (process.platform === "win32" ? "C:\\wamp64\\bin\\php\\php8.4.15\\php.exe" : "php");
     this.child = spawn(php, [path.join(root, "php/tests/call-push-ejabberd-fixture.php")], { stdio: ["pipe", "pipe", "pipe"] });
     this.buffer = ""; this.replies = []; this.waiters = [];
@@ -61,7 +61,7 @@ class RegistryFixture {
       }
     });
     this.child.stderr.resume();
-    this.child.stdin.write(JSON.stringify({ key: key.toString("base64"), bootstrapKey: bootstrapKey?.toString("base64") }) + "\n");
+    this.child.stdin.write(JSON.stringify({ key: key.toString("base64"), bootstrapKey: bootstrapKey?.toString("base64"), revocation }) + "\n");
   }
   async reply() {
     if (this.replies.length) return this.replies.shift();

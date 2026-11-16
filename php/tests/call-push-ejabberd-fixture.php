@@ -18,6 +18,15 @@ try {
     $device = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
     $binding = str_repeat('1', 64);
     $registration = $service->register('bob', $binding, $device, str_repeat('ab', 32), true);
+    if (isset($configuration['revocation'])) {
+        putenv('TELETYPTEL_CALL_SCOPE_REVOCATION=1');
+        putenv('TELETYPTEL_CALL_PUSH_ENVIRONMENT=production');
+        putenv('TELETYPTEL_CALL_SIGNALING_DOMAIN=example.test');
+        putenv('TELETYPTEL_CALL_SIGNALING_ISSUER=fixture');
+        putenv('TELETYPTEL_CALL_BOOTSTRAP_KEY_FILE=' . $configuration['revocation']['keyFile']);
+        putenv('TELETYPTEL_CALL_SCOPE_CA_FILE=' . $configuration['revocation']['caFile']);
+        putenv('TELETYPTEL_CALL_SCOPE_REVOCATION_URL=' . $configuration['revocation']['url']);
+    }
     $broker = null; $authorization = null;
     if (isset($configuration['bootstrapKey'])) {
         $bootstrapKey = base64_decode($configuration['bootstrapKey'], true);
@@ -56,6 +65,11 @@ try {
                 $result = $broker->handle($authorization['credential'], $body);
             } elseif ($input['action'] === 'revoke') {
                 $service->revokeSession('bob', $binding); $result = ['revoked' => true];
+            } elseif ($input['action'] === 'web-logout') {
+                $session = ['teletyptel_account_id' => 'bob', 'teletyptel_call_push_binding' => $binding];
+                CallPushService::revokeWebSession($pdo, $session);
+                $result = ['signedOut' => !isset($session['teletyptel_call_push_binding']),
+                    'pending' => (int)$pdo->query('SELECT COUNT(*) FROM call_scope_revocations WHERE delivered IS NULL')->fetchColumn()];
             } elseif ($input['action'] === 'spool') {
                 $directory = sys_get_temp_dir() . '/tc-signaling-spool-' . bin2hex(random_bytes(12));
                 mkdir($directory, 0700);

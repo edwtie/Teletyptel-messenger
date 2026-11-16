@@ -8,6 +8,8 @@ final class CallPushFailure extends RuntimeException
     public function __construct(string $message, public int $status = 400) { parent::__construct($message); }
 }
 
+require_once __DIR__ . '/CallScopeRevocation.php';
+
 final class CallPushService
 {
     private Closure $clock;
@@ -23,6 +25,7 @@ final class CallPushService
 
     public function ensureSchema(): void
     {
+        CallScopeRevocation::ensureSchema($this->pdo);
         $suffix = $this->pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql'
             ? ' ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_bin' : '';
         foreach ([
@@ -151,7 +154,8 @@ final class CallPushService
         }
         $token = strtolower($token);
         $tokenHash = hash_hmac('sha256', $this->environment . ':' . $token, $this->key);
-        return $this->atomic(function () use ($account, $binding, $deviceId, $token, $tokenHash) {
+        $revocations = [];
+        $result = $this->atomic(function () use ($account, $binding, $deviceId, $token, $tokenHash, &$revocations) {
             $this->profile($account);
             $this->cleanupInside();
             $existing = $this->rows('SELECT * FROM call_push_devices WHERE device_id = ? OR token_hash = ?', [$deviceId, $tokenHash]);
@@ -167,29 +171,38 @@ final class CallPushService
             $generation = bin2hex(random_bytes(16));
             $device = ['device_id' => $deviceId, 'account_id' => $account, 'generation' => $generation, 'environment' => $this->environment];
             $cipher = $this->crypt($token, $device);
+            $revocations = CallScopeRevocation::queue($this->pdo, $existing, $now);
             $this->write('DELETE FROM call_push_devices WHERE device_id = ?', [$deviceId]);
             $this->write('INSERT INTO call_push_devices VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
                 [$deviceId, $account, $binding, $generation, (int)AccountAccess::state($this->pdo, $account)['version'],
                  $this->environment, $tokenHash, $cipher, $now * 1000 + 999, $now + 86400]);
             return ['deviceId' => $deviceId, 'generation' => $generation, 'expiresAt' => $now + 86400];
         });
+        CallScopeRevocation::deliverConfigured($this->pdo, $revocations);
+        return $result;
     }
 
     public function revokeSession(string $account, string $binding): void
     {
         $binding = $this->binding($binding);
-        $this->atomic(function () use ($account, $binding) {
+        $ids = $this->atomic(function () use ($account, $binding) {
+            $ids = CallScopeRevocation::queue($this->pdo, $this->rows('SELECT * FROM call_push_devices WHERE account_id = ? AND session_binding = ?', [$account, $binding]), ($this->clock)());
             $this->write('DELETE FROM call_push_devices WHERE account_id = ? AND session_binding = ?', [$account, $binding]);
+            return $ids;
         });
+        CallScopeRevocation::deliverConfigured($this->pdo, $ids);
     }
 
     public function revokeDevice(string $account, string $deviceId): void
     {
         $deviceId = self::uuid($deviceId);
-        $this->atomic(function () use ($account, $deviceId) {
+        $ids = $this->atomic(function () use ($account, $deviceId) {
             $this->profile($account);
+            $ids = CallScopeRevocation::queue($this->pdo, $this->rows('SELECT * FROM call_push_devices WHERE account_id = ? AND device_id = ?', [$account, $deviceId]), ($this->clock)());
             $this->write('DELETE FROM call_push_devices WHERE account_id = ? AND device_id = ?', [$account, $deviceId]);
+            return $ids;
         });
+        CallScopeRevocation::deliverConfigured($this->pdo, $ids);
     }
 
     public static function revokeWebSession(PDO $pdo, array &$session): void
@@ -202,6 +215,9 @@ final class CallPushService
             $pdo->beginTransaction();
             $pdo->exec('UPDATE call_push_lock SET touched = touched + 1 WHERE lock_id = 1');
             if (!$pdo->query('SELECT lock_id FROM call_push_lock WHERE lock_id = 1')->fetchColumn()) throw new RuntimeException('Missing lock');
+            $devices = $pdo->prepare('SELECT * FROM call_push_devices WHERE session_binding = ?');
+            $devices->execute([hash('sha256', $binding)]);
+            $ids = CallScopeRevocation::queue($pdo, $devices->fetchAll(PDO::FETCH_ASSOC), time());
             $query = $pdo->prepare('DELETE FROM call_push_devices WHERE session_binding = ?');
             $query->execute([hash('sha256', $binding)]);
             $pdo->commit();
@@ -210,6 +226,7 @@ final class CallPushService
             throw new CallPushFailure('Afmelden van oproepmeldingen is niet gelukt. Probeer opnieuw.', 503);
         }
         unset($session['teletyptel_call_push_binding'], $session['teletyptel_call_push_csrf']);
+        CallScopeRevocation::deliverConfigured($pdo, $ids);
     }
 
     public function devices(string $account, string $binding): array

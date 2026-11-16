@@ -6,11 +6,13 @@ const { executeLogged } = require("./check-ios-native");
 function run() {
   if (process.platform !== "darwin") throw new Error("This unsigned SDK check requires macOS/Xcode");
   const root = path.resolve(__dirname, "..");
-  const directory = prepare("ios-native-update-" + Date.now());
+  const pushTest = require("./native-call-push-config").enabled(process.env.TELETYPTEL_NATIVE_PUSH_TEST)
+    ? { bundleId: "com.tiedragon.teletyptel", environment: "production", testOnly: true } : null;
+  const directory = prepare("ios-native-update-" + Date.now(), { pushTest });
   const reports = path.join(directory, "reports");
   fs.mkdirSync(reports);
   const result = { unsigned: true, uploaded: false, scope: "focused contacts, login recovery, privacy, account lifecycle, unread state, presentation, avatar, Jingle codec and native hold logic; no simulator/UI/camera/audio tests",
-    swiftTestFilter: "NativeContactTests|NativePresentationTests|NativeServicesTests.testNativeAvatar|NativeJingleMediaTests|NativeJingleSessionTests|NativeCallCoordinatorTests|NativeJingleTransportTests|NativeLoginModelTests|NativeChatInteractionsTests|NativeFeatureCompletionTests|NativeMUCTests|NativeGroupManagementTests|NativeCallIntentTests|NativeCallPolicyTests|NativeCallRoutingTests|NativeCallIntentSessionTests|NativeCallAnswerRecoveryTests|NativePushRegistryTests|NativeWarmCallTests|NativeCallMediaGateTests|NativePushRegistrationModelTests|NativeCallBootstrapTests|NativeColdCallContextTests|XMPPSessionTests", swiftUnitTests: false, nativeRttTests: false, deviceCompiled: false, uiTests: [] };
+    pushTestBuild: pushTest !== null, swiftTestFilter: "NativeContactTests|NativePresentationTests|NativeServicesTests.testNativeAvatar|NativeJingleMediaTests|NativeJingleSessionTests|NativeCallCoordinatorTests|NativeJingleTransportTests|NativeLoginModelTests|NativeChatInteractionsTests|NativeFeatureCompletionTests|NativeMUCTests|NativeGroupManagementTests|NativeCallIntentTests|NativeCallPolicyTests|NativeCallRoutingTests|NativeCallIntentSessionTests|NativeCallAnswerRecoveryTests|NativePushRegistryTests|NativeWarmCallTests|NativeCallMediaGateTests|NativePushRegistrationModelTests|NativeCallBootstrapTests|NativeColdCallContextTests|XMPPSessionTests", swiftUnitTests: false, nativeRttTests: false, deviceCompiled: false, uiTests: [] };
   const logged = (name, command, args) => executeLogged(command, args, { root, reports, name });
   try {
     logged("swift-tests", "swift", ["test", "--package-path", path.join(root, "mobile/ios-native"),

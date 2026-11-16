@@ -5,6 +5,7 @@ const path = require("node:path");
 const { createApnsSender } = require("./apns");
 
 function configuration(environment) {
+  environment = require("./configuration").settings(environment);
   const file = environment.TELETYPTEL_APNS_KEY_FILE;
   if (typeof file !== "string" || !path.isAbsolute(file)) throw new Error("APNs configuration unavailable");
   const resolved = fs.realpathSync(file);
