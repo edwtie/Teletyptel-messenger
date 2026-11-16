@@ -69,6 +69,19 @@ generation/expiry/account scope, no general-credential conversion, cancellation
 and the cold proof/reserve/proceed/fresh-offer order. Unsigned SDK checks are not
 real APNs or locked-screen iPhone acceptance.
 
+Validation of source `b77ec56` passed the
+[isolated server/core workflow](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43868902921):
+105 actual TLS/WSS authentication, scope, answer-permit and rejection checks on
+disposable ejabberd 25.10; 24 PHP broker checks; five fail-closed HTTP ingress
+checks; existing registry/producer regressions; and 103 selected Swift core tests.
+The [unsigned SDK matrix](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43868908105)
+passed 242 selected Swift tests and native RTT checks in each iPhone/iPad-labelled
+job, with successful generic iOS device-SDK compilation. Both reports contain
+`uploaded: false`, `deviceCompiled: true` and `uiTests: []`. This is component and
+contract evidence, not one combined real-APNs-to-CallKit-to-hardware-media test.
+The native flags, live ejabberd/Asterisk containers, production server settings
+and TestFlight distribution were not changed.
+
 Before activation: implement active-call leases and accepted-call producer
 lifecycle; wire immediate server-side scope revocation to logout/account/policy
 events; jointly exercise the real broker, protected WSS route, producer and native

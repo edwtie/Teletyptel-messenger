@@ -19,6 +19,14 @@ TestFlight upload is added. The preview plist does not enable
 `TeleTypTelNativeCallRecoveryLabEnabled`. See `services/call-push/README.md` for
 the isolated adapter/broker contract and all physical-device acceptance gates.
 
+Source `b77ec56` passed the
+[unsigned iPhone/iPad SDK matrix](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43868908105):
+242 selected Swift tests, native RTT checks and generic device-SDK builds in each
+job. The [server/core checks](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43868902921)
+passed actual scoped TLS/WSS and answer-permit rejection on disposable ejabberd
+25.10, plus 103 core Swift tests. No real APNs request, combined cold-launch media
+acceptance test, physical-device validation or TestFlight upload was performed.
+
 ## Call-only bootstrap checkpoint (2026-11-16)
 
 The core now has an ephemeral `NativeCallBootstrapGrant` and a distinct
