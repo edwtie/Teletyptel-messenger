@@ -61,6 +61,8 @@ test("Archive workflow never receives signing secrets, exports an IPA or sends A
   assert.match(checker, /"CODE_SIGNING_ALLOWED=NO", "archive"/);
   assert.match(checker, /Products\/Applications\/TeleTypTelNative.app/);
   assert.match(checker, /hasAlpha: no/);
+  assert.match(checker, /"-extract", "ApplicationProperties", "json"/);
+  assert.doesNotMatch(checker, /readPlist\("archive-metadata"/);
   assert.doesNotMatch(checker, /altool|exportArchive|process\.env\.IOS_|sendIncoming|rejectUnauthorized/);
   const workflow = fs.readFileSync(path.join(root, ".github/workflows/ios-native-preview.yml"), "utf8");
   assert.match(workflow, /focused-archive/);

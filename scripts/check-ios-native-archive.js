@@ -27,8 +27,9 @@ function run() {
       "-derivedDataPath", path.join(directory, "DerivedData"), "-archivePath", archive, "CODE_SIGNING_ALLOWED=NO", "archive"]);
     const appPath = path.join(archive, "Products/Applications/TeleTypTelNative.app");
     if (!fs.statSync(path.join(appPath, "TeleTypTelNative")).isFile() || !fs.statSync(path.join(appPath, "Assets.car")).isFile()) throw new Error("Missing archived executable or assets");
+    const applicationProperties = JSON.parse(logged("archive-metadata", "plutil", ["-extract", "ApplicationProperties", "json", "-o", "-", path.join(archive, "Info.plist")]));
     result = archiveConfig.inspect({ expected, app: readPlist("app-metadata", path.join(appPath, "Info.plist")),
-      archive: readPlist("archive-metadata", path.join(archive, "Info.plist")) });
+      archive: { ApplicationProperties: applicationProperties } });
     console.log("Unsigned native archive verified; no TestFlight upload or live push.");
   } finally { fs.writeFileSync(path.join(reports, "result.json"), JSON.stringify(result, null, 2)); }
 }
