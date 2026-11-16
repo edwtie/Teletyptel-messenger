@@ -55,6 +55,18 @@ and loopback-published ports; cleanup removes only its own container. It neither
 uses nor modifies the running TeleTypTel services. Native metadata/handshake tests
 are `NativeCallBootstrapTests`; SDK compilation is a separate unsigned CI gate.
 
+Validation of source `015189a` passed the
+[isolated server/core run](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43855684916):
+39 PHP issuance checks, the existing registry/recovery regressions, the real
+signed-spool/resource-proof chain and 79 actual scoped-authentication checks on
+ejabberd 25.10 over verified TLS. The macOS core job passed 95 selected Swift
+tests. The separate
+[unsigned iPhone/iPad SDK matrix](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43855690437)
+passed 234 selected Swift tests with zero failures in each job, native RTT tests
+and the generic iOS device-SDK build. Both reports say `uploaded: false` and
+`uiTests: []`. These are not physical-device, camera/audio, WSS-scoped-auth or
+end-to-end cold-launch/APNs acceptance results.
+
 Remaining sequence: cookie-free revocable device bootstrap authorization;
 authenticated broker and real event-driven revocation; cold-launch CallKit
 ownership; an explicit active-call lease beyond the initial twenty-second

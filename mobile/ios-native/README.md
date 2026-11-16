@@ -19,6 +19,14 @@ See `services/call-push/README.md` for exact limits, revocation integration stil
 needed, twenty-second bootstrap versus active-call leases, and release gates.
 No live APNs, provisioning or TestFlight upload is performed by these checks.
 
+Source `015189a` passed the
+[unsigned SDK matrix](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43855690437):
+234 selected Swift tests, native RTT tests and generic device-SDK compilation
+in each iPhone/iPad-labelled job. The
+[separate server/core run](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43855684916)
+also passed actual scoped authentication against a disposable ejabberd 25.10.
+Neither run tests signed cold-launch APNs or real iPhone media/background behavior.
+
 ## Feature-gap implementation checkpoint (2026-11-15)
 
 This section supersedes older statements below that native registration,
