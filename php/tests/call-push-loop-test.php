@@ -24,7 +24,7 @@ try {
 } catch (RuntimeException $error) { $check($error->getMessage() === 'fixture' && $ticks === 1, 'Fails closed instead of retrying an unknown dispatch'); }
 CallPushLoop::run(function () use (&$ticks): void { $ticks++; }, static fn(): bool => true);
 $check($ticks === 1, 'Already-stopped worker performs no work');
-foreach (['--migrate', '--once', '--run'] as $mode) {
+foreach (['--migrate', '--once', '--run', '--monitor'] as $mode) {
     $pipes = [];
     $process = proc_open([PHP_BINARY, dirname(__DIR__, 2) . '/services/call-push/worker.php', $mode],
         [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, null,

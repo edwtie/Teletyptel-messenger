@@ -85,7 +85,15 @@ enable new enrollment, cold bootstrap or renewal. Authenticated ending of one's
 existing call remains available without that optional readiness heartbeat.
 
 The worker now supports explicit `php services/call-push/worker.php --run` after
-operator configuration and schema migration. It processes iterations sequentially
+operator configuration and schema migration. For the background-call pilot, run
+`php services/call-push/worker.php --monitor` as a separate process with the same
+reviewed configuration. The monitor drains signed metadata/revocations, updates
+readiness and enqueues eligible jobs, but never calls the APNs sender. The pilot
+`--run` process requires the separate monitor's heartbeat; it does not refresh its
+own readiness. This prevents an Apple request taking up to fifteen seconds from
+blocking fresh active-call metadata and expiring healthy eight-second renewals.
+The scoped lease and normal signaling checks are not relaxed. Each process works
+sequentially
 at a one-second cadence, accounting for elapsed work; slow sends never overlap.
 The unchanged `--once` remains available. An iteration failure exits nonzero
 rather than blindly resending a dispatch whose outcome is unknown. On systems
@@ -97,7 +105,7 @@ availability monitoring. Less than five seconds between successful checks is
 needed; a once-per-minute task is insufficient. This gate is a deployment/configuration
 check, **not evidence of Apple provider acceptance or end-to-end delivery**.
 
-`php php/tests/call-push-loop-test.php` passes nine fake-clock and disabled-CLI
+`php php/tests/call-push-loop-test.php` passes ten fake-clock and disabled-CLI
 checks: bounded cadence, slow iterations, stop handling, failure propagation and
 refusal of all worker modes before database access when disabled. It does not
 exercise production dispatch or Apple delivery.

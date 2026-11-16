@@ -2,6 +2,11 @@ name: Call signaling server checks (isolated only)
 
 on:
   workflow_dispatch:
+    inputs:
+      server_only:
+        description: Explicit server-only revalidation when native Swift sources are unchanged
+        type: boolean
+        default: false
   push:
     branches: [codex/teletyptel-beta-polish]
     paths:
@@ -84,6 +89,7 @@ jobs:
         run: node scripts/check-call-active-ejabberd.js
 
   native-call-recovery:
+    if: inputs.server_only != true
     runs-on: macos-15
     timeout-minutes: 15
     steps:

@@ -46,11 +46,19 @@ test("Production APNs staging refuses unrelated bundle, environment, providers o
 
 test("Logout and rotation use a durable generation-specific revocation outbox without network inside transactions", () => {
   const php = process.env.TELETYPTEL_PHP || (process.platform === "win32" ? "C:\\wamp64\\bin\\php\\php8.4.15\\php.exe" : "php");
-  for (const source of ["call-scope-revocation-test", "call-push-activation-test"]) {
+  for (const source of ["call-scope-revocation-test", "call-push-activation-test", "call-push-loop-test"]) {
     const reply = spawnSync(php, ["php/tests/" + source + ".php"], { cwd: root, encoding: "utf8", timeout: 10000 });
     assert.equal(reply.status, 0, reply.stderr + reply.stdout);
     assert.match(reply.stdout, /checks passed/);
   }
+});
+
+test("Pilot monitoring keeps signaling and readiness separate from slow Apple dispatch", () => {
+  const worker = fs.readFileSync(path.join(root, "services/call-push/worker.php"), "utf8");
+  assert.match(worker, /if \(\$mode !== '--run' \|\| getenv\('TELETYPTEL_CALL_BACKGROUND_PILOT'\) !== '1'\) CallPushActivation::refresh/);
+  assert.match(worker, /if \(\$mode === '--monitor'\) \{[^\n]*return; \}\s*echo json_encode\(\$service->dispatchOne/);
+  assert.match(worker, /CallPushLoop::run\(\$iteration/);
+  assert.match(worker, /if \(\$mode === '--monitor' && getenv\('TELETYPTEL_CALL_BACKGROUND_PILOT'\) !== '1'\)/);
 });
 
 test("APNs production credentials load only from bounded protected external configuration", () => {

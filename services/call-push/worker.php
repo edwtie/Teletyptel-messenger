@@ -11,8 +11,9 @@ require_once dirname(__DIR__, 2) . '/php/lib/CallPushLoop.php';
 
 try {
     $mode = $argv[1] ?? '';
-    if (count($argv) !== 2 || !in_array($mode, ['--migrate', '--once', '--run'], true)) throw new RuntimeException('Use --migrate, --once or --run');
+    if (count($argv) !== 2 || !in_array($mode, ['--migrate', '--once', '--run', '--monitor'], true)) throw new RuntimeException('Use --migrate, --once, --run or --monitor');
     if (getenv('TELETYPTEL_CALL_PUSH_WORKER') !== '1') throw new RuntimeException('Disabled');
+    if ($mode === '--monitor' && getenv('TELETYPTEL_CALL_BACKGROUND_PILOT') !== '1') throw new RuntimeException('Pilot monitor disabled');
     $key = base64_decode((string)getenv('TELETYPTEL_CALL_PUSH_STORAGE_KEY'), true);
     $environment = (string)getenv('TELETYPTEL_CALL_PUSH_ENVIRONMENT');
     $pdo = Database::connect();
@@ -37,14 +38,15 @@ try {
         CallPushActivation::ensureSchema($pdo);
         echo "Call-push schema prepared. No pushes sent.\n";
     } else {
-        $iteration = static function () use ($pdo, $signaling, $service): void {
+        $iteration = static function () use ($pdo, $signaling, $service, $mode): void {
             if (getenv('TELETYPTEL_CALL_SCOPE_REVOCATION') === '1') CallScopeRevocation::configured($pdo)->drain();
             if ($signaling !== null && getenv('TELETYPTEL_CALL_SIGNALING_SPOOL') !== false) {
                 require_once dirname(__DIR__, 2) . '/php/lib/CallPushSpool.php';
                 (new CallPushSpool((string)getenv('TELETYPTEL_CALL_SIGNALING_SPOOL')))->drain($signaling);
             }
-            CallPushActivation::refresh($pdo);
+            if ($mode !== '--run' || getenv('TELETYPTEL_CALL_BACKGROUND_PILOT') !== '1') CallPushActivation::refresh($pdo);
             $signaling?->enqueue($service);
+            if ($mode === '--monitor') { echo "{\"monitor\":true}\n"; return; }
             echo json_encode($service->dispatchOne([CallPushTransport::class, 'send'](...)), JSON_THROW_ON_ERROR) . "\n";
         };
         if ($mode === '--once') $iteration();
