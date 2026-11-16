@@ -84,10 +84,23 @@ check writes a five-second production heartbeat. Failed or stale checks cannot
 enable new enrollment, cold bootstrap or renewal. Authenticated ending of one's
 existing call remains available without that optional readiness heartbeat.
 
-An operator supervisor must run the one-shot worker continuously with less than
-five seconds between successful checks; a once-per-minute task is insufficient.
-No such supervisor is installed here. This gate is a deployment/configuration
+The worker now supports explicit `php services/call-push/worker.php --run` after
+operator configuration and schema migration. It processes iterations sequentially
+at a one-second cadence, accounting for elapsed work; slow sends never overlap.
+The unchanged `--once` remains available. An iteration failure exits nonzero
+rather than blindly resending a dispatch whose outcome is unknown. On systems
+with PHP pcntl, SIGINT/SIGTERM request a stop after the current iteration; on
+Windows process termination still bounds readiness by the five-second heartbeat.
+No automatic startup service, environment activation or real push is installed
+or started by this change. Use a reviewed process supervisor for restart and
+availability monitoring. Less than five seconds between successful checks is
+needed; a once-per-minute task is insufficient. This gate is a deployment/configuration
 check, **not evidence of Apple provider acceptance or end-to-end delivery**.
+
+`php php/tests/call-push-loop-test.php` passes nine fake-clock and disabled-CLI
+checks: bounded cadence, slow iterations, stop handling, failure propagation and
+refusal of all worker modes before database access when disabled. It does not
+exercise production dispatch or Apple delivery.
 
 Local validation on 2026-11-16: 80 combined real disposable-ejabberd/TLS checks,
 23 durable-revocation checks, 21 pilot-readiness checks and 25 recovery checks
