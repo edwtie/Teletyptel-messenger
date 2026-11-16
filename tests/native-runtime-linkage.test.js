@@ -93,4 +93,7 @@ test("Archive and exported IPA linkage checks run before upload and no signing m
   const workflow = read(".github/workflows/ios-native-preview.yml");
   assert.match(workflow, /needs: native-preview/);
   assert.match(workflow, /node --test tests\/native-archive.test.js tests\/native-internal-release.test.js tests\/native-runtime-linkage.test.js/);
+  assert.match(workflow, /name: ios-native-preview-\$\{\{ github.run_id \}\}-\$\{\{ matrix.family \}\}-attempt-\$\{\{ github.run_attempt \}\}/);
+  assert.match(workflow, /name: native-internal-upload-\$\{\{ github.run_id \}\}-attempt-\$\{\{ github.run_attempt \}\}/);
+  assert.doesNotMatch(workflow, /overwrite: true/);
 });

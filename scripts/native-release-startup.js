@@ -13,8 +13,11 @@ function check({ directory, reports, family, logged, collect }) {
     "-destination", "platform=iOS Simulator,id=" + device.udid, "ONLY_ACTIVE_ARCH=YES", "-parallel-testing-enabled", "NO"];
   const bundle = path.join(directory, "release-startup.xcresult");
   try {
+    console.log("Building Release startup test for " + family + ".");
     logged("release-startup-build", "xcodebuild", [...common, "build-for-testing"]);
+    console.log("Booting Release startup simulator for " + family + ".");
     logged("release-startup-boot", "xcrun", ["simctl", "bootstatus", device.udid, "-b"]);
+    console.log("Running Release startup UI assertion for " + family + ".");
     logged("release-startup-test", "xcodebuild", [...common,
       "-only-testing:NativeStartupUITests/NativeStartupUITests/testStartupDoesNotOpenKeyboardOrShowAuthenticatedState",
       "-resultBundlePath", bundle, "test-without-building"]);

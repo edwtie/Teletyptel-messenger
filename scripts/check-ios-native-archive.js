@@ -34,6 +34,7 @@ function run() {
       archive: { ApplicationProperties: applicationProperties } });
     result.runtimeLinkage = runtime.inspect(appPath, (command, args) => logged("runtime-" + command + "-" + args[0].slice(1)
       + (args[1].endsWith("/WebRTC") ? "-framework" : "-app"), command, args));
+    console.log("Device archive and embedded WebRTC linkage verified; starting Release simulator UI check.");
     result.releaseStartup = startup.check({ directory, reports, family: process.env.TELETYPTEL_NATIVE_TEST_FAMILY, logged,
       collect: (bundle, options) => collectTestResults(bundle, { root, ...options }) });
     console.log("Unsigned native archive verified; no TestFlight upload or live push.");

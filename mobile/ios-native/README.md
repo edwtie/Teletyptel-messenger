@@ -30,6 +30,22 @@ the executable only searches system/build directories. Actual archive/export
 inspection and simulator startup results must still be obtained from the new
 workflow; 17.2 is not claimed uploaded at this preparation checkpoint.
 
+The first run on `75202da`,
+[43910469934 attempt 1](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43910469934/attempts/1),
+verifies both arm64 archives and runtime linkage. The actual Release startup
+assertion passes on the iPhone 16 Pro simulator (iOS 18.6), with a visible startup
+screenshot, one test passed and no failures. The iPad Pro 11-inch (M4) simulator's
+XCTest **runner** is killed before establishing its test connection; no app
+startup assertion runs there. This is not counted as a successful iPad test and
+the upload job is correctly skipped. The raw test reports are retained.
+
+A failed-job rerun was requested, then canceled before signing/upload when an
+artifact-name collision risk was identified. Artifact names now include the run
+attempt rather than deleting/overwriting earlier failed evidence. A fresh run
+must pass both unchanged Release startup assertions and all archive/runtime gates
+before 17.2 may upload. Simulator-runner failure is not silently converted into a
+pass, an application crash, or physical-device acceptance.
+
 ## Internal-NL encryption declaration corrected (2026-11-16)
 
 The owner confirmed this candidate is for internal testing in the Netherlands

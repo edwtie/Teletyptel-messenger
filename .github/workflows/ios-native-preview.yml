@@ -129,7 +129,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: ios-native-preview-${{ github.run_id }}-${{ matrix.family }}
+          name: ios-native-preview-${{ github.run_id }}-${{ matrix.family }}-attempt-${{ github.run_attempt }}
           path: |
             artifacts/ios-native-check-*/reports/
             artifacts/ios-native-update-*/reports/
@@ -172,6 +172,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: native-internal-upload-${{ github.run_id }}
+          name: native-internal-upload-${{ github.run_id }}-attempt-${{ github.run_attempt }}
           path: artifacts/ios-native-internal-*/reports/result.json
           retention-days: 7
