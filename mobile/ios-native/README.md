@@ -3015,6 +3015,31 @@ Sources: [checkout v5.1.0](https://github.com/actions/checkout/releases/tag/v5.1
 [setup-node v6.5.0](https://github.com/actions/setup-node/releases/tag/v6.5.0), and
 [upload-artifact v6.0.0](https://github.com/actions/upload-artifact/releases/tag/v6.0.0).
 
+## Native chat/menu layout correction (2026-11-16)
+
+Direct and group chats now own one header row instead of distributing the back
+button, avatar/title and action cluster over independent system navigation-bar
+placements. Identity text may truncate visually; its full accessibility label
+remains available. Symbol actions keep separate 44-point targets with 8-point
+spacing. The TC shortcut and conversation menu stay separate from the main menu.
+Group invitation remains a shortcut; leaving a group moves into the group menu
+as a destructive action instead of a third competing header button.
+
+Message menus occupy space in the first content row rather than overlaying the
+body and timestamp. Copy, reply, forward, edit, translation, reaction and deletion
+permissions are unchanged. This is a presentation correction, not a claim of
+complete feature or pixel parity with web/16.9; system menu styling remains native.
+
+The unsigned `focused-ui` / `menus` scope selects seven simulator tests, including
+long contact names, nonintersecting button/identity rectangles, minimum touch
+targets, short-message metadata clearance, menu actions, save/cancel settings and
+portrait/landscape rotation. It explicitly uses the existing Intel macOS runner
+label used for archive checks, avoiding the arm64 acquisition failures seen in
+the previous login run. Other validation modes, signing/upload gates and server
+configuration are unchanged. Local source/generator checks pass; actual simulator
+results and screenshot review remain a separate validation gate. No TestFlight
+upload is requested by this scope.
+
 ## Primary references
 
 - [RFC 7395: XMPP over WebSocket](https://www.rfc-editor.org/rfc/rfc7395.html):

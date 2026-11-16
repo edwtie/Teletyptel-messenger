@@ -73,6 +73,7 @@ struct NativeGroupChatView: View {
     var avatars: NativeAvatarCache? = nil
     var archive: NativeConversationArchive? = nil
     var onArchive: (() -> Void)? = nil
+    var onClose: (() -> Void)? = nil
     @State private var showParticipants = false
     @State private var showInvite = false
     @State private var searching = false
@@ -86,6 +87,8 @@ struct NativeGroupChatView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            NativeConversationHeader(title: room.components(separatedBy: "@")[0], subtitle: "Groep", avatarName: room,
+                identifier: "group", back: { onClose?(); dismiss() }) { groupActions }
             if let group = group {
                 status(group)
                 if searching { TextField("Zoek in deze groepssessie", text: $search).focused($searchFocused).textFieldStyle(.roundedBorder).frame(minHeight: 44).padding(.horizontal, 16).accessibilityIdentifier("group-search") }
@@ -98,27 +101,9 @@ struct NativeGroupChatView: View {
         }
         .onAppear { login?.visibleConversation = room }
         .onDisappear { if login?.visibleConversation == room { login?.visibleConversation = nil } }
-        .navigationTitle(room.components(separatedBy: "@")[0]).navigationBarTitleDisplayMode(.inline)
-        .toolbar(.visible, for: .navigationBar)
-        .toolbarBackground(NativeWebStyle.panel, for: .navigationBar)
-        .toolbarBackground(.visible, for: .navigationBar)
+        .navigationBarBackButtonHidden(true)
+        .toolbar(.hidden, for: .navigationBar)
         .font(NativeWebStyle.font()).foregroundStyle(NativeWebStyle.text)
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                if verticalSizeClass != .compact {
-                HStack(spacing: 8) {
-                    NativeWebAvatar(name: room)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(room.components(separatedBy: "@")[0]).font(NativeWebStyle.font(16, weight: .bold)).lineLimit(1)
-                        Text("Groep").font(NativeWebStyle.font(12)).foregroundStyle(NativeWebStyle.muted)
-                    }
-                }.accessibilityElement(children: .combine)
-                }
-            }
-            ToolbarItem(placement: .primaryAction) {
-                groupActions
-            }
-        }
         .sheet(isPresented: $showParticipants) {
             NativeGroupManagementView(groups: model, model: model.management, room: room)
         }
@@ -153,10 +138,11 @@ struct NativeGroupChatView: View {
                     if !searching { search = ""; searchFocused = false }
                     else { Task { await Task.yield(); searchFocused = true } }
                 } label: { Label("Berichten zoeken", systemImage: "magnifyingglass") }
-            } label: { Image(systemName: "person.3").frame(width: 44, height: 44) }
-                .buttonStyle(NativeWebIconStyle()).accessibilityLabel("Deelnemers en groepsmenu")
-            Button { model.leave(room: room) } label: { Image(systemName: "rectangle.portrait.and.arrow.right").frame(width: 44, height: 44) }
-                .buttonStyle(NativeWebIconStyle(destructive: true)).accessibilityLabel("Groep verlaten").accessibilityIdentifier("group-leave")
+                Divider()
+                Button(role: .destructive) { model.leave(room: room) } label: { Label("Groep verlaten", systemImage: "rectangle.portrait.and.arrow.right") }
+                    .accessibilityIdentifier("group-leave")
+            } label: { Image(systemName: "ellipsis").rotationEffect(.degrees(90)) }
+                .buttonStyle(NativeWebIconStyle()).accessibilityLabel("Deelnemers en groepsmenu").accessibilityIdentifier("group-menu")
         }
     }
 
@@ -294,7 +280,11 @@ private struct NativeGroupBubble: View {
     private var content: some View {
         VStack(alignment: .leading, spacing: 5) {
             VStack(alignment: .leading, spacing: 3) {
-            Text(message.nickname).font(.caption.bold())
+            HStack(alignment: .top, spacing: 6) {
+                Text(message.nickname).font(.caption.bold())
+                Menu { actions } label: { Image(systemName: "ellipsis").frame(width: 44, height: 44) }
+                    .buttonStyle(.plain).accessibilityLabel("Berichtmenu").accessibilityIdentifier("group-message-menu-" + message.id.uuidString)
+            }
             if message.retracted { Text("Bericht ingetrokken") }
             else {
             if let session = session, NativeFileReference.inMessage(message.body, configuration: session.configuration) != nil {
@@ -306,15 +296,10 @@ private struct NativeGroupBubble: View {
                 Text(message.body)
             }
             }
-            }.padding(.trailing, 44)
-            metadata
+            }
+            metadata.accessibilityElement(children: .combine).accessibilityIdentifier("group-message-metadata-" + message.id.uuidString)
             NativeReactionChips(reactions: message.reactions, owner: reactionOwner, enabled: canReact, selected: onReact)
             if let notice = message.actionNotice { Text(notice).font(.caption2) }
-        }
-        .overlay(alignment: .topTrailing) {
-            Menu { actions } label: {
-                Image(systemName: "ellipsis").frame(width: 44, height: 24).frame(height: 44, alignment: .top)
-            }.buttonStyle(.plain).accessibilityLabel("Berichtmenu").accessibilityIdentifier("group-message-menu-" + message.id.uuidString)
         }
     }
 

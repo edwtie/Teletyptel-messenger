@@ -33,6 +33,44 @@ enum NativeWebStyle {
     }
 }
 
+struct NativeConversationHeader<Actions: View>: View {
+    let title: String
+    let subtitle: String
+    var avatarName: String? = nil
+    var profile: NativePublicAvatar? = nil
+    let identifier: String
+    var identityLabel: String? = nil
+    let back: () -> Void
+    @ViewBuilder var actions: () -> Actions
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Button(action: back) { Image(systemName: "arrow.left") }
+                .buttonStyle(NativeWebIconStyle())
+                .accessibilityLabel("Terug naar contacten")
+                .accessibilityIdentifier(identifier + "-back")
+            HStack(spacing: 8) {
+                NativeWebAvatar(name: avatarName ?? title, size: 30, profile: profile)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title).font(NativeWebStyle.font(16, weight: .bold)).lineLimit(1).truncationMode(.tail)
+                    Text(LocalizedStringKey(subtitle)).font(NativeWebStyle.font(12))
+                        .foregroundStyle(NativeWebStyle.muted).lineLimit(1).truncationMode(.tail)
+                }.frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading).clipped()
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(identityLabel ?? title + " · " + subtitle)
+            .accessibilityIdentifier(identifier + "-connection")
+            HStack(spacing: 8, content: actions).fixedSize(horizontal: true, vertical: false)
+        }
+        .padding(.horizontal, 12).padding(.vertical, 8)
+        .frame(maxWidth: .infinity, minHeight: 60)
+        .background(NativeWebStyle.panel).foregroundStyle(NativeWebStyle.text)
+        .overlay(alignment: .bottom) { NativeWebStyle.line.frame(height: 1).allowsHitTesting(false) }
+        .accessibilityElement(children: .contain).accessibilityIdentifier(identifier + "-header")
+    }
+}
+
 struct NativeWebIconStyle: ButtonStyle {
     var prominent = false
     var destructive = false

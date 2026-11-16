@@ -686,7 +686,9 @@ private struct NativeLoginUIFixture: ServerChecking, NativeAccountChallenging, N
 
     func run(account: NativeAuthenticatedAccount, onConnected: @escaping @Sendable (String) -> Void,
              onRoster: @escaping @Sendable (NativeRosterState) -> Void) async throws {
-        onRoster(.ready([NativeContact(jid: "demo-contact@localhost", name: "Fictief testcontact",
+        let contactName = ProcessInfo.processInfo.environment["TELETYPTEL_NATIVE_LONG_CONTACT_NAME"] == "1"
+            ? "Fictief testcontact met een bijzonder lange naam" : "Fictief testcontact"
+        onRoster(.ready([NativeContact(jid: "demo-contact@localhost", name: contactName,
                                        groups: ["Testcontacten"], subscription: "both", presence: .online)]))
         try await run(account: account, onConnected: onConnected)
     }

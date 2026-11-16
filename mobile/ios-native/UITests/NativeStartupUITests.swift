@@ -231,7 +231,7 @@ final class NativeStartupUITests: XCTestCase {
         XCTAssertEqual(draft.value as? String, "Bewaar mijn concept")
         let latestVisible = NSPredicate { _, _ in
             outgoing.exists && outgoing.isHittable && outgoing.frame.maxY <= draft.frame.minY &&
-                outgoing.frame.minY >= self.application.navigationBars.firstMatch.frame.maxY - 1
+                outgoing.frame.minY >= self.application.descendants(matching: .any)["chat-header"].firstMatch.frame.maxY - 1
         }
         expectation(for: latestVisible, evaluatedWith: outgoing)
         waitForExpectations(timeout: 10)
@@ -250,6 +250,59 @@ final class NativeStartupUITests: XCTestCase {
         tapContact(contact)
         XCTAssertTrue(draft.waitForExistence(timeout: 5))
         XCTAssertEqual(draft.value as? String, "Bewaar mijn concept")
+    }
+
+    func testChatHeaderAndMessageMenuDoNotOverlapAcrossRotation() {
+        application.launchEnvironment["TELETYPTEL_NATIVE_LONG_CONTACT_NAME"] = "1"
+        signInFixture("connected")
+        let contact = application.descendants(matching: .any)["contact-demo-contact@localhost"].firstMatch
+        XCTAssertTrue(contact.waitForExistence(timeout: 10)); reveal(contact); tapContact(contact)
+        let header = application.descendants(matching: .any)["chat-header"].firstMatch
+        XCTAssertTrue(header.waitForExistence(timeout: 5))
+        let draft = application.descendants(matching: .any)["chat-draft"].firstMatch
+        draft.tap(); draft.typeText("Ja")
+        application.buttons["chat-send"].tap()
+        let outgoing = application.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "chat-message-", "Ja")).firstMatch
+        XCTAssertTrue(outgoing.waitForExistence(timeout: 5))
+        let identifier = String(outgoing.identifier.dropFirst("chat-message-".count))
+        let messageMenu = application.buttons["message-menu-" + identifier]
+        let metadata = application.descendants(matching: .any)["message-metadata-" + identifier].firstMatch
+        for orientation: UIDeviceOrientation in [.portrait, .landscapeLeft, .portrait] {
+            rotate(orientation)
+            assertConversationHeader("chat", actions: ["chat-start-total", "chat-menu"])
+            XCTAssertTrue(messageMenu.isHittable)
+            XCTAssertGreaterThanOrEqual(messageMenu.frame.width, 44)
+            XCTAssertGreaterThanOrEqual(messageMenu.frame.height, 44)
+            XCTAssertTrue(outgoing.frame.contains(messageMenu.frame))
+            XCTAssertLessThanOrEqual(messageMenu.frame.maxY, metadata.frame.minY)
+            application.buttons["chat-menu"].tap()
+            XCTAssertTrue(application.buttons["Spraak en video"].waitForExistence(timeout: 5))
+            snapshot(orientation == .landscapeLeft ? "chat-menu-landscape" : "chat-menu-portrait")
+            application.buttons["Vertaling"].tap()
+            let close = application.buttons["Sluiten"]
+            XCTAssertTrue(close.waitForExistence(timeout: 5)); close.tap()
+            XCTAssertTrue(header.waitForExistence(timeout: 5))
+            XCTAssertFalse(application.buttons["Gesprek beëindigen"].exists)
+        }
+        snapshot("chat-header-separated")
+    }
+
+    func testMainMenuRemainsSeparateFromConversationMenu() {
+        signInFixture("connected")
+        let main = application.buttons["messenger-main-menu"]
+        XCTAssertTrue(main.waitForExistence(timeout: 10))
+        XCTAssertGreaterThanOrEqual(main.frame.width, 44)
+        XCTAssertGreaterThanOrEqual(main.frame.height, 44)
+        main.tap()
+        XCTAssertTrue(application.buttons["open-number-dialer"].waitForExistence(timeout: 5))
+        XCTAssertTrue(application.buttons["open-groups"].exists)
+        XCTAssertTrue(application.buttons["menu-logout"].exists)
+        snapshot("main-menu-symbols")
+        application.buttons["open-account-settings"].tap()
+        let close = application.buttons["Sluiten"]
+        XCTAssertTrue(close.waitForExistence(timeout: 10)); close.tap()
+        XCTAssertTrue(main.waitForExistence(timeout: 5))
+        XCTAssertFalse(application.buttons["chat-menu"].exists)
     }
 
     func testMessageMenuEditForwardAndBothDeletionOptions() {
@@ -382,6 +435,8 @@ final class NativeStartupUITests: XCTestCase {
         expectation(for: latestVisible, evaluatedWith: outgoing)
         waitForExpectations(timeout: 10)
         snapshot("group-landscape")
+        assertConversationHeader("group", actions: ["group-invite", "group-menu"])
+        application.buttons["group-menu"].tap()
         let leave = application.buttons["group-leave"]
         XCTAssertTrue(leave.isHittable)
         XCTAssertTrue(application.frame.contains(leave.frame))
@@ -604,6 +659,28 @@ final class NativeStartupUITests: XCTestCase {
         }
         application.buttons["call-dtmf-close"].tap()
         XCTAssertTrue(application.buttons["Gespreksbediening"].isHittable)
+    }
+
+    private func assertConversationHeader(_ identifier: String, actions: [String]) {
+        let header = application.descendants(matching: .any)[identifier + "-header"].firstMatch
+        let identity = application.descendants(matching: .any)[identifier + "-connection"].firstMatch
+        let back = application.buttons[identifier + "-back"]
+        let buttons = [back] + actions.map { application.buttons[$0] }
+        XCTAssertTrue(header.exists)
+        XCTAssertTrue(application.frame.contains(header.frame))
+        XCTAssertTrue(header.frame.contains(identity.frame))
+        for button in buttons {
+            XCTAssertTrue(button.isHittable)
+            XCTAssertGreaterThanOrEqual(button.frame.width, 44)
+            XCTAssertGreaterThanOrEqual(button.frame.height, 44)
+            XCTAssertTrue(header.frame.contains(button.frame))
+            XCTAssertFalse(button.frame.intersects(identity.frame))
+        }
+        for first in buttons.indices {
+            for second in buttons.indices where second > first {
+                XCTAssertFalse(buttons[first].frame.intersects(buttons[second].frame))
+            }
+        }
     }
 
     private func snapshot(_ name: String) {

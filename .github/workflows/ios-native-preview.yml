@@ -10,6 +10,7 @@ on:
       - scripts/prepare-ios-native.js
       - scripts/native-login-assets.js
       - tests/native-login-presentation.test.js
+      - tests/native-chat-menu-layout.test.js
       - scripts/check-ios-native.js
       - scripts/check-ios-native-media.js
       - scripts/check-ios-native-codecs.js
@@ -55,7 +56,7 @@ on:
       ui_scope:
         description: Explicit test selection for focused-ui only
         type: choice
-        options: [regression, groups, tc]
+        options: [regression, groups, tc, menus]
         default: regression
 
 permissions:
@@ -63,7 +64,7 @@ permissions:
 
 jobs:
   native-preview:
-    runs-on: ${{ inputs.validation_mode == 'focused-archive' && 'macos-15-intel' || 'macos-15' }}
+    runs-on: ${{ (inputs.validation_mode == 'focused-archive' || (inputs.validation_mode == 'focused-ui' && inputs.ui_scope == 'menus')) && 'macos-15-intel' || 'macos-15' }}
     timeout-minutes: 45
     strategy:
       fail-fast: false
@@ -113,7 +114,7 @@ jobs:
         if: github.event_name == 'workflow_dispatch' && inputs.validation_mode != 'full'
         run: node --test tests/ios-native-update.test.js tests/native-g722.test.js
       - name: Check native recovery, capture, privacy and localization contracts
-        run: node --test tests/native-feature-completion.test.js tests/native-login-presentation.test.js
+        run: node --test tests/native-feature-completion.test.js tests/native-login-presentation.test.js tests/native-chat-menu-layout.test.js
       - name: Compile native app and test ${{ matrix.family }}
         run: |
           if [ "$TELETYPTEL_NATIVE_VALIDATION_MODE" = "focused-archive" ]; then

@@ -32,6 +32,7 @@ struct NativeChatView: View {
 
     var body: some View {
             VStack(spacing: 0) {
+                conversationHeader
                 if !model.isConnected {
                     Text(model.isReconnecting ? "Verbinding herstellen (\(model.reconnectAttempt)/5)… Je tekst blijft bewaard." : "Niet verbonden · tekst blijft in deze sessie bewaard")
                         .font(.caption).foregroundStyle(.secondary).padding(6)
@@ -104,69 +105,10 @@ struct NativeChatView: View {
                 }
                 composer.disabled(historyOnly)
             }
-            .navigationTitle(contact.displayName)
-            .navigationBarTitleDisplayMode(.inline)
             .navigationBarBackButtonHidden(true)
-            .toolbar(.visible, for: .navigationBar)
+            .toolbar(.hidden, for: .navigationBar)
             .font(NativeWebStyle.font())
             .foregroundStyle(NativeWebStyle.text)
-            .toolbarBackground(NativeWebStyle.panel, for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button { onClose?(); dismiss() } label: {
-                        Image(systemName: "arrow.left").frame(width: 44, height: 44)
-                    }.buttonStyle(NativeWebIconStyle()).accessibilityLabel("Terug naar contacten").accessibilityIdentifier("chat-back")
-                }
-                ToolbarItem(placement: .principal) {
-                    HStack(spacing: 8) {
-                        NativeWebAvatar(name: contact.displayName, profile: contactProfile)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(contact.displayName).font(NativeWebStyle.font(16, weight: .bold)).lineLimit(1)
-                            Text(LocalizedStringKey(contact.presence.label)).font(NativeWebStyle.font(12)).foregroundStyle(NativeWebStyle.muted)
-                        }
-                    }.accessibilityElement(children: .combine)
-                        .accessibilityLabel((model.isConnected ? "Verbonden · " : "Niet verbonden · ") + contact.displayName + " · " + contact.presence.label)
-                        .accessibilityIdentifier("chat-connection")
-                }
-                ToolbarItem(placement: .primaryAction) {
-                    HStack(spacing: 10) {
-                        Button { startCall(.total) } label: {
-                            NativeTotalConversationSymbol().fill(.white).frame(width: 26, height: 26)
-                                .frame(width: 44, height: 44)
-                        }
-                        .buttonStyle(NativeWebIconStyle(prominent: true))
-                        .disabled(!calls.canCall(contact))
-                        .accessibilityLabel("Totale conversatie starten")
-                        Menu {
-                            Button { contactName = contact.displayName; renameContact = true } label: { Label("Naam wijzigen", systemImage: "pencil") }
-                                .disabled(!model.canSend || model.contactActionBusy)
-                            Button { model.setMuted(contact.jid, muted: !model.chat.preferences.mutedPeers.contains(contact.jid)) } label: {
-                                Label(LocalizedStringKey(model.chat.preferences.mutedPeers.contains(contact.jid) ? "Meldingen aan" : "Meldingen dempen"), systemImage: "bell.slash")
-                            }
-                            Button { model.setBlocked(contact.jid, blocked: !model.isBlocked(contact.jid)) } label: {
-                                Label(LocalizedStringKey(model.isBlocked(contact.jid) ? "Deblokkeren" : "Blokkeren"), systemImage: "hand.raised")
-                            }.disabled(!model.canSend || model.contactActionBusy)
-                            Button(role: .destructive) { removeContact = true } label: { Label("Contact verwijderen", systemImage: "person.crop.circle.badge.minus") }
-                                .disabled(!model.canSend || model.contactActionBusy)
-                            callButton("Spraak", icon: "phone.fill", profile: .audio)
-                            callButton("Spraak en video", icon: "video.fill", profile: .video)
-                            callButton("Spraak en realtime tekst", icon: "teletype", profile: .audioRtt)
-                            Button { showTranslation = true } label: { Label("Vertaling", systemImage: "globe") }
-                            if let archive = archive {
-                                Button {
-                                    archive.set(peer: contact.jid, kind: "contact", archived: !archive.contains(peer: contact.jid, kind: "contact"))
-                                    onClose?(); dismiss()
-                                } label: { Label(archive.contains(peer: contact.jid, kind: "contact") ? "Terugzetten" : "Archiveren", systemImage: "archivebox") }
-                            }
-                            Button { model.loadHistory(for: contact.jid, refresh: true) } label: { Label("XMPP-archief ophalen", systemImage: "clock.arrow.circlepath") }
-                                .disabled(!model.canSend || model.historyStates[contact.jid] == .loading)
-                        } label: { Image(systemName: "ellipsis").rotationEffect(.degrees(90)) }
-                        .buttonStyle(NativeWebIconStyle())
-                        .accessibilityLabel("Gespreksmenu")
-                    }
-                }
-            }
             .scrollDismissesKeyboard(.interactively)
         .sheet(isPresented: $showTranslation) { NativeTranslationSettingsView(model: translation) }
         .onAppear { model.visibleConversation = contact.jid }
@@ -199,6 +141,47 @@ struct NativeChatView: View {
             guard translation.preferences.mode == "automatic" else { return }
             await translation.automaticallyTranslate(Array(messages.suffix(12)))
         }
+    }
+
+    private var conversationHeader: some View {
+        NativeConversationHeader(title: contact.displayName, subtitle: contact.presence.label, profile: contactProfile,
+            identifier: "chat", identityLabel: (model.isConnected ? "Verbonden · " : "Niet verbonden · ") + contact.displayName + " · " + contact.presence.label,
+            back: { onClose?(); dismiss() }) {
+            Button { startCall(.total) } label: {
+                NativeTotalConversationSymbol().fill(.white).frame(width: 26, height: 26).frame(width: 44, height: 44)
+            }
+            .buttonStyle(NativeWebIconStyle(prominent: true)).disabled(!calls.canCall(contact))
+            .accessibilityLabel("Totale conversatie starten").accessibilityIdentifier("chat-start-total")
+            Menu { conversationActions } label: { Image(systemName: "ellipsis").rotationEffect(.degrees(90)) }
+                .buttonStyle(NativeWebIconStyle()).accessibilityLabel("Gespreksmenu").accessibilityIdentifier("chat-menu")
+        }
+    }
+
+    @ViewBuilder private var conversationActions: some View {
+        callButton("Spraak", icon: "phone.fill", profile: .audio)
+        callButton("Spraak en video", icon: "video.fill", profile: .video)
+        callButton("Spraak en realtime tekst", icon: "teletype", profile: .audioRtt)
+        Button { showTranslation = true } label: { Label("Vertaling", systemImage: "globe") }
+        Divider()
+        Button { contactName = contact.displayName; renameContact = true } label: { Label("Naam wijzigen", systemImage: "pencil") }
+            .disabled(!model.canSend || model.contactActionBusy)
+        Button { model.setMuted(contact.jid, muted: !model.chat.preferences.mutedPeers.contains(contact.jid)) } label: {
+            Label(LocalizedStringKey(model.chat.preferences.mutedPeers.contains(contact.jid) ? "Meldingen aan" : "Meldingen dempen"), systemImage: "bell.slash")
+        }
+        if let archive = archive {
+            Button {
+                archive.set(peer: contact.jid, kind: "contact", archived: !archive.contains(peer: contact.jid, kind: "contact"))
+                onClose?(); dismiss()
+            } label: { Label(archive.contains(peer: contact.jid, kind: "contact") ? "Terugzetten" : "Archiveren", systemImage: "archivebox") }
+        }
+        Button { model.loadHistory(for: contact.jid, refresh: true) } label: { Label("XMPP-archief ophalen", systemImage: "clock.arrow.circlepath") }
+            .disabled(!model.canSend || model.historyStates[contact.jid] == .loading)
+        Divider()
+        Button { model.setBlocked(contact.jid, blocked: !model.isBlocked(contact.jid)) } label: {
+            Label(LocalizedStringKey(model.isBlocked(contact.jid) ? "Deblokkeren" : "Blokkeren"), systemImage: "hand.raised")
+        }.disabled(!model.canSend || model.contactActionBusy)
+        Button(role: .destructive) { removeContact = true } label: { Label("Contact verwijderen", systemImage: "person.crop.circle.badge.minus") }
+            .disabled(!model.canSend || model.contactActionBusy)
     }
 
     @ViewBuilder
@@ -250,7 +233,11 @@ struct NativeChatView: View {
 
     private func bubbleContent(_ message: NativeChatMessage) -> some View {
         VStack(alignment: .leading, spacing: 5) {
-                Text(message.retracted ? "Bericht ingetrokken" : message.body).padding(.trailing, 44)
+                HStack(alignment: .top, spacing: 6) {
+                    Text(message.retracted ? "Bericht ingetrokken" : message.body).accessibilityIdentifier("message-body-" + message.id.uuidString)
+                    Menu { messageActions(message) } label: { Image(systemName: "ellipsis").frame(width: 44, height: 44) }
+                        .buttonStyle(.plain).accessibilityLabel("Berichtmenu").accessibilityIdentifier("message-menu-" + message.id.uuidString)
+                }
                 if let session = model.activeWebSession, NativeFileReference.inMessage(message.body, configuration: session.configuration) != nil {
                     NativeFileMessageButton(bodyText: message.body, session: session)
                 }
@@ -264,14 +251,10 @@ struct NativeChatView: View {
                     if message.state != .incoming {
                         NativeMessageTicks(message: message)
                     }
-                }.foregroundStyle(NativeWebStyle.muted)
+                }.foregroundStyle(NativeWebStyle.muted).accessibilityElement(children: .combine)
+                    .accessibilityIdentifier("message-metadata-" + message.id.uuidString)
                 NativeReactionChips(reactions: message.reactions, owner: model.currentOwner, enabled: model.canSend && !message.reactionPending) { model.react(message.id, emoji: $0) }
                 if let notice = message.actionNotice { Text(notice).font(.caption2).foregroundStyle(NativeWebStyle.muted) }
-            }
-            .overlay(alignment: .topTrailing) {
-                Menu { messageActions(message) } label: {
-                    Image(systemName: "ellipsis").frame(width: 44, height: 24).frame(height: 44, alignment: .top)
-                }.buttonStyle(.plain).accessibilityLabel("Berichtmenu").accessibilityIdentifier("message-menu-" + message.id.uuidString)
             }
             .task(id: message.body) { translation.discardStale(key: message.id.uuidString, text: message.body) }
     }

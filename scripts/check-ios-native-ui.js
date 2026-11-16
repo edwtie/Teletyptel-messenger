@@ -8,6 +8,9 @@ const selectedTests = Object.freeze([
   "testLoginSettingsAreSeparateAndPreserveDraftsOnCancel",
   "testLoginSettingsSaveAndRotateWithoutOpeningKeyboard",
   "testRotationPreservesConfigurationAndInvalidAddressShowsInlineError",
+  "testChatHeaderAndMessageMenuDoNotOverlapAcrossRotation",
+  "testMainMenuRemainsSeparateFromConversationMenu",
+  "testMessageMenuEditForwardAndBothDeletionOptions",
   "testAttachmentUploadOnlyStagesLinkUntilExplicitSend",
   "testConnectionLossRecoversWithoutAnotherPasswordPrompt",
   "testGroupDiscoveryManagementAndSessionSearch",
@@ -19,6 +22,10 @@ const selectedTests = Object.freeze([
 
 function testsForScope(scope = "regression") {
   if (scope === "regression") return selectedTests;
+  if (scope === "menus") return ["testStartupDoesNotOpenKeyboardOrShowAuthenticatedState",
+    "testLoginSettingsAreSeparateAndPreserveDraftsOnCancel", "testLoginSettingsSaveAndRotateWithoutOpeningKeyboard",
+    "testChatHeaderAndMessageMenuDoNotOverlapAcrossRotation", "testMainMenuRemainsSeparateFromConversationMenu",
+    "testMessageMenuEditForwardAndBothDeletionOptions", "testExistingGroupJoinSendRotationAndLeave"];
   if (scope === "groups") return selectedTests.filter(name => name.includes("Group"));
   if (scope === "tc") return ["testWebStyleCallControlsAndRttPanesRemainReachableAcrossRotation", "testPeerCameraOnOrUnknownDoesNotEnterTextOnlyLayout"];
   throw new Error("Unsupported native UI scope");

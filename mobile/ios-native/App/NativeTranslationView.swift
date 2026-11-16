@@ -264,7 +264,7 @@ struct NativeMessengerView: View {
                     allowReadMarkers: !showAccount && !showTranslation && !showGroups && !showDialer && !showNewContact && !showAppearance && historyBrowser == nil,
                     historyOnly: !rosterJIDs.contains(contact.jid))
             } else if let room = model.groups.rooms.first(where: { $0.room == selected }) {
-                NativeGroupChatView(model: model.groups, room: room.room, login: model, translation: translation, avatars: avatars, archive: archive, onArchive: { selected = nil })
+                NativeGroupChatView(model: model.groups, room: room.room, login: model, translation: translation, avatars: avatars, archive: archive, onArchive: { selected = nil }, onClose: { selected = nil })
             } else {
                 GeometryReader { geometry in
                     NativeConversationBackground()
@@ -320,6 +320,7 @@ struct NativeMessengerView: View {
                 Button(role: .destructive, action: logout) { Label("Uitloggen", systemImage: "rectangle.portrait.and.arrow.right") }.accessibilityIdentifier("menu-logout")
             } label: { Image(systemName: "line.3.horizontal") }
                 .buttonStyle(NativeWebIconStyle()).accessibilityLabel("Hoofdmenu")
+                .accessibilityIdentifier("messenger-main-menu")
         }
         .padding(.horizontal, 14).padding(.vertical, 8)
         .frame(maxWidth: .infinity, minHeight: 58)
