@@ -156,10 +156,16 @@ earlier queued status; no live APNs or production deployment is inferred.
 
 The supplied local production key has been copied to the protected operator
 directory and verified for P-256 signing. A real certificate-verified HTTP/2 TLS
-connection to Apple succeeds. No provider-authenticated push, registration token,
-live server-module installation or signed native TestFlight replacement has been
-performed. The installed TestFlight version reported by the user is 16.9; do not
-treat that old web-shell build as the new native push target.
+connection to Apple succeeds. Native candidate `1.0 (17.1)` is now signed and
+uploaded for internal TestFlight in
+[run 43904501035](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43904501035).
+Its report still records Apple processing/compliance pending, APNs not activated
+and no physical-device test. No provider-authenticated push, registration token
+or live server-module installation has been established. The installed version
+last reported by the user is 16.9; that old web-shell build is not the native
+push target. Private journal transfer between the existing Linux Docker producer
+and Windows PHP worker, explicit bootstrap-schema migration and scoped server
+activation remain deployment prerequisites, not completed configuration.
 
 ## Active-call lease continuation (2026-11-16)
 

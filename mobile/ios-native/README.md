@@ -1,5 +1,30 @@
 # TeleTypTel native iOS migration
 
+## Native internal candidate 1.0 (17.1), uploaded 2026-11-16
+
+[Run 43904501035](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43904501035)
+on source `69b2990` completes successfully: both unsigned archive jobs and the
+separate protected signing/export/upload job pass. The downloaded result records
+`signed: true`, `uploaded: true`, `internalTestOnly: true`, version `1.0`, build
+`17.1` and the existing production bundle `com.tiedragon.teletyptel`.
+No separate public App Store release was submitted.
+
+This result establishes a verified signed upload, not Apple processing or tester
+availability. The report explicitly retains `processingAndCompliancePending`,
+`privacyReviewRequired` and `exportComplianceReviewRequired`, with
+`apnsActivated: false` and `physicalDeviceTested: false`. The first read-only App
+Store Connect build query after upload did not yet list build 17.1. Do not repeat
+the upload or silently answer encryption/privacy declarations to bypass processing.
+
+Before the locked-screen test, finish the private server pilot deployment,
+including the Docker-to-Windows signed signaling journal bridge, scoped ejabberd
+modules/listeners, explicit recovery schema migration and separate supervised
+monitor/dispatch workers. Keep enrollment disabled until these health gates pass.
+Then install the native candidate, sign in with the selected pilot account,
+obtain explicit background-call consent and a real PushKit registration, and
+test a genuine incoming call, answer/media/RTT, cancellation and logout revocation
+on the physical iPhone. A successful compile or upload cannot replace that test.
+
 ## Explicit native internal-release path (2026-11-16)
 
 `ios-native-preview.yml` now additionally supports the explicit dispatch inputs
@@ -76,10 +101,18 @@ isolated worker-loop checks. The first real archive run created the iOS app with
 the expected bundle ID, version `1.0 (17.0)`, AppIcon, iPhone/iPad families and
 push/recovery flags, but its post-check failed while converting the archive's
 date-containing plist to JSON. This is not a successful overall archive check.
-The fixed reader extracts only `ApplicationProperties`, retaining the validation
-instead of ignoring the failure. The revised source `81cd2b9` is being checked in
-[run 43896894934](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43896894934);
-it was queued at this checkpoint and is not yet counted as passed.
+Extracting `ApplicationProperties` through JSON conversion also failed on nested
+data/date fields in the subsequent run. The reader now uses Python's standard
+`plistlib` for binary/XML plists and returns only the two strictly typed string
+identifiers needed by the archive check. A real binary-plist regression covers
+dates, data and rejection of a non-string application path; validation is not
+skipped to hide the conversion error.
+
+Both unsigned archive jobs on source `69b2990` pass in
+[run 43904501035](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43904501035).
+This validates packaging for both device families, not a simulator or physical
+device session. The separate protected signing/upload job is tracked independently;
+unsigned success alone does not establish a signed upload or APNs delivery.
 
 ## Explicit APNs build staging (2026-11-16)
 
