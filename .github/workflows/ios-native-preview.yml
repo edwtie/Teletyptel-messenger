@@ -8,6 +8,8 @@ on:
       - mobile/ios-native/**
       - '!mobile/ios-native/README.md'
       - scripts/prepare-ios-native.js
+      - scripts/native-login-assets.js
+      - tests/native-login-presentation.test.js
       - scripts/check-ios-native.js
       - scripts/check-ios-native-media.js
       - scripts/check-ios-native-codecs.js
@@ -74,10 +76,10 @@ jobs:
       TELETYPTEL_NATIVE_UI_SCOPE: ${{ inputs.ui_scope || 'regression' }}
       TELETYPTEL_NATIVE_BUILD_NUMBER: ${{ inputs.build_number || '' }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           persist-credentials: false
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
         with:
           node-version: 22
       - name: Select Xcode 26
@@ -111,7 +113,7 @@ jobs:
         if: github.event_name == 'workflow_dispatch' && inputs.validation_mode != 'full'
         run: node --test tests/ios-native-update.test.js tests/native-g722.test.js
       - name: Check native recovery, capture, privacy and localization contracts
-        run: node --test tests/native-feature-completion.test.js
+        run: node --test tests/native-feature-completion.test.js tests/native-login-presentation.test.js
       - name: Compile native app and test ${{ matrix.family }}
         run: |
           if [ "$TELETYPTEL_NATIVE_VALIDATION_MODE" = "focused-archive" ]; then
@@ -127,7 +129,7 @@ jobs:
           fi
       - name: Save native test evidence
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
           name: ios-native-preview-${{ github.run_id }}-${{ matrix.family }}-attempt-${{ github.run_attempt }}
           path: |
@@ -143,10 +145,10 @@ jobs:
     runs-on: macos-15-intel
     timeout-minutes: 40
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           persist-credentials: false
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
         with:
           node-version: 22
       - name: Select Xcode 26
@@ -170,7 +172,7 @@ jobs:
         run: node scripts/native-internal-release.js --upload-internal
       - name: Save non-secret native upload status
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
           name: native-internal-upload-${{ github.run_id }}-attempt-${{ github.run_attempt }}
           path: artifacts/ios-native-internal-*/reports/result.json

@@ -97,3 +97,22 @@ test("Archive and exported IPA linkage checks run before upload and no signing m
   assert.match(workflow, /name: native-internal-upload-\$\{\{ github.run_id \}\}-attempt-\$\{\{ github.run_attempt \}\}/);
   assert.doesNotMatch(workflow, /overwrite: true/);
 });
+
+test("Native workflow pins verified Node 24 action runtimes without changing the build's Node version or hiding warnings", () => {
+  const workflow = fs.readFileSync(path.join(root, ".github/workflows/ios-native-preview.yml"), "utf8");
+  const pins = new Map([
+    ["actions/checkout", "fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09"],
+    ["actions/setup-node", "249970729cb0ef3589644e2896645e5dc5ba9c38"],
+    ["actions/upload-artifact", "b7c566a772e6b6bfb58ed0dc250532a479d7789f"]
+  ]);
+  const actions = [...workflow.matchAll(/uses: (actions\/[a-z-]+)@([^\s]+)/g)];
+  assert.equal(actions.length, 6);
+  for (const [action, commit] of pins) {
+    const references = actions.filter(match => match[1] === action);
+    assert.equal(references.length, 2);
+    for (const reference of references) assert.equal(reference[2], commit);
+  }
+  assert.equal((workflow.match(/node-version: 22/g) ?? []).length, 2);
+  assert.doesNotMatch(workflow, /11d5960a326750d5838078e36cf38b85af677262|49933ea5288caeca8642d1e84afbd3f7d6820020|ea165f8d65b6e75b540449e92b4886f43607fa02/);
+  assert.doesNotMatch(workflow, /ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION|FORCE_JAVASCRIPT_ACTIONS_TO_NODE24|persist-credentials: true/);
+});

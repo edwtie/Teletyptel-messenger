@@ -57,6 +57,8 @@ final class NativeStartupModel: ObservableObject {
 }
 
 struct NativeStartupView: View {
+    private enum LoginFocus: Hashable { case account, password, code }
+    @FocusState private var loginFocus: LoginFocus?
     private struct RestoredInput {
         let address: String
         let domain: String
@@ -80,6 +82,9 @@ struct NativeStartupView: View {
     @State private var rememberLogin = false
     @State private var showRegistration = false
     @State private var showRecovery = false
+    @State private var showLoginSettings = false
+    @State private var settingsAddress = ""
+    @State private var settingsDomain = ""
     @AppStorage("teletyptel.native.interfaceLanguage") private var interfaceLanguage = "system"
     @StateObject private var messageNotifications = NativeMessageNotifications.shared
     @State private var restoredInput: RestoredInput?
@@ -103,29 +108,25 @@ struct NativeStartupView: View {
         _model = StateObject(wrappedValue: NativeStartupModel())
         _loginModel = StateObject(wrappedValue: NativeLoginModel(history: NativeDeviceHistory()))
         _savedLogin = StateObject(wrappedValue: NativeSavedLoginModel(vault: NativeBiometricLoginVault()))
+        _address = State(initialValue: UserDefaults.standard.string(forKey: "teletyptel.native.serverAddress") ?? "")
+        _domain = State(initialValue: UserDefaults.standard.string(forKey: "teletyptel.native.xmppDomain") ?? "")
         fixtureName = nil
     }
 
     private var startupContent: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    Image("TeleTypTelLogo")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(maxWidth: 300)
-                        .accessibilityLabel("TeleTypTel")
-                        .frame(maxWidth: .infinity)
+            VStack(spacing: 0) {
+                VStack(alignment: .leading, spacing: 8) {
                     Text("Aanmelden")
                         .font(NativeWebStyle.font(28, weight: .bold))
                         .accessibilityAddTraits(.isHeader)
                     Text("Gebruik je XMPP-account om je aan te melden bij TeleTypTel.")
                         .foregroundStyle(NativeWebStyle.muted)
-                    Picker("App-taal", selection: $interfaceLanguage) {
-                        Text("Systeemtaal").tag("system")
-                        Text("Nederlands").tag("nl")
-                        Text("Engels").tag("en")
-                    }.accessibilityIdentifier("login-interface-language")
+                }
+                .frame(maxWidth: 560, alignment: .leading).padding(20)
+                NativeWebStyle.line.frame(height: 1).accessibilityHidden(true)
+                ScrollView {
+                  VStack(alignment: .leading, spacing: 18) {
                     if fixtureName != nil {
                         Text("TESTSCENARIO — geen echte serververbinding")
                             .font(.headline)
@@ -139,39 +140,11 @@ struct NativeStartupView: View {
                                     .disabled(loginModel.isWorking || loginModel.isSecondFactorPending || savedLogin.isWorking)
                                     .accessibilityIdentifier("biometric-login")
                             }
-                            Button("Bewaarde aanmelding verwijderen", role: .destructive) {
-                                savedLogin.forget()
-                                rememberLogin = false
-                            }
-                            .disabled(savedLogin.isWorking)
-                            .accessibilityIdentifier("forget-saved-login")
                         }
                     }
                     if savedLogin.isWorking { ProgressView("Face ID of Touch ID…") }
                     if let notice = savedLogin.notice {
                         Text(notice).font(.footnote).accessibilityIdentifier("saved-login-status")
-                    }
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Serveradres (HTTPS)")
-                        TextField("https://chat.teletyptel.nl", text: $address)
-                            .textContentType(.URL)
-                            .keyboardType(.URL)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                            .textFieldStyle(.roundedBorder)
-                            .accessibilityLabel("Serveradres, HTTPS")
-                            .accessibilityIdentifier("server-address")
-                            .disabled(loginModel.isWorking || loginModel.isConnected)
-                    }
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("XMPP-domein")
-                        TextField("Bijvoorbeeld localhost voor de lokale testserver", text: $domain)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                            .textFieldStyle(.roundedBorder)
-                            .accessibilityLabel("XMPP-domein")
-                            .accessibilityIdentifier("xmpp-domain")
-                            .disabled(loginModel.isWorking || loginModel.isConnected)
                     }
                     VStack(alignment: .leading, spacing: 12) {
                         if model.state.phase == .checking || loginModel.isWorking {
@@ -201,29 +174,18 @@ struct NativeStartupView: View {
                         } else if model.state.phase == .checking {
                             Button("Annuleren", action: model.cancel)
                                 .frame(minHeight: 44)
-                        } else {
-                            Button("Verbinding controleren") {
-                                loginModel.reset()
-                                model.check(address: address, domain: domain)
-                            }
-                                .buttonStyle(.borderedProminent).tint(NativeWebStyle.accent).foregroundStyle(.white)
-                                .controlSize(.large)
-                                .accessibilityIdentifier("check-connection")
-                                .disabled(address.isEmpty || domain.isEmpty)
                         }
                     }
                     .padding()
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(NativeWebStyle.incoming, in: RoundedRectangle(cornerRadius: 8))
                     .overlay(RoundedRectangle(cornerRadius: 8).stroke(NativeWebStyle.line, lineWidth: 1).allowsHitTesting(false))
-                    if loginModel.isConnected {
-                        contactsView
-                    }
                     if loginModel.isSecondFactorPending {
                         VStack(alignment: .leading, spacing: 12) {
                             Text("Tweestapsverificatie").font(.headline).accessibilityAddTraits(.isHeader)
                             Text("Vul de zes cijfers uit je authenticator-app in. Deze aanmeldpoging vervalt na vijf minuten.")
                             SecureField("Verificatiecode", text: $verificationCode)
+                                .focused($loginFocus, equals: .code)
                                 .textContentType(.oneTimeCode)
                                 .keyboardType(.numberPad)
                                 .textFieldStyle(.roundedBorder)
@@ -243,13 +205,11 @@ struct NativeStartupView: View {
                             .disabled(!loginModel.isAwaitingSecondFactor || verificationCode.range(of: #"\A[0-9]{6}\z"#, options: .regularExpression) == nil)
                         }
                     }
-                    if model.state.phase == .available && !loginModel.isConnected && !loginModel.isSecondFactorPending {
+                    if !loginModel.isConnected && !loginModel.isSecondFactorPending {
                         VStack(alignment: .leading, spacing: 12) {
-                            Text("Aanmelden")
-                                .font(.headline)
-                                .accessibilityAddTraits(.isHeader)
-                            Text("XMPP-account (naam@domein)")
+                            Text("Account")
                             TextField("naam@localhost", text: $jid)
+                                .focused($loginFocus, equals: .account)
                                 .textContentType(.username)
                                 .keyboardType(.emailAddress)
                                 .textInputAutocapitalization(.never)
@@ -260,58 +220,146 @@ struct NativeStartupView: View {
                                 .disabled(loginModel.isWorking || loginModel.isConnected)
                             Text("Wachtwoord")
                             SecureField("Wachtwoord", text: $password)
+                                .focused($loginFocus, equals: .password)
                                 .textContentType(.password)
                                 .textFieldStyle(.roundedBorder)
                                 .accessibilityLabel("Wachtwoord")
                                 .accessibilityIdentifier("login-password")
                                 .disabled(loginModel.isWorking || loginModel.isConnected)
-                            Toggle("Automatisch aanmelden met Face ID of Touch ID", isOn: $rememberLogin)
-                                .accessibilityIdentifier("remember-biometric-login")
-                                .disabled(loginModel.isWorking || savedLogin.isWorking)
-                            Text("Optioneel: bewaar je aanmelding alleen op dit apparaat, beschermd met Face ID of Touch ID. Bij openen vraagt iOS om ontgrendeling. Uitloggen verwijdert deze aanmelding.")
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
-                            Button("Aanmelden") {
-                                let submittedPassword = password
-                                password = ""
-                                savedLogin.prepare(address: address, domain: domain,
-                                    jid: jid.trimmingCharacters(in: .whitespacesAndNewlines),
-                                    password: submittedPassword, consented: rememberLogin && fixtureName == nil)
-                                loginModel.login(address: address, domain: domain,
-                                                 jid: jid.trimmingCharacters(in: .whitespacesAndNewlines), password: submittedPassword)
-                            }
-                            .buttonStyle(.borderedProminent).tint(NativeWebStyle.accent).foregroundStyle(.white)
-                            .controlSize(.large)
-                            .accessibilityIdentifier("login-account")
-                            .disabled(loginModel.isWorking || loginModel.isConnected || savedLogin.isWorking || jid.isEmpty || password.isEmpty)
+                            Button("Wachtwoord vergeten?") { showRecovery = true }
+                                .disabled(loginModel.isWorking || !hasServerConfiguration)
                             HStack(spacing: 16) {
                                 providerButton(.google, title: "Google")
                                 providerButton(.facebook, title: "Facebook")
-                            }
-                            HStack {
-                                Button("Nieuwe gebruiker") { showRegistration = true }
-                                Spacer()
-                                Button("Wachtwoord vergeten?") { showRecovery = true }
-                            }.disabled(loginModel.isWorking || (try? ServerConfiguration(address: address, domain: domain)) == nil)
-                            if !providerSDK.configured(.google) || !providerSDK.configured(.facebook) {
-                                Text("Google/Facebook vereisen providerinstellingen voor de bundle-ID van deze native build. De bestaande web- en TestFlight-aanmelding blijft ongewijzigd.")
-                                    .font(.caption).foregroundStyle(.secondary)
+                            }.frame(maxWidth: .infinity).padding(.vertical, 4)
+                            Toggle("Account bewaren", isOn: $rememberLogin)
+                                .accessibilityIdentifier("remember-biometric-login")
+                                .accessibilityHint("Bewaar je aanmelding alleen op dit apparaat, beschermd met Face ID of Touch ID.")
+                                .disabled(loginModel.isWorking || savedLogin.isWorking)
+                            if rememberLogin {
+                                Text("Beveiligd met Face ID of Touch ID.").font(.footnote).foregroundStyle(NativeWebStyle.muted)
                             }
                         }
                     }
-                    Text("Aanmelden gebruikt het ingevulde HTTPS-adres. Zonder toestemming blijven inloggegevens alleen in het werkgeheugen. Biometrisch aanmelden bewaart ze in de beveiligde iOS-sleutelhanger, niet in iCloud. Vertaling gebruikt alleen jouw eigen toestemming. Achtergrondoproepen blijven apart in ontwikkeling.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
+                  }
                 .frame(maxWidth: 560)
-                .padding(24)
+                .padding(20)
                 .frame(maxWidth: .infinity)
+                }
+                .scrollDismissesKeyboard(.interactively)
             }
             .background(NativeWebStyle.panel).foregroundStyle(NativeWebStyle.text)
-            .navigationTitle("TeleTypTel")
-            .navigationBarTitleDisplayMode(.inline)
-            .scrollDismissesKeyboard(.interactively)
+            .toolbar(.hidden, for: .navigationBar)
+            .safeAreaInset(edge: .bottom, spacing: 0) { loginActions }
         }
+    }
+
+    private var hasServerConfiguration: Bool {
+        (try? ServerConfiguration(address: address, domain: domain)) != nil
+    }
+
+    private var loginActions: some View {
+        VStack(spacing: 12) {
+            NativeWebStyle.line.frame(height: 1).accessibilityHidden(true)
+            VStack(spacing: 10) {
+                Button(action: submitLogin) { Text("Aanmelden").frame(maxWidth: .infinity, minHeight: 44) }
+                    .buttonStyle(.borderedProminent).tint(NativeWebStyle.accent).foregroundStyle(.white)
+                    .accessibilityIdentifier("login-account")
+                    .disabled(!hasServerConfiguration || loginModel.isWorking || loginModel.isConnected || loginModel.isSecondFactorPending || savedLogin.isWorking || jid.isEmpty || password.isEmpty)
+                HStack(spacing: 12) {
+                    Button { showRegistration = true } label: { Text("Nieuwe gebruiker").frame(maxWidth: .infinity, minHeight: 40) }
+                        .buttonStyle(.bordered)
+                        .disabled(!hasServerConfiguration || loginModel.isWorking || loginModel.isSecondFactorPending)
+                    Button {
+                        loginFocus = nil
+                        settingsAddress = address
+                        settingsDomain = domain
+                        showLoginSettings = true
+                    } label: { Image(systemName: "gearshape") }
+                        .buttonStyle(NativeWebIconStyle())
+                        .accessibilityLabel("Instellingen")
+                        .accessibilityIdentifier("login-settings")
+                        .disabled(loginModel.isWorking || loginModel.isSecondFactorPending || savedLogin.isWorking)
+                }
+            }.frame(maxWidth: 560).padding(.horizontal, 20).padding(.bottom, 12)
+        }.frame(maxWidth: .infinity).background(NativeWebStyle.panel)
+    }
+
+    private var loginSettings: some View {
+        NavigationStack {
+            Form {
+                Section("Verbinding") {
+                    TextField("Serveradres (HTTPS)", text: $settingsAddress)
+                        .textContentType(.URL).keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
+                        .accessibilityLabel("Serveradres, HTTPS").accessibilityIdentifier("server-address")
+                    TextField("XMPP-domein", text: $settingsDomain)
+                        .textInputAutocapitalization(.never).autocorrectionDisabled()
+                        .accessibilityLabel("XMPP-domein").accessibilityIdentifier("xmpp-domain")
+                    Button("Verbinding controleren") {
+                        model.check(address: settingsAddress, domain: settingsDomain)
+                    }.accessibilityIdentifier("check-connection")
+                        .disabled(settingsAddress.isEmpty || settingsDomain.isEmpty || model.state.phase == .checking)
+                    Text(LocalizedStringKey(statusText)).accessibilityIdentifier("settings-startup-status")
+                }
+                Section("Taal") {
+                    Picker("App-taal", selection: $interfaceLanguage) {
+                        Text("Systeemtaal").tag("system")
+                        Text("Nederlands").tag("nl")
+                        Text("Engels").tag("en")
+                    }.accessibilityIdentifier("login-interface-language")
+                }
+                Section("Privacy") {
+                    if savedLogin.hasSavedLogin {
+                        Button("Bewaarde aanmelding verwijderen", role: .destructive) {
+                            savedLogin.forget()
+                            rememberLogin = false
+                        }.disabled(savedLogin.isWorking).accessibilityIdentifier("forget-saved-login")
+                    }
+                    Text("Optioneel: bewaar je aanmelding alleen op dit apparaat, beschermd met Face ID of Touch ID. Bij openen vraagt iOS om ontgrendeling. Uitloggen verwijdert deze aanmelding.")
+                    Text("De app-taal staat los van berichtvertaling; een taal kiezen geeft geen toestemming om berichten extern te vertalen.")
+                    if !providerSDK.configured(.google) || !providerSDK.configured(.facebook) {
+                        Text("Google/Facebook vereisen providerinstellingen voor de bundle-ID van deze native build. De bestaande web- en TestFlight-aanmelding blijft ongewijzigd.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .modifier(NativeWebForm())
+            .navigationTitle("Instellingen")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Annuleren") { model.cancel(); showLoginSettings = false }.accessibilityIdentifier("login-settings-cancel")
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Bewaren") { saveLoginSettings(dismiss: true) }
+                        .accessibilityIdentifier("login-settings-save")
+                        .disabled((try? ServerConfiguration(address: settingsAddress, domain: settingsDomain)) == nil || model.state.phase == .checking)
+                }
+            }
+        }
+    }
+
+    private func saveLoginSettings(dismiss: Bool) {
+        guard !loginModel.isWorking, !loginModel.isSecondFactorPending,
+              (try? ServerConfiguration(address: settingsAddress, domain: settingsDomain)) != nil else { return }
+        address = settingsAddress
+        domain = settingsDomain
+        if fixtureName == nil {
+            UserDefaults.standard.set(address, forKey: "teletyptel.native.serverAddress")
+            UserDefaults.standard.set(domain, forKey: "teletyptel.native.xmppDomain")
+        }
+        if dismiss { showLoginSettings = false }
+    }
+
+    private func submitLogin() {
+        guard hasServerConfiguration, !loginModel.isWorking, !loginModel.isSecondFactorPending else { return }
+        loginFocus = nil
+        let submittedPassword = password
+        password = ""
+        savedLogin.prepare(address: address, domain: domain,
+            jid: jid.trimmingCharacters(in: .whitespacesAndNewlines),
+            password: submittedPassword, consented: rememberLogin && fixtureName == nil)
+        loginModel.login(address: address, domain: domain,
+            jid: jid.trimmingCharacters(in: .whitespacesAndNewlines), password: submittedPassword)
     }
 
     var body: some View {
@@ -350,6 +398,7 @@ struct NativeStartupView: View {
         .sheet(isPresented: $showRecovery) {
             if let configuration = try? ServerConfiguration(address: address, domain: domain) { NativeAccountEntryView(configuration: configuration, recovery: true) }
         }
+        .sheet(isPresented: $showLoginSettings, onDismiss: { model.reset() }) { loginSettings }
         .onAppear { messageNotifications.connect(loginModel) }
         .onReceive(loginModel.$chat) { _ in Task { @MainActor in messageNotifications.updateBadge() } }
         .onReceive(loginModel.groups.$rooms) { _ in Task { @MainActor in messageNotifications.updateBadge() } }
@@ -412,12 +461,17 @@ struct NativeStartupView: View {
 
     private func providerButton(_ provider: NativeIdentityProvider, title: String) -> some View {
         Button {
+            loginFocus = nil
             password = ""
             savedLogin.cancel()
             loginModel.loginSocial(address: address, domain: domain, provider: provider, signer: providerSDK)
-        } label: { Label(title, systemImage: "person.crop.circle").frame(minHeight: 44) }
-        .buttonStyle(.bordered)
-        .disabled(!providerSDK.configured(provider) || loginModel.isWorking || savedLogin.isWorking)
+        } label: {
+            Image(provider == .google ? "NativeGoogleSignIn" : "NativeFacebookSignIn")
+                .resizable().scaledToFit().frame(width: 28, height: 28).frame(width: 52, height: 52)
+        }
+        .buttonStyle(NativeWebIconStyle(round: true))
+        .accessibilityLabel(Text(provider == .google ? "Aanmelden met Google" : "Aanmelden met Facebook"))
+        .disabled(!hasServerConfiguration || !providerSDK.configured(provider) || loginModel.isWorking || savedLogin.isWorking || loginModel.isSecondFactorPending)
         .accessibilityIdentifier("login-" + provider.rawValue)
     }
 
@@ -557,7 +611,7 @@ struct NativeStartupView: View {
         }
         switch model.state.phase {
         case .idle:
-            return "Vul het bekende serveradres en XMPP-domein in. De controle start alleen wanneer je op de knop drukt."
+            return hasServerConfiguration ? "Meld je aan om verder te gaan." : "Stel de server in via Instellingen."
         case .checking:
             return "Beveiligde XMPP-verbinding controleren. Dit duurt maximaal acht seconden."
         case .available:

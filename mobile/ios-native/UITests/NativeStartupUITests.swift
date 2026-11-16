@@ -7,7 +7,7 @@ final class NativeStartupUITests: XCTestCase {
         continueAfterFailure = false
         XCUIDevice.shared.orientation = .portrait
         application = XCUIApplication()
-        application.launchArguments = ["-teletyptel.native.interfaceLanguage", "nl"]
+        application.launchArguments = ["-teletyptel.native.interfaceLanguage", "nl", "-teletyptel.native.serverAddress", "", "-teletyptel.native.xmppDomain", ""]
     }
 
     override func tearDownWithError() throws {
@@ -21,23 +21,28 @@ final class NativeStartupUITests: XCTestCase {
 
     func testStartupDoesNotOpenKeyboardOrShowAuthenticatedState() {
         application.launch()
-        XCTAssertTrue(application.textFields["server-address"].waitForExistence(timeout: 10))
+        XCTAssertTrue(application.buttons["login-settings"].waitForExistence(timeout: 10))
+        XCTAssertTrue(application.textFields["login-jid"].exists)
+        XCTAssertTrue(application.secureTextFields["login-password"].exists)
+        XCTAssertFalse(application.textFields["server-address"].exists)
+        XCTAssertFalse(application.textFields["xmpp-domain"].exists)
         XCTAssertFalse(application.keyboards.firstMatch.exists)
-        XCTAssertFalse(application.buttons["check-connection"].isEnabled)
+        XCTAssertFalse(application.buttons["check-connection"].exists)
+        XCTAssertFalse(application.buttons["login-account"].isEnabled)
         XCTAssertTrue(application.staticTexts["startup-status"].exists)
         XCTAssertFalse(application.staticTexts["Native iPhone- en iPad-app"].exists)
         snapshot("login-web-style")
     }
 
     func testEnglishStartupDoesNotTranslateUserDataOrRequestPermissions() {
-        application.launchArguments = ["-teletyptel.native.interfaceLanguage", "en"]
+        application.launchArguments = ["-teletyptel.native.interfaceLanguage", "en", "-teletyptel.native.serverAddress", "", "-teletyptel.native.xmppDomain", ""]
         application.launch()
-        XCTAssertTrue(application.textFields["server-address"].waitForExistence(timeout: 10))
+        XCTAssertTrue(application.buttons["login-settings"].waitForExistence(timeout: 10))
         XCTAssertTrue(application.staticTexts["Sign in"].exists)
         XCTAssertTrue(application.staticTexts["Use your XMPP account to sign in to TeleTypTel."].exists)
         XCTAssertFalse(application.keyboards.firstMatch.exists)
         XCTAssertTrue(application.alerts.allElementsBoundByIndex.isEmpty)
-        XCTAssertFalse(application.buttons["check-connection"].isEnabled)
+        XCTAssertFalse(application.buttons["check-connection"].exists)
         snapshot("english-login")
     }
 
@@ -68,6 +73,7 @@ final class NativeStartupUITests: XCTestCase {
 
     func testRotationPreservesConfigurationAndInvalidAddressShowsInlineError() {
         application.launch()
+        application.buttons["login-settings"].tap()
         let server = application.textFields["server-address"]
         XCTAssertTrue(server.waitForExistence(timeout: 10))
         server.tap()
@@ -82,11 +88,66 @@ final class NativeStartupUITests: XCTestCase {
         let check = application.buttons["check-connection"]
         reveal(check)
         check.tap()
-        let error = application.staticTexts["startup-status"]
+        let error = application.staticTexts["settings-startup-status"]
         let displayed = NSPredicate(format: "label CONTAINS %@", "zonder pad")
         expectation(for: displayed, evaluatedWith: error)
         waitForExpectations(timeout: 5)
         XCTAssertEqual(application.alerts.count, 0)
+    }
+
+    func testLoginSettingsAreSeparateAndPreserveDraftsOnCancel() {
+        application.launchEnvironment["TELETYPTEL_NATIVE_UI_FIXTURE"] = "connected"
+        application.launch()
+        let account = application.textFields["login-jid"]
+        XCTAssertTrue(account.waitForExistence(timeout: 10))
+        account.tap(); account.typeText("fixture@localhost")
+        let password = application.secureTextFields["login-password"]
+        password.tap(); password.typeText("fixture-password")
+        application.buttons["login-settings"].tap()
+        let server = application.textFields["server-address"]
+        XCTAssertTrue(server.waitForExistence(timeout: 5))
+        XCTAssertFalse(application.keyboards.firstMatch.exists)
+        server.tap(); server.typeText("/discarded")
+        application.buttons["login-settings-cancel"].tap()
+        XCTAssertTrue(account.waitForExistence(timeout: 5))
+        XCTAssertEqual(account.value as? String, "fixture@localhost")
+        XCTAssertTrue(application.buttons["login-account"].isEnabled)
+        XCTAssertFalse(server.exists)
+        XCTAssertFalse(application.keyboards.firstMatch.exists)
+        application.buttons["login-settings"].tap()
+        XCTAssertEqual(server.value as? String, "https://example.invalid")
+        application.buttons["login-settings-cancel"].tap()
+        rotate(.landscapeLeft)
+        XCTAssertTrue(application.buttons["login-settings"].isHittable)
+        XCTAssertTrue(application.buttons["login-account"].isHittable)
+        snapshot("login-landscape")
+    }
+
+    func testLoginSettingsSaveAndRotateWithoutOpeningKeyboard() {
+        application.launch()
+        let settings = application.buttons["login-settings"]
+        XCTAssertTrue(settings.waitForExistence(timeout: 10))
+        settings.tap()
+        let server = application.textFields["server-address"]
+        XCTAssertTrue(server.waitForExistence(timeout: 5))
+        XCTAssertFalse(application.buttons["login-settings-save"].isEnabled)
+        server.tap(); server.typeText("https://example.invalid")
+        let domain = application.textFields["xmpp-domain"]
+        domain.tap(); domain.typeText("localhost")
+        application.buttons["login-settings-save"].tap()
+        XCTAssertTrue(application.textFields["login-jid"].waitForExistence(timeout: 5))
+        XCTAssertFalse(server.exists)
+        XCTAssertFalse(application.keyboards.firstMatch.exists)
+        XCTAssertTrue(settings.isHittable)
+        XCTAssertTrue(application.buttons["login-account"].isHittable)
+        rotate(.landscapeLeft)
+        settings.tap()
+        XCTAssertEqual(server.value as? String, "https://example.invalid")
+        XCTAssertEqual(domain.value as? String, "localhost")
+        application.buttons["login-settings-cancel"].tap()
+        rotate(.portrait)
+        XCTAssertFalse(application.keyboards.firstMatch.exists)
+        snapshot("login-settings-separate")
     }
 
     func testNativeLoginAndDisconnectPreserveStateAcrossRotation() {
@@ -569,9 +630,6 @@ final class NativeStartupUITests: XCTestCase {
         application.launch()
         XCTAssertTrue(application.staticTexts["fixture-banner"].waitForExistence(timeout: 10))
         XCTAssertFalse(application.keyboards.firstMatch.exists)
-        let check = application.buttons["check-connection"]
-        reveal(check)
-        check.tap()
         let jid = application.textFields["login-jid"]
         XCTAssertTrue(jid.waitForExistence(timeout: 5))
         reveal(jid)

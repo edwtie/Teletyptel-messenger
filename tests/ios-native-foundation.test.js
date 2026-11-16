@@ -126,7 +126,7 @@ test("Native interaction/history/dialer sources stay in the isolated target with
   assert.match(dialing, /NativeAuthenticatedAccount\.validJID\(bare, domain: configuration\.domain\)/);
   assert.match(read("App/NativeDialerView.swift"), /\.tint\(NativeWebStyle\.enabled\)/);
   assert.match(read("App/TeleTypTelNativeApp.swift"), /\.overlay\(RoundedRectangle\(cornerRadius: 8\)\.stroke\(NativeWebStyle\.line, lineWidth: 1\)\.allowsHitTesting\(false\)\)/);
-  assert.equal((read("App/TeleTypTelNativeApp.swift").match(/\.buttonStyle\(\.borderedProminent\)\.tint\(NativeWebStyle\.accent\)\.foregroundStyle\(\.white\)/g) || []).length, 4);
+  assert.equal((read("App/TeleTypTelNativeApp.swift").match(/\.buttonStyle\(\.borderedProminent\)\.tint\(NativeWebStyle\.accent\)\.foregroundStyle\(\.white\)/g) || []).length, 3);
 });
 
 function diagnosticDirectory() {
@@ -335,7 +335,7 @@ test("Native preview has separate identity, no web runtime, upload or signing co
   assert.match(project, /facebook-ios-sdk.git/);
   assert.match(project, /kind = exactVersion; version = "9.0.0"/);
   assert.match(project, /kind = exactVersion; version = "18.1.1"/);
-  assert.doesNotMatch(read("App/TeleTypTelNativeApp.swift"), /WKWebView|CAPBridge|\.focused\(|becomeFirstResponder/);
+  assert.doesNotMatch(read("App/TeleTypTelNativeApp.swift"), /WKWebView|CAPBridge|becomeFirstResponder|loginFocus\s*=\s*\.(?:account|password|code)/);
   const plist = read("App/Info.plist");
   assert.doesNotMatch(plist, /NSAllowsArbitraryLoads/);
   assert.match(plist, /<key>UIBackgroundModes<\/key><array><string>audio<\/string><\/array>/);
@@ -350,6 +350,9 @@ test("Project generation is isolated, repeatable and refuses overwriting an exis
   assert.equal(path.dirname(directory), path.join(root, "artifacts"));
   assert.equal(fs.readFileSync(path.join(directory, "TeleTypTelNative.xcodeproj/project.pbxproj"), "utf8"), projectText().project);
   assert.ok(fs.existsSync(path.join(directory, "Assets.xcassets/TeleTypTelLogo.imageset/logo.png")));
+  for (const name of ["NativeGoogleSignIn", "NativeFacebookSignIn"]) {
+    assert.ok(fs.existsSync(path.join(directory, `Assets.xcassets/${name}.imageset/mark.svg`)));
+  }
   assert.equal(fs.readFileSync(path.join(directory, "Core/NativeRoster.swift"), "utf8"),
     read("Sources/TeleTypTelCore/NativeRoster.swift"));
   for (const [target, source] of [

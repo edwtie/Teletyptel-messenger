@@ -351,5 +351,10 @@
   "Systeemtaal": "System language",
   "Nederlands": "Dutch",
   "Engels": "English",
+  "Bewaren": "Save",
+  "Bewaar je aanmelding alleen op dit apparaat, beschermd met Face ID of Touch ID.": "Save your sign-in only on this device, protected with Face ID or Touch ID.",
+  "Beveiligd met Face ID of Touch ID.": "Protected with Face ID or Touch ID.",
+  "Meld je aan om verder te gaan.": "Sign in to continue.",
+  "Stel de server in via Instellingen.": "Set up the server in Settings.",
   "De app-taal staat los van berichtvertaling; een taal kiezen geeft geen toestemming om berichten extern te vertalen.": "App language is separate from message translation; choosing a language does not consent to external message translation."
 }

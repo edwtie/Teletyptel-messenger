@@ -157,6 +157,12 @@ function prepare(name, { providers = null, pushTest = null, archive = null } = {
   }
   write("Assets.xcassets/TeleTypTelLogo.imageset/logo.png", fs.readFileSync(path.join(root, "php/public/assets/brand/teletyptel-logo-header@2x.png")));
   write("Assets.xcassets/TeleTypTelLogo.imageset/Contents.json", JSON.stringify({ images: [{ idiom: "universal", filename: "logo.png", scale: "2x" }], info: { author: "xcode", version: 1 } }));
+  const loginMarks = require("./native-login-assets").loginAssets(fs.readFileSync(path.join(root, "php/public/chat.html"), "utf8"));
+  for (const [name, svg] of Object.entries(loginMarks)) {
+    write(`Assets.xcassets/${name}.imageset/mark.svg`, svg);
+    write(`Assets.xcassets/${name}.imageset/Contents.json`, JSON.stringify({ images: [{ idiom: "universal", filename: "mark.svg" }],
+      properties: { "preserves-vector-representation": true, "template-rendering-intent": "original" }, info: { author: "xcode", version: 1 } }));
+  }
   for (const [name, file] of [["ChatBackground", "teletyptel-bg-mobile.png"], ["ChatBackgroundWide", "teletyptel-bg-wide-1.png"], ["ChatBackgroundOpen", "teletyptel-bg-wide-2.png"], ["ChatBackgroundRight", "teletyptel-bg-wide-3.png"]]) {
     write(`Assets.xcassets/${name}.imageset/background.png`, fs.readFileSync(path.join(root, "php/public/assets/backgrounds", file)));
     write(`Assets.xcassets/${name}.imageset/Contents.json`, JSON.stringify({ images: [{ idiom: "universal", filename: "background.png" }], info: { author: "xcode", version: 1 } }));

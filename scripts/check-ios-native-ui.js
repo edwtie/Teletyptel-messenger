@@ -4,6 +4,10 @@ const { prepare } = require("./prepare-ios-native");
 const { executeLogged, collectTestResults, runSimulatorChecks, simulatorFamilies } = require("./check-ios-native");
 
 const selectedTests = Object.freeze([
+  "testStartupDoesNotOpenKeyboardOrShowAuthenticatedState",
+  "testLoginSettingsAreSeparateAndPreserveDraftsOnCancel",
+  "testLoginSettingsSaveAndRotateWithoutOpeningKeyboard",
+  "testRotationPreservesConfigurationAndInvalidAddressShowsInlineError",
   "testAttachmentUploadOnlyStagesLinkUntilExplicitSend",
   "testConnectionLossRecoversWithoutAnotherPasswordPrompt",
   "testGroupDiscoveryManagementAndSessionSearch",

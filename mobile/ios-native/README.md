@@ -2962,6 +2962,47 @@ user account, APNs credential or signed TestFlight build was used.
 - Background/locked-screen APNs/CallKit and network changes on actual hardware.
 - Security and accessibility re-audit; no blanket standards/compliance claim.
 
+## Native login presentation compared with 16.9 (2026-11-16)
+
+The login screen now follows the existing web/16.9 arrangement: account and
+password fields, password recovery, circular Google/Facebook marks, explicit
+account-saving consent and bottom-anchored Sign in / New user / gear actions.
+The actual brand SVG paths are reused from the existing web UI at build time;
+there is no external asset request or generic person icon standing in for a
+provider. An unavailable/unconfigured provider remains disabled.
+
+Server address, XMPP domain, interface language and explanatory privacy/provider
+details move to the separate gear sheet. Server edits are drafts: Cancel discards
+them, Save validates and stores only the chosen non-secret address/domain. No
+password or account identifier is added to UserDefaults. A manual connection
+check uses the draft, does not save it and does not send credentials. Sign in
+no longer requires a separate manual check first: the existing NativeLoginModel
+still checks HTTPS/XMPP before every authentication attempt. Invalid or missing
+server configuration keeps sign-in disabled. Biometric storage stays opt-in.
+
+No field receives programmatic focus on launch or dismissal. Explicit focus
+bindings are only cleared before settings/sign-in; they are never assigned a
+field automatically. Simulator assertions cover the separate gear, save/cancel,
+portrait/landscape, no keyboard on launch and the existing real login workflow
+with fictitious accounts. Source/generator checks alone are not iOS compilation,
+visual acceptance or device testing; the focused iPhone/iPad simulator run is
+the next validation gate. This presentation change is not yet a TestFlight build.
+
+## Native workflow action runtimes (2026-11-16)
+
+The native workflow is locally prepared to use immutable commits for checkout
+v5.1.0, setup-node v6.5.0 and upload-artifact v6.0.0. Each upstream `action.yml`
+was checked at its exact commit and declares `runs.using: node24`. Merely changing
+`node-version` does not upgrade an action's embedded runtime: the existing Node
+22 build toolchain stays unchanged. No warning-suppression override, signing
+permission, release gate, secret or artifact overwrite is added. Legacy workflows
+are outside this focused change. A running workflow uses its original source;
+this local patch neither restarts it nor changes its upload outcome.
+
+Sources: [checkout v5.1.0](https://github.com/actions/checkout/releases/tag/v5.1.0),
+[setup-node v6.5.0](https://github.com/actions/setup-node/releases/tag/v6.5.0), and
+[upload-artifact v6.0.0](https://github.com/actions/upload-artifact/releases/tag/v6.0.0).
+
 ## Primary references
 
 - [RFC 7395: XMPP over WebSocket](https://www.rfc-editor.org/rfc/rfc7395.html):
