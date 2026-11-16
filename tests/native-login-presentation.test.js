@@ -12,7 +12,8 @@ test("Native login keeps account fields and 16.9-style bottom actions visible wi
   const content = source.split("private var startupContent: some View")[1].split("private var hasServerConfiguration")[0];
   assert.match(content, /accessibilityIdentifier\("login-jid"\)/);
   assert.match(content, /accessibilityIdentifier\("login-password"\)/);
-  assert.match(content, /safeAreaInset\(edge: \.bottom, spacing: 0\) \{ loginActions \}/);
+  assert.match(content, /scrollDismissesKeyboard\(\.interactively\)\s+loginActions/);
+  assert.doesNotMatch(content, /safeAreaInset/);
   assert.doesNotMatch(content, /model\.state\.phase == \.available/);
   assert.doesNotMatch(content, /accessibilityIdentifier\("(?:server-address|xmpp-domain|login-interface-language)"\)|Picker\("App-taal"/);
   const actions = source.split("private var loginActions: some View")[1].split("private var loginSettings")[0];

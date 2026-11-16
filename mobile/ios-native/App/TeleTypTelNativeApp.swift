@@ -247,10 +247,10 @@ struct NativeStartupView: View {
                 .frame(maxWidth: .infinity)
                 }
                 .scrollDismissesKeyboard(.interactively)
+                loginActions
             }
             .background(NativeWebStyle.panel).foregroundStyle(NativeWebStyle.text)
             .toolbar(.hidden, for: .navigationBar)
-            .safeAreaInset(edge: .bottom, spacing: 0) { loginActions }
         }
     }
 
@@ -283,6 +283,7 @@ struct NativeStartupView: View {
                 }
             }.frame(maxWidth: 560).padding(.horizontal, 20).padding(.bottom, 12)
         }.frame(maxWidth: .infinity).background(NativeWebStyle.panel)
+            .accessibilityElement(children: .contain).accessibilityIdentifier("login-actions")
     }
 
     private var loginSettings: some View {

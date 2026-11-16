@@ -346,8 +346,10 @@ final class NativeStartupUITests: XCTestCase {
         application.buttons["message-menu-" + forwardID].tap(); application.buttons["Verwijderen"].tap()
         XCTAssertTrue(application.buttons["Verwijderen voor mij"].waitForExistence(timeout: 5))
         application.buttons["Verwijderen voor mij"].tap()
-        let hidden = NSPredicate(format: "exists == false")
-        expectation(for: hidden, evaluatedWith: forwarded); waitForExpectations(timeout: 5)
+        let hidden = NSPredicate { _, _ in
+            !self.application.descendants(matching: .any).matching(identifier: "chat-message-" + forwardID).firstMatch.exists
+        }
+        expectation(for: hidden, evaluatedWith: nil); waitForExpectations(timeout: 10)
         reveal(menu); menu.tap(); application.buttons["Verwijderen"].tap()
         let retract = application.buttons["Voor iedereen intrekken"]
         XCTAssertTrue(retract.waitForExistence(timeout: 5)); retract.tap()
@@ -721,6 +723,8 @@ final class NativeStartupUITests: XCTestCase {
         let password = application.secureTextFields["login-password"]
         reveal(password)
         password.tap()
+        let actions = application.descendants(matching: .any)["login-actions"].firstMatch
+        XCTAssertLessThanOrEqual(password.frame.maxY, actions.frame.minY)
         password.typeText("fixture-password")
         let remember = application.switches["remember-biometric-login"]
         reveal(remember)

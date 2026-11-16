@@ -3055,6 +3055,16 @@ timed out before completion, so the run is not reported as passing. The focused
 menu scope excludes repeated login checks to stay within the unchanged test
 budget; they remain selected by the broader regression scope.
 
+Run `43954488583` exposed an iPhone login regression before the menu checks: the
+bottom safe-area inset covered the password field when the keyboard was visible.
+The action bar now participates in the root vertical layout below the scrolling
+form, rather than overlaying it. Fixture sign-in checks the password/action-bar
+rectangles before typing. The iPad header, group and main-menu assertions passed
+individually in that run. Its message-deletion assertion reused a label-based
+locator although the failure hierarchy no longer contained the deleted UUID; the
+assertion now re-queries that exact UUID. The interrupted run remains failed and
+is not counted as complete simulator evidence.
+
 ## Primary references
 
 - [RFC 7395: XMPP over WebSocket](https://www.rfc-editor.org/rfc/rfc7395.html):
