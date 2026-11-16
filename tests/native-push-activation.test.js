@@ -46,9 +46,11 @@ test("Production APNs staging refuses unrelated bundle, environment, providers o
 
 test("Logout and rotation use a durable generation-specific revocation outbox without network inside transactions", () => {
   const php = process.env.TELETYPTEL_PHP || (process.platform === "win32" ? "C:\\wamp64\\bin\\php\\php8.4.15\\php.exe" : "php");
-  const reply = spawnSync(php, ["php/tests/call-scope-revocation-test.php"], { cwd: root, encoding: "utf8", timeout: 10000 });
-  assert.equal(reply.status, 0, reply.stderr + reply.stdout);
-  assert.match(reply.stdout, /checks passed/);
+  for (const source of ["call-scope-revocation-test", "call-push-activation-test"]) {
+    const reply = spawnSync(php, ["php/tests/" + source + ".php"], { cwd: root, encoding: "utf8", timeout: 10000 });
+    assert.equal(reply.status, 0, reply.stderr + reply.stdout);
+    assert.match(reply.stdout, /checks passed/);
+  }
 });
 
 test("APNs production credentials load only from bounded protected external configuration", () => {
@@ -63,6 +65,14 @@ test("APNs production credentials load only from bounded protected external conf
     const result = configuration({ TELETYPTEL_CALL_PUSH_APNS_CONFIG_FILE: configFile });
     assert.equal(result.environment, "production"); assert.equal(result.bundleId, "com.tiedragon.teletyptel");
     assert.equal(result.keyId, value.keyId);
+    const environment = { ...process.env, TELETYPTEL_CALL_PUSH_APNS_CONFIG_FILE: configFile, TELETYPTEL_CALL_PUSH_WORKER: "1" };
+    const checked = spawnSync(process.execPath, ["services/call-push/send.js", "--check-config"], { cwd: root, env: environment, encoding: "utf8", timeout: 5000 });
+    assert.equal(checked.status, 0, checked.stderr);
+    assert.deepEqual(JSON.parse(checked.stdout), { configured: true, environment: "production" });
+    const disabled = spawnSync(process.execPath, ["services/call-push/send.js", "--check-config"], {
+      cwd: root, env: { ...environment, TELETYPTEL_CALL_PUSH_WORKER: "0" }, encoding: "utf8", timeout: 5000
+    });
+    assert.equal(disabled.status, 1); assert.equal(disabled.stdout, "");
     for (const changes of [{ environment: "sandbox" }, { extra: true }, { keyFile: path.join(root, "README.md") }]) {
       fs.writeFileSync(configFile, JSON.stringify({ ...value, ...changes }));
       assert.throws(() => configuration({ TELETYPTEL_CALL_PUSH_APNS_CONFIG_FILE: configFile }));

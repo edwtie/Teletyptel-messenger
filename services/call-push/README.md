@@ -64,6 +64,52 @@ test build using the correct production profile, explicit device consent and a
 real PushKit token. Only a real incoming call can establish Apple/topic/device
 acceptance and locked-screen CallKit/media behavior.
 
+### Pilot readiness and validation evidence
+
+The registry advertises `backgroundAnswerRecovery` only for an explicitly listed
+account when `TELETYPTEL_CALL_BACKGROUND_PILOT=1` and
+`TELETYPTEL_CALL_BACKGROUND_PILOT_ACCOUNTS` is a JSON array of one to eight account
+IDs. These are database account IDs, not arbitrary caller-supplied JIDs. Registry,
+worker, recovery, signaling and generation revocation must all be explicitly
+enabled, with production APNs and `signaling-v1`. Normal browser and preview
+behavior stays unchanged while the pilot is disabled.
+
+`worker.php --migrate` explicitly creates the worker-health table. Each `--once`
+checks the protected APNs configuration without sending, then sends a separately
+purposed, nonce-bound signed health request to the real TLS revocation listener.
+The ejabberd acknowledgement checks the scoped backend and producer are loaded,
+its durable table is ready, and incompatible alternate authentication modules
+are absent. It neither authenticates to Apple nor revokes a device. A successful
+check writes a five-second production heartbeat. Failed or stale checks cannot
+enable new enrollment, cold bootstrap or renewal. Authenticated ending of one's
+existing call remains available without that optional readiness heartbeat.
+
+An operator supervisor must run the one-shot worker continuously with less than
+five seconds between successful checks; a once-per-minute task is insufficient.
+No such supervisor is installed here. This gate is a deployment/configuration
+check, **not evidence of Apple provider acceptance or end-to-end delivery**.
+
+Local validation on 2026-11-16: 80 combined real disposable-ejabberd/TLS checks,
+23 durable-revocation checks, 21 pilot-readiness checks and 25 recovery checks
+pass. The focused Node suites pass 90 checks with one explicitly macOS-only skip.
+No production accounts, live calls or APNs pushes are used by these tests.
+
+[Unsigned APNs-target run 43882598688](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43882598688)
+passes the iPhone and iPad jobs on `c3dd968`. Downloaded reports explicitly record
+`unsigned: true`, `uploaded: false`, `pushTestBuild: true`, `deviceCompiled: true`
+and no UI tests. These are generic iOS-device SDK compilations, not physical-device
+push tests. The earlier server job in
+[run 43882411871](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43882411871)
+passes the logout integration before the additional pilot-health check; its
+separate macOS job was still queued at the time of this record.
+
+The supplied local production key has been copied to the protected operator
+directory and verified for P-256 signing. A real certificate-verified HTTP/2 TLS
+connection to Apple succeeds. No provider-authenticated push, registration token,
+live server-module installation or signed native TestFlight replacement has been
+performed. The installed TestFlight version reported by the user is 16.9; do not
+treat that old web-shell build as the new native push target.
+
 ## Active-call lease continuation (2026-11-16)
 
 The disabled laboratory bridge now has a separate `tcl1` active-call permission.

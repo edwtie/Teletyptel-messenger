@@ -83,5 +83,11 @@ test("Server ingress is CLI-only and disabled before database access; native con
   assert.match(endpoint, /getenv\('TELETYPTEL_CALL_PUSH_POLICY'\) !== 'signaling-v1'/);
   assert.match(endpoint, /\$signaling->accept\(\$service, \$account, \$binding, \$input\)/);
   assert.doesNotMatch(read("php/public/api/call-control.php"), /acceptVerified|->accept\(|inviteVerified|session_start/);
-  assert.doesNotMatch(endpoint, /backgroundAnswerRecovery.*true|ensureSchema|dispatchOne|inviteVerified/);
+  assert.doesNotMatch(endpoint, /ensureSchema|dispatchOne|inviteVerified/);
+  assert.match(endpoint, /if \(CallPushActivation::ready\(\$pdo, \$account\)\) \$result\['capabilities'\] = \['backgroundAnswerRecovery' => true\]/);
+  const activation = read("php/lib/CallPushActivation.php");
+  assert.match(activation, /TELETYPTEL_CALL_BACKGROUND_PILOT_ACCOUNTS/);
+  assert.match(activation, /in_array\(\$account, \$accounts, true\)/);
+  assert.match(activation, /\$now - 5/);
+  assert.doesNotMatch(activation, /sendIncoming|->register\(|dispatchOne/);
 });

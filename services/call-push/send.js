@@ -48,7 +48,12 @@ if (require.main === module) {
   timeout.unref();
   Promise.resolve().then(() => {
     if (process.env.TELETYPTEL_CALL_PUSH_WORKER !== "1") throw new Error("Disabled");
-    return run(process.stdin, process.stdout, createApnsSender(configuration(process.env)));
+    const config = configuration(process.env), sender = createApnsSender(config);
+    if (process.argv.length === 3 && process.argv[2] === "--check-config") {
+      process.stdout.write(JSON.stringify({ configured: true, environment: config.environment }) + "\n"); return 0;
+    }
+    if (process.argv.length !== 2) throw new Error("Invalid command");
+    return run(process.stdin, process.stdout, sender);
   }).then(code => { process.exitCode = code; clearTimeout(timeout); }).catch(() => {
     process.stderr.write("Call-push transport unavailable or disabled.\n");
     process.exitCode = 1;

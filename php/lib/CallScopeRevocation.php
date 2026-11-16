@@ -118,4 +118,19 @@ final class CallScopeRevocation
         }
         return ['delivered' => $delivered, 'pending' => $pending];
     }
+
+    public function probe(): bool
+    {
+        if ($this->pdo->inTransaction()) throw new CallPushFailure('Netwerkcontrole mag niet binnen een transactie.', 503);
+        $now = ($this->clock)(); $nonce = bin2hex(random_bytes(16));
+        $payload = rtrim(strtr(base64_encode(json_encode(['version' => 1, 'environment' => $this->environment,
+            'domain' => $this->domain, 'issuer' => $this->issuer, 'nonce' => $nonce, 'issuedAt' => $now, 'expiresAt' => $now + 5], JSON_THROW_ON_ERROR)), '+/', '-_'), '=');
+        try {
+            $reply = ($this->transport)(json_encode(['health' => $payload, 'signature' => hash_hmac('sha256',
+                'teletyptel-call-health-v1:' . $this->environment . ':' . $this->domain . ':' . $this->issuer . ':' . $payload, $this->key)], JSON_THROW_ON_ERROR));
+            $value = is_string($reply['body'] ?? null) && strlen($reply['body']) <= 1024 ? json_decode($reply['body'], true) : null;
+            return ($reply['status'] ?? 0) === 200 && is_array($value) && count($value) === 2
+                && ($value['ready'] ?? null) === true && ($value['nonce'] ?? null) === $nonce;
+        } catch (Throwable $error) { return false; }
+    }
 }

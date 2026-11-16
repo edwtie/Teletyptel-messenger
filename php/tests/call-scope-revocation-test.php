@@ -37,6 +37,16 @@ try {
     $available = true; $fixture->now += 40;
     $check($revoker->drain() === ['delivered' => 1, 'pending' => 0], 'Retry uses a fresh authenticated envelope');
     $check($revoker->drain() === ['delivered' => 0, 'pending' => 0] && $attempts === 2, 'Acknowledged event is not sent again');
+    $probe = new CallScopeRevocation($fixture->pdo, $fixture->key, 'production', 'example.test', 'fixture',
+        function (string $raw) use ($fixture, $check): array {
+            $body = json_decode($raw, true);
+            $check(isset($body['health']) && !isset($body['payload']) && hash_equals($body['signature'], hash_hmac('sha256',
+                'teletyptel-call-health-v1:production:example.test:fixture:' . $body['health'], $fixture->key)), 'Health check has an independent purpose');
+            $payload = strtr($body['health'], '-_', '+/');
+            $claims = json_decode(base64_decode($payload . str_repeat('=', (4 - strlen($payload) % 4) % 4)), true);
+            return ['status' => 200, 'body' => json_encode(['ready' => true, 'nonce' => $claims['nonce']])];
+        }, fn() => $fixture->now);
+    $check($probe->probe(), 'Readiness probe checks its fresh response nonce');
     $deny(fn() => $revoker->drain(['invalid']));
     $deny(fn() => CallScopeRevocation::queue($fixture->pdo, [], $fixture->now));
     $fixture->pdo->beginTransaction();

@@ -49,6 +49,8 @@ async function run() {
     const httpPort = Number(execute(["port", name, "5444/tcp"]).trim().split(":").at(-1));
     registry = new RegistryFixture(signingKey, bootstrapKey, { keyFile, caFile, url: `https://127.0.0.1:${httpsPort}/call-revocations` });
     const registration = await registry.reply();
+    const health = await registry.request({ action: "health" });
+    check(health.ok && health.result.ready, "Actual signed readiness probe confirms producer, scoped backend and TLS without sending a call");
     stage = "revocation ingress guards";
     const revokeBody = changes => {
       const now = Math.floor(Date.now() / 1000);

@@ -3,6 +3,34 @@ declare(strict_types=1);
 
 final class CallPushTransport
 {
+    public static function configurationReady(): bool
+    {
+        $node = (string)getenv('TELETYPTEL_CALL_PUSH_NODE');
+        if (getenv('TELETYPTEL_CALL_PUSH_WORKER') !== '1' || !is_file($node) || !preg_match('~^(?:[A-Za-z]:[\\\\/]|/)~', $node)) return false;
+        $pipes = [];
+        $process = proc_open([$node, dirname(__DIR__, 2) . '/services/call-push/send.js', '--check-config'],
+            [0 => ['file', PHP_OS_FAMILY === 'Windows' ? 'NUL' : '/dev/null', 'r'], 1 => ['pipe', 'w'],
+             2 => ['file', PHP_OS_FAMILY === 'Windows' ? 'NUL' : '/dev/null', 'a']], $pipes, null, null, ['bypass_shell' => true]);
+        if (!is_resource($process)) return false;
+        try {
+            stream_set_blocking($pipes[1], false); $response = ''; $deadline = microtime(true) + 3;
+            do {
+                $response .= (string)stream_get_contents($pipes[1]);
+                if (strlen($response) > 1024 || microtime(true) > $deadline) return false;
+                $status = proc_get_status($process);
+                if (!$status['running']) { $response .= (string)stream_get_contents($pipes[1]); break; }
+                usleep(10000);
+            } while (true);
+            $value = strlen($response) <= 1024 ? json_decode($response, true) : null;
+            return $status['exitcode'] === 0 && is_array($value) && count($value) === 2
+                && ($value['configured'] ?? null) === true && ($value['environment'] ?? null) === 'production';
+        } finally {
+            foreach ($pipes as $pipe) if (is_resource($pipe)) fclose($pipe);
+            if (proc_get_status($process)['running']) proc_terminate($process);
+            proc_close($process);
+        }
+    }
+
     public static function send(string $deviceToken, array $invitation): array
     {
         $unavailable = ['accepted' => false, 'reason' => 'TransportUnavailable', 'invalidateDevice' => false];

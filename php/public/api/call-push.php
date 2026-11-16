@@ -23,6 +23,8 @@ try {
     $binding = $_SESSION['teletyptel_call_push_binding'] ?? bin2hex(random_bytes(32));
     if ($method === 'GET') {
         $result = ['devices' => $service->devices($account, $binding)];
+        require_once dirname(__DIR__, 2) . '/lib/CallPushActivation.php';
+        if (CallPushActivation::ready($pdo, $account)) $result['capabilities'] = ['backgroundAnswerRecovery' => true];
     } else {
         if (strtolower(trim(explode(';', $_SERVER['CONTENT_TYPE'] ?? '')[0])) !== 'application/json') {
             throw new CallPushFailure('JSON is vereist.', 415);
@@ -32,6 +34,10 @@ try {
         $input = json_decode($raw, true);
         if (!is_array($input)) throw new CallPushFailure('Ongeldige aanvraag.');
         if (($input['action'] ?? '') === 'register') {
+            if (getenv('TELETYPTEL_CALL_BACKGROUND_PILOT') === '1') {
+                require_once dirname(__DIR__, 2) . '/lib/CallPushActivation.php';
+                if (!CallPushActivation::ready($pdo, $account)) throw new CallPushFailure('Achtergrondoproepen zijn niet gereed voor dit testaccount.', 503);
+            }
             if (!is_string($input['deviceId'] ?? null) || !is_string($input['token'] ?? null) || ($input['consent'] ?? null) !== true) {
                 throw new CallPushFailure('Toestemming en toestelregistratie zijn vereist.');
             }

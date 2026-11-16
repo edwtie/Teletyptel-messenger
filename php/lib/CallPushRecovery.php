@@ -57,6 +57,7 @@ final class CallPushRecovery
 
     public function enroll(string $account, string $binding, string $deviceId): array
     {
+        $this->pilot($account);
         foreach ($this->registry->devices($account, $binding) as $device) {
             if ($device['device_id'] !== $deviceId) continue;
             $profile = $this->row('SELECT jid FROM account_profiles WHERE account_id = ?', [$account]);
@@ -85,9 +86,18 @@ final class CallPushRecovery
             throw new CallPushFailure('Oproeptoegang verlopen of ingetrokken.', 401);
         }
         foreach ($this->registry->devices($claims['account'], $claims['binding']) as $device) {
-            if ($device['device_id'] === $claims['device'] && hash_equals($device['generation'], $claims['generation'])) return $claims;
+            if ($device['device_id'] === $claims['device'] && hash_equals($device['generation'], $claims['generation'])) {
+                return $claims;
+            }
         }
         throw new CallPushFailure('Toestelregistratie ingetrokken.', 403);
+    }
+
+    private function pilot(string $account): void
+    {
+        if (getenv('TELETYPTEL_CALL_BACKGROUND_PILOT') !== '1') return;
+        require_once __DIR__ . '/CallPushActivation.php';
+        if (!CallPushActivation::ready($this->pdo, $account)) throw new CallPushFailure('Achtergrondoproepen zijn niet gereed voor dit testaccount.', 503);
     }
 
     public function handle(string $credential, array $input): array
@@ -110,6 +120,7 @@ final class CallPushRecovery
             if (($result[0]['state'] ?? '') !== 'ended') throw new CallPushFailure('Oproep is niet door dit toestel afgesloten.', 409);
             return ['ended' => true];
         }
+        $this->pilot($claims['account']);
         if ($action === 'bootstrap') return $this->bootstrap->issue($claims['account'], $claims['binding'], $claims['device'], $claims['generation'], $input['callId']);
         if ($action === 'lease') return $this->bootstrap->activeLease($claims['account'], $claims['binding'], $claims['device'],
             $claims['generation'], $input['callId'], $input['fullJid']);

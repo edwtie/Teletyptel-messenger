@@ -34,7 +34,12 @@ $reserved = $broker->handle($authorization['credential'], $accept);
 $check($reserved['callerJid'] === 'alice@example.test/caller' && $reserved['recipientJid'] === $full
     && str_starts_with($reserved['answerAuthorization'], 'tca1.'), 'Actual resource proof, reservation and scoped answer permit');
 $deny(fn() => $fixture->issuer->answerPermit('bob', $fixture->binding, $fixture->device, $fixture->registration['generation'], $input['callId'], 'bob@example.test/other'));
-$check($broker->handle($authorization['credential'], array_replace($input, ['action' => 'end']))['ended'] === true, 'Cleanup accepted');
+$previousPilot = getenv('TELETYPTEL_CALL_BACKGROUND_PILOT');
+putenv('TELETYPTEL_CALL_BACKGROUND_PILOT=1');
+try {
+    $deny(fn() => $broker->handle($authorization['credential'], $input));
+    $check($broker->handle($authorization['credential'], array_replace($input, ['action' => 'end']))['ended'] === true, 'Cleanup remains available when pilot readiness expires');
+} finally { putenv($previousPilot === false ? 'TELETYPTEL_CALL_BACKGROUND_PILOT' : 'TELETYPTEL_CALL_BACKGROUND_PILOT=' . $previousPilot); }
 $check($fixture->pdo->query('SELECT state FROM call_push_calls')->fetchColumn() === 'ended', 'Actual persisted end');
 foreach (['deviceId' => 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'generation' => str_repeat('f', 32),
     'sid' => 'other', 'mediaProfile' => 'audio', 'action' => 'history', 'extra' => 'forbidden'] as $field => $value) {

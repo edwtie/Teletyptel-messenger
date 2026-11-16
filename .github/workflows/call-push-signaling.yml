@@ -67,7 +67,7 @@ jobs:
         run: node --test tests/call-push-signaling.test.js tests/call-push-transport.test.js tests/apns-call-push.test.js tests/native-call-control.test.js tests/native-call-intent-routing.test.js tests/call-bootstrap.test.js tests/native-cold-call-bridge.test.js tests/native-push-activation.test.js
       - name: Check registry, revocation and competing answer processes
         run: |
-          for test in call-push-smoke call-push-reconcile-test call-push-control-test call-push-media-test call-push-endpoint-test call-control-endpoint-test call-bootstrap-test call-recovery-test call-recovery-endpoint-test call-active-lease-test call-scope-revocation-test; do
+          for test in call-push-smoke call-push-reconcile-test call-push-control-test call-push-media-test call-push-endpoint-test call-control-endpoint-test call-bootstrap-test call-recovery-test call-recovery-endpoint-test call-active-lease-test call-scope-revocation-test call-push-activation-test; do
             php "php/tests/$test.php"
           done
           php php/tests/call-push-transport-test.php "$(command -v node)"

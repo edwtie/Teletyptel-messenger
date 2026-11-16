@@ -4,7 +4,7 @@
 -include_lib("kernel/include/file.hrl").
 -export([start/1, stop/1, check_password/4, store_type/1, plain_password_required/1, user_exists/2, use_cache/1]).
 -export([auth_result/3, bind/1, send_packet/1, filter_send/1, authenticated/2, unbound/2, inline/1, info/2, terminated/2,
-         stream_started/2, revoke_device/3, attest_websocket/1, init_transport/2, signed_revocation/2]).
+         stream_started/2, revoke_device/3, attest_websocket/1, init_transport/2, signed_revocation/2, signed_health/2]).
 -define(TABLE, teletyptel_call_bootstrap).
 -define(NS, <<"urn:teletyptel:call-recovery:1">>).
 -define(JMI, <<"urn:xmpp:jingle-message:0">>).
@@ -367,7 +367,7 @@ revoke_device(Host, Device, Generation) ->
     end),
     lists:foreach(fun ejabberd_c2s:stop_async/1, Processes), ok.
 
-signed_revocation(Payload, Signature) ->
+revocation_claims(Payload, Signature, Purpose) ->
     true = os:getenv("TELETYPTEL_CALL_SCOPE_REVOCATION") =:= "1",
     Host = list_to_binary(os:getenv("TELETYPTEL_CALL_SCOPED_DOMAIN", "")),
     true = byte_size(Payload) =< 1024,
@@ -375,14 +375,28 @@ signed_revocation(Payload, Signature) ->
     match = re:run(Signature, <<"\\A[0-9a-f]{64}\\z">>, [{capture, none}]),
     #{key := Key, environment := Environment, issuer := Issuer} = persistent_term:get({?MODULE, Host}),
     Expected = string:lowercase(binary:encode_hex(crypto:mac(hmac, sha256, Key,
-        <<"teletyptel-call-revoke-v1:", Environment/binary, ":", Host/binary, ":", Issuer/binary, ":", Payload/binary>>))),
+        <<Purpose/binary, Environment/binary, ":", Host/binary, ":", Issuer/binary, ":", Payload/binary>>))),
     true = crypto:hash_equals(Expected, Signature),
     Translated = binary:replace(binary:replace(Payload, <<"-">>, <<"+">>, [global]), <<"_">>, <<"/">>, [global]),
     Claims = jiffy:decode(base64:decode(<<Translated/binary, (binary:copy(<<"=">>, (4 - byte_size(Translated) rem 4) rem 4))/binary>>), [return_maps]),
+    1 = maps:get(<<"version">>, Claims), Environment = maps:get(<<"environment">>, Claims),
+    Host = maps:get(<<"domain">>, Claims), Issuer = maps:get(<<"issuer">>, Claims), {Claims, Host}.
+
+signed_health(Payload, Signature) ->
+    {Claims, Host} = revocation_claims(Payload, Signature, <<"teletyptel-call-health-v1:">>),
+    true = lists:sort(maps:keys(Claims)) =:= lists:sort([<<"version">>, <<"environment">>, <<"domain">>, <<"issuer">>, <<"nonce">>, <<"issuedAt">>, <<"expiresAt">>]),
+    Nonce = maps:get(<<"nonce">>, Claims), match = re:run(Nonce, <<"\\A[0-9a-f]{32}\\z">>, [{capture, none}]),
+    Issued = maps:get(<<"issuedAt">>, Claims), Expires = maps:get(<<"expiresAt">>, Claims), Now = erlang:system_time(second),
+    true = is_integer(Issued) andalso is_integer(Expires) andalso Issued =< Now andalso Now - Issued =< 5
+        andalso Expires > Now andalso Expires =< Issued + 5,
+    true = gen_mod:is_loaded(Host, mod_teletyptel_calls),
+    false = gen_mod:is_loaded(Host, mod_sasl2), false = gen_mod:is_loaded(Host, mod_auth_fast),
+    ok = mnesia:wait_for_tables([?TABLE], 1000), Nonce.
+
+signed_revocation(Payload, Signature) ->
+    {Claims, Host} = revocation_claims(Payload, Signature, <<"teletyptel-call-revoke-v1:">>),
     true = lists:sort(maps:keys(Claims)) =:= lists:sort([<<"version">>, <<"environment">>, <<"domain">>, <<"issuer">>,
         <<"eventId">>, <<"deviceId">>, <<"generation">>, <<"issuedAt">>, <<"expiresAt">>]),
-    1 = maps:get(<<"version">>, Claims), Environment = maps:get(<<"environment">>, Claims),
-    Host = maps:get(<<"domain">>, Claims), Issuer = maps:get(<<"issuer">>, Claims),
     lists:foreach(fun(Name) -> match = re:run(maps:get(Name, Claims), <<"\\A[0-9a-f]{32}\\z">>, [{capture, none}]) end,
         [<<"eventId">>, <<"generation">>]),
     Device = maps:get(<<"deviceId">>, Claims),

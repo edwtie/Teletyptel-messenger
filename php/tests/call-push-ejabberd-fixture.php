@@ -70,6 +70,8 @@ try {
                 CallPushService::revokeWebSession($pdo, $session);
                 $result = ['signedOut' => !isset($session['teletyptel_call_push_binding']),
                     'pending' => (int)$pdo->query('SELECT COUNT(*) FROM call_scope_revocations WHERE delivered IS NULL')->fetchColumn()];
+            } elseif ($input['action'] === 'health') {
+                $result = ['ready' => CallScopeRevocation::configured($pdo)->probe()];
             } elseif ($input['action'] === 'spool') {
                 $directory = sys_get_temp_dir() . '/tc-signaling-spool-' . bin2hex(random_bytes(12));
                 mkdir($directory, 0700);
