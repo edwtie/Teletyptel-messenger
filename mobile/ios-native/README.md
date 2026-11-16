@@ -46,6 +46,16 @@ must pass both unchanged Release startup assertions and all archive/runtime gate
 before 17.2 may upload. Simulator-runner failure is not silently converted into a
 pass, an application crash, or physical-device acceptance.
 
+The replacement run on `a1d0b4c` is
+[43915481448](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43915481448).
+At 2026-11-16 18:21 Europe/Amsterdam it remains queued with no jobs allocated,
+after repeated checks over eleven minutes. It has not signed or uploaded 17.2.
+The existing 17.1 device crash must not be described as resolved in an installed
+update until the replacement actually uploads and is checked on the device.
+This queued run retains both archive/runtime checks and Release startup tests as
+mandatory gates before the protected internal upload; no approval, test, TLS or
+signature guard was bypassed to make it appear released.
+
 ## Internal-NL encryption declaration corrected (2026-11-16)
 
 The owner confirmed this candidate is for internal testing in the Netherlands
