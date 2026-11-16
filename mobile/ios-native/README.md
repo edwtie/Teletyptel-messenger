@@ -32,6 +32,15 @@ privacy conformance or successful real-device Google/Facebook sign-in. Server
 pilot deployment and explicit device consent/token registration remain required.
 No public App Store release or automatic configuration of other accounts is made.
 
+Archive/signing jobs use GitHub's explicit `macos-15-intel` image with Xcode 26;
+the generic iOS archive still contains arm64 device code for both families, not
+an Intel iPhone executable. Other preview modes retain their existing runner.
+This avoids the observed arm64 runner-capacity queue without dropping archive,
+profile, signature or provider checks. See the official
+[GitHub runner image matrix](https://github.com/actions/runner-images) for labels
+and the [macOS 15 image inventory](https://github.com/actions/runner-images/blob/main/images/macos/macos-15-Readme.md)
+for installed Xcode versions.
+
 ## Explicit unsigned archive validation (2026-11-16)
 
 The native preview workflow now has an explicit `focused-archive` mode, requiring

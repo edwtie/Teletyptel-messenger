@@ -70,6 +70,8 @@ test("Internal upload requires successful archive checks, the protected branch e
   const job = workflow.split("  internal-native-upload:")[1];
   assert.match(job, /needs: native-preview/);
   assert.match(job, /environment: ios-testflight/);
+  assert.match(job, /runs-on: macos-15-intel/);
+  assert.match(workflow, /inputs.validation_mode == 'focused-archive' && 'macos-15-intel' \|\| 'macos-15'/);
   assert.match(job, /github.event_name == 'workflow_dispatch'/);
   assert.match(job, /inputs.internal_upload == true/);
   assert.match(job, /refs\/heads\/codex\/teletyptel-beta-polish/);
