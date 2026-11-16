@@ -1,5 +1,68 @@
 # iOS call-push transport (not activated)
 
+## Scoped cold-call authentication foundation (2026-11-16)
+
+`CallPushBootstrap` and `ejabberd_auth_teletyptel_calls.erl` introduce a separate
+single-use, HMAC-authenticated `tcr1` credential. This is **an isolated, opt-in
+foundation, not a working cold-launch/APNs release**. No public bootstrap route,
+device bootstrap broker, live migration, ejabberd configuration, push activation,
+provisioning change or TestFlight upload is included.
+
+Issuance requires the existing authenticated account/session binding, current
+device registration and generation, a still-ringing invitation, current account
+access versions and the trusted producer's live caller/policy leases. The
+credential pins issuer, environment, domain, owner, full caller JID, call UUID,
+SID, device/generation, requested media profile, one resource and an expiry of
+at most twenty seconds. A separate 32-byte key is required; the producer key and
+ordinary status/end control credential are not reused. Issuance is transactional,
+limited to three attempts per call/device and does not reserve or answer a call.
+
+The actual ejabberd backend requires an existing account and encrypted c2s SASL1
+authentication. Generic password checks cannot redeem these grants. It disables
+auth caching, consumes nonces atomically in durable Mnesia storage, fixes the
+bound resource and terminates at the signed deadline. Early authenticated-packet
+hooks reject forbidden actions before normal server handlers; output filtering
+also covers server-generated stanzas. Only bounded matching-peer/SID JMI/Jingle,
+correlated IQ replies, server ping and matching resource-handoff metadata pass.
+Normal chat, roster, MAM retrieval, presence, account registration/removal, policy
+changes, other peers/SIDs and stream-management resumption are denied. Requested
+TC cannot silently downgrade to audio. Ordinary password authentication remains
+separate. SASL2 and FAST modules deliberately make this bootstrap fail closed;
+their compatibility has not been established.
+
+`revoke_device/3` is a trusted local Erlang operation, not a user API. It closes
+consumed streams and transactionally denies still-unredeemed grants for that
+device generation. **Real logout, account/policy revocation and registry events
+are not yet connected to this operation**. Already-issued credentials otherwise
+remain usable until their short signed expiry. Key rotation, multi-node shared
+nonce/revocation storage, WSS/proxy behavior and plugin combinations require
+deployment-specific validation; this single-node fixture is not proof of them.
+
+The native `NativeCallBootstrapGrant` validates bounded, context-matching response
+metadata and payload consistency, without claiming to authenticate the server's
+HMAC locally. A future authenticated, certificate-verified broker must supply
+the response; ejabberd verifies its signature during SASL. The new call-only
+stream initializer consumes the credential in RAM, binds only its signed resource
+and closes on expiry. It never creates a general account credential, loads chat
+history or persists this secret in Keychain. It is not yet wired into cold app
+launch or the CallKit media driver.
+
+Run `php php/tests/call-bootstrap-test.php` for the issuer guards and
+`node scripts/check-call-bootstrap-ejabberd.js` for actual isolated TLS/SASL,
+stanza isolation, nonce replay, deadline and revocation checks. The latter uses
+only a digest-pinned disposable ejabberd, generated CA/keys, fictional accounts
+and loopback-published ports; cleanup removes only its own container. It neither
+uses nor modifies the running TeleTypTel services. Native metadata/handshake tests
+are `NativeCallBootstrapTests`; SDK compilation is a separate unsigned CI gate.
+
+Remaining sequence: cookie-free revocable device bootstrap authorization;
+authenticated broker and real event-driven revocation; cold-launch CallKit
+ownership; an explicit active-call lease beyond the initial twenty-second
+bootstrap; fresh Jingle/media handoff; then signed physical-iPhone locked-screen
+and terminated-app tests. Keep recovery capability and native push disabled
+until these gates pass. A bootstrap grant is not media readiness and must not
+be used as a persistent call session or ordinary autologin token.
+
 ## Authenticated ejabberd producer and signed journal (2026-11-15)
 
 There is now a concrete journal-backed policy adapter, not an always-true policy
@@ -93,8 +156,9 @@ before answering succeeds; the app never substitutes audio for requested TC.
 **Not a completed cold-launch release:** a fully terminated app still needs
 narrowly scoped background authentication/bootstrap and revocation. Do not copy
 chat/Face ID credentials into background storage as a shortcut. The regular
-outgoing call UI and privacy-policy synchronization still need the compatible JMI
-calling path. Native APNs
+outgoing call UI and acknowledged privacy-policy synchronization now use the
+compatible JMI path for supported local accounts, but do not supply cold-launch
+authentication. Native APNs
 enrollment and the backend recovery capability remain disabled: no live APNs,
 server settings, entitlements or provisioning were enabled by this change.
 The old status/end-only capability cannot log in or reserve an answer. Signed

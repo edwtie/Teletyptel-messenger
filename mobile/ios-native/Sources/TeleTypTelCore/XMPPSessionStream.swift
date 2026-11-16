@@ -25,10 +25,13 @@ struct XMPPSessionStream {
     private static let bind = "urn:ietf:params:xml:ns:xmpp-bind"
     private(set) var phase: Phase = .opening
     private var account: NativeAuthenticatedAccount?
+    private var bootstrap: NativeCallBootstrapGrant?
+    private let bootstrapExpiry: TimeInterval?
+    private let now: () -> TimeInterval
     private let configuration: ServerConfiguration
     private let expectedJID: String
     private let bindID = "bind-" + UUID().uuidString
-    private let resource = "TeleTypTel-native-" + UUID().uuidString
+    private let resource: String
     private var boundJID: String?
     private var pingID: String?
     private var handshakeBytes = 0
@@ -37,16 +40,25 @@ struct XMPPSessionStream {
 
     init(account: NativeAuthenticatedAccount, loadRoster: Bool = false, callOnly: Bool = false) {
         self.account = account
+        bootstrapExpiry = nil
+        now = { Date().timeIntervalSince1970 }
+        resource = "TeleTypTel-native-" + UUID().uuidString
         self.callOnly = callOnly
         configuration = account.configuration
         expectedJID = account.jid
         if loadRoster && !callOnly { roster = NativeRosterStream(owner: account.jid) }
     }
 
+    init(bootstrap: NativeCallBootstrapGrant, now: @escaping () -> TimeInterval = { Date().timeIntervalSince1970 }) {
+        account = nil; self.bootstrap = bootstrap; bootstrapExpiry = bootstrap.expiresAt; self.now = now
+        resource = bootstrap.resource; configuration = bootstrap.configuration; expectedJID = bootstrap.owner; callOnly = true
+    }
+
     var opening: String { XMPPProbeStream.opening(for: configuration) }
 
     mutating func close() {
         account = nil
+        bootstrap = nil
         boundJID = nil
         pingID = nil
         roster = nil
@@ -57,6 +69,7 @@ struct XMPPSessionStream {
 
     mutating func heartbeat() throws -> String {
         guard phase == .online else { throw ConnectionFailure.invalidResponse }
+        guard bootstrapExpiry.map({ now().isFinite && now() < $0 }) ?? true else { close(); throw XMPPSessionFailure.authenticationRejected }
         guard pingID == nil else { close(); throw XMPPSessionFailure.heartbeatTimeout }
         let identifier = "ping-" + UUID().uuidString
         pingID = identifier
@@ -70,6 +83,7 @@ struct XMPPSessionStream {
 
     private mutating func process(_ message: String) throws -> XMPPSessionOutput {
         guard phase != .closed else { throw XMPPSessionFailure.streamClosed }
+        guard bootstrapExpiry.map({ now().isFinite && now() < $0 }) ?? true else { throw XMPPSessionFailure.authenticationRejected }
         if phase != .online {
             handshakeBytes += message.utf8.count
             guard handshakeBytes <= 65536 else { throw ConnectionFailure.invalidResponse }
@@ -87,16 +101,19 @@ struct XMPPSessionStream {
             }
             phase = phase == .opening ? .features : .bindingFeatures
         case .features:
-            guard root.name == "features", root.namespace == Self.streams, let account = account else {
+            guard root.name == "features", root.namespace == Self.streams, account != nil || bootstrap != nil else {
                 throw ConnectionFailure.invalidResponse
             }
             let mechanisms = root.children.filter { $0.name == "mechanisms" && $0.namespace == Self.sasl }
             guard mechanisms.count == 1 else { throw ConnectionFailure.invalidResponse }
             let plain = mechanisms[0].children.filter { $0.name == "mechanism" && $0.namespace == Self.sasl && $0.children.isEmpty && $0.text.trimmingCharacters(in: .whitespacesAndNewlines) == "PLAIN" }
             guard plain.count == 1 else { throw XMPPSessionFailure.unsupportedAuthentication }
-            let username = String(account.jid.prefix { $0 != "@" })
-            let payload = Data(("\0" + username + "\0" + account.password).utf8).base64EncodedString()
+            let payload: String
+            if let bootstrap = bootstrap { payload = bootstrap.saslPayload }
+            else if let account = account { payload = Data(("\0" + String(account.jid.prefix { $0 != "@" }) + "\0" + account.password).utf8).base64EncodedString() }
+            else { throw ConnectionFailure.invalidResponse }
             self.account = nil
+            self.bootstrap = nil
             phase = .authenticating
             return XMPPSessionOutput(frames: ["<auth xmlns='\(Self.sasl)' mechanism='PLAIN'>\(payload)</auth>"])
         case .authenticating:
@@ -124,6 +141,7 @@ struct XMPPSessionStream {
             }
             let parts = jid.text.split(separator: "/", maxSplits: 1, omittingEmptySubsequences: false)
             guard parts.count == 2, parts[0] == expectedJID, !parts[1].isEmpty,
+                  bootstrapExpiry == nil || parts[1] == resource,
                   jid.text.utf8.count <= 3071,
                   !jid.text.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) else {
                 throw XMPPSessionFailure.bindingRejected

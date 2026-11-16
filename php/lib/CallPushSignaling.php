@@ -355,6 +355,17 @@ final class CallPushSignaling
         } catch (Throwable $error) { return false; }
     }
 
+    public function bootstrapCaller(array $call, string $bootstrapKey, string $environment, string $domain): string
+    {
+        if (hash_equals($this->key, $bootstrapKey)) throw new CallPushFailure('Afzonderlijke oproeptoegangssleutel vereist.', 503);
+        if ($environment !== $this->environment || $domain !== $this->domain) throw new CallPushFailure('Oproepomgeving komt niet overeen.', 403);
+        if (!$this->allows($call, 'read')) throw new CallPushFailure('Oproepherstel niet toegestaan.', 403);
+        $record = $this->rows('SELECT caller_jid FROM call_signaling_calls WHERE scope_id = ? AND caller = ? AND sid = ?',
+            [$this->scope, $call['caller'], $call['sid']])[0] ?? null;
+        if (!$record || !is_string($record['caller_jid'])) throw new CallPushFailure('Oproepbron ontbreekt.', 403);
+        return $record['caller_jid'];
+    }
+
     public function enqueue(CallPushService $service, int $limit = 8): array
     {
         if ($limit < 1 || $limit > 32) throw new CallPushFailure('Ongeldige werkbatch.');

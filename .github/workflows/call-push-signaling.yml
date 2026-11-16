@@ -10,11 +10,17 @@ on:
       - php/public/api/call-push.php
       - php/public/api/call-control.php
       - php/tests/call-push*.php
+      - php/tests/call-bootstrap*.php
       - php/tests/call-control-endpoint-test.php
       - services/call-push/**
       - tests/call-push-signaling.test.js
+      - tests/call-bootstrap.test.js
       - tests/native-call-intent-routing.test.js
       - scripts/check-call-signaling-ejabberd.js
+      - scripts/check-call-bootstrap-ejabberd.js
+      - mobile/ios-native/Sources/TeleTypTelCore/NativeCallBootstrapGrant.swift
+      - mobile/ios-native/Sources/TeleTypTelCore/XMPPSessionStream.swift
+      - mobile/ios-native/Tests/TeleTypTelCoreTests/NativeCallBootstrapTests.swift
       - mobile/ios-native/Sources/TeleTypTelCore/NativeCallIntent.swift
       - mobile/ios-native/Sources/TeleTypTelCore/NativeCallPolicy.swift
       - mobile/ios-native/Sources/TeleTypTelCore/NativeCallIntentSession.swift
@@ -48,10 +54,10 @@ jobs:
       - name: Require PHP fixture extensions
         run: php -r 'foreach (["pdo_sqlite", "openssl", "mbstring"] as $extension) { if (!extension_loaded($extension)) { exit(1); } }'
       - name: Check signed-event interoperability and source boundaries
-        run: node --test tests/call-push-signaling.test.js tests/call-push-transport.test.js tests/apns-call-push.test.js tests/native-call-control.test.js tests/native-call-intent-routing.test.js
+        run: node --test tests/call-push-signaling.test.js tests/call-push-transport.test.js tests/apns-call-push.test.js tests/native-call-control.test.js tests/native-call-intent-routing.test.js tests/call-bootstrap.test.js
       - name: Check registry, revocation and competing answer processes
         run: |
-          for test in call-push-smoke call-push-reconcile-test call-push-control-test call-push-media-test call-push-endpoint-test call-control-endpoint-test; do
+          for test in call-push-smoke call-push-reconcile-test call-push-control-test call-push-media-test call-push-endpoint-test call-control-endpoint-test call-bootstrap-test; do
             php "php/tests/$test.php"
           done
           php php/tests/call-push-transport-test.php "$(command -v node)"
@@ -62,6 +68,8 @@ jobs:
           done
       - name: Check real disposable ejabberd to PHP and new-resource proof
         run: node scripts/check-call-signaling-ejabberd.js
+      - name: Check actual single-use scoped authentication and stanza isolation over TLS
+        run: node scripts/check-call-bootstrap-ejabberd.js
 
   native-call-recovery:
     runs-on: macos-15
@@ -76,4 +84,4 @@ jobs:
           test -n "$XCODE_PATH"
           echo "DEVELOPER_DIR=$XCODE_PATH/Contents/Developer" >> "$GITHUB_ENV"
       - name: Check native intent, reservation, cancellation and binding logic
-        run: swift test --package-path mobile/ios-native --filter 'NativeCallIntentTests|NativeCallPolicyTests|NativeCallRoutingTests|NativeCallIntentSessionTests|NativeCallAnswerRecoveryTests|NativePushRegistryTests|NativeJingleTransportTests|NativeWarmCallTests|NativeCallMediaGateTests|NativePushRegistrationModelTests|XMPPSessionTests'
+        run: swift test --package-path mobile/ios-native --filter 'NativeCallIntentTests|NativeCallPolicyTests|NativeCallRoutingTests|NativeCallIntentSessionTests|NativeCallAnswerRecoveryTests|NativePushRegistryTests|NativeJingleTransportTests|NativeWarmCallTests|NativeCallMediaGateTests|NativePushRegistrationModelTests|NativeCallBootstrapTests|XMPPSessionTests'

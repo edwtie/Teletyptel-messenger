@@ -1,0 +1,40 @@
+set -eu
+umask 077
+mkdir -p /tmp/tc/ebin
+head -c 32 /dev/urandom | base64 > /tmp/tc/bootstrap.key
+openssl req -x509 -newkey rsa:2048 -nodes -sha256 -days 1 -subj /CN=example.test \
+    -addext subjectAltName=DNS:example.test -keyout /tmp/tc/tls.key -out /tmp/tc/tls.crt >/dev/null 2>&1
+cat /tmp/tc/tls.key /tmp/tc/tls.crt > /tmp/tc/tls.pem
+export ERL_LIBS=/home/ejabberd/lib
+erl -boot /home/ejabberd/bin/start_clean -boot_var RELEASE_LIB /home/ejabberd/lib \
+    -pa /home/ejabberd/lib/*/ebin -noshell -eval \
+    'case compile:file("/source/ejabberd_auth_teletyptel_calls.erl", [report, {outdir,"/tmp/tc/ebin"}]) of {ok,_} -> halt(0); _ -> halt(1) end.'
+printf 'ERL_OPTIONS="-pa /tmp/tc/ebin"\n' > /tmp/tc/ejabberdctl.cfg
+cat > /tmp/tc/ejabberd.yml <<'CONFIG'
+hosts: [example.test]
+loglevel: warning
+auth_method: [teletyptel_calls, internal]
+s2s_access: none
+certfiles: [/tmp/tc/tls.pem]
+listen:
+  - port: 5223
+    ip: "0.0.0.0"
+    module: ejabberd_c2s
+    tls: true
+  - port: 5222
+    ip: "0.0.0.0"
+    module: ejabberd_c2s
+modules:
+  mod_roster: {}
+  mod_admin_extra: {}
+  mod_mam:
+    db_type: mnesia
+    default: always
+  mod_register: {}
+CONFIG
+export TELETYPTEL_CALL_SCOPED_AUTH=1
+export TELETYPTEL_CALL_SCOPED_DOMAIN=example.test
+export TELETYPTEL_CALL_SCOPED_ENVIRONMENT=production
+export TELETYPTEL_CALL_SCOPED_ISSUER=fixture
+export TELETYPTEL_CALL_SCOPED_KEY_FILE=/tmp/tc/bootstrap.key
+exec ejabberdctl -c /tmp/tc/ejabberdctl.cfg -f /tmp/tc/ejabberd.yml foreground

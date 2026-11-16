@@ -1,5 +1,24 @@
 # TeleTypTel native iOS migration
 
+## Call-only bootstrap checkpoint (2026-11-16)
+
+The core now has an ephemeral `NativeCallBootstrapGrant` and a distinct
+`XMPPSessionStream(bootstrap:)` initializer. Bounded payload/metadata must agree
+with the expected account, issuer/domain/environment, invitation UUID/SID/media,
+device/generation, fixed resource and twenty-second deadline. Credentials are
+redacted, not persisted and not converted into normal saved-login accounts.
+Expiry or an unexpected resource closes the stream; roster, chat delivery,
+presence announcement and discovery remain suppressed.
+
+This is a parser/handshake foundation, **not connected cold-launch calling**.
+The native parser cannot authenticate the private server HMAC: the future
+broker's authenticated HTTPS response and actual ejabberd SASL verification are
+required. The matching opt-in PHP issuer and restricted ejabberd backend have a
+real disposable TLS integration fixture, separately from native unit/SDK checks.
+See `services/call-push/README.md` for exact limits, revocation integration still
+needed, twenty-second bootstrap versus active-call leases, and release gates.
+No live APNs, provisioning or TestFlight upload is performed by these checks.
+
 ## Feature-gap implementation checkpoint (2026-11-15)
 
 This section supersedes older statements below that native registration,
