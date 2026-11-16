@@ -26,6 +26,24 @@ Denied renewal, cancellation or expiry stops the scoped connection and ends the
 call; no old timer may terminate a newer acknowledged lease. These are source
 changes behind the existing laboratory gates, not APNs activation.
 
+Source `fde7b5e` passed the
+[isolated server/core run](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43878040142):
+42 PHP active-lease guards, 137 actual scoped TLS/WSS checks, 70 combined real
+producer/broker/renewal checks and 107 selected Swift tests with zero failures.
+The combined conversation remained scoped beyond 45 seconds, survived old expiry
+timers and closed on an actual server preference change. Native tests cover
+lease context, acknowledged stream extension, expiry, cancellation and a clocked
+call past its original invitation deadline. This is not real APNs or physical
+CallKit/WebRTC acceptance.
+
+The [unsigned iPhone/iPad SDK matrix](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43878046114)
+for the same source passed 246 selected Swift tests and native RTT checks in
+each job, plus generic iOS device-SDK compilation. Both downloaded reports say
+`unsigned: true`, `uploaded: false`, `deviceCompiled: true` and `uiTests: []`.
+Local targeted Node checks passed 86 tests with one explicit macOS-only skip.
+No signed build, TestFlight distribution, real-device capture or APNs delivery
+is implied by these results.
+
 The combined isolated fixture is `node scripts/check-call-active-ejabberd.js`.
 It uses the actual producer, TLS c2s backend, PHP ledger/broker and repeated
 acknowledged renewals beyond both the 20-second bootstrap and 45-second invitation

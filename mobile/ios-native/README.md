@@ -17,6 +17,19 @@ and physical iPhone/iPad release gates. No APNs activation or TestFlight upload
 is part of this change. Swift unit and unsigned SDK validation must pass before
 this source is treated as compiled native evidence.
 
+Source `fde7b5e` passed 107 selected Swift core tests in the
+[isolated server/core run](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43878040142),
+including the active lease parser, stream deadline extension, repeated renewal
+beyond invitation expiry, cancellation and rejected acknowledgements. The same
+run passed the combined real ejabberd-producer/PHP-broker renewal fixture. This
+does not substitute for the separate SDK build or physical-device media tests.
+
+The subsequent [unsigned SDK matrix](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43878046114)
+for this source also passed: 246 selected Swift tests and native RTT checks per
+iPhone/iPad-labelled job, with successful generic iOS device-SDK compilation.
+Both reports contain `uploaded: false` and `uiTests: []`. No actual iPhone/iPad,
+simulator UI, camera/audio or live APNs test is claimed; TestFlight is unchanged.
+
 ## Push, CallKit and media bridge (2026-11-16)
 
 The app delegate and SwiftUI now share `NativeCallController.shared`. An extra
