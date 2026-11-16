@@ -154,6 +154,35 @@ async function run() {
     mismatched.connection.send(`<iq type='set' to='example.test' id='wrong-permit'><authorize xmlns='urn:teletyptel:call-recovery:1'>${otherPermit}</authorize></iq>`);
     for (let attempt = 0; attempt < 100 && !mismatched.connection.closed; attempt++) await delay(10);
     check(mismatched.connection.closed, "A winning-device permit cannot authorize another call/resource/nonce");
+    stage = "active lease isolation";
+    const leaseToken = (claims, changes = {}) => {
+      const issuedAt = Math.floor(Date.now() / 1000);
+      const value = { ...claims, scope: "call-xmpp-active-v1", issuedAt, expiresAt: issuedAt + 25, ...changes };
+      const payload = Buffer.from(JSON.stringify(value)).toString("base64url");
+      return "tcl1." + payload + "." + createHmac("sha256", Buffer.from(key, "base64"))
+        .update("teletyptel-call-active-v1:production:example.test:fixture:" + payload).digest("hex");
+    };
+    const beforeAnswer = await scoped("total", false);
+    beforeAnswer.connection.send(`<iq type='set' to='example.test' id='early-lease'><lease xmlns='urn:teletyptel:call-recovery:1'>${leaseToken(beforeAnswer.grant.claims)}</lease></iq>`);
+    for (let attempt = 0; attempt < 100 && !beforeAnswer.connection.closed; attempt++) await delay(10);
+    check(beforeAnswer.connection.closed, "Active lease cannot substitute for the winning-resource answer permit");
+    for (const changes of [{ nonce: randomBytes(16).toString("hex") }, { peer: "charlie@example.test/other" },
+      { profile: "audio" }, { scope: "call-xmpp-answer-v1" }, { generation: randomBytes(16).toString("hex") },
+      { expiresAt: Math.floor(Date.now() / 1000) + 3600 }]) {
+      const current = await scoped("total");
+      current.connection.send(`<iq type='set' to='example.test' id='bad-lease'><lease xmlns='urn:teletyptel:call-recovery:1'>${leaseToken(current.grant.claims, changes)}</lease></iq>`);
+      for (let attempt = 0; attempt < 100 && !current.connection.closed; attempt++) await delay(10);
+      check(current.connection.closed, "Signed active lease cannot change scope or grant an excessive lifetime");
+    }
+    const repeated = await scoped("total"), sameLease = leaseToken(repeated.grant.claims);
+    repeated.connection.send(`<iq type='set' to='example.test' id='first-lease'><lease xmlns='urn:teletyptel:call-recovery:1'>${sameLease}</lease></iq>`);
+    await repeated.connection.wait(/<iq\b(?=[^>]*\bid=['"]first-lease['"])[^>]*(?:\/>|>[\s\S]*?<\/iq>)/);
+    repeated.connection.send(`<iq type='set' to='example.test' id='repeat-lease'><lease xmlns='urn:teletyptel:call-recovery:1'>${sameLease}</lease></iq>`);
+    for (let attempt = 0; attempt < 100 && !repeated.connection.closed; attempt++) await delay(10);
+    check(repeated.connection.closed, "Replaying a lease cannot extend the deadline again");
+    const leaseAsLogin = client();
+    check(!await leaseAsLogin.authenticate("bob", sameLease), "Active permission can never authenticate a new stream"); leaseAsLogin.close();
+    stage = "negative scopes";
     const forbidden = [
       "<iq type='get' to='example.test' id='forbidden'><query xmlns='jabber:iq:roster'/></iq>",
       "<iq type='set' to='example.test' id='forbidden'><query xmlns='urn:xmpp:mam:2'/></iq>",

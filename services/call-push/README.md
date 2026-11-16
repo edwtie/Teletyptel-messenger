@@ -1,5 +1,49 @@
 # iOS call-push transport (not activated)
 
+## Active-call lease continuation (2026-11-16)
+
+The disabled laboratory bridge now has a separate `tcl1` active-call permission.
+The initial SASL credential is still single-use and limited to twenty seconds.
+Only the reserved winning resource, after its server-acknowledged `tca1` answer
+and actual observed `proceed`, may request continuation. The real ejabberd
+producer observes that resource and subsequent scoped keepalive IQs, checks both
+live resources and their privacy/preferences, and emits signed short-lived
+`active` metadata. It never replays an already-accepted proposal to new devices.
+
+The PHP ledger requires the accepted registry winner, exact call/SID, resource,
+nonce, generation, current account versions, consent/device expiry, current
+mutual policy and an unexpired previous bootstrap/active authorization. Active
+events extend only this accepted call; ordinary unanswered invitations retain
+their original expiry. The cookie-free broker's `lease` action then signs an
+independently purposed permission for at most 25 seconds. It cannot authenticate
+a new XMPP stream or alter the original peer, media or scope. Renewal cannot
+resurrect an expired, ended, revoked or differently answered call.
+
+Both native stream deadlines are extended only after ejabberd acknowledges the
+signed lease. The native recovery requests an initial lease before returning a
+media offer, renews every eight seconds and rechecks local consent/context.
+Denied renewal, cancellation or expiry stops the scoped connection and ends the
+call; no old timer may terminate a newer acknowledged lease. These are source
+changes behind the existing laboratory gates, not APNs activation.
+
+The combined isolated fixture is `node scripts/check-call-active-ejabberd.js`.
+It uses the actual producer, TLS c2s backend, PHP ledger/broker and repeated
+acknowledged renewals beyond both the 20-second bootstrap and 45-second invitation
+deadlines, then verifies server preference revocation closes that stream. It
+does not use native WebRTC, CallKit hardware or APNs. PHP lifecycle guards are
+`php php/tests/call-active-lease-test.php`. Explicit schema provisioning must now
+include both `CallPushSignaling::ensureSchema()` and
+`CallPushBootstrap::ensureSchema()`; HTTP requests still do not migrate tables.
+
+Still required: durable immediate server revocation from PHP logout/device/account
+events, deployment-specific key/schema/worker setup, a combined native-media
+transport run and signed physical-device acceptance. SQL logout already prevents
+new leases, but an issued lease can remain usable for up to 25 seconds unless the
+live server is explicitly notified. Do not describe that as immediate revocation.
+The real producer closes an active scoped stream on its observed policy/offline/
+end events. No production container, APNs flag, route, entitlement or TestFlight
+upload is changed here.
+
 ## Native push-to-media laboratory bridge (2026-11-16)
 
 This checkpoint supersedes the older no-broker/no-native-wiring statements below.
@@ -34,11 +78,10 @@ client cannot bypass the reservation by merely following a different UI sequence
 A permit for another nonce/resource is refused. This does not restrict ordinary
 full-account XMPP clients as though they used these call-only credentials.
 
-**Hard laboratory limit:** the scoped XMPP stream still closes after its signed
-twenty-second bootstrap lifetime. Both client and server enforce this; a prepared
-or connected media session is not an exemption. There is no active-call lease
-upgrade yet. These limited calls therefore cannot be offered as reliable,
-long-running or emergency conversations. The existing native registry challenge
+**Bootstrap limit:** without the separately verified active lease described
+above, the scoped stream closes at its signed twenty-second deadline. A prepared
+or connected media session by itself is not an exemption. This laboratory chain
+cannot yet be offered as a reliable production or emergency service. The native registry challenge
 still does not advertise background-answer readiness, so ordinary app enrollment
 cannot accidentally turn this experiment into a released feature.
 
@@ -82,8 +125,7 @@ contract evidence, not one combined real-APNs-to-CallKit-to-hardware-media test.
 The native flags, live ejabberd/Asterisk containers, production server settings
 and TestFlight distribution were not changed.
 
-Before activation: implement active-call leases and accepted-call producer
-lifecycle; wire immediate server-side scope revocation to logout/account/policy
+Before activation: wire immediate server-side scope revocation to PHP logout/account
 events; jointly exercise the real broker, protected WSS route, producer and native
 media transport; provision the correct APNs VoIP topic/entitlements and explicitly
 enroll test devices; then test signed foreground, locked, system-terminated,

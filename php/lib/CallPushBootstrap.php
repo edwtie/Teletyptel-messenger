@@ -28,6 +28,8 @@ final class CallPushBootstrap
         $this->pdo->exec('CREATE TABLE IF NOT EXISTS call_bootstrap_issues (nonce VARCHAR(32) PRIMARY KEY,
             call_id VARCHAR(36) NOT NULL, device_id VARCHAR(36) NOT NULL, generation VARCHAR(32) NOT NULL,
             created BIGINT NOT NULL, expires BIGINT NOT NULL)' . $suffix);
+        $this->pdo->exec('CREATE TABLE IF NOT EXISTS call_bootstrap_leases (nonce VARCHAR(32) PRIMARY KEY,
+            expires BIGINT NOT NULL)' . $suffix);
     }
 
     private function row(string $sql, array $values): ?array
@@ -85,6 +87,7 @@ final class CallPushBootstrap
                 'teletyptel-call-xmpp-v1:' . $this->environment . ':' . $this->domain . ':' . $this->issuer . ':' . $payload, $this->key);
             if (strlen($credential) > 1024) throw new CallPushFailure('Oproeptoegang is te groot.', 503);
             $this->pdo->prepare('DELETE FROM call_bootstrap_issues WHERE created < ?')->execute([$now - 86400]);
+            $this->pdo->prepare('DELETE FROM call_bootstrap_leases WHERE expires < ?')->execute([$now - 86400]);
             $this->pdo->prepare('INSERT INTO call_bootstrap_issues VALUES (?, ?, ?, ?, ?, ?)')->execute([$nonce, $callId, $deviceId, $generation, $now, $expires]);
             $this->pdo->commit();
             return ['credential' => $credential, 'claims' => $claims];
@@ -104,6 +107,50 @@ final class CallPushBootstrap
             $permit = $this->createAnswerPermit($account, $binding, $deviceId, $generation, $callId, $fullJid);
             $this->pdo->commit();
             return $permit;
+        } catch (Throwable $error) {
+            if ($this->pdo->inTransaction()) $this->pdo->rollBack();
+            throw $error;
+        }
+    }
+
+    public function activeLease(string $account, string $binding, string $deviceId, string $generation, string $callId, string $fullJid): array
+    {
+        if ($this->pdo->inTransaction()) throw new CallPushFailure('Oproepopslag is bezet.', 503);
+        $this->pdo->beginTransaction();
+        try {
+            $now = ($this->clock)();
+            $this->pdo->prepare('UPDATE call_push_lock SET touched = ? WHERE lock_id = 1')->execute([$now]);
+            if (!$this->row('SELECT lock_id FROM call_push_lock WHERE lock_id = ?', [1])) throw new CallPushFailure('Oproepopslag ontbreekt.', 503);
+            $call = $this->row('SELECT * FROM call_push_calls WHERE call_id = ?', [self::uuid($callId)]);
+            $device = $this->row('SELECT * FROM call_push_devices WHERE device_id = ?', [self::uuid($deviceId)]);
+            $owner = $this->row('SELECT jid FROM account_profiles WHERE account_id = ?', [$account]);
+            if (!$call || !$device || !$owner || $call['recipient'] !== $account || $call['state'] !== 'accepted'
+                || $call['accepted_device'] !== $deviceId || $call['accepted_generation'] !== $generation || $call['recipient_jid'] !== $fullJid
+                || $device['account_id'] !== $account || !hash_equals($device['generation'], $generation)
+                || !hash_equals($device['session_binding'], hash('sha256', $binding)) || (int)$device['expires'] <= $now
+                || $device['environment'] !== $this->environment || !AccountAccess::versionAllowed($this->pdo, $account, (int)$device['access_version'])
+                || !$this->signaling->allows($call, 'read')) throw new CallPushFailure('Gespreksverlenging geweigerd.', 403);
+            $active = $this->signaling->activeCall($call);
+            if (!$active) throw new CallPushFailure('Gespreksbewijs wordt verwerkt.', 425);
+            $issue = $this->row('SELECT * FROM call_bootstrap_issues WHERE nonce = ? AND call_id = ? AND device_id = ? AND generation = ?',
+                [$active['nonce'], $callId, $deviceId, $generation]);
+            $previous = $this->row('SELECT expires FROM call_bootstrap_leases WHERE nonce = ?', [$active['nonce']]);
+            if (!$issue || (int)($previous['expires'] ?? $issue['expires']) <= $now) throw new CallPushFailure('Gesprekstoegang verlopen.', 403);
+            $expires = min($now + 25, (int)$active['expires'], (int)$call['expires'], (int)$device['expires']);
+            $claims = ['version' => 1, 'scope' => 'call-xmpp-active-v1', 'environment' => $this->environment,
+                'domain' => $this->domain, 'issuer' => $this->issuer, 'owner' => $owner['jid'],
+                'peer' => $this->signaling->bootstrapCaller($call, $this->key, $this->environment, $this->domain),
+                'callId' => $callId, 'sid' => $call['sid'], 'deviceId' => $deviceId, 'generation' => $generation,
+                'profile' => $call['media_profile'], 'nonce' => $active['nonce'], 'resource' => 'tc-call-' . $active['nonce'],
+                'issuedAt' => $now, 'expiresAt' => $expires];
+            $payload = rtrim(strtr(base64_encode(json_encode($claims, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES)), '+/', '-_'), '=');
+            $credential = 'tcl1.' . $payload . '.' . hash_hmac('sha256',
+                'teletyptel-call-active-v1:' . $this->environment . ':' . $this->domain . ':' . $this->issuer . ':' . $payload, $this->key);
+            if (strlen($credential) > 1024) throw new CallPushFailure('Oproeptoegang is te groot.', 503);
+            $this->pdo->prepare('DELETE FROM call_bootstrap_leases WHERE nonce = ?')->execute([$active['nonce']]);
+            $this->pdo->prepare('INSERT INTO call_bootstrap_leases VALUES (?, ?)')->execute([$active['nonce'], max($expires, (int)($previous['expires'] ?? 0))]);
+            $this->pdo->commit();
+            return ['credential' => $credential, 'claims' => $claims];
         } catch (Throwable $error) {
             if ($this->pdo->inTransaction()) $this->pdo->rollBack();
             throw $error;

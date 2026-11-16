@@ -49,7 +49,11 @@ struct NativeColdCallContext: CustomStringConvertible, CustomDebugStringConverti
 }
 
 @MainActor
-protocol NativeColdCallServing: NativeWarmCallRegistryServing {
+protocol NativeActiveCallRegistryServing: NativeWarmCallRegistryServing {
+    func lease(invitation: NativeCallInvitation, registration: NativePushRegistration, bootstrap: NativeCallBootstrapGrant) async throws -> NativeCallActiveLease
+}
+
+protocol NativeColdCallServing: NativeActiveCallRegistryServing {
     func bootstrap(invitation: NativeCallInvitation, registration: NativePushRegistration) async throws -> NativeCallBootstrapGrant
 }
 
@@ -85,6 +89,14 @@ struct NativeCallRecoveryClient: NativeColdCallServing {
         guard reply.ended else { throw NativePushRegistryFailure.invalidResponse }
     }
 
+    func lease(invitation: NativeCallInvitation, registration: NativePushRegistration, bootstrap: NativeCallBootstrapGrant) async throws -> NativeCallActiveLease {
+        guard bootstrap.owner == context.authorization.owner, bootstrap.callID == invitation.id,
+              bootstrap.sid == invitation.sid, bootstrap.media == invitation.media else { throw NativePushRegistryFailure.rejected }
+        let data = try await request("lease", invitation: invitation, registration: registration,
+            fullJID: bootstrap.owner + "/" + bootstrap.resource)
+        return try bootstrap.activeLease(data, registrationExpiry: min(registration.expiresAt, context.authorization.expiresAt), now: now())
+    }
+
     private struct Reservation: Decodable { let callerJid: String; let recipientJid: String; let answerAuthorization: String }
     private struct Ended: Decodable { let ended: Bool }
     private struct Rejected: Decodable { let code: String }
@@ -93,7 +105,7 @@ struct NativeCallRecoveryClient: NativeColdCallServing {
         try Task.checkCancellation()
         try context.authorization.validate(configuration: context.configuration, registrationExpiry: registration.expiresAt, now: now())
         guard registration.deviceID == context.registration.deviceID, registration.generation == context.registration.generation,
-              invitation.expiresAt > now() || action == "end" else { throw NativePushRegistryFailure.rejected }
+              invitation.expiresAt > now() || ["end", "lease"].contains(action) else { throw NativePushRegistryFailure.rejected }
         var body: [String: String] = ["action": action, "callId": invitation.id.uuidString.lowercased(), "sid": invitation.sid,
             "mediaProfile": invitation.media.rawValue, "deviceId": registration.deviceID.uuidString.lowercased(), "generation": registration.generation]
         if let fullJID = fullJID { body["fullJid"] = fullJID }

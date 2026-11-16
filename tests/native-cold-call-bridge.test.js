@@ -11,7 +11,7 @@ const app = name => read("mobile/ios-native/App/" + name + ".swift");
 
 test("The actual cookie-free broker checks registration, proof, reservation, generation and end", () => {
   const php = process.env.TELETYPTEL_PHP || (process.platform === "win32" ? "C:\\wamp64\\bin\\php\\php8.4.15\\php.exe" : "php");
-  for (const name of ["call-recovery-test", "call-recovery-endpoint-test"]) {
+  for (const name of ["call-recovery-test", "call-recovery-endpoint-test", "call-active-lease-test"]) {
     const result = spawnSync(php, ["php/tests/" + name + ".php"], { cwd: root, encoding: "utf8", timeout: 15000 });
     assert.equal(result.status, 0, result.stdout + result.stderr);
     assert.match(result.stdout, /checks passed/);

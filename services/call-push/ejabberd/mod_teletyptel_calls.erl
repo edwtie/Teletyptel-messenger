@@ -111,7 +111,12 @@ user_send({Packet, #{jid := JID, lserver := Host} = State} = Acc) ->
                 case intent(Packet) of
                     {Action, SID, Profile} ->
                         allow = privacy(State, Packet, out),
-                        cast(Host, {intent, JID, xmpp:get_to(Packet), Action, SID, Profile, erlang:system_time(second)});
+                        case {Action, State} of
+                            {<<"proceed">>, #{teletyptel_answered := true, teletyptel_scope := Claims}} ->
+                                cast(Host, {active, start, JID, Claims, erlang:system_time(second)});
+                            {<<"proceed">>, _} -> ok;
+                            _ -> cast(Host, {intent, JID, xmpp:get_to(Packet), Action, SID, Profile, erlang:system_time(second)})
+                        end;
                     none -> ok
                 end,
                 Acc;
@@ -120,6 +125,11 @@ user_send({Packet, #{jid := JID, lserver := Host} = State} = Acc) ->
     catch _:_ -> Acc end;
 user_send(Acc) -> Acc.
 
+control(IQ, #xmlel{name = <<"keepalive">>, attrs = [{<<"xmlns">>, ?NS}], children = []},
+        #{teletyptel_answered := true, teletyptel_scope := Claims} = State) ->
+    true = maps:get(<<"expiresAt">>, Claims) > now(),
+    cast(maps:get(lserver, State), {active, refresh, maps:get(jid, State), Claims, now()}),
+    {drop, ejabberd_c2s:send(State, xmpp:make_iq_result(IQ))};
 control(IQ, #xmlel{name = <<"preferences">>, attrs = Attrs, children = Children}, State) ->
     true = lists:sort([Name || {Name, _} <- Attrs]) =:= [<<"dnd">>, <<"enabled">>, <<"xmlns">>],
     Enabled = boolean(proplists:get_value(<<"enabled">>, Attrs)),
@@ -159,7 +169,7 @@ intent(Packet) ->
     case Matches of
         [#xmlel{name = Action, attrs = Attrs, children = Descriptions}] ->
             SID = proplists:get_value(<<"id">>, Attrs),
-            case valid_sid(SID) andalso lists:member(Action, [<<"propose">>, <<"retract">>, <<"reject">>, <<"finish">>]) of
+            case valid_sid(SID) andalso lists:member(Action, [<<"propose">>, <<"proceed">>, <<"retract">>, <<"reject">>, <<"finish">>]) of
                 true when Action =:= <<"propose">> -> {Action, SID, media_profile(Descriptions)};
                 true -> {Action, SID, <<"audio">>};
                 false -> none
@@ -224,7 +234,7 @@ handle_cast({invalidate, JID}, #{calls := Calls} = State) ->
     Kept = maps:filter(fun(_, Call) ->
         Caller = maps:get(caller, Call), Recipient = maps:get(recipient, Call),
         case jid:remove_resource(Caller) =:= Bare orelse Recipient =:= Bare of
-            true -> emit_pair(Caller, Recipient, false, State), false;
+            true -> emit_pair(Caller, Recipient, false, State), stop_scoped(Call), false;
             false -> true
         end
     end, Calls),
@@ -233,6 +243,12 @@ handle_cast({intent, Caller, Recipient, Action, SID, Profile, Observed}, State) 
     Next = try
         true = now() - Observed >= 0 andalso now() - Observed =< 2,
         process_intent(Caller, Recipient, Action, SID, Profile, State)
+    catch _:_ -> State end,
+    {noreply, Next};
+handle_cast({active, Action, JID, Claims, Observed}, State) ->
+    Next = try
+        true = now() - Observed >= 0 andalso now() - Observed =< 2,
+        active_call(Action, JID, Claims, State)
     catch _:_ -> State end,
     {noreply, Next};
 handle_cast({handoff, JID, Values, Observed}, State) ->
@@ -270,16 +286,42 @@ process_intent(Actor, Peer, Action, SID, _, #{calls := Calls} = State) ->
          (maps:get(recipient, Call) =:= jid:remove_resource(Actor) andalso maps:get(caller, Call) =:= Peer))],
     lists:foreach(fun({_, Call}) ->
         true = lists:member(Action, [<<"retract">>, <<"reject">>, <<"finish">>]),
+        true = maps:get(full, Call, Actor) =:= Actor orelse maps:get(caller, Call) =:= Actor,
         emit(#{type => <<"end">>, caller => jid:encode(maps:get(caller, Call)), recipient => jid:encode(maps:get(recipient, Call)),
-               actor => jid:encode(Actor), sid => SID}, State)
+               actor => jid:encode(Actor), sid => SID}, State), stop_scoped(Call)
     end, Matches),
     State#{calls => lists:foldl(fun({Key, _}, Acc) -> maps:remove(Key, Acc) end, Calls, Matches)}.
+
+active_call(Action, JID, Claims, #{calls := Calls} = State) ->
+    Caller = jid:decode(maps:get(<<"peer">>, Claims)), SID = maps:get(<<"sid">>, Claims), Key = {jid:encode(Caller), SID},
+    Call = maps:get(Key, Calls),
+    true = maps:get(expires, Call) > now() andalso maps:get(<<"expiresAt">>, Claims) > now(),
+    Caller = maps:get(caller, Call), true = maps:get(recipient, Call) =:= jid:remove_resource(JID),
+    true = maps:get(profile, Call) =:= maps:get(<<"profile">>, Claims),
+    true = jid:encode(JID) =:= <<(maps:get(<<"owner">>, Claims))/binary, "/", (maps:get(<<"resource">>, Claims))/binary>>,
+    case Action of
+        start -> false = maps:is_key(full, Call);
+        refresh -> JID = maps:get(full, Call),
+            Original = maps:get(scope, Call),
+            true = maps:without([<<"expiresAt">>], Original) =:= maps:without([<<"expiresAt">>], Claims)
+    end,
+    true = resource_live(Caller) andalso resource_live(JID) andalso pair_allowed(Caller, JID),
+    lists:foreach(fun(Peer) -> emit(#{type => <<"resource">>, jid => jid:encode(Peer), online => true, expiresAt => now() + 25}, State) end, [Caller, JID]),
+    emit_pair(Caller, JID, true, State),
+    emit(#{type => <<"active">>, callId => maps:get(<<"callId">>, Claims), sid => SID, jid => jid:encode(JID),
+        deviceId => maps:get(<<"deviceId">>, Claims), generation => maps:get(<<"generation">>, Claims),
+        nonce => maps:get(<<"nonce">>, Claims), expiresAt => now() + 25}, State),
+    State#{calls => Calls#{Key => Call#{full => JID, scope => Claims, expires => now() + 25}}}.
+
+stop_scoped(#{full := #jid{luser = User, lserver = Host, lresource = Resource}}) ->
+    case ejabberd_sm:get_session_pid(User, Host, Resource) of Pid when is_pid(Pid) -> ejabberd_c2s:stop_async(Pid); _ -> ok end;
+stop_scoped(_) -> ok.
 
 now() -> erlang:system_time(second).
 replay_pending(JID, #{calls := Calls}) ->
     maps:foreach(fun({_, SID}, Call) ->
         Caller = maps:get(caller, Call),
-        case maps:get(recipient, Call) =:= jid:remove_resource(JID) andalso maps:get(expires, Call) > now()
+        case not maps:is_key(full, Call) andalso maps:get(recipient, Call) =:= jid:remove_resource(JID) andalso maps:get(expires, Call) > now()
             andalso pair_allowed(Caller, JID) of
             true ->
                 Kinds = case maps:get(profile, Call) of
@@ -327,7 +369,12 @@ offline(Pid, Encoded, #{resources := Resources, calls := Calls} = State) ->
             erlang:demonitor(Reference, [flush]),
             emit(#{type => <<"resource">>, jid => Encoded, online => false, expiresAt => now() + 25}, State),
             State#{resources => maps:remove(Encoded, Resources),
-                   calls => maps:filter(fun({Caller, _}, _) -> Caller =/= Encoded end, Calls)};
+                   calls => maps:filter(fun({Caller, _}, Call) ->
+                       case Caller =:= Encoded orelse maps:get(full, Call, undefined) =:= jid:decode(Encoded) of
+                           true -> stop_scoped(Call), false;
+                           false -> true
+                       end
+                   end, Calls)};
         _ -> State
     end.
 
@@ -340,10 +387,12 @@ refresh(#{calls := Calls, resources := Resources} = State) ->
     end, Resources),
     Retained = maps:filter(fun(_, Call) ->
         case maps:get(expires, Call) > now() of
-            false -> false;
+            false -> stop_scoped(Call), false;
             true ->
                 Caller = maps:get(caller, Call), Recipient = maps:get(recipient, Call),
-                Allowed = resource_live(Caller) andalso pair_allowed(Caller, Recipient),
+                Allowed = resource_live(Caller) andalso pair_allowed(Caller, Recipient)
+                    andalso case maps:get(full, Call, undefined) of undefined -> true; Full -> resource_live(Full) end,
+                case Allowed of false -> stop_scoped(Call); true -> ok end,
                 emit_pair(Caller, Recipient, Allowed, State), Allowed
         end
     end, Calls),

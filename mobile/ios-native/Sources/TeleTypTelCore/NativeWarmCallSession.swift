@@ -25,7 +25,11 @@ final class NativeWarmCallSession {
     private let registry: any NativeWarmCallRegistryServing
     private let recovery: NativeCallAnswerRecovery
     private let now: () -> TimeInterval
+    private let waitForRenewal: () async throws -> Void
     private var connection: Task<Void, Never>?
+    private var renewal: Task<Void, Never>?
+    private var activeBootstrap: NativeCallBootstrapGrant?
+    private var activeDeadline: TimeInterval?
     private var sender: (any NativeCallRecoverySending)?
     private var bound: String?
     private var proposal: NativeCallIntent?
@@ -40,9 +44,10 @@ final class NativeWarmCallSession {
     var remoteEnded: (() -> Void)?
 
     init(invitation: NativeCallInvitation, registration: NativePushRegistration, registry: any NativeWarmCallRegistryServing,
-         now: @escaping () -> TimeInterval = { Date().timeIntervalSince1970 }) {
+         now: @escaping () -> TimeInterval = { Date().timeIntervalSince1970 },
+         waitForRenewal: @escaping () async throws -> Void = { try await Task.sleep(nanoseconds: 8_000_000_000) }) {
         self.invitation = invitation; self.registration = registration; self.registry = registry
-        self.now = now; recovery = NativeCallAnswerRecovery(now: now)
+        self.now = now; self.waitForRenewal = waitForRenewal; recovery = NativeCallAnswerRecovery(now: now)
     }
 
     func prepare(account: NativeAuthenticatedAccount, connector: any NativeCallXMPPConnecting = NativeXMPPConnection(),
@@ -59,12 +64,28 @@ final class NativeWarmCallSession {
               bootstrap.expiresAt > now(), bootstrap.expiresAt <= invitation.expiresAt,
               connection == nil, !stopped else { throw NativeJingleFailure.invalidRequest }
         authorizedPeer = bootstrap.peer; authorizedResource = bootstrap.owner + "/" + bootstrap.resource
-        return try await prepare(owner: bootstrap.owner, connect: { connected, sender, intent, jingle in
+        activeBootstrap = bootstrap; activeDeadline = bootstrap.expiresAt
+        let offer = try await prepare(owner: bootstrap.owner, connect: { connected, sender, intent, jingle in
             try await connector.runCall(bootstrap: bootstrap, onConnected: connected, onSender: sender, onIntent: intent, onJingle: jingle)
         }, validatePeer: { peer in guard peer == bootstrap.peer else { throw NativeJingleFailure.rejected } }, validateContext: {
             try validateContext()
             guard bootstrap.expiresAt > self.now() else { throw NativeJingleFailure.timedOut }
         })
+        renewal = Task { [weak self] in
+            while !Task.isCancelled {
+                do {
+                    guard let wait = self?.waitForRenewal else { return }
+                    try await wait()
+                    guard let self = self, !self.stopped, !self.failed else { return }
+                    try await self.renewLease(bootstrap: bootstrap, sender: offer.sender, validate: validateContext)
+                } catch {
+                    guard let self = self, !self.stopped else { return }
+                    self.failConnection(); self.endServerCall(); self.connection?.cancel()
+                    return
+                }
+            }
+        }
+        return offer
     }
 
     private typealias Connect = (@escaping @Sendable (String) -> Void,
@@ -107,6 +128,7 @@ final class NativeWarmCallSession {
                 requireAnswerAuthorization: authorizedResource != nil,
                 validateContext: { try validateContext(); try validatePeer(proposal.peer) },
                 abandonReservation: { [weak self] in self?.endServerCall() })
+            if let bootstrap = activeBootstrap { try await renewLease(bootstrap: bootstrap, sender: sender, validate: validateContext) }
             while requests.isEmpty { try await pause(deadline, validate: validateContext) }
             try current(deadline, validate: validateContext)
             guard requests.filter({ $0.action == "session-initiate" }).count == 1, let request = requests.first,
@@ -145,6 +167,27 @@ final class NativeWarmCallSession {
     }
 
     private func failConnection() { guard !stopped, !failed else { return }; failed = true; remoteEnded?() }
+    private func renewLease(bootstrap: NativeCallBootstrapGrant, sender: any NativeCallRecoverySending,
+                            validate: () throws -> Void) async throws {
+        guard let registry = registry as? any NativeActiveCallRegistryServing else { throw NativeJingleFailure.rejected }
+        try current(activeDeadline ?? 0, validate: validate)
+        try await sender.keepCallAlive()
+        var lease: NativeCallActiveLease?
+        for retry in 0..<12 {
+            try current(activeDeadline ?? 0, validate: validate)
+            do { lease = try await registry.lease(invitation: invitation, registration: registration, bootstrap: bootstrap); break }
+            catch NativePushRegistryFailure.proofPending {
+                guard retry < 11 else { throw NativeJingleFailure.timedOut }
+                try await Task.sleep(nanoseconds: 150_000_000)
+            }
+        }
+        guard let lease = lease, bootstrap.matches(lease), lease.expiresAt > (activeDeadline ?? 0),
+              lease.expiresAt <= now() + 25, lease.expiresAt <= registration.expiresAt else { throw NativeJingleFailure.rejected }
+        try current(activeDeadline ?? 0, validate: validate)
+        try await sender.authorizeActiveCallLease(lease)
+        try current(activeDeadline ?? 0, validate: validate)
+        activeDeadline = lease.expiresAt
+    }
     private func current(_ deadline: TimeInterval, validate: () throws -> Void) throws {
         try Task.checkCancellation(); try validate()
         guard !stopped, !failed else { throw NativeJingleFailure.disconnected }
@@ -157,6 +200,7 @@ final class NativeWarmCallSession {
     func cancel() {
         guard !stopped else { return }
         stopped = true; recovery.cancel(); receiveJingle = nil; remoteEnded = nil
+        renewal?.cancel(); renewal = nil; activeBootstrap = nil; activeDeadline = nil
         connection?.cancel(); connection = nil; sender = nil; requests.removeAll()
     }
     func endServerCall() {

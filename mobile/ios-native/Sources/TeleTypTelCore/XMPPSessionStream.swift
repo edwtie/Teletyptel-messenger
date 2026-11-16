@@ -26,7 +26,7 @@ struct XMPPSessionStream {
     private(set) var phase: Phase = .opening
     private var account: NativeAuthenticatedAccount?
     private var bootstrap: NativeCallBootstrapGrant?
-    private let bootstrapExpiry: TimeInterval?
+    private var bootstrapExpiry: TimeInterval?
     private let now: () -> TimeInterval
     private let configuration: ServerConfiguration
     private let expectedJID: String
@@ -55,6 +55,13 @@ struct XMPPSessionStream {
     }
 
     var opening: String { XMPPProbeStream.opening(for: configuration) }
+
+    mutating func applyAcknowledgedCallLease(_ lease: NativeCallActiveLease) throws {
+        guard phase == .online, let current = bootstrapExpiry, current > now(), now().isFinite,
+              lease.owner == expectedJID, lease.resource == resource, lease.domain == configuration.domain,
+              lease.expiresAt > current, lease.expiresAt <= now() + 25 else { throw NativePushRegistryFailure.rejected }
+        bootstrapExpiry = lease.expiresAt
+    }
 
     mutating func close() {
         account = nil

@@ -2,6 +2,7 @@
 declare(strict_types=1);
 if (PHP_SAPI !== 'cli') { http_response_code(404); exit; }
 require_once dirname(__DIR__) . '/lib/CallPushSpool.php';
+require_once dirname(__DIR__) . '/lib/CallPushRecovery.php';
 
 try {
     $configuration = json_decode(fgets(STDIN, 4096), true, 8, JSON_THROW_ON_ERROR);
@@ -17,6 +18,15 @@ try {
     $device = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
     $binding = str_repeat('1', 64);
     $registration = $service->register('bob', $binding, $device, str_repeat('ab', 32), true);
+    $broker = null; $authorization = null;
+    if (isset($configuration['bootstrapKey'])) {
+        $bootstrapKey = base64_decode($configuration['bootstrapKey'], true);
+        if ($bootstrapKey === false || strlen($bootstrapKey) !== 32) throw new RuntimeException('Invalid bootstrap fixture');
+        $issuer = new CallPushBootstrap($pdo, $signaling, $bootstrapKey, 'production', 'example.test', 'fixture');
+        $issuer->ensureSchema();
+        $broker = new CallPushRecovery($pdo, $service, $issuer, $signaling, $bootstrapKey, 'production', 'example.test', 'fixture');
+        $authorization = $broker->enroll('bob', $binding, $device);
+    }
     echo json_encode(['generation' => $registration['generation']], JSON_THROW_ON_ERROR) . "\n";
     while (($line = fgets(STDIN, 2097152)) !== false) {
         $input = json_decode($line, true, 16, JSON_THROW_ON_ERROR);
@@ -36,6 +46,16 @@ try {
             } elseif ($input['action'] === 'accept') {
                 $result = $signaling->accept($service, 'bob', $binding, ['action' => 'accept', 'callId' => $input['callId'],
                     'deviceId' => $device, 'generation' => $registration['generation'], 'fullJid' => $input['jid']]);
+            } elseif ($input['action'] === 'recovery' && $broker !== null) {
+                $call = $pdo->prepare('SELECT sid, media_profile FROM call_push_calls WHERE call_id = ?');
+                $call->execute([$input['callId']]); $row = $call->fetch(PDO::FETCH_ASSOC);
+                if (!$row) throw new CallPushFailure('Unknown fixture call');
+                $body = ['action' => $input['operation'], 'callId' => $input['callId'], 'sid' => $row['sid'], 'mediaProfile' => $row['media_profile'],
+                    'deviceId' => $device, 'generation' => $registration['generation']];
+                if (isset($input['jid'])) $body['fullJid'] = $input['jid'];
+                $result = $broker->handle($authorization['credential'], $body);
+            } elseif ($input['action'] === 'revoke') {
+                $service->revokeSession('bob', $binding); $result = ['revoked' => true];
             } elseif ($input['action'] === 'spool') {
                 $directory = sys_get_temp_dir() . '/tc-signaling-spool-' . bin2hex(random_bytes(12));
                 mkdir($directory, 0700);

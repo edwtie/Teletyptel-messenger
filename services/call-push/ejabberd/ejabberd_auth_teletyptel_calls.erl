@@ -165,6 +165,29 @@ valid(_) -> false.
 close(State) -> ejabberd_c2s:stop_async(self()), State.
 authenticated(#{auth_module := ?MODULE, teletyptel_scope := Claims, lserver := Host} = State,
     #iq{type = set, id = Id, from = From, to = To,
+        sub_els = [#xmlel{name = <<"lease">>, attrs = [{<<"xmlns">>, ?NS}], children = [{xmlcdata, Token}]}]} = IQ) ->
+    try
+        true = valid(State), true = maps:get(teletyptel_answered, State, false),
+        true = byte_size(Id) > 0 andalso byte_size(Id) =< 256,
+        Own = <<(maps:get(<<"owner">>, Claims))/binary, "/", (maps:get(<<"resource">>, Claims))/binary>>,
+        Own = jid:encode(From), Host = jid:encode(To),
+        Renewed = active_lease(Token, Claims, Host),
+        Expires = maps:get(<<"expiresAt">>, Renewed),
+        {atomic, ok} = mnesia:transaction(fun() ->
+            Key = {Host, maps:get(<<"nonce">>, Claims)},
+            [{?TABLE, Key, Pid, Device, Generation, _}] = mnesia:read(?TABLE, Key, write),
+            true = Pid =:= self(),
+            [] = mnesia:read(?TABLE, {Host, {revoked, Device, Generation}}, read),
+            mnesia:write({?TABLE, Key, Pid, Device, Generation, Expires})
+        end),
+        erlang:send_after(max(1, (Expires - erlang:system_time(second)) * 1000), self(),
+            {teletyptel_scope_expired, maps:get(<<"nonce">>, Claims)}),
+        Pending = maps:get(teletyptel_out, State), false = maps:is_key(Id, Pending), true = map_size(Pending) < 32,
+        Extended = State#{teletyptel_scope => Renewed, teletyptel_out => Pending#{Id => Host}},
+        {stop, ejabberd_c2s:send(Extended, xmpp:make_iq_result(IQ))}
+    catch _:_ -> {stop, close(State)} end;
+authenticated(#{auth_module := ?MODULE, teletyptel_scope := Claims, lserver := Host} = State,
+    #iq{type = set, id = Id, from = From, to = To,
         sub_els = [#xmlel{name = <<"authorize">>, attrs = [{<<"xmlns">>, ?NS}], children = [{xmlcdata, Token}]}]} = IQ) ->
     try
         true = valid(State), false = maps:get(teletyptel_answered, State, false),
@@ -182,27 +205,38 @@ authenticated(#{auth_module := ?MODULE} = State, Packet) ->
 authenticated(State, _) -> State.
 
 answer_permit(Token, Claims, Host) ->
+    Value = signed_permission(Token, <<"tca1">>, <<"teletyptel-call-answer-v1:">>, Claims, Host),
+    <<"call-xmpp-answer-v1">> = maps:get(<<"scope">>, Value),
+    true = maps:get(<<"expiresAt">>, Value) =< maps:get(<<"expiresAt">>, Claims), ok.
+
+active_lease(Token, Claims, Host) ->
+    Value = signed_permission(Token, <<"tcl1">>, <<"teletyptel-call-active-v1:">>, Claims, Host),
+    <<"call-xmpp-active-v1">> = maps:get(<<"scope">>, Value),
+    true = maps:get(<<"expiresAt">>, Value) > maps:get(<<"expiresAt">>, Claims),
+    Claims#{<<"expiresAt">> => maps:get(<<"expiresAt">>, Value)}.
+
+signed_permission(Token, Prefix, Purpose, Claims, Host) ->
     true = byte_size(Token) =< 1024,
-    [<<"tca1">>, Payload, Signature] = binary:split(Token, <<".">>, [global]),
+    [Prefix, Payload, Signature] = binary:split(Token, <<".">>, [global]),
     match = re:run(Payload, <<"\\A[A-Za-z0-9_-]+\\z">>, [{capture, none}]),
     match = re:run(Signature, <<"\\A[0-9a-f]{64}\\z">>, [{capture, none}]),
     #{key := Key, environment := Environment, issuer := Issuer} = persistent_term:get({?MODULE, Host}),
     Expected = string:lowercase(binary:encode_hex(crypto:mac(hmac, sha256, Key,
-        <<"teletyptel-call-answer-v1:", Environment/binary, ":", Host/binary, ":", Issuer/binary, ":", Payload/binary>>))),
+        <<Purpose/binary, Environment/binary, ":", Host/binary, ":", Issuer/binary, ":", Payload/binary>>))),
     true = crypto:hash_equals(Expected, Signature),
     Translated = binary:replace(binary:replace(Payload, <<"-">>, <<"+">>, [global]), <<"_">>, <<"/">>, [global]),
     Value = jiffy:decode(base64:decode(<<Translated/binary, (binary:copy(<<"=">>, (4 - byte_size(Translated) rem 4) rem 4))/binary>>), [return_maps]),
     true = lists:sort(maps:keys(Value)) =:= lists:sort(maps:keys(Claims)),
-    <<"call-xmpp-answer-v1">> = maps:get(<<"scope">>, Value),
     true = maps:without([<<"scope">>, <<"issuedAt">>, <<"expiresAt">>], Value) =:= maps:without([<<"scope">>, <<"issuedAt">>, <<"expiresAt">>], Claims),
     Issued = maps:get(<<"issuedAt">>, Value), Expires = maps:get(<<"expiresAt">>, Value), Now = erlang:system_time(second),
-    true = is_integer(Issued) andalso is_integer(Expires) andalso Issued =< Now andalso Now - Issued =< 20
-        andalso Expires > Now andalso Expires =< maps:get(<<"expiresAt">>, Claims), ok.
+    true = is_integer(Issued) andalso is_integer(Expires) andalso Issued =< Now andalso Now - Issued =< 25
+        andalso Expires > Now andalso Expires =< Issued + 25, Value.
 unbound(#{auth_module := ?MODULE} = State, _) -> {stop, close(State)};
 unbound(State, _) -> State.
 inline({#{auth_module := ?MODULE} = State, _, _}) -> {stop, {close(State), [], []}};
 inline(Value) -> Value.
-info(#{auth_module := ?MODULE} = State, {teletyptel_scope_expired, _}) -> {stop, close(State)};
+info(#{auth_module := ?MODULE} = State, {teletyptel_scope_expired, _}) ->
+    case valid(State) of true -> {stop, State}; false -> {stop, close(State)} end;
 info(State, _) -> State.
 terminated(#{auth_module := ?MODULE} = State, _) -> erase({?MODULE, grant}), State;
 terminated(State, _) -> State.
@@ -249,6 +283,8 @@ permitted(#iq{type = Type, id = Id, from = From, to = To, sub_els = Els}, #{tele
             Raw = [xmpp:encode(Element) || Element <- Els],
             true = case {Type, Other, Raw} of
                 {get, Host, [#xmlel{name = <<"ping">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:ping">>}], children = []}]} -> true;
+                {set, Host, [#xmlel{name = <<"keepalive">>} = Element]} when Direction =:= out ->
+                    maps:get(teletyptel_answered, State, false) andalso keepalive(Element, Claims);
                 {set, Host, [Element]} when Direction =:= out -> handoff(Element, Claims);
                 {set, _, [Element]} -> maps:get(teletyptel_answered, State, false) andalso Other =:= maps:get(<<"peer">>, Claims) andalso jingle(Element, Claims, Direction);
                 _ -> false
@@ -265,6 +301,9 @@ permitted(#message{type = chat, from = From, to = To, body = [], subject = [], t
     true = Direction =/= out orelse Intent#xmlel.name =/= <<"proceed">> orelse maps:get(teletyptel_answered, State, false),
     true = lists:all(fun(Element) -> Element =:= Intent orelse metadata(Element, Claims, Direction) end, Raw), State;
 permitted(_, _, _) -> error(outside_call_scope).
+
+keepalive(#xmlel{name = <<"keepalive">>, attrs = [{<<"xmlns">>, ?NS}], children = []}, _) -> true;
+keepalive(_, _) -> false.
 
 handoff(#xmlel{name = <<"handoff">>, attrs = Attrs, children = []}, Claims) ->
     Values = maps:from_list(Attrs),

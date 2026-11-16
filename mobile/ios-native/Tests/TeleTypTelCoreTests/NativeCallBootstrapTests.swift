@@ -16,10 +16,10 @@ final class NativeCallBootstrapTests: XCTestCase {
          "resource": "tc-call-" + nonce, "issuedAt": 100, "expiresAt": 120]
     }
 
-    private func body(_ value: [String: Any], metadata: [String: Any]? = nil) throws -> Data {
+    private func body(_ value: [String: Any], metadata: [String: Any]? = nil, prefix: String = "tcr1") throws -> Data {
         let encoded = try JSONSerialization.data(withJSONObject: value).base64EncodedString()
             .replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "")
-        return try JSONSerialization.data(withJSONObject: ["credential": "tcr1." + encoded + "." + String(repeating: "a", count: 64),
+        return try JSONSerialization.data(withJSONObject: ["credential": prefix + "." + encoded + "." + String(repeating: "a", count: 64),
                                                           "claims": metadata ?? value])
     }
 
@@ -143,5 +143,44 @@ final class NativeCallBootstrapTests: XCTestCase {
         time = 120
         XCTAssertThrowsError(try connected.heartbeat())
         XCTAssertEqual(connected.phase, .closed)
+    }
+
+    func testActiveLeasePinsOriginalIdentityAndCannotBecomeAnotherLoginCredential() throws {
+        let bootstrap = try grant()
+        var active = claims(); active["scope"] = "call-xmpp-active-v1"; active["issuedAt"] = 110; active["expiresAt"] = 135
+        let data = try body(active, prefix: "tcl1")
+        let lease = try bootstrap.activeLease(data, registrationExpiry: 200, now: 110)
+        XCTAssertTrue(bootstrap.matches(lease))
+        XCTAssertEqual(String(reflecting: lease), "NativeCallActiveLease(redacted)")
+        XCTAssertThrowsError(try decode(data, now: 110))
+        XCTAssertThrowsError(try bootstrap.activeLease(body(active), registrationExpiry: 200, now: 110))
+        for (field, value) in [("owner", "other@example.test"), ("peer", "charlie@example.test/caller"),
+            ("sid", "different"), ("profile", "audio"), ("nonce", String(repeating: "f", count: 32)),
+            ("resource", "other"), ("generation", String(repeating: "f", count: 32)), ("scope", "call-xmpp-answer-v1")] {
+            var changed = active; changed[field] = value
+            XCTAssertThrowsError(try bootstrap.activeLease(body(changed, prefix: "tcl1"), registrationExpiry: 200, now: 110), field)
+        }
+        XCTAssertThrowsError(try bootstrap.activeLease(data, registrationExpiry: 134, now: 110))
+        XCTAssertThrowsError(try bootstrap.activeLease(data, registrationExpiry: 200, now: 135))
+    }
+
+    func testAcknowledgedLeaseExtendsOnlyAnUnexpiredBoundCallStream() throws {
+        let bootstrap = try grant()
+        var active = claims(); active["scope"] = "call-xmpp-active-v1"; active["issuedAt"] = 110; active["expiresAt"] = 135
+        let lease = try bootstrap.activeLease(body(active, prefix: "tcl1"), registrationExpiry: 200, now: 110)
+        var time: TimeInterval = 100
+        var stream = XMPPSessionStream(bootstrap: bootstrap, now: { time })
+        XCTAssertThrowsError(try stream.applyAcknowledgedCallLease(lease))
+        let identifier = try binding(&stream)
+        _ = try stream.receive(bound(identifier, resource: bootstrap.resource))
+        time = 110
+        try stream.applyAcknowledgedCallLease(lease)
+        XCTAssertThrowsError(try stream.applyAcknowledgedCallLease(lease))
+        time = 121
+        XCTAssertNoThrow(try stream.heartbeat())
+        time = 135
+        XCTAssertThrowsError(try stream.applyAcknowledgedCallLease(lease))
+        XCTAssertThrowsError(try stream.receive("<message xmlns='jabber:client'/>"))
+        XCTAssertEqual(stream.phase, .closed)
     }
 }

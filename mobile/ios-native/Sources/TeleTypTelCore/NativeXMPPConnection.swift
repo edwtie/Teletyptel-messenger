@@ -36,10 +36,14 @@ protocol NativeJingleXMPPConnecting: NativeXMPPConnecting {
 
 protocol NativeCallRecoverySending: NativeJingleSending, NativeCallIntentSending {
     func authorizeCallAnswer(_ permit: String) async throws
+    func keepCallAlive() async throws
+    func authorizeActiveCallLease(_ lease: NativeCallActiveLease) async throws
 }
 
 extension NativeCallRecoverySending {
     func authorizeCallAnswer(_ permit: String) async throws { throw NativePushRegistryFailure.unavailable }
+    func keepCallAlive() async throws { throw NativePushRegistryFailure.unavailable }
+    func authorizeActiveCallLease(_ lease: NativeCallActiveLease) async throws { throw NativePushRegistryFailure.unavailable }
 }
 
 protocol NativeCallXMPPConnecting {
@@ -188,6 +192,7 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
     private var completed = false
     private var scopeDeadline: DispatchWorkItem?
     private var scopeExpiry: TimeInterval?
+    private var bootstrapContext: NativeCallBootstrapGrant?
     private var scopedSocketURL: URL?
 
     init(account: NativeAuthenticatedAccount, onConnected: @escaping @Sendable (String) -> Void,
@@ -219,6 +224,7 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
          onJingle: @escaping @Sendable (NativeJingleRequest) -> Void) {
         configuration = bootstrap.configuration; ownerJID = bootstrap.owner; callOnly = true
         stream = XMPPSessionStream(bootstrap: bootstrap); scopeExpiry = bootstrap.expiresAt
+        bootstrapContext = bootstrap
         scopedSocketURL = bootstrap.configuration.webSocket.deletingLastPathComponent().appendingPathComponent("xmpp-call-websocket")
         self.onConnected = onConnected; self.onCallSender = onSender
         self.callIntentObserver = onIntent; self.onJingle = onJingle
@@ -263,6 +269,46 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
               callOnly else { throw NativePushRegistryFailure.rejected }
         let identifier = "call-answer-" + UUID().uuidString
         try await exchangeCallControl("<iq xmlns='jabber:client' type='set' to='\(configuration.domain)' id='\(identifier)'><authorize xmlns='urn:teletyptel:call-recovery:1'>\(permit)</authorize></iq>", identifier: identifier)
+    }
+
+    func keepCallAlive() async throws {
+        let identifier = "call-keepalive-" + UUID().uuidString
+        try await exchangeCallControl("<iq xmlns='jabber:client' type='set' to='\(configuration.domain)' id='\(identifier)'><keepalive xmlns='urn:teletyptel:call-recovery:1'/></iq>", identifier: identifier)
+    }
+
+    func authorizeActiveCallLease(_ lease: NativeCallActiveLease) async throws {
+        let identifier = "call-lease-" + UUID().uuidString
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            queue.async {
+                guard !self.completed, self.bootstrapContext?.matches(lease) == true,
+                      let expiry = self.scopeExpiry, expiry > Date().timeIntervalSince1970,
+                      lease.expiresAt > expiry else { continuation.resume(throwing: NativePushRegistryFailure.rejected); return }
+                continuation.resume()
+            }
+        }
+        try await exchangeCallControl("<iq xmlns='jabber:client' type='set' to='\(configuration.domain)' id='\(identifier)'><lease xmlns='urn:teletyptel:call-recovery:1'>\(lease.credential)</lease></iq>", identifier: identifier)
+        try Task.checkCancellation()
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            queue.async {
+                do {
+                    guard !self.completed else { throw NativeJingleFailure.disconnected }
+                    try self.stream.applyAcknowledgedCallLease(lease)
+                    self.scopeExpiry = lease.expiresAt
+                    self.scheduleScopeDeadline(lease.expiresAt)
+                    continuation.resume()
+                } catch { self.finish(error); continuation.resume(throwing: error) }
+            }
+        }
+    }
+
+    private func scheduleScopeDeadline(_ expiry: TimeInterval) {
+        scopeDeadline?.cancel()
+        let deadline = DispatchWorkItem { [weak self] in
+            guard let self = self, self.scopeExpiry == expiry else { return }
+            self.finish(NativeJingleFailure.timedOut)
+        }
+        scopeDeadline = deadline
+        queue.asyncAfter(deadline: .now() + max(0, expiry - Date().timeIntervalSince1970), execute: deadline)
     }
 
     private func receiveCallIntent(_ frame: String) {
@@ -851,9 +897,7 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
                 if let expiry = self.scopeExpiry {
                     let remaining = expiry - Date().timeIntervalSince1970
                     guard remaining > 0, remaining <= 20 else { self.finish(NativeJingleFailure.timedOut); return }
-                    let deadline = DispatchWorkItem { [weak self] in self?.finish(NativeJingleFailure.timedOut) }
-                    self.scopeDeadline = deadline
-                    self.queue.asyncAfter(deadline: .now() + remaining, execute: deadline)
+                    self.scheduleScopeDeadline(expiry)
                 }
                 let settings = URLSessionConfiguration.ephemeral
                 settings.httpCookieStorage = nil
@@ -906,6 +950,7 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
         completed = true
         self.continuation = nil
         scopeDeadline?.cancel(); scopeDeadline = nil
+        bootstrapContext = nil
         onConnected = nil
         onRoster = nil
         onChat = nil

@@ -69,6 +69,9 @@ final class CallPushSignaling
             'handoffs' => 'scope_id VARCHAR(64) NOT NULL, call_id VARCHAR(36) NOT NULL, device_id VARCHAR(36) NOT NULL,
                 generation VARCHAR(32) NOT NULL, full_jid VARCHAR(512) NOT NULL, revision BIGINT NOT NULL,
                 expires BIGINT NOT NULL, touched BIGINT NOT NULL, PRIMARY KEY(scope_id, call_id, device_id, generation)',
+            'active' => 'scope_id VARCHAR(64) NOT NULL, call_id VARCHAR(36) NOT NULL, device_id VARCHAR(36) NOT NULL,
+                generation VARCHAR(32) NOT NULL, full_jid VARCHAR(512) NOT NULL, nonce VARCHAR(32) NOT NULL,
+                revision BIGINT NOT NULL, expires BIGINT NOT NULL, touched BIGINT NOT NULL, PRIMARY KEY(scope_id, call_id)',
         ] as $table => $columns) $this->pdo->exec('CREATE TABLE IF NOT EXISTS call_signaling_' . $table . ' (' . $columns . ')' . $suffix);
     }
 
@@ -192,6 +195,7 @@ final class CallPushSignaling
                 'policy' => $this->policyEvent($event, $now, $body['timestamp']),
                 'offer', 'end' => $this->callEvent($event, $now, $body['timestamp']),
                 'handoff' => $this->handoffEvent($event, $now, $body['timestamp']),
+                'active' => $this->activeEvent($event, $now, $body['timestamp']),
                 default => throw new CallPushFailure('Onbekende signaleringsgebeurtenis.'),
             };
             $this->write("UPDATE call_push_jobs SET state = 'skipped' WHERE state = 'pending' AND call_id IN
@@ -310,6 +314,65 @@ final class CallPushSignaling
         $this->write('INSERT INTO call_signaling_handoffs VALUES (?, ?, ?, ?, ?, ?, ?, ?)', [...$parameters, $event['jid'], $revision, min($expires, (int)$call['expires']), $now]);
     }
 
+    public function activeCall(array $call): ?array
+    {
+        $record = $this->rows('SELECT * FROM call_signaling_active WHERE scope_id = ? AND call_id = ?',
+            [$this->scope, $call['call_id'] ?? ''])[0] ?? null;
+        if (!$record || ($call['state'] ?? '') !== 'accepted' || (int)$record['expires'] <= ($this->clock)()
+            || $record['device_id'] !== ($call['accepted_device'] ?? null)
+            || $record['generation'] !== ($call['accepted_generation'] ?? null)
+            || $record['full_jid'] !== ($call['recipient_jid'] ?? null)) return null;
+        return $record;
+    }
+
+    private function activeEvent(array $event, int $now, int $issued): void
+    {
+        self::fields($event, ['type', 'callId', 'sid', 'jid', 'deviceId', 'generation', 'nonce', 'revision', 'expiresAt']);
+        $callId = self::uuid($event['callId']); $deviceId = self::uuid($event['deviceId']);
+        $sid = self::identifier($event['sid']); $account = $this->account($event['jid'], true);
+        foreach (['generation', 'nonce'] as $field) {
+            if (!is_string($event[$field]) || !preg_match('/\A[0-9a-f]{32}\z/', $event[$field])) throw new CallPushFailure('Ongeldig gespreksbewijs.');
+        }
+        $expires = $this->lease($event['expiresAt'], 25, $issued);
+        $call = $this->rows('SELECT * FROM call_push_calls WHERE call_id = ?', [$callId])[0] ?? null;
+        $device = $this->rows('SELECT * FROM call_push_devices WHERE device_id = ?', [$deviceId])[0] ?? null;
+        $record = $call ? ($this->rows('SELECT * FROM call_signaling_calls WHERE scope_id = ? AND caller = ? AND sid = ?',
+            [$this->scope, $call['caller'], $sid])[0] ?? null) : null;
+        if (!$call || !$device || !$record || $record['call_id'] !== $callId || $call['state'] !== 'accepted'
+            || $call['recipient'] !== $account['account_id'] || $call['sid'] !== $sid
+            || $call['accepted_device'] !== $deviceId || $call['accepted_generation'] !== $event['generation']
+            || $call['recipient_jid'] !== $event['jid'] || $device['account_id'] !== $account['account_id']
+            || $device['generation'] !== $event['generation'] || $device['environment'] !== $this->environment
+            || (int)$device['expires'] <= $now || (int)$device['access_version'] !== $account['version']
+            || !$this->allows($call, 'read') || !$this->resourceAllowed($event['jid'], $account['account_id'])
+            || $event['jid'] !== $account['jid'] . '/tc-call-' . $event['nonce']) {
+            throw new CallPushFailure('Actief gesprek niet bevestigd.', 403);
+        }
+        $issue = $this->rows('SELECT * FROM call_bootstrap_issues WHERE nonce = ? AND call_id = ? AND device_id = ? AND generation = ?',
+            [$event['nonce'], $callId, $deviceId, $event['generation']])[0] ?? null;
+        $lease = $this->rows('SELECT expires FROM call_bootstrap_leases WHERE nonce = ?', [$event['nonce']])[0] ?? null;
+        $previous = $this->rows('SELECT * FROM call_signaling_active WHERE scope_id = ? AND call_id = ?', [$this->scope, $callId])[0] ?? null;
+        if (!$issue || (int)($lease['expires'] ?? $issue['expires']) <= $now
+            || $previous && ($previous['nonce'] !== $event['nonce'] || $this->activeCall($call) === null)) {
+            throw new CallPushFailure('Gesprekstoegang verlopen.', 403);
+        }
+        if (!$previous) {
+            $handoff = $this->rows('SELECT * FROM call_signaling_handoffs WHERE scope_id = ? AND call_id = ? AND device_id = ? AND generation = ?',
+                [$this->scope, $callId, $deviceId, $event['generation']])[0] ?? null;
+            if (!$handoff || $handoff['full_jid'] !== $event['jid'] || (int)$handoff['expires'] <= $now) {
+                throw new CallPushFailure('Gespreksbewijs ontbreekt.', 403);
+            }
+        }
+        $revision = $this->revision($event['revision'], $previous);
+        $expires = min($expires, (int)$device['expires']);
+        $this->write('DELETE FROM call_signaling_active WHERE scope_id = ? AND call_id = ?', [$this->scope, $callId]);
+        $this->write('INSERT INTO call_signaling_active VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [$this->scope, $callId, $deviceId, $event['generation'], $event['jid'], $event['nonce'], $revision, $expires, $now]);
+        $this->write("UPDATE call_signaling_calls SET state = 'active', expires = ?, touched = ? WHERE scope_id = ? AND call_id = ?",
+            [$expires, $now, $this->scope, $callId]);
+        $this->write("UPDATE call_push_calls SET expires = ? WHERE call_id = ? AND state = 'accepted'", [$expires, $callId]);
+    }
+
     private function resourceAllowed(string $jid, string $account): bool
     {
         $row = $this->rows('SELECT * FROM call_signaling_resources WHERE scope_id = ? AND full_jid = ?', [$this->scope, $jid])[0] ?? null;
@@ -335,7 +398,9 @@ final class CallPushSignaling
                 || !is_string($call['caller'] ?? null) || !is_string($call['recipient'] ?? null) || !is_string($call['sid'] ?? null)) return false;
             $record = $this->rows('SELECT * FROM call_signaling_calls WHERE scope_id = ? AND caller = ? AND sid = ?', [$this->scope, $call['caller'], $call['sid']])[0] ?? null;
             $now = ($this->clock)();
-            if (!$record || $record['state'] !== 'pending' || $record['recipient'] !== $call['recipient'] || (int)$record['expires'] <= $now
+            if (!$record || !in_array($record['state'], ['pending', 'active'], true)
+                || $record['state'] === 'active' && $operation !== 'read'
+                || $record['recipient'] !== $call['recipient'] || (int)$record['expires'] <= $now
                 || $record['media_profile'] !== ($call['media_profile'] ?? null)
                 || (bool)($call['has_video'] ?? null) !== in_array($record['media_profile'], ['video', 'total'], true)
                 || (int)($call['expires'] ?? 0) > (int)$record['expires'] || (int)($call['expires'] ?? 0) <= $now
@@ -347,6 +412,10 @@ final class CallPushSignaling
                 || !AccountAccess::versionAllowed($this->pdo, $record['caller'], (int)$record['caller_version'])
                 || !AccountAccess::versionAllowed($this->pdo, $record['recipient'], (int)$record['recipient_version'])
                 || !$this->resourceAllowed($record['caller_jid'], $record['caller']) || !$this->pairAllowed($record['caller'], $record['recipient'])) return false;
+            if ($record['state'] === 'active') {
+                $active = $this->activeCall($call);
+                return $active !== null && $this->resourceAllowed($active['full_jid'], $record['recipient']);
+            }
             if ($operation !== 'accept') return true;
             $handoff = $this->rows('SELECT * FROM call_signaling_handoffs WHERE scope_id = ? AND call_id = ? AND device_id = ? AND generation = ?',
                 [$this->scope, $call['call_id'] ?? '', $call['accepted_device'] ?? '', $call['accepted_generation'] ?? ''])[0] ?? null;
@@ -427,7 +496,7 @@ final class CallPushSignaling
     private function cleanupInside(int $now): void
     {
         $this->write('DELETE FROM call_signaling_events WHERE scope_id = ? AND created < ?', [$this->scope, $now - 120]);
-        foreach (['resources', 'policies', 'handoffs', 'calls'] as $table) {
+        foreach (['resources', 'policies', 'handoffs', 'calls', 'active'] as $table) {
             $this->write('DELETE FROM call_signaling_' . $table . ' WHERE scope_id = ? AND touched < ?', [$this->scope, $now - 86400]);
         }
     }

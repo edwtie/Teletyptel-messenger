@@ -9,6 +9,7 @@ private actor WarmCallConnection: NativeCallXMPPConnecting, NativeBootstrapXMPPC
     private var connected = false
     private var stopped = false
     private var activeBound = "bob@localhost/awakened"
+    var rejectLease = false
     let profile: NativeCallMedia
     let offerProfile: NativeCallMedia
     let boundJID: String
@@ -59,6 +60,12 @@ private actor WarmCallConnection: NativeCallXMPPConnecting, NativeBootstrapXMPPC
         operations.append("proof")
     }
     func authorizeCallAnswer(_ permit: String) async throws { operations.append("authorize") }
+    func keepCallAlive() async throws { operations.append("keepalive") }
+    func authorizeActiveCallLease(_ lease: NativeCallActiveLease) async throws {
+        operations.append("lease")
+        if rejectLease { throw NativePushRegistryFailure.rejected }
+    }
+    func setRejectLease(_ value: Bool) { rejectLease = value }
     func sendCallIntent(action: NativeCallIntentAction, peer: String, sid: String, media: NativeCallMedia?) async throws {
         guard action == .proceed, peer == "alice@localhost/caller", sid == "call-1" else { throw NativeJingleFailure.invalidRequest }
         operations.append("proceed")
@@ -99,13 +106,29 @@ private actor WarmCallConnection: NativeCallXMPPConnecting, NativeBootstrapXMPPC
 }
 
 @MainActor
-private final class WarmCallRegistry: NativeWarmCallRegistryServing {
+private final class WarmCallRegistry: NativeActiveCallRegistryServing {
     var accepts = 0
     var ends = 0
     var caller = "alice@localhost/caller"
     var permitted = true
     var afterAccept: (() -> Void)?
     var answerAuthorization: String?
+    var leases = 0
+    var now: () -> TimeInterval = { 100 }
+    func lease(invitation: NativeCallInvitation, registration: NativePushRegistration, bootstrap: NativeCallBootstrapGrant) async throws -> NativeCallActiveLease {
+        guard permitted else { throw NativePushRegistryFailure.rejected }
+        leases += 1
+        let sasl = try XCTUnwrap(String(data: XCTUnwrap(Data(base64Encoded: bootstrap.saslPayload)), encoding: .utf8))
+        let secret = try XCTUnwrap(sasl.split(separator: "\0").last)
+        let encoded = String(secret.split(separator: ".")[1]).replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/")
+        let data = try XCTUnwrap(Data(base64Encoded: encoded + String(repeating: "=", count: (4 - encoded.count % 4) % 4)))
+        var claims = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        claims["scope"] = "call-xmpp-active-v1"; claims["issuedAt"] = Int(now()); claims["expiresAt"] = Int(now()) + 25
+        let payload = try JSONSerialization.data(withJSONObject: claims).base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "")
+        let body = try JSONSerialization.data(withJSONObject: ["credential": "tcl1." + payload + "." + String(repeating: "a", count: 64), "claims": claims])
+        return try bootstrap.activeLease(body, registrationExpiry: registration.expiresAt, now: now())
+    }
     func accept(invitation: NativeCallInvitation, registration: NativePushRegistration, fullJID: String) async throws -> NativeCallReservation {
         accepts += 1
         guard permitted else { throw NativePushRegistryFailure.rejected }
@@ -142,7 +165,7 @@ final class NativeWarmCallTests: XCTestCase {
             XCTAssertEqual(offer.request.action, "session-initiate")
             XCTAssertEqual(registry.accepts, 1)
             let operations = await connection.history()
-            XCTAssertEqual(operations, ["bind", "proof", "authorize", "proceed"])
+            XCTAssertEqual(operations, ["bind", "proof", "authorize", "proceed", "keepalive", "lease"])
             recovery.cancel(); recovery.endServerCall()
         }
     }
@@ -173,6 +196,47 @@ final class NativeWarmCallTests: XCTestCase {
         let operations = await connection.history()
         XCTAssertEqual(operations, ["bind", "proof"])
         recovery.cancel()
+    }
+
+    func testColdActiveRenewalOutlivesInvitationButStopsOnRevokedContext() async throws {
+        var time: TimeInterval = 100
+        var allowed = true
+        let registry = WarmCallRegistry(), connection = WarmCallConnection()
+        registry.now = { time }; registry.answerAuthorization = "fictional-permit"
+        let invitation = try XCTUnwrap(NativeCallInvitation(sid: "call-1", expiresAt: 145, media: .total, now: 100))
+        let registration = NativePushRegistration(deviceID: UUID(), generation: String(repeating: "a", count: 32), expiresAt: 500, controlCredential: nil)
+        let recovery = NativeWarmCallSession(invitation: invitation, registration: registration, registry: registry,
+            now: { time }, waitForRenewal: { try await Task.sleep(nanoseconds: 2_000_000); time += 10 })
+        var ended = 0
+        recovery.remoteEnded = { ended += 1 }
+        _ = try await recovery.prepare(bootstrap: bootstrap(invitation: invitation, registration: registration), connector: connection, validateContext: {
+            guard allowed else { throw NativeJingleFailure.rejected }
+        })
+        await settle { registry.leases >= 7 }
+        XCTAssertGreaterThan(time, invitation.expiresAt)
+        XCTAssertEqual(ended, 0)
+        allowed = false
+        await settle { let stopped = await connection.isStopped(); return ended == 1 && stopped && registry.ends == 1 }
+        XCTAssertEqual(ended, 1)
+        let count = registry.leases
+        try await Task.sleep(nanoseconds: 10_000_000)
+        XCTAssertEqual(registry.leases, count)
+        recovery.cancel()
+    }
+
+    func testColdLeaseNeedsServerAcknowledgementBeforeReturningMediaOffer() async throws {
+        let registry = WarmCallRegistry(), connection = WarmCallConnection()
+        registry.answerAuthorization = "fictional-permit"
+        await connection.setRejectLease(true)
+        let invitation = try XCTUnwrap(NativeCallInvitation(sid: "call-1", expiresAt: 145, media: .total, now: 100))
+        let registration = NativePushRegistration(deviceID: UUID(), generation: String(repeating: "a", count: 32), expiresAt: 200, controlCredential: nil)
+        let recovery = NativeWarmCallSession(invitation: invitation, registration: registration, registry: registry, now: { 100 })
+        do {
+            _ = try await recovery.prepare(bootstrap: bootstrap(invitation: invitation, registration: registration), connector: connection, validateContext: {})
+            XCTFail("Unacknowledged active scope must not start media")
+        } catch {}
+        await settle { let stopped = await connection.isStopped(); return stopped && registry.ends == 1 }
+        XCTAssertEqual(registry.leases, 1)
     }
     private func account() throws -> NativeAuthenticatedAccount {
         NativeAuthenticatedAccount(configuration: try ServerConfiguration(address: "https://example.invalid", domain: "localhost"),

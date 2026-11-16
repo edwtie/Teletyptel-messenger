@@ -1,5 +1,22 @@
 # TeleTypTel native iOS migration
 
+## Active scoped-call continuation (2026-11-16)
+
+The gated cold path now requests a separate short active-call lease before its
+media offer is returned and every eight seconds while the call remains valid.
+The lease pins the original call/device/resource/peer/profile; it never becomes
+a saved account or SASL credential. Native deadlines move only after the scoped
+ejabberd connection acknowledges the server-signed permission. An expired scope
+cannot be revived; revocation, failed acknowledgement and cancellation stop the
+connection and end the call. The ordinary foreground account path is unchanged.
+
+The accompanying server producer/ledger lifecycle supports calls beyond the
+original invitation timeout; see `services/call-push/README.md` for the actual
+TLS/broker integration fixture and remaining immediate-revocation, deployment
+and physical iPhone/iPad release gates. No APNs activation or TestFlight upload
+is part of this change. Swift unit and unsigned SDK validation must pass before
+this source is treated as compiled native evidence.
+
 ## Push, CallKit and media bridge (2026-11-16)
 
 The app delegate and SwiftUI now share `NativeCallController.shared`. An extra
@@ -12,8 +29,8 @@ answer authorization, proceed and fresh Jingle
 into `NativeIncomingPeerNegotiator` and the existing WebRTC/CallKit audio gate.
 
 This supersedes older statements that no native cold-path wiring exists. It does
-**not** remove release gates: scoped XMPP still expires after twenty seconds,
-active-call leases/producer lifecycle and immediate revocation integration remain
+**not** remove release gates: scoped XMPP expires after twenty seconds without
+the separate active lease described above; immediate PHP revocation integration remains
 unfinished, and no readiness capability, APNs activation, entitlements or signed
 TestFlight upload is added. The preview plist does not enable
 `TeleTypTelNativeCallRecoveryLabEnabled`. See `services/call-push/README.md` for

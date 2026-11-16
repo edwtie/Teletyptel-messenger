@@ -95,9 +95,9 @@ final class CallPushRecovery
         $claims = $this->authorize($credential);
         $action = $input['action'] ?? '';
         $fields = ['action', 'callId', 'sid', 'mediaProfile', 'deviceId', 'generation'];
-        if ($action === 'accept') $fields[] = 'fullJid';
+        if (in_array($action, ['accept', 'lease'], true)) $fields[] = 'fullJid';
         $keys = array_keys($input); sort($keys); sort($fields);
-        if ($keys !== $fields || !in_array($action, ['bootstrap', 'accept', 'end'], true)) throw new CallPushFailure('Ongeldige herstelopdracht.');
+        if ($keys !== $fields || !in_array($action, ['bootstrap', 'accept', 'lease', 'end'], true)) throw new CallPushFailure('Ongeldige herstelopdracht.');
         foreach ($input as $value) if (!is_string($value)) throw new CallPushFailure('Ongeldige herstelgegevens.');
         if ($input['deviceId'] !== $claims['device'] || !hash_equals($claims['generation'], $input['generation'])) throw new CallPushFailure('Verkeerd toestel.', 403);
         $call = $this->row('SELECT * FROM call_push_calls WHERE call_id = ?', [$input['callId']]);
@@ -111,6 +111,8 @@ final class CallPushRecovery
             return ['ended' => true];
         }
         if ($action === 'bootstrap') return $this->bootstrap->issue($claims['account'], $claims['binding'], $claims['device'], $claims['generation'], $input['callId']);
+        if ($action === 'lease') return $this->bootstrap->activeLease($claims['account'], $claims['binding'], $claims['device'],
+            $claims['generation'], $input['callId'], $input['fullJid']);
         if (!preg_match('/\/tc-call-([0-9a-f]{32})\z/', $input['fullJid'], $match)
             || !$this->row('SELECT nonce FROM call_bootstrap_issues WHERE nonce = ? AND call_id = ? AND device_id = ? AND generation = ? AND expires > ?',
                 [$match[1], $call['call_id'], $claims['device'], $claims['generation'], ($this->clock)()])) throw new CallPushFailure('Verbindingsbewijs ontbreekt.', 403);
