@@ -95,13 +95,17 @@ pass. The focused Node suites pass 90 checks with one explicitly macOS-only skip
 No production accounts, live calls or APNs pushes are used by these tests.
 
 [Unsigned APNs-target run 43882598688](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43882598688)
-passes the iPhone and iPad jobs on `c3dd968`. Downloaded reports explicitly record
+passes the iPhone and iPad jobs on `c3dd968`, with 246 Swift checks per job.
+Downloaded reports explicitly record
 `unsigned: true`, `uploaded: false`, `pushTestBuild: true`, `deviceCompiled: true`
 and no UI tests. These are generic iOS-device SDK compilations, not physical-device
 push tests. The earlier server job in
 [run 43882411871](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43882411871)
 passes the logout integration before the additional pilot-health check; its
-separate macOS job was still queued at the time of this record.
+separate macOS job was later canceled without executing any steps, so that
+workflow as a whole is not green. The isolated revalidation of `068bc43` is
+[run 43885375403](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43885375403);
+it was queued at the time of this record, not yet counted as passed.
 
 The supplied local production key has been copied to the protected operator
 directory and verified for P-256 signing. A real certificate-verified HTTP/2 TLS
