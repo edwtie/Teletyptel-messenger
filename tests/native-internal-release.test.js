@@ -25,7 +25,7 @@ test("Production providers are enabled only for an explicit real-bundle archive 
   for (const value of [configured.google.clientId, configured.google.serverClientId, configured.facebook.appId]) assert.ok(source.includes(value));
   assert.match(source, /TeleTypTelProviderBundleID<\/key><string>com.tiedragon.teletyptel<\/string>/);
   assert.match(source, /TeleTypTelFacebookEnabled<\/key><true\/>/);
-  assert.doesNotMatch(source, /ITSAppUsesNonExemptEncryption/);
+  assert.match(source, /<key>ITSAppUsesNonExemptEncryption<\/key>\s*<false\s*\/>/);
   assert.equal(fs.readFileSync(path.join(staged, "App/PrivacyInfo.xcprivacy"), "utf8"), read("mobile/ios-native/App/PrivacyInfo.xcprivacy"));
   assert.match(projectText().project, /App\/PrivacyInfo.xcprivacy/);
 });

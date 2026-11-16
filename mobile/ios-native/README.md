@@ -1,5 +1,50 @@
 # TeleTypTel native iOS migration
 
+## Internal-NL encryption declaration corrected (2026-11-16)
+
+The owner confirmed this candidate is for internal testing in the Netherlands
+only, not France or a public App Store release. The native archive generator now
+adds exactly one boolean `ITSAppUsesNonExemptEncryption = false` for that scoped
+internal target. Ordinary non-archive preview staging is unchanged. An existing
+different/string/duplicate declaration or export-compliance code fails the build
+for review rather than being silently overwritten. Actual unsigned and signed
+archive validation requires the boolean declaration in the archived app.
+
+The native inventory is **not encryption-free**: URLSession/Security provide
+HTTPS/WSS, secure credentials and authentication; CryptoKit provides AES-256-GCM
+for the scoped local cache and SHA-256; the pinned WebRTC 157.0.0 dependency uses
+standard DTLS/SRTP/SCTP media/data transport. No proprietary encryption algorithm
+was identified in the reviewed native implementation. The Google 9.0.0 and
+Facebook 18.1.1 sign-in dependencies also remain part of the release inventory;
+they are not omitted from the assessment just because sign-in is optional.
+
+Apple's [documentation requirements table](https://developer.apple.com/help/app-store-connect/reference/app-information/export-compliance-documentation-for-encryption)
+distinguishes OS encryption from third-party industry-standard algorithms and
+requires the referenced French declaration only for App Store distribution in
+France. The [plist key](https://developer.apple.com/documentation/bundleresources/information-property-list/itsappusesnonexemptencryption)
+means no **non-exempt** encryption, not no encryption or disabled TLS. This is the
+scoped Apple submission assessment for the reviewed internal-NL candidate, not a
+blanket export-law certification, a CCATS classification or approval for future
+territories. Reassess before public/French distribution, an encryption/provider
+dependency change or adding a new encryption feature. Preserve any separate
+government reporting obligations; absence of Apple documentation is not a waiver
+of those obligations.
+
+The existing signed build `1.0 (17.1)` was updated through Apple's documented
+build API, changing only `usesNonExemptEncryption` from unset to boolean false.
+A fresh read confirms `processingState: VALID`, audience `INTERNAL_ONLY`,
+internal state `IN_BETA_TESTING` and external state `NOT_APPLICABLE`. No binary
+was replaced, no second upload was needed and tester groups were not changed.
+The signed 17.1 binary itself still predates the plist correction; the server-side
+declaration covers that build, while future internal archives contain the key.
+APNs activation and physical-device acceptance remain separate, unfinished gates.
+
+Local validation passes eighteen focused Node tests and the expanded suite passes
+61 tests with one explicitly macOS-only skip, including real plist parsing, typed
+declaration/duplicate/conflict rejection, signed-archive metadata guards and
+unchanged isolated preview behavior. No new simulator/media run is claimed for a
+packaging-only change.
+
 ## Native internal candidate 1.0 (17.1), uploaded 2026-11-16
 
 [Run 43904501035](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43904501035)
@@ -15,10 +60,11 @@ availability. The report explicitly retains `processingAndCompliancePending`,
 `apnsActivated: false` and `physicalDeviceTested: false`. The first read-only App
 Store Connect query did not yet list 17.1; a subsequent read-only query confirms
 `processingState: VALID`, `expired: false`, internal state
-`MISSING_EXPORT_COMPLIANCE` and external state `NOT_APPLICABLE`. Apple's encryption
-declaration is still unset. No declaration or tester-group change was made by
-these queries. Do not repeat the successful upload or silently answer encryption/
-privacy declarations to bypass the remaining availability gate.
+`MISSING_EXPORT_COMPLIANCE` and external state `NOT_APPLICABLE`. At that checkpoint
+the encryption declaration was still unset and those queries made no changes.
+The subsequent reviewed internal-NL correction above resolves that specific gate.
+Do not repeat the successful upload or silently copy this declaration to a
+different distribution/encryption scope.
 
 Before the locked-screen test, finish the private server pilot deployment,
 including the Docker-to-Windows signed signaling journal bridge, scoped ejabberd
@@ -53,8 +99,9 @@ real-bundle archive; the differently registered preview remains isolated. Provid
 tracking flags remain disabled. The app-level privacy manifest documents observed
 app-only UserDefaults use and elapsed-time timers (CA92.1 and 35F9.1). It does not
 claim that no user data is collected or replace SDK manifests/App Store privacy
-answers. The build does not silently declare encryption exempt. Apple processing
-and export-compliance review may still block TestFlight availability after upload.
+answers. The subsequent scoped internal-NL declaration is documented above;
+it is not an automatic exemption for other distributions. Apple processing and
+export-compliance review may still block availability for a changed release scope.
 
 An uploaded result is not proof of delivered APNs, locked-screen CallKit/media,
 privacy conformance or successful real-device Google/Facebook sign-in. Server

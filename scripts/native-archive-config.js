@@ -18,6 +18,12 @@ function plist(source, config) {
     if ([...source.matchAll(pattern)].length !== 1) throw new Error("Review changed native archive metadata");
     source = source.replace(pattern, (_, prefix, suffix) => prefix + value + suffix);
   }
+  const declarations = source.match(/<key>ITSAppUsesNonExemptEncryption<\/key>/g) || [];
+  if (declarations.length > 1 || source.includes("ITSEncryptionExportComplianceCode")
+      || declarations.length === 1 && !/<key>ITSAppUsesNonExemptEncryption<\/key>\s*<false\s*\/>/.test(source)) {
+    throw new Error("Review changed native internal-NL encryption declaration");
+  }
+  if (!declarations.length) source = source.replace("<dict>", "<dict>\n<key>ITSAppUsesNonExemptEncryption</key><false/>\n");
   return source;
 }
 
@@ -30,6 +36,7 @@ function inspect({ app, archive, expected }) {
       || app.TeleTypTelNativeCallPushEnabled !== true || app.TeleTypTelNativeCallRecoveryLabEnabled !== true
       || app.TeleTypTelNativePushTestOnly !== true || !app.UIBackgroundModes?.includes("voip")
       || !app.UIBackgroundModes?.includes("audio")
+      || app.ITSAppUsesNonExemptEncryption !== false || Object.hasOwn(app, "ITSEncryptionExportComplianceCode")
       || archive.ApplicationProperties?.ApplicationPath !== "Applications/TeleTypTelNative.app"
       || archive.ApplicationProperties?.CFBundleIdentifier !== app.CFBundleIdentifier) {
     throw new Error("Archived native app does not match the requested internal push-test target");

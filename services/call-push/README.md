@@ -159,9 +159,12 @@ directory and verified for P-256 signing. A real certificate-verified HTTP/2 TLS
 connection to Apple succeeds. Native candidate `1.0 (17.1)` is now signed and
 uploaded for internal TestFlight in
 [run 43904501035](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43904501035).
-Its upload report records processing/compliance pending; a subsequent read-only
-Apple query confirms processing `VALID` but internal availability still
-`MISSING_EXPORT_COMPLIANCE`. APNs remains unactivated and no physical-device test
+Its initial upload report records processing/compliance pending. After reviewing
+the native encryption inventory and confirming internal Netherlands-only testing,
+the existing build's declaration was corrected; a fresh Apple query confirms
+processing `VALID` and internal availability `IN_BETA_TESTING`. See the native
+README for the assessment and future distribution/dependency review limits.
+APNs remains unactivated and no physical-device test
 has been performed. No provider-authenticated push, registration token
 or live server-module installation has been established. The installed version
 last reported by the user is 16.9; that old web-shell build is not the native
