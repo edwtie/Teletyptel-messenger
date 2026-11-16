@@ -1,5 +1,23 @@
 # iOS call-push transport (not activated)
 
+## Local HTTPS runtime prerequisite (2026-11-16)
+
+Check the actual HTTPS PHP runtime, not only the CLI binary used by tests. The
+local TeleTypTel SSL virtual host was still configured for PHP 8.0.30, causing
+call-push/control/recovery to return an HTML parse error before their JSON guards
+ran. A status of HTTP 200 alone is therefore not evidence that these APIs work.
+The separate public-auth configuration could still return valid JSON.
+
+The SSL-vhost configuration is now prepared for the tested PHP 8.4.15 CGI runtime,
+using a TeleTypTel-specific version macro instead of changing other WAMP hosts.
+A protected backup was made before editing and Apache reports `Syntax OK`.
+The attempted reload did not change the observed live PHP version; a deliberate
+WAMP restart and repeat HTTPS verification remain required at this checkpoint.
+No APNs flags, credentials, registry migration or production modules were enabled
+as a substitute for fixing that runtime prerequisite. Successful verification
+requires the expected JSON content type/schema and a disabled or authenticated
+API response, not an HTML error page. No certificate bypass is permitted.
+
 ## Logout revocation and production-APNs preparation (2026-11-16)
 
 PHP logout/session replacement, explicit device revocation and registration
