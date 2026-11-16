@@ -34,6 +34,8 @@ final class NativeWarmCallSession {
     private var failed = false
     private var stopped = false
     private var endRequested = false
+    private var authorizedPeer: String?
+    private var authorizedResource: String?
     var receiveJingle: ((NativeJingleRequest, any NativeJingleSending) -> Void)?
     var remoteEnded: (() -> Void)?
 
@@ -46,21 +48,48 @@ final class NativeWarmCallSession {
     func prepare(account: NativeAuthenticatedAccount, connector: any NativeCallXMPPConnecting = NativeXMPPConnection(),
                  validatePeer: @escaping (String) throws -> Void = { _ in },
                  validateContext: @escaping () throws -> Void) async throws -> NativeWarmCallOffer {
+        try await prepare(owner: account.jid, connect: { connected, sender, intent, jingle in
+            try await connector.runCall(account: account, onConnected: connected, onSender: sender, onIntent: intent, onJingle: jingle)
+        }, validatePeer: validatePeer, validateContext: validateContext)
+    }
+
+    func prepare(bootstrap: NativeCallBootstrapGrant, connector: any NativeBootstrapXMPPConnecting = NativeXMPPConnection(),
+                 validateContext: @escaping () throws -> Void) async throws -> NativeWarmCallOffer {
+        guard bootstrap.callID == invitation.id, bootstrap.sid == invitation.sid, bootstrap.media == invitation.media,
+              bootstrap.expiresAt > now(), bootstrap.expiresAt <= invitation.expiresAt,
+              connection == nil, !stopped else { throw NativeJingleFailure.invalidRequest }
+        authorizedPeer = bootstrap.peer; authorizedResource = bootstrap.owner + "/" + bootstrap.resource
+        return try await prepare(owner: bootstrap.owner, connect: { connected, sender, intent, jingle in
+            try await connector.runCall(bootstrap: bootstrap, onConnected: connected, onSender: sender, onIntent: intent, onJingle: jingle)
+        }, validatePeer: { peer in guard peer == bootstrap.peer else { throw NativeJingleFailure.rejected } }, validateContext: {
+            try validateContext()
+            guard bootstrap.expiresAt > self.now() else { throw NativeJingleFailure.timedOut }
+        })
+    }
+
+    private typealias Connect = (@escaping @Sendable (String) -> Void,
+        @escaping @Sendable (any NativeCallRecoverySending) -> Void,
+        @escaping @Sendable (NativeCallIntent) -> Void, @escaping @Sendable (NativeJingleRequest) -> Void) async throws -> Void
+
+    private func prepare(owner: String, connect: @escaping Connect,
+                         validatePeer: @escaping (String) throws -> Void,
+                         validateContext: @escaping () throws -> Void) async throws -> NativeWarmCallOffer {
         guard connection == nil, !stopped else { throw NativeJingleFailure.staleBinding }
         let deadline = min(invitation.expiresAt, now() + 12)
         connection = Task { [weak self] in
             do {
-                try await connector.runCall(account: account, onConnected: { [weak self] jid in
+                try await connect({ [weak self] jid in
                     Task { @MainActor in
                         guard let self = self, !self.stopped else { return }
-                        guard NativeJingleTransport.fullJID(jid), NativeChatCodec.bareJID(jid) == account.jid else { self.failed = true; return }
+                        guard NativeJingleTransport.fullJID(jid), NativeChatCodec.bareJID(jid) == owner,
+                              self.authorizedResource == nil || self.authorizedResource == jid else { self.failed = true; return }
                         self.bound = jid
                     }
-                }, onSender: { [weak self] sender in
+                }, { [weak self] sender in
                     Task { @MainActor in guard self?.stopped == false else { return }; self?.sender = sender }
-                }, onIntent: { [weak self] intent in
-                    Task { @MainActor in self?.receive(intent, owner: account.jid) }
-                }, onJingle: { [weak self] request in
+                }, { [weak self] intent in
+                    Task { @MainActor in self?.receive(intent, owner: owner) }
+                }, { [weak self] request in
                     Task { @MainActor in self?.receive(request) }
                 })
                 self?.failConnection()
@@ -74,7 +103,7 @@ final class NativeWarmCallSession {
             _ = try await sender.bindCall(peer: proposal.peer, sid: invitation.sid)
             try current(deadline, validate: validateContext)
             expectedPeer = try await recovery.recover(invitation: invitation, registration: registration, proposal: proposal,
-                owner: account.jid, fullJID: bound, sender: sender, registry: registry,
+                owner: owner, fullJID: bound, sender: sender, registry: registry,
                 validateContext: { try validateContext(); try validatePeer(proposal.peer) },
                 abandonReservation: { [weak self] in self?.endServerCall() })
             while requests.isEmpty { try await pause(deadline, validate: validateContext) }
@@ -90,6 +119,7 @@ final class NativeWarmCallSession {
 
     private func receive(_ intent: NativeCallIntent, owner: String) {
         guard !stopped, !failed, intent.sid == invitation.sid,
+              authorizedPeer == nil || intent.peer == authorizedPeer,
               NativeChatCodec.bareJID(intent.peer) != owner else { return }
         if intent.action == .propose {
             guard intent.media == invitation.media, proposal == nil || proposal?.peer == intent.peer else { failConnection(); return }

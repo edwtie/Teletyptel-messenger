@@ -36,6 +36,11 @@ try {
                 throw new CallPushFailure('Toestemming en toestelregistratie zijn vereist.');
             }
             $result = $service->register($account, $binding, $input['deviceId'], $input['token'], true);
+            if (getenv('TELETYPTEL_CALL_RECOVERY_LAB') === '1') {
+                require_once dirname(__DIR__, 2) . '/lib/CallPushRecovery.php';
+                try { $result['recovery'] = CallPushRecovery::configured($pdo)->enroll($account, $binding, $input['deviceId']); }
+                catch (Throwable $error) { $service->revokeDevice($account, $input['deviceId']); throw $error; }
+            }
             if (getenv('TELETYPTEL_CALL_PUSH_NATIVE_CONTROL') === '1') {
                 $result['controlToken'] = $service->controlCredential($account, $binding, $input['deviceId']);
             }

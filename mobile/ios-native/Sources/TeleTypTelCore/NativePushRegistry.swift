@@ -13,6 +13,7 @@ struct NativePushRegistration: CustomStringConvertible, CustomDebugStringConvert
     let generation: String
     let expiresAt: TimeInterval
     let controlCredential: String?
+    var recovery: NativeCallRecoveryAuthorization? = nil
     var description: String { "NativePushRegistration(redacted)" }
     var debugDescription: String { description }
 }
@@ -52,8 +53,11 @@ struct NativePushRegistryClient: NativePushRegistryServing {
             throw NativePushRegistryFailure.invalidResponse
         }
         try Task.checkCancellation()
+        if let recovery = reply.recovery {
+            try recovery.validate(configuration: session.configuration, registrationExpiry: reply.expiresAt, now: now())
+        }
         return NativePushRegistration(deviceID: deviceID, generation: reply.generation,
-            expiresAt: reply.expiresAt, controlCredential: reply.controlToken)
+            expiresAt: reply.expiresAt, controlCredential: reply.controlToken, recovery: reply.recovery)
     }
 
     func revoke(deviceID: UUID) async throws {
@@ -185,6 +189,7 @@ struct NativePushRegistryClient: NativePushRegistryServing {
         let generation: String
         let expiresAt: TimeInterval
         let controlToken: String?
+        let recovery: NativeCallRecoveryAuthorization?
     }
     private struct Revoked: Decodable, NativePushRegistryReply {
         let ok: Bool

@@ -27,7 +27,7 @@ final class NativePushVault: NativePushStoring {
               !value.scope.accountID.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains),
               value.controlCredential.map({ $0.utf8.count <= 1024 }) ?? true else { throw Failure.invalid }
         if !UserDefaults.standard.bool(forKey: consentKey) {
-            value.consented = false; value.pendingRevocation = true; value.controlCredential = nil
+            value.consented = false; value.pendingRevocation = true; value.controlCredential = nil; value.recovery = nil
         }
         return value
     }

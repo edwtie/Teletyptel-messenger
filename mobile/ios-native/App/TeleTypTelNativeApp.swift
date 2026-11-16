@@ -66,7 +66,7 @@ struct NativeStartupView: View {
     @StateObject private var loginModel: NativeLoginModel
     @StateObject private var savedLogin: NativeSavedLoginModel
     @StateObject private var background = NativeBackgroundController()
-    @StateObject private var calls = NativeCallController()
+    @StateObject private var calls = NativeCallController.shared
     @StateObject private var translation = NativeTranslationModel()
     @StateObject private var providerSDK = NativeProviderSDK()
     @State private var selectedContact: NativeContact?
@@ -396,7 +396,7 @@ struct NativeStartupView: View {
             savedLogin.cancel()
             model.cancel()
             background.stop()
-            calls.detach()
+            if !calls.hasLiveCall { calls.detach() }
             loginModel.suspend()
         }
     }

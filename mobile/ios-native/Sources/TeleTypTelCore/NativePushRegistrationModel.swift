@@ -14,6 +14,7 @@ struct NativePushRecord: Codable, CustomStringConvertible, CustomDebugStringConv
     var generation: String?
     var expiresAt: TimeInterval?
     var controlCredential: String?
+    var recovery: NativeCallRecoveryAuthorization? = nil
     var description: String { "NativePushRecord(redacted)" }
     var debugDescription: String { description }
 }
@@ -59,6 +60,27 @@ final class NativePushRegistrationModel: ObservableObject {
         self.now = now
     }
     deinit { renewal?.cancel() }
+
+    func restoreColdRegistration() -> NativeColdCallContext? {
+        guard enabled, record == nil, scope == nil else { return nil }
+        do {
+            guard let saved = try store.load() else { return nil }
+            let context = try NativeColdCallContext.restore(saved, now: now())
+            record = saved; scope = saved.scope; consented = true; available = true
+            return context
+        } catch { return nil }
+    }
+
+    func coldCallContext() -> NativeColdCallContext? {
+        guard enabled, consented, available, let record = record, record.scope == scope else { return nil }
+        return try? NativeColdCallContext.restore(record, now: now())
+    }
+
+    func restoredTokenChanged(_ data: Data?) {
+        guard let data = data, (16...256).contains(data.count) else { markRevocation(); return }
+        lastToken = data; token = data
+        flushToken()
+    }
 
     func recoveryRegistration(for expected: NativePushScope) -> NativePushRegistration? {
         guard enabled, consented, available, scope == expected, let value = record,
@@ -108,7 +130,7 @@ final class NativePushRegistrationModel: ObservableObject {
               record == nil || (record?.scope == scope && record?.pendingRevocation == false) else { return }
         do {
             var value = record ?? NativePushRecord(scope: scope, deviceID: UUID(), consented: true, pendingRevocation: false)
-            value.consented = true; value.pendingRevocation = true; value.controlCredential = nil
+            value.consented = true; value.pendingRevocation = true; value.controlCredential = nil; value.recovery = nil
             try store.save(value)
             record = value
             self.consented = true
@@ -166,6 +188,7 @@ final class NativePushRegistrationModel: ObservableObject {
                 var saved = value
                 saved.pendingRevocation = false; saved.generation = registered.generation
                 saved.expiresAt = registered.expiresAt; saved.controlCredential = registered.controlCredential
+                saved.recovery = registered.recovery
                 try self.store.save(saved)
                 self.record = saved
                 self.notice = "Oproepregistratie bevestigd. Een echte vergrendelde-schermtest blijft vereist."
@@ -211,7 +234,7 @@ final class NativePushRegistrationModel: ObservableObject {
         renewal?.cancel(); renewal = nil
         driver?.stopPushRegistration()
         guard var value = record else { return }
-        value.consented = false; value.pendingRevocation = true; value.controlCredential = nil
+        value.consented = false; value.pendingRevocation = true; value.controlCredential = nil; value.recovery = nil
         record = value
         do { try store.save(value) }
         catch {

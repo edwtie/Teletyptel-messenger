@@ -3,6 +3,9 @@ const assert = require("node:assert/strict");
 const path = require("node:path");
 const tls = require("node:tls");
 const net = require("node:net");
+const fs = require("node:fs");
+const os = require("node:os");
+const http = require("node:http");
 const { execFileSync, spawnSync } = require("node:child_process");
 const { randomBytes, createHmac } = require("node:crypto");
 const root = path.resolve(__dirname, "..");
@@ -56,11 +59,11 @@ async function run() {
   const image = "ejabberd/ecs@sha256:3d120adff1ba1f2993d1ededed6c1eb7f5f6d9c9ad645d32b3e505e8dedeec35";
   const execute = args => execFileSync("docker", args, { cwd: root, encoding: "utf8", timeout: 90000, maxBuffer: 1024 * 1024, stdio: "pipe" });
   const control = args => execute(["exec", name, "ejabberdctl", "-c", "/tmp/tc/ejabberdctl.cfg", "-f", "/tmp/tc/ejabberd.yml", ...args]);
-  const clients = []; let created = false; let checks = 0; let stage = "startup";
-  const check = (value, label) => { assert.ok(value, label); checks++; };
+  const clients = []; let created = false; let checks = 0; let stage = "startup"; let caDirectory; let lastCheck = "startup";
+  const check = (value, label) => { lastCheck = label; assert.ok(value, label); checks++; };
   const php = process.env.TELETYPTEL_PHP || (process.platform === "win32" ? "C:\\wamp64\\bin\\php\\php8.4.15\\php.exe" : "php");
   try {
-    execute(["run", "-d", "--name", name, "--publish", "127.0.0.1::5223", "--publish", "127.0.0.1::5222",
+    execute(["run", "-d", "--name", name, "--publish", "127.0.0.1::5223", "--publish", "127.0.0.1::5222", "--publish", "127.0.0.1::5443", "--publish", "127.0.0.1::5444",
       "--mount", `type=bind,source=${path.join(root, "services/call-push/ejabberd")},target=/source,readonly`,
       "--entrypoint", "sh", image, "/source/tests/bootstrap-start.sh"]);
     created = true;
@@ -88,6 +91,26 @@ async function run() {
       assert.equal(reply.status, 0, "Actual isolated PHP issuer must succeed");
       return JSON.parse(reply.stdout);
     };
+    stage = "verified scoped WebSocket";
+    const wssPort = Number(execute(["port", name, "5443/tcp"]).trim().split(":").at(-1));
+    const httpPort = Number(execute(["port", name, "5444/tcp"]).trim().split(":").at(-1));
+    caDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "tc-bootstrap-ca-"));
+    const caFile = path.join(caDirectory, "public-ca.pem"); fs.writeFileSync(caFile, ca);
+    for (const scoped of [true, false]) {
+      const result = spawnSync(process.execPath, [path.join(__dirname, "call-bootstrap-wss-fixture.js")], {
+        cwd: root, env: { ...process.env, NODE_EXTRA_CA_CERTS: caFile }, encoding: "utf8", timeout: 15000,
+        input: JSON.stringify({ port: wssPort, scoped, grant: mint("total") }), maxBuffer: 8192
+      });
+      if (result.status !== 0) process.stderr.write(result.stderr);
+      check(result.status === 0, "Real WSS must enforce verified local TLS attestation");
+      check(Object.values(JSON.parse(result.stdout)).every(value => value === true), "WSS bind, ping and roster isolation must pass");
+    }
+    const insecureStatus = await new Promise((resolve, reject) => {
+      const request = http.get({ hostname: "127.0.0.1", port: httpPort, path: "/xmpp-call-websocket",
+        headers: { Host: "example.test", "X-Forwarded-Proto": "https", "x-teletyptel-tls-attestation": "spoofed" } }, response => { response.resume(); resolve(response.statusCode); });
+      request.on("error", reject); request.setTimeout(3000, () => request.destroy(new Error("HTTP fixture timed out")));
+    });
+    check(insecureStatus === 403, "Spoofed proxy/TLS headers cannot authorize cleartext WebSocket transport");
     const sign = claims => {
       const payload = Buffer.from(JSON.stringify(claims)).toString("base64url");
       return "tcr1." + payload + "." + createHmac("sha256", Buffer.from(key, "base64"))
@@ -181,10 +204,11 @@ async function run() {
     check(!last.connection.buffer.includes("private-chat"), "Expiry does not flush stored chat");
     process.stdout.write(`Scoped call bootstrap: ${checks} checks passed against real ejabberd over verified TLS; no APNs or production data.\n`);
   } catch (error) {
-    throw new Error("Scoped bootstrap fixture failed at " + stage + ": " + (stage === "startup" ? error.message : error.name));
+    throw new Error("Scoped bootstrap fixture failed at " + stage + ": " + (stage === "startup" ? error.message : error.name + " (" + lastCheck + ")"));
   } finally {
     for (const connection of clients) connection.close();
     if (created) execute(["rm", "-f", name]);
+    if (caDirectory) { fs.unlinkSync(path.join(caDirectory, "public-ca.pem")); fs.rmdirSync(caDirectory); }
   }
 }
 

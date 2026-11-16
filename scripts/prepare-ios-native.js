@@ -15,6 +15,7 @@ coreFiles.push("NativePushRegistry.swift", "NativePushRegistrationModel.swift");
 coreFiles.push("NativeCallIntent.swift", "NativeCallAnswerRecovery.swift");
 coreFiles.push("NativeCallMediaGate.swift", "NativeWarmCallSession.swift");
 coreFiles.push("NativeCallPolicy.swift", "NativeCallIntentSession.swift", "NativeCallBootstrapGrant.swift");
+coreFiles.push("NativeCallRecoveryClient.swift");
 appFiles.push("App/NativeIntentPeerNegotiator.swift");
 coreFiles.push("NativeInterpreterProtocol.swift", "NativeInterpreterSession.swift");
 coreFiles.push("NativeContactEditing.swift", "NativePresentationPreferences.swift", "NativeAvatarEditing.swift");

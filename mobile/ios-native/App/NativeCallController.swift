@@ -1,6 +1,7 @@
 import Combine
 import Foundation
 import WebRTC
+import UIKit
 
 @MainActor
 private final class NativePeerRouter: NativePeerNegotiating {
@@ -53,6 +54,7 @@ private final class NativePeerRouter: NativePeerNegotiating {
 
 @MainActor
 final class NativeCallController: ObservableObject, NativePushRegistering {
+    static let shared = NativeCallController()
     enum Status: Equatable { case idle, calling(String), ringing(String), active(String), failed }
 
     @Published private(set) var status: Status = .idle {
@@ -83,6 +85,7 @@ final class NativeCallController: ObservableObject, NativePushRegistering {
     private var pendingPush: NativeCallInvitation?
     private var warmLease: NativeWarmCallLease?
     private var warmSession: NativeWarmCallSession?
+    private var coldContext: NativeColdCallContext?
     private var intentLease: NativeCallIntentLease?
     private var isForeground = true
     var backgroundCallEnded: (() -> Void)?
@@ -123,6 +126,18 @@ final class NativeCallController: ObservableObject, NativePushRegistering {
 
     init() {}
 
+    func restoreBackgroundCalls() {
+        guard Bundle.main.object(forInfoDictionaryKey: "TeleTypTelNativeCallRecoveryLabEnabled") as? Bool == true,
+              runtime == nil, let context = pushRegistration.restoreColdRegistration() else { return }
+        coldContext = context; account = context.authorization.owner
+        isForeground = UIApplication.shared.applicationState == .active
+        guard ensureRuntime().platform.enable(account: context.authorization.owner, consented: true, tokenChanged: { [weak self] data in
+            guard let self = self else { return }
+            self.pushRegistration.restoredTokenChanged(data)
+            if data == nil { self.coldContext = nil; self.resetCall() }
+        }) else { coldContext = nil; pushRegistration.logout(); return }
+    }
+
     #if DEBUG
     func presentVisualFixture() {
         guard ProcessInfo.processInfo.environment["TELETYPTEL_NATIVE_UI_FIXTURE"] == "connected",
@@ -139,18 +154,23 @@ final class NativeCallController: ObservableObject, NativePushRegistering {
 
     func attach(_ login: NativeLoginModel) {
         guard self.login !== login else { return }
-        detach()
+        if self.login != nil { detach() }
         self.login = login
         login.onJingle = { [weak self] request, sender in
             self?.receive(request, sender: sender)
         }
         login.onCallIntent = { [weak self] intent, sender in self?.receive(intent, sender: sender) }
-        synchronize(login.phase)
+        if coldContext == nil || login.isConnected { synchronize(login.phase) }
     }
 
     func synchronize(_ phase: NativeLoginModel.Phase) {
         switch phase {
         case .connected(let jid):
+            if let context = coldContext, NativeChatCodec.bareJID(jid) == context.authorization.owner,
+               login?.activeAccountID == context.scope.accountID {
+                account = jid
+                return
+            }
             if let lease = warmLease, hasLiveCall, login?.permitsWarmCall(lease) == true,
                NativeChatCodec.bareJID(jid) == lease.account.jid {
                 account = jid
@@ -161,6 +181,7 @@ final class NativeCallController: ObservableObject, NativePushRegistering {
             account = jid
             if ensureRuntime().platform.connectForeground(account: jid) == nil { status = .failed }
         case .checking, .authenticating, .connecting, .awaitingSecondFactor:
+            if coldContext != nil, hasLiveCall { return }
             if let lease = warmLease, hasLiveCall, login?.permitsWarmCall(lease) == true { return }
             if login?.isReconnecting == true {
                 resetCall()
@@ -171,7 +192,14 @@ final class NativeCallController: ObservableObject, NativePushRegistering {
         case .suspended:
             if !hasLiveCall { resetCall() }
             if !pushRegistration.consented { account = nil; runtime?.logout() }
-        case .idle, .failed, .signedOut:
+        case .idle, .failed:
+            if coldContext != nil { return }
+            pushRegistration.logout()
+            resetCall()
+            account = nil
+            runtime?.logout()
+        case .signedOut:
+            coldContext = nil
             pushRegistration.logout()
             resetCall()
             account = nil
@@ -180,6 +208,7 @@ final class NativeCallController: ObservableObject, NativePushRegistering {
     }
 
     func detach() {
+        coldContext = nil
         pushRegistration.logout()
         login?.onJingle = nil
         login?.onCallIntent = nil
@@ -400,7 +429,7 @@ final class NativeCallController: ObservableObject, NativePushRegistering {
             prepareInterpreter()
         }
         if coordinator.lifecycle.current?.phase == .ringing, let pending = pendingPush,
-           pending.id == coordinator.currentHandle?.id, warmLease == nil {
+           pending.id == coordinator.currentHandle?.id, warmLease == nil, coldContext == nil {
             _ = coordinator.end(id: pending.id, reason: .failed)
         }
     }
@@ -443,6 +472,12 @@ final class NativeCallController: ObservableObject, NativePushRegistering {
             return
         }
         guard let invitation = pendingPush, invitation.id == handle.id, invitation.sid == handle.sid,
+              invitation.media == profile else { throw NativeJingleFailure.disconnected }
+        if warmLease == nil, let context = coldContext {
+            try await prepareColdMedia(handle: handle, invitation: invitation, context: context)
+            return
+        }
+        guard
               invitation.media == profile, let lease = warmLease, let accountID = lease.account.accountID,
               let session = lease.account.webSession, login?.permitsWarmCall(lease) == true,
               let registration = pushRegistration.recoveryRegistration(for: NativePushScope(
@@ -482,6 +517,41 @@ final class NativeCallController: ObservableObject, NativePushRegistering {
         activePeer = provider
         callPeerJID = NativeChatCodec.bareJID(offer.request.peer)
         peerName = callPeerJID
+        recovery.receiveJingle = { [weak self] request, sender in self?.receive(request, sender: sender) }
+        recovery.activateRouting()
+    }
+
+    private func prepareColdMedia(handle: NativeCallHandle, invitation: NativeCallInvitation, context: NativeColdCallContext) async throws {
+        guard Bundle.main.object(forInfoDictionaryKey: "TeleTypTelNativeCallRecoveryLabEnabled") as? Bool == true,
+              let factory = factory, let capture = capture, let router = router else { throw NativeJingleFailure.disconnected }
+        let validate: () throws -> Void = { [weak self] in
+            guard let self = self, self.activeID == handle.id, self.pendingPush?.id == handle.id,
+                  let current = self.pushRegistration.coldCallContext(), current.scope == context.scope,
+                  current.registration.deviceID == context.registration.deviceID,
+                  current.registration.generation == context.registration.generation,
+                  self.login?.chat.preferences.doNotDisturb != true else { throw NativeJingleFailure.rejected }
+        }
+        try validate()
+        let client = NativeCallRecoveryClient(context: context)
+        let grant = try await client.bootstrap(invitation: invitation, registration: context.registration)
+        try validate(); try Task.checkCancellation()
+        let recovery = NativeWarmCallSession(invitation: invitation, registration: context.registration, registry: client)
+        warmSession = recovery
+        recovery.remoteEnded = { [weak self] in _ = self?.runtime?.platform.coordinator.end(id: handle.id, reason: .remoteEnded) }
+        let offer = try await recovery.prepare(bootstrap: grant, validateContext: validate)
+        try validate(); try Task.checkCancellation()
+        guard warmSession === recovery, activePeer == nil else { throw NativeJingleFailure.staleBinding }
+        let provider = try await NativeIncomingPeerNegotiator(request: offer.request, profile: invitation.media,
+            signalling: offer.sender, factory: factory, tracks: { [weak capture] in
+                guard let tracks = capture?.tracks else { throw NativeMediaCaptureFailure.unavailable }
+                return tracks
+            }, stopCapture: { [weak capture] in capture?.stop() })
+        do { try validate(); try Task.checkCancellation() }
+        catch { provider.cancel(notifyPeer: true); throw error }
+        guard warmSession === recovery, activePeer == nil, router.install(provider) else {
+            provider.cancel(notifyPeer: true); throw NativeJingleFailure.staleBinding
+        }
+        activePeer = provider; callPeerJID = NativeChatCodec.bareJID(offer.request.peer); peerName = callPeerJID
         recovery.receiveJingle = { [weak self] request, sender in self?.receive(request, sender: sender) }
         recovery.activateRouting()
     }

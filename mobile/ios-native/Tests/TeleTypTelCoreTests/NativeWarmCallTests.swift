@@ -1,13 +1,14 @@
 import XCTest
 @testable import TeleTypTelCore
 
-private actor WarmCallConnection: NativeCallXMPPConnecting, NativeCallRecoverySending {
+private actor WarmCallConnection: NativeCallXMPPConnecting, NativeBootstrapXMPPConnecting, NativeCallRecoverySending {
     private var transport = NativeJingleTransport(owner: "bob@localhost/awakened")
     private var onJingle: (@Sendable (NativeJingleRequest) -> Void)?
     private var onIntent: (@Sendable (NativeCallIntent) -> Void)?
     private var operations: [String] = []
     private var connected = false
     private var stopped = false
+    private var activeBound = "bob@localhost/awakened"
     let profile: NativeCallMedia
     let offerProfile: NativeCallMedia
     let boundJID: String
@@ -26,9 +27,22 @@ private actor WarmCallConnection: NativeCallXMPPConnecting, NativeCallRecoverySe
                  onSender: @escaping @Sendable (any NativeCallRecoverySending) -> Void,
                  onIntent: @escaping @Sendable (NativeCallIntent) -> Void,
                  onJingle: @escaping @Sendable (NativeJingleRequest) -> Void) async throws {
+        activeBound = boundJID
         self.onJingle = onJingle; self.onIntent = onIntent; connected = true
         onConnected(boundJID); onSender(self)
         if proposes { onIntent(NativeCallIntent(action: .propose, sid: "call-1", peer: "alice@localhost/caller", media: profile)) }
+        defer { stopped = true; self.onJingle = nil; self.onIntent = nil }
+        while true { try await Task.sleep(nanoseconds: 100_000_000) }
+    }
+    func runCall(bootstrap: NativeCallBootstrapGrant, onConnected: @escaping @Sendable (String) -> Void,
+                 onSender: @escaping @Sendable (any NativeCallRecoverySending) -> Void,
+                 onIntent: @escaping @Sendable (NativeCallIntent) -> Void,
+                 onJingle: @escaping @Sendable (NativeJingleRequest) -> Void) async throws {
+        activeBound = boundJID == "bob@localhost/awakened" ? bootstrap.owner + "/" + bootstrap.resource : boundJID
+        transport = NativeJingleTransport(owner: activeBound)
+        self.onJingle = onJingle; self.onIntent = onIntent; connected = true
+        onConnected(activeBound); onSender(self)
+        if proposes { onIntent(NativeCallIntent(action: .propose, sid: bootstrap.sid, peer: "alice@localhost/caller", media: profile)) }
         defer { stopped = true; self.onJingle = nil; self.onIntent = nil }
         while true { try await Task.sleep(nanoseconds: 100_000_000) }
     }
@@ -61,7 +75,7 @@ private actor WarmCallConnection: NativeCallXMPPConnecting, NativeCallRecoverySe
         onIntent?(NativeCallIntent(action: .retract, sid: sid, peer: peer, media: nil))
     }
     private func emit(_ element: String, identifier: String) throws {
-        let stanza = "<iq xmlns='jabber:client' type='set' from='alice@localhost/caller' to='bob@localhost/awakened' id='\(identifier)'>\(element)</iq>"
+        let stanza = "<iq xmlns='jabber:client' type='set' from='alice@localhost/caller' to='\(activeBound)' id='\(identifier)'>\(element)</iq>"
         let request = try XCTUnwrap(transport.receive(stanza, now: 100).request)
         onJingle?(request)
     }
@@ -101,6 +115,48 @@ private final class WarmCallRegistry: NativeWarmCallRegistryServing {
 
 @MainActor
 final class NativeWarmCallTests: XCTestCase {
+    private func bootstrap(invitation: NativeCallInvitation, registration: NativePushRegistration, peer: String = "alice@localhost/caller") throws -> NativeCallBootstrapGrant {
+        let nonce = String(repeating: "c", count: 32)
+        let claims: [String: Any] = ["version": 1, "scope": "call-xmpp-bootstrap-v1", "domain": "localhost", "issuer": "fixture",
+            "environment": "production", "owner": "bob@localhost", "peer": peer, "callId": invitation.id.uuidString.lowercased(),
+            "sid": invitation.sid, "deviceId": registration.deviceID.uuidString.lowercased(), "generation": registration.generation,
+            "profile": invitation.media.rawValue, "nonce": nonce, "resource": "tc-call-" + nonce, "issuedAt": 100, "expiresAt": 120]
+        let payload = try JSONSerialization.data(withJSONObject: claims).base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "")
+        let body = try JSONSerialization.data(withJSONObject: ["credential": "tcr1." + payload + "." + String(repeating: "a", count: 64), "claims": claims])
+        return try NativeCallBootstrapGrant.decode(body, configuration: account().configuration, owner: "bob@localhost",
+            invitation: invitation, registration: registration, issuer: "fixture", environment: "production", now: 100)
+    }
+
+    func testColdBootstrapUsesProofReservationProceedAndFreshOfferForAllProfiles() async throws {
+        for profile in NativeCallMedia.allCases {
+            let registry = WarmCallRegistry(), connection = WarmCallConnection(profile: profile, offerProfile: profile)
+            let invitation = try XCTUnwrap(NativeCallInvitation(sid: "call-1", expiresAt: 145, media: profile, now: 100))
+            let registration = NativePushRegistration(deviceID: UUID(), generation: String(repeating: "a", count: 32), expiresAt: 200, controlCredential: nil)
+            let recovery = NativeWarmCallSession(invitation: invitation, registration: registration, registry: registry, now: { 100 })
+            let offer = try await recovery.prepare(bootstrap: bootstrap(invitation: invitation, registration: registration), connector: connection, validateContext: {})
+            XCTAssertEqual(offer.request.peer, "alice@localhost/caller")
+            XCTAssertEqual(offer.request.action, "session-initiate")
+            XCTAssertEqual(registry.accepts, 1)
+            let operations = await connection.history()
+            XCTAssertEqual(operations, ["bind", "proof", "proceed"])
+            recovery.cancel(); recovery.endServerCall()
+        }
+    }
+
+    func testColdBootstrapRejectsWrongResourceBeforeReservationAndStopsConnection() async throws {
+        let registry = WarmCallRegistry(), connection = WarmCallConnection(boundJID: "bob@localhost/wrong-resource")
+        let invitation = try XCTUnwrap(NativeCallInvitation(sid: "call-1", expiresAt: 145, media: .total, now: 100))
+        let registration = NativePushRegistration(deviceID: UUID(), generation: String(repeating: "a", count: 32), expiresAt: 200, controlCredential: nil)
+        let recovery = NativeWarmCallSession(invitation: invitation, registration: registration, registry: registry, now: { 100 })
+        do {
+            _ = try await recovery.prepare(bootstrap: bootstrap(invitation: invitation, registration: registration), connector: connection, validateContext: {})
+            XCTFail("Unexpected resource was accepted")
+        } catch { XCTAssertEqual(registry.accepts, 0) }
+        try await Task.sleep(nanoseconds: 20_000_000)
+        let stopped = await connection.isStopped()
+        XCTAssertTrue(stopped)
+    }
     private func account() throws -> NativeAuthenticatedAccount {
         NativeAuthenticatedAccount(configuration: try ServerConfiguration(address: "https://example.invalid", domain: "localhost"),
             jid: "bob@localhost", password: "fictional-test-only")

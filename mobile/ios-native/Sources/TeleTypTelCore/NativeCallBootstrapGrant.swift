@@ -25,6 +25,9 @@ struct NativeCallBootstrapGrant: CustomStringConvertible, CustomDebugStringConve
     let peer: String
     let resource: String
     let expiresAt: TimeInterval
+    let callID: UUID
+    let sid: String
+    let media: NativeCallMedia
     var description: String { "NativeCallBootstrapGrant(redacted)" }
     var debugDescription: String { description }
     var saslPayload: String { Data(("\0" + String(owner.prefix { $0 != "@" }) + "\0" + secret).utf8).base64EncodedString() }
@@ -62,7 +65,7 @@ struct NativeCallBootstrapGrant: CustomStringConvertible, CustomDebugStringConve
               TimeInterval(claims.expiresAt) <= invitation.expiresAt,
               TimeInterval(claims.expiresAt) <= registration.expiresAt else { throw NativePushRegistryFailure.invalidResponse }
         return Self(secret: credential, configuration: configuration, owner: owner, peer: claims.peer,
-                    resource: claims.resource, expiresAt: TimeInterval(claims.expiresAt))
+                    resource: claims.resource, expiresAt: TimeInterval(claims.expiresAt), callID: claims.callId, sid: claims.sid, media: claims.profile)
     }
     private static func matches(_ value: String, _ pattern: String) -> Bool {
         value.range(of: "\\A(?:" + pattern + ")\\z", options: .regularExpression) != nil

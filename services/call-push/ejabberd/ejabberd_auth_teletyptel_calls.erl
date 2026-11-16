@@ -4,7 +4,7 @@
 -include_lib("kernel/include/file.hrl").
 -export([start/1, stop/1, check_password/4, store_type/1, plain_password_required/1, user_exists/2, use_cache/1]).
 -export([auth_result/3, bind/1, send_packet/1, filter_send/1, authenticated/2, unbound/2, inline/1, info/2, terminated/2,
-         stream_started/2, revoke_device/3]).
+         stream_started/2, revoke_device/3, attest_websocket/1, init_transport/2]).
 -define(TABLE, teletyptel_call_bootstrap).
 -define(NS, <<"urn:teletyptel:call-recovery:1">>).
 -define(JMI, <<"urn:xmpp:jingle-message:0">>).
@@ -35,6 +35,7 @@ use_cache(_) -> false.
 user_exists(_, _) -> {nocache, false}.
 
 hooks(Action, Host) ->
+    apply(ejabberd_hooks, Action, [c2s_init, ?MODULE, init_transport, 1]),
     lists:foreach(fun({Hook, Function}) -> apply(ejabberd_hooks, Action, [Hook, Host, ?MODULE, Function, 1]) end,
         [{c2s_stream_started, stream_started}, {c2s_auth_result, auth_result}, {c2s_handle_bind, bind}, {user_send_packet, send_packet},
          {c2s_filter_send, filter_send}, {c2s_authenticated_packet, authenticated}, {c2s_unbinded_packet, unbound},
@@ -67,7 +68,43 @@ check_password(_, _, _, _) -> erase({?MODULE, grant}), erase({?MODULE, transport
 stream_started(#{lserver := Host, stream_encrypted := true} = State, _) ->
     case maps:get(auth_module, State, undefined) of undefined -> put({?MODULE, transport}, Host); _ -> erase({?MODULE, transport}) end,
     State;
+stream_started(#{lserver := Host, teletyptel_wss_verified := true} = State, _) ->
+    case maps:get(auth_module, State, undefined) of undefined -> put({?MODULE, transport}, Host); _ -> erase({?MODULE, transport}) end,
+    State;
 stream_started(State, _) -> erase({?MODULE, transport}), State.
+
+attest_websocket(IP) ->
+    Host = list_to_binary(os:getenv("TELETYPTEL_CALL_SCOPED_DOMAIN", "")),
+    Stamp = integer_to_binary(erlang:system_time(second)), Nonce = string:lowercase(binary:encode_hex(crypto:strong_rand_bytes(16))),
+    <<Stamp/binary, ".", Nonce/binary, ".", (websocket_mac(Host, IP, Stamp, Nonce))/binary>>.
+
+websocket_mac(Host, IP, Stamp, Nonce) ->
+    #{key := Key, environment := Environment, issuer := Issuer} = persistent_term:get({?MODULE, Host}),
+    string:lowercase(binary:encode_hex(crypto:mac(hmac, sha256, Key,
+        <<"teletyptel-wss-v1:", Environment/binary, ":", Host/binary, ":", Issuer/binary, ":", Stamp/binary, ":", Nonce/binary, ":", (term_to_binary(IP))/binary>>))).
+
+init_transport({ok, #{ip := IP, socket := Socket} = State}, Options) ->
+    try
+        websocket = xmpp_socket:get_transport(Socket),
+        Headers = proplists:get_value(headers, proplists:get_value(http, Options, []), []),
+        Token = proplists:get_value(<<"x-teletyptel-tls-attestation">>, Headers),
+        [Stamp, Nonce, Signature] = binary:split(Token, <<".">>, [global]),
+        true = abs(erlang:system_time(second) - binary_to_integer(Stamp)) =< 5,
+        match = re:run(Nonce, <<"\\A[0-9a-f]{32}\\z">>, [{capture, none}]),
+        Host = list_to_binary(os:getenv("TELETYPTEL_CALL_SCOPED_DOMAIN", "")),
+        true = crypto:hash_equals(websocket_mac(Host, IP, Stamp, Nonce), Signature),
+        {atomic, ok} = mnesia:transaction(fun() ->
+            mnesia:write_lock_table(?TABLE),
+            lists:foreach(fun({?TABLE, Old, _, _, _, Expires}) ->
+                case Expires < erlang:system_time(second) of true -> mnesia:delete({?TABLE, Old}); false -> ok end
+            end, mnesia:match_object({?TABLE, {Host, {wss, '_'}}, '_', '_', '_', '_'})),
+            true = mnesia:table_info(?TABLE, size) < 4096,
+            Id = {Host, {wss, Nonce}}, [] = mnesia:read(?TABLE, Id, write),
+            mnesia:write({?TABLE, Id, self(), <<>>, <<>>, erlang:system_time(second) + 5})
+        end),
+        {ok, State#{teletyptel_wss_verified => true}}
+    catch _:_ -> {ok, State} end;
+init_transport(Value, _) -> Value.
 
 claims(Credential, User, Host) ->
     true = byte_size(Credential) =< 1024,
@@ -101,7 +138,7 @@ claims(Credential, User, Host) ->
     Value.
 
 auth_result(#{auth_module := ?MODULE} = State, true, _) ->
-    case {erase({?MODULE, grant}), maps:get(stream_encrypted, State, false)} of
+    case {erase({?MODULE, grant}), maps:get(stream_encrypted, State, false) orelse maps:get(teletyptel_wss_verified, State, false)} of
         {Claims, true} when is_map(Claims) ->
             erlang:send_after(max(1, (maps:get(<<"expiresAt">>, Claims) - erlang:system_time(second)) * 1000), self(), {teletyptel_scope_expired, maps:get(<<"nonce">>, Claims)}),
             {stop, State#{teletyptel_scope => Claims, teletyptel_out => #{}, teletyptel_in => #{}}};
@@ -213,6 +250,7 @@ jingle(#xmlel{name = <<"jingle">>, attrs = Attrs, children = Children}, Claims, 
                 #xmlel{name = <<"description">>} = Description <- Content]) =:= profile(Claims));
 jingle(_, _, _) -> false.
 reply_element(#xmlel{name = <<"error">>}, _) -> true;
+reply_element(#xmlel{name = <<"ping">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:ping">>}], children = []}, _) -> true;
 reply_element(Element, Claims) -> jingle(Element, Claims, in) orelse jingle(Element, Claims, out) orelse handoff(Element, Claims).
 intent(#xmlel{name = Action, attrs = Attrs, children = Children}, Claims, Direction) ->
     true = maps:from_list(Attrs) =:= #{<<"xmlns">> => ?JMI, <<"id">> => maps:get(<<"sid">>, Claims)},

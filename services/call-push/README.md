@@ -1,5 +1,71 @@
 # iOS call-push transport (not activated)
 
+## Native push-to-media laboratory bridge (2026-11-16)
+
+This checkpoint supersedes the older no-broker/no-native-wiring statements below.
+It is **not a production background-call release**. The new chain is:
+app-delegate-owned singleton, restored explicit device consent, PushKit callback,
+immediate CallKit report, answer-time cookie-free broker, one-shot scoped WSS,
+fresh proposal, device/resource proof, reservation, proceed, fresh matching Jingle
+and the existing incoming native WebRTC/media gate. The UI observes that same
+runtime; appearing/disappearing views must not create a second CallKit owner.
+CallKit audio activation still controls the microphone. Permission requests and
+camera capture are not introduced on a locked/background screen.
+
+The broker at `api/call-recovery.php` accepts only bounded POST/JSON and a separate
+`tcd1` device authorization. It cannot log in to chat, retrieve history, list calls
+or send arbitrary invitations. Enrollment occurs only inside the existing
+authenticated, CSRF-checked, consented device registration. The encrypted token
+contains only the push-specific session binding and device/account scope, not a
+web session cookie, XMPP password or biometric credential. Every request checks
+the current registry generation, expiry and account access version. Logout,
+registration rotation and revocation prevent subsequent broker access. Failed
+enrollment revokes the newly registered device instead of silently leaving it
+enabled. The old status/end-only control bearer is unchanged.
+
+**Hard laboratory limit:** the scoped XMPP stream still closes after its signed
+twenty-second bootstrap lifetime. Both client and server enforce this; a prepared
+or connected media session is not an exemption. There is no active-call lease
+upgrade yet. These limited calls therefore cannot be offered as reliable,
+long-running or emergency conversations. The existing native registry challenge
+still does not advertise background-answer readiness, so ordinary app enrollment
+cannot accidentally turn this experiment into a released feature.
+
+The extra server opt-in is `TELETYPTEL_CALL_RECOVERY_LAB=1`, together with the
+existing registry and `signaling-v1` settings. It needs an independently provisioned
+`TELETYPTEL_CALL_BOOTSTRAP_KEY_FILE`, base64 32 bytes, protected outside the
+repository/web root. Schemas must be explicitly provisioned; HTTP does not migrate
+them. No flags, files, keys, production configuration or native entitlements are
+activated by this source change. Native cold restoration additionally requires
+both native push and `TeleTypTelNativeCallRecoveryLabEnabled`; neither is added
+to the preview plist. Do not enable them for normal TestFlight users.
+
+Scoped WSS uses a separate `/xmpp-call-websocket` route handled by
+`teletyptel_call_ws`. The stock websocket path does not establish physical TLS
+proof in the c2s state. The new adapter requires an actual `fast_tls` HTTPS socket,
+strips any user-supplied internal attestation, then adds a five-second, single-use,
+server-HMAC proof bound to the actual peer endpoint. The authentication backend
+verifies/consumes it through c2s initialization; it never trusts a client-provided
+`Forwarded`/`X-Forwarded-Proto` header. Direct TLS c2s remains supported. A proxy
+must also use verified HTTPS to this dedicated listener; plaintext proxy upstreams
+are deliberately refused. Compile/test the adapter against the exact ejabberd
+version, with `mod_ping` available. No route is installed here.
+
+Local automated checks include the actual encrypted-device broker and proof/
+reservation database path, fail-closed HTTP ingress, real TLS/WSS scoped auth and
+cleartext/spoofed-header rejection. Swift tests cover restored-consent rejection,
+generation/expiry/account scope, no general-credential conversion, cancellation
+and the cold proof/reserve/proceed/fresh-offer order. Unsigned SDK checks are not
+real APNs or locked-screen iPhone acceptance.
+
+Before activation: implement active-call leases and accepted-call producer
+lifecycle; wire immediate server-side scope revocation to logout/account/policy
+events; jointly exercise the real broker, protected WSS route, producer and native
+media transport; provision the correct APNs VoIP topic/entitlements and explicitly
+enroll test devices; then test signed foreground, locked, system-terminated,
+cancelled and competing-device calls on actual iPhone/iPad hardware. This source
+does not claim reliable delivery after a user force-quits the app.
+
 ## Scoped cold-call authentication foundation (2026-11-16)
 
 `CallPushBootstrap` and `ejabberd_auth_teletyptel_calls.erl` introduce a separate

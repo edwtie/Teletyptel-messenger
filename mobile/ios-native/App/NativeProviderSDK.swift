@@ -5,8 +5,10 @@ import FacebookLogin
 
 enum NativeProviderFailure: Error { case configuration, unavailable, denied }
 
+@MainActor
 final class NativeProviderAppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+        NativeCallController.shared.restoreBackgroundCalls()
         if Bundle.main.object(forInfoDictionaryKey: "TeleTypTelFacebookEnabled") as? Bool == true {
             Settings.shared.isAutoLogAppEventsEnabled = false
             Settings.shared.isAdvertiserIDCollectionEnabled = false
@@ -17,6 +19,9 @@ final class NativeProviderAppDelegate: NSObject, UIApplicationDelegate {
         }
         return true
     }
+
+    func applicationDidEnterBackground(_ application: UIApplication) { NativeCallController.shared.setForeground(false) }
+    func applicationDidBecomeActive(_ application: UIApplication) { NativeCallController.shared.setForeground(true) }
 }
 
 @MainActor

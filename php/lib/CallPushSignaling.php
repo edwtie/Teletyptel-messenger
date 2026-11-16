@@ -355,10 +355,15 @@ final class CallPushSignaling
         } catch (Throwable $error) { return false; }
     }
 
-    public function bootstrapCaller(array $call, string $bootstrapKey, string $environment, string $domain): string
+    public function assertBootstrapConfiguration(string $bootstrapKey, string $environment, string $domain): void
     {
         if (hash_equals($this->key, $bootstrapKey)) throw new CallPushFailure('Afzonderlijke oproeptoegangssleutel vereist.', 503);
         if ($environment !== $this->environment || $domain !== $this->domain) throw new CallPushFailure('Oproepomgeving komt niet overeen.', 403);
+    }
+
+    public function bootstrapCaller(array $call, string $bootstrapKey, string $environment, string $domain): string
+    {
+        $this->assertBootstrapConfiguration($bootstrapKey, $environment, $domain);
         if (!$this->allows($call, 'read')) throw new CallPushFailure('Oproepherstel niet toegestaan.', 403);
         $record = $this->rows('SELECT caller_jid FROM call_signaling_calls WHERE scope_id = ? AND caller = ? AND sid = ?',
             [$this->scope, $call['caller'], $call['sid']])[0] ?? null;

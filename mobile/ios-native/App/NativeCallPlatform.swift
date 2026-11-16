@@ -117,6 +117,12 @@ final class NativeCallPlatform: NSObject, PKPushRegistryDelegate, CXProviderDele
 
     @discardableResult
     func enable(account: String, consented: Bool, tokenChanged: @escaping (Data?) -> Void) -> Bool {
+        if registry != nil, consented, !revocationRequired, registration != nil,
+           let previous = self.account, let bare = NativeChatCodec.bareJID(account),
+           NativeChatCodec.bareJID(previous) == bare {
+            self.tokenChanged = tokenChanged
+            return true
+        }
         guard Bundle.main.object(forInfoDictionaryKey: "TeleTypTelNativeCallPushEnabled") as? Bool == true,
               consented, registry == nil,
               let activeRegistration = connectForeground(account: account) else { return false }

@@ -1,5 +1,23 @@
 # TeleTypTel native iOS migration
 
+## Push, CallKit and media bridge (2026-11-16)
+
+The app delegate and SwiftUI now share `NativeCallController.shared`. An extra
+disabled laboratory flag gates cold restoration of explicitly consented,
+after-first-unlock device-only recovery authorization. No general chat password,
+biometric unlock or PHP session cookie is used in the cold path. Network work
+starts on answer, after CallKit reporting. The bounded HTTPS broker and distinct
+call-only WSS transport feed actual proof/reservation, proceed and fresh Jingle
+into `NativeIncomingPeerNegotiator` and the existing WebRTC/CallKit audio gate.
+
+This supersedes older statements that no native cold-path wiring exists. It does
+**not** remove release gates: scoped XMPP still expires after twenty seconds,
+active-call leases/producer lifecycle and immediate revocation integration remain
+unfinished, and no readiness capability, APNs activation, entitlements or signed
+TestFlight upload is added. The preview plist does not enable
+`TeleTypTelNativeCallRecoveryLabEnabled`. See `services/call-push/README.md` for
+the isolated adapter/broker contract and all physical-device acceptance gates.
+
 ## Call-only bootstrap checkpoint (2026-11-16)
 
 The core now has an ephemeral `NativeCallBootstrapGrant` and a distinct

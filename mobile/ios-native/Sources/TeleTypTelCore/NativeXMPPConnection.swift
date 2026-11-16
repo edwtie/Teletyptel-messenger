@@ -43,8 +43,24 @@ protocol NativeCallXMPPConnecting {
                  onJingle: @escaping @Sendable (NativeJingleRequest) -> Void) async throws
 }
 
-public struct NativeXMPPConnection: NativeXMPPConnecting, NativeJingleXMPPConnecting, NativeCallXMPPConnecting {
+protocol NativeBootstrapXMPPConnecting {
+    func runCall(bootstrap: NativeCallBootstrapGrant, onConnected: @escaping @Sendable (String) -> Void,
+                 onSender: @escaping @Sendable (any NativeCallRecoverySending) -> Void,
+                 onIntent: @escaping @Sendable (NativeCallIntent) -> Void,
+                 onJingle: @escaping @Sendable (NativeJingleRequest) -> Void) async throws
+}
+
+public struct NativeXMPPConnection: NativeXMPPConnecting, NativeJingleXMPPConnecting, NativeCallXMPPConnecting, NativeBootstrapXMPPConnecting {
     public init() {}
+
+    func runCall(bootstrap: NativeCallBootstrapGrant, onConnected: @escaping @Sendable (String) -> Void,
+                 onSender: @escaping @Sendable (any NativeCallRecoverySending) -> Void,
+                 onIntent: @escaping @Sendable (NativeCallIntent) -> Void,
+                 onJingle: @escaping @Sendable (NativeJingleRequest) -> Void) async throws {
+        let operation = SessionOperation(bootstrap: bootstrap, onConnected: onConnected, onSender: onSender,
+            onIntent: onIntent, onJingle: onJingle)
+        try await withTaskCancellationHandler(operation: { try await operation.run() }, onCancel: { operation.cancel() })
+    }
 
     func runCall(account: NativeAuthenticatedAccount, onConnected: @escaping @Sendable (String) -> Void,
                  onSender: @escaping @Sendable (any NativeCallRecoverySending) -> Void,
@@ -164,6 +180,9 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
     private var stream: XMPPSessionStream
     private var cancelled = false
     private var completed = false
+    private var scopeDeadline: DispatchWorkItem?
+    private var scopeExpiry: TimeInterval?
+    private var scopedSocketURL: URL?
 
     init(account: NativeAuthenticatedAccount, onConnected: @escaping @Sendable (String) -> Void,
          onRoster: (@Sendable (NativeRosterState) -> Void)? = nil,
@@ -186,6 +205,17 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
         self.onSender = onSender
         self.onJingle = onJingle
         self.onJingleSender = onJingleSender
+    }
+
+    init(bootstrap: NativeCallBootstrapGrant, onConnected: @escaping @Sendable (String) -> Void,
+         onSender: @escaping @Sendable (any NativeCallRecoverySending) -> Void,
+         onIntent: @escaping @Sendable (NativeCallIntent) -> Void,
+         onJingle: @escaping @Sendable (NativeJingleRequest) -> Void) {
+        configuration = bootstrap.configuration; ownerJID = bootstrap.owner; callOnly = true
+        stream = XMPPSessionStream(bootstrap: bootstrap); scopeExpiry = bootstrap.expiresAt
+        scopedSocketURL = bootstrap.configuration.webSocket.deletingLastPathComponent().appendingPathComponent("xmpp-call-websocket")
+        self.onConnected = onConnected; self.onCallSender = onSender
+        self.callIntentObserver = onIntent; self.onJingle = onJingle
     }
 
     func observeCallIntents(_ observer: @escaping @Sendable (NativeCallIntent) -> Void) async {
@@ -804,6 +834,13 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
             queue.async {
                 self.continuation = continuation
                 if self.cancelled { self.finish(CancellationError()); return }
+                if let expiry = self.scopeExpiry {
+                    let remaining = expiry - Date().timeIntervalSince1970
+                    guard remaining > 0, remaining <= 20 else { self.finish(NativeJingleFailure.timedOut); return }
+                    let deadline = DispatchWorkItem { [weak self] in self?.finish(NativeJingleFailure.timedOut) }
+                    self.scopeDeadline = deadline
+                    self.queue.asyncAfter(deadline: .now() + remaining, execute: deadline)
+                }
                 let settings = URLSessionConfiguration.ephemeral
                 settings.httpCookieStorage = nil
                 settings.httpShouldSetCookies = false
@@ -811,7 +848,7 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
                 settings.urlCache = nil
                 settings.timeoutIntervalForRequest = 10
                 let session = URLSession(configuration: settings, delegate: self, delegateQueue: nil)
-                let socket = session.webSocketTask(with: self.configuration.webSocket, protocols: ["xmpp"])
+                let socket = session.webSocketTask(with: self.scopedSocketURL ?? self.configuration.webSocket, protocols: ["xmpp"])
                 socket.maximumMessageSize = 65536
                 self.session = session
                 self.socket = socket
@@ -854,6 +891,7 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
         let graceful = cancelled && stream.phase == .online
         completed = true
         self.continuation = nil
+        scopeDeadline?.cancel(); scopeDeadline = nil
         onConnected = nil
         onRoster = nil
         onChat = nil
