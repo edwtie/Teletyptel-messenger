@@ -786,9 +786,11 @@ final class NativeStartupUITests: XCTestCase {
     }
 
     private func waitForStatus(_ text: String) {
-        reveal(application.staticTexts["startup-status"], upward: false)
-        let displayed = NSPredicate(format: "label CONTAINS %@", text)
-        expectation(for: displayed, evaluatedWith: application.staticTexts["startup-status"])
-        waitForExpectations(timeout: 10)
+        let displayed = NSPredicate { _, _ in
+            let status = self.application.staticTexts["startup-status"]
+            return status.exists && status.label.contains(text)
+        }
+        expectation(for: displayed, evaluatedWith: nil)
+        waitForExpectations(timeout: 30)
     }
 }

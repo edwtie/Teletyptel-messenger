@@ -3065,6 +3065,16 @@ locator although the failure hierarchy no longer contained the deleted UUID; the
 assertion now re-queries that exact UUID. The interrupted run remains failed and
 is not counted as complete simulator evidence.
 
+In run `43961195165` the iPhone test runner was killed before establishing its
+XCTest connection; no iPhone app assertion ran. The iPad chat-overlap and main-menu
+checks again passed individually. The remaining iPad checks stopped in the shared
+status waiter; its failure hierarchy already showed the expected connected label.
+That waiter now re-queries the current status element across the login-to-messenger
+view replacement, with a thirty-second UI-only deadline for the slow hosted
+runner. No application authentication/network timeout is changed. A further
+unsigned validation run is required; these failed runs do not establish full
+iPhone/iPad acceptance.
+
 ## Primary references
 
 - [RFC 7395: XMPP over WebSocket](https://www.rfc-editor.org/rfc/rfc7395.html):

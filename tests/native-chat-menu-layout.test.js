@@ -74,4 +74,8 @@ test("Login actions take layout space instead of covering the password while the
   const methods = read("mobile/ios-native/UITests/NativeStartupUITests.swift");
   assert.match(methods, /XCTAssertLessThanOrEqual\(password.frame.maxY, actions.frame.minY\)/);
   assert.match(methods, /matching\(identifier: "chat-message-" \+ forwardID\)\.firstMatch.exists/);
+  const status = methods.split("private func waitForStatus")[1];
+  assert.match(status, /let status = self.application.staticTexts\["startup-status"\]/);
+  assert.match(status, /status.exists && status.label.contains\(text\)/);
+  assert.match(status, /waitForExpectations\(timeout: 30\)/);
 });
