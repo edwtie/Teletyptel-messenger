@@ -58,6 +58,7 @@ private actor WarmCallConnection: NativeCallXMPPConnecting, NativeBootstrapXMPPC
     func proveCallResource(invitation: NativeCallInvitation, registration: NativePushRegistration) async throws {
         operations.append("proof")
     }
+    func authorizeCallAnswer(_ permit: String) async throws { operations.append("authorize") }
     func sendCallIntent(action: NativeCallIntentAction, peer: String, sid: String, media: NativeCallMedia?) async throws {
         guard action == .proceed, peer == "alice@localhost/caller", sid == "call-1" else { throw NativeJingleFailure.invalidRequest }
         operations.append("proceed")
@@ -104,11 +105,12 @@ private final class WarmCallRegistry: NativeWarmCallRegistryServing {
     var caller = "alice@localhost/caller"
     var permitted = true
     var afterAccept: (() -> Void)?
+    var answerAuthorization: String?
     func accept(invitation: NativeCallInvitation, registration: NativePushRegistration, fullJID: String) async throws -> NativeCallReservation {
         accepts += 1
         guard permitted else { throw NativePushRegistryFailure.rejected }
         afterAccept?()
-        return NativeCallReservation(callerJID: caller, recipientJID: fullJID)
+        return NativeCallReservation(callerJID: caller, recipientJID: fullJID, answerAuthorization: answerAuthorization)
     }
     func end(invitation: NativeCallInvitation, registration: NativePushRegistration) async throws { ends += 1 }
 }
@@ -131,6 +133,7 @@ final class NativeWarmCallTests: XCTestCase {
     func testColdBootstrapUsesProofReservationProceedAndFreshOfferForAllProfiles() async throws {
         for profile in NativeCallMedia.allCases {
             let registry = WarmCallRegistry(), connection = WarmCallConnection(profile: profile, offerProfile: profile)
+            registry.answerAuthorization = "fictional-permit"
             let invitation = try XCTUnwrap(NativeCallInvitation(sid: "call-1", expiresAt: 145, media: profile, now: 100))
             let registration = NativePushRegistration(deviceID: UUID(), generation: String(repeating: "a", count: 32), expiresAt: 200, controlCredential: nil)
             let recovery = NativeWarmCallSession(invitation: invitation, registration: registration, registry: registry, now: { 100 })
@@ -139,7 +142,7 @@ final class NativeWarmCallTests: XCTestCase {
             XCTAssertEqual(offer.request.action, "session-initiate")
             XCTAssertEqual(registry.accepts, 1)
             let operations = await connection.history()
-            XCTAssertEqual(operations, ["bind", "proof", "proceed"])
+            XCTAssertEqual(operations, ["bind", "proof", "authorize", "proceed"])
             recovery.cancel(); recovery.endServerCall()
         }
     }
@@ -156,6 +159,20 @@ final class NativeWarmCallTests: XCTestCase {
         try await Task.sleep(nanoseconds: 20_000_000)
         let stopped = await connection.isStopped()
         XCTAssertTrue(stopped)
+    }
+
+    func testColdBootstrapCannotProceedWithoutServerAnswerAuthorization() async throws {
+        let registry = WarmCallRegistry(), connection = WarmCallConnection()
+        let invitation = try XCTUnwrap(NativeCallInvitation(sid: "call-1", expiresAt: 145, media: .total, now: 100))
+        let registration = NativePushRegistration(deviceID: UUID(), generation: String(repeating: "a", count: 32), expiresAt: 200, controlCredential: nil)
+        let recovery = NativeWarmCallSession(invitation: invitation, registration: registration, registry: registry, now: { 100 })
+        do {
+            _ = try await recovery.prepare(bootstrap: bootstrap(invitation: invitation, registration: registration), connector: connection, validateContext: {})
+            XCTFail("Missing server answer authorization was accepted")
+        } catch { XCTAssertEqual(error as? NativeJingleFailure, .rejected) }
+        let operations = await connection.history()
+        XCTAssertEqual(operations, ["bind", "proof"])
+        recovery.cancel()
     }
     private func account() throws -> NativeAuthenticatedAccount {
         NativeAuthenticatedAccount(configuration: try ServerConfiguration(address: "https://example.invalid", domain: "localhost"),

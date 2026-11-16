@@ -163,10 +163,41 @@ valid(#{lserver := Host, teletyptel_scope := Claims}) ->
 valid(_) -> false.
 
 close(State) -> ejabberd_c2s:stop_async(self()), State.
+authenticated(#{auth_module := ?MODULE, teletyptel_scope := Claims, lserver := Host} = State,
+    #iq{type = set, id = Id, from = From, to = To,
+        sub_els = [#xmlel{name = <<"authorize">>, attrs = [{<<"xmlns">>, ?NS}], children = [{xmlcdata, Token}]}]} = IQ) ->
+    try
+        true = valid(State), false = maps:get(teletyptel_answered, State, false),
+        true = byte_size(Id) > 0 andalso byte_size(Id) =< 256,
+        Own = <<(maps:get(<<"owner">>, Claims))/binary, "/", (maps:get(<<"resource">>, Claims))/binary>>,
+        Own = jid:encode(From), Host = jid:encode(To),
+        ok = answer_permit(Token, Claims, Host),
+        Pending = maps:get(teletyptel_out, State), false = maps:is_key(Id, Pending), true = map_size(Pending) < 32,
+        Authorized = State#{teletyptel_answered => true, teletyptel_out => Pending#{Id => Host}},
+        {stop, ejabberd_c2s:send(Authorized, xmpp:make_iq_result(IQ))}
+    catch _:_ -> {stop, close(State)} end;
 authenticated(#{auth_module := ?MODULE} = State, Packet) ->
     try true = ?is_stanza(Packet) andalso valid(State), _ = permitted(Packet, State, out), State
     catch _:_ -> {stop, close(State)} end;
 authenticated(State, _) -> State.
+
+answer_permit(Token, Claims, Host) ->
+    true = byte_size(Token) =< 1024,
+    [<<"tca1">>, Payload, Signature] = binary:split(Token, <<".">>, [global]),
+    match = re:run(Payload, <<"\\A[A-Za-z0-9_-]+\\z">>, [{capture, none}]),
+    match = re:run(Signature, <<"\\A[0-9a-f]{64}\\z">>, [{capture, none}]),
+    #{key := Key, environment := Environment, issuer := Issuer} = persistent_term:get({?MODULE, Host}),
+    Expected = string:lowercase(binary:encode_hex(crypto:mac(hmac, sha256, Key,
+        <<"teletyptel-call-answer-v1:", Environment/binary, ":", Host/binary, ":", Issuer/binary, ":", Payload/binary>>))),
+    true = crypto:hash_equals(Expected, Signature),
+    Translated = binary:replace(binary:replace(Payload, <<"-">>, <<"+">>, [global]), <<"_">>, <<"/">>, [global]),
+    Value = jiffy:decode(base64:decode(<<Translated/binary, (binary:copy(<<"=">>, (4 - byte_size(Translated) rem 4) rem 4))/binary>>), [return_maps]),
+    true = lists:sort(maps:keys(Value)) =:= lists:sort(maps:keys(Claims)),
+    <<"call-xmpp-answer-v1">> = maps:get(<<"scope">>, Value),
+    true = maps:without([<<"scope">>, <<"issuedAt">>, <<"expiresAt">>], Value) =:= maps:without([<<"scope">>, <<"issuedAt">>, <<"expiresAt">>], Claims),
+    Issued = maps:get(<<"issuedAt">>, Value), Expires = maps:get(<<"expiresAt">>, Value), Now = erlang:system_time(second),
+    true = is_integer(Issued) andalso is_integer(Expires) andalso Issued =< Now andalso Now - Issued =< 20
+        andalso Expires > Now andalso Expires =< maps:get(<<"expiresAt">>, Claims), ok.
 unbound(#{auth_module := ?MODULE} = State, _) -> {stop, close(State)};
 unbound(State, _) -> State.
 inline({#{auth_module := ?MODULE} = State, _, _}) -> {stop, {close(State), [], []}};
@@ -219,7 +250,7 @@ permitted(#iq{type = Type, id = Id, from = From, to = To, sub_els = Els}, #{tele
             true = case {Type, Other, Raw} of
                 {get, Host, [#xmlel{name = <<"ping">>, attrs = [{<<"xmlns">>, <<"urn:xmpp:ping">>}], children = []}]} -> true;
                 {set, Host, [Element]} when Direction =:= out -> handoff(Element, Claims);
-                {set, _, [Element]} -> Other =:= maps:get(<<"peer">>, Claims) andalso jingle(Element, Claims, Direction);
+                {set, _, [Element]} -> maps:get(teletyptel_answered, State, false) andalso Other =:= maps:get(<<"peer">>, Claims) andalso jingle(Element, Claims, Direction);
                 _ -> false
             end,
             Pending = maps:get(Requests, State), true = map_size(Pending) < 32, false = maps:is_key(Id, Pending),
@@ -231,6 +262,7 @@ permitted(#message{type = chat, from = From, to = To, body = [], subject = [], t
     Raw = [xmpp:encode(Element) || Element <- Els],
     [Intent] = [Element || #xmlel{attrs = Attrs} = Element <- Raw, proplists:get_value(<<"xmlns">>, Attrs) =:= ?JMI],
     true = intent(Intent, Claims, Direction),
+    true = Direction =/= out orelse Intent#xmlel.name =/= <<"proceed">> orelse maps:get(teletyptel_answered, State, false),
     true = lists:all(fun(Element) -> Element =:= Intent orelse metadata(Element, Claims, Direction) end, Raw), State;
 permitted(_, _, _) -> error(outside_call_scope).
 

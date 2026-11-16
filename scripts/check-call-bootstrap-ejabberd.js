@@ -116,10 +116,14 @@ async function run() {
       return "tcr1." + payload + "." + createHmac("sha256", Buffer.from(key, "base64"))
         .update("teletyptel-call-xmpp-v1:production:example.test:fixture:" + payload).digest("hex");
     };
-    const scoped = async profile => {
+    const scoped = async (profile, authorize = true) => {
       const grant = mint(profile), connection = client();
       check(await connection.authenticate("bob", grant.credential), "Call credential authenticated");
       check(/type=['"]result['"]/.test(await connection.bind(grant.claims.resource)), "Signed resource bound");
+      if (authorize) {
+        connection.send(`<iq type='set' to='example.test' id='authorize'><authorize xmlns='urn:teletyptel:call-recovery:1'>${grant.answerAuthorization}</authorize></iq>`);
+        check(/type=['"]result['"]/.test(await connection.wait(/<iq\b(?=[^>]*\bid=['"]authorize['"])[^>]*(?:\/>|>[\s\S]*?<\/iq>)/)), "Server-signed winning-resource authorization acknowledged");
+      }
       return { grant, connection };
     };
     stage = "ordinary login";
@@ -142,6 +146,14 @@ async function run() {
       const replay = client(); check(!await replay.authenticate("bob", grant.credential), "Grant replay denied across resources"); replay.close();
     }
     stage = "negative scopes";
+    const premature = await scoped("total", false);
+    premature.connection.send(`<message type='chat' to='${premature.grant.claims.peer}'><proceed xmlns='urn:xmpp:jingle-message:0' id='${premature.grant.claims.sid}'/></message>`);
+    for (let attempt = 0; attempt < 100 && !premature.connection.closed; attempt++) await delay(10);
+    check(premature.connection.closed, "Bootstrap alone cannot answer before a server-signed reservation permit");
+    const mismatched = await scoped("total", false), otherPermit = mint("total").answerAuthorization;
+    mismatched.connection.send(`<iq type='set' to='example.test' id='wrong-permit'><authorize xmlns='urn:teletyptel:call-recovery:1'>${otherPermit}</authorize></iq>`);
+    for (let attempt = 0; attempt < 100 && !mismatched.connection.closed; attempt++) await delay(10);
+    check(mismatched.connection.closed, "A winning-device permit cannot authorize another call/resource/nonce");
     const forbidden = [
       "<iq type='get' to='example.test' id='forbidden'><query xmlns='jabber:iq:roster'/></iq>",
       "<iq type='set' to='example.test' id='forbidden'><query xmlns='urn:xmpp:mam:2'/></iq>",

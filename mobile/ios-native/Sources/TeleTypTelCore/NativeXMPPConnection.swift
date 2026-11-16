@@ -34,7 +34,13 @@ protocol NativeJingleXMPPConnecting: NativeXMPPConnecting {
              onJingleSender: @escaping @Sendable (any NativeJingleSending) -> Void) async throws
 }
 
-protocol NativeCallRecoverySending: NativeJingleSending, NativeCallIntentSending {}
+protocol NativeCallRecoverySending: NativeJingleSending, NativeCallIntentSending {
+    func authorizeCallAnswer(_ permit: String) async throws
+}
+
+extension NativeCallRecoverySending {
+    func authorizeCallAnswer(_ permit: String) async throws { throw NativePushRegistryFailure.unavailable }
+}
 
 protocol NativeCallXMPPConnecting {
     func runCall(account: NativeAuthenticatedAccount, onConnected: @escaping @Sendable (String) -> Void,
@@ -249,6 +255,14 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
         let identifier = "call-proof-" + UUID().uuidString
         try await exchangeCallControl(NativeCallIntent.handoff(owner: ownerJID, identifier: identifier,
             invitation: invitation, registration: registration), identifier: identifier)
+    }
+
+    func authorizeCallAnswer(_ permit: String) async throws {
+        guard permit.utf8.count <= 1024,
+              permit.range(of: "\\Atca1\\.[A-Za-z0-9_-]+\\.[0-9a-f]{64}\\z", options: .regularExpression) != nil,
+              callOnly else { throw NativePushRegistryFailure.rejected }
+        let identifier = "call-answer-" + UUID().uuidString
+        try await exchangeCallControl("<iq xmlns='jabber:client' type='set' to='\(configuration.domain)' id='\(identifier)'><authorize xmlns='urn:teletyptel:call-recovery:1'>\(permit)</authorize></iq>", identifier: identifier)
     }
 
     private func receiveCallIntent(_ frame: String) {

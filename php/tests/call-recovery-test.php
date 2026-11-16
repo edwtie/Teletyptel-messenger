@@ -25,12 +25,15 @@ $grant = $broker->handle($authorization['credential'], $input);
 $check($grant['claims']['callId'] === $input['callId'], 'Actual cookie-free issuance');
 $full = 'bob@example.test/' . $grant['claims']['resource'];
 $accept = array_replace($input, ['action' => 'accept', 'fullJid' => $full]);
+$deny(fn() => $fixture->issuer->answerPermit('bob', $fixture->binding, $fixture->device, $fixture->registration['generation'], $input['callId'], $full));
 $deny(fn() => $broker->handle($authorization['credential'], $accept));
 $fixture->event(['type' => 'resource', 'jid' => $full, 'online' => true, 'revision' => 1, 'expiresAt' => $fixture->now + 25]);
 $fixture->event(['type' => 'handoff', 'callId' => $input['callId'], 'sid' => $input['sid'], 'jid' => $full,
     'deviceId' => $fixture->device, 'generation' => $fixture->registration['generation'], 'revision' => 1, 'expiresAt' => $fixture->now + 15]);
 $reserved = $broker->handle($authorization['credential'], $accept);
-$check($reserved === ['callerJid' => 'alice@example.test/caller', 'recipientJid' => $full], 'Actual resource proof and reservation');
+$check($reserved['callerJid'] === 'alice@example.test/caller' && $reserved['recipientJid'] === $full
+    && str_starts_with($reserved['answerAuthorization'], 'tca1.'), 'Actual resource proof, reservation and scoped answer permit');
+$deny(fn() => $fixture->issuer->answerPermit('bob', $fixture->binding, $fixture->device, $fixture->registration['generation'], $input['callId'], 'bob@example.test/other'));
 $check($broker->handle($authorization['credential'], array_replace($input, ['action' => 'end']))['ended'] === true, 'Cleanup accepted');
 $check($fixture->pdo->query('SELECT state FROM call_push_calls')->fetchColumn() === 'ended', 'Actual persisted end');
 foreach (['deviceId' => 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'generation' => str_repeat('f', 32),

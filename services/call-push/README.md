@@ -6,7 +6,8 @@ This checkpoint supersedes the older no-broker/no-native-wiring statements below
 It is **not a production background-call release**. The new chain is:
 app-delegate-owned singleton, restored explicit device consent, PushKit callback,
 immediate CallKit report, answer-time cookie-free broker, one-shot scoped WSS,
-fresh proposal, device/resource proof, reservation, proceed, fresh matching Jingle
+fresh proposal, device/resource proof, reservation, signed answer authorization,
+proceed, fresh matching Jingle
 and the existing incoming native WebRTC/media gate. The UI observes that same
 runtime; appearing/disappearing views must not create a second CallKit owner.
 CallKit audio activation still controls the microphone. Permission requests and
@@ -22,6 +23,16 @@ the current registry generation, expiry and account access version. Logout,
 registration rotation and revocation prevent subsequent broker access. Failed
 enrollment revokes the newly registered device instead of silently leaving it
 enabled. The old status/end-only control bearer is unchanged.
+
+The broker issues a separate `tca1` answer permit only after the actual reservation
+and resource proof are current, under the same registry lock. It pins the winning
+call/device/generation/full resource/nonce/peer/profile and cannot extend the
+original bootstrap expiry. The native chain must obtain an XMPP acknowledgement
+of this permit before `proceed`. The authentication backend itself blocks
+`proceed` and Jingle media negotiation until that acknowledgement: a modified
+client cannot bypass the reservation by merely following a different UI sequence.
+A permit for another nonce/resource is refused. This does not restrict ordinary
+full-account XMPP clients as though they used these call-only credentials.
 
 **Hard laboratory limit:** the scoped XMPP stream still closes after its signed
 twenty-second bootstrap lifetime. Both client and server enforce this; a prepared

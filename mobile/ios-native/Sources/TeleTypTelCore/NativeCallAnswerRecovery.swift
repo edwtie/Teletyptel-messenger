@@ -5,9 +5,12 @@ protocol NativeCallReservationServing {
     func accept(invitation: NativeCallInvitation, registration: NativePushRegistration, fullJID: String) async throws -> NativeCallReservation
 }
 
-struct NativeCallReservation: Equatable {
+struct NativeCallReservation: Equatable, CustomStringConvertible, CustomDebugStringConvertible {
     let callerJID: String
     let recipientJID: String
+    var answerAuthorization: String? = nil
+    var description: String { "NativeCallReservation(redacted)" }
+    var debugDescription: String { description }
 }
 
 extension NativePushRegistryClient: NativeCallReservationServing {}
@@ -30,6 +33,7 @@ final class NativeCallAnswerRecovery {
     func recover(invitation: NativeCallInvitation, registration: NativePushRegistration, proposal: NativeCallIntent,
                  owner: String, fullJID: String, sender: any NativeCallIntentSending,
                  registry: any NativeCallReservationServing,
+                 requireAnswerAuthorization: Bool = false,
                  validateContext: @escaping () throws -> Void = {},
                  abandonReservation: @escaping () async -> Void) async throws -> String {
         guard phase == .idle, proposal.action == .propose, proposal.sid == invitation.sid,
@@ -61,6 +65,11 @@ final class NativeCallAnswerRecovery {
             try valid(attempt, invitation: invitation)
             try validateContext()
             guard reservation.callerJID == proposal.peer, reservation.recipientJID == fullJID else { throw NativeJingleFailure.rejected }
+            if let permit = reservation.answerAuthorization {
+                guard let scopedSender = sender as? any NativeCallRecoverySending else { throw NativeJingleFailure.rejected }
+                try await scopedSender.authorizeCallAnswer(permit)
+                try valid(attempt, invitation: invitation); try validateContext()
+            } else if requireAnswerAuthorization { throw NativeJingleFailure.rejected }
             phase = .proceeding
             try await sender.sendCallIntent(action: .proceed, peer: proposal.peer, sid: invitation.sid, media: nil)
             try valid(attempt, invitation: invitation)

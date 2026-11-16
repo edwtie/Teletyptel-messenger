@@ -120,6 +120,8 @@ final class CallPushRecovery
             throw new CallPushFailure('Verbindingsbewijs wordt verwerkt.', 425);
         }
         $this->registry->acceptVerified($claims['account'], $claims['binding'], $input['callId'], $claims['device'], $claims['generation'], $input['fullJid']);
-        return ['callerJid' => $caller, 'recipientJid' => $input['fullJid']];
+        return ['callerJid' => $caller, 'recipientJid' => $input['fullJid'],
+            'answerAuthorization' => $this->bootstrap->answerPermit($claims['account'], $claims['binding'], $claims['device'],
+                $claims['generation'], $call['call_id'], $input['fullJid'])];
     }
 }

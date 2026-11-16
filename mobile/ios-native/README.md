@@ -7,7 +7,8 @@ disabled laboratory flag gates cold restoration of explicitly consented,
 after-first-unlock device-only recovery authorization. No general chat password,
 biometric unlock or PHP session cookie is used in the cold path. Network work
 starts on answer, after CallKit reporting. The bounded HTTPS broker and distinct
-call-only WSS transport feed actual proof/reservation, proceed and fresh Jingle
+call-only WSS transport feed actual proof/reservation, server-acknowledged scoped
+answer authorization, proceed and fresh Jingle
 into `NativeIncomingPeerNegotiator` and the existing WebRTC/CallKit audio gate.
 
 This supersedes older statements that no native cold-path wiring exists. It does

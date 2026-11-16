@@ -93,4 +93,50 @@ final class CallPushBootstrap
             throw $error;
         }
     }
+
+    public function answerPermit(string $account, string $binding, string $deviceId, string $generation, string $callId, string $fullJid): string
+    {
+        if ($this->pdo->inTransaction()) throw new CallPushFailure('Oproepopslag is bezet.', 503);
+        $this->pdo->beginTransaction();
+        try {
+            $this->pdo->prepare('UPDATE call_push_lock SET touched = ? WHERE lock_id = 1')->execute([($this->clock)()]);
+            if (!$this->row('SELECT lock_id FROM call_push_lock WHERE lock_id = ?', [1])) throw new CallPushFailure('Oproepopslag ontbreekt.', 503);
+            $permit = $this->createAnswerPermit($account, $binding, $deviceId, $generation, $callId, $fullJid);
+            $this->pdo->commit();
+            return $permit;
+        } catch (Throwable $error) {
+            if ($this->pdo->inTransaction()) $this->pdo->rollBack();
+            throw $error;
+        }
+    }
+
+    private function createAnswerPermit(string $account, string $binding, string $deviceId, string $generation, string $callId, string $fullJid): string
+    {
+        $now = ($this->clock)();
+        $call = $this->row('SELECT * FROM call_push_calls WHERE call_id = ?', [self::uuid($callId)]);
+        $device = $this->row('SELECT * FROM call_push_devices WHERE device_id = ?', [self::uuid($deviceId)]);
+        $owner = $this->row('SELECT jid FROM account_profiles WHERE account_id = ?', [$account]);
+        if (!$call || !$device || !$owner || $call['recipient'] !== $account || $call['state'] !== 'accepted'
+            || $call['accepted_device'] !== $deviceId || $call['accepted_generation'] !== $generation || $call['recipient_jid'] !== $fullJid
+            || $device['account_id'] !== $account || !hash_equals($device['generation'], $generation)
+            || !hash_equals($device['session_binding'], hash('sha256', $binding)) || (int)$device['expires'] <= $now
+            || $device['environment'] !== $this->environment || !AccountAccess::versionAllowed($this->pdo, $account, (int)$device['access_version'])
+            || !$this->signaling->allows($call, 'accept') || !preg_match('/\A' . preg_quote($owner['jid'], '/') . '\/tc-call-([0-9a-f]{32})\z/', $fullJid, $match)) {
+            throw new CallPushFailure('Opnemen is niet toegestaan.', 403);
+        }
+        $issue = $this->row('SELECT expires FROM call_bootstrap_issues WHERE nonce = ? AND call_id = ? AND device_id = ? AND generation = ? AND expires > ?',
+            [$match[1], $callId, $deviceId, $generation, $now]);
+        if (!$issue) throw new CallPushFailure('Oproeptoegang verlopen.', 403);
+        $claims = ['version' => 1, 'scope' => 'call-xmpp-answer-v1', 'environment' => $this->environment,
+            'domain' => $this->domain, 'issuer' => $this->issuer, 'owner' => $owner['jid'],
+            'peer' => $this->signaling->bootstrapCaller($call, $this->key, $this->environment, $this->domain),
+            'callId' => $callId, 'sid' => $call['sid'], 'deviceId' => $deviceId, 'generation' => $generation,
+            'profile' => $call['media_profile'], 'nonce' => $match[1], 'resource' => 'tc-call-' . $match[1],
+            'issuedAt' => $now, 'expiresAt' => min((int)$issue['expires'], (int)$call['expires'], (int)$device['expires'])];
+        $payload = rtrim(strtr(base64_encode(json_encode($claims, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES)), '+/', '-_'), '=');
+        $credential = 'tca1.' . $payload . '.' . hash_hmac('sha256',
+            'teletyptel-call-answer-v1:' . $this->environment . ':' . $this->domain . ':' . $this->issuer . ':' . $payload, $this->key);
+        if (strlen($credential) > 1024) throw new CallPushFailure('Oproeptoegang is te groot.', 503);
+        return $credential;
+    }
 }

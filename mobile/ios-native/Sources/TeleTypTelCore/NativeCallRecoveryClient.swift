@@ -71,12 +71,13 @@ struct NativeCallRecoveryClient: NativeColdCallServing {
         }
         let data = try await request("accept", invitation: invitation, registration: registration, fullJID: fullJID)
         let value = try JSONDecoder().decode(Reservation.self, from: data)
-        guard value.recipientJid == fullJID, NativeJingleTransport.fullJID(value.callerJid),
+        guard value.recipientJid == fullJID, NativeJingleTransport.fullJID(value.callerJid), value.answerAuthorization.utf8.count <= 1024,
+              value.answerAuthorization.range(of: "\\Atca1\\.[A-Za-z0-9_-]+\\.[0-9a-f]{64}\\z", options: .regularExpression) != nil,
               NativeChatCodec.bareJID(value.callerJid) != context.authorization.owner,
               NativeChatCodec.bareJID(value.callerJid)?.hasSuffix("@" + context.configuration.domain) == true else {
             throw NativePushRegistryFailure.invalidResponse
         }
-        return NativeCallReservation(callerJID: value.callerJid, recipientJID: value.recipientJid)
+        return NativeCallReservation(callerJID: value.callerJid, recipientJID: value.recipientJid, answerAuthorization: value.answerAuthorization)
     }
 
     func end(invitation: NativeCallInvitation, registration: NativePushRegistration) async throws {
@@ -84,7 +85,7 @@ struct NativeCallRecoveryClient: NativeColdCallServing {
         guard reply.ended else { throw NativePushRegistryFailure.invalidResponse }
     }
 
-    private struct Reservation: Decodable { let callerJid: String; let recipientJid: String }
+    private struct Reservation: Decodable { let callerJid: String; let recipientJid: String; let answerAuthorization: String }
     private struct Ended: Decodable { let ended: Bool }
     private struct Rejected: Decodable { let code: String }
 

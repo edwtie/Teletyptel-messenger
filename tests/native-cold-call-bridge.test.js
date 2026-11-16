@@ -42,6 +42,8 @@ test("Cold authentication never opens a normal account or bypasses scoped expiry
   assert.match(core("NativeXMPPConnection"), /remaining > 0, remaining <= 20/);
   assert.match(core("NativeWarmCallSession"), /bootstrap.callID == invitation.id/);
   assert.match(core("NativeWarmCallSession"), /self.authorizedResource == jid/);
+  assert.match(core("NativeWarmCallSession"), /requireAnswerAuthorization: authorizedResource != nil/);
+  assert.match(core("NativeCallAnswerRecovery"), /authorizeCallAnswer\(permit\)/);
   assert.match(core("NativePushRegistrationModel"), /value.recovery = nil/);
   const client = core("NativeCallRecoveryClient");
   assert.match(client, /settings.httpCookieStorage = nil/);
@@ -60,6 +62,8 @@ test("Only server-verified TLS can attest the special WebSocket listener", () =>
   assert.match(backend, /crypto:hash_equals\(websocket_mac\(Host, IP, Stamp, Nonce\), Signature\)/);
   assert.match(backend, /Id = \{Host, \{wss, Nonce\}\}/);
   assert.match(backend, /stream_encrypted, State, false\) orelse maps:get\(teletyptel_wss_verified/);
+  assert.match(backend, /ok = answer_permit\(Token, Claims, Host\)/);
+  assert.match(backend, /teletyptel_answered => true/);
   const endpoint = read("php/public/api/call-recovery.php");
   assert.match(endpoint, /TELETYPTEL_CALL_RECOVERY_LAB/);
   assert.doesNotMatch(endpoint, /session_start|ensureSchema|controlCredential/);

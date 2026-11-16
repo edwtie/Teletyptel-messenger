@@ -104,6 +104,7 @@ final class NativeWarmCallSession {
             try current(deadline, validate: validateContext)
             expectedPeer = try await recovery.recover(invitation: invitation, registration: registration, proposal: proposal,
                 owner: owner, fullJID: bound, sender: sender, registry: registry,
+                requireAnswerAuthorization: authorizedResource != nil,
                 validateContext: { try validateContext(); try validatePeer(proposal.peer) },
                 abandonReservation: { [weak self] in self?.endServerCall() })
             while requests.isEmpty { try await pause(deadline, validate: validateContext) }
