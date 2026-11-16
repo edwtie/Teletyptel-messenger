@@ -110,6 +110,12 @@ checks: bounded cadence, slow iterations, stop handling, failure propagation and
 refusal of all worker modes before database access when disabled. It does not
 exercise production dispatch or Apple delivery.
 
+The server-only revalidation of `e7a978f` passes in
+[run 43895683434](https://github.com/edwtie/Teletyptel-messenger/actions/runs/43895683434),
+including the real disposable TLS/broker/logout integration. The Swift job is
+explicitly skipped in this server-only run because no Swift source changed;
+it is not counted as additional native compilation or physical-device evidence.
+
 Local validation on 2026-11-16: 80 combined real disposable-ejabberd/TLS checks,
 23 durable-revocation checks, 21 pilot-readiness checks and 25 recovery checks
 pass. The focused Node suites pass 90 checks with one explicitly macOS-only skip.
