@@ -43,7 +43,9 @@ function run() {
   const result = { unsigned: true, uploaded: false, physicalDeviceTested: false,
     scope: "focused simulator UI regression; not a full unit, media or device SDK run",
     uiScope: scope, selectedTests: tests, uiTests: [] };
-  const logged = (name, command, args, timeout) => executeLogged(command, args, { root, reports, name, timeout });
+  const logged = (name, command, args, timeout) => executeLogged(command, args, {
+    root, reports, name, timeout: timeout ?? (scope === "menus" && name.endsWith("-build") ? 1200000 : undefined)
+  });
   try {
     const inventory = JSON.parse(logged("simulator-inventory", "xcrun", ["simctl", "list", "devices", "available", "--json"]));
     const devices = Object.entries(inventory.devices).filter(([runtime]) => runtime.includes("iOS"))

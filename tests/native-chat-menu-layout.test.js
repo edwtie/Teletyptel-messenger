@@ -63,4 +63,5 @@ test("Menu simulator scope measures hit targets and overlap for both orientation
   const workflow = read(".github/workflows/ios-native-preview.yml");
   assert.match(workflow, /inputs.validation_mode == 'focused-ui' && inputs.ui_scope == 'menus'/);
   assert.match(workflow, /tests\/native-chat-menu-layout.test.js/);
+  assert.match(read("scripts/check-ios-native-ui.js"), /timeout: timeout \?\? \(scope === "menus" && name.endsWith\("-build"\) \? 1200000 : undefined\)/);
 });

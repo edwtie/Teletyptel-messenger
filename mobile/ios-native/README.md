@@ -3040,6 +3040,12 @@ configuration are unchanged. Local source/generator checks pass; actual simulato
 results and screenshot review remain a separate validation gate. No TestFlight
 upload is requested by this scope.
 
+The first Intel iPhone menu build in run `43948799088` hit the existing ten-minute
+build-process timeout while compiling sources, without reporting a Swift error.
+For this menu-only scope the build-process budget is now explicitly twenty
+minutes; the existing test and job time limits remain bounded and unchanged.
+This timeout is not counted as a passed compile or UI test.
+
 ## Primary references
 
 - [RFC 7395: XMPP over WebSocket](https://www.rfc-editor.org/rfc/rfc7395.html):
