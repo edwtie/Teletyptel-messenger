@@ -103,7 +103,7 @@ function projectText({ pushTest = null, archive = null } = {}) {
   const projectConfigs = configurations("project", common);
   const appConfigs = configurations("app", 'PRODUCT_NAME = TeleTypTelNative; PRODUCT_BUNDLE_IDENTIFIER = '
     + (pushTest ? 'com.tiedragon.teletyptel' : 'com.tiedragon.teletyptel.nativepreview')
-    + '; INFOPLIST_FILE = App/Info.plist;' + (pushTest ? ' CODE_SIGN_ENTITLEMENTS = App/NativeCallPush.entitlements;' : '')
+    + '; INFOPLIST_FILE = App/Info.plist; LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks");' + (pushTest ? ' CODE_SIGN_ENTITLEMENTS = App/NativeCallPush.entitlements;' : '')
     + (archive ? ' SKIP_INSTALL = NO; INSTALL_PATH = "$(LOCAL_APPS_DIR)"; ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;' : ''));
   const testConfigs = configurations("test", 'PRODUCT_NAME = NativeStartupUITests; PRODUCT_BUNDLE_IDENTIFIER = com.tiedragon.teletyptel.nativepreview.uitests; GENERATE_INFOPLIST_FILE = YES; TEST_TARGET_NAME = TeleTypTelNative;');
   const proxy = object("proxy", `{isa = PBXContainerItemProxy; containerPortal = ${identifier("project")}; proxyType = 1; remoteGlobalIDString = ${identifier("target")}; remoteInfo = TeleTypTelNative;}`);

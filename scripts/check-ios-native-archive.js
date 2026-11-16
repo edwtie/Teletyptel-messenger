@@ -2,14 +2,16 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { prepare } = require("./prepare-ios-native");
-const { executeLogged } = require("./check-ios-native");
+const { executeLogged, collectTestResults } = require("./check-ios-native");
 const archiveConfig = require("./native-archive-config");
+const runtime = require("./native-runtime-linkage");
+const startup = require("./native-release-startup");
 
 function run() {
   if (process.platform !== "darwin") throw new Error("Unsigned native archiving requires macOS/Xcode");
   if (!require("./native-call-push-config").enabled(process.env.TELETYPTEL_NATIVE_PUSH_TEST)) throw new Error("Explicit native push-test staging is required");
   const root = path.resolve(__dirname, "..");
-  const expected = { version: "1.0", buildNumber: "17.0" };
+  const expected = { version: "1.0", buildNumber: process.env.TELETYPTEL_NATIVE_BUILD_NUMBER || "17.0" };
   const directory = prepare("ios-native-archive-" + Date.now(), {
     pushTest: { bundleId: "com.tiedragon.teletyptel", environment: "production", testOnly: true }, archive: expected
   });
@@ -30,6 +32,10 @@ function run() {
     const applicationProperties = archiveConfig.readProperties(path.join(archive, "Info.plist"), (command, args) => logged("archive-metadata", command, args));
     result = archiveConfig.inspect({ expected, app: readPlist("app-metadata", path.join(appPath, "Info.plist")),
       archive: { ApplicationProperties: applicationProperties } });
+    result.runtimeLinkage = runtime.inspect(appPath, (command, args) => logged("runtime-" + command + "-" + args[0].slice(1)
+      + (args[1].endsWith("/WebRTC") ? "-framework" : "-app"), command, args));
+    result.releaseStartup = startup.check({ directory, reports, family: process.env.TELETYPTEL_NATIVE_TEST_FAMILY, logged,
+      collect: (bundle, options) => collectTestResults(bundle, { root, ...options }) });
     console.log("Unsigned native archive verified; no TestFlight upload or live push.");
   } finally { fs.writeFileSync(path.join(reports, "result.json"), JSON.stringify(result, null, 2)); }
 }

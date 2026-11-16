@@ -7,6 +7,7 @@ const { spawnSync } = require("node:child_process");
 const { prepare } = require("./prepare-ios-native");
 const push = require("./native-call-push-config");
 const metadata = require("./native-archive-config");
+const runtime = require("./native-runtime-linkage");
 const bundleId = "com.tiedragon.teletyptel", teamId = "H29RTRBD9D";
 const pushTest = { bundleId, environment: "production", testOnly: true };
 
@@ -137,6 +138,7 @@ function run() {
     const app = plist(path.join(appPath, "Info.plist"));
     const properties = metadata.readProperties(path.join(archive, "Info.plist"), command);
     metadata.inspect({ app, archive: { ApplicationProperties: properties }, expected });
+    result.archiveRuntime = runtime.inspect(appPath, command);
     validateApp(app, configured); validatePrivacy(plist(path.join(appPath, "PrivacyInfo.xcprivacy")));
     command("codesign", ["--verify", "--deep", "--strict", appPath]);
     const entitlements = command("codesign", ["-d", "--entitlements", ":-", appPath]);
@@ -152,6 +154,15 @@ function run() {
     logged("xcodebuild", ["-exportArchive", "-archivePath", archive, "-exportPath", output, "-exportOptionsPlist", exportPlist], "export.txt");
     const packages = fs.readdirSync(output).filter(name => name.endsWith(".ipa"));
     if (packages.length !== 1) throw new Error("Unexpected exported packages");
+    stage = "verify exported runtime";
+    const unpacked = path.join(temporary, "exported");
+    command("ditto", ["-x", "-k", path.join(output, packages[0]), unpacked]);
+    const exportedApp = path.join(unpacked, "Payload/TeleTypTelNative.app");
+    result.exportedRuntime = runtime.inspect(exportedApp, command);
+    const exportedInfo = plist(path.join(exportedApp, "Info.plist"));
+    metadata.inspect({ app: exportedInfo, archive: { ApplicationProperties: properties }, expected });
+    validateApp(exportedInfo, configured);
+    command("codesign", ["--verify", "--deep", "--strict", exportedApp]);
     stage = "upload internal TestFlight";
     const privateKeys = path.join(os.homedir(), ".appstoreconnect/private_keys"); fs.mkdirSync(privateKeys, { recursive: true, mode: 0o700 });
     const keyFile = path.join(privateKeys, "AuthKey_" + secrets.IOS_ASC_KEY_ID + ".p8");

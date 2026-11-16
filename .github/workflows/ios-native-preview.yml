@@ -15,6 +15,9 @@ on:
       - scripts/check-ios-native-archive.js
       - scripts/native-archive-config.js
       - scripts/native-internal-release.js
+      - scripts/native-runtime-linkage.js
+      - scripts/native-release-startup.js
+      - tests/native-runtime-linkage.test.js
       - scripts/native-provider-config.js
       - tests/native-internal-release.test.js
       - scripts/check-ios-native-ui.js
@@ -97,7 +100,7 @@ jobs:
         if: inputs.validation_mode == 'focused-archive'
         run: |
           test "$TELETYPTEL_NATIVE_PUSH_TEST" = 1
-          node --test tests/native-archive.test.js tests/native-internal-release.test.js
+          node --test tests/native-archive.test.js tests/native-internal-release.test.js tests/native-runtime-linkage.test.js
       - name: Check isolated project generator
         if: github.event_name != 'workflow_dispatch' || inputs.validation_mode == 'full'
         run: node --test tests/ios-native-foundation.test.js
@@ -152,7 +155,7 @@ jobs:
           test -n "$XCODE_PATH"
           echo "DEVELOPER_DIR=$XCODE_PATH/Contents/Developer" >> "$GITHUB_ENV"
       - name: Check native release contracts without credentials
-        run: node --test tests/native-internal-release.test.js
+        run: node --test tests/native-internal-release.test.js tests/native-runtime-linkage.test.js
       - name: Sign and upload native internal candidate
         env:
           TELETYPTEL_NATIVE_BUILD_NUMBER: ${{ inputs.build_number }}

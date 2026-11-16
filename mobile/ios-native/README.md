@@ -1,5 +1,35 @@
 # TeleTypTel native iOS migration
 
+## Device-launch regression found in 17.1 (2026-11-16)
+
+User-supplied TestFlight feedback for `1.0 (17.1)` reports launch termination
+`DYLD 1 Library missing`, specifically `@rpath/WebRTC.framework/WebRTC`, before
+application code runs. The earlier archive log shows WebRTC was copied into
+`Frameworks`, but the generated app target did not declare
+`@executable_path/Frameworks` in `LD_RUNPATH_SEARCH_PATHS`. Successful compilation,
+code signing and Apple processing did not establish launchability. The raw
+feedback archive and its personal/device identifiers are not published.
+
+Both Debug and Release app configurations now retain `$(inherited)` and add the
+embedded-framework runpath. Before signing/upload, the actual device archive must
+contain WebRTC, reference its expected install name, include the executable's
+framework runpath and contain arm64 app/framework binaries. The same inspection
+runs again on the actual exported IPA, which is unpacked only in protected
+temporary staging and checked for a valid signature before upload.
+
+Each unsigned archive preflight now also builds and runs the actual Release
+startup UI assertion on its iPhone or iPad simulator. It must reach the visible
+server-address/startup screen without the keyboard or authenticated state; a
+successful build or `simctl launch` alone is not counted as an opstart test.
+Build, boot and assertion errors propagate. This is not a physical-device,
+social-login, media or APNs acceptance test.
+
+The replacement candidate is `1.0 (17.2)`. Local validation passes 68 checks with
+one macOS-only skip, including regression cases where the framework exists but
+the executable only searches system/build directories. Actual archive/export
+inspection and simulator startup results must still be obtained from the new
+workflow; 17.2 is not claimed uploaded at this preparation checkpoint.
+
 ## Internal-NL encryption declaration corrected (2026-11-16)
 
 The owner confirmed this candidate is for internal testing in the Netherlands
