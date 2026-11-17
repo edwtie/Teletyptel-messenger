@@ -393,8 +393,10 @@ final class NativeStartupUITests: XCTestCase {
 
     func testWebSmileyPickerUsesSharedImagesAndOnlyChangesDraft() {
         signInFixture("connected")
+        XCTAssertTrue(application.buttons["messenger-main-menu"].waitForExistence(timeout: 20))
+        waitForStatus("XMPP verbonden als fixture@localhost")
         let contact = application.descendants(matching: .any)["contact-demo-contact@localhost"].firstMatch
-        XCTAssertTrue(contact.waitForExistence(timeout: 10)); reveal(contact); tapContact(contact)
+        XCTAssertTrue(contact.waitForExistence(timeout: 30)); reveal(contact); tapContact(contact)
         let draft = application.descendants(matching: .any)["chat-draft"].firstMatch
         XCTAssertTrue(draft.waitForExistence(timeout: 5))
         let count = application.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "message-body-")).count
@@ -405,6 +407,11 @@ final class NativeStartupUITests: XCTestCase {
         XCTAssertFalse(application.keyboards.firstMatch.exists)
         snapshot("web-smileys-portrait")
         application.buttons["smiley-option-biggrin"].tap()
+        application.buttons["chat-smileys"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        XCTAssertTrue(draft.waitForExistence(timeout: 5))
+        XCTAssertTrue((draft.value as? String)?.contains(":D") == true)
+        application.buttons["chat-smileys"].tap()
+        XCTAssertTrue(picker.waitForExistence(timeout: 5))
         application.buttons["smiley-option-bonk"].tap()
         XCTAssertEqual(application.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "message-body-")).count, count)
         rotate(.landscapeLeft)

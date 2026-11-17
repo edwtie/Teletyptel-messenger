@@ -61,6 +61,8 @@ test("Direct and group chats share the image picker and insert text codes withou
   const view = read("mobile/ios-native/App/NativeSmileys.swift");
   assert.match(view, /count: 6/);
   assert.match(view, /minHeight: 44/);
+  assert.match(view, /minHeight: 44\).contentShape\(Rectangle\(\)\)/);
+  assert.match(view, /frame\(width: 32, height: 26\).allowsHitTesting\(false\)/);
   assert.match(view, /accessibilityReduceMotion/);
   assert.match(view, /removeAnimation\(forKey: "smiley"\)/);
   assert.match(view, /CGImageSourceCreateImageAtIndex/);

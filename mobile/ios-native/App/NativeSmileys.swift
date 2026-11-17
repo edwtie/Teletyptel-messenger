@@ -81,6 +81,7 @@ private struct NativeAnimatedSmiley: UIViewRepresentable {
     let reduceMotion: Bool
     func makeUIView(context: Context) -> UIImageView {
         let view = UIImageView()
+        view.isUserInteractionEnabled = false
         view.contentMode = .scaleAspectFit
         view.setContentHuggingPriority(.defaultLow, for: .horizontal)
         view.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
@@ -118,9 +119,9 @@ struct NativeSmileyPicker: View {
                         Group {
                             if let frames = NativeSmileyImages.frames(smiley) {
                                 NativeAnimatedSmiley(frames: frames, reduceMotion: reduceMotion)
-                                    .frame(width: 32, height: 26).accessibilityHidden(true)
+                                    .frame(width: 32, height: 26).allowsHitTesting(false).accessibilityHidden(true)
                             } else { Text(smiley.codes.first ?? smiley.name) }
-                        }.frame(maxWidth: .infinity, minHeight: 44)
+                        }.frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .background(NativeWebStyle.button, in: RoundedRectangle(cornerRadius: 8))
