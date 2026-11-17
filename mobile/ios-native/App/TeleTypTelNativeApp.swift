@@ -8,6 +8,7 @@ struct TeleTypTelNativeApp: App {
         WindowGroup {
             NativeStartupView().font(NativeWebStyle.font()).tint(NativeWebStyle.accent)
                 .environment(\.locale, language == "nl" || language == "en" ? Locale(identifier: language) : .current)
+                .modifier(NativeVisualViewportCapture())
         }
     }
 }

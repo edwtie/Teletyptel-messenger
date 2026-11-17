@@ -73,6 +73,13 @@ window.nativeVisualFixture = {
     const bounds = message.getBoundingClientRect();
     message.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: bounds.right - 15, clientY: bounds.top + 10 }));
   },
+  cleanup() {
+    state.call = null;
+    stopIncomingCallHaptics();
+    updateCallUi();
+    closeMessageContextMenu();
+    for (const dialog of document.querySelectorAll("dialog[open]")) dialog.close();
+  },
   captureGeometry() {
     const selectors = [".topbar", ".conversation-header", ".message-body", ".message-inline-meta", ".message-avatar", ".composer", "#messageInput", "#mobileActionsPanel", "#accountDialog", "#smileyPickerPanel", "#phoneDialerDialog"];
     return Object.fromEntries(selectors.map(selector => [selector, [...document.querySelectorAll(selector)].filter(element => element.getClientRects().length).map(element => {

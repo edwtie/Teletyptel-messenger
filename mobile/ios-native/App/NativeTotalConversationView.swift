@@ -77,6 +77,7 @@ struct NativeTotalConversationView: View {
             }
         }
         .interactiveDismissDisabled()
+        .modifier(NativeVisualViewportCapture())
         .onChange(of: controller.presentation?.remoteText) { text in
             if let text = text { translateLive(text, direction: "peer") }
         }

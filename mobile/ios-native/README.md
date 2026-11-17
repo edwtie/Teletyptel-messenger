@@ -15,7 +15,8 @@ the clock, mocks API/XMPP with fictitious content and blocks external requests.
 It neither connects to WAMP/APNs nor substitutes a lookalike HTML mockup. On
 wide web layouts some actions are persistent toolbars instead of popovers; that
 presentation is retained, not forcibly restyled to resemble native. The separate
-manual `native-visual-web.yml` workflow captures desktop WebKit on macOS. This
+`native-visual-web.yml` workflow captures desktop WebKit on macOS, on explicit
+dispatch or changes to its own capture tooling. This
 is a reproducible web reference, not a claim of physical iOS Safari equivalence.
 
 The unsigned native `visual` scope captures main-menu sheets in both orientations
@@ -23,11 +24,16 @@ and themes, plus existing login, contacts, menus, chat, groups, smileys, TC and
 startup scenarios. Real XCTest screenshots also retain point-based geometry.
 `import-native.js` imports known screenshot names, hashes original PNGs and reads
 XCTest's EXIF orientation; landscape is not inferred from filenames alone.
-Original bytes are retained. Existing captures have different message/history
-content and time from the web fixture, and no measured app-only safe-area crop:
-they are useful side-by-side review evidence but are **not comparable for strict
-pixel acceptance**. The report explicitly blocks them rather than calling them
-passed or assigning a misleading similarity percentage.
+Original bytes are retained. Earlier captures have different message/history
+content and time from the web fixture, and no measured app-only safe-area crop.
+A transparent one-point DEBUG-only probe now measures the actual UIWindow safe
+area when the UI runner explicitly enables it; it is not active in normal app
+use or Release. Geometry attachments carry that measurement when accessible.
+Where that viewport matches the reference's full original scale,
+`VISUAL_DIAGNOSTIC=1` can additionally produce app-only images and red pixel diffs.
+These are useful review evidence but **not strict pixel acceptance** until the
+shared content/clock/fixture contract also matches. Diagnostic differences never
+become green results; the originals remain linked in the gallery.
 
 `compare.js` produces a local HTML gallery and full coverage JSON. Eligible pairs
 require identical fixture hash, content clock, locale, timezone, viewport,

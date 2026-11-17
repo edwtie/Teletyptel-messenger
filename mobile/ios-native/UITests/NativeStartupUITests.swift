@@ -8,6 +8,7 @@ final class NativeStartupUITests: XCTestCase {
         XCUIDevice.shared.orientation = .portrait
         application = XCUIApplication()
         application.launchArguments = ["-teletyptel.native.interfaceLanguage", "nl", "-teletyptel.native.serverAddress", "", "-teletyptel.native.xmppDomain", ""]
+        application.launchEnvironment["TELETYPTEL_NATIVE_VISUAL_METRICS"] = "1"
     }
 
     override func tearDownWithError() throws {
@@ -978,7 +979,12 @@ final class NativeStartupUITests: XCTestCase {
             let bounds = element.frame
             return ["id": identifier, "x": bounds.minX, "y": bounds.minY, "width": bounds.width, "height": bounds.height]
         }
-        let geometry: [String: Any] = ["schema": 1, "name": name, "units": "points", "appFrame": ["x": frame.minX, "y": frame.minY, "width": frame.width, "height": frame.height], "imageSize": ["width": screenshot.image.size.width, "height": screenshot.image.size.height, "scale": screenshot.image.scale], "elements": elements, "fixture": "isolated-native-connected-v1", "pixelEquality": "not-evaluated"]
+        var geometry: [String: Any] = ["schema": 1, "name": name, "units": "points", "appFrame": ["x": frame.minX, "y": frame.minY, "width": frame.width, "height": frame.height], "imageSize": ["width": screenshot.image.size.width, "height": screenshot.image.size.height, "scale": screenshot.image.scale], "elements": elements, "fixture": "isolated-native-connected-v1", "pixelEquality": "not-evaluated"]
+        let probe = application.descendants(matching: .any)["visual-native-viewport"].firstMatch
+        if probe.exists, let value = probe.value as? String, let bytes = value.data(using: .utf8),
+           let viewport = try? JSONSerialization.jsonObject(with: bytes) as? [String: Any] {
+            geometry["viewport"] = viewport
+        }
         if let bytes = try? JSONSerialization.data(withJSONObject: geometry, options: [.sortedKeys]) {
             let metrics = XCTAttachment(data: bytes, uniformTypeIdentifier: "public.json")
             metrics.name = name + "-geometry"

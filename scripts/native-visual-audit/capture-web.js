@@ -8,6 +8,12 @@ const { screens, variants, caseID } = require("./catalogue");
 const root = path.resolve(__dirname, "../..");
 const origin = "https://teletyptel-visual.example.invalid";
 const epoch = "2026-11-17T11:00:00.000Z";
+
+async function bounded(promise, milliseconds, message) {
+  let timer;
+  try { return await Promise.race([promise, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(message)), milliseconds); })]); }
+  finally { clearTimeout(timer); }
+}
 const scenarios = {
   login: async page => page.evaluate(() => nativeVisualFixture.login()),
   "login-settings": async page => { await page.evaluate(() => nativeVisualFixture.login()); await page.locator("#dialogServerSettingsButton").click(); },
@@ -39,9 +45,26 @@ const scenarios = {
   audio: async page => page.evaluate(() => nativeVisualFixture.call("audio")),
   video: async page => page.evaluate(() => nativeVisualFixture.call("video")),
   tc: async page => page.evaluate(() => nativeVisualFixture.call("total")),
-  "call-controls": async page => { await page.evaluate(() => nativeVisualFixture.call("total")); await page.locator("#callControlsToggle").click(); },
+  "call-controls": async page => {
+    await page.evaluate(() => nativeVisualFixture.call("total"));
+    if (await page.locator("#callControlsToggle").isVisible()) { await page.locator("#callControlsToggle").click(); return "popover"; }
+    return "persistent-web-call-controls";
+  },
   "call-keypad": async page => { await page.evaluate(() => nativeVisualFixture.call("total")); await page.locator("#callKeypadButton").evaluate(element => element.click()); },
   "incoming-call": async page => page.evaluate(() => nativeVisualFixture.call("total", true))
+};
+
+const visibleState = {
+  login: "#accountDialog:not([hidden])", "login-settings": '[data-settings-panel="server"]:not([hidden])',
+  contacts: "#conversationSidebar", chat: "#messageTimeline .message-body", "contact-profile": "#contactProfileDialog:not([hidden])",
+  "message-menu": "#messageContextMenu:not([hidden])", smileys: "#smileyPickerPanel:not([hidden])", attachments: "#attachmentMenuPanel:not([hidden])",
+  account: "#accountDialog:not([hidden])", appearance: '[data-settings-panel="preferences"]:not([hidden])',
+  translation: '[data-settings-panel="privacy"]:not([hidden])', "account-security": '[data-settings-panel="security"]:not([hidden])',
+  "profile-edit": '[data-settings-panel="profile"]:not([hidden])', "group-management": "#groupManagementDialog:not([hidden])",
+  dialer: "#phoneDialerDialog[open]", "dialer-contacts": "#phoneDialerContactsPanel:not([hidden])",
+  history: "#historyPage:not([hidden])", archive: "#tabPanel:not([hidden])", audio: "#callPanel:not([hidden])",
+  video: "#callPanel:not([hidden])", tc: "#totalConversationTextPanel:not([hidden])", "call-controls": "#callPanel:not([hidden])",
+  "call-keypad": "#callKeypadDialog[open]", "incoming-call": "#incomingCallDialog:not([hidden])"
 };
 
 function trackedReader(revision) {
@@ -122,6 +145,7 @@ async function capture({ output, revision = "HEAD", browserName = "webkit", sele
           await page.evaluate(async () => { await document.fonts.ready; await Promise.race([Promise.all([...document.images].map(image => image.decode().catch(() => {}))), new Promise(resolve => setTimeout(resolve, 1000))]); });
           if (errors.length) throw new Error(errors.join("; "));
           if (screen.id !== "login" && await page.locator("dialog.xmpp-availability[open]").count()) throw new Error("Startup overlay still covers the requested screen");
+          if (visibleState[screen.id] && !await page.locator(visibleState[screen.id]).first().isVisible()) throw new Error("The requested real screen did not become visible: " + screen.id);
           const geometry = await page.evaluate(() => nativeVisualFixture.captureGeometry());
           const file = identifier + ".png";
           await page.screenshot({ path: path.join(output, file), animations: "disabled", caret: "hide" });
@@ -132,14 +156,28 @@ async function capture({ output, revision = "HEAD", browserName = "webkit", sele
         } catch (error) {
           await page.screenshot({ path: path.join(output, identifier + "-failed.png"), animations: "disabled" }).catch(() => {});
           result.captures.push({ id: identifier, screen: screen.id, ...variant, status: "capture-failed", error: error.message, errors });
-        } finally { await context.close(); }
+        } finally {
+          try {
+            await bounded(page.evaluate(() => window.nativeVisualFixture?.cleanup()), 5000, "Fixture teardown did not settle");
+            await bounded(context.close(), 10000, "WebKit context did not close");
+          } catch (error) {
+            const entry = result.captures.at(-1);
+            if (entry?.id === identifier) { entry.status = "capture-failed"; entry.error = error.message; }
+            throw error;
+          } finally {
+            result.files = source.manifest();
+            fs.writeFileSync(path.join(output, "web-manifest.json"), JSON.stringify(result, null, 2));
+          }
+        }
       }
     }
   } finally {
-    await browser.close();
-    result.blocked = [...new Set(result.blocked)];
-    result.files = source.manifest();
-    fs.writeFileSync(path.join(output, "web-manifest.json"), JSON.stringify(result, null, 2));
+    try { await bounded(browser.close(), 10000, "WebKit did not close"); }
+    finally {
+      result.blocked = [...new Set(result.blocked)];
+      result.files = source.manifest();
+      fs.writeFileSync(path.join(output, "web-manifest.json"), JSON.stringify(result, null, 2));
+    }
   }
   return result;
 }
@@ -150,8 +188,8 @@ if (require.main === module) {
   const selectedVariants = process.env.VISUAL_FIRST_VARIANT === "1" ? variants.slice(0, 1) : undefined;
   capture({ output, selectedScreens, selectedVariants, browserName: process.env.VISUAL_BROWSER || "webkit" }).then(result => {
     console.log(JSON.stringify({ output, captured: result.captures.filter(entry => entry.file).length, failed: result.captures.filter(entry => !entry.file).map(entry => ({ id: entry.id, error: entry.error })) }));
-    if (result.captures.some(entry => !entry.file)) process.exitCode = 1;
-  }).catch(error => { console.error(error.message); process.exitCode = 1; });
+    process.exit(result.captures.some(entry => entry.status === "capture-failed") ? 1 : 0);
+  }).catch(error => { console.error(error.message); process.exit(1); });
 }
 
 module.exports = { capture, trackedReader, scenarios };

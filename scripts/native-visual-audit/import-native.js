@@ -54,7 +54,7 @@ function pngSize(bytes) {
 }
 
 function importedName(filename) {
-  if (typeof filename !== "string" || !/^[a-zA-Z0-9_.-]+\.png$/.test(filename)) throw new Error("Invalid exported PNG filename");
+  if (typeof filename !== "string" || !/^[a-zA-Z0-9_.-]+\.(?:png|json|txt)$/.test(filename)) throw new Error("Invalid exported evidence filename");
   return filename;
 }
 
@@ -78,6 +78,14 @@ function importCaptures({ sources, output, revision, runURL }) {
       if ((size.width > size.height) !== (scenario.orientation === "landscape")) throw new Error("Screenshot orientation disagrees with its declared scenario: " + file);
       const id = caseID(scenario.screen, variant);
       const entry = { id, screen: scenario.screen, ...variant, sourceFile: path.join(directory, file), file: id + ".png", imageSize: size, attachment: attachment.suggestedHumanReadableName, status: "native-captured-only", fixture: "isolated-native-connected-v1", sha256: crypto.createHash("sha256").update(bytes).digest("hex"), priority: scenario.priority };
+      const baseName = attachment.suggestedHumanReadableName.split(/_\d+_/)[0].replace(/\.png$/, "");
+      const metrics = (test.attachments || []).find(candidate => candidate.suggestedHumanReadableName?.startsWith(baseName + "-geometry") && /\.(?:json|txt)$/.test(candidate.exportedFileName || ""));
+      if (metrics) {
+        const geometry = JSON.parse(fs.readFileSync(path.join(directory, prefix + importedName(metrics.exportedFileName)), "utf8"));
+        if (geometry.name !== baseName || geometry.schema !== 1 || geometry.units !== "points") throw new Error("Geometry does not belong to its screenshot");
+        entry.geometry = geometry;
+        if (geometry.viewport) entry.viewport = geometry.viewport;
+      }
       const existing = selected.get(id);
       if (existing) {
         if (existing.priority === entry.priority) throw new Error("Ambiguous duplicate native case: " + id);

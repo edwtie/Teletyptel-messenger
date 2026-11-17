@@ -91,6 +91,39 @@ enum NativeWebStyle {
 }
 
 #if DEBUG
+struct NativeVisualViewportProbe: UIViewRepresentable {
+    func makeUIView(context: Context) -> UIView {
+        let view = NativeVisualViewportValue()
+        view.isAccessibilityElement = true
+        view.accessibilityIdentifier = "visual-native-viewport"
+        view.accessibilityLabel = "Testmeting van het appvenster"
+        view.backgroundColor = .clear
+        view.isUserInteractionEnabled = false
+        return view
+    }
+    func updateUIView(_ view: UIView, context: Context) {}
+}
+
+private final class NativeVisualViewportValue: UIView {
+    override var accessibilityValue: String? {
+        get {
+            guard let window = window else { return nil }
+            let insets = window.safeAreaInsets
+            let scale = window.screen.scale
+            let area = window.bounds.inset(by: insets)
+            let value: [String: Any] = ["source": "measured-safe-area", "x": Int((area.minX * scale).rounded()),
+                "y": Int((area.minY * scale).rounded()), "width": Int((area.width * scale).rounded()),
+                "height": Int((area.height * scale).rounded()), "scale": scale]
+            guard let data = try? JSONSerialization.data(withJSONObject: value, options: [.sortedKeys]) else { return nil }
+            return String(data: data, encoding: .utf8)
+        }
+        set {}
+    }
+}
+
+#endif
+
+#if DEBUG
 extension NativeWebStyle {
     static var paletteValidationStatus: String {
         guard let data = NSDataAsset(name: "WebPaletteReference")?.data,
@@ -121,6 +154,20 @@ extension NativeWebStyle {
     }
 }
 #endif
+
+struct NativeVisualViewportCapture: ViewModifier {
+    @ViewBuilder func body(content: Content) -> some View {
+#if DEBUG
+        if ProcessInfo.processInfo.environment["TELETYPTEL_NATIVE_VISUAL_METRICS"] == "1" {
+            content.overlay(alignment: .topLeading) {
+                NativeVisualViewportProbe().frame(width: 1, height: 1).allowsHitTesting(false)
+            }
+        } else { content }
+#else
+        content
+#endif
+    }
+}
 
 struct NativeStartupProgress: View {
     let isActive: Bool
@@ -381,6 +428,7 @@ struct NativeWebForm: ViewModifier {
             .toolbarBackground(NativeWebStyle.panelStrong, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .tint(NativeWebStyle.accent)
+            .modifier(NativeVisualViewportCapture())
     }
 }
 

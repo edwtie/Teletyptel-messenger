@@ -70,6 +70,7 @@ test("Unmatched fixture, language, theme, time, scale and viewport are blocked r
   assert.deepEqual(pairIssues(reference, actual), []);
   for (const key of Object.keys(reference)) assert.ok(pairIssues(reference, { ...actual, [key]: undefined }).some(issue => issue.includes(key)));
   assert.ok(pairIssues(reference, { ...actual, viewport: undefined }).some(issue => issue.includes("viewport")));
+  assert.ok(pairIssues(reference, { ...actual, viewport: { ...actual.viewport, width: 100 } }).some(issue => issue.includes("entire declared app area")));
   assert.ok(pairIssues(reference, { ...actual, errors: ["broken image"] }).some(issue => issue.includes("runtime")));
 });
 
@@ -109,4 +110,21 @@ test("Visual simulator scope captures actual forms in both orientations and reta
   for (const selected of testsForScope("visual")) assert.ok(methods.includes("func " + selected + "()"), selected);
   assert.ok(testsForScope("visual").includes("testVisualInventoryCapturesEveryMainMenuSheetInBothOrientations"));
   for (const source of ['"visual-" + screen + "-portrait-" + theme', '"visual-" + screen + "-landscape-" + theme', 'XCTAssertFalse(menuFrame.intersects(metadata.frame))', 'XCTAssertLessThanOrEqual(outgoing.frame.height, 64)', 'name + "-geometry"']) assert.ok(methods.includes(source), source);
+});
+
+test("Viewport instrumentation is transparent and DEBUG/environment gated, while diagnostic diffs cannot become acceptance", () => {
+  const style = fs.readFileSync(path.join(root, "mobile/ios-native/App/NativeWebStyle.swift"), "utf8");
+  const probe = style.split("#if DEBUG")[1].split("extension NativeWebStyle")[0];
+  assert.match(probe, /window\.safeAreaInsets/);
+  assert.match(probe, /window\.bounds\.inset\(by: insets\)/);
+  assert.match(probe, /view\.backgroundColor = \.clear/);
+  assert.match(probe, /view\.isUserInteractionEnabled = false/);
+  const capture = style.split("struct NativeVisualViewportCapture")[1].split("struct NativeStartupProgress")[0];
+  assert.match(capture, /#if DEBUG/);
+  assert.match(capture, /TELETYPTEL_NATIVE_VISUAL_METRICS/);
+  assert.match(capture, /#else\s+content\s+#endif/);
+  const comparison = fs.readFileSync(path.join(root, "scripts/native-visual-audit/compare.js"), "utf8");
+  assert.match(comparison, /else \{ entry\.reviewMetrics = metrics; entry\.status = "diagnostic-only"; \}/);
+  const coverage = completeness([{ id: caseID("chat", variants[0]), screen: "chat", ...variants[0], status: "diagnostic-only", identical: true, acceptanceEligible: false }]);
+  assert.equal(coverage.proven, 0);
 });
