@@ -102,7 +102,7 @@ test("Menu simulator scope measures hit targets and overlap for both orientation
 test("Login actions take layout space instead of covering the password while the keyboard is open", () => {
   const startup = read(app + "TeleTypTelNativeApp.swift");
   const content = startup.split("private var startupContent: some View")[1].split("private var hasServerConfiguration")[0];
-  assert.match(content, /scrollDismissesKeyboard\(\.interactively\)\s+loginActions/);
+  assert.match(content, /scrollDismissesKeyboard\(\.interactively\)\s+if !showsServerStatusScreen \{ loginActions \}/);
   assert.doesNotMatch(content, /safeAreaInset/);
   const methods = read("mobile/ios-native/UITests/NativeStartupUITests.swift");
   assert.match(methods, /XCTAssertLessThanOrEqual\(password.frame.maxY, actions.frame.minY\)/);

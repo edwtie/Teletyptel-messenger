@@ -1,5 +1,30 @@
 # TeleTypTel native iOS migration
 
+## Advanced server settings and unavailable-server screen (2026-11-17)
+
+Server addresses, XMPP domains, connection probes and provider configuration
+details are now collapsed behind an explicitly opened **Geavanceerd** disclosure.
+The normal settings gear still offers language and privacy settings; saving a
+server configuration is only available after opening the advanced section.
+This is a presentation safeguard, not administrator authorization or a security
+boundary. Existing custom settings and secure defaults remain unchanged.
+
+Connection failures use the same startup view with the logo, a short status and
+**Opnieuw proberen**, without exposing technical fields or adding an error popup.
+Certificate failures retain a distinct security warning and never bypass trust
+validation. Account/password and two-factor errors are not labelled server-offline.
+Retry clears pending password/code input and checks availability only: it does not
+submit credentials, restart OAuth or silently unlock a saved sign-in. Successful
+retry returns to sign-in; it does not mean the user is authenticated.
+
+Advanced draft probes use a separate model, so cancelling settings cannot clear
+an existing server-failure screen or replace its state with results for an unsaved
+server. Closing the sheet cancels and resets only that draft probe. No additional
+real startup requests, infrastructure changes or TestFlight upload are added.
+The DEBUG offline fixture fails its first probe and succeeds on retry, only for
+`example.invalid`/`localhost`. Simulator screenshots retain the test-scenario banner
+and are not evidence of a live service outage or physical-device acceptance.
+
 ## Confirmed server defaults for the next build (2026-11-17)
 
 Fresh installations now prefill `https://dev.teletyptel.nl` and XMPP domain

@@ -31,7 +31,7 @@ test("Native login keeps account fields and 16.9-style bottom actions visible wi
   const content = source.split("private var startupContent: some View")[1].split("private var hasServerConfiguration")[0];
   assert.match(content, /accessibilityIdentifier\("login-jid"\)/);
   assert.match(content, /accessibilityIdentifier\("login-password"\)/);
-  assert.match(content, /scrollDismissesKeyboard\(\.interactively\)\s+loginActions/);
+  assert.match(content, /scrollDismissesKeyboard\(\.interactively\)\s+if !showsServerStatusScreen \{ loginActions \}/);
   assert.doesNotMatch(content, /safeAreaInset/);
   assert.doesNotMatch(content, /model\.state\.phase == \.available/);
   assert.doesNotMatch(content, /accessibilityIdentifier\("(?:server-address|xmpp-domain|login-interface-language)"\)|Picker\("App-taal"/);
@@ -46,15 +46,19 @@ test("Server settings use discardable drafts and persist only explicit non-secre
   const settings = source.split("private var loginSettings: some View")[1].split("private func submitLogin")[0];
   assert.match(settings, /TextField\("Serveradres \(HTTPS\)", text: \$settingsAddress\)/);
   assert.match(settings, /TextField\("XMPP-domein", text: \$settingsDomain\)/);
-  assert.match(settings, /Button\("Annuleren"\) \{ model\.cancel\(\); showLoginSettings = false \}/);
+  assert.match(settings, /Button\(LocalizedStringKey\(advancedServerSettings \? "Annuleren" : "Sluiten"\)\) \{ settingsModel\.cancel\(\); showLoginSettings = false \}/);
   assert.match(settings, /Button\("Bewaren"\) \{ saveLoginSettings\(dismiss: true\) \}/);
-  assert.match(settings, /model\.check\(address: settingsAddress, domain: settingsDomain\)/);
+  assert.match(settings, /settingsModel\.check\(address: settingsAddress, domain: settingsDomain\)/);
   assert.match(settings, /fixtureName == nil/);
+  assert.match(settings, /DisclosureGroup\(isExpanded: \$advancedServerSettings\)/);
+  assert.match(settings, /if advancedServerSettings \{/);
+  assert.match(settings, /guard advancedServerSettings, !loginModel.isWorking/);
   assert.match(settings, /UserDefaults\.standard\.set\(address, forKey: "teletyptel\.native\.serverAddress"\)/);
   assert.match(settings, /UserDefaults\.standard\.set\(domain, forKey: "teletyptel\.native\.xmppDomain"\)/);
   assert.equal((source.match(/UserDefaults\.standard\.set\(/g) ?? []).length, 2);
   assert.doesNotMatch(settings, /UserDefaults[^\n]*(?:password|submittedPassword|verificationCode|jid)/);
-  assert.match(source, /onDismiss: \{ model\.reset\(\) \}/);
+  assert.match(source, /onDismiss: \{ settingsModel\.reset\(\) \}/);
+  assert.doesNotMatch(settings, /(?<![A-Za-z])model\.(check|cancel|reset)\(/);
 });
 
 test("Presentation changes retain per-login server checks, credential privacy and biometric opt-in", () => {
@@ -99,7 +103,7 @@ test("Startup activity follows real preparation, server, authentication and biom
   const busy = source.split("private var startupIsBusy: Bool")[1].split("private var hasServerConfiguration")[0];
   assert.match(busy, /preparingStartup \|\| model.state.phase == \.checking \|\| loginModel.isWorking \|\| savedLogin.isWorking/);
   assert.match(source, /NativeStartupProgress\(isActive: startupIsBusy\)/);
-  assert.match(source, /NativeStartupProgress\(isActive: model.state.phase == \.checking, identifier: "settings-startup-progress"\)/);
+  assert.match(source, /NativeStartupProgress\(isActive: settingsModel.state.phase == \.checking, identifier: "settings-startup-progress"\)/);
   assert.match(source, /restoreSavedLoginIfForeground\(\)\s+preparingStartup = false/);
   const indicator = read("mobile/ios-native/App/NativeWebStyle.swift").split("struct NativeStartupProgress")[1].split("struct NativeConversationHeader")[0];
   assert.match(indicator, /accessibilityReduceMotion/);
@@ -114,7 +118,7 @@ test("Startup simulator scope checks activity, cancel, certificate failure and n
   const { testsForScope } = require("../scripts/check-ios-native-ui");
   const methods = read("mobile/ios-native/UITests/NativeStartupUITests.swift");
   const selected = testsForScope("startup");
-  assert.equal(selected.length, 3);
+  assert.equal(selected.length, 7);
   for (const name of selected) assert.ok(methods.includes("func " + name + "()"), name);
   for (const value of ['"startup-cancel-check"', '"startup-progress-portrait"', '"startup-progress-landscape"',
     '"startup-progress-certificate-stopped"', '"TELETYPTEL_NATIVE_STARTUP_PROGRESS_FIXTURE"']) assert.ok(methods.includes(value));
@@ -122,4 +126,24 @@ test("Startup simulator scope checks activity, cancel, certificate failure and n
   assert.match(fixture, /configuration.origin.host == "example.invalid", configuration.domain == "localhost"/);
   assert.match(fixture, /throw ConnectionFailure.certificate/);
   assert.match(source, /#if DEBUG\s+private actor NativeLoginUIConnectionCount/);
+});
+
+test("Unavailable servers show a simple inline retry screen, while server fields and technical details require explicit advanced disclosure", () => {
+  assert.match(source, /@State private var advancedServerSettings = false/);
+  assert.match(source, /@State private var advancedFailureDetails = false/);
+  assert.match(source, /if showsServerStatusScreen \{\s+serverStatusPanel\s+\} else \{/);
+  assert.match(source, /if !showsServerStatusScreen \{ loginActions \}/);
+  const panel = source.split("private var serverStatusPanel: some View")[1].split("private var serverStatusTitle")[0];
+  assert.match(panel, /Button\("Opnieuw proberen", action: retryServerAvailability\)/);
+  assert.match(panel, /DisclosureGroup\(isExpanded: \$advancedFailureDetails\) \{\s+if advancedFailureDetails/);
+  assert.match(panel, /openLoginSettings\(advanced: true\)/);
+  assert.doesNotMatch(panel, /sheet\(|fullScreenCover\(|TextField\(/);
+  const retry = source.split("private func retryServerAvailability() {")[1].split("private func openLoginSettings")[0];
+  assert.match(retry, /loginModel.reset\(\)\s+model.check\(address: address, domain: domain\)/);
+  assert.match(retry, /password = ""/);
+  assert.doesNotMatch(retry, /submitLogin|unlockSavedLogin|loginSocial|authenticate|\.login\(/);
+  const failures = source.split("private var serverFailure:")[1].split("private var serverStatusPanel")[0];
+  assert.match(failures, /failed\(\.connection\(let failure\)\)/);
+  assert.doesNotMatch(failures, /invalidCredentials|authenticationRejected|twoFactorRequired/);
+  assert.match(source, /Vertrouw geen onbekend certificaat/);
 });

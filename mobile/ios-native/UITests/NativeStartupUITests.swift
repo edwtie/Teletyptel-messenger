@@ -63,9 +63,54 @@ final class NativeStartupUITests: XCTestCase {
         }
         expectation(for: failed, evaluatedWith: nil); waitForExpectations(timeout: 10)
         XCTAssertFalse(progress.exists)
-        XCTAssertTrue(application.buttons["login-settings"].isHittable)
+        XCTAssertFalse(application.buttons["login-settings"].exists)
+        XCTAssertTrue(application.descendants(matching: .any)["startup-advanced"].firstMatch.exists)
         XCTAssertFalse(application.keyboards.firstMatch.exists)
         snapshot("startup-progress-certificate-stopped")
+    }
+
+    func testOfflineStartupHidesTechnicalSettingsAndRetryDoesNotSignIn() {
+        application.launchEnvironment["TELETYPTEL_NATIVE_UI_FIXTURE"] = "connected"
+        application.launchEnvironment["TELETYPTEL_NATIVE_STARTUP_PROGRESS_FIXTURE"] = "offline"
+        application.launch()
+        let title = application.staticTexts["startup-failure-title"]
+        XCTAssertTrue(title.waitForExistence(timeout: 10))
+        expectation(for: NSPredicate(format: "label == %@", "Server niet bereikbaar"), evaluatedWith: title)
+        waitForExpectations(timeout: 10)
+        XCTAssertFalse(application.buttons["login-settings"].exists)
+        XCTAssertFalse(application.textFields["server-address"].exists)
+        XCTAssertFalse(application.textFields["xmpp-domain"].exists)
+        XCTAssertFalse(application.buttons["check-connection"].exists)
+        XCTAssertFalse(application.staticTexts["startup-technical-details"].exists)
+        XCTAssertFalse(application.textFields["login-jid"].exists)
+        XCTAssertFalse(application.keyboards.firstMatch.exists)
+        let retry = application.buttons["startup-retry"]
+        XCTAssertTrue(retry.isHittable)
+        XCTAssertGreaterThanOrEqual(retry.frame.height, 44)
+        snapshot("startup-offline-simple")
+        rotate(.landscapeLeft)
+        XCTAssertTrue(retry.isHittable)
+        XCTAssertTrue(application.frame.contains(retry.frame))
+        snapshot("startup-offline-landscape")
+        rotate(.portrait)
+        let advanced = application.descendants(matching: .any)["startup-advanced"].firstMatch
+        XCTAssertTrue(advanced.isHittable)
+        advanced.tap()
+        XCTAssertTrue(application.staticTexts["startup-technical-details"].waitForExistence(timeout: 5))
+        application.buttons["login-settings"].tap()
+        XCTAssertTrue(application.textFields["server-address"].waitForExistence(timeout: 5))
+        XCTAssertFalse(application.keyboards.firstMatch.exists)
+        snapshot("startup-offline-advanced-settings")
+        application.buttons["login-settings-cancel"].tap()
+        XCTAssertTrue(title.waitForExistence(timeout: 5))
+        XCTAssertEqual(title.label, "Server niet bereikbaar")
+        retry.tap()
+        XCTAssertTrue(application.textFields["login-jid"].waitForExistence(timeout: 10))
+        XCTAssertFalse(application.buttons["messenger-main-menu"].exists)
+        XCTAssertFalse(application.buttons["login-account"].isEnabled)
+        XCTAssertFalse(application.keyboards.firstMatch.exists)
+        XCTAssertFalse(title.exists)
+        snapshot("startup-offline-recovered")
     }
 
     func testEnglishStartupDoesNotTranslateUserDataOrRequestPermissions() {
@@ -108,6 +153,7 @@ final class NativeStartupUITests: XCTestCase {
     func testRotationPreservesConfigurationAndInvalidAddressShowsInlineError() {
         application.launch()
         application.buttons["login-settings"].tap()
+        expandAdvancedServerSettings()
         let server = application.textFields["server-address"]
         XCTAssertTrue(server.waitForExistence(timeout: 10))
         server.tap()
@@ -138,6 +184,9 @@ final class NativeStartupUITests: XCTestCase {
         let password = application.secureTextFields["login-password"]
         password.tap(); password.typeText("fixture-password")
         application.buttons["login-settings"].tap()
+        XCTAssertFalse(application.textFields["server-address"].exists)
+        XCTAssertFalse(application.buttons["login-settings-save"].exists)
+        expandAdvancedServerSettings()
         let server = application.textFields["server-address"]
         XCTAssertTrue(server.waitForExistence(timeout: 5))
         XCTAssertFalse(application.keyboards.firstMatch.exists)
@@ -149,6 +198,7 @@ final class NativeStartupUITests: XCTestCase {
         XCTAssertFalse(server.exists)
         XCTAssertFalse(application.keyboards.firstMatch.exists)
         application.buttons["login-settings"].tap()
+        expandAdvancedServerSettings()
         XCTAssertEqual(server.value as? String, "https://example.invalid")
         application.buttons["login-settings-cancel"].tap()
         rotate(.landscapeLeft)
@@ -162,6 +212,10 @@ final class NativeStartupUITests: XCTestCase {
         let settings = application.buttons["login-settings"]
         XCTAssertTrue(settings.waitForExistence(timeout: 10))
         settings.tap()
+        XCTAssertFalse(application.textFields["server-address"].exists)
+        XCTAssertFalse(application.buttons["login-settings-save"].exists)
+        snapshot("login-settings-simple")
+        expandAdvancedServerSettings()
         let server = application.textFields["server-address"]
         XCTAssertTrue(server.waitForExistence(timeout: 5))
         XCTAssertFalse(application.buttons["login-settings-save"].isEnabled)
@@ -176,6 +230,7 @@ final class NativeStartupUITests: XCTestCase {
         XCTAssertTrue(application.buttons["login-account"].isHittable)
         rotate(.landscapeLeft)
         settings.tap()
+        expandAdvancedServerSettings()
         XCTAssertEqual(server.value as? String, "https://example.invalid")
         XCTAssertEqual(domain.value as? String, "localhost")
         application.buttons["login-settings-cancel"].tap()
@@ -763,6 +818,13 @@ final class NativeStartupUITests: XCTestCase {
                 XCTAssertFalse(buttonFrames[first].intersects(buttonFrames[second]))
             }
         }
+    }
+
+    private func expandAdvancedServerSettings() {
+        let advanced = application.descendants(matching: .any)["login-advanced-settings"].firstMatch
+        XCTAssertTrue(advanced.waitForExistence(timeout: 5))
+        advanced.tap()
+        XCTAssertTrue(application.textFields["server-address"].waitForExistence(timeout: 5))
     }
 
     private func snapshot(_ name: String) {

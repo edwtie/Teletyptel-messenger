@@ -372,5 +372,18 @@
   "Aan": "On",
   "Uit": "Off",
   "Gesprek actief": "Call active",
-  "Geen gesprek": "No call"
+  "Geen gesprek": "No call",
+  "Geavanceerd": "Advanced",
+  "Serverinstellingen": "Server settings",
+  "Verbinding controleren…": "Checking connection…",
+  "Beveiligde verbinding mislukt": "Secure connection failed",
+  "Verbinding niet ingesteld": "Connection not configured",
+  "Server niet bereikbaar": "Server unavailable",
+  "Verbinding mislukt": "Connection failed",
+  "De verbinding met TeleTypTel wordt gecontroleerd.": "Checking the connection to TeleTypTel.",
+  "De beveiliging van de server kon niet worden gecontroleerd. Vertrouw geen onbekend certificaat. Neem contact op met de beheerder.": "The server's security could not be verified. Do not trust an unknown certificate. Contact the administrator.",
+  "De verbinding kan met deze instellingen niet worden gestart. Neem contact op met de beheerder.": "The connection cannot start with these settings. Contact the administrator.",
+  "Controleer je internetverbinding en probeer het opnieuw.": "Check your internet connection and try again.",
+  "De verbinding met TeleTypTel is niet gelukt. Probeer het later opnieuw.": "Could not connect to TeleTypTel. Try again later.",
+  "Wijzig de serverinstellingen alleen als je weet welke server je nodig hebt. Verkeerde instellingen kunnen aanmelden verhinderen.": "Only change the server settings if you know which server you need. Incorrect settings can prevent sign-in."
 }

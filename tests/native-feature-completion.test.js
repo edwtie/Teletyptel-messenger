@@ -11,7 +11,7 @@ test("Focused simulator regression selects real assertions without pretending to
   const { selectedTests, run, testsForScope } = require("../scripts/check-ios-native-ui");
   const { runSimulatorChecks } = require("../scripts/check-ios-native");
   const methods = read("mobile/ios-native/UITests/NativeStartupUITests.swift");
-  assert.equal(selectedTests.length, 15);
+  assert.equal(selectedTests.length, 16);
   assert.deepEqual(testsForScope(), selectedTests);
   assert.deepEqual(testsForScope("groups"), ["testGroupDiscoveryManagementAndSessionSearch", "testExistingGroupJoinSendRotationAndLeave"]);
   assert.throws(() => testsForScope("silently-skip"), /Unsupported/);

@@ -7,6 +7,7 @@ const simulator = require("./native-simulator-session");
 const selectedTests = Object.freeze([
   "testStartupDoesNotOpenKeyboardOrShowAuthenticatedState",
   "testStartupProgressStopsOnCancelAndCertificateFailure",
+  "testOfflineStartupHidesTechnicalSettingsAndRetryDoesNotSignIn",
   "testLoginSettingsAreSeparateAndPreserveDraftsOnCancel",
   "testLoginSettingsSaveAndRotateWithoutOpeningKeyboard",
   "testRotationPreservesConfigurationAndInvalidAddressShowsInlineError",
@@ -25,7 +26,9 @@ const selectedTests = Object.freeze([
 function testsForScope(scope = "regression") {
   if (scope === "regression") return selectedTests;
   if (scope === "startup") return ["testStartupDoesNotOpenKeyboardOrShowAuthenticatedState",
-    "testStartupProgressStopsOnCancelAndCertificateFailure", "testEnglishStartupDoesNotTranslateUserDataOrRequestPermissions"];
+    "testStartupProgressStopsOnCancelAndCertificateFailure", "testOfflineStartupHidesTechnicalSettingsAndRetryDoesNotSignIn",
+    "testLoginSettingsAreSeparateAndPreserveDraftsOnCancel", "testLoginSettingsSaveAndRotateWithoutOpeningKeyboard",
+    "testRotationPreservesConfigurationAndInvalidAddressShowsInlineError", "testEnglishStartupDoesNotTranslateUserDataOrRequestPermissions"];
   if (scope === "menus") return ["testChatHeaderAndMessageMenuDoNotOverlapAcrossRotation", "testMainMenuRemainsSeparateFromConversationMenu"];
   if (scope === "groups") return selectedTests.filter(name => name.includes("Group"));
   if (scope === "tc") return ["testWebStyleCallControlsAndRttPanesRemainReachableAcrossRotation", "testPeerCameraOnOrUnknownDoesNotEnterTextOnlyLayout"];

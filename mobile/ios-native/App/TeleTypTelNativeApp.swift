@@ -65,6 +65,7 @@ struct NativeStartupView: View {
         let jid: String
     }
     @StateObject private var model: NativeStartupModel
+    @StateObject private var settingsModel: NativeStartupModel
     @StateObject private var loginModel: NativeLoginModel
     @StateObject private var savedLogin: NativeSavedLoginModel
     @StateObject private var background = NativeBackgroundController()
@@ -84,6 +85,8 @@ struct NativeStartupView: View {
     @State private var showRegistration = false
     @State private var showRecovery = false
     @State private var showLoginSettings = false
+    @State private var advancedServerSettings = false
+    @State private var advancedFailureDetails = false
     @State private var settingsAddress = ""
     @State private var settingsDomain = ""
     @AppStorage("teletyptel.native.interfaceLanguage") private var interfaceLanguage = "system"
@@ -97,6 +100,7 @@ struct NativeStartupView: View {
            ["connected", "two-factor", "disconnect", "invitations"].contains(scenario) {
             let fixture = NativeLoginUIFixture(scenario: scenario)
             _model = StateObject(wrappedValue: NativeStartupModel(checker: fixture))
+            _settingsModel = StateObject(wrappedValue: NativeStartupModel(checker: fixture))
             _loginModel = StateObject(wrappedValue: NativeLoginModel(checker: fixture, authenticator: fixture, connection: fixture,
                 reconnectWait: { _ in try await Task.sleep(nanoseconds: 2_000_000_000) }))
             _savedLogin = StateObject(wrappedValue: NativeSavedLoginModel(vault: NativeBiometricLoginVault(enabled: false)))
@@ -107,6 +111,7 @@ struct NativeStartupView: View {
         }
         #endif
         _model = StateObject(wrappedValue: NativeStartupModel())
+        _settingsModel = StateObject(wrappedValue: NativeStartupModel())
         _loginModel = StateObject(wrappedValue: NativeLoginModel(history: NativeDeviceHistory()))
         _savedLogin = StateObject(wrappedValue: NativeSavedLoginModel(vault: NativeBiometricLoginVault()))
         let server = NativeServerDefaults.resolve(
@@ -120,6 +125,7 @@ struct NativeStartupView: View {
     private var startupContent: some View {
         NavigationStack {
             VStack(spacing: 0) {
+                if !showsServerStatusScreen {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Aanmelden")
                         .font(NativeWebStyle.font(28, weight: .bold))
@@ -128,6 +134,7 @@ struct NativeStartupView: View {
                         .foregroundStyle(NativeWebStyle.muted)
                 }
                 .frame(maxWidth: 560, alignment: .leading).padding(20)
+                }
                 NativeStartupProgress(isActive: startupIsBusy)
                 ScrollView {
                   VStack(alignment: .leading, spacing: 18) {
@@ -136,6 +143,9 @@ struct NativeStartupView: View {
                             .font(.headline)
                             .accessibilityIdentifier("fixture-banner")
                     }
+                    if showsServerStatusScreen {
+                        serverStatusPanel
+                    } else {
                     if savedLogin.hasSavedLogin {
                         VStack(alignment: .leading, spacing: 12) {
                             if !loginModel.isConnected {
@@ -241,13 +251,14 @@ struct NativeStartupView: View {
                             }
                         }
                     }
+                    }
                   }
                 .frame(maxWidth: 560)
                 .padding(20)
                 .frame(maxWidth: .infinity)
                 }
                 .scrollDismissesKeyboard(.interactively)
-                loginActions
+                if !showsServerStatusScreen { loginActions }
             }
             .background(NativeWebStyle.panel).foregroundStyle(NativeWebStyle.text)
             .toolbar(.hidden, for: .navigationBar)
@@ -262,6 +273,91 @@ struct NativeStartupView: View {
         (try? ServerConfiguration(address: address, domain: domain)) != nil
     }
 
+    private var serverFailure: ConnectionFailure? {
+        if case .failed(.connection(let failure)) = loginModel.phase { return failure }
+        if case .failed(.xmpp(.streamClosed)) = loginModel.phase { return .offline }
+        if case .failed(.xmpp(.heartbeatTimeout)) = loginModel.phase { return .timeout }
+        if case .failed(let failure) = model.state.phase { return failure }
+        return nil
+    }
+
+    private var showsServerStatusScreen: Bool {
+        serverFailure != nil || model.state.phase == .checking && !showLoginSettings
+    }
+
+    private var serverStatusPanel: some View {
+        VStack(spacing: 18) {
+            Image("TeleTypTelLogo").resizable().scaledToFit().frame(maxWidth: 240, maxHeight: 60)
+                .accessibilityLabel("TeleTypTel")
+            Text(LocalizedStringKey(serverStatusTitle)).font(NativeWebStyle.font(22, weight: .bold))
+                .accessibilityAddTraits(.isHeader).accessibilityIdentifier("startup-failure-title")
+            Text(LocalizedStringKey(serverStatusMessage)).multilineTextAlignment(.center)
+                .foregroundStyle(NativeWebStyle.muted).accessibilityIdentifier("startup-status")
+            if model.state.phase == .checking {
+                Button("Annuleren", action: model.cancel).frame(minHeight: 44)
+                    .accessibilityIdentifier("startup-cancel-check")
+            } else {
+                Button("Opnieuw proberen", action: retryServerAvailability)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .buttonStyle(.borderedProminent).tint(NativeWebStyle.accent)
+                    .disabled(startupIsBusy || !hasServerConfiguration)
+                    .accessibilityIdentifier("startup-retry")
+                DisclosureGroup(isExpanded: $advancedFailureDetails) {
+                  if advancedFailureDetails {
+                    if let failure = serverFailure {
+                        Text(LocalizedStringKey(connectionError(failure))).font(.footnote)
+                            .accessibilityIdentifier("startup-technical-details")
+                    }
+                    Button { openLoginSettings(advanced: true) } label: { Label("Serverinstellingen", systemImage: "gearshape") }
+                        .frame(minHeight: 44).accessibilityIdentifier("login-settings")
+                  }
+                } label: { Text("Geavanceerd").frame(minHeight: 44) }
+                    .accessibilityIdentifier("startup-advanced")
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: 300)
+        .accessibilityElement(children: .contain).accessibilityIdentifier("startup-server-status")
+    }
+
+    private var serverStatusTitle: String {
+        if model.state.phase == .checking { return "Verbinding controleren…" }
+        switch serverFailure {
+        case .certificate: return "Beveiligde verbinding mislukt"
+        case .configuration: return "Verbinding niet ingesteld"
+        case .offline, .timeout: return "Server niet bereikbaar"
+        default: return "Verbinding mislukt"
+        }
+    }
+
+    private var serverStatusMessage: String {
+        if model.state.phase == .checking { return "De verbinding met TeleTypTel wordt gecontroleerd." }
+        switch serverFailure {
+        case .certificate: return "De beveiliging van de server kon niet worden gecontroleerd. Vertrouw geen onbekend certificaat. Neem contact op met de beheerder."
+        case .configuration: return "De verbinding kan met deze instellingen niet worden gestart. Neem contact op met de beheerder."
+        case .offline, .timeout: return "Controleer je internetverbinding en probeer het opnieuw."
+        default: return "De verbinding met TeleTypTel is niet gelukt. Probeer het later opnieuw."
+        }
+    }
+
+    private func retryServerAvailability() {
+        guard hasServerConfiguration, !startupIsBusy, !loginModel.isConnected, !loginModel.isSecondFactorPending else { return }
+        loginFocus = nil
+        password = ""
+        verificationCode = ""
+        advancedFailureDetails = false
+        loginModel.reset()
+        model.check(address: address, domain: domain)
+    }
+
+    private func openLoginSettings(advanced: Bool = false) {
+        loginFocus = nil
+        settingsModel.reset()
+        settingsAddress = address
+        settingsDomain = domain
+        advancedServerSettings = advanced
+        showLoginSettings = true
+    }
+
     private var loginActions: some View {
         VStack(spacing: 12) {
             NativeWebStyle.line.frame(height: 1).accessibilityHidden(true)
@@ -274,12 +370,7 @@ struct NativeStartupView: View {
                     Button { showRegistration = true } label: { Text("Nieuwe gebruiker").frame(maxWidth: .infinity, minHeight: 40) }
                         .buttonStyle(.bordered)
                         .disabled(!hasServerConfiguration || loginModel.isWorking || loginModel.isSecondFactorPending)
-                    Button {
-                        loginFocus = nil
-                        settingsAddress = address
-                        settingsDomain = domain
-                        showLoginSettings = true
-                    } label: { Image(systemName: "gearshape") }
+                    Button { openLoginSettings() } label: { Image(systemName: "gearshape") }
                         .buttonStyle(NativeWebIconStyle())
                         .accessibilityLabel("Instellingen")
                         .accessibilityIdentifier("login-settings")
@@ -293,7 +384,11 @@ struct NativeStartupView: View {
     private var loginSettings: some View {
         NavigationStack {
             Form {
-                Section("Verbinding") {
+                Section {
+                  DisclosureGroup(isExpanded: $advancedServerSettings) {
+                   if advancedServerSettings {
+                    Text("Wijzig de serverinstellingen alleen als je weet welke server je nodig hebt. Verkeerde instellingen kunnen aanmelden verhinderen.")
+                        .font(.footnote)
                     TextField("Serveradres (HTTPS)", text: $settingsAddress)
                         .textContentType(.URL).keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
                         .accessibilityLabel("Serveradres, HTTPS").accessibilityIdentifier("server-address")
@@ -301,11 +396,18 @@ struct NativeStartupView: View {
                         .textInputAutocapitalization(.never).autocorrectionDisabled()
                         .accessibilityLabel("XMPP-domein").accessibilityIdentifier("xmpp-domain")
                     Button("Verbinding controleren") {
-                        model.check(address: settingsAddress, domain: settingsDomain)
+                        settingsModel.check(address: settingsAddress, domain: settingsDomain)
                     }.accessibilityIdentifier("check-connection")
-                        .disabled(settingsAddress.isEmpty || settingsDomain.isEmpty || model.state.phase == .checking)
-                    NativeStartupProgress(isActive: model.state.phase == .checking, identifier: "settings-startup-progress")
-                    Text(LocalizedStringKey(statusText)).accessibilityIdentifier("settings-startup-status")
+                        .disabled(settingsAddress.isEmpty || settingsDomain.isEmpty || settingsModel.state.phase == .checking)
+                    NativeStartupProgress(isActive: settingsModel.state.phase == .checking, identifier: "settings-startup-progress")
+                    Text(LocalizedStringKey(settingsStatusText)).accessibilityIdentifier("settings-startup-status")
+                    if !providerSDK.configured(.google) || !providerSDK.configured(.facebook) {
+                        Text("Google/Facebook vereisen providerinstellingen voor de bundle-ID van deze native build. De bestaande web- en TestFlight-aanmelding blijft ongewijzigd.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                   }
+                  } label: { Text("Geavanceerd").frame(minHeight: 44) }
+                    .accessibilityIdentifier("login-advanced-settings")
                 }
                 Section("Taal") {
                     Picker("App-taal", selection: $interfaceLanguage) {
@@ -323,29 +425,27 @@ struct NativeStartupView: View {
                     }
                     Text("Optioneel: bewaar je aanmelding alleen op dit apparaat, beschermd met Face ID of Touch ID. Bij openen vraagt iOS om ontgrendeling. Uitloggen verwijdert deze aanmelding.")
                     Text("De app-taal staat los van berichtvertaling; een taal kiezen geeft geen toestemming om berichten extern te vertalen.")
-                    if !providerSDK.configured(.google) || !providerSDK.configured(.facebook) {
-                        Text("Google/Facebook vereisen providerinstellingen voor de bundle-ID van deze native build. De bestaande web- en TestFlight-aanmelding blijft ongewijzigd.")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
                 }
             }
             .modifier(NativeWebForm())
             .navigationTitle("Instellingen")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Annuleren") { model.cancel(); showLoginSettings = false }.accessibilityIdentifier("login-settings-cancel")
+                    Button(LocalizedStringKey(advancedServerSettings ? "Annuleren" : "Sluiten")) { settingsModel.cancel(); showLoginSettings = false }.accessibilityIdentifier("login-settings-cancel")
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Bewaren") { saveLoginSettings(dismiss: true) }
+                    if advancedServerSettings {
+                      Button("Bewaren") { saveLoginSettings(dismiss: true) }
                         .accessibilityIdentifier("login-settings-save")
-                        .disabled((try? ServerConfiguration(address: settingsAddress, domain: settingsDomain)) == nil || model.state.phase == .checking)
+                        .disabled((try? ServerConfiguration(address: settingsAddress, domain: settingsDomain)) == nil || settingsModel.state.phase == .checking)
+                    }
                 }
             }
         }
     }
 
     private func saveLoginSettings(dismiss: Bool) {
-        guard !loginModel.isWorking, !loginModel.isSecondFactorPending,
+        guard advancedServerSettings, !loginModel.isWorking, !loginModel.isSecondFactorPending,
               (try? ServerConfiguration(address: settingsAddress, domain: settingsDomain)) != nil else { return }
         address = settingsAddress
         domain = settingsDomain
@@ -408,7 +508,7 @@ struct NativeStartupView: View {
         .sheet(isPresented: $showRecovery) {
             if let configuration = try? ServerConfiguration(address: address, domain: domain) { NativeAccountEntryView(configuration: configuration, recovery: true) }
         }
-        .sheet(isPresented: $showLoginSettings, onDismiss: { model.reset() }) { loginSettings }
+        .sheet(isPresented: $showLoginSettings, onDismiss: { settingsModel.reset() }) { loginSettings }
         .onAppear { messageNotifications.connect(loginModel) }
         .onReceive(loginModel.$chat) { _ in Task { @MainActor in messageNotifications.updateBadge() } }
         .onReceive(loginModel.groups.$rooms) { _ in Task { @MainActor in messageNotifications.updateBadge() } }
@@ -435,6 +535,7 @@ struct NativeStartupView: View {
                 verificationCode = ""
                 savedLogin.cancel()
                 model.cancel()
+                settingsModel.cancel()
                 calls.setForeground(false)
                 calls.backgroundCallEnded = { [weak loginModel, weak background] in
                     guard let loginModel = loginModel else { return }
@@ -621,7 +722,19 @@ struct NativeStartupView: View {
             case .xmpp(.heartbeatTimeout): return "De XMPP-server reageert niet meer. De verbinding is gestopt; meld opnieuw aan."
             }
         }
-        switch model.state.phase {
+        return probeStatusText
+    }
+
+    private var probeStatusText: String {
+        probeStatus(model.state.phase)
+    }
+
+    private var settingsStatusText: String {
+        probeStatus(settingsModel.state.phase)
+    }
+
+    private func probeStatus(_ phase: StartupState.Phase) -> String {
+        switch phase {
         case .idle:
             return hasServerConfiguration ? "Meld je aan om verder te gaan." : "Stel de server in via Instellingen."
         case .checking:
@@ -672,6 +785,7 @@ private actor NativeLoginUIConnectionCount {
 private struct NativeLoginUIFixture: ServerChecking, NativeAccountChallenging, NativeXMPPConnecting {
     let scenario: String
     private let connections = NativeLoginUIConnectionCount()
+    private let availabilityChecks = NativeLoginUIConnectionCount()
 
     init(scenario: String) { self.scenario = scenario }
 
@@ -714,6 +828,10 @@ private struct NativeLoginUIFixture: ServerChecking, NativeAccountChallenging, N
         }
         if ProcessInfo.processInfo.environment["TELETYPTEL_NATIVE_STARTUP_PROGRESS_FIXTURE"] == "certificate" {
             throw ConnectionFailure.certificate
+        }
+        if ProcessInfo.processInfo.environment["TELETYPTEL_NATIVE_STARTUP_PROGRESS_FIXTURE"] == "offline",
+           await availabilityChecks.next() == 1 {
+            throw ConnectionFailure.offline
         }
         try await Task.sleep(nanoseconds: 150_000_000)
         return ProbeReport(mechanisms: ["PLAIN"])
