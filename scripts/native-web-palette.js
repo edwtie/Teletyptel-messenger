@@ -126,6 +126,7 @@ function assets(root) {
   return Object.fromEntries(Object.entries(values).map(([name, themes]) => {
     const assetName = "Web" + name[0].toUpperCase() + name.slice(1);
     const colors = ["light", "dark"].map(theme => ({
+      idiom: "universal",
       ...(theme === "dark" ? { appearances: [{ appearance: "luminosity", value: "dark" }] } : {}),
       color: { "color-space": "srgb", components: Object.fromEntries(["red", "green", "blue", "alpha"]
         .map((channel, index) => [channel, String(themes[theme][index])])) }
@@ -134,4 +135,10 @@ function assets(root) {
   }));
 }
 
-module.exports = { rules, rgba, palette, assets };
+function assertCompiledPalette(output) {
+  if (/The color set "Web\w+"[^\n]*unassigned children/.test(output)) {
+    throw new Error("Xcode discarded web colour variants; native appearance cannot be accepted");
+  }
+}
+
+module.exports = { rules, rgba, palette, assets, assertCompiledPalette };

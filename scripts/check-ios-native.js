@@ -59,7 +59,8 @@ function runSimulatorChecks({ common, family, destination, deviceID, resultBundl
   }
   const simulatorArguments = [...common, "-destination", destination,
     "-configuration", "Debug", "ONLY_ACTIVE_ARCH=YES", "-parallel-testing-enabled", "NO"];
-  logged(family + "-build", "xcodebuild", [...simulatorArguments, "build-for-testing"]);
+  const buildOutput = logged(family + "-build", "xcodebuild", [...simulatorArguments, "build-for-testing"]);
+  require("./native-web-palette").assertCompiledPalette(buildOutput);
   logged(family + "-boot", "xcrun", ["simctl", "bootstatus", deviceID, "-b"]);
   if (smokeResultBundle) {
     logged(family + "-cloud-history-tests", "xcodebuild", [...simulatorArguments,

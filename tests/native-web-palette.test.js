@@ -3,7 +3,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const { rules, rgba, palette, assets } = require("../scripts/native-web-palette");
+const { rules, rgba, palette, assets, assertCompiledPalette } = require("../scripts/native-web-palette");
 const root = path.resolve(__dirname, "..");
 const client = fs.readFileSync(path.join(root, "php/public/chat-client.css"), "utf8");
 const controls = fs.readFileSync(path.join(root, "php/public/call-controls-menu.css"), "utf8");
@@ -39,11 +39,18 @@ test("Native colour assets derive both appearances from the rendered web roles, 
     assert.equal(asset.colors.length, 2);
     assert.deepEqual(asset.colors[1].appearances, [{ appearance: "luminosity", value: "dark" }]);
     for (const entry of asset.colors) {
+      assert.equal(entry.idiom, "universal");
       assert.equal(entry.color["color-space"], "srgb");
       assert.ok(Object.values(entry.color.components).every(value => Number.isFinite(Number(value)) && Number(value) >= 0 && Number(value) <= 1));
     }
   }
   assert.match(read("scripts/prepare-ios-native.js"), /require\("\.\/native-web-palette"\)\.assets\(root\)/);
+});
+
+test("Native simulator acceptance rejects colour variants discarded by the asset compiler", () => {
+  assert.doesNotThrow(() => assertCompiledPalette("CompileAssetCatalogVariant\nBUILD SUCCEEDED"));
+  assert.throws(() => assertCompiledPalette('Assets.xcassets:./WebText.colorset: warning: The color set "WebText" has 2 unassigned children.'), /Xcode discarded web colour variants/);
+  assert.match(read("scripts/check-ios-native.js"), /assertCompiledPalette\(buildOutput\)/);
 });
 
 test("Web colour changes propagate to native output and missing, cyclic or unsupported CSS fails explicitly", () => {

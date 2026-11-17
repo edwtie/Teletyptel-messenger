@@ -26,6 +26,13 @@ TestFlight upload is enabled. Local source/generator/release checks pass 92 test
 with one macOS-only skip; actual simulator comparison is a separate checkpoint.
 Earlier screenshot evidence elsewhere in this document predates this palette.
 
+The first appearance run (`44122896197`) compiled and passed interaction checks,
+but manual screenshot inspection rejected it: Xcode discarded colour variants
+because their universal idiom was missing. This is fixed in the generated asset
+metadata; a regression check also rejects Xcode's unassigned-colour warnings.
+Green interaction tests alone are not visual acceptance. Replacement screenshots
+must be inspected before accepting this change.
+
 This shared foundation is not a claim of complete pixel or functional equality.
 iOS keyboard, permission/provider dialogs, pickers and system menus remain native;
 SF Symbols and native form layout still require visual comparison. Unimplemented
