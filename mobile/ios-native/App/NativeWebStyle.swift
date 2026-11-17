@@ -2,6 +2,23 @@ import SwiftUI
 import UIKit
 import ImageIO
 
+struct NativeInlineMessage<Content: View, Metadata: View>: View {
+    @ViewBuilder var content: Content
+    @ViewBuilder var metadata: Metadata
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .lastTextBaseline, spacing: 8) {
+                content.fixedSize(horizontal: true, vertical: true)
+                metadata.fixedSize()
+            }.fixedSize(horizontal: true, vertical: true)
+            VStack(alignment: .trailing, spacing: 4) {
+                content.frame(maxWidth: .infinity, alignment: .leading).fixedSize(horizontal: false, vertical: true)
+                metadata.fixedSize()
+            }
+        }
+    }
+}
 enum NativeWebStyle {
     static func color(_ light: UInt32, dark: UInt32) -> Color {
         Color(uiColor: UIColor { traits in

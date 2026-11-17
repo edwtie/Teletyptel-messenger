@@ -271,9 +271,9 @@ private struct NativeGroupBubble: View {
     private var description: String { message.nickname + ": " + (message.retracted ? "Bericht ingetrokken" : message.body) + ". " + message.state.label }
     private var indicator: String { message.state == .sending ? "clock" : message.state == .submitted ? "checkmark" : "exclamationmark.circle" }
     var body: some View {
-        HStack {
-            if message.own { Spacer(minLength: 36) }
-            else { NativeWebAvatar(name: message.nickname, size: 30) }
+        HStack(alignment: .top, spacing: 8) {
+            if message.own { Spacer(minLength: 36); messageMenu }
+            else { NativeWebAvatar(name: message.nickname, size: 30).padding(.top, 4) }
             ViewThatFits(in: .horizontal) { content.fixedSize(horizontal: true, vertical: true); content }
             .foregroundStyle(NativeWebStyle.text)
             .padding(.horizontal, 10).padding(.vertical, 8).background(NativeWebBubble(own: message.own).fill(fillColor))
@@ -284,22 +284,17 @@ private struct NativeGroupBubble: View {
             .accessibilityLabel(description)
             .accessibilityIdentifier("group-message-" + message.id.uuidString)
             .contextMenu { actions }
-            if !message.own { Spacer(minLength: 36) }
+            if !message.own { messageMenu; Spacer(minLength: 36) }
             else if let avatars = avatars, let ownJID = ownJID {
-                NativeCachedAvatar(name: message.nickname, jid: ownJID, cache: avatars, size: 30)
-            } else { NativeWebAvatar(name: message.nickname, size: 30) }
+                NativeCachedAvatar(name: message.nickname, jid: ownJID, cache: avatars, size: 30).padding(.top, 4)
+            } else { NativeWebAvatar(name: message.nickname, size: 30).padding(.top, 4) }
         }
     }
 
     private var content: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            VStack(alignment: .leading, spacing: 3) {
-            HStack(alignment: .top, spacing: 6) {
-                Text(message.nickname).font(.caption.bold())
-                Spacer(minLength: 0)
-                Menu { actions } label: { Image(systemName: "ellipsis").frame(width: 44, height: 44) }
-                    .buttonStyle(.plain).accessibilityLabel("Berichtmenu").accessibilityIdentifier("group-message-menu-" + message.id.uuidString)
-            }
+        VStack(alignment: .leading, spacing: 4) {
+            Text(message.nickname).font(NativeWebStyle.font(12, weight: .bold)).lineLimit(1)
+            NativeInlineMessage {
             if message.retracted { Text("Bericht ingetrokken") }
             else {
             if let session = session, NativeFileReference.inMessage(message.body, configuration: session.configuration) != nil {
@@ -311,11 +306,18 @@ private struct NativeGroupBubble: View {
                 NativeSmileyText(value: message.body)
             }
             }
+            } metadata: {
+                metadata.accessibilityElement(children: .combine).accessibilityIdentifier("group-message-metadata-" + message.id.uuidString)
             }
-            metadata.accessibilityElement(children: .combine).accessibilityIdentifier("group-message-metadata-" + message.id.uuidString)
             NativeReactionChips(reactions: message.reactions, owner: reactionOwner, enabled: canReact, selected: onReact)
             if let notice = message.actionNotice { Text(notice).font(.caption2) }
         }
+    }
+
+    private var messageMenu: some View {
+        Menu { actions } label: { Image(systemName: "ellipsis").frame(width: 44, height: 44) }
+            .buttonStyle(.plain).foregroundStyle(NativeWebStyle.muted)
+            .accessibilityLabel("Berichtmenu").accessibilityIdentifier("group-message-menu-" + message.id.uuidString)
     }
 
     @ViewBuilder private var actions: some View {
@@ -332,10 +334,9 @@ private struct NativeGroupBubble: View {
     }
 
     private var metadata: some View {
-        HStack(spacing: 5) {
-            Spacer(minLength: 0)
-            Text(message.date, style: .time).font(.caption2)
-            if message.own { Image(systemName: indicator).font(.caption2) }
+        HStack(spacing: 3) {
+            Text(message.date, style: .time).font(NativeWebStyle.font(11))
+            if message.own { Image(systemName: indicator).font(NativeWebStyle.font(11)) }
         }.foregroundStyle(NativeWebStyle.muted)
     }
 }

@@ -363,8 +363,10 @@ final class NativeStartupUITests: XCTestCase {
             let menuFrame = messageMenu.frame
             XCTAssertGreaterThanOrEqual(menuFrame.width, 44)
             XCTAssertGreaterThanOrEqual(menuFrame.height, 44)
-            XCTAssertTrue(outgoing.frame.contains(menuFrame))
-            XCTAssertLessThanOrEqual(menuFrame.maxY, metadata.frame.minY)
+            XCTAssertFalse(outgoing.frame.intersects(menuFrame))
+            XCTAssertFalse(menuFrame.intersects(metadata.frame))
+            XCTAssertLessThanOrEqual(outgoing.frame.height, 64)
+            XCTAssertTrue(application.frame.contains(menuFrame))
             application.buttons["chat-menu"].tap()
             XCTAssertTrue(application.buttons["Spraak en video"].waitForExistence(timeout: 5))
             expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: application.keyboards.firstMatch)
@@ -491,6 +493,37 @@ final class NativeStartupUITests: XCTestCase {
             controls.tap()
             XCTAssertTrue(application.buttons["Camera inschakelen"].waitForExistence(timeout: 5))
             snapshot("web-palette-tc-controls-" + theme)
+            application.terminate()
+        }
+    }
+
+    func testVisualInventoryCapturesEveryMainMenuSheetInBothOrientations() {
+        let arguments = application.launchArguments
+        let destinations = [("dialer", "open-number-dialer"), ("history", "open-history"),
+                            ("archive", "open-archive"), ("appearance", "open-appearance"),
+                            ("profile-edit", "open-profile"), ("account", "open-account-settings"),
+                            ("groups", "open-groups"), ("translation", "open-translation")]
+        for theme in ["light", "dark"] {
+            application.launchArguments = arguments + ["-teletyptel.native.theme", theme]
+            signInFixture("connected")
+            let main = application.buttons["messenger-main-menu"]
+            XCTAssertTrue(main.waitForExistence(timeout: 20))
+            waitForStatus("XMPP verbonden als fixture@localhost")
+            for (screen, identifier) in destinations {
+                main.tap()
+                let action = application.buttons[identifier]
+                XCTAssertTrue(action.waitForExistence(timeout: 5)); action.tap()
+                let close = application.buttons["Sluiten"].firstMatch
+                XCTAssertTrue(close.waitForExistence(timeout: 10))
+                XCTAssertFalse(application.keyboards.firstMatch.exists)
+                snapshot("visual-" + screen + "-portrait-" + theme)
+                rotate(.landscapeLeft)
+                XCTAssertTrue(close.isHittable)
+                snapshot("visual-" + screen + "-landscape-" + theme)
+                rotate(.portrait)
+                close.tap()
+                XCTAssertTrue(main.waitForExistence(timeout: 5))
+            }
             application.terminate()
         }
     }
@@ -932,10 +965,26 @@ final class NativeStartupUITests: XCTestCase {
     }
 
     private func snapshot(_ name: String) {
-        let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        let screenshot = XCUIScreen.main.screenshot()
+        let attachment = XCTAttachment(screenshot: screenshot)
         attachment.name = name
         attachment.lifetime = .keepAlways
         add(attachment)
+        let frame = application.frame
+        let identifiers = ["messenger-brand-header", "chat-header", "chat-identity", "chat-draft", "main-menu-grid", "conversation-menu-panel", "smiley-picker", "login-actions"]
+        let elements = identifiers.compactMap { identifier -> [String: Any]? in
+            let element = application.descendants(matching: .any)[identifier].firstMatch
+            guard element.exists else { return nil }
+            let bounds = element.frame
+            return ["id": identifier, "x": bounds.minX, "y": bounds.minY, "width": bounds.width, "height": bounds.height]
+        }
+        let geometry: [String: Any] = ["schema": 1, "name": name, "units": "points", "appFrame": ["x": frame.minX, "y": frame.minY, "width": frame.width, "height": frame.height], "imageSize": ["width": screenshot.image.size.width, "height": screenshot.image.size.height, "scale": screenshot.image.scale], "elements": elements, "fixture": "isolated-native-connected-v1", "pixelEquality": "not-evaluated"]
+        if let bytes = try? JSONSerialization.data(withJSONObject: geometry, options: [.sortedKeys]) {
+            let metrics = XCTAttachment(data: bytes, uniformTypeIdentifier: "public.json")
+            metrics.name = name + "-geometry"
+            metrics.lifetime = .keepAlways
+            add(metrics)
+        }
     }
 
     private func rotate(_ orientation: UIDeviceOrientation) {

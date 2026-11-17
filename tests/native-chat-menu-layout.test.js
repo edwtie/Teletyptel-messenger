@@ -72,15 +72,20 @@ test("16.9 references use a symbol-only three-column main grid and a distinct co
   assert.match(style, /RoundedRectangle\(cornerRadius: 14\)/);
 });
 
-test("Message menus take layout space rather than overlaying message text and delivery metadata", () => {
-  const chat = read(app + "NativeChatView.swift").split("private func bubbleContent")[1].split("private func messageActions")[0];
-  const group = read(app + "NativeGroupsView.swift").split("private var content: some View")[1].split("private var actions: some View")[0];
+test("Message menus sit beside compact web-style bubbles without covering text or delivery metadata", () => {
+  const chat = read(app + "NativeChatView.swift").split("private func bubble(")[1].split("private func messageActions")[0];
+  const group = read(app + "NativeGroupsView.swift").split("private var fillColor")[1].split("private var actions: some View")[0];
   for (const source of [chat, group]) {
-    assert.match(source, /HStack\(alignment: \.top, spacing: 6\)/);
+    assert.match(source, /HStack\(alignment: \.top, spacing: 8\)/);
+    assert.match(source, /NativeInlineMessage/);
     assert.match(source, /Image\(systemName: "ellipsis"\)\.frame\(width: 44, height: 44\)/);
     assert.doesNotMatch(source, /overlay\(alignment: \.topTrailing\)|padding\(\.trailing, 44\)/);
     assert.match(source, /message-metadata-/);
   }
+  const line = read(app + "NativeWebStyle.swift").split("struct NativeInlineMessage")[1].split("enum NativeWebStyle")[0];
+  assert.match(line, /ViewThatFits\(in: \.horizontal\)/);
+  assert.match(line, /HStack\(alignment: \.lastTextBaseline, spacing: 8\)/);
+  assert.match(line, /VStack\(alignment: \.trailing, spacing: 4\)/);
 });
 
 test("Menu simulator scope measures hit targets and overlap for both orientations, not just screenshots", () => {
@@ -90,13 +95,13 @@ test("Menu simulator scope measures hit targets and overlap for both orientation
   assert.equal(selected.length, 2);
   for (const name of selected) assert.ok(methods.includes("func " + name + "()"), name);
   for (const value of ["assertConversationHeader", "buttonFrame.intersects(identityFrame)",
-    "buttonFrames[first].intersects(buttonFrames[second])", "menuFrame.maxY, metadata.frame.minY", "outgoingMenu.isHittable",
+    "buttonFrames[first].intersects(buttonFrames[second])", "menuFrame.intersects(metadata.frame)", "outgoing.frame.height, 64", "outgoingMenu.isHittable",
     'snapshot("main-menu-symbols")', '"chat-menu-landscape" : "chat-menu-portrait"',
     'TELETYPTEL_NATIVE_LONG_CONTACT_NAME', '.portrait, .landscapeLeft, .portrait']) assert.ok(methods.includes(value), value);
   const workflow = read(".github/workflows/ios-native-preview.yml");
-  assert.match(workflow, /inputs.validation_mode == 'focused-ui' && \(inputs.ui_scope == 'menus' \|\| inputs.ui_scope == 'startup' \|\| inputs.ui_scope == 'appearance' \|\| inputs.ui_scope == 'smileys'\)/);
+  assert.match(workflow, /inputs.validation_mode == 'focused-ui' && \(inputs.ui_scope == 'menus' \|\| inputs.ui_scope == 'startup' \|\| inputs.ui_scope == 'appearance' \|\| inputs.ui_scope == 'smileys' \|\| inputs.ui_scope == 'visual'\)/);
   assert.match(workflow, /tests\/native-chat-menu-layout.test.js/);
-  assert.match(read("scripts/check-ios-native-ui.js"), /timeout: timeout \?\? \(\["menus", "startup", "appearance", "smileys"\].includes\(scope\) && name.endsWith\("-build"\) \? 1200000 : undefined\)/);
+  assert.match(read("scripts/check-ios-native-ui.js"), /timeout: timeout \?\? \(\["menus", "startup", "appearance", "smileys", "visual"\].includes\(scope\) && name.endsWith\("-build"\) \? 1200000 : undefined\)/);
 });
 
 test("Login actions take layout space instead of covering the password while the keyboard is open", () => {

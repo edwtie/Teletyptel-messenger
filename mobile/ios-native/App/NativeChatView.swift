@@ -244,9 +244,10 @@ struct NativeChatView: View {
 
     private func bubble(_ message: NativeChatMessage) -> some View {
         let incoming = message.state == .incoming
-        return HStack(alignment: .bottom, spacing: 8) {
+        return HStack(alignment: .top, spacing: 8) {
             if !incoming { Spacer(minLength: 36) }
-            if incoming { avatar }
+            if incoming { avatar.padding(.top, 4) }
+            else { messageMenu(message) }
             ViewThatFits(in: .horizontal) {
                 bubbleContent(message).fixedSize(horizontal: true, vertical: true)
                 bubbleContent(message)
@@ -261,18 +262,18 @@ struct NativeChatView: View {
             .accessibilityLabel(accessibleMessage(message))
             .accessibilityIdentifier("chat-message-" + message.id.uuidString)
             .contextMenu { messageActions(message) }
-            if incoming { Spacer(minLength: 36) }
-            else { NativeWebAvatar(name: model.currentOwner ?? "TX", size: 30, profile: ownProfile) }
+            if incoming { messageMenu(message); Spacer(minLength: 36) }
+            else { NativeWebAvatar(name: model.currentOwner ?? "TX", size: 30, profile: ownProfile).padding(.top, 4) }
         }
     }
 
     private func bubbleContent(_ message: NativeChatMessage) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-                HStack(alignment: .top, spacing: 6) {
-                    NativeSmileyText(value: message.retracted ? "Bericht ingetrokken" : message.body).accessibilityIdentifier("message-body-" + message.id.uuidString)
-                    Spacer(minLength: 0)
-                    Menu { messageActions(message) } label: { Image(systemName: "ellipsis").frame(width: 44, height: 44) }
-                        .buttonStyle(.plain).accessibilityLabel("Berichtmenu").accessibilityIdentifier("message-menu-" + message.id.uuidString)
+        VStack(alignment: .leading, spacing: 4) {
+                NativeInlineMessage {
+                    NativeSmileyText(value: message.retracted ? "Bericht ingetrokken" : message.body)
+                        .accessibilityIdentifier("message-body-" + message.id.uuidString)
+                } metadata: {
+                    messageMetadata(message)
                 }
                 if let session = model.activeWebSession, NativeFileReference.inMessage(message.body, configuration: session.configuration) != nil {
                     NativeFileMessageButton(bodyText: message.body, session: session)
@@ -280,19 +281,25 @@ struct NativeChatView: View {
                 if !message.retracted, translation.isCurrent(key: message.id.uuidString, text: message.body), let result = translation.results[message.id.uuidString], translation.preferences.mode != "off", translation.sharingConsent {
                     NativeTranslationCaption(result: result)
                 }
-                HStack(spacing: 5) {
-                    Spacer(minLength: 0)
-                    Text(message.date, style: .time).font(.caption2)
-                    if message.edited { Text("bewerkt").font(.caption2) }
-                    if message.state != .incoming {
-                        NativeMessageTicks(message: message)
-                    }
-                }.foregroundStyle(NativeWebStyle.muted).accessibilityElement(children: .combine)
-                    .accessibilityIdentifier("message-metadata-" + message.id.uuidString)
                 NativeReactionChips(reactions: message.reactions, owner: model.currentOwner, enabled: model.canSend && !message.reactionPending) { model.react(message.id, emoji: $0) }
                 if let notice = message.actionNotice { Text(notice).font(.caption2).foregroundStyle(NativeWebStyle.muted) }
             }
             .task(id: message.body) { translation.discardStale(key: message.id.uuidString, text: message.body) }
+    }
+
+    private func messageMenu(_ message: NativeChatMessage) -> some View {
+        Menu { messageActions(message) } label: { Image(systemName: "ellipsis").frame(width: 44, height: 44) }
+            .buttonStyle(.plain).foregroundStyle(NativeWebStyle.muted)
+            .accessibilityLabel("Berichtmenu").accessibilityIdentifier("message-menu-" + message.id.uuidString)
+    }
+
+    private func messageMetadata(_ message: NativeChatMessage) -> some View {
+        HStack(spacing: 3) {
+            Text(message.date, style: .time).font(NativeWebStyle.font(11))
+            if message.edited { Text("bewerkt").font(NativeWebStyle.font(11)) }
+            if message.state != .incoming { NativeMessageTicks(message: message) }
+        }.foregroundStyle(NativeWebStyle.muted).accessibilityElement(children: .combine)
+            .accessibilityIdentifier("message-metadata-" + message.id.uuidString)
     }
 
     @ViewBuilder private func messageActions(_ message: NativeChatMessage) -> some View {
