@@ -1,11 +1,11 @@
 # TeleTypTel native iOS migration
 
-## Internal candidate 1.0 (17.3), preparing 2026-11-17
+## Internal candidate 1.0 (17.3), uploaded 2026-11-17
 
 The owner requested TestFlight publication of the 16.9-reference menu/icon,
-startup-activity and keyboard-focus corrections. A read-only App Store Connect
-query confirms 17.2 is the latest processed internal build; 17.3 is the next
-candidate. Run `44056073428` validated the device archive, WebRTC linkage and
+startup-activity and keyboard-focus corrections. Before publication, a read-only
+App Store Connect query confirmed 17.2 as the latest processed internal build;
+17.3 was selected as the next candidate. Run `44056073428` validated the device archive, WebRTC linkage and
 iPhone Release startup, but the iPad XCTest runner timed out waiting for its
 Accessibility-loaded notification. The upload job was skipped, not bypassed.
 The separate iPad menu rerun `44051521857` attempt 2 met the same bootstrap error.
@@ -21,9 +21,25 @@ and all archive/signature/export gates must succeed before signing/upload.
 This is a test-environment correction, not an app, server or permission change.
 
 Local orchestration, release and native UI contracts pass 84 tests, with one
-macOS-only check skipped. Fresh-run results and Apple processing are pending;
-17.3 has not yet been uploaded at this checkpoint. The existing reviewed
-internal-Netherlands encryption and protected signing configuration are unchanged.
+macOS-only check skipped. The existing reviewed internal-Netherlands encryption
+and protected signing configuration are unchanged.
+
+[Release run 44061642423](https://github.com/edwtie/Teletyptel-messenger/actions/runs/44061642423)
+at `3bf0d3e` is green: both actual Release startup assertions, unsigned device
+archive/runtime checks and the separate protected signing/export/upload job
+succeed. The bounded upload result confirms version `1.0`, build `17.3`,
+`signed: true`, `uploaded: true`, `internalTestOnly: true`, with no failed stage or
+cleanup warning. There is no public App Store release or server/APNs activation.
+This proves upload, not Apple processing or availability to a particular tester;
+the result retains `processingAndCompliancePending: true`. A post-upload App
+Store Connect processing state was not independently confirmed at completion.
+
+The additional [menu run 44061648921](https://github.com/edwtie/Teletyptel-messenger/actions/runs/44061648921)
+passes on iPhone. The iPad Debug UI run reaches application launch but eventually
+hits the twenty-minute `xcodebuild` test timeout without a completed test summary.
+It is not reported as a menu pass or as a diagnosed production-app crash.
+Physical iPhone/iPad startup, sign-in, menu and rotation acceptance remain needed;
+the observed successful Release startup checks do not establish full UI parity.
 
 ## Device-launch regression found in 17.1 (2026-11-16)
 
