@@ -2,6 +2,34 @@ import XCTest
 @testable import TeleTypTelCore
 
 final class StartupTests: XCTestCase {
+    func testFreshInstallUsesConfirmedSecureServerDefaults() throws {
+        let server = NativeServerDefaults.resolve(savedAddress: nil, savedDomain: nil)
+        XCTAssertEqual(server.address, "https://dev.teletyptel.nl")
+        XCTAssertEqual(server.domain, "localhost")
+        let configuration = try ServerConfiguration(address: server.address, domain: server.domain)
+        XCTAssertEqual(configuration.webSocket.absoluteString, "wss://dev.teletyptel.nl/xmpp-websocket")
+    }
+
+    func testSavedServerSettingsAreNotReplacedByDefaults() {
+        for (address, domain) in [("https://custom.example:8443", "custom.example"), ("", ""),
+                                  ("http://invalid.example", "invalid.example")] {
+            let server = NativeServerDefaults.resolve(savedAddress: address, savedDomain: domain)
+            XCTAssertEqual(server.address, address)
+            XCTAssertEqual(server.domain, domain)
+        }
+    }
+
+    func testPartialSavedSettingsDoNotCombineWithAnotherServer() {
+        let addressOnly = NativeServerDefaults.resolve(savedAddress: "https://custom.example", savedDomain: nil)
+        XCTAssertEqual(addressOnly.address, "https://custom.example")
+        XCTAssertEqual(addressOnly.domain, "")
+        let domainOnly = NativeServerDefaults.resolve(savedAddress: nil, savedDomain: "custom.example")
+        XCTAssertEqual(domainOnly.address, "")
+        XCTAssertEqual(domainOnly.domain, "custom.example")
+        XCTAssertThrowsError(try ServerConfiguration(address: addressOnly.address, domain: addressOnly.domain))
+        XCTAssertThrowsError(try ServerConfiguration(address: domainOnly.address, domain: domainOnly.domain))
+    }
+
     func testConfigurationUsesSecureSameHostSocket() throws {
         let configuration = try ServerConfiguration(address: "https://192.0.2.1:8443/", domain: "LOCALHOST")
         XCTAssertEqual(configuration.webSocket.absoluteString, "wss://192.0.2.1:8443/xmpp-websocket")

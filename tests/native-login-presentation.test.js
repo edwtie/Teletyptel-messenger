@@ -8,6 +8,25 @@ const root = path.resolve(__dirname, "..");
 const read = file => fs.readFileSync(path.join(root, file), "utf8");
 const source = read("mobile/ios-native/App/TeleTypTelNativeApp.swift");
 
+test("Confirmed server defaults apply only when both saved values are absent, without rewriting preferences or contacting the server", () => {
+  const defaults = read("mobile/ios-native/Sources/TeleTypTelCore/Startup.swift").split("public enum NativeServerDefaults")[1].split("public enum ConnectionFailure")[0];
+  assert.match(defaults, /static let address = "https:\/\/dev\.teletyptel\.nl"/);
+  assert.match(defaults, /static let domain = "localhost"/);
+  assert.match(defaults, /savedAddress == nil && savedDomain == nil/);
+  assert.match(defaults, /return \(savedAddress \?\? "", savedDomain \?\? ""\)/);
+  assert.doesNotMatch(defaults, /UserDefaults|URLSession|\.check\(|\.login\(/);
+  const initialization = source.split("    init() {")[1].split("private var startupContent")[0];
+  assert.match(initialization, /NativeServerDefaults\.resolve\(/);
+  assert.match(initialization, /_address = State\(initialValue: server.address\)/);
+  assert.match(initialization, /_domain = State\(initialValue: server.domain\)/);
+  assert.ok(initialization.indexOf('"https://example.invalid"') < initialization.indexOf("NativeServerDefaults.resolve("));
+  const swiftTests = read("mobile/ios-native/Tests/TeleTypTelCoreTests/StartupTests.swift");
+  for (const method of ["testFreshInstallUsesConfirmedSecureServerDefaults", "testSavedServerSettingsAreNotReplacedByDefaults", "testPartialSavedSettingsDoNotCombineWithAnotherServer"]) {
+    assert.ok(swiftTests.includes("func " + method + "()"));
+  }
+  assert.match(read("scripts/check-ios-native-update.js"), /swiftTestFilter: "StartupTests\|/);
+});
+
 test("Native login keeps account fields and 16.9-style bottom actions visible without exposing server/language controls", () => {
   const content = source.split("private var startupContent: some View")[1].split("private var hasServerConfiguration")[0];
   assert.match(content, /accessibilityIdentifier\("login-jid"\)/);

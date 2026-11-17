@@ -109,8 +109,11 @@ struct NativeStartupView: View {
         _model = StateObject(wrappedValue: NativeStartupModel())
         _loginModel = StateObject(wrappedValue: NativeLoginModel(history: NativeDeviceHistory()))
         _savedLogin = StateObject(wrappedValue: NativeSavedLoginModel(vault: NativeBiometricLoginVault()))
-        _address = State(initialValue: UserDefaults.standard.string(forKey: "teletyptel.native.serverAddress") ?? "")
-        _domain = State(initialValue: UserDefaults.standard.string(forKey: "teletyptel.native.xmppDomain") ?? "")
+        let server = NativeServerDefaults.resolve(
+            savedAddress: UserDefaults.standard.string(forKey: "teletyptel.native.serverAddress"),
+            savedDomain: UserDefaults.standard.string(forKey: "teletyptel.native.xmppDomain"))
+        _address = State(initialValue: server.address)
+        _domain = State(initialValue: server.domain)
         fixtureName = nil
     }
 

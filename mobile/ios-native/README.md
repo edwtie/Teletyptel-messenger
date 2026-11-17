@@ -1,5 +1,23 @@
 # TeleTypTel native iOS migration
 
+## Confirmed server defaults for the next build (2026-11-17)
+
+Fresh installations now prefill `https://dev.teletyptel.nl` and XMPP domain
+`localhost`, as confirmed by the owner. Existing saved settings are not rewritten.
+Explicitly empty or partial saved settings also stay unchanged: a custom address
+is never silently combined with another server's default domain, or vice versa.
+The fields remain editable behind the sign-in settings gear, with the existing
+HTTPS, certificate, domain and per-login server checks retained. Selecting these
+defaults adds no startup network probe or automatic sign-in. DEBUG fixtures and
+explicit empty simulator launch arguments remain isolated from the real server.
+
+Three Swift startup tests cover fresh defaults, preserved saved values and
+partial-setting rejection. The focused unsigned update check includes those
+startup tests. Local source/generator/release checks pass 85 tests with one
+macOS-only skip; actual Swift/SDK verification remains a separate CI check.
+This source change does not alter the already uploaded TestFlight build 17.3;
+it needs a subsequent app build to reach installed devices.
+
 ## Internal candidate 1.0 (17.3), uploaded 2026-11-17
 
 The owner requested TestFlight publication of the 16.9-reference menu/icon,

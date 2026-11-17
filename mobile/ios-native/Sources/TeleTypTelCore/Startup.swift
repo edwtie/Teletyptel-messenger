@@ -1,5 +1,17 @@
 import Foundation
 
+public enum NativeServerDefaults {
+    public static let address = "https://dev.teletyptel.nl"
+    public static let domain = "localhost"
+
+    public static func resolve(savedAddress: String?, savedDomain: String?) -> (address: String, domain: String) {
+        if savedAddress == nil && savedDomain == nil {
+            return (address, domain)
+        }
+        return (savedAddress ?? "", savedDomain ?? "")
+    }
+}
+
 public enum ConnectionFailure: Error, Equatable {
     case configuration
     case certificate
