@@ -150,3 +150,15 @@ test("Unavailable servers show a simple inline retry screen, while server fields
   assert.doesNotMatch(failures, /invalidCredentials|authenticationRejected|twoFactorRequired/);
   assert.match(source, /Vertrouw geen onbekend certificaat/);
 });
+
+test("Advanced controls use a compact symbol with a full touch target and a localized accessible label", () => {
+  for (const state of ["advancedFailureDetails", "advancedServerSettings"]) {
+    const button = source.split(`Button { ${state}.toggle() } label:`)[1].split(".accessibilityIdentifier(")[0];
+    assert.match(button, /Image\(systemName: "slider.horizontal.3"\)/);
+    assert.match(button, /buttonStyle\(NativeWebIconStyle\(\)\)/);
+    assert.match(button, /accessibilityLabel\("Geavanceerd"\)\.help\("Geavanceerd"\)/);
+    assert.doesNotMatch(button, /Text\("Geavanceerd"\)|chevron|Spacer\(/);
+  }
+  const style = read("mobile/ios-native/App/NativeWebStyle.swift").split("struct NativeWebIconStyle:")[1].split("struct NativeWebMenuTileStyle:")[0];
+  assert.match(style, /frame\(minWidth: 44, minHeight: 44\)/);
+});

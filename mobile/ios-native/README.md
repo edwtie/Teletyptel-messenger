@@ -2,6 +2,13 @@
 
 ## Advanced server settings and unavailable-server screen (2026-11-17)
 
+The subsequent compact-control correction replaces the visible **Geavanceerd**
+word and chevron with the same `slider.horizontal.3` symbol on both screens.
+It retains a 44-point touch target, the localized accessible label/help and
+expanded/collapsed state. Configuration stays hidden until explicitly opened.
+This small visual correction has local source checks; the simulator evidence
+below applies to the preceding text-labelled controls, not a new TestFlight build.
+
 Server addresses, XMPP domains, connection probes and provider configuration
 details are now collapsed behind an explicitly opened **Geavanceerd** disclosure.
 The normal settings gear still offers language and privacy settings; saving a

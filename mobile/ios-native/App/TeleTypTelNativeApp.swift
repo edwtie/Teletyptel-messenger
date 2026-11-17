@@ -305,13 +305,10 @@ struct NativeStartupView: View {
                     .disabled(startupIsBusy || !hasServerConfiguration)
                     .accessibilityIdentifier("startup-retry")
                 Button { advancedFailureDetails.toggle() } label: {
-                    HStack {
-                        Text("Geavanceerd")
-                        Spacer()
-                        Image(systemName: advancedFailureDetails ? "chevron.down" : "chevron.right")
-                    }.frame(minHeight: 44).contentShape(Rectangle())
+                    Image(systemName: "slider.horizontal.3")
                 }
-                .buttonStyle(.plain).foregroundStyle(NativeWebStyle.buttonText)
+                .buttonStyle(NativeWebIconStyle())
+                .accessibilityLabel("Geavanceerd").help("Geavanceerd")
                 .accessibilityValue(Text(LocalizedStringKey(advancedFailureDetails ? "Uitgeklapt" : "Ingeklapt")))
                 .accessibilityIdentifier("startup-advanced")
                 if advancedFailureDetails {
@@ -395,12 +392,10 @@ struct NativeStartupView: View {
             Form {
                 Section {
                   Button { advancedServerSettings.toggle() } label: {
-                    HStack {
-                        Text("Geavanceerd")
-                        Spacer()
-                        Image(systemName: advancedServerSettings ? "chevron.down" : "chevron.right")
-                    }.frame(minHeight: 44).contentShape(Rectangle())
+                    Image(systemName: "slider.horizontal.3")
                   }
+                  .buttonStyle(NativeWebIconStyle())
+                  .accessibilityLabel("Geavanceerd").help("Geavanceerd")
                   .accessibilityValue(Text(LocalizedStringKey(advancedServerSettings ? "Uitgeklapt" : "Ingeklapt")))
                   .accessibilityIdentifier("login-advanced-settings")
                    if advancedServerSettings {
