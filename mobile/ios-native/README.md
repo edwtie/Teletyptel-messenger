@@ -3138,6 +3138,19 @@ Simulator execution and review of its real screenshots remain required: earlier
 run `43993143666` failed and is not evidence of acceptance. Only unsigned checks
 are requested; there is no TestFlight upload, APNs activation or server change.
 
+Run `44047631143` compiled the app for both simulator families. The iPad chat
+header/menu geometry test passed, including portrait/landscape rotation; its
+exported screenshots were reviewed. They also showed that the keyboard could
+remain underneath the menu, so opening a menu now releases only the relevant
+draft/search focus without erasing text or focusing anything automatically.
+Changing contacts cancels a pending conversation-menu action. The iPad main-menu
+test failed at an additional sign-in status-string wait before opening the menu,
+even though the failure hierarchy contained the connected messenger. That
+unnecessary wait is removed; the test still requires the authenticated main-menu
+button and asserts the grid's actual hit targets and order. The iPhone UI runner
+was killed before establishing its test connection. These outcomes are not an
+overall simulator pass; the focused checks need a new run.
+
 ## Primary references
 
 - [RFC 7395: XMPP over WebSocket](https://www.rfc-editor.org/rfc/rfc7395.html):

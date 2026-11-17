@@ -97,6 +97,7 @@ struct NativeMessengerView: View {
     @State private var showAppearance = false
     @State private var showProfile = false
     @State private var mainMenuOpen = false
+    @FocusState private var searchFocused: Bool
     @State private var historyBrowser: String?
     @State private var menuPresentation: Task<Void, Never>?
     @StateObject private var avatars = NativeAvatarCache()
@@ -152,6 +153,7 @@ struct NativeMessengerView: View {
                     HStack(spacing: 8) {
                         Image(systemName: "magnifyingglass").foregroundStyle(NativeWebStyle.muted)
                         TextField("Contacten zoeken", text: $search).textFieldStyle(.plain)
+                            .focused($searchFocused)
                             .accessibilityLabel("Contacten zoeken")
                     }
                     .padding(.horizontal, 10).frame(minHeight: 44)
@@ -308,7 +310,7 @@ struct NativeMessengerView: View {
                     .buttonStyle(NativeWebIconStyle(destructive: true))
                     .accessibilityLabel("Uitloggen").accessibilityIdentifier("disconnect-session")
             }
-            Button { mainMenuOpen.toggle() } label: { Image(systemName: "line.3.horizontal") }
+            Button { searchFocused = false; mainMenuOpen.toggle() } label: { Image(systemName: "line.3.horizontal") }
                 .buttonStyle(NativeWebIconStyle(prominent: mainMenuOpen)).accessibilityLabel("Hoofdmenu")
                 .accessibilityValue(Text(LocalizedStringKey(mainMenuOpen ? "Geopend" : "Gesloten")))
                 .accessibilityIdentifier("messenger-main-menu")

@@ -20,6 +20,7 @@ struct NativeChatView: View {
     @State private var conversationMenuOpen = false
     @State private var showInterpreterHelp = false
     @State private var menuPresentation: Task<Void, Never>?
+    @FocusState private var draftFocused: Bool
     @State private var forwarding: NativeChatMessage?
     @State private var editing: NativeChatMessage?
     @State private var deleting: NativeChatMessage?
@@ -116,6 +117,11 @@ struct NativeChatView: View {
         .sheet(isPresented: $showTranslation) { NativeTranslationSettingsView(model: translation) }
         .onAppear { model.visibleConversation = contact.jid }
         .onDisappear { menuPresentation?.cancel(); menuPresentation = nil; if model.visibleConversation == contact.jid { model.visibleConversation = nil } }
+        .onChange(of: contact.jid) { _ in
+            menuPresentation?.cancel(); menuPresentation = nil
+            conversationMenuOpen = false; showInterpreterHelp = false; draftFocused = false
+        }
+        .onChange(of: allowReadMarkers) { allowed in if !allowed { draftFocused = false } }
         .confirmationDialog("Gebarentolk oproepen", isPresented: $showInterpreterHelp, titleVisibility: .visible) {
             Button("Totale conversatie starten") { startCall(.total) }.disabled(!calls.canCall(contact))
             Button("Annuleren", role: .cancel) {}
@@ -161,10 +167,10 @@ struct NativeChatView: View {
             }
             .buttonStyle(NativeTotalConversationButtonStyle()).disabled(!calls.canCall(contact))
             .accessibilityLabel("Totale conversatie starten").accessibilityIdentifier("chat-start-total")
-            Button { showInterpreterHelp = true } label: { Image(systemName: "person.2.wave.2") }
+            Button { draftFocused = false; showInterpreterHelp = true } label: { Image(systemName: "person.2.wave.2") }
                 .buttonStyle(NativeWebIconStyle()).accessibilityLabel("Gebarentolk oproepen")
                 .accessibilityIdentifier("chat-interpreter")
-            Button { conversationMenuOpen.toggle() } label: { Image(systemName: "ellipsis").rotationEffect(.degrees(90)) }
+            Button { draftFocused = false; conversationMenuOpen.toggle() } label: { Image(systemName: "ellipsis").rotationEffect(.degrees(90)) }
                 .buttonStyle(NativeWebIconStyle(prominent: conversationMenuOpen))
                 .accessibilityLabel("Gespreksmenu").accessibilityIdentifier("chat-menu")
                 .accessibilityValue(Text(LocalizedStringKey(conversationMenuOpen ? "Geopend" : "Gesloten")))
@@ -331,6 +337,7 @@ struct NativeChatView: View {
                 .buttonStyle(NativeWebIconStyle(round: true))
                 .accessibilityLabel("Emoji")
             TextField("Typ een bericht", text: Binding(get: { draft }, set: { model.setDraft($0, peer: contact.jid) }), axis: .vertical)
+                .focused($draftFocused)
                 .lineLimit(1...5).textFieldStyle(.plain).padding(.vertical, 12)
                 .accessibilityLabel("Bericht").accessibilityIdentifier("chat-draft")
             if draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {

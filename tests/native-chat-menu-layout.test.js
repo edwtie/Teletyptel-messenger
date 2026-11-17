@@ -52,6 +52,7 @@ test("16.9 references use a symbol-only three-column main grid and a distinct co
   assert.match(grid, /Nieuws · nog niet beschikbaar in deze app[^\n]+disabled\(true\)/);
   assert.match(grid, /Klantenservice · nog niet beschikbaar in deze app[^\n]+disabled\(true\)/);
   assert.match(main, /allowReadMarkers: !mainMenuOpen && !showProfile/);
+  assert.match(main, /searchFocused = false; mainMenuOpen.toggle\(\)/);
   const chat = read(app + "NativeChatView.swift");
   assert.match(chat, /popover\(isPresented: \$conversationMenuOpen, arrowEdge: \.top\)/);
   assert.match(chat, /NativeWebCompactPopover\(\)/);
@@ -59,6 +60,9 @@ test("16.9 references use a symbol-only three-column main grid and a distinct co
   assert.ok(chat.indexOf('accessibilityIdentifier("chat-start-total")') < chat.indexOf('accessibilityIdentifier("chat-interpreter")'));
   assert.ok(chat.indexOf('accessibilityIdentifier("chat-interpreter")') < chat.indexOf('accessibilityIdentifier("chat-menu")'));
   assert.match(chat, /!conversationMenuOpen && !showInterpreterHelp/);
+  assert.match(chat, /draftFocused = false; conversationMenuOpen.toggle\(\)/);
+  assert.match(chat, /onChange\(of: allowReadMarkers\) \{ allowed in if !allowed \{ draftFocused = false \} \}/);
+  assert.match(chat, /onChange\(of: contact.jid\) \{ _ in\s+menuPresentation\?\.cancel\(\)/);
   assert.match(chat, /Tolkcontact is nog niet aangesloten/);
   assert.doesNotMatch(chat, /calls\.prepareInterpreter\(|interpreter\.request\(|Tolkwerkplek|RTT herstellen/);
   const style = read(app + "NativeWebStyle.swift").split("struct NativeWebMenuTileStyle")[1].split("struct NativeCachedAvatar")[0];

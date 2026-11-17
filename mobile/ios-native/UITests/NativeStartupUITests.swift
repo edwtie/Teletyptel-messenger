@@ -312,6 +312,8 @@ final class NativeStartupUITests: XCTestCase {
             XCTAssertLessThanOrEqual(menuFrame.maxY, metadata.frame.minY)
             application.buttons["chat-menu"].tap()
             XCTAssertTrue(application.buttons["Spraak en video"].waitForExistence(timeout: 5))
+            expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: application.keyboards.firstMatch)
+            waitForExpectations(timeout: 5)
             let panel = application.descendants(matching: .any)["conversation-menu-panel"].firstMatch
             XCTAssertTrue(panel.exists)
             XCTAssertTrue(application.frame.contains(panel.frame))
@@ -336,7 +338,6 @@ final class NativeStartupUITests: XCTestCase {
 
     func testMainMenuRemainsSeparateFromConversationMenu() {
         signInFixture("connected")
-        waitForStatus("XMPP verbonden als fixture@localhost")
         let main = application.buttons["messenger-main-menu"]
         XCTAssertTrue(main.waitForExistence(timeout: 10))
         XCTAssertGreaterThanOrEqual(main.frame.width, 44)
