@@ -42,6 +42,10 @@ Where that viewport matches the reference's full original scale,
 These are useful review evidence but **not strict pixel acceptance** until the
 shared content/clock/fixture contract also matches. Diagnostic differences never
 become green results; the originals remain linked in the gallery.
+The gallery also compares measured header/menu/draft rectangles, subtracting only
+the measured safe-area origin from native point coordinates. It does not rescale
+images or treat equal rectangles as equal rendering. These layout diagnostics
+help distinguish real width/spacing differences from differing fixture text.
 
 The first web-reference run produced 216 images, but image review found that the
 fixture had not finished initializing the inactive call toolbar and subsequently

@@ -3,7 +3,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const { comparePixels, cropPixels, orientPixels, pairIssues, completeness, renderReport } = require("../scripts/native-visual-audit/compare");
+const { comparePixels, cropPixels, orientPixels, pairIssues, compareLayout, completeness, renderReport } = require("../scripts/native-visual-audit/compare");
 const { screens, variants, caseID } = require("../scripts/native-visual-audit/catalogue");
 const { scenarioForName, pngSize } = require("../scripts/native-visual-audit/import-native");
 const { trackedReader } = require("../scripts/native-visual-audit/capture-web");
@@ -92,6 +92,17 @@ test("Report states full-catalogue failure explicitly, escapes evidence and dist
   assert.match(html, /pixelgelijkheid NIET bewezen/);
   assert.doesNotMatch(html, /<script>/);
   assert.match(html, /geen bewijs/);
+});
+
+test("Layout diagnostics use measured safe-area coordinates without rescaling screenshots or asserting pixel equality", () => {
+  const reference = { geometry: { "#mobileActionsPanel": [{ x: 70, y: 64, width: 320, height: 240 }] } };
+  const actual = { scale: 3, viewport: { source: "measured-safe-area", x: 0, y: 186 }, geometry: { units: "points", elements: [{ id: "main-menu-grid", x: 100, y: 126, width: 252, height: 240 }] } };
+  const [layout] = compareLayout(reference, actual);
+  assert.deepEqual(layout.native, { x: 100, y: 64, width: 252, height: 240 });
+  assert.deepEqual(layout.delta, { x: 30, y: 0, width: -68, height: 0 });
+  assert.deepEqual(compareLayout(reference, { ...actual, viewport: undefined }), []);
+  assert.deepEqual(compareLayout({ geometry: {} }, actual), []);
+  assert.equal(Object.hasOwn(layout, "identical"), false);
 });
 
 test("Web fixture renders frozen real web source, never mockup HTML, with external connections disabled", () => {
