@@ -22,17 +22,29 @@ an existing server-failure screen or replace its state with results for an unsav
 server. Closing the sheet cancels and resets only that draft probe. No additional
 real startup requests, infrastructure changes or TestFlight upload are added.
 The DEBUG offline fixture fails its first probe and succeeds on retry, only for
-`example.invalid`/`localhost`. Simulator screenshots retain the test-scenario banner
-and are not evidence of a live service outage or physical-device acceptance.
+`example.invalid`/`localhost`. The DEBUG interface includes a test-scenario banner
+(which can scroll out of view). Saved simulator screenshots are labelled as tests,
+not evidence of a live service outage or physical-device acceptance.
 
-The first actual iPhone simulator run (`44074496320`) compiled successfully but
-found five failing UI checks: native DisclosureGroup propagated its identifier
+The first actual simulator run (`44074496320`) compiled for both families but
+found five failing UI checks on each: native DisclosureGroup propagated its identifier
 to child fields, the retry button's actual target was only 32 points, and an
 inactive progress element remained in the accessibility tree after cancellation.
 Explicit expansion buttons preserve individual field identifiers; retry sizing
 is now inside its label, with explicit white text. The inactive progress branch
 retains the four-point layout space without an active progress identifier. The
-original assertions remain enforced and require a new simulator run.
+original assertions remain enforced.
+
+[Unsigned startup run 44078210139](https://github.com/edwtie/Teletyptel-messenger/actions/runs/44078210139)
+at `53257eb` passes all seven actual UI tests on both iPhone 16 Pro and iPad Pro
+11-inch (M4), iOS 18.6 simulators: fourteen passed, no failures or skips. Coverage
+includes hidden technical fields, explicit expansion, discard/save, invalid
+configuration, portrait/landscape, no keyboard on startup, cancellation, distinct
+certificate warnings and retry returning to unauthenticated sign-in. Real
+simulator screenshots were inspected and copied to Downloads with `test` in their
+filenames. Local source/generator/release checks pass 86 tests with one macOS-only
+skip. This is still unsigned testing, not a TestFlight upload or physical-device
+acceptance; the installed 17.3 build is unchanged.
 
 ## Confirmed server defaults for the next build (2026-11-17)
 
