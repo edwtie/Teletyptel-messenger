@@ -16,20 +16,20 @@ async function bounded(promise, milliseconds, message) {
 }
 const scenarios = {
   login: async page => page.evaluate(() => nativeVisualFixture.login()),
-  "login-settings": async page => { await page.evaluate(() => nativeVisualFixture.login()); await page.locator("#dialogServerSettingsButton").click(); },
+  "login-settings": async page => { await page.evaluate(() => nativeVisualFixture.login()); await page.locator("#dialogServerSettingsButton").tap(); },
   contacts: async page => page.evaluate(() => nativeVisualFixture.contacts()),
   "main-menu": async page => {
-    if (await page.locator("#mobileActionsToggle").isVisible()) { await page.locator("#mobileActionsToggle").click(); return "popover"; }
+    if (await page.locator("#mobileActionsToggle").isVisible()) { await page.locator("#mobileActionsToggle").tap(); return "popover"; }
     return "persistent-web-toolbar";
   },
   chat: async () => {},
   "conversation-menu": async page => {
-    if (await page.locator("#chatMoreToggle").isVisible()) { await page.locator("#chatMoreToggle").click(); return "popover"; }
+    if (await page.locator("#chatMoreToggle").isVisible()) { await page.locator("#chatMoreToggle").tap(); return "popover"; }
     return "persistent-web-actions";
   },
   "message-menu": async page => page.evaluate(() => nativeVisualFixture.messageMenu()),
-  smileys: async page => page.locator("#emojiButton").click(),
-  attachments: async page => page.locator("#attachmentMenuButton").click(),
+  smileys: async page => page.locator("#emojiButton").tap(),
+  attachments: async page => page.locator("#attachmentMenuButton").tap(),
   account: async page => page.evaluate(() => nativeVisualFixture.settings()),
   appearance: async page => page.evaluate(() => nativeVisualFixture.settingsPanel("preferences")),
   translation: async page => page.evaluate(() => nativeVisualFixture.settingsPanel("privacy")),
@@ -39,7 +39,7 @@ const scenarios = {
   "group-chat": async page => page.evaluate(() => nativeVisualFixture.group()),
   "group-management": async page => { await page.evaluate(() => nativeVisualFixture.group()); await page.evaluate(() => nativeVisualFixture.groupManagement()); },
   dialer: async page => { await page.locator("#phoneDialerButton").evaluate(element => element.click()); },
-  "dialer-contacts": async page => { await page.locator("#phoneDialerButton").evaluate(element => element.click()); await page.locator("#phoneDialerContactsView").click(); },
+  "dialer-contacts": async page => { await page.locator("#phoneDialerButton").evaluate(element => element.click()); await page.locator("#phoneDialerContactsView").tap(); },
   history: async page => page.locator("#historyButton").evaluate(element => element.click()),
   archive: async page => page.locator("#archiveButton").evaluate(element => element.click()),
   audio: async page => page.evaluate(() => nativeVisualFixture.call("audio")),
@@ -47,7 +47,7 @@ const scenarios = {
   tc: async page => page.evaluate(() => nativeVisualFixture.call("total")),
   "call-controls": async page => {
     await page.evaluate(() => nativeVisualFixture.call("total"));
-    if (await page.locator("#callControlsToggle").isVisible()) { await page.locator("#callControlsToggle").click(); return "popover"; }
+    if (await page.locator("#callControlsToggle").isVisible()) { await page.locator("#callControlsToggle").tap(); return "popover"; }
     return "persistent-web-call-controls";
   },
   "call-keypad": async page => { await page.evaluate(() => nativeVisualFixture.call("total")); await page.locator("#callKeypadButton").evaluate(element => element.click()); },
@@ -110,7 +110,7 @@ async function capture({ output, revision = "HEAD", sourceMode = "committed", br
       for (const screen of screens.filter(entry => selectedScreens.includes(entry.id))) {
         const identifier = caseID(screen.id, variant);
         console.log("Opening " + identifier);
-        const context = await browser.newContext({ viewport: { width: variant.width, height: variant.height }, deviceScaleFactor: variant.scale, locale: "nl-NL", timezoneId: "Europe/Amsterdam", colorScheme: variant.theme, reducedMotion: "reduce", serviceWorkers: "block" });
+        const context = await browser.newContext({ viewport: { width: variant.width, height: variant.height }, deviceScaleFactor: variant.scale, isMobile: true, hasTouch: true, locale: "nl-NL", timezoneId: "Europe/Amsterdam", colorScheme: variant.theme, reducedMotion: "reduce", serviceWorkers: "block" });
         const errors = [];
         const page = await context.newPage();
         page.setDefaultTimeout(5000);
@@ -143,6 +143,8 @@ async function capture({ output, revision = "HEAD", sourceMode = "committed", br
           console.log("Loaded " + identifier);
           await page.waitForFunction(() => Boolean(window.nativeVisualFixture), null, { timeout: 5000 });
           console.log("Hook ready " + identifier);
+          const input = await page.evaluate(() => ({ touchPoints: navigator.maxTouchPoints, coarse: matchMedia("(pointer: coarse)").matches, hover: matchMedia("(hover: hover)").matches }));
+          if (!input.touchPoints || !input.coarse || input.hover) throw new Error("Mobile touch media do not match the native comparison target");
           await page.evaluate(theme => nativeVisualFixture.setup(theme), variant.theme);
           console.log("Fixture ready " + identifier);
           await page.waitForTimeout(100);
@@ -165,7 +167,7 @@ async function capture({ output, revision = "HEAD", sourceMode = "committed", br
           await page.screenshot({ path: path.join(output, file), animations: "disabled", caret: "hide" });
           const visibleImages = await page.evaluate(() => [...document.images].filter(image => image.getClientRects().length && image.getAttribute("src")).map(image => ({ source: image.getAttribute("src"), complete: image.complete && image.naturalWidth > 0 })));
           if (visibleImages.some(image => !image.complete)) throw new Error("Visible image did not decode");
-          result.captures.push({ id: identifier, screen: screen.id, ...variant, file, geometry, visibleImages, stateVerified: true, presentation: presentation || "default", errors, status: "web-captured-only" });
+          result.captures.push({ id: identifier, screen: screen.id, ...variant, file, geometry, visibleImages, stateVerified: true, inputVerified: true, input, presentation: presentation || "default", errors, status: "web-captured-only" });
           console.log("Captured " + identifier);
         } catch (error) {
           await page.screenshot({ path: path.join(output, identifier + "-failed.png"), animations: "disabled" }).catch(() => {});

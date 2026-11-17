@@ -56,6 +56,7 @@ function pairIssues(reference, actual) {
   }
   if (!/^[a-f0-9]{64}$/.test(reference.fixtureHash || "")) issues.push("Missing verified shared fixture hash");
   if (reference.stateVerified !== true) issues.push("The requested web screen state has not been verified");
+  if (reference.inputVerified !== true) issues.push("The mobile touch input mode has not been verified");
   if (!actual.viewport || actual.viewport.source !== "measured-safe-area") issues.push("Native app viewport has not been measured");
   if (actual.viewport && (actual.viewport.width !== actual.width * actual.scale || actual.viewport.height !== actual.height * actual.scale)) issues.push("Native viewport must cover the entire declared app area at its original pixel scale");
   if (reference.errors?.length || actual.errors?.length) issues.push("Capture has runtime errors");
@@ -158,7 +159,7 @@ function audit({ webDirectory, nativeDirectory, output, pngModule, diagnostic = 
     }
     entries.push(entry);
   }
-  const report = { schema: 1, webRevision: web.sourceMode === "working-tree" ? "Uncommitted local web files on base " + web.revision : web.revision, webSourceMode: web.sourceMode || "committed", webSourceFiles: web.files, nativeRevision: native.revision, exclusions, coverage: completeness(entries) };
+  const report = { schema: 1, webRevision: web.sourceMode === "working-tree" ? "Uncommitted local web files on base " + web.revision : web.revision, webSourceMode: web.sourceMode || "committed", webRenderer: web.renderer, webCaveat: web.caveat, webSourceFiles: web.files, nativeRevision: native.revision, exclusions, coverage: completeness(entries) };
   fs.writeFileSync(path.join(output, "report.json"), JSON.stringify(report, null, 2));
   fs.writeFileSync(path.join(output, "index.html"), renderReport(report, output));
   return report;

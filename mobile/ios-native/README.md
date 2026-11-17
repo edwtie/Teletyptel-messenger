@@ -18,6 +18,12 @@ presentation is retained, not forcibly restyled to resemble native. The separate
 `native-visual-web.yml` workflow captures desktop WebKit on macOS, on explicit
 dispatch or changes to its own capture tooling. This
 is a reproducible web reference, not a claim of physical iOS Safari equivalence.
+Touch emulation and mobile viewport behavior are explicit; captures verify a
+coarse pointer, touch points and no hover capability. Visible interaction uses
+touch taps, not a desktop mouse. Earlier desktop-pointer captures are useful
+review material but cannot pass the mobile pixel-acceptance contract. A Windows
+Chromium capture may also use Segoe UI where iOS falls back to Arial; it must not
+be presented as an iOS font/rasterization reference.
 
 The unsigned native `visual` scope captures main-menu sheets in both orientations
 and themes, plus existing login, contacts, menus, chat, groups, smileys, TC and
