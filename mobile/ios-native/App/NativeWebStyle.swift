@@ -178,19 +178,21 @@ struct NativeStartupProgress: View {
         Group {
             if isActive {
                 GeometryReader { geometry in
-                TimelineView(.animation(minimumInterval: 0.05, paused: reduceMotion)) { context in
-                    let width = max(1, geometry.size.width * 0.28)
-                    let phase = reduceMotion ? 0.5 : context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1.6) / 1.6
-                    ZStack(alignment: .leading) {
-                        NativeWebStyle.button
-                        Capsule().fill(NativeWebStyle.accent).frame(width: width)
-                            .offset(x: CGFloat(phase) * (geometry.size.width + width) - width)
+                    ZStack {
+                        Rectangle().fill(NativeWebStyle.button)
+                            .frame(width: geometry.size.width, height: 4)
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel("Voortgang opstarten").accessibilityValue(Text("Bezig"))
+                            .accessibilityIdentifier(identifier)
+                        TimelineView(.animation(minimumInterval: 0.05, paused: reduceMotion)) { context in
+                            let width = max(1, geometry.size.width * 0.28)
+                            let phase = reduceMotion ? 0.5 : context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1.6) / 1.6
+                            Capsule().fill(NativeWebStyle.accent).frame(width: width)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .offset(x: CGFloat(phase) * (geometry.size.width + width) - width)
+                        }
+                        .accessibilityHidden(true)
                     }
-                }
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel("Voortgang opstarten").accessibilityValue(Text("Bezig"))
-                .accessibilityIdentifier(identifier)
-                .accessibilityFrame(geometry.frame(in: .global))
                 }
                 .frame(height: 4).clipped().allowsHitTesting(false)
             } else {

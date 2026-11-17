@@ -50,8 +50,9 @@ The broad `visual` attempt compiled both simulator families but exceeded its
 20-minute UI budget before producing a complete result bundle. Its logs also
 identified an iPad progress accessibility frame outside the clipped strip and a
 group-message menu hit-test failure during rotation. Those are not visual passes.
-The progress accessibility frame is now explicitly the strip's measured global
-frame and message-menu labels have full rectangular hit targets. The group
+The animated progress segment is hidden from accessibility; a separate static
+four-point strip supplies its bounded accessibility element. Message-menu labels
+have full rectangular hit targets. The group
 visibility predicate caches its frame reads rather than repeating costly AX
 queries; its geometric and hittability conditions remain mandatory. The minimum
 44-point assertion allows only a one-millionth-point floating arithmetic error,

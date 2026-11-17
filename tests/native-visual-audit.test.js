@@ -136,7 +136,9 @@ test("Viewport instrumentation is transparent and DEBUG/environment gated, while
 test("Visual repair checks preserve the clipped progress accessibility frame and complete message hit rectangles", () => {
   const style = fs.readFileSync(path.join(root, "mobile/ios-native/App/NativeWebStyle.swift"), "utf8");
   const progress = style.split("struct NativeStartupProgress")[1].split("struct NativeConversationHeader")[0];
-  assert.match(progress, /accessibilityFrame\(geometry\.frame\(in: \.global\)\)/);
+  assert.match(progress, /Rectangle\(\)\.fill\(NativeWebStyle.button\)\s+\.frame\(width: geometry.size.width, height: 4\)\s+\.accessibilityElement\(children: \.ignore\)/);
+  assert.match(progress, /TimelineView[\s\S]+\.accessibilityHidden\(true\)/);
+  assert.doesNotMatch(progress, /\.accessibilityFrame\(/);
   assert.match(progress, /frame\(height: 4\)\.clipped\(\)\.allowsHitTesting\(false\)/);
   const { testsForScope } = require("../scripts/check-ios-native-ui");
   assert.ok(testsForScope("visual-repair").includes("testStartupProgressStopsOnCancelAndCertificateFailure"));
