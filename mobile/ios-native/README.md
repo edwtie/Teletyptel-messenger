@@ -3151,6 +3151,18 @@ button and asserts the grid's actual hit targets and order. The iPhone UI runner
 was killed before establishing its test connection. These outcomes are not an
 overall simulator pass; the focused checks need a new run.
 
+Follow-up [run 44051521857](https://github.com/edwtie/Teletyptel-messenger/actions/runs/44051521857)
+at source commit `7dcc9f9` built both families. The iPhone 16 Pro / iOS 18.6
+simulator passed both focused menu tests (2 passed, 0 failed), including the
+three-column grid, account-sheet navigation, minimum targets, nonoverlap,
+portrait/landscape conversation menus and keyboard dismissal. Its actual grid,
+portrait and landscape screenshots were exported and visually reviewed.
+The iPad Pro 11-inch (M4) / iOS 18.6 runner failed to initialize with
+`Timed out waiting for AX loaded notification` before the UI assertions ran.
+This is an outstanding simulator-validation limitation, not a passed iPad check
+or an observed app/menu assertion failure. The overall workflow is therefore
+not green. No TestFlight upload, signing change or server activation took place.
+
 ## Primary references
 
 - [RFC 7395: XMPP over WebSocket](https://www.rfc-editor.org/rfc/rfc7395.html):
