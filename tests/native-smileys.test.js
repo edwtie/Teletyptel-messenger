@@ -15,6 +15,7 @@ test("Native smileys use the complete ordered web catalogue, including aliases a
   assert.deepEqual(entries.find(entry => entry.name === "worshippy").codes, ["_/-\\o_", "_o_"]);
   assert.deepEqual(entries.find(entry => entry.name === "puh").codes, [":>", ":*"]);
   const resolved = sources(root);
+  assert.ok(resolved.filter(entry => !entry.animated).every(entry => !entry.data.toString("utf8").includes("\r\n")));
   assert.equal(resolved.find(entry => entry.name === "smile").fileName, "smile.svg");
   assert.equal(resolved.find(entry => entry.name === "bonk").fileName, "bonk.gif");
   assert.throws(() => catalogue("const smiles = [];"), /not found/);

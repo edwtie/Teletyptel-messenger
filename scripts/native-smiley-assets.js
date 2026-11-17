@@ -24,7 +24,8 @@ function sources(root) {
   return catalogue(fs.readFileSync(path.join(root, "php/public/chat-client.js"), "utf8")).map(entry => {
     const original = path.join(root, "php/public/smileys", entry.fileName);
     const fileName = fs.existsSync(original) ? entry.fileName : entry.fileName.replace(/\.[^.]+$/, ".svg");
-    const data = fs.readFileSync(path.join(root, "php/public/smileys", fileName));
+    const originalData = fs.readFileSync(path.join(root, "php/public/smileys", fileName));
+    const data = fileName.endsWith(".svg") ? Buffer.from(originalData.toString("utf8").replace(/\r\n/g, "\n")) : originalData;
     return { ...entry, fileName, data, animated: fileName.endsWith(".gif") };
   });
 }
