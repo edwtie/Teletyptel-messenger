@@ -391,6 +391,71 @@ final class NativeStartupUITests: XCTestCase {
         snapshot("chat-header-separated")
     }
 
+    func testWebPaletteLoginChatAndMenusInBothThemes() {
+        let arguments = application.launchArguments
+        for theme in ["light", "dark"] {
+            application.launchArguments = arguments + ["-teletyptel.native.theme", theme]
+            application.launchEnvironment["TELETYPTEL_NATIVE_UI_FIXTURE"] = "connected"
+            application.launch()
+            XCTAssertTrue(application.buttons["login-settings"].waitForExistence(timeout: 10))
+            XCTAssertFalse(application.keyboards.firstMatch.exists)
+            snapshot("web-palette-login-" + theme)
+            application.terminate()
+            signInFixture("connected")
+            let main = application.buttons["messenger-main-menu"]
+            XCTAssertTrue(main.waitForExistence(timeout: 10))
+            snapshot("web-palette-contacts-" + theme)
+            main.tap()
+            XCTAssertTrue(application.buttons["open-appearance"].waitForExistence(timeout: 5))
+            snapshot("web-palette-main-menu-" + theme)
+            application.buttons["open-appearance"].tap()
+            let close = application.buttons["Sluiten"]
+            XCTAssertTrue(close.waitForExistence(timeout: 5))
+            snapshot("web-palette-settings-" + theme)
+            close.tap()
+            let contact = application.descendants(matching: .any)["contact-demo-contact@localhost"].firstMatch
+            XCTAssertTrue(contact.waitForExistence(timeout: 5)); reveal(contact); tapContact(contact)
+            let draft = application.descendants(matching: .any)["chat-draft"].firstMatch
+            XCTAssertTrue(draft.waitForExistence(timeout: 5))
+            draft.tap(); draft.typeText("Fictief eigen voorbeeldbericht")
+            application.buttons["chat-send"].tap()
+            application.buttons["chat-menu"].tap()
+            XCTAssertTrue(application.buttons["Spraak en video"].waitForExistence(timeout: 5))
+            snapshot("web-palette-conversation-menu-" + theme)
+            application.buttons["Vertaling"].tap()
+            XCTAssertTrue(close.waitForExistence(timeout: 5)); close.tap()
+            XCTAssertTrue(draft.waitForExistence(timeout: 5))
+            XCTAssertFalse(application.keyboards.firstMatch.exists)
+            snapshot("web-palette-chat-portrait-" + theme)
+            rotate(.landscapeLeft)
+            snapshot("web-palette-chat-landscape-" + theme)
+            application.terminate()
+            rotate(.portrait)
+        }
+    }
+
+    func testWebPaletteTotalConversationInBothThemes() {
+        let arguments = application.launchArguments
+        for theme in ["light", "dark"] {
+            application.launchArguments = arguments + ["-teletyptel.native.theme", theme]
+            application.launchEnvironment["TELETYPTEL_NATIVE_UI_FIXTURE"] = "connected"
+            application.launchEnvironment["TELETYPTEL_NATIVE_CALL_VISUAL_FIXTURE"] = "total"
+            application.launch()
+            let controls = application.buttons["Gespreksbediening"]
+            XCTAssertTrue(controls.waitForExistence(timeout: 10))
+            XCTAssertTrue(application.buttons["Gesprek beëindigen"].isHittable)
+            XCTAssertFalse(application.keyboards.firstMatch.exists)
+            snapshot("web-palette-tc-portrait-" + theme)
+            rotate(.landscapeLeft)
+            snapshot("web-palette-tc-landscape-" + theme)
+            rotate(.portrait)
+            controls.tap()
+            XCTAssertTrue(application.buttons["Camera inschakelen"].waitForExistence(timeout: 5))
+            snapshot("web-palette-tc-controls-" + theme)
+            application.terminate()
+        }
+    }
+
     func testMainMenuRemainsSeparateFromConversationMenu() {
         signInFixture("connected")
         let main = application.buttons["messenger-main-menu"]

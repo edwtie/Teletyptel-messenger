@@ -11,7 +11,7 @@ struct NativeAttachmentButton: View {
     @State private var show = false
     var body: some View {
         Button { show = true } label: { Image(systemName: "plus").frame(width: 40, height: 44) }
-            .buttonStyle(NativeWebIconStyle(round: true))
+            .buttonStyle(NativeWebIconStyle(round: true, composer: true))
             .accessibilityLabel("Bijlage, opname of locatie toevoegen").accessibilityIdentifier("attachment-picker")
             .disabled(!login.canSend || login.activeWebSession == nil)
             .sheet(isPresented: $show) { NativeAttachmentPicker(login: login, stage: stage) }
@@ -52,7 +52,7 @@ private struct NativeAttachmentPicker: View {
                 }
                 if let progress = model.progress { ProgressView(value: progress).accessibilityLabel("Bestand uploaden") }
                 if let status = model.status { Text(status).font(.caption) }
-                if let error = error { Text(error).foregroundStyle(.red) }
+                if let error = error { Text(error).foregroundStyle(NativeWebStyle.danger) }
                 if let link = link {
                     Button {
                         guard login.canSend else { return }

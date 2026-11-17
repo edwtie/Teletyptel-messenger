@@ -51,7 +51,7 @@ struct NativeHistoricalContacts: View {
                             }
                         }
                         .frame(maxWidth: .infinity, minHeight: 58, alignment: .leading)
-                        .foregroundStyle(selected == conversation.peer ? Color.white : NativeWebStyle.muted)
+                        .foregroundStyle(selected == conversation.peer ? NativeWebStyle.selectionText : NativeWebStyle.muted)
                         .contentShape(Rectangle())
                         .accessibilityElement(children: .combine)
                         .accessibilityIdentifier("cloud-contact-" + conversation.peer)

@@ -58,7 +58,7 @@ struct NativeTranslationSettingsView: View {
                 Section {
                     if !model.ready { Text("Geen actieve vertaalsessie. Meld opnieuw aan als de instellingen niet geladen zijn.") }
                     else if !model.available { Text("De beheerder heeft nog geen beschikbare vertaaldienst ingesteld.") }
-                    if let error = model.error { Text(error).foregroundStyle(.red) }
+                    if let error = model.error { Text(error).foregroundStyle(NativeWebStyle.danger) }
                     Button("Instellingen opslaan") {
                         preferences.automaticConsent = preferences.mode == "automatic" && consent
                         saving = true
@@ -211,9 +211,10 @@ struct NativeMessengerView: View {
                                 Circle().fill(presenceColor(contact.presence)).frame(width: 10, height: 10)
                                     .accessibilityLabel(contact.presence.label)
                             }
-                            .foregroundStyle(selected == contact.jid ? Color.white : NativeWebStyle.muted)
+                            .foregroundStyle(selected == contact.jid ? NativeWebStyle.selectionText : NativeWebStyle.muted)
                             .padding(.horizontal, 10).padding(.vertical, 10)
-                            .background(selected == contact.jid ? NativeWebStyle.accent : NativeWebStyle.button, in: RoundedRectangle(cornerRadius: 6))
+                            .background(selected == contact.jid ? NativeWebStyle.selection : NativeWebStyle.button, in: RoundedRectangle(cornerRadius: 6))
+                            .overlay(RoundedRectangle(cornerRadius: 6).stroke(selected == contact.jid ? NativeWebStyle.selectionBorder : .clear, lineWidth: 1).allowsHitTesting(false))
                             .accessibilityElement(children: .combine)
                             .accessibilityIdentifier("contact-" + contact.jid)
                         }
@@ -232,15 +233,16 @@ struct NativeMessengerView: View {
                                     Text(group.room.components(separatedBy: "@")[0]).font(NativeWebStyle.font(14, weight: .bold)).lineLimit(1)
                                     Text(group.messages.last?.body ?? "Groep").font(NativeWebStyle.font(13)).lineLimit(1)
                                 }.frame(maxWidth: .infinity, alignment: .leading)
-                                Circle().fill(Color.blue).frame(width: 10, height: 10).accessibilityLabel("Groep")
+                                Circle().fill(NativeWebStyle.groupPresence).frame(width: 10, height: 10).accessibilityLabel("Groep")
                                 if group.unreadCount > 0 {
                                     Text(String(group.unreadCount)).font(.caption.bold()).padding(6)
                                         .background(NativeWebStyle.accent, in: Capsule()).foregroundStyle(.white)
                                         .accessibilityLabel("\(group.unreadCount) ongelezen groepsberichten")
                                 }
                             }.padding(10)
-                                .foregroundStyle(selected == group.room ? Color.white : NativeWebStyle.muted)
-                                .background(selected == group.room ? NativeWebStyle.accent : NativeWebStyle.button, in: RoundedRectangle(cornerRadius: 6))
+                                .foregroundStyle(selected == group.room ? NativeWebStyle.selectionText : NativeWebStyle.muted)
+                                .background(selected == group.room ? NativeWebStyle.selection : NativeWebStyle.button, in: RoundedRectangle(cornerRadius: 6))
+                                .overlay(RoundedRectangle(cornerRadius: 6).stroke(selected == group.room ? NativeWebStyle.selectionBorder : .clear, lineWidth: 1).allowsHitTesting(false))
                         }
                         .listRowInsets(EdgeInsets(top: 0, leading: 12, bottom: 6, trailing: 12))
                         .listRowSeparator(.hidden).listRowBackground(Color.clear)
@@ -307,7 +309,7 @@ struct NativeMessengerView: View {
                     .buttonStyle(NativeWebIconStyle()).accessibilityLabel("Accountinstellingen")
                     .accessibilityIdentifier("toolbar-account-settings")
                 Button(action: logout) { Image(systemName: "rectangle.portrait.and.arrow.right") }
-                    .buttonStyle(NativeWebIconStyle(destructive: true))
+                    .buttonStyle(NativeWebIconStyle(logout: true))
                     .accessibilityLabel("Uitloggen").accessibilityIdentifier("disconnect-session")
             }
             Button { searchFocused = false; mainMenuOpen.toggle() } label: { Image(systemName: "line.3.horizontal") }
@@ -379,11 +381,11 @@ struct NativeMessengerView: View {
 
     private func presenceColor(_ presence: NativeContactPresence) -> Color {
         switch presence {
-        case .online: return .green
-        case .offline: return .red
-        case .away, .extendedAway: return .orange
-        case .busy: return .red
-        case .unknown: return .gray
+        case .online: return NativeWebStyle.online
+        case .offline: return NativeWebStyle.offline
+        case .away, .extendedAway: return NativeWebStyle.warning
+        case .busy: return NativeWebStyle.danger
+        case .unknown: return NativeWebStyle.muted
         }
     }
 

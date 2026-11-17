@@ -11,23 +11,63 @@ enum NativeWebStyle {
                            blue: CGFloat(value & 255) / 255, alpha: 1)
         })
     }
-    static let panel = color(0xffffff, dark: 0x1f2937)
-    static let background = color(0xeef2f7, dark: 0x111827)
-    static let text = color(0x111827, dark: 0xf9fafb)
-    static let muted = color(0x53657c, dark: 0xb6c2d1)
-    static let line = color(0xc9d4e2, dark: 0x4b5563)
-    static let button = color(0xedf4ff, dark: 0x263244)
-    static let buttonBorder = color(0x6aa2ff, dark: 0x6aa2ff)
-    static let buttonText = color(0x174a8b, dark: 0xdbeafe)
-    static let accent = color(0x2563eb, dark: 0x2563eb)
-    static let outgoing = color(0xddf8ea, dark: 0x144f3a)
-    static let incoming = color(0xf5f7fb, dark: 0x273242)
-    static let outgoingLine = color(0x1d8d68, dark: 0x1d8d68)
-    static let incomingLine = color(0x3f536d, dark: 0x64748b)
-    static let callBackground = Color(red: 0.035, green: 0.067, blue: 0.12)
-    static let callLine = Color(red: 0.12, green: 0.32, blue: 0.62)
-    static let enabled = Color(red: 0.086, green: 0.639, blue: 0.29)
-    static let disabled = Color(red: 0.863, green: 0.149, blue: 0.149)
+    static let panel = Color("WebPanel")
+    static let background = Color("WebBackground")
+    static let panelStrong = Color("WebPanelStrong")
+    static let header = Color("WebHeader")
+    static let text = Color("WebText")
+    static let muted = Color("WebMuted")
+    static let line = Color("WebLine")
+    static let input = Color("WebInput")
+    static let button = Color("WebButton")
+    static let buttonBorder = Color("WebButtonBorder")
+    static let buttonText = Color("WebButtonText")
+    static let accent = Color("WebAccent")
+    static let link = Color("WebLink")
+    static let outgoing = Color("WebOutgoing")
+    static let incoming = Color("WebIncoming")
+    static let outgoingLine = Color("WebOutgoingLine")
+    static let incomingLine = Color("WebIncomingLine")
+    static let selection = Color("WebSelection")
+    static let selectionText = Color("WebSelectionText")
+    static let selectionBorder = Color("WebSelectionBorder")
+    static let composer = Color("WebComposer")
+    static let composerButton = Color("WebComposerButton")
+    static let composerButtonText = Color("WebComposerButtonText")
+    static let composerSend = Color("WebComposerSend")
+    static let composerSendText = Color("WebComposerSendText")
+    static let backgroundOverlay = Color("WebBackgroundOverlay")
+    static let totalConversation = Color("WebTotalConversation")
+    static let totalDisabled = Color("WebTotalDisabled")
+    static let totalDisabledText = Color("WebTotalDisabledText")
+    static let callButton = Color("WebCallButton")
+    static let callButtonText = Color("WebCallButtonText")
+    static let callBackground = Color("WebCallBackground")
+    static let callLine = Color("WebCallLine")
+    static let callMenu = Color("WebCallMenu")
+    static let rttBackground = Color("WebRttBackground")
+    static let rttLabel = Color("WebRttLabel")
+    static let rttText = Color("WebRttText")
+    static let rttPlaceholder = Color("WebRttPlaceholder")
+    static let enabled = Color("WebEnabled")
+    static let disabled = Color("WebDisabled")
+    static let enabledLine = Color("WebEnabledLine")
+    static let disabledLine = Color("WebDisabledLine")
+    static let unavailableCall = Color("WebUnavailableCall")
+    static let unavailableCallLine = Color("WebUnavailableCallLine")
+    static let warning = Color("WebWarning")
+    static let danger = Color("WebDanger")
+    static let online = Color("WebOnline")
+    static let offline = Color("WebOffline")
+    static let groupPresence = Color("WebGroupPresence")
+    static let receipt = Color("WebReceipt")
+    static let receiptRead = Color("WebReceiptRead")
+    static let dateBackground = Color("WebDateBackground")
+    static let dateText = Color("WebDateText")
+    static let dateLine = Color("WebDateLine")
+    static let logout = Color("WebLogout")
+    static let logoutText = Color("WebLogoutText")
+    static let logoutLine = Color("WebLogoutLine")
     static func font(_ size: CGFloat = 16, weight: Font.Weight = .regular) -> Font {
         .custom(weight == .bold ? "Arial-BoldMT" : "ArialMT", size: size, relativeTo: .body)
     }
@@ -96,9 +136,25 @@ struct NativeConversationHeader<Actions: View>: View {
         }
         .padding(.horizontal, 12).padding(.vertical, 8)
         .frame(maxWidth: .infinity, minHeight: 60)
-        .background(NativeWebStyle.panel).foregroundStyle(NativeWebStyle.text)
+        .background(NativeWebStyle.header).foregroundStyle(NativeWebStyle.text)
         .overlay(alignment: .bottom) { NativeWebStyle.line.frame(height: 1).allowsHitTesting(false) }
         .accessibilityElement(children: .contain).accessibilityIdentifier(identifier + "-header")
+    }
+}
+
+struct NativeWebTextButtonStyle: ButtonStyle {
+    var prominent = false
+    var positive = false
+    @Environment(\.isEnabled) private var enabled
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label.font(NativeWebStyle.font())
+            .padding(.horizontal, 12).padding(.vertical, 6)
+            .frame(minWidth: 44, minHeight: 44).contentShape(Rectangle())
+            .foregroundStyle(prominent ? Color.white : NativeWebStyle.buttonText)
+            .background(prominent ? (positive ? NativeWebStyle.enabled : NativeWebStyle.accent) : NativeWebStyle.button,
+                        in: RoundedRectangle(cornerRadius: 6))
+            .overlay(RoundedRectangle(cornerRadius: 6).stroke(positive ? NativeWebStyle.enabledLine : NativeWebStyle.buttonBorder, lineWidth: 1))
+            .opacity(enabled ? (configuration.isPressed ? 0.75 : 1) : 0.45)
     }
 }
 
@@ -106,17 +162,24 @@ struct NativeWebIconStyle: ButtonStyle {
     var prominent = false
     var destructive = false
     var round = false
+    var composer = false
+    var callControl = false
+    var logout = false
     @Environment(\.isEnabled) private var enabled
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 22, weight: .regular))
             .frame(minWidth: 44, minHeight: 44)
             .contentShape(Rectangle())
-            .foregroundStyle(destructive ? Color.white : prominent ? Color.white : NativeWebStyle.buttonText)
-            .background(destructive ? NativeWebStyle.disabled : prominent ? NativeWebStyle.accent : NativeWebStyle.button,
+            .foregroundStyle(logout ? NativeWebStyle.logoutText : destructive ? Color.white :
+                composer ? (prominent ? NativeWebStyle.composerSendText : NativeWebStyle.composerButtonText) :
+                prominent ? Color.white : callControl ? NativeWebStyle.callButtonText : NativeWebStyle.buttonText)
+            .background(logout ? NativeWebStyle.logout : destructive ? NativeWebStyle.disabled :
+                composer ? (prominent ? NativeWebStyle.composerSend : NativeWebStyle.composerButton) :
+                prominent ? NativeWebStyle.accent : callControl ? NativeWebStyle.callButton : NativeWebStyle.button,
                         in: RoundedRectangle(cornerRadius: round ? 999 : 6))
             .overlay(RoundedRectangle(cornerRadius: round ? 999 : 6)
-                .strokeBorder(round ? Color.clear : destructive ? NativeWebStyle.disabled : NativeWebStyle.buttonBorder, lineWidth: 1))
+                .strokeBorder(round ? Color.clear : logout ? NativeWebStyle.logoutLine : destructive ? NativeWebStyle.disabledLine : NativeWebStyle.buttonBorder, lineWidth: 1))
             .opacity(enabled ? (configuration.isPressed ? 0.75 : 1) : 0.4)
     }
 }
@@ -130,9 +193,9 @@ struct NativeWebMenuTileStyle: ButtonStyle {
         configuration.label.font(.system(size: 22))
             .frame(maxWidth: .infinity, minHeight: 48)
             .contentShape(Rectangle())
-            .foregroundStyle(destructive ? NativeWebStyle.disabled : selected ? Color.white : NativeWebStyle.buttonText)
-            .background(selected ? NativeWebStyle.accent : NativeWebStyle.button, in: RoundedRectangle(cornerRadius: 6))
-            .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(destructive ? NativeWebStyle.disabled : NativeWebStyle.buttonBorder, lineWidth: 1))
+            .foregroundStyle(destructive ? NativeWebStyle.logoutText : selected ? Color.white : NativeWebStyle.buttonText)
+            .background(destructive ? NativeWebStyle.logout : selected ? NativeWebStyle.accent : NativeWebStyle.button, in: RoundedRectangle(cornerRadius: 6))
+            .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(destructive ? NativeWebStyle.logoutLine : NativeWebStyle.buttonBorder, lineWidth: 1))
             .opacity(enabled ? (configuration.isPressed ? 0.75 : 1) : 0.4)
     }
 }
@@ -156,10 +219,22 @@ struct NativeTotalConversationButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label.frame(minWidth: 44, minHeight: 44)
-            .foregroundStyle(Color.white)
-            .background(Color(red: 0.08, green: 0.33, blue: 0.74), in: RoundedRectangle(cornerRadius: 14))
+            .foregroundStyle(enabled ? Color.white : NativeWebStyle.totalDisabledText)
+            .background(enabled ? NativeWebStyle.totalConversation : NativeWebStyle.totalDisabled, in: RoundedRectangle(cornerRadius: 14))
             .shadow(color: .black.opacity(0.12), radius: 4, y: 2)
-            .opacity(enabled ? (configuration.isPressed ? 0.75 : 1) : 0.4)
+            .opacity(configuration.isPressed ? 0.75 : 1)
+    }
+}
+
+struct NativeWebCallSymbolStyle: ButtonStyle {
+    let color: Color
+    @Environment(\.isEnabled) private var enabled
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label.font(.system(size: 24, weight: .semibold))
+            .foregroundStyle(.white).frame(width: 48, height: 48)
+            .background(enabled ? color : NativeWebStyle.unavailableCall, in: RoundedRectangle(cornerRadius: 6))
+            .overlay(RoundedRectangle(cornerRadius: 6).stroke(enabled ? (color == NativeWebStyle.enabled ? NativeWebStyle.enabledLine : color == NativeWebStyle.disabled ? NativeWebStyle.disabledLine : NativeWebStyle.buttonBorder) : NativeWebStyle.unavailableCallLine, lineWidth: 1))
+            .opacity(configuration.isPressed ? 0.75 : 1)
     }
 }
 
@@ -249,13 +324,42 @@ struct NativeWebForm: ViewModifier {
     func body(content: Content) -> some View {
         content
             .font(NativeWebStyle.font())
+            .buttonStyle(NativeWebTextButtonStyle())
             .foregroundStyle(NativeWebStyle.text)
             .scrollContentBackground(.hidden)
             .background(NativeWebStyle.panel)
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(NativeWebStyle.button, for: .navigationBar)
+            .toolbarBackground(NativeWebStyle.panelStrong, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .tint(NativeWebStyle.accent)
+    }
+}
+
+enum NativeWebDateBreaks {
+    static func starts(in messages: [(UUID, Date)], calendar: Calendar = .current) -> Set<UUID> {
+        var previous: Date?
+        var result = Set<UUID>()
+        for (identifier, date) in messages {
+            if previous.map({ !calendar.isDate($0, inSameDayAs: date) }) ?? true { result.insert(identifier) }
+            previous = date
+        }
+        return result
+    }
+}
+
+struct NativeWebDateSeparator: View {
+    let date: Date
+    var body: some View {
+        Group {
+            if Calendar.current.isDateInToday(date) { Text("Vandaag") }
+            else if Calendar.current.isDateInYesterday(date) { Text("Gisteren") }
+            else { Text(date, format: .dateTime.day().month().year()) }
+        }
+        .font(NativeWebStyle.font(12, weight: .bold)).foregroundStyle(NativeWebStyle.dateText)
+        .padding(.horizontal, 10).padding(.vertical, 4)
+        .background(NativeWebStyle.dateBackground, in: RoundedRectangle(cornerRadius: 8))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(NativeWebStyle.dateLine, lineWidth: 1))
+        .frame(maxWidth: .infinity).padding(.vertical, 8).accessibilityAddTraits(.isHeader)
     }
 }
 
@@ -273,7 +377,15 @@ extension View {
             .font(NativeWebStyle.font())
             .foregroundStyle(NativeWebStyle.text)
             .padding(.horizontal, 8).padding(.vertical, 5)
-            .background(NativeWebStyle.panel, in: RoundedRectangle(cornerRadius: 999))
+            .background(NativeWebStyle.composer, in: RoundedRectangle(cornerRadius: 999))
             .shadow(color: .black.opacity(0.18), radius: 4, y: 2)
+    }
+
+    func nativeWebField() -> some View {
+        self.textFieldStyle(.plain).font(NativeWebStyle.font())
+            .padding(.horizontal, 10).padding(.vertical, 10)
+            .foregroundStyle(NativeWebStyle.text)
+            .background(NativeWebStyle.input, in: RoundedRectangle(cornerRadius: 6))
+            .overlay(RoundedRectangle(cornerRadius: 6).stroke(NativeWebStyle.line, lineWidth: 1).allowsHitTesting(false))
     }
 }

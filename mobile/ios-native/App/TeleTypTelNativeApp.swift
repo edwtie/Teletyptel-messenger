@@ -150,7 +150,7 @@ struct NativeStartupView: View {
                         VStack(alignment: .leading, spacing: 12) {
                             if !loginModel.isConnected {
                                 Button("Aanmelden met Face ID of Touch ID", action: unlockSavedLogin)
-                                    .buttonStyle(.borderedProminent).tint(NativeWebStyle.accent).foregroundStyle(.white)
+                                    .buttonStyle(NativeWebTextButtonStyle(prominent: true))
                                     .disabled(loginModel.isWorking || loginModel.isSecondFactorPending || savedLogin.isWorking)
                                     .accessibilityIdentifier("biometric-login")
                             }
@@ -166,7 +166,7 @@ struct NativeStartupView: View {
                         if let callStatusText = callStatusText {
                             Text(callStatusText)
                                 .font(.footnote)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(NativeWebStyle.muted)
                                 .accessibilityIdentifier("call-status")
                         }
                         if loginModel.isWorking || loginModel.isConnected || loginModel.isSecondFactorPending {
@@ -177,7 +177,7 @@ struct NativeStartupView: View {
                                 rememberLogin = false
                                 loginModel.disconnect()
                             }
-                            .buttonStyle(.bordered)
+                            .buttonStyle(NativeWebTextButtonStyle())
                             .frame(minHeight: 44)
                             .accessibilityIdentifier("disconnect-session")
                         } else if model.state.phase == .checking {
@@ -198,19 +198,19 @@ struct NativeStartupView: View {
                                 .focused($loginFocus, equals: .code)
                                 .textContentType(.oneTimeCode)
                                 .keyboardType(.numberPad)
-                                .textFieldStyle(.roundedBorder)
+                                .nativeWebField()
                                 .accessibilityLabel("Zescijferige verificatiecode")
                                 .accessibilityIdentifier("two-factor-code")
                                 .disabled(!loginModel.isAwaitingSecondFactor)
                             if let error = loginModel.twoFactorError {
-                                Text(error).foregroundStyle(.red).accessibilityIdentifier("two-factor-error")
+                                Text(error).foregroundStyle(NativeWebStyle.danger).accessibilityIdentifier("two-factor-error")
                             }
                             Button("Code bevestigen") {
                                 let code = verificationCode
                                 verificationCode = ""
                                 loginModel.verifySecondFactor(code: code)
                             }
-                            .buttonStyle(.borderedProminent).tint(NativeWebStyle.accent).foregroundStyle(.white)
+                            .buttonStyle(NativeWebTextButtonStyle(prominent: true))
                             .accessibilityIdentifier("two-factor-verify")
                             .disabled(!loginModel.isAwaitingSecondFactor || verificationCode.range(of: #"\A[0-9]{6}\z"#, options: .regularExpression) == nil)
                         }
@@ -224,7 +224,7 @@ struct NativeStartupView: View {
                                 .keyboardType(.emailAddress)
                                 .textInputAutocapitalization(.never)
                                 .autocorrectionDisabled()
-                                .textFieldStyle(.roundedBorder)
+                                .nativeWebField()
                                 .accessibilityLabel("XMPP-account")
                                 .accessibilityIdentifier("login-jid")
                                 .disabled(loginModel.isWorking || loginModel.isConnected)
@@ -232,7 +232,7 @@ struct NativeStartupView: View {
                             SecureField("Wachtwoord", text: $password)
                                 .focused($loginFocus, equals: .password)
                                 .textContentType(.password)
-                                .textFieldStyle(.roundedBorder)
+                                .nativeWebField()
                                 .accessibilityLabel("Wachtwoord")
                                 .accessibilityIdentifier("login-password")
                                 .disabled(loginModel.isWorking || loginModel.isConnected)
@@ -307,7 +307,7 @@ struct NativeStartupView: View {
                 Button(action: retryServerAvailability) {
                     Text("Opnieuw proberen").frame(maxWidth: .infinity, minHeight: 44)
                 }
-                    .buttonStyle(.borderedProminent).tint(NativeWebStyle.accent).foregroundStyle(.white)
+                    .buttonStyle(NativeWebTextButtonStyle(prominent: true))
                     .disabled(startupIsBusy || !hasServerConfiguration)
                     .accessibilityIdentifier("startup-retry")
                 if advancedFailureDetails {
@@ -378,12 +378,12 @@ struct NativeStartupView: View {
             NativeWebStyle.line.frame(height: 1).accessibilityHidden(true)
             VStack(spacing: 10) {
                 Button(action: submitLogin) { Text("Aanmelden").frame(maxWidth: .infinity, minHeight: 44) }
-                    .buttonStyle(.borderedProminent).tint(NativeWebStyle.accent).foregroundStyle(.white)
+                    .buttonStyle(NativeWebTextButtonStyle(prominent: true))
                     .accessibilityIdentifier("login-account")
                     .disabled(!hasServerConfiguration || loginModel.isWorking || loginModel.isConnected || loginModel.isSecondFactorPending || savedLogin.isWorking || jid.isEmpty || password.isEmpty)
                 HStack(spacing: 12) {
                     Button { showRegistration = true } label: { Text("Nieuwe gebruiker").frame(maxWidth: .infinity, minHeight: 40) }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(NativeWebTextButtonStyle())
                         .disabled(!hasServerConfiguration || loginModel.isWorking || loginModel.isSecondFactorPending)
                     Button { openLoginSettings() } label: { Image(systemName: "gearshape") }
                         .buttonStyle(NativeWebIconStyle())
@@ -417,7 +417,7 @@ struct NativeStartupView: View {
                     Text(LocalizedStringKey(settingsStatusText)).accessibilityIdentifier("settings-startup-status")
                     if !providerSDK.configured(.google) || !providerSDK.configured(.facebook) {
                         Text("Google/Facebook vereisen providerinstellingen voor de bundle-ID van deze native build. De bestaande web- en TestFlight-aanmelding blijft ongewijzigd.")
-                            .font(.caption).foregroundStyle(.secondary)
+                            .font(.caption).foregroundStyle(NativeWebStyle.muted)
                     }
                    }
                 }
@@ -650,7 +650,7 @@ struct NativeStartupView: View {
                 .accessibilityAddTraits(.isHeader)
             Text("Kies een contact om te chatten. De status komt van XMPP; onbekend betekent niet offline. Groepsgesprekken volgen later.")
                 .font(.footnote)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(NativeWebStyle.muted)
             switch loginModel.roster {
             case .idle, .loading:
                 ProgressView("Contacten ophalen…")
@@ -674,11 +674,11 @@ struct NativeStartupView: View {
                                     Text(contact.jid).font(.subheadline)
                                     Text(contact.presence.label)
                                         .font(.subheadline)
-                                        .foregroundStyle(.secondary)
+                                        .foregroundStyle(NativeWebStyle.muted)
                                     if !contact.groups.isEmpty {
                                         Text(contact.groups.joined(separator: ", "))
                                             .font(.footnote)
-                                            .foregroundStyle(.secondary)
+                                            .foregroundStyle(NativeWebStyle.muted)
                                     }
                                 }
                             }

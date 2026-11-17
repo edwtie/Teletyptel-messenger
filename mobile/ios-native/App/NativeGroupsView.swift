@@ -21,11 +21,11 @@ struct NativeGroupsView: View {
                     TextField("Jouw schermnaam", text: $nickname).autocorrectionDisabled()
                         .accessibilityIdentifier("group-nickname")
                     Text("Gebruik het volledige adres, zoals groep@conference.jouwdomein. Alleen bestaande groepen op je eigen XMPP-domein worden ondersteund.")
-                        .font(.caption).foregroundStyle(.secondary)
+                        .font(.caption).foregroundStyle(NativeWebStyle.muted)
                     Button { model.join(room: room, nickname: nickname) } label: { Label("Groep openen", systemImage: "person.3.fill") }
                         .disabled(!model.available).accessibilityIdentifier("group-join")
                 }
-                if let error = model.error { Text(error).foregroundStyle(.red).accessibilityIdentifier("group-error") }
+                if let error = model.error { Text(error).foregroundStyle(NativeWebStyle.danger).accessibilityIdentifier("group-error") }
                 NativeInvitationInbox(model: model.invitationModel, nickname: $nickname) { identifier in
                     model.acceptInvitation(identifier, nickname: nickname)
                 }
@@ -36,7 +36,7 @@ struct NativeGroupsView: View {
                             VStack(alignment: .leading, spacing: 4) {
                                 Label(group.room, systemImage: "person.3.fill").lineLimit(2)
                                 Text(group.joining ? "Deelname controleren…" : group.snapshot == nil ? "Niet in de groep" : "Deelgenomen")
-                                    .font(.caption).foregroundStyle(.secondary)
+                                    .font(.caption).foregroundStyle(NativeWebStyle.muted)
                             }
                         }.accessibilityIdentifier("group-room-" + group.room)
                     }
@@ -91,9 +91,9 @@ struct NativeGroupChatView: View {
                 identifier: "group", back: { onClose?(); dismiss() }) { groupActions }
             if let group = group {
                 status(group)
-                if searching { TextField("Zoek in deze groepssessie", text: $search).focused($searchFocused).textFieldStyle(.roundedBorder).frame(minHeight: 44).padding(.horizontal, 16).accessibilityIdentifier("group-search") }
+                if searching { TextField("Zoek in deze groepssessie", text: $search).focused($searchFocused).nativeWebField().frame(minHeight: 44).padding(.horizontal, 16).accessibilityIdentifier("group-search") }
                 messageList(group)
-                if let error = model.error { Text(error).font(.caption).foregroundStyle(.red).padding(4) }
+                if let error = model.error { Text(error).font(.caption).foregroundStyle(NativeWebStyle.danger).padding(4) }
                 composer(group)
             } else {
                 Text(model.error ?? "Deze groep kan nog niet worden geopend. Ga terug en probeer opnieuw.").font(.callout).padding()
@@ -104,6 +104,7 @@ struct NativeGroupChatView: View {
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
         .font(NativeWebStyle.font()).foregroundStyle(NativeWebStyle.text)
+        .background(NativeConversationBackground())
         .sheet(isPresented: $showParticipants) {
             NativeGroupManagementView(groups: model, model: model.management, room: room)
         }
@@ -172,8 +173,11 @@ struct NativeGroupChatView: View {
                         }.padding(.horizontal, 14)
                     }
                     LazyVStack(spacing: 12) {
+                        let visibleMessages = group.messages.filter { !$0.hidden && (search.isEmpty || $0.body.localizedCaseInsensitiveContains(search) || $0.nickname.localizedCaseInsensitiveContains(search)) }
+                        let dayStarts = NativeWebDateBreaks.starts(in: visibleMessages.map { ($0.id, $0.date) })
                         if group.historyLimited { Text("Beperkt cachevenster · haal andere pagina’s op via Online geschiedenis.").font(.caption) }
-                        ForEach(group.messages.filter { !$0.hidden && (search.isEmpty || $0.body.localizedCaseInsensitiveContains(search) || $0.nickname.localizedCaseInsensitiveContains(search)) }) { message in
+                        ForEach(visibleMessages) { message in
+                            if dayStarts.contains(message.id) { NativeWebDateSeparator(date: message.date) }
                             NativeGroupBubble(message: message, translation: translation, session: login?.activeWebSession,
                                 avatars: avatars, ownJID: login?.currentOwner,
                                 canForward: login?.canSend == true,
@@ -205,7 +209,7 @@ struct NativeGroupChatView: View {
             }
             .background {
                 GeometryReader { geometry in
-                    NativeConversationBackground()
+                    Color.clear
                         .task(id: geometry.size) {
                             await Task.yield()
                             guard !Task.isCancelled else { return }
@@ -231,7 +235,7 @@ struct NativeGroupChatView: View {
             TextField("Typ een groepsbericht", text: Binding(get: { self.group?.draft ?? "" }, set: { model.setDraft($0, room: room) }), axis: .vertical)
                 .lineLimit(1...4).accessibilityIdentifier("group-draft")
             Button { model.send(room: room) } label: { Image(systemName: "paperplane").frame(width: 44, height: 44) }
-                .buttonStyle(NativeWebIconStyle(prominent: true, round: true))
+                .buttonStyle(NativeWebIconStyle(prominent: true, round: true, composer: true))
                 .disabled(!model.available || group.snapshot?.canSpeak != true || group.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 .accessibilityLabel("Groepsbericht verzenden").accessibilityIdentifier("group-send")
         }.nativeWebComposer().padding(.horizontal, 10).padding(.vertical, verticalSizeClass == .compact ? 4 : 10)

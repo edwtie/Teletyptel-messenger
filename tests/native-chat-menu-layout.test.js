@@ -68,7 +68,7 @@ test("16.9 references use a symbol-only three-column main grid and a distinct co
   const style = read(app + "NativeWebStyle.swift").split("struct NativeWebMenuTileStyle")[1].split("struct NativeCachedAvatar")[0];
   assert.match(style, /minHeight: 48/);
   assert.match(style, /minHeight: 44/);
-  assert.match(style, /destructive \? NativeWebStyle.disabled/);
+  assert.match(style, /destructive \? NativeWebStyle.logoutText/);
   assert.match(style, /RoundedRectangle\(cornerRadius: 14\)/);
 });
 
@@ -94,9 +94,9 @@ test("Menu simulator scope measures hit targets and overlap for both orientation
     'snapshot("main-menu-symbols")', '"chat-menu-landscape" : "chat-menu-portrait"',
     'TELETYPTEL_NATIVE_LONG_CONTACT_NAME', '.portrait, .landscapeLeft, .portrait']) assert.ok(methods.includes(value), value);
   const workflow = read(".github/workflows/ios-native-preview.yml");
-  assert.match(workflow, /inputs.validation_mode == 'focused-ui' && \(inputs.ui_scope == 'menus' \|\| inputs.ui_scope == 'startup'\)/);
+  assert.match(workflow, /inputs.validation_mode == 'focused-ui' && \(inputs.ui_scope == 'menus' \|\| inputs.ui_scope == 'startup' \|\| inputs.ui_scope == 'appearance'\)/);
   assert.match(workflow, /tests\/native-chat-menu-layout.test.js/);
-  assert.match(read("scripts/check-ios-native-ui.js"), /timeout: timeout \?\? \(\["menus", "startup"\].includes\(scope\) && name.endsWith\("-build"\) \? 1200000 : undefined\)/);
+  assert.match(read("scripts/check-ios-native-ui.js"), /timeout: timeout \?\? \(\["menus", "startup", "appearance"\].includes\(scope\) && name.endsWith\("-build"\) \? 1200000 : undefined\)/);
 });
 
 test("Login actions take layout space instead of covering the password while the keyboard is open", () => {

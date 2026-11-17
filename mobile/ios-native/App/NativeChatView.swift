@@ -39,7 +39,7 @@ struct NativeChatView: View {
                 conversationHeader
                 if !model.isConnected {
                     Text(model.isReconnecting ? "Verbinding herstellen (\(model.reconnectAttempt)/5)… Je tekst blijft bewaard." : "Niet verbonden · tekst blijft in deze sessie bewaard")
-                        .font(.caption).foregroundStyle(.secondary).padding(6)
+                        .font(.caption).foregroundStyle(NativeWebStyle.muted).padding(6)
                         .accessibilityIdentifier("chat-connection")
                 }
                 if model.chat.historyLimited {
@@ -60,7 +60,9 @@ struct NativeChatView: View {
                             if let error = model.chatError { Text(error).font(.caption).padding(6).accessibilityIdentifier("chat-error") }
                             if let error = translation.error { Text(error).font(.caption).padding(6) }
                             LazyVStack(spacing: 12) {
+                                let dayStarts = NativeWebDateBreaks.starts(in: messages.map { ($0.id, $0.date) })
                                 ForEach(messages) { message in
+                                    if dayStarts.contains(message.id) { NativeWebDateSeparator(date: message.date) }
                                     bubble(message).id(message.id).background(GeometryReader { geometry in
                                         Color.clear.preference(key: NativeMessageFramesKey.self, value: [message.id: geometry.frame(in: .named("native-chat-messages"))])
                                     })
@@ -83,7 +85,7 @@ struct NativeChatView: View {
                     .clipped()
                     .background {
                         GeometryReader { geometry in
-                            NativeConversationBackground()
+                            Color.clear
                                 .task(id: geometry.size) {
                                     await Task.yield()
                                     guard !Task.isCancelled else { return }
@@ -112,6 +114,7 @@ struct NativeChatView: View {
             .navigationBarBackButtonHidden(true)
             .toolbar(.hidden, for: .navigationBar)
             .font(NativeWebStyle.font())
+            .background(NativeConversationBackground())
             .foregroundStyle(NativeWebStyle.text)
             .scrollDismissesKeyboard(.interactively)
         .sheet(isPresented: $showTranslation) { NativeTranslationSettingsView(model: translation) }
@@ -168,7 +171,7 @@ struct NativeChatView: View {
             .buttonStyle(NativeTotalConversationButtonStyle()).disabled(!calls.canCall(contact))
             .accessibilityLabel("Totale conversatie starten").accessibilityIdentifier("chat-start-total")
             Button { draftFocused = false; showInterpreterHelp = true } label: { Image(systemName: "person.2.wave.2") }
-                .buttonStyle(NativeWebIconStyle()).accessibilityLabel("Gebarentolk oproepen")
+                .buttonStyle(NativeWebIconStyle(callControl: true)).accessibilityLabel("Gebarentolk oproepen")
                 .accessibilityIdentifier("chat-interpreter")
             Button { draftFocused = false; conversationMenuOpen.toggle() } label: { Image(systemName: "ellipsis").rotationEffect(.degrees(90)) }
                 .buttonStyle(NativeWebIconStyle(prominent: conversationMenuOpen))
@@ -230,7 +233,7 @@ struct NativeChatView: View {
         case .loading:
             ProgressView("Servergeschiedenis ophalen…").font(.caption)
         case .ready:
-            Text("Recent serverarchief · maximaal 50 resultaten per keer").font(.caption).foregroundStyle(.secondary)
+            Text("Recent serverarchief · maximaal 50 resultaten per keer").font(.caption).foregroundStyle(NativeWebStyle.muted)
                 .accessibilityIdentifier("history-ready")
         case .unavailable:
             Text("Serverarchief niet beschikbaar. Berichten uit deze sessie blijven zichtbaar.")
@@ -334,7 +337,7 @@ struct NativeChatView: View {
         HStack(alignment: .bottom, spacing: 8) {
             NativeAttachmentButton(login: model) { link in model.setDraft(draft.isEmpty ? link : draft + "\n" + link, peer: contact.jid) }
             Button { showEmoji.toggle() } label: { Image(systemName: "face.smiling").frame(width: 40, height: 44) }
-                .buttonStyle(NativeWebIconStyle(round: true))
+                .buttonStyle(NativeWebIconStyle(round: true, composer: true))
                 .accessibilityLabel("Emoji")
             TextField("Typ een bericht", text: Binding(get: { draft }, set: { model.setDraft($0, peer: contact.jid) }), axis: .vertical)
                 .focused($draftFocused)
@@ -342,14 +345,14 @@ struct NativeChatView: View {
                 .accessibilityLabel("Bericht").accessibilityIdentifier("chat-draft")
             if draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 Button { startCall(.video) } label: { Image(systemName: "video").frame(width: 40, height: 44) }
-                    .buttonStyle(NativeWebIconStyle(round: true))
+                    .buttonStyle(NativeWebIconStyle(round: true, composer: true))
                     .accessibilityLabel("Videogesprek starten").disabled(!calls.canCall(contact))
                 Button { startCall(.audio) } label: { Image(systemName: "mic").frame(width: 40, height: 44) }
-                    .buttonStyle(NativeWebIconStyle(round: true))
+                    .buttonStyle(NativeWebIconStyle(round: true, composer: true))
                     .accessibilityLabel("Audiogesprek starten").disabled(!calls.canCall(contact))
             } else {
                 Button { model.sendDraft(to: contact.jid) } label: { Image(systemName: "paperplane").frame(width: 44, height: 44) }
-                    .buttonStyle(NativeWebIconStyle(prominent: true, round: true))
+                    .buttonStyle(NativeWebIconStyle(prominent: true, round: true, composer: true))
                     .accessibilityLabel("Bericht verzenden").accessibilityIdentifier("chat-send").disabled(!model.canSend)
             }
         }

@@ -1,5 +1,38 @@
 # TeleTypTel native iOS migration
 
+## Web-led shared visual styles (2026-11-17)
+
+The existing Messenger web styles are the source of truth for the native visual
+palette. `scripts/native-web-palette.js` reads explicit roles from
+`php/public/chat-client.css` and the final `call-controls-menu.css` overrides,
+resolves light/dark variables and transparency, and emits named sRGB colour sets
+into the isolated Xcode asset catalogue during preparation. Missing or unsupported
+role values fail the build instead of silently choosing another colour. The web
+files themselves are not rewritten by this step. This is a scoped role mapping,
+not a general CSS renderer or runtime private-label configuration loader.
+
+Shared native components now use these assets for page/form/header backgrounds,
+normal and primary buttons, fields, selected contacts/groups, composer and send
+buttons, chat bubble fills/borders, read receipts, presence, TC, RTT and call
+controls. Call states stay green/red; disabled call controls retain their existing
+capability gates and get the web's unavailable-state colours. Wallpaper overlays
+also use the web alpha values. Direct/group chats gain web-style day separators,
+without changing messages, archive queries, ordering, consent or network actions.
+
+The focused unsigned `appearance` scope captures real simulator screenshots in
+both themes for login, contacts, main/conversation menus, settings, chat and TC,
+including portrait/landscape. All data is fictitious and no live media, APNs or
+TestFlight upload is enabled. Local source/generator/release checks pass 92 tests,
+with one macOS-only skip; actual simulator comparison is a separate checkpoint.
+Earlier screenshot evidence elsewhere in this document predates this palette.
+
+This shared foundation is not a claim of complete pixel or functional equality.
+iOS keyboard, permission/provider dialogs, pickers and system menus remain native;
+SF Symbols and native form layout still require visual comparison. Unimplemented
+native News/Support and other documented feature gaps are not made functional by
+restyling. Physical-device, provider, SIP and background-call acceptance are outside
+this visual-only change. A new signed build is still needed to update TestFlight.
+
 ## Advanced server settings and unavailable-server screen (2026-11-17)
 
 The subsequent compact-control correction replaces the visible **Geavanceerd**

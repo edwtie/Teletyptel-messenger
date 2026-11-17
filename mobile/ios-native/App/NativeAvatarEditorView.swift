@@ -74,7 +74,7 @@ struct NativeAvatarEditorView: View {
                     }
                 }
                 if model.busy || loading { ProgressView("Foto verwerken…") }
-                if let error = error { Text(error).foregroundStyle(.red) }
+                if let error = error { Text(error).foregroundStyle(NativeWebStyle.danger) }
                 if let notice = model.notice { Text(notice) }
                 if model.profile?.avatarDataUrl.isEmpty == false {
                     Button(role: .destructive) { deleting = true } label: { Label("Profielfoto verwijderen", systemImage: "trash") }.disabled(model.busy || loading)

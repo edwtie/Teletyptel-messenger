@@ -25,7 +25,7 @@ struct NativeDialerView: View {
                     TextField("Gateway-JID inclusief /resource", text: $gateway)
                         .focused($gatewayFocused).onSubmit { gatewayFocused = false }
                         .textInputAutocapitalization(.never).autocorrectionDisabled().keyboardType(.asciiCapable)
-                        .textFieldStyle(.roundedBorder).accessibilityIdentifier("sip-lab-gateway")
+                        .nativeWebField().accessibilityIdentifier("sip-lab-gateway")
                     HStack {
                         Text(number.isEmpty ? "Telefoonnummer" : number).font(.title2).lineLimit(1).minimumScaleFactor(0.6)
                             .accessibilityIdentifier("dialer-number")
@@ -49,7 +49,7 @@ struct NativeDialerView: View {
                         calls.startLabCall(route)
                         dismiss()
                     } label: { Image(systemName: "phone.fill").font(.title2).foregroundStyle(.white).frame(maxWidth: .infinity, minHeight: 52) }
-                        .buttonStyle(.borderedProminent).tint(NativeWebStyle.enabled).accessibilityLabel("Lokale Asterisk-echo met TC bellen")
+                        .buttonStyle(NativeWebTextButtonStyle(prominent: true, positive: true)).accessibilityLabel("Lokale Asterisk-echo met TC bellen")
                         .accessibilityIdentifier("sip-lab-call").disabled(route == nil || !login.canSend || calls.hasLiveCall)
                 }.padding(20).frame(maxWidth: 420).frame(maxWidth: .infinity)
             }

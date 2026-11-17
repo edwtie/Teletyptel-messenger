@@ -124,9 +124,9 @@ test("Native interaction/history/dialer sources stay in the isolated target with
   assert.match(dialing, /NativeDialing\.normalized\(number\) == "600"/);
   assert.match(dialing, /parts\.count == 4, octets\.count == 4/);
   assert.match(dialing, /NativeAuthenticatedAccount\.validJID\(bare, domain: configuration\.domain\)/);
-  assert.match(read("App/NativeDialerView.swift"), /\.tint\(NativeWebStyle\.enabled\)/);
+  assert.match(read("App/NativeDialerView.swift"), /NativeWebTextButtonStyle\(prominent: true, positive: true\)/);
   assert.match(read("App/TeleTypTelNativeApp.swift"), /\.overlay\(RoundedRectangle\(cornerRadius: 8\)\.stroke\(NativeWebStyle\.line, lineWidth: 1\)\.allowsHitTesting\(false\)\)/);
-  assert.equal((read("App/TeleTypTelNativeApp.swift").match(/\.buttonStyle\(\.borderedProminent\)\.tint\(NativeWebStyle\.accent\)\.foregroundStyle\(\.white\)/g) || []).length, 4);
+  assert.equal((read("App/TeleTypTelNativeApp.swift").match(/\.buttonStyle\(NativeWebTextButtonStyle\(prominent: true\)\)/g) || []).length, 4);
 });
 
 function diagnosticDirectory() {
@@ -350,6 +350,9 @@ test("Project generation is isolated, repeatable and refuses overwriting an exis
   assert.equal(path.dirname(directory), path.join(root, "artifacts"));
   assert.equal(fs.readFileSync(path.join(directory, "TeleTypTelNative.xcodeproj/project.pbxproj"), "utf8"), projectText().project);
   assert.ok(fs.existsSync(path.join(directory, "Assets.xcassets/TeleTypTelLogo.imageset/logo.png")));
+  for (const [file, expected] of Object.entries(require("../scripts/native-web-palette").assets(root))) {
+    assert.equal(fs.readFileSync(path.join(directory, file), "utf8"), expected, file);
+  }
   for (const name of ["NativeGoogleSignIn", "NativeFacebookSignIn"]) {
     assert.ok(fs.existsSync(path.join(directory, `Assets.xcassets/${name}.imageset/mark.svg`)));
   }
@@ -715,9 +718,10 @@ test("Native navigation source keeps sidebar visibility explicit and avoids dupl
 test("Native web visual contract shares palette, shell, bubbles and reachable symbol controls", () => {
   const theme = read("App/NativeWebStyle.swift");
   const css = fs.readFileSync(path.join(root, "php/public/chat-client.css"), "utf8");
-  for (const value of ["ffffff", "111827", "53657c", "2563eb", "ddf8ea", "f5f7fb", "1d8d68", "3f536d", "edf4ff", "6aa2ff"]) {
-    assert.ok(theme.includes("0x" + value), value);
-    assert.ok(css.toLowerCase().includes("#" + value), value);
+  const palette = require("../scripts/native-web-palette").assets(root);
+  for (const role of ["Panel", "Text", "Muted", "Accent", "Outgoing", "Incoming", "OutgoingLine", "IncomingLine", "Button", "ButtonBorder"]) {
+    assert.ok(theme.includes(`Color("Web${role}")`), role);
+    assert.ok(palette[`Assets.xcassets/Web${role}.colorset/Contents.json`], role);
   }
   assert.match(theme, /minWidth: 44, minHeight: 44/);
   assert.match(theme, /relativeTo: \.body/);

@@ -14,7 +14,7 @@ struct NativeMessageTicks: View {
                 HStack(spacing: -7) {
                     Image(systemName: "checkmark")
                     if message.delivery != .unconfirmed { Image(systemName: "checkmark") }
-                }.foregroundStyle(message.delivery == .displayed ? NativeWebStyle.accent : NativeWebStyle.muted)
+                }.foregroundStyle(message.delivery == .displayed ? NativeWebStyle.receiptRead : NativeWebStyle.receipt)
             } else { Image(systemName: "exclamationmark.circle") }
         }.accessibilityLabel(message.statusLabel).font(.caption2)
     }

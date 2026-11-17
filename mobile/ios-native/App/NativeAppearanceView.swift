@@ -14,7 +14,8 @@ struct NativeConversationBackground: View {
             let background = NativeChatBackground(rawValue: selection) ?? .automatic
             if let asset = background.asset(wide: geometry.size.width > geometry.size.height) {
                 Image(asset).resizable().scaledToFill().frame(width: geometry.size.width, height: geometry.size.height).clipped()
-            } else { NativeWebStyle.panel }
+                    .overlay(NativeWebStyle.backgroundOverlay)
+            } else { NativeWebStyle.background }
         }.allowsHitTesting(false).accessibilityHidden(true)
     }
 }

@@ -151,6 +151,7 @@ function prepare(name, { providers = null, pushTest = null, archive = null } = {
   }
   if (pushTest) write("App/NativeCallPush.entitlements", callPush.entitlements(pushTest));
   write("Assets.xcassets/Contents.json", JSON.stringify({ info: { author: "xcode", version: 1 } }));
+  for (const [file, content] of Object.entries(require("./native-web-palette").assets(root))) write(file, content);
   if (archive) {
     write("Assets.xcassets/AppIcon.appiconset/icon.png", fs.readFileSync(path.join(root, "ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png")));
     write("Assets.xcassets/AppIcon.appiconset/Contents.json", JSON.stringify({ images: [{ filename: "icon.png", idiom: "universal", platform: "ios", size: "1024x1024" }], info: { author: "xcode", version: 1 } }));

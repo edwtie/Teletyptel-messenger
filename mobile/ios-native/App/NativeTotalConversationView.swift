@@ -115,7 +115,7 @@ struct NativeTotalConversationView: View {
                 .accessibilityLabel("Videobeeld van gesprekspartner")
         } else {
             ZStack {
-                Color(red: 0.02, green: 0.06, blue: 0.12)
+                NativeWebStyle.callBackground
                 VStack(spacing: 12) {
                     Image(systemName: presentation.profile.hasVideo ? "video.slash.fill" : "waveform")
                         .font(.system(size: 42, weight: .semibold))
@@ -140,22 +140,22 @@ struct NativeTotalConversationView: View {
                     .lineLimit(1)
                 Text(controller.holdPending ? "Pauzestatus wordt bevestigd…" : presentation.isHeld ? "Gesprek gepauzeerd · RTT blijft bewaard" : profileName(presentation.profile))
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(NativeWebStyle.muted)
                     .accessibilityIdentifier("call-hold-status")
             }
             Spacer()
             Button { controller.prepareInterpreter(); interpreterOpen = true } label: { Image(systemName: "person.2.wave.2") }
-                .buttonStyle(NativeWebIconStyle()).accessibilityLabel("Gebarentolk oproepen")
+                .buttonStyle(NativeWebIconStyle(callControl: true)).accessibilityLabel("Gebarentolk oproepen")
                 .accessibilityIdentifier("call-interpreter")
             if presentation.profile.contents.contains("rtt") {
                 Image(systemName: presentation.rttReady ? "text.bubble.fill" : "text.bubble")
-                    .foregroundStyle(presentation.rttReady ? .green : .orange)
+                    .foregroundStyle(presentation.rttReady ? NativeWebStyle.online : NativeWebStyle.warning)
                     .accessibilityLabel(presentation.rttReady ? "Realtime tekst verbonden" : "Realtime tekst wordt verbonden")
             }
             Button { controlsOpen.toggle() } label: { Image(systemName: "slider.horizontal.3") }
                 .buttonStyle(NativeWebIconStyle()).accessibilityLabel("Gespreksbediening")
                 .popover(isPresented: $controlsOpen, arrowEdge: .top) {
-                    controls(presentation).padding(12).background(NativeWebStyle.callBackground)
+                    controls(presentation).padding(12).background(NativeWebStyle.callMenu)
                         .modifier(NativeWebCompactPopover())
                 }
             Button(action: controller.endCall) { Image(systemName: "phone.down.fill") }
@@ -189,7 +189,7 @@ struct NativeTotalConversationView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text(controller.peerName ?? "Gesprekspartner")
                 .font(.caption.bold())
-                .foregroundStyle(Color(red: 0.55, green: 0.75, blue: 1))
+                .foregroundStyle(NativeWebStyle.rttLabel)
             if expanded {
                 ScrollViewReader { scroll in
                     rttContent(expanded: true, identifier: "tc-peer-scroll") { remoteRttText(presentation) }
@@ -206,7 +206,7 @@ struct NativeTotalConversationView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text(presentation.remoteText.isEmpty ? "…" : presentation.remoteText)
                 .font(.title3)
-                .foregroundStyle(.white)
+                .foregroundStyle(NativeWebStyle.rttText)
                 .frame(maxWidth: .infinity, minHeight: 44, alignment: .topLeading)
                 .accessibilityLabel("Realtime tekst van gesprekspartner: " +
                                     (presentation.remoteText.isEmpty ? "nog geen tekst" : presentation.remoteText))
@@ -221,19 +221,19 @@ struct NativeTotalConversationView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Ik")
                 .font(.caption.bold())
-                .foregroundStyle(Color(red: 0.55, green: 0.75, blue: 1))
+                .foregroundStyle(NativeWebStyle.rttLabel)
             rttContent(expanded: expanded, identifier: "tc-own-scroll") {
                 VStack(alignment: .leading, spacing: 6) {
                     TextField("Typ realtime tekst", text: Binding(
                         get: { controller.presentation?.ownText ?? "" },
                         set: controller.setRttText
-                    ), prompt: Text("Typ realtime tekst").foregroundColor(Color.white.opacity(0.65)), axis: .vertical)
+                    ), prompt: Text("Typ realtime tekst").foregroundColor(NativeWebStyle.rttPlaceholder), axis: .vertical)
                     .lineLimit(expanded ? nil : 5)
                     .frame(minHeight: 44, alignment: .topLeading)
                     .textFieldStyle(.plain)
                     .font(.title3)
-                    .foregroundStyle(.white)
-                    .tint(.blue)
+                    .foregroundStyle(NativeWebStyle.rttText)
+                    .tint(NativeWebStyle.link)
                     .focused($rttFocused)
                     .disabled(!presentation.rttReady)
                     .accessibilityLabel("Eigen realtime tekst")
@@ -286,16 +286,16 @@ struct NativeTotalConversationView: View {
                 .disabled(!presentation.canSendDtmf)
                 .accessibilityIdentifier("call-dtmf-keypad")
             if presentation.profile.contents.contains("rtt") {
-                callButton(symbol: "keyboard.fill", color: presentation.rttReady ? NativeWebStyle.enabled : .orange,
+                callButton(symbol: "keyboard.fill", color: presentation.rttReady ? NativeWebStyle.enabled : NativeWebStyle.warning,
                            label: "Realtime tekst typen") { rttFocused = true }
                     .disabled(!presentation.rttReady)
             }
         }
         .padding(10)
-        .background(Color(red: 0.02, green: 0.06, blue: 0.12).opacity(0.94),
+        .background(NativeWebStyle.callMenu,
                     in: RoundedRectangle(cornerRadius: 18))
         .overlay(RoundedRectangle(cornerRadius: 18)
-            .stroke(Color(red: 0.12, green: 0.32, blue: 0.62), lineWidth: 1.5))
+            .stroke(NativeWebStyle.callLine, lineWidth: 1.5))
         .frame(maxWidth: .infinity)
     }
 
@@ -315,7 +315,7 @@ struct NativeTotalConversationView: View {
                                 }.frame(maxWidth: .infinity, minHeight: 58)
                             }
                             .disabled(controller.presentation?.canSendDtmf != true)
-                            .buttonStyle(.bordered).accessibilityLabel("Telefoontoets " + tone)
+                            .buttonStyle(NativeWebTextButtonStyle()).accessibilityLabel("Telefoontoets " + tone)
                             .accessibilityIdentifier("call-dtmf-" + tone)
                         }
                     }
@@ -335,12 +335,8 @@ struct NativeTotalConversationView: View {
                             action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: symbol)
-                .font(.system(size: 24, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(width: 48, height: 48)
-                .background(color, in: RoundedRectangle(cornerRadius: 6))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(NativeWebCallSymbolStyle(color: color))
         .accessibilityLabel(label)
     }
 
@@ -391,7 +387,7 @@ private extension View {
         self
             .padding(10)
             .frame(maxWidth: .infinity, maxHeight: expanded ? .infinity : nil, alignment: .topLeading)
-            .background(NativeWebStyle.callBackground.opacity(0.94), in: RoundedRectangle(cornerRadius: 8))
+            .background(NativeWebStyle.rttBackground, in: RoundedRectangle(cornerRadius: 8))
             .overlay(RoundedRectangle(cornerRadius: 8).stroke(NativeWebStyle.callLine, lineWidth: 2))
             .accessibilityElement(children: .contain)
     }

@@ -116,7 +116,7 @@ struct NativeCaptureOptions: View {
             Button { openCamera(video: true) } label: { Label("Videobericht opnemen", systemImage: "video.badge.plus") }
                 .disabled(exclusion.callActive || voice.recording || !UIImagePickerController.isSourceTypeAvailable(.camera))
             if exclusion.callActive { Text("Opnemen is niet beschikbaar tijdens een oproep.").font(.caption) }
-            if let error = error { Text(error).font(.caption).foregroundStyle(.red) }
+            if let error = error { Text(error).font(.caption).foregroundStyle(NativeWebStyle.danger) }
         }
         .fullScreenCover(isPresented: Binding(get: { cameraMode != nil }, set: { if !$0 { cameraMode = nil } })) {
             if let mode = cameraMode {
