@@ -114,6 +114,8 @@ test("Visual simulator scope captures actual forms in both orientations and reta
   for (const selected of testsForScope("visual")) assert.ok(methods.includes("func " + selected + "()"), selected);
   assert.ok(testsForScope("visual").includes("testVisualInventoryCapturesEveryMainMenuSheetInBothOrientations"));
   for (const source of ['"visual-" + screen + "-portrait-" + theme', '"visual-" + screen + "-landscape-" + theme', 'XCTAssertFalse(menuFrame.intersects(metadata.frame))', 'XCTAssertLessThanOrEqual(outgoing.frame.height, 64)', 'name + "-geometry"']) assert.ok(methods.includes(source), source);
+  assert.match(methods, /name\.hasPrefix\("web-palette-conversation-menu-"\)[\s\S]+identifiers = \["chat-header", "conversation-menu-panel"\]/);
+  assert.match(methods, /identifiers = \[\][\s\S]+geometry\["viewport"\] = viewport/);
 });
 
 test("Viewport instrumentation is transparent and DEBUG/environment gated, while diagnostic diffs cannot become acceptance", () => {

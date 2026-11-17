@@ -975,7 +975,20 @@ final class NativeStartupUITests: XCTestCase {
         attachment.lifetime = .keepAlways
         add(attachment)
         let frame = application.frame
-        let identifiers = ["messenger-brand-header", "chat-header", "chat-identity", "chat-draft", "main-menu-grid", "conversation-menu-panel", "smiley-picker", "login-actions"]
+        let identifiers: [String]
+        if name.hasPrefix("web-palette-main-menu-") {
+            identifiers = ["main-menu-grid"]
+        } else if name.hasPrefix("web-palette-conversation-menu-") {
+            identifiers = ["chat-header", "conversation-menu-panel"]
+        } else if name.hasPrefix("web-palette-chat-") {
+            identifiers = ["chat-header", "chat-draft"]
+        } else if name.hasPrefix("web-palette-login-") {
+            identifiers = ["login-actions"]
+        } else if name.hasPrefix("web-smileys-") {
+            identifiers = ["smiley-picker"]
+        } else {
+            identifiers = []
+        }
         let elements = identifiers.compactMap { identifier -> [String: Any]? in
             let element = application.descendants(matching: .any)[identifier].firstMatch
             guard element.exists else { return nil }

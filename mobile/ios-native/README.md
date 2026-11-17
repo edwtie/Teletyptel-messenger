@@ -45,6 +45,12 @@ WebKit teardown is bounded and the partial manifest is saved after each case;
 a renderer teardown failure remains a failure rather than hanging indefinitely.
 The separate `visual-metrics` native scope captures the three presentation suites
 without rerunning unrelated message/group operations or enabling signed uploads.
+Its first attempt also exceeded the UI budget: the form inventory and chat
+presentation finished on iPhone, but the final TC capture did not finish in time
+to export a valid result bundle. These partial logs are not screenshot acceptance.
+Snapshot geometry now queries only identifiers relevant to that visible scenario,
+rather than eight possible controls behind every form/full-screen presentation.
+Every snapshot still measures its app viewport; layout assertions are unchanged.
 
 The broad `visual` attempt compiled both simulator families but exceeded its
 20-minute UI budget before producing a complete result bundle. Its logs also
