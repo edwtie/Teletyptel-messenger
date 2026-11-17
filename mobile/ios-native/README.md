@@ -46,6 +46,18 @@ a renderer teardown failure remains a failure rather than hanging indefinitely.
 The separate `visual-metrics` native scope captures the three presentation suites
 without rerunning unrelated message/group operations or enabling signed uploads.
 
+The broad `visual` attempt compiled both simulator families but exceeded its
+20-minute UI budget before producing a complete result bundle. Its logs also
+identified an iPad progress accessibility frame outside the clipped strip and a
+group-message menu hit-test failure during rotation. Those are not visual passes.
+The progress accessibility frame is now explicitly the strip's measured global
+frame and message-menu labels have full rectangular hit targets. The group
+visibility predicate caches its frame reads rather than repeating costly AX
+queries; its geometric and hittability conditions remain mandatory. The minimum
+44-point assertion allows only a one-millionth-point floating arithmetic error,
+not a smaller visual or touch target. `visual-repair` checks these four focused
+menu/group/progress scenarios separately from the longer form-capture suite.
+
 `compare.js` produces a local HTML gallery and full coverage JSON. Eligible pairs
 require identical fixture hash, content clock, locale, timezone, viewport,
 scale, orientation and theme, with an explicitly measured native app viewport.

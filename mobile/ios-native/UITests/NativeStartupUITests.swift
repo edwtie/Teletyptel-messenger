@@ -362,8 +362,8 @@ final class NativeStartupUITests: XCTestCase {
             assertConversationHeader("chat", actions: ["chat-start-total", "chat-interpreter", "chat-menu"])
             XCTAssertTrue(messageMenu.isHittable)
             let menuFrame = messageMenu.frame
-            XCTAssertGreaterThanOrEqual(menuFrame.width, 44)
-            XCTAssertGreaterThanOrEqual(menuFrame.height, 44)
+            XCTAssertGreaterThanOrEqual(menuFrame.width + 0.000001, 44)
+            XCTAssertGreaterThanOrEqual(menuFrame.height + 0.000001, 44)
             XCTAssertFalse(outgoing.frame.intersects(menuFrame))
             XCTAssertFalse(menuFrame.intersects(metadata.frame))
             XCTAssertLessThanOrEqual(outgoing.frame.height, 64)
@@ -698,10 +698,13 @@ final class NativeStartupUITests: XCTestCase {
         snapshot("group-portrait")
         rotate(.landscapeLeft)
         let viewport = application.scrollViews["group-messages-fixture@conference.localhost"].firstMatch
+        XCTAssertTrue(viewport.waitForExistence(timeout: 5))
         let outgoingMenu = application.buttons["group-message-menu-" + String(outgoing.identifier.dropFirst("group-message-".count))]
         let latestVisible = NSPredicate { _, _ in
-            outgoing.exists && outgoingMenu.isHittable && viewport.exists &&
-                viewport.frame.contains(outgoing.frame) && outgoing.frame.maxY <= draft.frame.minY
+            let messageFrame = outgoing.frame
+            let viewportFrame = viewport.frame
+            let draftFrame = draft.frame
+            return outgoingMenu.isHittable && viewportFrame.contains(messageFrame) && messageFrame.maxY <= draftFrame.minY
         }
         expectation(for: latestVisible, evaluatedWith: outgoing)
         waitForExpectations(timeout: 10)

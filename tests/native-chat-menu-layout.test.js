@@ -79,6 +79,7 @@ test("Message menus sit beside compact web-style bubbles without covering text o
     assert.match(source, /HStack\(alignment: \.top, spacing: 8\)/);
     assert.match(source, /NativeInlineMessage/);
     assert.match(source, /Image\(systemName: "ellipsis"\)\.frame\(width: 44, height: 44\)/);
+    assert.match(source, /frame\(width: 44, height: 44\)\.contentShape\(Rectangle\(\)\)/);
     assert.doesNotMatch(source, /overlay\(alignment: \.topTrailing\)|padding\(\.trailing, 44\)/);
     assert.match(source, /message-metadata-/);
   }
@@ -99,9 +100,9 @@ test("Menu simulator scope measures hit targets and overlap for both orientation
     'snapshot("main-menu-symbols")', '"chat-menu-landscape" : "chat-menu-portrait"',
     'TELETYPTEL_NATIVE_LONG_CONTACT_NAME', '.portrait, .landscapeLeft, .portrait']) assert.ok(methods.includes(value), value);
   const workflow = read(".github/workflows/ios-native-preview.yml");
-  assert.match(workflow, /inputs.validation_mode == 'focused-ui' && \(inputs.ui_scope == 'menus' \|\| inputs.ui_scope == 'startup' \|\| inputs.ui_scope == 'appearance' \|\| inputs.ui_scope == 'smileys' \|\| inputs.ui_scope == 'visual' \|\| inputs.ui_scope == 'visual-metrics'\)/);
+  assert.match(workflow, /inputs.validation_mode == 'focused-ui' && \(inputs.ui_scope == 'menus' \|\| inputs.ui_scope == 'startup' \|\| inputs.ui_scope == 'appearance' \|\| inputs.ui_scope == 'smileys' \|\| inputs.ui_scope == 'visual' \|\| inputs.ui_scope == 'visual-metrics' \|\| inputs.ui_scope == 'visual-repair'\)/);
   assert.match(workflow, /tests\/native-chat-menu-layout.test.js/);
-  assert.match(read("scripts/check-ios-native-ui.js"), /timeout: timeout \?\? \(\["menus", "startup", "appearance", "smileys", "visual", "visual-metrics"\].includes\(scope\) && name.endsWith\("-build"\) \? 1200000 : undefined\)/);
+  assert.match(read("scripts/check-ios-native-ui.js"), /timeout: timeout \?\? \(\["menus", "startup", "appearance", "smileys", "visual", "visual-metrics", "visual-repair"\].includes\(scope\) && name.endsWith\("-build"\) \? 1200000 : undefined\)/);
 });
 
 test("Login actions take layout space instead of covering the password while the keyboard is open", () => {

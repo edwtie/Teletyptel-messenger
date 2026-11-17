@@ -45,7 +45,7 @@ test("Attachment review precedes optional capture rows and main-menu sheets wait
   const style = read("mobile/ios-native/App/NativeWebStyle.swift");
   assert.match(style, /frame\(minWidth: 44, minHeight: 44\)\s+\.contentShape\(Rectangle\(\)\)/);
   assert.match(style, /\.strokeBorder\(round \? Color\.clear/);
-  assert.match(read("mobile/ios-native/UITests/NativeStartupUITests.swift"), /viewport\.frame\.contains\(outgoing\.frame\)/);
+  assert.match(read("mobile/ios-native/UITests/NativeStartupUITests.swift"), /viewportFrame\.contains\(messageFrame\)/);
   const groupSearchTest = read("mobile/ios-native/UITests/NativeStartupUITests.swift")
     .split("func testGroupDiscoveryManagementAndSessionSearch() {")[1].split("\n    func test")[0];
   assert.match(groupSearchTest, /let messages = application\.scrollViews\["group-messages-fixture@conference\.localhost"\]/);

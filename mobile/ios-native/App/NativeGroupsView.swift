@@ -315,7 +315,7 @@ private struct NativeGroupBubble: View {
     }
 
     private var messageMenu: some View {
-        Menu { actions } label: { Image(systemName: "ellipsis").frame(width: 44, height: 44) }
+        Menu { actions } label: { Image(systemName: "ellipsis").frame(width: 44, height: 44).contentShape(Rectangle()) }
             .buttonStyle(.plain).foregroundStyle(NativeWebStyle.muted)
             .accessibilityLabel("Berichtmenu").accessibilityIdentifier("group-message-menu-" + message.id.uuidString)
     }

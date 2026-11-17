@@ -187,11 +187,12 @@ struct NativeStartupProgress: View {
                             .offset(x: CGFloat(phase) * (geometry.size.width + width) - width)
                     }
                 }
-                }
-                .frame(height: 4).clipped().allowsHitTesting(false)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel("Voortgang opstarten").accessibilityValue(Text("Bezig"))
                 .accessibilityIdentifier(identifier)
+                .accessibilityFrame(geometry.frame(in: .global))
+                }
+                .frame(height: 4).clipped().allowsHitTesting(false)
             } else {
                 NativeWebStyle.line.frame(height: 1).frame(height: 4)
                     .allowsHitTesting(false).accessibilityHidden(true)
