@@ -47,7 +47,7 @@ window.nativeVisualFixture = {
   },
   profile() { openAccountDialog({ mode: "profile" }); },
   settings() { openAccountDialog(); },
-  settingsPanel(panel) { openAccountDialog(); setAccountSettingsPanel(panel); },
+  settingsPanel(panel) { openAccountDialog({ mode: panel === "security" ? "profile" : "settings" }); setAccountSettingsPanel(panel); },
   contactProfile() { openContactProfileDialog(activeConversation()); },
   group() {
     selectConversation(state.conversations.find(conversation => conversation.kind === "group"));
