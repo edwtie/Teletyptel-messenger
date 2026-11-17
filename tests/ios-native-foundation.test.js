@@ -353,6 +353,9 @@ test("Project generation is isolated, repeatable and refuses overwriting an exis
   for (const [file, expected] of Object.entries(require("../scripts/native-web-palette").assets(root))) {
     assert.equal(fs.readFileSync(path.join(directory, file), "utf8"), expected, file);
   }
+    for (const [file, expected] of Object.entries(require("../scripts/native-smiley-assets").assets(root))) {
+      assert.ok(fs.readFileSync(path.join(directory, file)).equals(Buffer.isBuffer(expected) ? expected : Buffer.from(expected)), file);
+    }
   for (const name of ["NativeGoogleSignIn", "NativeFacebookSignIn"]) {
     assert.ok(fs.existsSync(path.join(directory, `Assets.xcassets/${name}.imageset/mark.svg`)));
   }

@@ -1,5 +1,34 @@
 # TeleTypTel native iOS migration
 
+## Shared web smileys (2026-11-17)
+
+Feedback archive 9 shows build 16.9's custom web smiley grid, not Apple's Unicode
+emoji keyboard. Native direct/group composers now use the same ordered 41-entry
+catalogue and aliases from `chat-client.js`, in a scrollable image popover. Picking
+an image inserts its original text code into the draft, with whitespace, and does
+not send a message. XMPP bodies, archives, copy/edit/forward and reaction payloads
+remain unchanged; reactions still use their separate Unicode picker.
+
+Original GIF bytes are bundled as data assets and animated in the picker using
+their frame timing; Reduce Motion keeps the first frame. Web SVG fallbacks are
+rasterized at 96 pixels by pinned `@resvg/resvg-js@2.6.2` (see
+https://github.com/thx/resvg-js), not redrawn as system emoji. Their checked-in PNG
+derivatives and source hashes are verified during staging. There is no new runtime
+renderer dependency, webview, external image request or backend change. Regenerate
+SVG derivatives with `node scripts/native-smiley-assets.js --render <module-path>`
+after installing that pinned renderer into a separate ignored tooling directory.
+
+Regular direct/group message display recognizes the same longest-first aliases,
+using the original artwork and retaining raw accessible text. Inline GIFs currently
+use their first frame; only the picker animates. Ordinary Unicode text is retained.
+The local Weergave option “Smileys weergeven” can disable replacement without
+changing stored/transmitted text. TC's raw RTT/media paths are not rewritten.
+
+The focused unsigned `smileys` simulator scope checks real bundled decoding of all
+41 images, opens the picker in portrait/landscape, and verifies picking changes
+only the draft before explicit Send. Simulator results are pending; local checks
+are not simulator or physical-device evidence. No TestFlight upload is requested.
+
 ## Web-led shared visual styles (2026-11-17)
 
 The existing Messenger web styles are the source of truth for the native visual

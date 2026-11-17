@@ -101,14 +101,6 @@ struct NativeChatView: View {
                     }
                     .onAppear { proxy.scrollTo("chat-bottom", anchor: .bottom) }
                 }
-                if showEmoji {
-                    HStack {
-                        ForEach(["🙂", "👍", "❤️", "👋", "🙏", "😂"], id: \.self) { emoji in
-                            Button(emoji) { model.setDraft(draft + emoji, peer: contact.jid) }
-                                .font(.title2).frame(minWidth: 44, minHeight: 44)
-                        }
-                    }
-                }
                 composer.disabled(historyOnly)
             }
             .navigationBarBackButtonHidden(true)
@@ -277,7 +269,7 @@ struct NativeChatView: View {
     private func bubbleContent(_ message: NativeChatMessage) -> some View {
         VStack(alignment: .leading, spacing: 5) {
                 HStack(alignment: .top, spacing: 6) {
-                    Text(message.retracted ? "Bericht ingetrokken" : message.body).accessibilityIdentifier("message-body-" + message.id.uuidString)
+                    NativeSmileyText(value: message.retracted ? "Bericht ingetrokken" : message.body).accessibilityIdentifier("message-body-" + message.id.uuidString)
                     Spacer(minLength: 0)
                     Menu { messageActions(message) } label: { Image(systemName: "ellipsis").frame(width: 44, height: 44) }
                         .buttonStyle(.plain).accessibilityLabel("Berichtmenu").accessibilityIdentifier("message-menu-" + message.id.uuidString)
@@ -336,9 +328,13 @@ struct NativeChatView: View {
     private var composer: some View {
         HStack(alignment: .bottom, spacing: 8) {
             NativeAttachmentButton(login: model) { link in model.setDraft(draft.isEmpty ? link : draft + "\n" + link, peer: contact.jid) }
-            Button { showEmoji.toggle() } label: { Image(systemName: "face.smiling").frame(width: 40, height: 44) }
-                .buttonStyle(NativeWebIconStyle(round: true, composer: true))
-                .accessibilityLabel("Emoji")
+            Button { draftFocused = false; showEmoji.toggle() } label: { Image(systemName: "face.smiling").frame(width: 40, height: 44) }
+                .buttonStyle(NativeWebIconStyle(prominent: showEmoji, round: true, composer: true))
+                .accessibilityLabel("Smiley kiezen").accessibilityIdentifier("chat-smileys")
+                .popover(isPresented: $showEmoji, arrowEdge: .bottom) {
+                    NativeSmileyPicker { code in model.setDraft(NativeSmiley.appending(code, to: draft), peer: contact.jid) }
+                        .padding(8).modifier(NativeWebCompactPopover())
+                }
             TextField("Typ een bericht", text: Binding(get: { draft }, set: { model.setDraft($0, peer: contact.jid) }), axis: .vertical)
                 .focused($draftFocused)
                 .lineLimit(1...5).textFieldStyle(.plain).padding(.vertical, 12)

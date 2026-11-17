@@ -83,6 +83,8 @@ struct NativeGroupChatView: View {
     @State private var deleting: NativeGroupText?
     @State private var browsingOlder = false
     @State private var preservedMessage: UUID?
+    @State private var showSmileys = false
+    @FocusState private var draftFocused: Bool
     private var group: NativeGroupConversation? { model.rooms.first { $0.room == room } }
 
     var body: some View {
@@ -232,8 +234,16 @@ struct NativeGroupChatView: View {
                 let draft = self.group?.draft ?? ""
                 model.setDraft(draft.isEmpty ? link : draft + "\n" + link, room: room)
             }.disabled(group.snapshot?.canSpeak != true) }
+            Button { searchFocused = false; draftFocused = false; showSmileys.toggle() } label: { Image(systemName: "face.smiling").frame(width: 40, height: 44) }
+                .buttonStyle(NativeWebIconStyle(prominent: showSmileys, round: true, composer: true))
+                .accessibilityLabel("Smiley kiezen").accessibilityIdentifier("group-smileys")
+                .disabled(group.snapshot?.canSpeak != true)
+                .popover(isPresented: $showSmileys, arrowEdge: .bottom) {
+                    NativeSmileyPicker { code in model.setDraft(NativeSmiley.appending(code, to: self.group?.draft ?? ""), room: room) }
+                        .padding(8).modifier(NativeWebCompactPopover())
+                }
             TextField("Typ een groepsbericht", text: Binding(get: { self.group?.draft ?? "" }, set: { model.setDraft($0, room: room) }), axis: .vertical)
-                .lineLimit(1...4).accessibilityIdentifier("group-draft")
+                .focused($draftFocused).lineLimit(1...4).accessibilityIdentifier("group-draft")
             Button { model.send(room: room) } label: { Image(systemName: "paperplane").frame(width: 44, height: 44) }
                 .buttonStyle(NativeWebIconStyle(prominent: true, round: true, composer: true))
                 .disabled(!model.available || group.snapshot?.canSpeak != true || group.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
@@ -293,12 +303,12 @@ private struct NativeGroupBubble: View {
             if message.retracted { Text("Bericht ingetrokken") }
             else {
             if let session = session, NativeFileReference.inMessage(message.body, configuration: session.configuration) != nil {
-                Text(message.body)
+                NativeSmileyText(value: message.body)
                 NativeFileMessageButton(bodyText: message.body, session: session)
             } else if let translation = translation {
                 NativeGroupTranslationExtras(model: translation, message: message)
             } else {
-                Text(message.body)
+                NativeSmileyText(value: message.body)
             }
             }
             }
@@ -348,7 +358,7 @@ private struct NativeGroupTranslationExtras: View {
     private var key: String { "group:" + message.room + ":" + message.id.uuidString }
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
-            Text(message.body)
+            NativeSmileyText(value: message.body)
             if model.preferences.mode != "off", model.sharingConsent, let result = model.results[key] { NativeTranslationCaption(result: result) }
         }
         .task(id: "\(model.preferences.mode):\(model.preferences.targetLanguage):\(model.sharingConsent):\(model.ready)") {

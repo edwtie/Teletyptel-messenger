@@ -10,6 +10,9 @@ on:
       - scripts/prepare-ios-native.js
       - scripts/native-login-assets.js
       - scripts/native-web-palette.js
+      - scripts/native-smiley-assets.js
+      - tests/native-smileys.test.js
+      - php/public/smileys/**
       - tests/native-web-palette.test.js
       - php/public/chat-client.css
       - php/public/call-controls-menu.css
@@ -62,7 +65,7 @@ on:
       ui_scope:
         description: Explicit test selection for focused-ui only
         type: choice
-        options: [regression, groups, tc, menus, startup, appearance]
+        options: [regression, groups, tc, menus, startup, appearance, smileys]
         default: regression
 
 permissions:
@@ -70,7 +73,7 @@ permissions:
 
 jobs:
   native-preview:
-    runs-on: ${{ (inputs.validation_mode == 'focused-archive' || (inputs.validation_mode == 'focused-ui' && (inputs.ui_scope == 'menus' || inputs.ui_scope == 'startup' || inputs.ui_scope == 'appearance'))) && 'macos-15-intel' || 'macos-15' }}
+    runs-on: ${{ (inputs.validation_mode == 'focused-archive' || (inputs.validation_mode == 'focused-ui' && (inputs.ui_scope == 'menus' || inputs.ui_scope == 'startup' || inputs.ui_scope == 'appearance' || inputs.ui_scope == 'smileys'))) && 'macos-15-intel' || 'macos-15' }}
     timeout-minutes: 45
     strategy:
       fail-fast: false
@@ -120,7 +123,7 @@ jobs:
         if: github.event_name == 'workflow_dispatch' && inputs.validation_mode != 'full'
         run: node --test tests/ios-native-update.test.js tests/native-g722.test.js
       - name: Check native recovery, capture, privacy and localization contracts
-        run: node --test tests/native-feature-completion.test.js tests/native-login-presentation.test.js tests/native-chat-menu-layout.test.js tests/native-simulator-session.test.js tests/native-web-palette.test.js
+        run: node --test tests/native-feature-completion.test.js tests/native-login-presentation.test.js tests/native-chat-menu-layout.test.js tests/native-simulator-session.test.js tests/native-web-palette.test.js tests/native-smileys.test.js
       - name: Compile native app and test ${{ matrix.family }}
         run: |
           if [ "$TELETYPTEL_NATIVE_VALIDATION_MODE" = "focused-archive" ]; then

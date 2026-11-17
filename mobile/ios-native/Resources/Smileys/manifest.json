@@ -1,0 +1,145 @@
+{
+  "renderer": "@resvg/resvg-js@2.6.2",
+  "entries": {
+    "biggrin": {
+      "source": "biggrin.svg",
+      "sourceSHA256": "129d777e1c0b80b7dc471f7ef78663e4e4d5a8a1fcfc4f1d0648da3de043d086",
+      "pngSHA256": "ed914165d627279d60477b5a67e213fd4816a2403a85fe476c5a50d1d9a1779f"
+    },
+    "clown": {
+      "source": "clown.svg",
+      "sourceSHA256": "238f5759c716d985087a7439dac9ea8c281216d705219e65e3094a8aaf652e7f",
+      "pngSHA256": "d93c20e5ad83bdd0adb57ae8741b48e9afca3177ba1f7f061a4eab501145ac01"
+    },
+    "confused": {
+      "source": "confused.svg",
+      "sourceSHA256": "99d2d761e3808e29f4a1851484b2fa20564dcf612ef338b914e6563f45fa5c41",
+      "pngSHA256": "f76fa7b2be90c349338daf516a12863daeda442e0ae422eaa40900a4f1ba8eee"
+    },
+    "coool": {
+      "source": "coool.svg",
+      "sourceSHA256": "c9e71884b2582db6c9b9def0004fd350924d3b04315cdcae9ae3570704ba991e",
+      "pngSHA256": "4dc1b0eeddee582b034f95f2f012d1ebe89ef342a65419102136ba75cbe4da25"
+    },
+    "cry": {
+      "source": "cry.svg",
+      "sourceSHA256": "61f68289cb13fc2d070c71f9050b03b39124ca0da0cbbca2faef9df1a3e6bb17",
+      "pngSHA256": "081abb58ed667bb56e6e102fb81497a588dd8fb0b923e41ef984b64228547048"
+    },
+    "devil": {
+      "source": "devil.svg",
+      "sourceSHA256": "b07afe784ecffe5ed940dac667a0646c9c5579bd47d50ae5deb6fa2f83893510",
+      "pngSHA256": "b9b6b48571b3fc766785c102b53abe3ffda86db51d7b1aa02af8119502bc5899"
+    },
+    "devilish": {
+      "source": "devilish.svg",
+      "sourceSHA256": "2727cc1c250966f7eedd8e2698b7108ea7cdb18a1556a372df3040441b7d6fe3",
+      "pngSHA256": "e6cb53da14aceae001e71feaedcf727a3a32ce66603bf72a7ff285487748362d"
+    },
+    "frown": {
+      "source": "frown.svg",
+      "sourceSHA256": "f45bdf6a95413f6991ea4a52a3de29921d9b2e8a604e7eff75b2111e3203e2f2",
+      "pngSHA256": "fe5c36fdf6a582418dd3fffce4530816cee56080c9a6537ba5d52904111d12d2"
+    },
+    "heart": {
+      "source": "heart.svg",
+      "sourceSHA256": "bbbbd08cd63204cef23486441b69bd76012e8d4fe50fba0d689282094ca2f98e",
+      "pngSHA256": "d640c25399e7071137589e2a602dae58a0695ad8e7ce22121a5f3f9909a4ce7f"
+    },
+    "kwijl": {
+      "source": "kwijl.svg",
+      "sourceSHA256": "9280e7188254019b461b7869fbc148f8029c7eb2e50d57f2383d8b9d1b4eb601",
+      "pngSHA256": "8472eb3c5193b12f32ea48162f8022ce37052551eb3a10c44c9d76e97ee8ae26"
+    },
+    "loveit": {
+      "source": "loveit.svg",
+      "sourceSHA256": "ecb3989599c0f5f350e4e1eb25009d086185c3934a9b3b3e0571be631486772d",
+      "pngSHA256": "96d91651401dae22160f54b2e725f4c7740d87cd46048499a98322685b64f0d8"
+    },
+    "marrysmile": {
+      "source": "marrysmile.svg",
+      "sourceSHA256": "498892f15b6b740274ec61ac78917fdd7d9bca2ac29a9f42f9db17bce7373304",
+      "pngSHA256": "2f6955135fe7afba9a9d16cdf37a640e1255634c2fd759a639b7e0f3f58598be"
+    },
+    "michel": {
+      "source": "michel.svg",
+      "sourceSHA256": "bdf9f35d65123322ef48e68641559949241765cefe5f3a482b4ecde1f1d8ef24",
+      "pngSHA256": "2a7c2235eebe6b6842721b219c743f3b39ccf26652c1647b7b22ad3f31571899"
+    },
+    "nerd": {
+      "source": "nerd.svg",
+      "sourceSHA256": "f5ae3f4014b52f161a8a91ab7ef0d170533e864b702419de24f433e8d2a46dd3",
+      "pngSHA256": "3df4b83e5c8ea080edc086ac44ce7412ed38389639c44931584d2db03b9d7a4e"
+    },
+    "nosmile2": {
+      "source": "nosmile2.svg",
+      "sourceSHA256": "156565f20a5bdccfc7304899ff6e3d83125f6df7661f5a696f934f9f61207129",
+      "pngSHA256": "269b6ada848dc65310c84378515b175fd7b483e7d3200d6ffa36010941fe9328"
+    },
+    "puh": {
+      "source": "puh.svg",
+      "sourceSHA256": "010fb0fd0e3ba2499eb1ad3cf41eec9ec9bb9bd3f2f2eba22c20d28dd3df13e3",
+      "pngSHA256": "d87e19125f7a6abe3ce12d2621e0b0f4752dc2a60342d261969f0aa853828325"
+    },
+    "puh2": {
+      "source": "puh2.svg",
+      "sourceSHA256": "2cec8551eabae761972befab1ff5938f0c1dd60f5f48fb047944c8337c4694e3",
+      "pngSHA256": "73d4390f2b7b3747787653df46343410fee4c585fe549cc898ba73fc263c0b03"
+    },
+    "rc5": {
+      "source": "rc5.svg",
+      "sourceSHA256": "e7166bd9fa9345eb30294943dcf72c0cddd783d36168e4a3166a8e24be954e51",
+      "pngSHA256": "3f418db1cd6632c358a7f9067258941db572179bc9d8558d404442b56a326056"
+    },
+    "redface": {
+      "source": "redface.svg",
+      "sourceSHA256": "01f1eff85035d436278826bbddc987063cf48fe09676f4e3bccb1f267ab872ea",
+      "pngSHA256": "ec37417557bc97795d8827a758774537aee3dcf12de58de75a15bded1292dcbe"
+    },
+    "sadley": {
+      "source": "sadley.svg",
+      "sourceSHA256": "93d07aec44ad3138874b6c230aeb857e2f4bcfb1d5eb2be4a5f98aac0a043ff8",
+      "pngSHA256": "a9dfbead5c4bc71141302297ef3473080161c15c10ad1762953bef436bab7140"
+    },
+    "shiny": {
+      "source": "shiny.svg",
+      "sourceSHA256": "cd068b8bd05d291d91f93ce2bd1021cc2e38799b698ccb27339902ee5699aba1",
+      "pngSHA256": "6f7bb5e7b4241322905f8ea5356806754355cf9f0b8a01fec9ab4f3691549d5f"
+    },
+    "sintsmiley": {
+      "source": "sintsmiley.svg",
+      "sourceSHA256": "e9ae75c7117c1990e612e2ae05e39fff79e2d8b80aed729a63b093d4cadf433c",
+      "pngSHA256": "f22a41713de31f383bd15ba4b042c02e60adb148a9585815375048973b56c909"
+    },
+    "smile": {
+      "source": "smile.svg",
+      "sourceSHA256": "56984c01bd0f54798332c284853ae16a366b8d15402c6f5714ea2df093f67942",
+      "pngSHA256": "506909cfd1cb0ceeb5a1778be6a1fb799e099a3310f0c74a4cd16c168383594d"
+    },
+    "thumbsup": {
+      "source": "thumbsup.svg",
+      "sourceSHA256": "4d0d6ab44ec319f68aea14ab1acfd9f94a9aab44bc7b027f8f65c4b0e7c6da0d",
+      "pngSHA256": "87d28833d8872c42ee98a980041fbbe92a98fb144ec63461a6a28add697192b6"
+    },
+    "vork": {
+      "source": "vork.svg",
+      "sourceSHA256": "6e650f024aead5d102a27e4def05d193de740b5838293e891799dbcd2a33737d",
+      "pngSHA256": "2857abdb643f6e8276dd2e3da0393821fae12d11888fd2b2c77b3631935f38e7"
+    },
+    "wink": {
+      "source": "wink.svg",
+      "sourceSHA256": "68370d050162a51d3f355a5949f80525a921a7c25930a93601a3a6a608980685",
+      "pngSHA256": "e140a5a5e2984aa6d1aa1a82005fd38db52146b6d57f2bf958bf665acb4d27ca"
+    },
+    "worshippy": {
+      "source": "worshippy.svg",
+      "sourceSHA256": "6351f72b3b63d6cf2ed74513ede09e074e442990c15b84db78c5c62c855f7988",
+      "pngSHA256": "caefb6cd76f08f5f7466faeb485d379eddc81003942dc5a10ebdb91b5021870d"
+    },
+    "yummie": {
+      "source": "yummie.svg",
+      "sourceSHA256": "3fb2abe82df93838e464d229a0e065f92bbe3799e97fd3e45f1ffbc14d1c8c7c",
+      "pngSHA256": "edef04b5102ea6e44954caa624b12f2877fa5c29d2405a6b7c2bfd7770e7d844"
+    }
+  }
+}

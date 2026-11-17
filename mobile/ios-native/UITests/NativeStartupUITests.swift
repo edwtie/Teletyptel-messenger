@@ -391,6 +391,35 @@ final class NativeStartupUITests: XCTestCase {
         snapshot("chat-header-separated")
     }
 
+    func testWebSmileyPickerUsesSharedImagesAndOnlyChangesDraft() {
+        signInFixture("connected")
+        let contact = application.descendants(matching: .any)["contact-demo-contact@localhost"].firstMatch
+        XCTAssertTrue(contact.waitForExistence(timeout: 10)); reveal(contact); tapContact(contact)
+        let draft = application.descendants(matching: .any)["chat-draft"].firstMatch
+        XCTAssertTrue(draft.waitForExistence(timeout: 5))
+        let count = application.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "message-body-")).count
+        application.buttons["chat-smileys"].tap()
+        let picker = application.descendants(matching: .any)["smiley-picker"].firstMatch
+        XCTAssertTrue(picker.waitForExistence(timeout: 5))
+        XCTAssertEqual(picker.value as? String, "41 smileys beschikbaar")
+        XCTAssertFalse(application.keyboards.firstMatch.exists)
+        snapshot("web-smileys-portrait")
+        application.buttons["smiley-option-biggrin"].tap()
+        application.buttons["smiley-option-bonk"].tap()
+        XCTAssertEqual(application.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "message-body-")).count, count)
+        rotate(.landscapeLeft)
+        XCTAssertTrue(application.buttons["smiley-option-biggrin"].isHittable)
+        snapshot("web-smileys-landscape")
+        rotate(.portrait)
+        application.buttons["chat-smileys"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        XCTAssertTrue(draft.waitForExistence(timeout: 5))
+        XCTAssertTrue((draft.value as? String)?.contains(":D") == true)
+        XCTAssertTrue((draft.value as? String)?.contains("8)7") == true)
+        snapshot("web-smileys-draft-only")
+        application.buttons["chat-send"].tap()
+        snapshot("web-smileys-inline")
+    }
+
     func testWebPaletteLoginChatAndMenusInBothThemes() {
         let arguments = application.launchArguments
         for theme in ["light", "dark"] {

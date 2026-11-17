@@ -24,6 +24,7 @@ struct NativeAppearanceView: View {
     @AppStorage("teletyptel.native.interfaceLanguage") private var language = "system"
     @AppStorage("teletyptel.native.theme") private var theme = NativeInterfaceTheme.automatic.rawValue
     @AppStorage("teletyptel.native.background") private var background = NativeChatBackground.automatic.rawValue
+    @AppStorage("teletyptel.native.showSmileys") private var showSmileys = true
     @Environment(\.dismiss) private var dismiss
     var body: some View {
         NavigationStack {
@@ -41,6 +42,7 @@ struct NativeAppearanceView: View {
                     Picker("Chatachtergrond", selection: $background) {
                         ForEach(NativeChatBackground.allCases, id: \.rawValue) { Text(LocalizedStringKey($0.title)).tag($0.rawValue) }
                     }
+                    Toggle("Smileys weergeven", isOn: $showSmileys).accessibilityIdentifier("render-smileys")
                     Text("Deze voorkeuren worden alleen op dit apparaat bewaard. Ze veranderen geen account-, privacy- of vertaalinstellingen.").font(.caption)
                 }
                 Section("Voorbeeld") {
