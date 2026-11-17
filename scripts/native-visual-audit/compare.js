@@ -158,7 +158,7 @@ function audit({ webDirectory, nativeDirectory, output, pngModule, diagnostic = 
     }
     entries.push(entry);
   }
-  const report = { schema: 1, webRevision: web.revision, nativeRevision: native.revision, exclusions, coverage: completeness(entries) };
+  const report = { schema: 1, webRevision: web.sourceMode === "working-tree" ? "Uncommitted local web files on base " + web.revision : web.revision, webSourceMode: web.sourceMode || "committed", webSourceFiles: web.files, nativeRevision: native.revision, exclusions, coverage: completeness(entries) };
   fs.writeFileSync(path.join(output, "report.json"), JSON.stringify(report, null, 2));
   fs.writeFileSync(path.join(output, "index.html"), renderReport(report, output));
   return report;

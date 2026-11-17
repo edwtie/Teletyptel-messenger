@@ -67,13 +67,20 @@ const visibleState = {
   "call-keypad": "#callKeypadDialog[open]", "incoming-call": "#incomingCallDialog:not([hidden])"
 };
 
-function trackedReader(revision) {
+function trackedReader(revision, sourceMode = "committed") {
+  if (!["committed", "working-tree"].includes(sourceMode)) throw new Error("Choose an explicit committed or working-tree web source");
   const files = new Map();
   const known = new Set(execFileSync("git", ["ls-tree", "-r", "--name-only", revision, "php/public"], { cwd: root, encoding: "utf8" }).trim().split(/\r?\n/));
+  if (sourceMode === "working-tree") for (const file of ["php/public/private-label.css", "php/public/private-label.js"]) known.add(file);
   return {
     read(file) {
       if (!known.has(file)) return null;
-      if (!files.has(file)) files.set(file, execFileSync("git", ["show", revision + ":" + file], { cwd: root, maxBuffer: 24 * 1024 * 1024 }));
+      if (!files.has(file)) {
+        if (sourceMode === "working-tree") {
+          if (!fs.existsSync(path.join(root, file))) return null;
+          files.set(file, fs.readFileSync(path.join(root, file)));
+        } else files.set(file, execFileSync("git", ["show", revision + ":" + file], { cwd: root, maxBuffer: 24 * 1024 * 1024 }));
+      }
       return files.get(file);
     },
     manifest() { return [...files].map(([file, bytes]) => ({ file, sha256: crypto.createHash("sha256").update(bytes).digest("hex") })); }
@@ -84,18 +91,18 @@ function mime(file) {
   return ({ ".html": "text/html", ".js": "application/javascript", ".css": "text/css", ".png": "image/png", ".gif": "image/gif", ".svg": "image/svg+xml", ".json": "application/json", ".lng": "text/plain" })[path.extname(file)] || "application/octet-stream";
 }
 
-async function capture({ output, revision = "HEAD", browserName = "webkit", selectedScreens = Object.keys(scenarios), selectedVariants = variants } = {}) {
+async function capture({ output, revision = "HEAD", sourceMode = "committed", browserName = "webkit", selectedScreens = Object.keys(scenarios), selectedVariants = variants } = {}) {
   if (!output || fs.existsSync(output)) throw new Error("Choose a new output directory; existing evidence is never overwritten");
   if (!selectedScreens.length || selectedScreens.some(screen => !Object.hasOwn(scenarios, screen)) || new Set(selectedScreens).size !== selectedScreens.length || !selectedVariants.length) throw new Error("Select explicit known visual scenarios and viewports");
   const playwright = require("playwright");
   if (!["webkit", "chromium"].includes(browserName)) throw new Error("Unsupported renderer");
-  const source = trackedReader(revision);
+  const source = trackedReader(revision, sourceMode);
   const sha = execFileSync("git", ["rev-parse", revision], { cwd: root, encoding: "utf8" }).trim();
   const bootstrap = fs.readFileSync(path.join(root, "scripts/ios-simulator/fixture-bootstrap.js"), "utf8");
   const hook = fs.readFileSync(path.join(__dirname, "web-hook.js"), "utf8");
   fs.mkdirSync(output, { recursive: true });
   const hash = content => crypto.createHash("sha256").update(content).digest("hex");
-  const result = { captureSchema: 2, revision: sha, source: "committed actual chat.html/CSS/JS, API and XMPP mocked; no replacement UI", renderer: browserName, epoch, locale: "nl-NL", timezone: "Europe/Amsterdam", fixtureSources: { hook: hash(hook), bootstrap: hash(bootstrap) }, captures: [], blocked: [], caveat: "Desktop WebKit/Chromium at CSS viewport size, not physical iOS Safari. This alone is not a native pixel-equality result." };
+  const result = { captureSchema: 2, revision: sha, sourceMode, source: sourceMode + " actual chat.html/CSS/JS, API and XMPP mocked; no replacement UI", renderer: browserName, epoch, locale: "nl-NL", timezone: "Europe/Amsterdam", fixtureSources: { hook: hash(hook), bootstrap: hash(bootstrap) }, captures: [], blocked: [], caveat: "Desktop WebKit/Chromium at CSS viewport size, not physical iOS Safari. This alone is not a native pixel-equality result." };
   const browser = await playwright[browserName].launch({ headless: true });
   console.log("Visual renderer ready: " + browserName);
   try {
@@ -194,7 +201,7 @@ if (require.main === module) {
   const output = path.resolve(process.argv[2] || path.join(root, "artifacts/native-visual-web-" + Date.now()));
   const selectedScreens = process.env.VISUAL_SCREENS?.split(",");
   const selectedVariants = process.env.VISUAL_FIRST_VARIANT === "1" ? variants.slice(0, 1) : undefined;
-  capture({ output, selectedScreens, selectedVariants, browserName: process.env.VISUAL_BROWSER || "webkit" }).then(result => {
+  capture({ output, selectedScreens, selectedVariants, sourceMode: process.env.VISUAL_SOURCE || "committed", browserName: process.env.VISUAL_BROWSER || "webkit" }).then(result => {
     console.log(JSON.stringify({ output, captured: result.captures.filter(entry => entry.file).length, failed: result.captures.filter(entry => !entry.file).map(entry => ({ id: entry.id, error: entry.error })) }));
     process.exit(result.captures.some(entry => entry.status === "capture-failed") ? 1 : 0);
   }).catch(error => { console.error(error.message); process.exit(1); });

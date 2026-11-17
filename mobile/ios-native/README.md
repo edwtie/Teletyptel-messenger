@@ -86,6 +86,16 @@ node scripts/native-visual-audit/compare.js artifacts/visual-web-new artifacts/v
 node --test tests/native-visual-audit.test.js
 ```
 
+The CI reference uses committed source only. The local worktree currently also
+has unpublished dialer/branding changes; it must not be represented as that same
+commit. To review those actual local files without publishing them, explicitly
+set `VISUAL_SOURCE=working-tree` when running `capture-web.js`. This mode reads
+only known public frontend files plus the two named branding assets, retains
+their exact hashes and marks the report as uncommitted local source. It still
+blocks backend/provider connections and does not read private configuration or
+the PostNL demo. `VISUAL_BROWSER=chromium` identifies a desktop Chrome reference,
+not an iOS WebKit or physical-device result.
+
 XCTest exports supplied to the importer use family-prefixed `iphone-manifest.json`,
 `ipad-manifest.json` and family-prefixed original exported PNG basenames. Do not
 mix revisions or infer fixture metadata from screenshots. The initial visual

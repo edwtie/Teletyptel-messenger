@@ -6,6 +6,7 @@ const path = require("node:path");
 const { comparePixels, cropPixels, orientPixels, pairIssues, completeness, renderReport } = require("../scripts/native-visual-audit/compare");
 const { screens, variants, caseID } = require("../scripts/native-visual-audit/catalogue");
 const { scenarioForName, pngSize } = require("../scripts/native-visual-audit/import-native");
+const { trackedReader } = require("../scripts/native-visual-audit/capture-web");
 const root = path.resolve(__dirname, "..");
 
 test("Visual inventory includes all declared screens and every device/orientation/theme; missing cases cannot pass", () => {
@@ -106,6 +107,18 @@ test("Web fixture renders frozen real web source, never mockup HTML, with extern
   assert.match(hook, /updateCallUi\(\)/);
   assert.match(runner, /Requested popover contains no visible controls/);
   assert.match(runner, /stateVerified: true/);
+});
+
+test("Unpublished web files require an explicit local source mode and cannot silently replace the committed reference", () => {
+  const committed = trackedReader("HEAD");
+  assert.equal(committed.read("php/config.php"), null);
+  assert.equal(committed.read("scripts/ios-testflight/facebook.local.json"), null);
+  assert.throws(() => trackedReader("HEAD", "automatic"), /explicit/);
+  const working = trackedReader("HEAD", "working-tree");
+  assert.deepEqual(working.read("php/public/chat.html"), fs.readFileSync(path.join(root, "php/public/chat.html")));
+  assert.equal(working.read("php/config.php"), null);
+  assert.equal(working.read("php/public/postnl-demo.js"), null);
+  assert.ok(working.manifest().every(entry => /^[a-f0-9]{64}$/.test(entry.sha256)));
 });
 
 test("Visual simulator scope captures actual forms in both orientations and retains strict no-overlap and compactness checks", () => {
