@@ -95,7 +95,7 @@ async function capture({ output, revision = "HEAD", browserName = "webkit", sele
   const hook = fs.readFileSync(path.join(__dirname, "web-hook.js"), "utf8");
   fs.mkdirSync(output, { recursive: true });
   const hash = content => crypto.createHash("sha256").update(content).digest("hex");
-  const result = { revision: sha, source: "committed actual chat.html/CSS/JS, API and XMPP mocked; no replacement UI", renderer: browserName, epoch, locale: "nl-NL", timezone: "Europe/Amsterdam", fixtureSources: { hook: hash(hook), bootstrap: hash(bootstrap) }, captures: [], blocked: [], caveat: "Desktop WebKit/Chromium at CSS viewport size, not physical iOS Safari. This alone is not a native pixel-equality result." };
+  const result = { captureSchema: 2, revision: sha, source: "committed actual chat.html/CSS/JS, API and XMPP mocked; no replacement UI", renderer: browserName, epoch, locale: "nl-NL", timezone: "Europe/Amsterdam", fixtureSources: { hook: hash(hook), bootstrap: hash(bootstrap) }, captures: [], blocked: [], caveat: "Desktop WebKit/Chromium at CSS viewport size, not physical iOS Safari. This alone is not a native pixel-equality result." };
   const browser = await playwright[browserName].launch({ headless: true });
   console.log("Visual renderer ready: " + browserName);
   try {
@@ -138,20 +138,27 @@ async function capture({ output, revision = "HEAD", browserName = "webkit", sele
           console.log("Hook ready " + identifier);
           await page.evaluate(theme => nativeVisualFixture.setup(theme), variant.theme);
           console.log("Fixture ready " + identifier);
+          await page.waitForTimeout(100);
+          await page.evaluate(() => { document.activeElement?.blur(); });
           const presentation = await scenarios[screen.id](page);
           await page.waitForTimeout(80);
-          await page.evaluate(() => { document.activeElement?.blur(); });
+          if (["login", "login-settings", "account", "profile-edit", "appearance", "translation", "account-security"].includes(screen.id)) await page.evaluate(() => { document.activeElement?.blur(); });
           await page.waitForTimeout(180);
           await page.evaluate(async () => { await document.fonts.ready; await Promise.race([Promise.all([...document.images].map(image => image.decode().catch(() => {}))), new Promise(resolve => setTimeout(resolve, 1000))]); });
           if (errors.length) throw new Error(errors.join("; "));
           if (screen.id !== "login" && await page.locator("dialog.xmpp-availability[open]").count()) throw new Error("Startup overlay still covers the requested screen");
           if (visibleState[screen.id] && !await page.locator(visibleState[screen.id]).first().isVisible()) throw new Error("The requested real screen did not become visible: " + screen.id);
+          if (presentation === "popover") {
+            const panel = ({ "main-menu": "#mobileActionsPanel", "conversation-menu": "#chatMorePanel", "call-controls": "#callControlsMenu" })[screen.id];
+            if (!panel || !await page.locator(panel).isVisible()) throw new Error("Requested popover closed before capture: " + screen.id);
+            if (!await page.locator(panel + " button:visible").count()) throw new Error("Requested popover contains no visible controls: " + screen.id);
+          }
           const geometry = await page.evaluate(() => nativeVisualFixture.captureGeometry());
           const file = identifier + ".png";
           await page.screenshot({ path: path.join(output, file), animations: "disabled", caret: "hide" });
           const visibleImages = await page.evaluate(() => [...document.images].filter(image => image.getClientRects().length && image.getAttribute("src")).map(image => ({ source: image.getAttribute("src"), complete: image.complete && image.naturalWidth > 0 })));
           if (visibleImages.some(image => !image.complete)) throw new Error("Visible image did not decode");
-          result.captures.push({ id: identifier, screen: screen.id, ...variant, file, geometry, visibleImages, presentation: presentation || "default", errors, status: "web-captured-only" });
+          result.captures.push({ id: identifier, screen: screen.id, ...variant, file, geometry, visibleImages, stateVerified: true, presentation: presentation || "default", errors, status: "web-captured-only" });
           console.log("Captured " + identifier);
         } catch (error) {
           await page.screenshot({ path: path.join(output, identifier + "-failed.png"), animations: "disabled" }).catch(() => {});
@@ -173,6 +180,7 @@ async function capture({ output, revision = "HEAD", browserName = "webkit", sele
     }
   } finally {
     try { await bounded(browser.close(), 10000, "WebKit did not close"); }
+    catch (error) { result.teardownFailure = error.message; throw error; }
     finally {
       result.blocked = [...new Set(result.blocked)];
       result.files = source.manifest();

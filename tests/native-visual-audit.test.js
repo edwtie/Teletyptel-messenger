@@ -65,10 +65,11 @@ test("XCTest landscape PNG orientation is read from EXIF and rotated losslessly,
 });
 
 test("Unmatched fixture, language, theme, time, scale and viewport are blocked rather than misrepresented as comparisons", () => {
-  const reference = { screen: "chat", family: "iPhone", orientation: "portrait", theme: "light", width: 402, height: 778, scale: 3, locale: "nl-NL", timezone: "Europe/Amsterdam", epoch: "2026-11-17T11:00:00.000Z", fixtureHash: "a".repeat(64) };
+  const reference = { screen: "chat", family: "iPhone", orientation: "portrait", theme: "light", width: 402, height: 778, scale: 3, locale: "nl-NL", timezone: "Europe/Amsterdam", epoch: "2026-11-17T11:00:00.000Z", fixtureHash: "a".repeat(64), stateVerified: true };
   const actual = { ...reference, viewport: { source: "measured-safe-area", x: 0, y: 186, width: 1206, height: 2334 } };
   assert.deepEqual(pairIssues(reference, actual), []);
-  for (const key of Object.keys(reference)) assert.ok(pairIssues(reference, { ...actual, [key]: undefined }).some(issue => issue.includes(key)));
+  for (const key of Object.keys(reference).filter(key => key !== "stateVerified")) assert.ok(pairIssues(reference, { ...actual, [key]: undefined }).some(issue => issue.includes(key)));
+  assert.ok(pairIssues({ ...reference, stateVerified: false }, actual).some(issue => issue.includes("web screen state")));
   assert.ok(pairIssues(reference, { ...actual, viewport: undefined }).some(issue => issue.includes("viewport")));
   assert.ok(pairIssues(reference, { ...actual, viewport: { ...actual.viewport, width: 100 } }).some(issue => issue.includes("entire declared app area")));
   assert.ok(pairIssues(reference, { ...actual, errors: ["broken image"] }).some(issue => issue.includes("runtime")));
@@ -102,6 +103,9 @@ test("Web fixture renders frozen real web source, never mockup HTML, with extern
   assert.doesNotMatch(hook, /innerHTML|outerHTML|\.style\./);
   assert.match(hook, /renderActiveConversation\(\)/);
   assert.match(hook, /xmppAvailability\?\.ready\(\)/);
+  assert.match(hook, /updateCallUi\(\)/);
+  assert.match(runner, /Requested popover contains no visible controls/);
+  assert.match(runner, /stateVerified: true/);
 });
 
 test("Visual simulator scope captures actual forms in both orientations and retains strict no-overlap and compactness checks", () => {

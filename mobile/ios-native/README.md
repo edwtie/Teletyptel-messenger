@@ -35,6 +35,17 @@ These are useful review evidence but **not strict pixel acceptance** until the
 shared content/clock/fixture contract also matches. Diagnostic differences never
 become green results; the originals remain linked in the gallery.
 
+The first web-reference run produced 216 images, but image review found that the
+fixture had not finished initializing the inactive call toolbar and subsequently
+blurred menu focus. Those menu images are superseded, not accepted comparisons.
+The capture now initializes the real call UI, preserves menu focus, requires a
+visible nonempty popover and checks the requested screen before recording
+`stateVerified: true`. Older captures without that flag cannot pass acceptance.
+WebKit teardown is bounded and the partial manifest is saved after each case;
+a renderer teardown failure remains a failure rather than hanging indefinitely.
+The separate `visual-metrics` native scope captures the three presentation suites
+without rerunning unrelated message/group operations or enabling signed uploads.
+
 `compare.js` produces a local HTML gallery and full coverage JSON. Eligible pairs
 require identical fixture hash, content clock, locale, timezone, viewport,
 scale, orientation and theme, with an explicitly measured native app viewport.
