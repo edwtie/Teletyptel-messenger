@@ -6,6 +6,9 @@ The subsequent compact-control correction replaces the visible **Geavanceerd**
 word and chevron with the same `slider.horizontal.3` symbol on both screens.
 It retains a 44-point touch target, the localized accessible label/help and
 expanded/collapsed state. Configuration stays hidden until explicitly opened.
+Both symbols now sit at the bottom right: a reserved footer below the startup
+scroll view and a bottom safe-area inset on the settings form. They stay within
+the native safe area without floating over messages, fields or the retry button.
 This small visual correction has local source checks; the simulator evidence
 below applies to the preceding text-labelled controls, not a new TestFlight build.
 

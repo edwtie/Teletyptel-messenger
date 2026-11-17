@@ -259,6 +259,12 @@ struct NativeStartupView: View {
                 }
                 .scrollDismissesKeyboard(.interactively)
                 if !showsServerStatusScreen { loginActions }
+                if showsServerStatusScreen && model.state.phase != .checking {
+                    HStack {
+                        Spacer(minLength: 0)
+                        advancedFailureButton
+                    }.padding(.horizontal, 20).padding(.bottom, 12)
+                }
             }
             .background(NativeWebStyle.panel).foregroundStyle(NativeWebStyle.text)
             .toolbar(.hidden, for: .navigationBar)
@@ -304,13 +310,6 @@ struct NativeStartupView: View {
                     .buttonStyle(.borderedProminent).tint(NativeWebStyle.accent).foregroundStyle(.white)
                     .disabled(startupIsBusy || !hasServerConfiguration)
                     .accessibilityIdentifier("startup-retry")
-                Button { advancedFailureDetails.toggle() } label: {
-                    Image(systemName: "slider.horizontal.3")
-                }
-                .buttonStyle(NativeWebIconStyle())
-                .accessibilityLabel("Geavanceerd").help("Geavanceerd")
-                .accessibilityValue(Text(LocalizedStringKey(advancedFailureDetails ? "Uitgeklapt" : "Ingeklapt")))
-                .accessibilityIdentifier("startup-advanced")
                 if advancedFailureDetails {
                     if let failure = serverFailure {
                         Text(LocalizedStringKey(connectionError(failure))).font(.footnote)
@@ -323,6 +322,16 @@ struct NativeStartupView: View {
         }
         .frame(maxWidth: .infinity, minHeight: 300)
         .accessibilityElement(children: .contain).accessibilityIdentifier("startup-server-status")
+    }
+
+    private var advancedFailureButton: some View {
+        Button { advancedFailureDetails.toggle() } label: {
+            Image(systemName: "slider.horizontal.3")
+        }
+        .buttonStyle(NativeWebIconStyle())
+        .accessibilityLabel("Geavanceerd").help("Geavanceerd")
+        .accessibilityValue(Text(LocalizedStringKey(advancedFailureDetails ? "Uitgeklapt" : "Ingeklapt")))
+        .accessibilityIdentifier("startup-advanced")
     }
 
     private var serverStatusTitle: String {
@@ -391,13 +400,6 @@ struct NativeStartupView: View {
         NavigationStack {
             Form {
                 Section {
-                  Button { advancedServerSettings.toggle() } label: {
-                    Image(systemName: "slider.horizontal.3")
-                  }
-                  .buttonStyle(NativeWebIconStyle())
-                  .accessibilityLabel("Geavanceerd").help("Geavanceerd")
-                  .accessibilityValue(Text(LocalizedStringKey(advancedServerSettings ? "Uitgeklapt" : "Ingeklapt")))
-                  .accessibilityIdentifier("login-advanced-settings")
                    if advancedServerSettings {
                     Text("Wijzig de serverinstellingen alleen als je weet welke server je nodig hebt. Verkeerde instellingen kunnen aanmelden verhinderen.")
                         .font(.footnote)
@@ -438,6 +440,16 @@ struct NativeStartupView: View {
                 }
             }
             .modifier(NativeWebForm())
+            .safeAreaInset(edge: .bottom, alignment: .trailing) {
+                Button { advancedServerSettings.toggle() } label: {
+                    Image(systemName: "slider.horizontal.3")
+                }
+                .buttonStyle(NativeWebIconStyle())
+                .accessibilityLabel("Geavanceerd").help("Geavanceerd")
+                .accessibilityValue(Text(LocalizedStringKey(advancedServerSettings ? "Uitgeklapt" : "Ingeklapt")))
+                .accessibilityIdentifier("login-advanced-settings")
+                .padding(.trailing, 20).padding(.vertical, 12)
+            }
             .navigationTitle("Instellingen")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

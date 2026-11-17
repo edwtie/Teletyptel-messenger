@@ -162,3 +162,15 @@ test("Advanced controls use a compact symbol with a full touch target and a loca
   const style = read("mobile/ios-native/App/NativeWebStyle.swift").split("struct NativeWebIconStyle:")[1].split("struct NativeWebMenuTileStyle:")[0];
   assert.match(style, /frame\(minWidth: 44, minHeight: 44\)/);
 });
+
+test("Advanced symbols remain at the bottom right without overlapping scrollable content", () => {
+  const content = source.split("private var startupContent: some View")[1].split("private var startupIsBusy")[0];
+  assert.match(content, /scrollDismissesKeyboard\(\.interactively\)[\s\S]*if showsServerStatusScreen && model.state.phase != \.checking \{\s+HStack \{\s+Spacer\(minLength: 0\)\s+advancedFailureButton/);
+  const panel = source.split("private var serverStatusPanel: some View")[1].split("private var advancedFailureButton")[0];
+  assert.doesNotMatch(panel, /advancedFailureDetails.toggle\(\)|startup-advanced/);
+  const settings = source.split("private var loginSettings: some View")[1].split("private func saveLoginSettings")[0];
+  const form = settings.split(".modifier(NativeWebForm())")[0];
+  assert.doesNotMatch(form, /advancedServerSettings.toggle\(\)/);
+  assert.match(settings, /safeAreaInset\(edge: \.bottom, alignment: \.trailing\) \{\s+Button \{ advancedServerSettings.toggle\(\) \}/);
+  assert.doesNotMatch(content + settings, /\.overlay\(alignment: \.bottomTrailing\)/);
+});
