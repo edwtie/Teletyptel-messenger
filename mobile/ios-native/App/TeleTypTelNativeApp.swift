@@ -294,25 +294,34 @@ struct NativeStartupView: View {
             Text(LocalizedStringKey(serverStatusMessage)).multilineTextAlignment(.center)
                 .foregroundStyle(NativeWebStyle.muted).accessibilityIdentifier("startup-status")
             if model.state.phase == .checking {
-                Button("Annuleren", action: model.cancel).frame(minHeight: 44)
+                Button(action: model.cancel) { Text("Annuleren").frame(minHeight: 44) }
+                    .buttonStyle(.plain)
                     .accessibilityIdentifier("startup-cancel-check")
             } else {
-                Button("Opnieuw proberen", action: retryServerAvailability)
-                    .frame(maxWidth: .infinity, minHeight: 44)
-                    .buttonStyle(.borderedProminent).tint(NativeWebStyle.accent)
+                Button(action: retryServerAvailability) {
+                    Text("Opnieuw proberen").frame(maxWidth: .infinity, minHeight: 44)
+                }
+                    .buttonStyle(.borderedProminent).tint(NativeWebStyle.accent).foregroundStyle(.white)
                     .disabled(startupIsBusy || !hasServerConfiguration)
                     .accessibilityIdentifier("startup-retry")
-                DisclosureGroup(isExpanded: $advancedFailureDetails) {
-                  if advancedFailureDetails {
+                Button { advancedFailureDetails.toggle() } label: {
+                    HStack {
+                        Text("Geavanceerd")
+                        Spacer()
+                        Image(systemName: advancedFailureDetails ? "chevron.down" : "chevron.right")
+                    }.frame(minHeight: 44).contentShape(Rectangle())
+                }
+                .buttonStyle(.plain).foregroundStyle(NativeWebStyle.buttonText)
+                .accessibilityValue(Text(LocalizedStringKey(advancedFailureDetails ? "Uitgeklapt" : "Ingeklapt")))
+                .accessibilityIdentifier("startup-advanced")
+                if advancedFailureDetails {
                     if let failure = serverFailure {
                         Text(LocalizedStringKey(connectionError(failure))).font(.footnote)
                             .accessibilityIdentifier("startup-technical-details")
                     }
                     Button { openLoginSettings(advanced: true) } label: { Label("Serverinstellingen", systemImage: "gearshape") }
                         .frame(minHeight: 44).accessibilityIdentifier("login-settings")
-                  }
-                } label: { Text("Geavanceerd").frame(minHeight: 44) }
-                    .accessibilityIdentifier("startup-advanced")
+                }
             }
         }
         .frame(maxWidth: .infinity, minHeight: 300)
@@ -385,7 +394,15 @@ struct NativeStartupView: View {
         NavigationStack {
             Form {
                 Section {
-                  DisclosureGroup(isExpanded: $advancedServerSettings) {
+                  Button { advancedServerSettings.toggle() } label: {
+                    HStack {
+                        Text("Geavanceerd")
+                        Spacer()
+                        Image(systemName: advancedServerSettings ? "chevron.down" : "chevron.right")
+                    }.frame(minHeight: 44).contentShape(Rectangle())
+                  }
+                  .accessibilityValue(Text(LocalizedStringKey(advancedServerSettings ? "Uitgeklapt" : "Ingeklapt")))
+                  .accessibilityIdentifier("login-advanced-settings")
                    if advancedServerSettings {
                     Text("Wijzig de serverinstellingen alleen als je weet welke server je nodig hebt. Verkeerde instellingen kunnen aanmelden verhinderen.")
                         .font(.footnote)
@@ -406,8 +423,6 @@ struct NativeStartupView: View {
                             .font(.caption).foregroundStyle(.secondary)
                     }
                    }
-                  } label: { Text("Geavanceerd").frame(minHeight: 44) }
-                    .accessibilityIdentifier("login-advanced-settings")
                 }
                 Section("Taal") {
                     Picker("App-taal", selection: $interfaceLanguage) {

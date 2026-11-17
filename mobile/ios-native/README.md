@@ -25,6 +25,15 @@ The DEBUG offline fixture fails its first probe and succeeds on retry, only for
 `example.invalid`/`localhost`. Simulator screenshots retain the test-scenario banner
 and are not evidence of a live service outage or physical-device acceptance.
 
+The first actual iPhone simulator run (`44074496320`) compiled successfully but
+found five failing UI checks: native DisclosureGroup propagated its identifier
+to child fields, the retry button's actual target was only 32 points, and an
+inactive progress element remained in the accessibility tree after cancellation.
+Explicit expansion buttons preserve individual field identifiers; retry sizing
+is now inside its label, with explicit white text. The inactive progress branch
+retains the four-point layout space without an active progress identifier. The
+original assertions remain enforced and require a new simulator run.
+
 ## Confirmed server defaults for the next build (2026-11-17)
 
 Fresh installations now prefill `https://dev.teletyptel.nl` and XMPP domain

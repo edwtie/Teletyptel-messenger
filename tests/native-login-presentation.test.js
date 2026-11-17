@@ -50,7 +50,7 @@ test("Server settings use discardable drafts and persist only explicit non-secre
   assert.match(settings, /Button\("Bewaren"\) \{ saveLoginSettings\(dismiss: true\) \}/);
   assert.match(settings, /settingsModel\.check\(address: settingsAddress, domain: settingsDomain\)/);
   assert.match(settings, /fixtureName == nil/);
-  assert.match(settings, /DisclosureGroup\(isExpanded: \$advancedServerSettings\)/);
+  assert.match(settings, /Button \{ advancedServerSettings.toggle\(\) \} label:/);
   assert.match(settings, /if advancedServerSettings \{/);
   assert.match(settings, /guard advancedServerSettings, !loginModel.isWorking/);
   assert.match(settings, /UserDefaults\.standard\.set\(address, forKey: "teletyptel\.native\.serverAddress"\)/);
@@ -110,7 +110,8 @@ test("Startup activity follows real preparation, server, authentication and biom
   assert.match(indicator, /paused: reduceMotion/);
   assert.match(indicator, /Capsule\(\).fill\(NativeWebStyle.accent\)/);
   assert.match(indicator, /frame\(height: 4\).clipped\(\).allowsHitTesting\(false\)/);
-  assert.match(indicator, /accessibilityHidden\(!isActive\)/);
+  assert.match(indicator, /if isActive \{/);
+  assert.match(indicator, /else \{\s+NativeWebStyle.line.frame\(height: 1\).frame\(height: 4\)\s+\.allowsHitTesting\(false\).accessibilityHidden\(true\)/);
   assert.doesNotMatch(indicator, /ProgressView\(value:|Timer|Task.sleep|100%|URLSession/);
 });
 
@@ -134,8 +135,10 @@ test("Unavailable servers show a simple inline retry screen, while server fields
   assert.match(source, /if showsServerStatusScreen \{\s+serverStatusPanel\s+\} else \{/);
   assert.match(source, /if !showsServerStatusScreen \{ loginActions \}/);
   const panel = source.split("private var serverStatusPanel: some View")[1].split("private var serverStatusTitle")[0];
-  assert.match(panel, /Button\("Opnieuw proberen", action: retryServerAvailability\)/);
-  assert.match(panel, /DisclosureGroup\(isExpanded: \$advancedFailureDetails\) \{\s+if advancedFailureDetails/);
+  assert.match(panel, /Button\(action: retryServerAvailability\) \{\s+Text\("Opnieuw proberen"\).frame\(maxWidth: \.infinity, minHeight: 44\)/);
+  assert.match(panel, /Button \{ advancedFailureDetails.toggle\(\) \} label:/);
+  assert.match(panel, /if advancedFailureDetails \{/);
+  assert.doesNotMatch(panel, /DisclosureGroup/);
   assert.match(panel, /openLoginSettings\(advanced: true\)/);
   assert.doesNotMatch(panel, /sheet\(|fullScreenCover\(|TextField\(/);
   const retry = source.split("private func retryServerAvailability() {")[1].split("private func openLoginSettings")[0];
