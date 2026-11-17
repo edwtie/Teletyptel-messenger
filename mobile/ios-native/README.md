@@ -26,8 +26,16 @@ changing stored/transmitted text. TC's raw RTT/media paths are not rewritten.
 
 The focused unsigned `smileys` simulator scope checks real bundled decoding of all
 41 images, opens the picker in portrait/landscape, and verifies picking changes
-only the draft before explicit Send. Simulator results are pending; local checks
-are not simulator or physical-device evidence. No TestFlight upload is requested.
+only the draft before explicit Send. Unsigned run `44171628879`, revision
+`11fa4a0`, passes 1/1 UI test on iPhone 16 Pro and 1/1 on iPad Pro 11-inch (M4),
+iOS 18.6. All 41 bundled images decode; two picked codes survive rotation, no
+message is created before Send, and the resulting inline artwork is captured.
+Representative picker and inline screenshots were manually inspected. The first
+interaction run exposed an image-view hit-target issue; images now ignore touch
+events and the full button rectangle handles them. Local checks pass 97 tests
+with one macOS-only skip. These are shared-picker/direct-chat simulator checks,
+not an actual-device, live XMPP delivery, complete group-chat or animation-timing
+acceptance test. The TestFlight upload job is skipped.
 
 ## Web-led shared visual styles (2026-11-17)
 
