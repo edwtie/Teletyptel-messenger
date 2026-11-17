@@ -303,7 +303,7 @@ final class NativeStartupUITests: XCTestCase {
         let metadata = application.descendants(matching: .any)["message-metadata-" + identifier].firstMatch
         for orientation: UIDeviceOrientation in [.portrait, .landscapeLeft, .portrait] {
             rotate(orientation)
-            assertConversationHeader("chat", actions: ["chat-start-total", "chat-menu"])
+            assertConversationHeader("chat", actions: ["chat-start-total", "chat-interpreter", "chat-menu"])
             XCTAssertTrue(messageMenu.isHittable)
             let menuFrame = messageMenu.frame
             XCTAssertGreaterThanOrEqual(menuFrame.width, 44)
@@ -312,8 +312,20 @@ final class NativeStartupUITests: XCTestCase {
             XCTAssertLessThanOrEqual(menuFrame.maxY, metadata.frame.minY)
             application.buttons["chat-menu"].tap()
             XCTAssertTrue(application.buttons["Spraak en video"].waitForExistence(timeout: 5))
+            let panel = application.descendants(matching: .any)["conversation-menu-panel"].firstMatch
+            XCTAssertTrue(panel.exists)
+            XCTAssertTrue(application.frame.contains(panel.frame))
+            XCTAssertFalse(application.descendants(matching: .any)["main-menu-grid"].firstMatch.exists)
+            let audio = application.buttons["Spraak"]
+            let video = application.buttons["Spraak en video"]
+            XCTAssertGreaterThanOrEqual(audio.frame.height, 44)
+            XCTAssertGreaterThanOrEqual(video.frame.height, 44)
+            XCTAssertFalse(audio.frame.intersects(video.frame))
             snapshot(orientation == .landscapeLeft ? "chat-menu-landscape" : "chat-menu-portrait")
-            application.buttons["Vertaling"].tap()
+            let translation = application.buttons["Vertaling"]
+            if !translation.isHittable { panel.swipeUp() }
+            XCTAssertTrue(translation.isHittable)
+            translation.tap()
             let close = application.buttons["Sluiten"]
             XCTAssertTrue(close.waitForExistence(timeout: 5)); close.tap()
             XCTAssertTrue(header.waitForExistence(timeout: 5))
@@ -324,6 +336,7 @@ final class NativeStartupUITests: XCTestCase {
 
     func testMainMenuRemainsSeparateFromConversationMenu() {
         signInFixture("connected")
+        waitForStatus("XMPP verbonden als fixture@localhost")
         let main = application.buttons["messenger-main-menu"]
         XCTAssertTrue(main.waitForExistence(timeout: 10))
         XCTAssertGreaterThanOrEqual(main.frame.width, 44)
@@ -332,6 +345,32 @@ final class NativeStartupUITests: XCTestCase {
         XCTAssertTrue(application.buttons["open-number-dialer"].waitForExistence(timeout: 5))
         XCTAssertTrue(application.buttons["open-groups"].exists)
         XCTAssertTrue(application.buttons["menu-logout"].exists)
+        let grid = application.descendants(matching: .any)["main-menu-grid"].firstMatch
+        XCTAssertTrue(grid.exists)
+        XCTAssertTrue(application.frame.contains(grid.frame))
+        let rows = [["open-number-dialer", "menu-news", "menu-support"],
+                    ["open-history", "open-archive", "open-appearance"],
+                    ["open-profile", "open-account-settings", "menu-do-not-disturb"],
+                    ["menu-logout", "open-groups", "open-translation"]]
+        var previousRowBottom: CGFloat = 0
+        for row in rows {
+            let buttons = row.map { application.buttons[$0] }
+            let frames = buttons.map(\.frame)
+            for index in buttons.indices {
+                XCTAssertTrue(buttons[index].exists)
+                XCTAssertGreaterThanOrEqual(frames[index].width, 44)
+                XCTAssertGreaterThanOrEqual(frames[index].height, 44)
+                XCTAssertTrue(grid.frame.contains(frames[index]))
+                XCTAssertEqual(frames[index].minY, frames[0].minY, accuracy: 1)
+                if index > 0 { XCTAssertLessThanOrEqual(frames[index - 1].maxX, frames[index].minX) }
+            }
+            XCTAssertGreaterThanOrEqual(frames[0].minY, previousRowBottom)
+            previousRowBottom = frames[0].maxY
+        }
+        XCTAssertFalse(application.buttons["menu-news"].isEnabled)
+        XCTAssertFalse(application.buttons["menu-support"].isEnabled)
+        XCTAssertFalse(grid.staticTexts["Nummer bellen"].exists)
+        XCTAssertFalse(application.buttons["chat-menu"].exists)
         snapshot("main-menu-symbols")
         application.buttons["open-account-settings"].tap()
         let close = application.buttons["Sluiten"]

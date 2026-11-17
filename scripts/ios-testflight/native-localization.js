@@ -14,7 +14,7 @@ function catalog(root) {
   const directory = path.join(root, "mobile/ios-native/App");
   for (const file of fs.readdirSync(directory).filter(file => file.endsWith(".swift"))) {
     const source = fs.readFileSync(path.join(directory, file), "utf8");
-    for (const match of source.matchAll(/(?:Text|Button|Label|Section|Toggle|Picker|TextField|SecureField|ProgressView|navigationTitle|accessibilityLabel|accessibilityHint|alert|confirmationDialog)\("((?:[^"\\]|\\.)*)"/g)) {
+    for (const match of source.matchAll(/(?:Text|Button|Label|Section|Toggle|Picker|TextField|SecureField|ProgressView|navigationTitle|accessibilityLabel|accessibilityHint|alert|confirmationDialog|menuTile|callButton)\("((?:[^"\\]|\\.)*)"/g)) {
       if (match[1].includes("\\(")) continue;
       const key = JSON.parse('"' + match[1] + '"');
       keys.add(key);

@@ -359,5 +359,18 @@
   "Beveiligd met Face ID of Touch ID.": "Protected with Face ID or Touch ID.",
   "Meld je aan om verder te gaan.": "Sign in to continue.",
   "Stel de server in via Instellingen.": "Set up the server in Settings.",
-  "De app-taal staat los van berichtvertaling; een taal kiezen geeft geen toestemming om berichten extern te vertalen.": "App language is separate from message translation; choosing a language does not consent to external message translation."
+  "De app-taal staat los van berichtvertaling; een taal kiezen geeft geen toestemming om berichten extern te vertalen.": "App language is separate from message translation; choosing a language does not consent to external message translation.",
+  "Start eerst een totale conversatie. Met de tolkknop in dat gesprek vraag je daarna een bevoegde tolk aan. Een tolk neemt alleen na toestemming deel; Tolkcontact is nog niet aangesloten.": "Start a Total Conversation first. Use the interpreter button in that call to request an authorized interpreter. An interpreter only joins with consent; Tolkcontact is not connected yet.",
+  "Contact beheren": "Manage contact",
+  "Nieuws · nog niet beschikbaar in deze app": "News · not yet available in this app",
+  "Klantenservice · nog niet beschikbaar in deze app": "Support · not yet available in this app",
+  "Audio": "Audio",
+  "Audio + video": "Audio + video",
+  "Audio + RTT": "Audio + RTT",
+  "Geopend": "Open",
+  "Gesloten": "Closed",
+  "Aan": "On",
+  "Uit": "Off",
+  "Gesprek actief": "Call active",
+  "Geen gesprek": "No call"
 }

@@ -95,6 +95,8 @@ struct NativeMessengerView: View {
     @State private var showDialer = false
     @State private var showNewContact = false
     @State private var showAppearance = false
+    @State private var showProfile = false
+    @State private var mainMenuOpen = false
     @State private var historyBrowser: String?
     @State private var menuPresentation: Task<Void, Never>?
     @StateObject private var avatars = NativeAvatarCache()
@@ -131,6 +133,7 @@ struct NativeMessengerView: View {
         .sheet(isPresented: $showDialer) { NativeDialerView(login: model, calls: calls) }
         .sheet(isPresented: $showNewContact) { NativeNewContactView(login: model) }
         .sheet(isPresented: $showAppearance) { NativeAppearanceView() }
+        .sheet(isPresented: $showProfile) { NativeAvatarEditorView(login: model, onSaved: { avatars.refreshOwner() }) }
         .sheet(isPresented: Binding(get: { historyBrowser != nil }, set: { if !$0 { historyBrowser = nil } })) {
             NativeHistoryBrowserView(login: model, calls: calls, translation: translation, archive: archive, avatars: avatars, archivedOnly: historyBrowser == "archive")
         }
@@ -261,7 +264,7 @@ struct NativeMessengerView: View {
             if let contact = selectedContact {
                 NativeChatView(model: model, calls: calls, translation: translation, contact: contact, onClose: { selected = nil },
                     contactProfile: avatars.profiles[contact.jid], ownProfile: avatars.owner.flatMap { avatars.profiles[$0] }, avatars: avatars, archive: archive,
-                    allowReadMarkers: !showAccount && !showTranslation && !showGroups && !showDialer && !showNewContact && !showAppearance && historyBrowser == nil,
+                    allowReadMarkers: !mainMenuOpen && !showProfile && !showAccount && !showTranslation && !showGroups && !showDialer && !showNewContact && !showAppearance && historyBrowser == nil,
                     historyOnly: !rosterJIDs.contains(contact.jid))
             } else if let room = model.groups.rooms.first(where: { $0.room == selected }) {
                 NativeGroupChatView(model: model.groups, room: room.room, login: model, translation: translation, avatars: avatars, archive: archive, onArchive: { selected = nil }, onClose: { selected = nil })
@@ -305,22 +308,13 @@ struct NativeMessengerView: View {
                     .buttonStyle(NativeWebIconStyle(destructive: true))
                     .accessibilityLabel("Uitloggen").accessibilityIdentifier("disconnect-session")
             }
-            Menu {
-                Section("Communicatie") {
-                    Button { afterMenu { showDialer = true } } label: { Label("Nummer bellen", systemImage: "phone") }.accessibilityIdentifier("open-number-dialer")
-                    Button { afterMenu { showGroups = true } } label: { Label("Groepschats", systemImage: "person.3") }.accessibilityIdentifier("open-groups")
-                    Button { afterMenu { historyBrowser = "history" } } label: { Label("Geschiedenis", systemImage: "clock") }
-                    Button { afterMenu { historyBrowser = "archive" } } label: { Label("Archief", systemImage: "archivebox") }
-                }
-                Section("Instellingen") {
-                    Button { afterMenu { showAppearance = true } } label: { Label("Weergave", systemImage: "circle.lefthalf.filled") }
-                    Button { afterMenu { showAccount = true } } label: { Label("Accountinstellingen", systemImage: "gearshape") }.accessibilityIdentifier("open-account-settings")
-                    Button { afterMenu { showTranslation = true } } label: { Label("Vertaling", systemImage: "globe") }
-                }
-                Button(role: .destructive, action: logout) { Label("Uitloggen", systemImage: "rectangle.portrait.and.arrow.right") }.accessibilityIdentifier("menu-logout")
-            } label: { Image(systemName: "line.3.horizontal") }
-                .buttonStyle(NativeWebIconStyle()).accessibilityLabel("Hoofdmenu")
+            Button { mainMenuOpen.toggle() } label: { Image(systemName: "line.3.horizontal") }
+                .buttonStyle(NativeWebIconStyle(prominent: mainMenuOpen)).accessibilityLabel("Hoofdmenu")
+                .accessibilityValue(Text(LocalizedStringKey(mainMenuOpen ? "Geopend" : "Gesloten")))
                 .accessibilityIdentifier("messenger-main-menu")
+                .popover(isPresented: $mainMenuOpen, arrowEdge: .top) {
+                    mainMenuGrid.modifier(NativeWebCompactPopover())
+                }
         }
         .padding(.horizontal, 14).padding(.vertical, 8)
         .frame(maxWidth: .infinity, minHeight: 58)
@@ -330,7 +324,40 @@ struct NativeMessengerView: View {
         .accessibilityIdentifier("messenger-brand-header")
     }
 
+    private var mainMenuGrid: some View {
+        ScrollView {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
+                menuTile("Nummer bellen", symbol: "phone", identifier: "open-number-dialer") { afterMenu { showDialer = true } }
+                menuTile("Nieuws · nog niet beschikbaar in deze app", symbol: "doc.text", identifier: "menu-news") {}.disabled(true)
+                menuTile("Klantenservice · nog niet beschikbaar in deze app", symbol: "headphones", identifier: "menu-support") {}.disabled(true)
+                menuTile("Geschiedenis", symbol: "calendar", identifier: "open-history") { afterMenu { historyBrowser = "history" } }
+                menuTile("Archief", symbol: "archivebox", identifier: "open-archive") { afterMenu { historyBrowser = "archive" } }
+                menuTile("Weergave", symbol: "circle.lefthalf.filled", identifier: "open-appearance") { afterMenu { showAppearance = true } }
+                menuTile("Profiel", symbol: "person", identifier: "open-profile") { afterMenu { showProfile = true } }
+                menuTile("Accountinstellingen", symbol: "gearshape", identifier: "open-account-settings") { afterMenu { showAccount = true } }
+                menuTile("Niet storen", symbol: model.chat.preferences.doNotDisturb ? "bell.slash.fill" : "bell.slash", identifier: "menu-do-not-disturb", selected: model.chat.preferences.doNotDisturb) {
+                    model.setDoNotDisturb(!model.chat.preferences.doNotDisturb)
+                }.accessibilityValue(Text(LocalizedStringKey(model.chat.preferences.doNotDisturb ? "Aan" : "Uit")))
+                menuTile("Uitloggen", symbol: "rectangle.portrait.and.arrow.right", identifier: "menu-logout", destructive: true) { afterMenu { logout() } }
+                menuTile("Groepschats", symbol: "person.3", identifier: "open-groups") { afterMenu { showGroups = true } }
+                menuTile("Vertaling", symbol: "globe", identifier: "open-translation") { afterMenu { showTranslation = true } }
+            }.padding(12)
+        }
+        .frame(width: 252, height: verticalSizeClass == .compact ? 180 : 240)
+        .background(NativeWebStyle.panel)
+        .accessibilityElement(children: .contain).accessibilityIdentifier("main-menu-grid")
+    }
+
+    private func menuTile(_ title: String, symbol: String, identifier: String, destructive: Bool = false, selected: Bool = false,
+                          action: @escaping () -> Void) -> some View {
+        Button(action: action) { Image(systemName: symbol) }
+            .buttonStyle(NativeWebMenuTileStyle(destructive: destructive, selected: selected))
+            .accessibilityLabel(LocalizedStringKey(title)).help(LocalizedStringKey(title))
+            .accessibilityIdentifier(identifier)
+    }
+
     private func afterMenu(_ action: @escaping @MainActor () -> Void) {
+        mainMenuOpen = false
         menuPresentation?.cancel()
         menuPresentation = Task { @MainActor in
             do { try await Task.sleep(nanoseconds: 250_000_000) } catch { return }

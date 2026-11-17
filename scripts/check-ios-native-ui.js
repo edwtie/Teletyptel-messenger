@@ -25,8 +25,7 @@ function testsForScope(scope = "regression") {
   if (scope === "regression") return selectedTests;
   if (scope === "startup") return ["testStartupDoesNotOpenKeyboardOrShowAuthenticatedState",
     "testStartupProgressStopsOnCancelAndCertificateFailure", "testEnglishStartupDoesNotTranslateUserDataOrRequestPermissions"];
-  if (scope === "menus") return ["testChatHeaderAndMessageMenuDoNotOverlapAcrossRotation", "testMainMenuRemainsSeparateFromConversationMenu",
-    "testMessageMenuEditForwardAndBothDeletionOptions", "testExistingGroupJoinSendRotationAndLeave"];
+  if (scope === "menus") return ["testChatHeaderAndMessageMenuDoNotOverlapAcrossRotation", "testMainMenuRemainsSeparateFromConversationMenu"];
   if (scope === "groups") return selectedTests.filter(name => name.includes("Group"));
   if (scope === "tc") return ["testWebStyleCallControlsAndRttPanesRemainReachableAcrossRotation", "testPeerCameraOnOrUnknownDoesNotEnterTextOnlyLayout"];
   throw new Error("Unsupported native UI scope");

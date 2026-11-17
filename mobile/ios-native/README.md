@@ -3030,7 +3030,7 @@ body and timestamp. Copy, reply, forward, edit, translation, reaction and deleti
 permissions are unchanged. This is a presentation correction, not a claim of
 complete feature or pixel parity with web/16.9; system menu styling remains native.
 
-The unsigned `focused-ui` / `menus` scope selects four simulator tests, including
+The initial unsigned `focused-ui` / `menus` scope selected four simulator tests, including
 long contact names, nonintersecting button/identity rectangles, minimum touch
 targets, short-message metadata clearance, menu actions, group leave and
 portrait/landscape rotation. The broader regression scope retains the login and
@@ -3101,6 +3101,42 @@ keyboard. Its slow/failing checker is DEBUG-only and restricted to
 is still required. The earlier menu run `43966885233` was not green (the iPhone
 runner timed out loading Accessibility); it is not reported as acceptance proof.
 No new TestFlight upload is authorized by this test scope.
+
+## Menu references from build 16.9 (2026-11-17)
+
+Feedback ZIPs 6, 7 and 8 identify build 16.9 and now provide the actual menu/icon
+baseline. The screenshots themselves, account names and feedback metadata are
+not committed. The main menu is a separate, symbol-only three-column popover:
+phone/news/support, history/archive/appearance, profile/settings/do-not-disturb,
+then logout. Existing native group and translation shortcuts use the remaining
+two cells of the last row rather than disappearing. Symbols retain localized
+VoiceOver names, help text, 48-point tile heights and an explicit selected state.
+News and support are disabled and labelled unavailable because there is no native
+implementation to connect them to yet.
+
+The chat header has TC, interpreter and vertical ellipsis in one bounded row.
+The TC shortcut uses the reference's rounded blue treatment. The separate chat
+popover offers Audio, Audio + video and Audio + RTT as full-width symbol/text
+rows, with translation and a secondary contact-management menu. It scrolls in
+short landscape layouts. Rename, mute, archive, history, block and removal keep
+their existing capabilities and permission checks. Read markers are suppressed
+while these menus or their explanatory dialogs cover the conversation.
+
+The interpreter shortcut explains the existing consent-based call flow; it does
+not call a private Tolkcontact service or pretend to be a staff workspace.
+Likewise no inactive-call RTT reset is invented solely to copy an old screenshot.
+Green/red in-call controls, signalling, media and the startup activity strip are
+unchanged by this visual correction. This is not a claim of complete 16.9 parity.
+
+The `menus` scope now selects just the two visual menu/header tests. They check
+grid order, nonoverlapping 44-point-or-larger targets, disabled placeholders,
+separate popovers, short-message clearance and portrait/landscape chat layout.
+Message edit/forward/delete and group join/leave remain in the existing broader
+regression scope; they are not rerun just to compare this menu presentation.
+Local source/generator checks pass 68 tests, with one macOS-only check skipped.
+Simulator execution and review of its real screenshots remain required: earlier
+run `43993143666` failed and is not evidence of acceptance. Only unsigned checks
+are requested; there is no TestFlight upload, APNs activation or server change.
 
 ## Primary references
 

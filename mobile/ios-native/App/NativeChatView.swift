@@ -17,6 +17,9 @@ struct NativeChatView: View {
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @State private var showTranslation = false
     @State private var showEmoji = false
+    @State private var conversationMenuOpen = false
+    @State private var showInterpreterHelp = false
+    @State private var menuPresentation: Task<Void, Never>?
     @State private var forwarding: NativeChatMessage?
     @State private var editing: NativeChatMessage?
     @State private var deleting: NativeChatMessage?
@@ -70,7 +73,7 @@ struct NativeChatView: View {
                     .overlayPreferenceValue(NativeMessageFramesKey.self) { frames in
                         GeometryReader { viewport in
                             let visible = frames.filter { CGRect(origin: .zero, size: viewport.size).contains($0.value) }.map(\.key)
-                            let enabled = scenePhase == .active && allowReadMarkers && !showTranslation && forwarding == nil && editing == nil && deleting == nil && calls.presentation == nil && (model.canSend || model.canReadCachedHistory)
+                            let enabled = scenePhase == .active && allowReadMarkers && !conversationMenuOpen && !showInterpreterHelp && !showTranslation && forwarding == nil && editing == nil && deleting == nil && calls.presentation == nil && (model.canSend || model.canReadCachedHistory)
                             Color.clear.allowsHitTesting(false).task(id: enabled ? visible.map(\.uuidString).sorted().joined() : "hidden") {
                                 if enabled { model.displayed(visible) }
                             }
@@ -112,7 +115,13 @@ struct NativeChatView: View {
             .scrollDismissesKeyboard(.interactively)
         .sheet(isPresented: $showTranslation) { NativeTranslationSettingsView(model: translation) }
         .onAppear { model.visibleConversation = contact.jid }
-        .onDisappear { if model.visibleConversation == contact.jid { model.visibleConversation = nil } }
+        .onDisappear { menuPresentation?.cancel(); menuPresentation = nil; if model.visibleConversation == contact.jid { model.visibleConversation = nil } }
+        .confirmationDialog("Gebarentolk oproepen", isPresented: $showInterpreterHelp, titleVisibility: .visible) {
+            Button("Totale conversatie starten") { startCall(.total) }.disabled(!calls.canCall(contact))
+            Button("Annuleren", role: .cancel) {}
+        } message: {
+            Text("Start eerst een totale conversatie. Met de tolkknop in dat gesprek vraag je daarna een bevoegde tolk aan. Een tolk neemt alleen na toestemming deel; Tolkcontact is nog niet aangesloten.")
+        }
         .alert("Naam wijzigen", isPresented: $renameContact) {
             TextField("Naam", text: $contactName)
             Button("Opslaan") { model.renameContact(contact.jid, name: contactName) }
@@ -150,28 +159,53 @@ struct NativeChatView: View {
             Button { startCall(.total) } label: {
                 NativeTotalConversationSymbol().fill(.white).frame(width: 26, height: 26).frame(width: 44, height: 44)
             }
-            .buttonStyle(NativeWebIconStyle(prominent: true)).disabled(!calls.canCall(contact))
+            .buttonStyle(NativeTotalConversationButtonStyle()).disabled(!calls.canCall(contact))
             .accessibilityLabel("Totale conversatie starten").accessibilityIdentifier("chat-start-total")
-            Menu { conversationActions } label: { Image(systemName: "ellipsis").rotationEffect(.degrees(90)) }
-                .buttonStyle(NativeWebIconStyle()).accessibilityLabel("Gespreksmenu").accessibilityIdentifier("chat-menu")
+            Button { showInterpreterHelp = true } label: { Image(systemName: "person.2.wave.2") }
+                .buttonStyle(NativeWebIconStyle()).accessibilityLabel("Gebarentolk oproepen")
+                .accessibilityIdentifier("chat-interpreter")
+            Button { conversationMenuOpen.toggle() } label: { Image(systemName: "ellipsis").rotationEffect(.degrees(90)) }
+                .buttonStyle(NativeWebIconStyle(prominent: conversationMenuOpen))
+                .accessibilityLabel("Gespreksmenu").accessibilityIdentifier("chat-menu")
+                .accessibilityValue(Text(LocalizedStringKey(conversationMenuOpen ? "Geopend" : "Gesloten")))
+                .popover(isPresented: $conversationMenuOpen, arrowEdge: .top) {
+                    ScrollView {
+                        VStack(spacing: 8) { conversationActions }.padding(12)
+                    }
+                    .frame(width: 260, height: verticalSizeClass == .compact ? 180 : 320)
+                    .background(NativeWebStyle.panel)
+                    .accessibilityElement(children: .contain).accessibilityIdentifier("conversation-menu-panel")
+                    .modifier(NativeWebCompactPopover())
+                }
         }
     }
 
     @ViewBuilder private var conversationActions: some View {
-        callButton("Spraak", icon: "phone.fill", profile: .audio)
-        callButton("Spraak en video", icon: "video.fill", profile: .video)
-        callButton("Spraak en realtime tekst", icon: "teletype", profile: .audioRtt)
-        Button { showTranslation = true } label: { Label("Vertaling", systemImage: "globe") }
+        callButton("Spraak", icon: "phone.fill", profile: .audio, display: "Audio")
+        callButton("Spraak en video", icon: "video.fill", profile: .video, display: "Audio + video")
+        callButton("Spraak en realtime tekst", icon: "teletype", profile: .audioRtt, display: "Audio + RTT")
+        Button { afterConversationMenu { showTranslation = true } } label: { Label("Vertaling", systemImage: "globe") }
+            .buttonStyle(NativeWebMenuRowStyle())
+        Menu { contactActions } label: { Label("Contact beheren", systemImage: "person.crop.circle") }
+            .buttonStyle(NativeWebMenuRowStyle()).accessibilityIdentifier("chat-contact-actions")
         Divider()
-        Button { contactName = contact.displayName; renameContact = true } label: { Label("Naam wijzigen", systemImage: "pencil") }
+        Text(LocalizedStringKey(calls.hasLiveCall ? "Gesprek actief" : "Geen gesprek"))
+            .font(NativeWebStyle.font(12)).foregroundStyle(NativeWebStyle.muted)
+            .accessibilityIdentifier("conversation-menu-status")
+    }
+
+    @ViewBuilder private var contactActions: some View {
+        Button { afterConversationMenu { contactName = contact.displayName; renameContact = true } } label: { Label("Naam wijzigen", systemImage: "pencil") }
             .disabled(!model.canSend || model.contactActionBusy)
         Button { model.setMuted(contact.jid, muted: !model.chat.preferences.mutedPeers.contains(contact.jid)) } label: {
             Label(LocalizedStringKey(model.chat.preferences.mutedPeers.contains(contact.jid) ? "Meldingen aan" : "Meldingen dempen"), systemImage: "bell.slash")
         }
         if let archive = archive {
             Button {
-                archive.set(peer: contact.jid, kind: "contact", archived: !archive.contains(peer: contact.jid, kind: "contact"))
-                onClose?(); dismiss()
+                afterConversationMenu {
+                    archive.set(peer: contact.jid, kind: "contact", archived: !archive.contains(peer: contact.jid, kind: "contact"))
+                    onClose?(); dismiss()
+                }
             } label: { Label(archive.contains(peer: contact.jid, kind: "contact") ? "Terugzetten" : "Archiveren", systemImage: "archivebox") }
         }
         Button { model.loadHistory(for: contact.jid, refresh: true) } label: { Label("XMPP-archief ophalen", systemImage: "clock.arrow.circlepath") }
@@ -180,7 +214,7 @@ struct NativeChatView: View {
         Button { model.setBlocked(contact.jid, blocked: !model.isBlocked(contact.jid)) } label: {
             Label(LocalizedStringKey(model.isBlocked(contact.jid) ? "Deblokkeren" : "Blokkeren"), systemImage: "hand.raised")
         }.disabled(!model.canSend || model.contactActionBusy)
-        Button(role: .destructive) { removeContact = true } label: { Label("Contact verwijderen", systemImage: "person.crop.circle.badge.minus") }
+        Button(role: .destructive) { afterConversationMenu { removeContact = true } } label: { Label("Contact verwijderen", systemImage: "person.crop.circle.badge.minus") }
             .disabled(!model.canSend || model.contactActionBusy)
     }
 
@@ -318,8 +352,20 @@ struct NativeChatView: View {
 
     private func startCall(_ profile: NativeCallMedia) { calls.startCall(contact, profile: profile) }
 
-    private func callButton(_ title: String, icon: String, profile: NativeCallMedia) -> some View {
-        Button { startCall(profile) } label: { Label(LocalizedStringKey(title), systemImage: icon) }
+    private func afterConversationMenu(_ action: @escaping @MainActor () -> Void) {
+        conversationMenuOpen = false
+        menuPresentation?.cancel()
+        menuPresentation = Task { @MainActor in
+            do { try await Task.sleep(nanoseconds: 250_000_000) } catch { return }
+            guard !Task.isCancelled, model.currentOwner != nil else { return }
+            action()
+            menuPresentation = nil
+        }
+    }
+
+    private func callButton(_ title: String, icon: String, profile: NativeCallMedia, display: String) -> some View {
+        Button { afterConversationMenu { startCall(profile) } } label: { Label(LocalizedStringKey(display), systemImage: icon) }
+            .buttonStyle(NativeWebMenuRowStyle()).accessibilityLabel(LocalizedStringKey(title))
             .disabled(!calls.canCall(contact))
     }
 }

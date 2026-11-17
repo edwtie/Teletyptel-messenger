@@ -116,6 +116,48 @@ struct NativeWebIconStyle: ButtonStyle {
     }
 }
 
+struct NativeWebMenuTileStyle: ButtonStyle {
+    var destructive = false
+    var selected = false
+    @Environment(\.isEnabled) private var enabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label.font(.system(size: 22))
+            .frame(maxWidth: .infinity, minHeight: 48)
+            .contentShape(Rectangle())
+            .foregroundStyle(destructive ? NativeWebStyle.disabled : selected ? Color.white : NativeWebStyle.buttonText)
+            .background(selected ? NativeWebStyle.accent : NativeWebStyle.button, in: RoundedRectangle(cornerRadius: 6))
+            .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(destructive ? NativeWebStyle.disabled : NativeWebStyle.buttonBorder, lineWidth: 1))
+            .opacity(enabled ? (configuration.isPressed ? 0.75 : 1) : 0.4)
+    }
+}
+
+struct NativeWebMenuRowStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var enabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label.font(NativeWebStyle.font())
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .padding(.horizontal, 10).contentShape(Rectangle())
+            .foregroundStyle(NativeWebStyle.buttonText)
+            .background(NativeWebStyle.button, in: RoundedRectangle(cornerRadius: 6))
+            .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(NativeWebStyle.buttonBorder, lineWidth: 1))
+            .opacity(enabled ? (configuration.isPressed ? 0.75 : 1) : 0.4)
+    }
+}
+
+struct NativeTotalConversationButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var enabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label.frame(minWidth: 44, minHeight: 44)
+            .foregroundStyle(Color.white)
+            .background(Color(red: 0.08, green: 0.33, blue: 0.74), in: RoundedRectangle(cornerRadius: 14))
+            .shadow(color: .black.opacity(0.12), radius: 4, y: 2)
+            .opacity(enabled ? (configuration.isPressed ? 0.75 : 1) : 0.4)
+    }
+}
+
 struct NativeCachedAvatar: View {
     let name: String
     let jid: String

@@ -26,7 +26,7 @@ test("Chat and group headers allocate identity and controls in one bounded row, 
 test("Conversation menu keeps all existing call and contact capabilities behind symbol actions", () => {
   const chat = read(app + "NativeChatView.swift");
   for (const value of ['accessibilityIdentifier("chat-menu")', 'accessibilityIdentifier("chat-start-total")',
-    'startCall(.total)', 'profile: .audio)', 'profile: .video)', 'profile: .audioRtt)',
+    'startCall(.total)', 'profile: .audio, display: "Audio")', 'profile: .video, display: "Audio + video")', 'profile: .audioRtt, display: "Audio + RTT")',
     'showTranslation = true', 'model.setMuted(', 'model.setBlocked(', 'removeContact = true', 'renameContact = true',
     'model.loadHistory(for: contact.jid, refresh: true)']) assert.ok(chat.includes(value), value);
   assert.match(chat, /disabled\(!calls.canCall\(contact\)\)/);
@@ -37,6 +37,35 @@ test("Conversation menu keeps all existing call and contact capabilities behind 
   assert.doesNotMatch(actions, /NativeWebIconStyle\(destructive: true\)/);
   assert.match(actions, /accessibilityIdentifier\("group-menu"\)/);
   assert.match(read(app + "NativeTranslationView.swift"), /accessibilityIdentifier\("messenger-main-menu"\)/);
+});
+
+test("16.9 references use a symbol-only three-column main grid and a distinct conversation popover", () => {
+  const main = read(app + "NativeTranslationView.swift");
+  assert.match(main, /popover\(isPresented: \$mainMenuOpen, arrowEdge: \.top\)/);
+  assert.match(main, /LazyVGrid\(columns: Array\(repeating: GridItem\(\.flexible\(\), spacing: 8\), count: 3\)/);
+  const grid = main.split("private var mainMenuGrid")[1].split("private func afterMenu")[0];
+  const identifiers = [...grid.matchAll(/identifier: "([^"]+)"/g)].map(match => match[1]);
+  assert.deepEqual(identifiers, ["open-number-dialer", "menu-news", "menu-support", "open-history", "open-archive", "open-appearance",
+    "open-profile", "open-account-settings", "menu-do-not-disturb", "menu-logout", "open-groups", "open-translation"]);
+  assert.match(grid, /Button\(action: action\) \{ Image\(systemName: symbol\) \}/);
+  assert.match(grid, /accessibilityLabel\(LocalizedStringKey\(title\)\)\.help\(LocalizedStringKey\(title\)\)/);
+  assert.match(grid, /Nieuws · nog niet beschikbaar in deze app[^\n]+disabled\(true\)/);
+  assert.match(grid, /Klantenservice · nog niet beschikbaar in deze app[^\n]+disabled\(true\)/);
+  assert.match(main, /allowReadMarkers: !mainMenuOpen && !showProfile/);
+  const chat = read(app + "NativeChatView.swift");
+  assert.match(chat, /popover\(isPresented: \$conversationMenuOpen, arrowEdge: \.top\)/);
+  assert.match(chat, /NativeWebCompactPopover\(\)/);
+  assert.match(chat, /buttonStyle\(NativeTotalConversationButtonStyle\(\)\)/);
+  assert.ok(chat.indexOf('accessibilityIdentifier("chat-start-total")') < chat.indexOf('accessibilityIdentifier("chat-interpreter")'));
+  assert.ok(chat.indexOf('accessibilityIdentifier("chat-interpreter")') < chat.indexOf('accessibilityIdentifier("chat-menu")'));
+  assert.match(chat, /!conversationMenuOpen && !showInterpreterHelp/);
+  assert.match(chat, /Tolkcontact is nog niet aangesloten/);
+  assert.doesNotMatch(chat, /calls\.prepareInterpreter\(|interpreter\.request\(|Tolkwerkplek|RTT herstellen/);
+  const style = read(app + "NativeWebStyle.swift").split("struct NativeWebMenuTileStyle")[1].split("struct NativeCachedAvatar")[0];
+  assert.match(style, /minHeight: 48/);
+  assert.match(style, /minHeight: 44/);
+  assert.match(style, /destructive \? NativeWebStyle.disabled/);
+  assert.match(style, /RoundedRectangle\(cornerRadius: 14\)/);
 });
 
 test("Message menus take layout space rather than overlaying message text and delivery metadata", () => {
@@ -54,7 +83,7 @@ test("Menu simulator scope measures hit targets and overlap for both orientation
   const { testsForScope } = require("../scripts/check-ios-native-ui");
   const methods = read("mobile/ios-native/UITests/NativeStartupUITests.swift");
   const selected = testsForScope("menus");
-  assert.equal(selected.length, 4);
+  assert.equal(selected.length, 2);
   for (const name of selected) assert.ok(methods.includes("func " + name + "()"), name);
   for (const value of ["assertConversationHeader", "buttonFrame.intersects(identityFrame)",
     "buttonFrames[first].intersects(buttonFrames[second])", "menuFrame.maxY, metadata.frame.minY", "outgoingMenu.isHittable",
