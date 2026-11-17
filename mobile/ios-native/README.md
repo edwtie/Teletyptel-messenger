@@ -1,5 +1,30 @@
 # TeleTypTel native iOS migration
 
+## Internal candidate 1.0 (17.3), preparing 2026-11-17
+
+The owner requested TestFlight publication of the 16.9-reference menu/icon,
+startup-activity and keyboard-focus corrections. A read-only App Store Connect
+query confirms 17.2 is the latest processed internal build; 17.3 is the next
+candidate. Run `44056073428` validated the device archive, WebRTC linkage and
+iPhone Release startup, but the iPad XCTest runner timed out waiting for its
+Accessibility-loaded notification. The upload job was skipped, not bypassed.
+The separate iPad menu rerun `44051521857` attempt 2 met the same bootstrap error.
+
+To isolate the hosted test environment, menu and Release-startup checks now
+create a fresh simulator of the same selected device type and iOS runtime.
+They boot it, open Simulator from the selected Xcode bundle and verify that its
+display renders before compiling the UI-test target. Stock simulator devices,
+failed artifacts and local-user devices are not erased or deleted. Preparation
+errors propagate; a rendered home screen is not counted as an app startup pass.
+Both families must still run the real unchanged Release startup assertion,
+and all archive/signature/export gates must succeed before signing/upload.
+This is a test-environment correction, not an app, server or permission change.
+
+Local orchestration, release and native UI contracts pass 84 tests, with one
+macOS-only check skipped. Fresh-run results and Apple processing are pending;
+17.3 has not yet been uploaded at this checkpoint. The existing reviewed
+internal-Netherlands encryption and protected signing configuration are unchanged.
+
 ## Device-launch regression found in 17.1 (2026-11-16)
 
 User-supplied TestFlight feedback for `1.0 (17.1)` reports launch termination

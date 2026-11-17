@@ -20,6 +20,8 @@ on:
       - scripts/native-internal-release.js
       - scripts/native-runtime-linkage.js
       - scripts/native-release-startup.js
+      - scripts/native-simulator-session.js
+      - tests/native-simulator-session.test.js
       - tests/native-runtime-linkage.test.js
       - scripts/native-provider-config.js
       - tests/native-internal-release.test.js
@@ -114,7 +116,7 @@ jobs:
         if: github.event_name == 'workflow_dispatch' && inputs.validation_mode != 'full'
         run: node --test tests/ios-native-update.test.js tests/native-g722.test.js
       - name: Check native recovery, capture, privacy and localization contracts
-        run: node --test tests/native-feature-completion.test.js tests/native-login-presentation.test.js tests/native-chat-menu-layout.test.js
+        run: node --test tests/native-feature-completion.test.js tests/native-login-presentation.test.js tests/native-chat-menu-layout.test.js tests/native-simulator-session.test.js
       - name: Compile native app and test ${{ matrix.family }}
         run: |
           if [ "$TELETYPTEL_NATIVE_VALIDATION_MODE" = "focused-archive" ]; then

@@ -55,12 +55,15 @@ test("Runtime inspection rejects the observed device crash even when WebRTC was 
 });
 
 test("Release startup requires a real UI assertion and propagates build, boot and launch failures", () => {
-  const device = { name: "iPhone 17 Pro", udid: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", isAvailable: true };
-  for (const failure of [null, "release-startup-build", "release-startup-boot", "release-startup-test"]) {
+  const device = { name: "iPhone 17 Pro", udid: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", isAvailable: true,
+    deviceTypeIdentifier: "com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro" };
+  for (const failure of [null, "release-startup-create", "release-startup-build", "release-startup-boot", "release-startup-window", "release-startup-display", "release-startup-test"]) {
     const calls = []; let collected = 0;
     const logged = (name, command, args) => {
       calls.push({ name, command, args });
       if (name === failure) throw new Error("fixture failure");
+      if (name === "release-startup-developer-directory") return "/fixture/Xcode.app/Contents/Developer\n";
+      if (name === "release-startup-create") return "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb\n";
       return name === "release-simulator-inventory" ? JSON.stringify({ devices: { "com.apple.CoreSimulator.SimRuntime.iOS-26-2": [device] } }) : "";
     };
     const operation = () => startup.check({ directory: "/fixture", reports: "/fixture/reports", family: "iPhone", logged,
@@ -70,10 +73,13 @@ test("Release startup requires a real UI assertion and propagates build, boot an
       const result = operation();
       assert.equal(result.startupUIVisible, true); assert.equal(result.configuration, "Release");
       assert.equal(result.physicalDeviceTested, false);
+      assert.equal(result.freshSimulator, true);
+      assert.ok(calls.findIndex(call => call.name === "release-startup-display") < calls.findIndex(call => call.name === "release-startup-build"));
       const launch = calls.find(call => call.name === "release-startup-test");
       assert.ok(launch.args.includes("test-without-building"));
       assert.ok(launch.args.includes("-only-testing:NativeStartupUITests/NativeStartupUITests/testStartupDoesNotOpenKeyboardOrShowAuthenticatedState"));
       assert.ok(launch.args.includes("Release")); assert.ok(!launch.args.includes("Debug"));
+      assert.ok(launch.args.includes("platform=iOS Simulator,id=bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"));
     }
     assert.equal(collected, 1);
   }

@@ -2,6 +2,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { prepare } = require("./prepare-ios-native");
 const { executeLogged, collectTestResults, runSimulatorChecks, simulatorFamilies } = require("./check-ios-native");
+const simulator = require("./native-simulator-session");
 
 const selectedTests = Object.freeze([
   "testStartupDoesNotOpenKeyboardOrShowAuthenticatedState",
@@ -48,23 +49,21 @@ function run() {
   });
   try {
     const inventory = JSON.parse(logged("simulator-inventory", "xcrun", ["simctl", "list", "devices", "available", "--json"]));
-    const devices = Object.entries(inventory.devices).filter(([runtime]) => runtime.includes("iOS"))
-      .flatMap(([, values]) => values).filter(device => device.isAvailable);
     const common = ["-project", path.join(directory, "TeleTypTelNative.xcodeproj"), "-scheme", "TeleTypTelNative",
       "-derivedDataPath", path.join(directory, "DerivedData"), "CODE_SIGNING_ALLOWED=NO"];
     const failures = [];
     for (const family of families) {
-      const device = devices.find(device => device.name.startsWith(family));
-      if (!device) throw new Error("Missing " + family + " simulator; no silent coverage skip");
       const resultBundle = path.join(reports, family + ".xcresult");
       let passed = false;
+      let device;
       try {
+        device = simulator.prepare({ inventory, family, reports, prefix: family + "-simulator", logged });
         runSimulatorChecks({ common, family, deviceID: device.udid, resultBundle, tests, logged,
           destination: "platform=iOS Simulator,arch=" + (process.arch === "arm64" ? "arm64" : "x86_64") + ",id=" + device.udid });
         passed = true;
       } catch (error) { failures.push(family + ": " + error.message); }
       finally { collectTestResults(resultBundle, { root, reports, family }); }
-      result.uiTests.push({ family, name: device.name, passed });
+      result.uiTests.push({ family, name: device?.name ?? family, freshSimulator: device?.fresh === true, passed });
     }
     if (failures.length) throw new Error(failures.join("\n"));
   } catch (error) {
