@@ -174,6 +174,26 @@ pixel claim. Preserve keyboard, VoiceOver, Dynamic Type and minimum touch target
 while aligning presentation. No backend feature reimplementation, live service
 call, APNs activation or production infrastructure change was made for this audit.
 
+### Rotation and menu activation follow-up
+
+The two failed iPhone checks are being addressed without waiving their layout
+requirements. Direct/group message menus explicitly use their normalized centre
+as the accessibility activation point, rather than inheriting a stale descendant
+point after rotation. This uses Apple's documented
+[UnitPoint activation modifier](https://developer.apple.com/documentation/swiftui/view/accessibilityactivationpoint(_:)-9l0w0),
+available from iOS 14; it does not use guessed screen coordinates or change the
+44-point rectangle, menu permissions or message content.
+
+The DEBUG measurement probe also reports the real UIWindow bounds and scene
+orientation. The rotation helper first waits for that native state, then checks
+the actual screenshot orientation and application frame. It no longer repeatedly
+requests a potentially stale AX application frame and a compositor screenshot in
+the same polling predicate. Each stage has its own ten-second simulator budget;
+this is not a physical-device rotation-latency claim. The group check now also
+opens the actual message menu and selects Copy, rather than relying only on an
+`isHittable` result. New simulator results remain required before calling either
+failed check resolved. The earlier 352-case audit result is unchanged.
+
 ## Shared web smileys (2026-11-17)
 
 Feedback archive 9 shows build 16.9's custom web smiley grid, not Apple's Unicode

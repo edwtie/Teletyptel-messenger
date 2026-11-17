@@ -290,6 +290,7 @@ struct NativeChatView: View {
     private func messageMenu(_ message: NativeChatMessage) -> some View {
         Menu { messageActions(message) } label: { Image(systemName: "ellipsis").frame(width: 44, height: 44).contentShape(Rectangle()) }
             .buttonStyle(.plain).foregroundStyle(NativeWebStyle.muted)
+            .accessibilityActivationPoint(UnitPoint.center)
             .accessibilityLabel("Berichtmenu").accessibilityIdentifier("message-menu-" + message.id.uuidString)
     }
 

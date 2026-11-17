@@ -80,6 +80,7 @@ test("Message menus sit beside compact web-style bubbles without covering text o
     assert.match(source, /NativeInlineMessage/);
     assert.match(source, /Image\(systemName: "ellipsis"\)\.frame\(width: 44, height: 44\)/);
     assert.match(source, /frame\(width: 44, height: 44\)\.contentShape\(Rectangle\(\)\)/);
+    assert.match(source, /accessibilityActivationPoint\(UnitPoint.center\)/);
     assert.doesNotMatch(source, /overlay\(alignment: \.topTrailing\)|padding\(\.trailing, 44\)/);
     assert.match(source, /message-metadata-/);
   }
@@ -87,6 +88,19 @@ test("Message menus sit beside compact web-style bubbles without covering text o
   assert.match(line, /ViewThatFits\(in: \.horizontal\)/);
   assert.match(line, /HStack\(alignment: \.lastTextBaseline, spacing: 8\)/);
   assert.match(line, /VStack\(alignment: \.trailing, spacing: 4\)/);
+});
+
+test("Rotation waits for actual native scene geometry before reading compositor pixels and still tests message-menu activation", () => {
+  const style = read(app + "NativeWebStyle.swift");
+  assert.match(style, /"windowWidth": window.bounds.width, "windowHeight": window.bounds.height/);
+  assert.match(style, /window.windowScene\?\.interfaceOrientation.rawValue/);
+  const methods = read("mobile/ios-native/UITests/NativeStartupUITests.swift");
+  const rotate = methods.split("private func rotate(")[1].split("private func signInFixture")[0];
+  assert.match(rotate, /expectation\(for: windowSettled, evaluatedWith: probe\)[\s\S]+expectation\(for: screenSettled, evaluatedWith: application\)/);
+  assert.match(rotate, /interfaceOrientation.isLandscape == landscape && \(width > height\) == landscape/);
+  assert.match(rotate, /XCTAssertEqual\(frame.width > frame.height, landscape\)/);
+  assert.match(methods, /outgoingMenu.tap\(\)[\s\S]+copy.waitForExistence\(timeout: 5\)[\s\S]+copy.tap\(\)/);
+  assert.ok(methods.includes("outgoingMenu.isHittable"));
 });
 
 test("Menu simulator scope measures hit targets and overlap for both orientations, not just screenshots", () => {

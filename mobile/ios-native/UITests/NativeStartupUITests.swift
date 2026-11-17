@@ -709,6 +709,11 @@ final class NativeStartupUITests: XCTestCase {
         expectation(for: latestVisible, evaluatedWith: outgoing)
         waitForExpectations(timeout: 10)
         snapshot("group-landscape")
+        outgoingMenu.tap()
+        let copy = application.buttons["Kopiëren"]
+        XCTAssertTrue(copy.waitForExistence(timeout: 5))
+        snapshot("group-message-actions-landscape")
+        copy.tap()
         assertConversationHeader("group", actions: ["group-invite", "group-menu"])
         application.buttons["group-menu"].tap()
         let leave = application.buttons["group-leave"]
@@ -1012,13 +1017,27 @@ final class NativeStartupUITests: XCTestCase {
     private func rotate(_ orientation: UIDeviceOrientation) {
         XCUIDevice.shared.orientation = orientation
         let landscape = orientation == .landscapeLeft || orientation == .landscapeRight
-        let settled = NSPredicate { [self] _, _ in
-            let frame = application.frame
-            let image = XCUIScreen.main.screenshot().image.size
-            return (frame.width > frame.height) == landscape && (image.width > image.height) == landscape
+        let probe = application.descendants(matching: .any)["visual-native-viewport"].firstMatch
+        XCTAssertTrue(probe.waitForExistence(timeout: 5))
+        let windowSettled = NSPredicate { _, _ in
+            guard let value = probe.value as? String, let data = value.data(using: .utf8),
+                  let measurement = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let rawOrientation = measurement["interfaceOrientation"] as? Int,
+                  let interfaceOrientation = UIInterfaceOrientation(rawValue: rawOrientation), interfaceOrientation != .unknown,
+                  let width = measurement["windowWidth"] as? Double,
+                  let height = measurement["windowHeight"] as? Double else { return false }
+            return interfaceOrientation.isLandscape == landscape && (width > height) == landscape
         }
-        expectation(for: settled, evaluatedWith: application)
+        expectation(for: windowSettled, evaluatedWith: probe)
         waitForExpectations(timeout: 10)
+        let screenSettled = NSPredicate { _, _ in
+            let image = XCUIScreen.main.screenshot().image.size
+            return (image.width > image.height) == landscape
+        }
+        expectation(for: screenSettled, evaluatedWith: application)
+        waitForExpectations(timeout: 10)
+        let frame = application.frame
+        XCTAssertEqual(frame.width > frame.height, landscape)
     }
 
     private func signInFixture(_ scenario: String) {

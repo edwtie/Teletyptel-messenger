@@ -113,7 +113,9 @@ private final class NativeVisualViewportValue: UIView {
             let area = window.bounds.inset(by: insets)
             let value: [String: Any] = ["source": "measured-safe-area", "x": Int((area.minX * scale).rounded()),
                 "y": Int((area.minY * scale).rounded()), "width": Int((area.width * scale).rounded()),
-                "height": Int((area.height * scale).rounded()), "scale": scale]
+                "height": Int((area.height * scale).rounded()), "scale": scale,
+                "windowWidth": window.bounds.width, "windowHeight": window.bounds.height,
+                "interfaceOrientation": window.windowScene?.interfaceOrientation.rawValue ?? UIInterfaceOrientation.unknown.rawValue]
             guard let data = try? JSONSerialization.data(withJSONObject: value, options: [.sortedKeys]) else { return nil }
             return String(data: data, encoding: .utf8)
         }
