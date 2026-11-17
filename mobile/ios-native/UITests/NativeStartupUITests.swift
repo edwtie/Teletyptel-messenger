@@ -34,6 +34,40 @@ final class NativeStartupUITests: XCTestCase {
         snapshot("login-web-style")
     }
 
+    func testStartupProgressStopsOnCancelAndCertificateFailure() {
+        application.launchEnvironment["TELETYPTEL_NATIVE_UI_FIXTURE"] = "connected"
+        application.launchEnvironment["TELETYPTEL_NATIVE_STARTUP_PROGRESS_FIXTURE"] = "checking"
+        application.launch()
+        let progress = application.descendants(matching: .any)["startup-progress"].firstMatch
+        XCTAssertTrue(progress.waitForExistence(timeout: 10))
+        XCTAssertFalse(application.keyboards.firstMatch.exists)
+        snapshot("startup-progress-portrait")
+        rotate(.landscapeLeft)
+        XCTAssertTrue(progress.exists)
+        XCTAssertGreaterThan(progress.frame.width, 100)
+        XCTAssertTrue(application.frame.contains(progress.frame))
+        snapshot("startup-progress-landscape")
+        application.buttons["startup-cancel-check"].tap()
+        let stopped = NSPredicate { _, _ in
+            !self.application.descendants(matching: .any)["startup-progress"].firstMatch.exists
+        }
+        expectation(for: stopped, evaluatedWith: nil); waitForExpectations(timeout: 10)
+        XCTAssertFalse(application.keyboards.firstMatch.exists)
+        application.terminate()
+        rotate(.portrait)
+        application.launchEnvironment["TELETYPTEL_NATIVE_STARTUP_PROGRESS_FIXTURE"] = "certificate"
+        application.launch()
+        let failed = NSPredicate { _, _ in
+            let status = self.application.staticTexts["startup-status"]
+            return status.exists && status.label.contains("certificaat")
+        }
+        expectation(for: failed, evaluatedWith: nil); waitForExpectations(timeout: 10)
+        XCTAssertFalse(progress.exists)
+        XCTAssertTrue(application.buttons["login-settings"].isHittable)
+        XCTAssertFalse(application.keyboards.firstMatch.exists)
+        snapshot("startup-progress-certificate-stopped")
+    }
+
     func testEnglishStartupDoesNotTranslateUserDataOrRequestPermissions() {
         application.launchArguments = ["-teletyptel.native.interfaceLanguage", "en", "-teletyptel.native.serverAddress", "", "-teletyptel.native.xmppDomain", ""]
         application.launch()

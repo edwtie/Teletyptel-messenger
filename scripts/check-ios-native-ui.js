@@ -5,6 +5,7 @@ const { executeLogged, collectTestResults, runSimulatorChecks, simulatorFamilies
 
 const selectedTests = Object.freeze([
   "testStartupDoesNotOpenKeyboardOrShowAuthenticatedState",
+  "testStartupProgressStopsOnCancelAndCertificateFailure",
   "testLoginSettingsAreSeparateAndPreserveDraftsOnCancel",
   "testLoginSettingsSaveAndRotateWithoutOpeningKeyboard",
   "testRotationPreservesConfigurationAndInvalidAddressShowsInlineError",
@@ -22,6 +23,8 @@ const selectedTests = Object.freeze([
 
 function testsForScope(scope = "regression") {
   if (scope === "regression") return selectedTests;
+  if (scope === "startup") return ["testStartupDoesNotOpenKeyboardOrShowAuthenticatedState",
+    "testStartupProgressStopsOnCancelAndCertificateFailure", "testEnglishStartupDoesNotTranslateUserDataOrRequestPermissions"];
   if (scope === "menus") return ["testChatHeaderAndMessageMenuDoNotOverlapAcrossRotation", "testMainMenuRemainsSeparateFromConversationMenu",
     "testMessageMenuEditForwardAndBothDeletionOptions", "testExistingGroupJoinSendRotationAndLeave"];
   if (scope === "groups") return selectedTests.filter(name => name.includes("Group"));
@@ -42,7 +45,7 @@ function run() {
     scope: "focused simulator UI regression; not a full unit, media or device SDK run",
     uiScope: scope, selectedTests: tests, uiTests: [] };
   const logged = (name, command, args, timeout) => executeLogged(command, args, {
-    root, reports, name, timeout: timeout ?? (scope === "menus" && name.endsWith("-build") ? 1200000 : undefined)
+    root, reports, name, timeout: timeout ?? (["menus", "startup"].includes(scope) && name.endsWith("-build") ? 1200000 : undefined)
   });
   try {
     const inventory = JSON.parse(logged("simulator-inventory", "xcrun", ["simctl", "list", "devices", "available", "--json"]));

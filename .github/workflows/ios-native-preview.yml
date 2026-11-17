@@ -56,7 +56,7 @@ on:
       ui_scope:
         description: Explicit test selection for focused-ui only
         type: choice
-        options: [regression, groups, tc, menus]
+        options: [regression, groups, tc, menus, startup]
         default: regression
 
 permissions:
@@ -64,7 +64,7 @@ permissions:
 
 jobs:
   native-preview:
-    runs-on: ${{ (inputs.validation_mode == 'focused-archive' || (inputs.validation_mode == 'focused-ui' && inputs.ui_scope == 'menus')) && 'macos-15-intel' || 'macos-15' }}
+    runs-on: ${{ (inputs.validation_mode == 'focused-archive' || (inputs.validation_mode == 'focused-ui' && (inputs.ui_scope == 'menus' || inputs.ui_scope == 'startup'))) && 'macos-15-intel' || 'macos-15' }}
     timeout-minutes: 45
     strategy:
       fail-fast: false

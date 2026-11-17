@@ -3075,6 +3075,33 @@ runner. No application authentication/network timeout is changed. A further
 unsigned validation run is required; these failed runs do not establish full
 iPhone/iPad acceptance.
 
+## Startup activity and visual baseline (2026-11-17)
+
+The requested visual baseline remains the legacy 16.9 interface. Feedback ZIP 5
+contained a 16.3 screenshot and is not used as a new design specification.
+
+The native startup/sign-in header now reserves a four-point activity strip.
+It is blue while the view prepares, an explicit server check runs, credentials
+are authenticated, XMPP connects, or biometric restoration is pending. The
+existing status text remains on the same page. Idle, cancellation, certificate
+failure and waiting for user input stop the indicator. Settings show their own
+separately identified strip during an explicit server check.
+
+This is indeterminate activity, not a guessed percentage or a delayed login.
+The blue segment moves without changing layout; Reduce Motion keeps it still.
+It cannot intercept taps and does not add a server request, startup wait, extra
+error page or automatic field focus. The OS-managed launch image itself is not
+an animated app view. See [Apple's progress-indicator guidance](https://developer.apple.com/design/human-interface-guidelines/progress-indicators).
+
+Local source/generator checks pass 67 tests, with one macOS-only check skipped.
+The new unsigned `focused-ui` / `startup` scope selects three startup-only tests,
+including checking, cancellation, certificate failure, rotation and no automatic
+keyboard. Its slow/failing checker is DEBUG-only and restricted to
+`example.invalid` / `localhost`; it never probes a real server. Simulator evidence
+is still required. The earlier menu run `43966885233` was not green (the iPhone
+runner timed out loading Accessibility); it is not reported as acceptance proof.
+No new TestFlight upload is authorized by this test scope.
+
 ## Primary references
 
 - [RFC 7395: XMPP over WebSocket](https://www.rfc-editor.org/rfc/rfc7395.html):

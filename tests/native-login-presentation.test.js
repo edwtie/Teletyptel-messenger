@@ -75,3 +75,32 @@ test("Focused simulator coverage includes login, gear settings, cancellation and
   assert.match(tests, /snapshot\("login-settings-separate"\)/);
   assert.match(read(".github/workflows/ios-native-preview.yml"), /tests\/native-login-presentation\.test\.js/);
 });
+
+test("Startup activity follows real preparation, server, authentication and biometric work without fake percentages", () => {
+  const busy = source.split("private var startupIsBusy: Bool")[1].split("private var hasServerConfiguration")[0];
+  assert.match(busy, /preparingStartup \|\| model.state.phase == \.checking \|\| loginModel.isWorking \|\| savedLogin.isWorking/);
+  assert.match(source, /NativeStartupProgress\(isActive: startupIsBusy\)/);
+  assert.match(source, /NativeStartupProgress\(isActive: model.state.phase == \.checking, identifier: "settings-startup-progress"\)/);
+  assert.match(source, /restoreSavedLoginIfForeground\(\)\s+preparingStartup = false/);
+  const indicator = read("mobile/ios-native/App/NativeWebStyle.swift").split("struct NativeStartupProgress")[1].split("struct NativeConversationHeader")[0];
+  assert.match(indicator, /accessibilityReduceMotion/);
+  assert.match(indicator, /paused: reduceMotion/);
+  assert.match(indicator, /Capsule\(\).fill\(NativeWebStyle.accent\)/);
+  assert.match(indicator, /frame\(height: 4\).clipped\(\).allowsHitTesting\(false\)/);
+  assert.match(indicator, /accessibilityHidden\(!isActive\)/);
+  assert.doesNotMatch(indicator, /ProgressView\(value:|Timer|Task.sleep|100%|URLSession/);
+});
+
+test("Startup simulator scope checks activity, cancel, certificate failure and no keyboard without real services", () => {
+  const { testsForScope } = require("../scripts/check-ios-native-ui");
+  const methods = read("mobile/ios-native/UITests/NativeStartupUITests.swift");
+  const selected = testsForScope("startup");
+  assert.equal(selected.length, 3);
+  for (const name of selected) assert.ok(methods.includes("func " + name + "()"), name);
+  for (const value of ['"startup-cancel-check"', '"startup-progress-portrait"', '"startup-progress-landscape"',
+    '"startup-progress-certificate-stopped"', '"TELETYPTEL_NATIVE_STARTUP_PROGRESS_FIXTURE"']) assert.ok(methods.includes(value));
+  const fixture = source.split("private struct NativeLoginUIFixture:")[1];
+  assert.match(fixture, /configuration.origin.host == "example.invalid", configuration.domain == "localhost"/);
+  assert.match(fixture, /throw ConnectionFailure.certificate/);
+  assert.match(source, /#if DEBUG\s+private actor NativeLoginUIConnectionCount/);
+});

@@ -33,6 +33,32 @@ enum NativeWebStyle {
     }
 }
 
+struct NativeStartupProgress: View {
+    let isActive: Bool
+    var identifier = "startup-progress"
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        GeometryReader { geometry in
+            if isActive {
+                TimelineView(.animation(minimumInterval: 0.05, paused: reduceMotion)) { context in
+                    let width = max(1, geometry.size.width * 0.28)
+                    let phase = reduceMotion ? 0.5 : context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1.6) / 1.6
+                    ZStack(alignment: .leading) {
+                        NativeWebStyle.button
+                        Capsule().fill(NativeWebStyle.accent).frame(width: width)
+                            .offset(x: CGFloat(phase) * (geometry.size.width + width) - width)
+                    }
+                }
+            } else { NativeWebStyle.line.frame(height: 1) }
+        }
+        .frame(height: 4).clipped().allowsHitTesting(false)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Voortgang opstarten").accessibilityValue(Text("Bezig"))
+        .accessibilityHidden(!isActive).accessibilityIdentifier(identifier)
+    }
+}
+
 struct NativeConversationHeader<Actions: View>: View {
     let title: String
     let subtitle: String

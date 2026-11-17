@@ -73,6 +73,7 @@ struct NativeStartupView: View {
     @StateObject private var providerSDK = NativeProviderSDK()
     @State private var selectedContact: NativeContact?
     @State private var showMessenger = false
+    @State private var preparingStartup = true
     @Environment(\.scenePhase) private var scenePhase
     @State private var address = ""
     @State private var domain = ""
@@ -124,7 +125,7 @@ struct NativeStartupView: View {
                         .foregroundStyle(NativeWebStyle.muted)
                 }
                 .frame(maxWidth: 560, alignment: .leading).padding(20)
-                NativeWebStyle.line.frame(height: 1).accessibilityHidden(true)
+                NativeStartupProgress(isActive: startupIsBusy)
                 ScrollView {
                   VStack(alignment: .leading, spacing: 18) {
                     if fixtureName != nil {
@@ -142,15 +143,10 @@ struct NativeStartupView: View {
                             }
                         }
                     }
-                    if savedLogin.isWorking { ProgressView("Face ID of Touch ID…") }
                     if let notice = savedLogin.notice {
                         Text(notice).font(.footnote).accessibilityIdentifier("saved-login-status")
                     }
                     VStack(alignment: .leading, spacing: 12) {
-                        if model.state.phase == .checking || loginModel.isWorking {
-                            ProgressView("Verbinding voorbereiden…")
-                                .tint(.blue)
-                        }
                         Text(LocalizedStringKey(statusText))
                             .fixedSize(horizontal: false, vertical: true)
                             .accessibilityIdentifier("startup-status")
@@ -174,6 +170,7 @@ struct NativeStartupView: View {
                         } else if model.state.phase == .checking {
                             Button("Annuleren", action: model.cancel)
                                 .frame(minHeight: 44)
+                                .accessibilityIdentifier("startup-cancel-check")
                         }
                     }
                     .padding()
@@ -254,6 +251,10 @@ struct NativeStartupView: View {
         }
     }
 
+    private var startupIsBusy: Bool {
+        preparingStartup || model.state.phase == .checking || loginModel.isWorking || savedLogin.isWorking
+    }
+
     private var hasServerConfiguration: Bool {
         (try? ServerConfiguration(address: address, domain: domain)) != nil
     }
@@ -300,6 +301,7 @@ struct NativeStartupView: View {
                         model.check(address: settingsAddress, domain: settingsDomain)
                     }.accessibilityIdentifier("check-connection")
                         .disabled(settingsAddress.isEmpty || settingsDomain.isEmpty || model.state.phase == .checking)
+                    NativeStartupProgress(isActive: model.state.phase == .checking, identifier: "settings-startup-progress")
                     Text(LocalizedStringKey(statusText)).accessibilityIdentifier("settings-startup-status")
                 }
                 Section("Taal") {
@@ -383,10 +385,14 @@ struct NativeStartupView: View {
             calls.attach(loginModel)
             #if DEBUG
             if fixtureName == "connected" { calls.presentVisualFixture() }
+            if fixtureName != nil, ProcessInfo.processInfo.environment["TELETYPTEL_NATIVE_STARTUP_PROGRESS_FIXTURE"] != nil {
+                model.check(address: address, domain: domain)
+            }
             #endif
         }
         .task {
             restoreSavedLoginIfForeground()
+            preparingStartup = false
         }
         .onChange(of: address) { _ in resetConfiguration() }
         .onChange(of: domain) { _ in resetConfiguration() }
@@ -587,6 +593,8 @@ struct NativeStartupView: View {
     }
 
     private var statusText: String {
+        if preparingStartup { return "App voorbereiden…" }
+        if savedLogin.isWorking { return "Face ID of Touch ID…" }
         switch loginModel.phase {
         case .idle: break
         case .checking: return "Chatserver opnieuw controleren voordat je inloggegevens worden verstuurd…"
@@ -697,6 +705,12 @@ private struct NativeLoginUIFixture: ServerChecking, NativeAccountChallenging, N
     func check(_ configuration: ServerConfiguration) async throws -> ProbeReport {
         guard configuration.origin.host == "example.invalid", configuration.domain == "localhost" else {
             throw ConnectionFailure.configuration
+        }
+        if ProcessInfo.processInfo.environment["TELETYPTEL_NATIVE_STARTUP_PROGRESS_FIXTURE"] == "checking" {
+            try await Task.sleep(nanoseconds: 300_000_000_000)
+        }
+        if ProcessInfo.processInfo.environment["TELETYPTEL_NATIVE_STARTUP_PROGRESS_FIXTURE"] == "certificate" {
+            throw ConnectionFailure.certificate
         }
         try await Task.sleep(nanoseconds: 150_000_000)
         return ProbeReport(mechanisms: ["PLAIN"])
