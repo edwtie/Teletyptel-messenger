@@ -2,6 +2,12 @@ name: Capture real web references for native visual audit
 
 on:
   workflow_dispatch:
+  push:
+    branches: [codex/teletyptel-beta-polish]
+    paths:
+      - .github/workflows/native-visual-web.yml
+      - scripts/native-visual-audit/**
+      - tests/native-visual-audit.test.js
 
 permissions:
   contents: read
