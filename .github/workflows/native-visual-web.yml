@@ -1,0 +1,35 @@
+name: Capture real web references for native visual audit
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  web-reference:
+    runs-on: macos-15-intel
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: 22
+      - name: Check strict comparison and coverage contracts
+        run: node --test tests/native-visual-audit.test.js
+      - name: Install isolated pinned screenshot tools
+        run: npm install --prefix scripts/native-visual-audit --package-lock=false --ignore-scripts --no-audit --no-fund
+      - name: Install WebKit
+        run: node scripts/native-visual-audit/node_modules/playwright/cli.js install webkit
+      - name: Capture real web UI with fictitious data and blocked external connections
+        run: node scripts/native-visual-audit/capture-web.js artifacts/native-visual-web
+      - name: Retain reference images and source hashes, not a claim of native pixel equality
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        with:
+          name: actual-web-reference-WebKit
+          path: artifacts/native-visual-web/
+          if-no-files-found: error
+          retention-days: 7

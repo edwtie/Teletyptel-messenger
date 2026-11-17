@@ -1,0 +1,11 @@
+{
+  "name": "teletyptel-native-visual-audit",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Isolated real-web captures and fail-closed native pixel comparison",
+  "engines": { "node": ">=22" },
+  "dependencies": {
+    "playwright": "1.60.0",
+    "pngjs": "7.0.0"
+  }
+}

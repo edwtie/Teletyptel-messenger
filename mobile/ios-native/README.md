@@ -1,5 +1,65 @@
 # TeleTypTel native iOS migration
 
+## Screen by screen visual audit (2026-11-17)
+
+The visual acceptance catalogue in `scripts/native-visual-audit/catalogue.js`
+contains 44 app screens, each with iPhone/iPad, portrait/landscape and light/dark
+variants: 352 required comparisons. A missing capture does not disappear from
+the denominator. A successful screenshot or simulator job is not pixel equality.
+The catalogue is a bounded set of initial states, not every possible message,
+language, keyboard, error, accessibility text size or live video combination.
+
+`capture-web.js` renders the actual committed `chat.html`, CSS, scripts, logo,
+wallpaper and smileys. It records the exact revision and source hashes, freezes
+the clock, mocks API/XMPP with fictitious content and blocks external requests.
+It neither connects to WAMP/APNs nor substitutes a lookalike HTML mockup. On
+wide web layouts some actions are persistent toolbars instead of popovers; that
+presentation is retained, not forcibly restyled to resemble native. The separate
+manual `native-visual-web.yml` workflow captures desktop WebKit on macOS. This
+is a reproducible web reference, not a claim of physical iOS Safari equivalence.
+
+The unsigned native `visual` scope captures main-menu sheets in both orientations
+and themes, plus existing login, contacts, menus, chat, groups, smileys, TC and
+startup scenarios. Real XCTest screenshots also retain point-based geometry.
+`import-native.js` imports known screenshot names, hashes original PNGs and reads
+XCTest's EXIF orientation; landscape is not inferred from filenames alone.
+Original bytes are retained. Existing captures have different message/history
+content and time from the web fixture, and no measured app-only safe-area crop:
+they are useful side-by-side review evidence but are **not comparable for strict
+pixel acceptance**. The report explicitly blocks them rather than calling them
+passed or assigning a misleading similarity percentage.
+
+`compare.js` produces a local HTML gallery and full coverage JSON. Eligible pairs
+require identical fixture hash, content clock, locale, timezone, viewport,
+scale, orientation and theme, with an explicitly measured native app viewport.
+PNG EXIF rotations are lossless pixel permutations. There is no resampling,
+automatic alignment, antialiasing allowance, similarity threshold, app-region
+mask or automatic baseline approval. Every RGBA channel must match. The command
+exits nonzero until all 352 catalogue cases are eligible and identical. Native
+system keyboards, permission/OS pickers and provider-owned login pages are
+outside the app viewport, not silently ignored app controls.
+
+Run the tools from the repository root, always with fresh output directories:
+
+```text
+npm install --prefix scripts/native-visual-audit --package-lock=false --ignore-scripts --no-audit --no-fund
+node scripts/native-visual-audit/node_modules/playwright/cli.js install webkit
+node scripts/native-visual-audit/capture-web.js artifacts/visual-web-new
+node scripts/native-visual-audit/import-native.js EXPORTED_ATTACHMENTS artifacts/visual-native-new EXACT_NATIVE_COMMIT RUN_URL
+node scripts/native-visual-audit/compare.js artifacts/visual-web-new artifacts/visual-native-new artifacts/visual-report-new
+node --test tests/native-visual-audit.test.js
+```
+
+XCTest exports supplied to the importer use family-prefixed `iphone-manifest.json`,
+`ipad-manifest.json` and family-prefixed original exported PNG basenames. Do not
+mix revisions or infer fixture metadata from screenshots. The initial visual
+review found unnecessarily tall message bubbles: native chat/group menu targets
+were inside the bubble and timestamps always occupied a separate line. Menus
+now retain their 44-point targets beside the bubble; short text and metadata
+share a baseline, while longer text wraps with metadata below. The simulator
+checks compact short-bubble height and menu/text/metadata nonoverlap through
+rotation. This is a targeted correction, not a completed all-screen parity claim.
+
 ## Shared web smileys (2026-11-17)
 
 Feedback archive 9 shows build 16.9's custom web smiley grid, not Apple's Unicode
