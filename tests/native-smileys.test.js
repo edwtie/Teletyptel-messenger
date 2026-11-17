@@ -66,7 +66,8 @@ test("Direct and group chats share the image picker and insert text codes withou
   assert.match(view, /CGImageSourceCreateImageAtIndex/);
   assert.match(view, /UIImage\(named: smiley.assetName\)/);
   assert.match(view, /guard showSmileys else \{ return Text\(verbatim: value\) \}/);
-  assert.match(view, /\.sorted \{ \$0.code.count/);
+  assert.match(view, /let matches = NativeSmiley.aliases/);
+  assert.match(view, /return first.code.count > second.code.count/);
   assert.match(view, /\.accessibilityLabel\(value\)/);
   assert.doesNotMatch(view, /URLSession|WKWebView|WebKit|sendDraft|sendMessage|react\(/);
   assert.match(read("mobile/ios-native/App/NativeAppearanceView.swift"), /Toggle\("Smileys weergeven", isOn: \$showSmileys\)/);

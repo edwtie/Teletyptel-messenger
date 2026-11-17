@@ -3,6 +3,10 @@ import UIKit
 import ImageIO
 
 struct NativeSmiley: Decodable, Identifiable {
+    struct Alias {
+        let code: String
+        let smiley: NativeSmiley
+    }
     let name: String
     let codes: [String]
     let assetName: String
@@ -12,6 +16,16 @@ struct NativeSmiley: Decodable, Identifiable {
         guard let data = NSDataAsset(name: "WebSmileyCatalogue")?.data,
               let entries = try? JSONDecoder().decode([NativeSmiley].self, from: data) else { return [] }
         return entries
+    }()
+    static let aliases: [Alias] = {
+        var result: [Alias] = []
+        for smiley in catalogue {
+            for code in smiley.codes { result.append(Alias(code: code, smiley: smiley)) }
+        }
+        return result.sorted { first, second in
+            if first.code.count != second.code.count { return first.code.count > second.code.count }
+            return first.code < second.code
+        }
     }()
     static func appending(_ code: String, to draft: String) -> String {
         draft + (draft.last.map { $0.isWhitespace ? "" : " " } ?? "") + code + " "
@@ -134,8 +148,7 @@ struct NativeSmileyText: View {
     var body: some View { rendered.accessibilityLabel(value) }
     private var rendered: Text {
         guard showSmileys else { return Text(verbatim: value) }
-        let matches = NativeSmiley.catalogue.flatMap { smiley in smiley.codes.map { (code: $0, smiley: smiley) } }
-            .sorted { $0.code.count == $1.code.count ? $0.code < $1.code : $0.code.count > $1.code.count }
+        let matches = NativeSmiley.aliases
         var result = Text("")
         var index = value.startIndex
         var plainStart = index
