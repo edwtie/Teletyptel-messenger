@@ -133,6 +133,7 @@ test("Web fixture renders frozen real web source, never mockup HTML, with extern
   assert.match(hook, /renderActiveConversation\(\)/);
   assert.match(hook, /xmppAvailability\?\.ready\(\)/);
   assert.match(hook, /updateCallUi\(\)/);
+  assert.ok(hook.includes('".chat-header"'));
   assert.match(runner, /Requested popover contains no visible controls/);
   assert.match(runner, /stateVerified: true/);
 });

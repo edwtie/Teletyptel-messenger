@@ -125,6 +125,55 @@ share a baseline, while longer text wraps with metadata below. The simulator
 checks compact short-bubble height and menu/text/metadata nonoverlap through
 rotation. This is a targeted correction, not a completed all-screen parity claim.
 
+## Visual audit results and remaining work (2026-11-18)
+
+**Full pixel equality is not established, and the current interfaces are visibly
+different.** This is not a completed all-screen visual acceptance or a new
+TestFlight release. The source/generator/tool checks pass 111 tests, with one
+macOS-only check skipped; these are not 111 passed visual comparisons.
+
+Actual unsigned evidence at native source `f7f40394978a30b58bf351632cf25422ec443bd1`:
+
+- [Capture run 44195745476](https://github.com/edwtie/Teletyptel-messenger/actions/runs/44195745476):
+  iPad Pro 11-inch (M4), iOS 18.6 passes all three presentation suites, producing
+  50 distinct imported images after deduplication. The iPhone build exceeded its
+  compiler time budget, so there is no complete iPhone capture set from this run.
+- [Repair run 44195752179](https://github.com/edwtie/Teletyptel-messenger/actions/runs/44195752179):
+  the iPad passes all four focused checks. The iPhone compiles and passes main-menu
+  geometry and startup progress/cancel/certificate checks, but fails the rotation
+  settling predicate and group-message-menu activation check. Those failures are
+  unresolved validation gaps, not waived assertions or proof of device acceptance.
+- [WebKit touch-reference run 44195757146](https://github.com/edwtie/Teletyptel-messenger/actions/runs/44195757146)
+  captures 216 verified web states. A separate local Chromium capture includes
+  the unpublished frontend changes without publishing those files. Desktop engine
+  references are not physical-device Safari or native rendering proof.
+
+The local review at `artifacts/native-visual-review-final-2026-11-18/index.html`
+uses 56 newly rendered local web views, matching the measured native app size
+where a counterpart exists, and the 50 original iPad captures. Its 352-case matrix
+contains 46 diagnostic pairs, 10 web-only cases, 4 native-only cases and 292 cases
+without either image in that review set. **Zero cases meet strict pixel
+acceptance.** This means the full claim is unproven, not that 352 functioning
+screens have all failed. Diagnostic pixel percentages include different fixture
+content and must not be advertised as a product similarity or quality score.
+
+Confirmed presentation differences and concrete next acceptance work:
+
+| Priority | Area | Required change/evidence |
+| --- | --- | --- |
+| P0 | Comparable fixtures | Share message/history/avatars, clock, locale, timezone, provider availability and translation state, recording the same verified fixture hash in both captures. Do not fill missing metadata with assumed values. |
+| P0 | iPhone rotation/group menu | Resolve the failed rotation-settling and activation checks with their real screenshots/hierarchy; rerun the unchanged hit-area/nonoverlap requirements and obtain a complete capture set. |
+| P1 | Adaptive shell | At 834-point portrait width, web uses a single conversation pane while native retains a 300-point contact column. Match the web breakpoints, drawer/column behavior and header actions in both orientations. |
+| P1 | Main/conversation menus | The measured iPad main menu is 252×253 native versus 320×242 web; the conversation menu is 260×333 versus 280×223. Align placement, dimensions, symbol artwork and available actions without silently removing capabilities. |
+| P1 | Chat | Compact short bubbles are implemented, but composer dimensions, history/status rows, wallpaper sizing, message alignment and reaction/menu symbols still differ. Retest with identical message data. |
+| P1 | Forms and missing native screens | Native Forms/sheets differ from web dialogs, tabs and grids. Align app-owned account, appearance, groups, translation and dialer components. Native News/Support remain disabled placeholders, not completed equivalents. |
+| P2 | Complete proof | Capture every remaining catalogue state, fix measured differences and rerun exact RGBA comparisons. Any deliberate platform exception must be documented, not hidden with masks, scaling, tolerances or automatic baseline approval. |
+
+Native system permission/picker/provider screens remain outside the app-owned
+pixel claim. Preserve keyboard, VoiceOver, Dynamic Type and minimum touch targets
+while aligning presentation. No backend feature reimplementation, live service
+call, APNs activation or production infrastructure change was made for this audit.
+
 ## Shared web smileys (2026-11-17)
 
 Feedback archive 9 shows build 16.9's custom web smiley grid, not Apple's Unicode

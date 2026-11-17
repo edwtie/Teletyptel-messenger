@@ -95,7 +95,7 @@ function evidencePath(directory, file) {
 
 function compareLayout(reference, actual) {
   if (actual?.geometry?.units !== "points" || actual.viewport?.source !== "measured-safe-area" || ![actual.viewport.x, actual.viewport.y, actual.scale].every(Number.isFinite) || actual.scale <= 0) return [];
-  const mappings = [["messenger-brand-header", ".topbar"], ["chat-header", ".conversation-header"],
+  const mappings = [["messenger-brand-header", ".topbar"], ["chat-header", ".chat-header"],
     ["chat-draft", "#messageInput"], ["main-menu-grid", "#mobileActionsPanel"],
     ["conversation-menu-panel", "#chatMorePanel"], ["smiley-picker", "#smileyPickerPanel"]];
   const fields = ["x", "y", "width", "height"];
