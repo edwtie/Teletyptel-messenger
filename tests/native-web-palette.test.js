@@ -85,6 +85,7 @@ test("Shared native components use web colour roles for selection, composer, rec
   assert.match(style, /background\(NativeWebStyle.composer, in:/);
   assert.match(style, /NativeWebStyle.composerSendText/);
   assert.match(style, /NativeWebStyle.totalDisabledText/);
+  assert.match(read("mobile/ios-native/App/NativeChatView.swift"), /NativeTotalConversationSymbol\(\).fill\(.foreground\)/);
   assert.match(style, /background\(NativeWebStyle.input, in:/);
   assert.match(style, /struct NativeWebTextButtonStyle: ButtonStyle/);
   assert.match(read("mobile/ios-native/App/NativeAppearanceView.swift"), /overlay\(NativeWebStyle.backgroundOverlay\)/);

@@ -22,12 +22,13 @@ without changing messages, archive queries, ordering, consent or network actions
 The focused unsigned `appearance` scope captures real simulator screenshots in
 both themes for login, contacts, main/conversation menus, settings, chat and TC,
 including portrait/landscape. All data is fictitious and no live media, APNs or
-TestFlight upload is enabled. Local source/generator/release checks pass 92 tests,
+TestFlight upload is enabled. Local source/generator/release checks pass 93 tests,
 with one macOS-only skip; actual simulator comparison is a separate checkpoint.
 Earlier screenshot evidence elsewhere in this document predates this palette.
 
-The first appearance run (`44122896197`) compiled and passed interaction checks,
-but manual screenshot inspection rejected it: Xcode discarded colour variants
+The first appearance run (`44122896197`) compiled and passed iPad interaction
+checks; its iPhone job was cancelled after manual screenshot inspection rejected
+the visual result. Xcode discarded colour variants
 because their universal idiom was missing. This is fixed in the generated asset
 metadata; a regression check also rejects Xcode's unassigned-colour warnings.
 Green interaction tests alone are not visual acceptance. Replacement screenshots
@@ -41,6 +42,19 @@ A DEBUG-only fixture check resolves every compiled UIColor in both appearances
 and compares its actual RGBA against the generated web reference. The appearance
 test requires that runtime check to pass before capturing the UI; this data and
 check do not activate any production network service.
+
+Accepted palette evidence: unsigned run `44151699693`, revision `295487f`,
+passes 2/2 UI tests on iPhone 16 Pro and 2/2 on iPad Pro 11-inch (M4), iOS 18.6.
+The tests resolve all 57 named colours against the web RGBA reference in both
+appearances and capture 20 screens per family. Representative login, menu, chat
+and TC screenshots were manually inspected, including landscape and dark mode.
+The upload job is skipped. This is not an actual-device, live-call, translation
+provider or full functional regression result.
+
+Screenshot review also found the TC shortcut shape explicitly painted white,
+overriding its disabled foreground. A final presentation-only follow-up makes
+that shape inherit the button foreground. It passes the local source checks;
+the simulator evidence above predates that one-line follow-up.
 
 This shared foundation is not a claim of complete pixel or functional equality.
 iOS keyboard, permission/provider dialogs, pickers and system menus remain native;

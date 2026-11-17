@@ -166,7 +166,7 @@ struct NativeChatView: View {
             identifier: "chat", identityLabel: (model.isConnected ? "Verbonden · " : "Niet verbonden · ") + contact.displayName + " · " + contact.presence.label,
             back: { onClose?(); dismiss() }) {
             Button { startCall(.total) } label: {
-                NativeTotalConversationSymbol().fill(.white).frame(width: 26, height: 26).frame(width: 44, height: 44)
+                NativeTotalConversationSymbol().fill(.foreground).frame(width: 26, height: 26).frame(width: 44, height: 44)
             }
             .buttonStyle(NativeTotalConversationButtonStyle()).disabled(!calls.canCall(contact))
             .accessibilityLabel("Totale conversatie starten").accessibilityIdentifier("chat-start-total")
