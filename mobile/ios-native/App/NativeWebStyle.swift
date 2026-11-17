@@ -73,6 +73,38 @@ enum NativeWebStyle {
     }
 }
 
+#if DEBUG
+extension NativeWebStyle {
+    static var paletteValidationStatus: String {
+        guard let data = NSDataAsset(name: "WebPaletteReference")?.data,
+              let reference = (try? JSONSerialization.jsonObject(with: data)) as? [String: [String: [Double]]] else {
+            return "Missing web palette reference"
+        }
+        for (role, themes) in reference.sorted(by: { $0.key < $1.key }) {
+            let name = "Web" + role.prefix(1).uppercased() + role.dropFirst()
+            for (theme, expected) in themes {
+                let traits = UITraitCollection(userInterfaceStyle: theme == "dark" ? .dark : .light)
+                guard let color = UIColor(named: name, in: .main, compatibleWith: traits)?.resolvedColor(with: traits) else {
+                    return "Missing colour " + name + " " + theme
+                }
+                var red: CGFloat = 0
+                var green: CGFloat = 0
+                var blue: CGFloat = 0
+                var alpha: CGFloat = 0
+                guard color.getRed(&red, green: &green, blue: &blue, alpha: &alpha), expected.count == 4 else {
+                    return "Invalid colour " + name + " " + theme
+                }
+                let actual = [red, green, blue, alpha].map(Double.init)
+                if zip(actual, expected).contains(where: { abs($0 - $1) > 0.002 }) {
+                    return "Incorrect RGBA " + name + " " + theme + ": " + actual.description
+                }
+            }
+        }
+        return "Web palette verified"
+    }
+}
+#endif
+
 struct NativeStartupProgress: View {
     let isActive: Bool
     var identifier = "startup-progress"

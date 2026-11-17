@@ -41,9 +41,13 @@ test("Native colour assets derive both appearances from the rendered web roles, 
     for (const entry of asset.colors) {
       assert.equal(entry.idiom, "universal");
       assert.equal(entry.color["color-space"], "srgb");
+      assert.ok(Object.values(entry.color.components).every(value => /^\d\.\d{6}$/.test(value)));
       assert.ok(Object.values(entry.color.components).every(value => Number.isFinite(Number(value)) && Number(value) >= 0 && Number(value) <= 1));
     }
   }
+  assert.equal(JSON.parse(generated["Assets.xcassets/WebPanel.colorset/Contents.json"]).colors[0].color.components.alpha, "1.000000");
+  assert.equal(JSON.parse(generated["Assets.xcassets/WebPanel.colorset/Contents.json"]).colors[0].color.components.red, "1.000000");
+  assert.deepEqual(JSON.parse(generated["Assets.xcassets/WebPaletteReference.dataset/reference.json"]), values);
   assert.match(read("scripts/prepare-ios-native.js"), /require\("\.\/native-web-palette"\)\.assets\(root\)/);
 });
 
@@ -111,5 +115,10 @@ test("Appearance comparison explicitly captures light/dark login, contacts, menu
   }
   assert.match(scenarios, /TELETYPTEL_NATIVE_UI_FIXTURE/);
   assert.match(scenarios, /-teletyptel.native.theme/);
+  assert.match(scenarios, /XCTAssertEqual\(palette.value as\? String, "Web palette verified"\)/);
+  const style = read("mobile/ios-native/App/NativeWebStyle.swift");
+  assert.match(style, /#if DEBUG\s+extension NativeWebStyle/);
+  assert.match(style, /UIColor\(named: name, in: .main, compatibleWith: traits\)/);
+  assert.match(style, /color.getRed\(&red, green: &green, blue: &blue, alpha: &alpha\)/);
   assert.match(read(".github/workflows/ios-native-preview.yml"), /tests\/native-web-palette.test.js/);
 });

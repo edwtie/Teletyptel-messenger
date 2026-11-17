@@ -142,6 +142,9 @@ struct NativeStartupView: View {
                         Text("TESTSCENARIO — geen echte serververbinding")
                             .font(.headline)
                             .accessibilityIdentifier("fixture-banner")
+#if DEBUG
+                            .accessibilityValue(NativeWebStyle.paletteValidationStatus)
+#endif
                     }
                     if showsServerStatusScreen {
                         serverStatusPanel

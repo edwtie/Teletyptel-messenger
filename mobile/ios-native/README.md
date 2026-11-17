@@ -33,6 +33,15 @@ metadata; a regression check also rejects Xcode's unassigned-colour warnings.
 Green interaction tests alone are not visual acceptance. Replacement screenshots
 must be inspected before accepting this change.
 
+The replacement interaction run (`44127643007`) also passed on both families,
+but its screenshots exposed a second metadata issue: whole-number colour strings
+were not rendered as the intended normalized RGBA components. Generated channels
+now always use decimal-point notation, including `1.000000` for opaque alpha.
+A DEBUG-only fixture check resolves every compiled UIColor in both appearances
+and compares its actual RGBA against the generated web reference. The appearance
+test requires that runtime check to pass before capturing the UI; this data and
+check do not activate any production network service.
+
 This shared foundation is not a claim of complete pixel or functional equality.
 iOS keyboard, permission/provider dialogs, pickers and system menus remain native;
 SF Symbols and native form layout still require visual comparison. Unimplemented

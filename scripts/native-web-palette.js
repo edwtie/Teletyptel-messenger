@@ -123,16 +123,21 @@ function palette(clientCSS, controlsCSS) {
 function assets(root) {
   const values = palette(fs.readFileSync(path.join(root, "php/public/chat-client.css"), "utf8"),
     fs.readFileSync(path.join(root, "php/public/call-controls-menu.css"), "utf8"));
-  return Object.fromEntries(Object.entries(values).map(([name, themes]) => {
+  const generated = Object.fromEntries(Object.entries(values).map(([name, themes]) => {
     const assetName = "Web" + name[0].toUpperCase() + name.slice(1);
     const colors = ["light", "dark"].map(theme => ({
       idiom: "universal",
       ...(theme === "dark" ? { appearances: [{ appearance: "luminosity", value: "dark" }] } : {}),
       color: { "color-space": "srgb", components: Object.fromEntries(["red", "green", "blue", "alpha"]
-        .map((channel, index) => [channel, String(themes[theme][index])])) }
+        .map((channel, index) => [channel, themes[theme][index].toFixed(6)])) }
     }));
     return [`Assets.xcassets/${assetName}.colorset/Contents.json`, JSON.stringify({ colors, info: { author: "xcode", version: 1 } })];
   }));
+  generated["Assets.xcassets/WebPaletteReference.dataset/Contents.json"] = JSON.stringify({
+    data: [{ idiom: "universal", filename: "reference.json" }], info: { author: "xcode", version: 1 }
+  });
+  generated["Assets.xcassets/WebPaletteReference.dataset/reference.json"] = JSON.stringify(values);
+  return generated;
 }
 
 function assertCompiledPalette(output) {

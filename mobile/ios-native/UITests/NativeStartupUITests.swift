@@ -398,6 +398,9 @@ final class NativeStartupUITests: XCTestCase {
             application.launchEnvironment["TELETYPTEL_NATIVE_UI_FIXTURE"] = "connected"
             application.launch()
             XCTAssertTrue(application.buttons["login-settings"].waitForExistence(timeout: 10))
+            let palette = application.staticTexts["fixture-banner"]
+            XCTAssertTrue(palette.waitForExistence(timeout: 5))
+            XCTAssertEqual(palette.value as? String, "Web palette verified")
             XCTAssertFalse(application.keyboards.firstMatch.exists)
             snapshot("web-palette-login-" + theme)
             application.terminate()
