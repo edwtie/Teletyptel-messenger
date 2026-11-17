@@ -19,7 +19,9 @@ presentation is retained, not forcibly restyled to resemble native. The separate
 dispatch or changes to its own capture tooling. This
 is a reproducible web reference, not a claim of physical iOS Safari equivalence.
 Touch emulation and mobile viewport behavior are explicit; captures verify a
-coarse pointer, touch points and no hover capability. Visible interaction uses
+coarse pointer, touch-event support and no hover capability. The reported touch
+point count is recorded without overriding it (desktop WebKit may report zero).
+Visible interaction uses
 touch taps, not a desktop mouse. Earlier desktop-pointer captures are useful
 review material but cannot pass the mobile pixel-acceptance contract. A Windows
 Chromium capture may also use Segoe UI where iOS falls back to Arial; it must not

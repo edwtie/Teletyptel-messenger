@@ -178,21 +178,14 @@ struct NativeStartupProgress: View {
         Group {
             if isActive {
                 GeometryReader { geometry in
-                    ZStack {
-                        Rectangle().fill(NativeWebStyle.button)
-                            .frame(width: geometry.size.width, height: 4)
-                            .accessibilityElement(children: .ignore)
-                            .accessibilityLabel("Voortgang opstarten").accessibilityValue(Text("Bezig"))
-                            .accessibilityIdentifier(identifier)
-                        TimelineView(.animation(minimumInterval: 0.05, paused: reduceMotion)) { context in
-                            let width = max(1, geometry.size.width * 0.28)
-                            let phase = reduceMotion ? 0.5 : context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1.6) / 1.6
-                            Capsule().fill(NativeWebStyle.accent).frame(width: width)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .offset(x: CGFloat(phase) * (geometry.size.width + width) - width)
+                    Rectangle().fill(NativeWebStyle.button)
+                        .frame(width: geometry.size.width, height: 4)
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel("Voortgang opstarten").accessibilityValue(Text("Bezig"))
+                        .accessibilityIdentifier(identifier)
+                        .overlay {
+                            NativeStartupActivitySegment(width: geometry.size.width, reduceMotion: reduceMotion)
                         }
-                        .accessibilityHidden(true)
-                    }
                 }
                 .frame(height: 4).clipped().allowsHitTesting(false)
             } else {
@@ -200,6 +193,24 @@ struct NativeStartupProgress: View {
                     .allowsHitTesting(false).accessibilityHidden(true)
             }
         }
+    }
+}
+
+private struct NativeStartupActivitySegment: View {
+    let width: CGFloat
+    let reduceMotion: Bool
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 0.05, paused: reduceMotion)) { context in
+            let segmentWidth: CGFloat = max(1, width * 0.28)
+            let phase: TimeInterval = reduceMotion ? 0.5 : context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1.6) / 1.6
+            let offset: CGFloat = CGFloat(phase) * (width + segmentWidth) - segmentWidth
+            Capsule().fill(NativeWebStyle.accent)
+                .frame(width: segmentWidth)
+                .offset(x: offset)
+                .frame(width: width, alignment: .leading)
+        }
+        .accessibilityHidden(true)
     }
 }
 

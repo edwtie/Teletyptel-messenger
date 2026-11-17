@@ -143,8 +143,8 @@ async function capture({ output, revision = "HEAD", sourceMode = "committed", br
           console.log("Loaded " + identifier);
           await page.waitForFunction(() => Boolean(window.nativeVisualFixture), null, { timeout: 5000 });
           console.log("Hook ready " + identifier);
-          const input = await page.evaluate(() => ({ touchPoints: navigator.maxTouchPoints, coarse: matchMedia("(pointer: coarse)").matches, hover: matchMedia("(hover: hover)").matches }));
-          if (!input.touchPoints || !input.coarse || input.hover) throw new Error("Mobile touch media do not match the native comparison target");
+          const input = await page.evaluate(() => ({ touchPoints: navigator.maxTouchPoints, touchEvents: "ontouchstart" in window && typeof TouchEvent !== "undefined", coarse: matchMedia("(pointer: coarse)").matches, hover: matchMedia("(hover: hover)").matches }));
+          if (!input.touchEvents || !input.coarse || input.hover) throw new Error("Mobile touch media do not match the native comparison target: " + JSON.stringify(input));
           await page.evaluate(theme => nativeVisualFixture.setup(theme), variant.theme);
           console.log("Fixture ready " + identifier);
           await page.waitForTimeout(100);
