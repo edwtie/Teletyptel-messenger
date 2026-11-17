@@ -58,6 +58,16 @@ function importedName(filename) {
   return filename;
 }
 
+function measuredVariant(variant, viewport, imageSize) {
+  if (!viewport) return { ...variant };
+  const values = [viewport.x, viewport.y, viewport.width, viewport.height];
+  if (viewport.source !== "measured-safe-area" || viewport.scale !== variant.scale || !values.every(Number.isSafeInteger) || viewport.x < 0 || viewport.y < 0 || viewport.width <= 0 || viewport.height <= 0 || !imageSize || viewport.x + viewport.width > imageSize.width || viewport.y + viewport.height > imageSize.height) throw new Error("Invalid measured native viewport");
+  const width = viewport.width / variant.scale;
+  const height = viewport.height / variant.scale;
+  if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || (width > height) !== (variant.orientation === "landscape")) throw new Error("Measured native viewport does not have an exact supported CSS size");
+  return { ...variant, width, height };
+}
+
 function importCaptures({ sources, output, revision, runURL }) {
   if (!/^[a-f0-9]{40}$/.test(revision || "")) throw new Error("An exact native source commit is required");
   if (!output || fs.existsSync(output)) throw new Error("Choose a new native evidence directory");
@@ -84,7 +94,10 @@ function importCaptures({ sources, output, revision, runURL }) {
         const geometry = JSON.parse(fs.readFileSync(path.join(directory, prefix + importedName(metrics.exportedFileName)), "utf8"));
         if (geometry.name !== baseName || geometry.schema !== 1 || geometry.units !== "points") throw new Error("Geometry does not belong to its screenshot");
         entry.geometry = geometry;
-        if (geometry.viewport) entry.viewport = geometry.viewport;
+        if (geometry.viewport) {
+          Object.assign(entry, measuredVariant(variant, geometry.viewport, size));
+          entry.viewport = geometry.viewport;
+        }
       }
       const existing = selected.get(id);
       if (existing) {
@@ -110,4 +123,4 @@ if (require.main === module) {
   } catch (error) { console.error(error.message); process.exitCode = 1; }
 }
 
-module.exports = { scenarioForName, pngSize, importCaptures };
+module.exports = { scenarioForName, pngSize, measuredVariant, importCaptures };

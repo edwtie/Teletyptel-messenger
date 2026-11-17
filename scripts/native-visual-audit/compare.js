@@ -57,6 +57,7 @@ function pairIssues(reference, actual) {
   if (!/^[a-f0-9]{64}$/.test(reference.fixtureHash || "")) issues.push("Missing verified shared fixture hash");
   if (reference.stateVerified !== true) issues.push("The requested web screen state has not been verified");
   if (reference.inputVerified !== true) issues.push("The mobile touch input mode has not been verified");
+  if (reference.pairedNativeRevision && reference.pairedNativeRevision !== actual.revision) issues.push("The measured reference belongs to another native revision");
   if (!actual.viewport || actual.viewport.source !== "measured-safe-area") issues.push("Native app viewport has not been measured");
   if (actual.viewport && (actual.viewport.width !== actual.width * actual.scale || actual.viewport.height !== actual.height * actual.scale)) issues.push("Native viewport must cover the entire declared app area at its original pixel scale");
   if (reference.errors?.length || actual.errors?.length) issues.push("Capture has runtime errors");
@@ -145,6 +146,7 @@ function audit({ webDirectory, nativeDirectory, output, pngModule, diagnostic = 
     const reference = referenceCases.get(id);
     const actual = actualCases.get(id);
     const entry = { id, screen: screen.id, ...variant, status: "not-compared", identical: false, acceptanceEligible: false };
+    if (actual || reference) Object.assign(entry, { width: actual?.width ?? reference.width, height: actual?.height ?? reference.height });
     if (reference?.file) entry.webFile = evidencePath(webDirectory, reference.file);
     if (actual?.file) entry.nativeFile = evidencePath(nativeDirectory, actual.file);
     if (reference?.status === "capture-failed") { entry.status = "web-capture-failed"; entry.issues = [reference.error]; }
@@ -153,7 +155,7 @@ function audit({ webDirectory, nativeDirectory, output, pngModule, diagnostic = 
       entry.layout = compareLayout(reference, actual);
       entry.issues = pairIssues({ ...web, ...reference }, { ...native, ...actual });
       if (entry.issues.length) entry.status = "not-comparable";
-      const measuredViewport = actual.viewport?.source === "measured-safe-area" && actual.viewport.width === variant.width * variant.scale && actual.viewport.height === variant.height * variant.scale;
+      const measuredViewport = actual.viewport?.source === "measured-safe-area" && actual.viewport.width === actual.width * actual.scale && actual.viewport.height === actual.height * actual.scale && actual.width === reference.width && actual.height === reference.height && actual.scale === reference.scale;
       if (!entry.issues.length || (diagnostic && measuredViewport)) {
         PNG ||= require(pngModule || "pngjs").PNG;
         const referenceBytes = fs.readFileSync(entry.webFile);

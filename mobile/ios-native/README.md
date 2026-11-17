@@ -46,6 +46,13 @@ The gallery also compares measured header/menu/draft rectangles, subtracting onl
 the measured safe-area origin from native point coordinates. It does not rescale
 images or treat equal rectangles as equal rendering. These layout diagnostics
 help distinguish real width/spacing differences from differing fixture text.
+Default catalogue canvas sizes are not measurements. The iPad simulator actually
+reported 834×1161 in portrait, 1210×785 in normal landscape and 1210×809 when TC
+hides the status bar. The importer retains those exact measured app sizes. Set
+`VISUAL_NATIVE_MANIFEST` to the imported `native-manifest.json` before capturing
+the web reference to render each available counterpart at that exact CSS size.
+This changes the fresh browser viewport, not existing screenshot pixels. Missing
+native cases keep explicitly labelled default sizes and cannot become successes.
 
 The first web-reference run produced 216 images, but image review found that the
 fixture had not finished initializing the inactive call toolbar and subsequently

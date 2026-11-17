@@ -4,6 +4,7 @@ const path = require("node:path");
 const crypto = require("node:crypto");
 const { execFileSync } = require("node:child_process");
 const { screens, variants, caseID } = require("./catalogue");
+const { measuredVariant } = require("./import-native");
 
 const root = path.resolve(__dirname, "../..");
 const origin = "https://teletyptel-visual.example.invalid";
@@ -91,7 +92,7 @@ function mime(file) {
   return ({ ".html": "text/html", ".js": "application/javascript", ".css": "text/css", ".png": "image/png", ".gif": "image/gif", ".svg": "image/svg+xml", ".json": "application/json", ".lng": "text/plain" })[path.extname(file)] || "application/octet-stream";
 }
 
-async function capture({ output, revision = "HEAD", sourceMode = "committed", browserName = "webkit", selectedScreens = Object.keys(scenarios), selectedVariants = variants } = {}) {
+async function capture({ output, revision = "HEAD", sourceMode = "committed", nativeManifest, browserName = "webkit", selectedScreens = Object.keys(scenarios), selectedVariants = variants } = {}) {
   if (!output || fs.existsSync(output)) throw new Error("Choose a new output directory; existing evidence is never overwritten");
   if (!selectedScreens.length || selectedScreens.some(screen => !Object.hasOwn(scenarios, screen)) || new Set(selectedScreens).size !== selectedScreens.length || !selectedVariants.length) throw new Error("Select explicit known visual scenarios and viewports");
   const playwright = require("playwright");
@@ -100,15 +101,22 @@ async function capture({ output, revision = "HEAD", sourceMode = "committed", br
   const sha = execFileSync("git", ["rev-parse", revision], { cwd: root, encoding: "utf8" }).trim();
   const bootstrap = fs.readFileSync(path.join(root, "scripts/ios-simulator/fixture-bootstrap.js"), "utf8");
   const hook = fs.readFileSync(path.join(__dirname, "web-hook.js"), "utf8");
+  const native = nativeManifest ? JSON.parse(fs.readFileSync(nativeManifest, "utf8")) : { captures: [] };
+  if (!Array.isArray(native.captures) || (nativeManifest && !/^[a-f0-9]{40}$/.test(native.revision || ""))) throw new Error("Native viewport evidence must identify its exact source");
+  const nativeCases = new Map(native.captures.map(entry => [entry.id, entry]));
+  if (nativeCases.size !== native.captures.length) throw new Error("Duplicate native viewport evidence");
   fs.mkdirSync(output, { recursive: true });
   const hash = content => crypto.createHash("sha256").update(content).digest("hex");
   const result = { captureSchema: 2, revision: sha, sourceMode, source: sourceMode + " actual chat.html/CSS/JS, API and XMPP mocked; no replacement UI", renderer: browserName, epoch, locale: "nl-NL", timezone: "Europe/Amsterdam", fixtureSources: { hook: hash(hook), bootstrap: hash(bootstrap) }, captures: [], blocked: [], caveat: "Desktop WebKit/Chromium at CSS viewport size, not physical iOS Safari. This alone is not a native pixel-equality result." };
+  if (nativeManifest) result.pairedNativeRevision = native.revision;
   const browser = await playwright[browserName].launch({ headless: true });
   console.log("Visual renderer ready: " + browserName);
   try {
-    for (const variant of selectedVariants) {
+    for (const baseVariant of selectedVariants) {
       for (const screen of screens.filter(entry => selectedScreens.includes(entry.id))) {
-        const identifier = caseID(screen.id, variant);
+        const identifier = caseID(screen.id, baseVariant);
+        const measurement = nativeCases.get(identifier);
+        const variant = measuredVariant(baseVariant, measurement?.viewport, measurement?.imageSize);
         console.log("Opening " + identifier);
         const context = await browser.newContext({ viewport: { width: variant.width, height: variant.height }, deviceScaleFactor: variant.scale, isMobile: true, hasTouch: true, locale: "nl-NL", timezoneId: "Europe/Amsterdam", colorScheme: variant.theme, reducedMotion: "reduce", serviceWorkers: "block" });
         const errors = [];
@@ -167,7 +175,7 @@ async function capture({ output, revision = "HEAD", sourceMode = "committed", br
           await page.screenshot({ path: path.join(output, file), animations: "disabled", caret: "hide" });
           const visibleImages = await page.evaluate(() => [...document.images].filter(image => image.getClientRects().length && image.getAttribute("src")).map(image => ({ source: image.getAttribute("src"), complete: image.complete && image.naturalWidth > 0 })));
           if (visibleImages.some(image => !image.complete)) throw new Error("Visible image did not decode");
-          result.captures.push({ id: identifier, screen: screen.id, ...variant, file, geometry, visibleImages, stateVerified: true, inputVerified: true, input, presentation: presentation || "default", errors, status: "web-captured-only" });
+          result.captures.push({ id: identifier, screen: screen.id, ...variant, file, geometry, visibleImages, viewportBasis: measurement?.viewport ? "native-measured" : "catalogue-default", stateVerified: true, inputVerified: true, input, presentation: presentation || "default", errors, status: "web-captured-only" });
           console.log("Captured " + identifier);
         } catch (error) {
           await page.screenshot({ path: path.join(output, identifier + "-failed.png"), animations: "disabled" }).catch(() => {});
@@ -203,7 +211,7 @@ if (require.main === module) {
   const output = path.resolve(process.argv[2] || path.join(root, "artifacts/native-visual-web-" + Date.now()));
   const selectedScreens = process.env.VISUAL_SCREENS?.split(",");
   const selectedVariants = process.env.VISUAL_FIRST_VARIANT === "1" ? variants.slice(0, 1) : undefined;
-  capture({ output, selectedScreens, selectedVariants, sourceMode: process.env.VISUAL_SOURCE || "committed", browserName: process.env.VISUAL_BROWSER || "webkit" }).then(result => {
+  capture({ output, selectedScreens, selectedVariants, nativeManifest: process.env.VISUAL_NATIVE_MANIFEST, sourceMode: process.env.VISUAL_SOURCE || "committed", browserName: process.env.VISUAL_BROWSER || "webkit" }).then(result => {
     console.log(JSON.stringify({ output, captured: result.captures.filter(entry => entry.file).length, failed: result.captures.filter(entry => !entry.file).map(entry => ({ id: entry.id, error: entry.error })) }));
     process.exit(result.captures.some(entry => entry.status === "capture-failed") ? 1 : 0);
   }).catch(error => { console.error(error.message); process.exit(1); });

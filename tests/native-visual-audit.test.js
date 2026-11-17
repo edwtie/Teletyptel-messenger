@@ -5,7 +5,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { comparePixels, cropPixels, orientPixels, pairIssues, compareLayout, completeness, renderReport } = require("../scripts/native-visual-audit/compare");
 const { screens, variants, caseID } = require("../scripts/native-visual-audit/catalogue");
-const { scenarioForName, pngSize } = require("../scripts/native-visual-audit/import-native");
+const { scenarioForName, pngSize, measuredVariant } = require("../scripts/native-visual-audit/import-native");
 const { trackedReader } = require("../scripts/native-visual-audit/capture-web");
 const root = path.resolve(__dirname, "..");
 
@@ -103,6 +103,20 @@ test("Layout diagnostics use measured safe-area coordinates without rescaling sc
   assert.deepEqual(compareLayout(reference, { ...actual, viewport: undefined }), []);
   assert.deepEqual(compareLayout({ geometry: {} }, actual), []);
   assert.equal(Object.hasOwn(layout, "identical"), false);
+});
+
+test("Actual measured app sizes drive a fresh web render, including status-bar changes; screenshots are never stretched", () => {
+  const variant = variants.find(entry => entry.family === "iPad" && entry.orientation === "portrait");
+  const viewport = { source: "measured-safe-area", x: 0, y: 48, width: 1668, height: 2322, scale: 2 };
+  const image = { width: 1668, height: 2420 };
+  assert.equal(measuredVariant(variant, viewport, image).height, 1161);
+  assert.equal(variant.height, 1166);
+  assert.deepEqual(measuredVariant(variant), variant);
+  assert.throws(() => measuredVariant(variant, { ...viewport, scale: 3 }, image), /Invalid measured/);
+  assert.throws(() => measuredVariant(variant, { ...viewport, height: 2323 }, image), /exact supported CSS size/);
+  assert.throws(() => measuredVariant(variant, { ...viewport, height: 5000 }, image), /Invalid measured/);
+  const landscape = variants.find(entry => entry.family === "iPad" && entry.orientation === "landscape");
+  assert.equal(measuredVariant(landscape, { ...viewport, y: 0, width: 2420, height: 1618 }, { width: 2420, height: 1668 }).height, 809);
 });
 
 test("Web fixture renders frozen real web source, never mockup HTML, with external connections disabled", () => {
