@@ -3613,6 +3613,38 @@ not green. No TestFlight upload, signing change or server activation took place.
 
 ## Additional visual matrix follow-up
 
+### Verified evidence cohort (2026-11-18)
+
+Unsigned simulator run
+[44207060897](https://github.com/edwtie/Teletyptel-messenger/actions/runs/44207060897)
+passed all three selected presentation tests on each family: iPhone 16 Pro and
+iPad Pro 11-inch (M4), iOS Simulator 18.6. These are the palette/login/chat,
+TC and main-menu sheet capture tests, not the separate message-action regression.
+The source is exactly `204bece0cf8d52008ef450dd36d78eadef235061`.
+
+The retained cohort contains **100 distinct native captures from that one
+revision** at `artifacts/native-visual-cohort-44207060897`. The corresponding
+local working-tree web capture contains 240 actual renders, with zero failed
+captures, at `artifacts/native-visual-cohort-web-44207060897`. The generated
+side-by-side report at
+`artifacts/native-visual-cohort-review-44207060897/index.html` retains 92
+diagnostic pairs, 148 web-only cases, eight native-only cases and 104 cases with
+neither image. Overall there are 112 missing web images and 252 missing native
+images. **Zero of 352 cases are accepted as strictly pixel-identical.**
+Locale, timezone, clock/history and the shared fixture hash are not yet verified
+equivalent. The report does not turn UI-test passes or diagnostic pixels into
+acceptance, and does not combine screenshots from different native revisions.
+Its HTML image-decode check passed for the actual phone chat reference, measured
+native viewport and diff. This is report verification, not an extra native test.
+
+Unsigned SDK/logic run
+[44213133379](https://github.com/edwtie/Teletyptel-messenger/actions/runs/44213133379)
+on `c7a3855fd02d209360c6f223f9a568a1b5a0da4f` passed the selected 255 Swift
+tests with zero failures in each matrix job, the native RTT checks and the
+generic iOS device compilation. Its result explicitly has `uploaded: false`,
+`pushTestBuild: false` and no UI tests. This validates the background rule's
+core tests and SDK compilation, not new visual screenshots or a physical device.
+
 ### Automatic conversation background (2026-11-18)
 
 Native automatic background selection now follows the actual web rule: the mobile
