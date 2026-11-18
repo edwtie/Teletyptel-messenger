@@ -3657,6 +3657,18 @@ capture instead of comparing different underlying screens. The corrected phone
 report at `artifacts/native-navigation-phone-review-44358702422-contacts-state`
 still has **0/352 accepted** and 12 diagnostic pairs. These small same-source
 cohorts do not replace or silently merge the earlier full catalogue evidence.
+On `2b9620b`,
+[run 44372648947](https://github.com/edwtie/Teletyptel-messenger/actions/runs/44372648947)
+again passed its selected iPhone test and compiled both simulator apps. The iPad
+test and unchanged retry stopped at the ten-second screenshot-orientation wait,
+before navigation captures or the new sidebar assertion. Their failure PNGs and
+window metadata show portrait at failure time; they do not prove that the earlier
+UIImage-size predicate was correct or that sidebar validation passed. The next
+test-only candidate reads the actual screenshot PNG's pixel size and declared
+EXIF orientation (only 1/3/6/8), using the same lossless orientation rule as the
+importer, and records those measurements. The original ten-second window/screen
+waits and independent app-frame orientation assertion are retained. Native results
+for this test-only follow-up are pending; no screenshots are resized or relabeled.
 No TestFlight upload, APNs activation or server change was performed.
 
 ### Verified evidence cohort (2026-11-18)

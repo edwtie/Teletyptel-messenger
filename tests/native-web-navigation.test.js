@@ -83,3 +83,16 @@ test("Sidebar evidence uses direct DEBUG view bounds and never substitutes the o
   actual.geometry.elements[0].source = "measured-view-bounds";
   assert.equal(compareLayout(reference, actual)[0].delta.width, 100);
 });
+
+test("Rotation checks the actual PNG orientation without scaling images or extending the original wait", () => {
+  const ui = read("mobile/ios-native/UITests/NativeStartupUITests.swift");
+  const rotation = ui.split("private func rotate(_ orientation: UIDeviceOrientation)")[1].split("private func signInFixture")[0];
+  assert.match(rotation, /screenshot.pngRepresentation as CFData/);
+  assert.match(rotation, /kCGImagePropertyOrientation/);
+  assert.match(rotation, /\[1, 3, 6, 8\].contains\(orientation\)/);
+  assert.match(rotation, /let swapsAxes = orientation == 6 \|\| orientation == 8/);
+  assert.match(rotation, /return \(width > height\) == landscape/);
+  assert.match(rotation, /XCTAssertEqual\(frame.width > frame.height, landscape\)/);
+  assert.equal((rotation.match(/waitForExpectations\(timeout: 10\)/g) || []).length, 2);
+  assert.doesNotMatch(rotation, /screenshot\(\).image.size|resize|UIGraphics|draw\(in:/);
+});

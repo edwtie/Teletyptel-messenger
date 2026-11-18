@@ -1,4 +1,5 @@
 import XCTest
+import ImageIO
 
 final class NativeStartupUITests: XCTestCase {
     private var application: XCUIApplication!
@@ -1199,8 +1200,21 @@ final class NativeStartupUITests: XCTestCase {
         expectation(for: windowSettled, evaluatedWith: probe)
         waitForExpectations(timeout: 10)
         let screenSettled = NSPredicate { _, _ in
-            let image = XCUIScreen.main.screenshot().image.size
-            return (image.width > image.height) == landscape
+            let screenshot = XCUIScreen.main.screenshot()
+            guard let source = CGImageSourceCreateWithData(screenshot.pngRepresentation as CFData, nil),
+                  let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+                  let pixelWidth = properties[kCGImagePropertyPixelWidth] as? NSNumber,
+                  let pixelHeight = properties[kCGImagePropertyPixelHeight] as? NSNumber else { return false }
+            let rawWidth = pixelWidth.doubleValue
+            let rawHeight = pixelHeight.doubleValue
+            let orientation = (properties[kCGImagePropertyOrientation] as? NSNumber)?.intValue ?? 1
+            guard [rawWidth, rawHeight].allSatisfy(\.isFinite), rawWidth > 0, rawHeight > 0,
+                  rawWidth != rawHeight, rawWidth * rawHeight <= 20_000_000, [1, 3, 6, 8].contains(orientation) else { return false }
+            let swapsAxes = orientation == 6 || orientation == 8
+            let width = swapsAxes ? rawHeight : rawWidth
+            let height = swapsAxes ? rawWidth : rawHeight
+            print("NATIVE_ROTATION_PNG expectedLandscape=\(landscape) width=\(width) height=\(height) orientation=\(orientation)")
+            return (width > height) == landscape
         }
         expectation(for: screenSettled, evaluatedWith: application)
         waitForExpectations(timeout: 10)
