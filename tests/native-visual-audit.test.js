@@ -9,6 +9,26 @@ const { scenarioForName, pngSize, measuredVariant } = require("../scripts/native
 const { trackedReader, profileForVariant } = require("../scripts/native-visual-audit/capture-web");
 const root = path.resolve(__dirname, "..");
 
+test("Visual data is one bounded immutable local fixture, not a fabricated shared native acceptance hash", () => {
+  const { readDataFixture, validateDataFixture } = require("../scripts/native-visual-audit/data-fixture");
+  const fixture = readDataFixture();
+  assert.match(fixture.sha256, /^[a-f0-9]{64}$/);
+  assert.equal(fixture.data.epoch, "2026-11-17T11:00:00.000Z");
+  assert.ok(Object.isFrozen(fixture.data.messages[0]));
+  assert.equal(validateDataFixture(fixture.data), fixture.data);
+  for (const invalid of [null, { ...fixture.data, schema: 2 }, { ...fixture.data, epoch: "2026-02-30T11:00:00.000Z" },
+    { ...fixture.data, contact: { ...fixture.data.contact, jid: "someone@example.com" } },
+    { ...fixture.data, messages: [fixture.data.messages[0], fixture.data.messages[0]] },
+    { ...fixture.data, account: { ...fixture.data.account, password: "not-for-this-fixture" } },
+    { ...fixture.data, rtt: { peer: "x".repeat(5001), self: "text" } }]) assert.throws(() => validateDataFixture(invalid));
+  const runner = fs.readFileSync(path.join(root, "scripts/native-visual-audit/capture-web.js"), "utf8");
+  const hook = fs.readFileSync(path.join(root, "scripts/native-visual-audit/web-hook.js"), "utf8");
+  assert.match(runner, /data: fixture.sha256/);
+  assert.doesNotMatch(runner, /fixtureHash:/);
+  assert.match(hook, /state.account = \{ \.\.\.fixture.account \}/);
+  assert.match(hook, /for \(const message of fixture.messages\) addMessage/);
+});
+
 test("Additional references open real 2FA, reaction and own-message editor states without submitting data", () => {
   const { scenarios } = require("../scripts/native-visual-audit/capture-web");
   for (const name of ["two-factor-login", "message-reactions", "message-edit"]) assert.equal(typeof scenarios[name], "function");

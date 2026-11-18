@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "id": "teletyptel-visual-data-v1",
+  "epoch": "2026-11-17T11:00:00.000Z",
+  "locale": "nl-NL",
+  "timezone": "Europe/Amsterdam",
+  "account": {
+    "accountId": "fixture-ui",
+    "jid": "fixture@localhost",
+    "displayName": "Fictieve gebruiker",
+    "preferredLanguage": "ned"
+  },
+  "contact": {
+    "jid": "demo-contact@localhost",
+    "name": "Fictief testcontact",
+    "presence": "online",
+    "avatarColor": "#2563eb",
+    "phoneNumber": "+31201234567"
+  },
+  "group": {
+    "jid": "demo-room@conference.localhost",
+    "name": "Fictieve groep"
+  },
+  "messages": [
+    { "direction": "peer", "body": "Fictief ontvangen bericht", "id": "fixture-peer" },
+    { "direction": "self", "body": "Fictief eigen voorbeeldbericht", "id": "fixture-own" }
+  ],
+  "rtt": {
+    "peer": "Fictieve realtime tekst van de ander",
+    "self": "Fictieve eigen realtime tekst"
+  }
+}

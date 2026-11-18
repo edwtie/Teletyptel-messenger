@@ -5,10 +5,10 @@ const crypto = require("node:crypto");
 const { execFileSync } = require("node:child_process");
 const { screens, variants, caseID } = require("./catalogue");
 const { measuredVariant } = require("./import-native");
+const { readDataFixture } = require("./data-fixture");
 
 const root = path.resolve(__dirname, "../..");
 const origin = "https://teletyptel-visual.example.invalid";
-const epoch = "2026-11-17T11:00:00.000Z";
 
 async function bounded(promise, milliseconds, message) {
   let timer;
@@ -117,13 +117,15 @@ async function capture({ output, revision = "HEAD", sourceMode = "committed", na
   const sha = execFileSync("git", ["rev-parse", revision], { cwd: root, encoding: "utf8" }).trim();
   const bootstrap = fs.readFileSync(path.join(root, "scripts/ios-simulator/fixture-bootstrap.js"), "utf8");
   const hook = fs.readFileSync(path.join(__dirname, "web-hook.js"), "utf8");
+  const fixture = readDataFixture();
+  const { epoch, locale, timezone } = fixture.data;
   const native = nativeManifest ? JSON.parse(fs.readFileSync(nativeManifest, "utf8")) : { captures: [] };
   if (!Array.isArray(native.captures) || (nativeManifest && !/^[a-f0-9]{40}$/.test(native.revision || ""))) throw new Error("Native viewport evidence must identify its exact source");
   const nativeCases = new Map(native.captures.map(entry => [entry.id, entry]));
   if (nativeCases.size !== native.captures.length) throw new Error("Duplicate native viewport evidence");
   fs.mkdirSync(output, { recursive: true });
   const hash = content => crypto.createHash("sha256").update(content).digest("hex");
-  const result = { captureSchema: 3, revision: sha, sourceMode, source: sourceMode + " actual chat.html/CSS/JS, API and XMPP mocked; no replacement UI", renderer: browserName, epoch, locale: "nl-NL", timezone: "Europe/Amsterdam", fixtureSources: { hook: hash(hook), bootstrap: hash(bootstrap) }, captures: [], blocked: [], caveat: "Desktop WebKit/Chromium with verified Safari phone/tablet classification and measured geometry, not physical iOS Safari. This alone is not a native pixel-equality result." };
+  const result = { captureSchema: 3, revision: sha, sourceMode, source: sourceMode + " actual chat.html/CSS/JS, API and XMPP mocked; no replacement UI", renderer: browserName, epoch, locale, timezone, fixtureSources: { hook: hash(hook), bootstrap: hash(bootstrap), data: fixture.sha256 }, captures: [], blocked: [], caveat: "Desktop WebKit/Chromium with verified Safari phone/tablet classification and measured geometry, not physical iOS Safari. This alone is not a native pixel-equality result." };
   if (nativeManifest) result.pairedNativeRevision = native.revision;
   const browser = await playwright[browserName].launch({ headless: true });
   console.log("Visual renderer ready: " + browserName);
@@ -135,7 +137,7 @@ async function capture({ output, revision = "HEAD", sourceMode = "committed", na
         const variant = measuredVariant(baseVariant, measurement?.viewport, measurement?.imageSize);
         const profile = profileForVariant(variant, playwright.devices);
         console.log("Opening " + identifier);
-        const context = await browser.newContext({ viewport: { width: variant.width, height: variant.height }, deviceScaleFactor: variant.scale, userAgent: profile.userAgent, isMobile: true, hasTouch: true, locale: "nl-NL", timezoneId: "Europe/Amsterdam", colorScheme: variant.theme, reducedMotion: "reduce", serviceWorkers: "block" });
+        const context = await browser.newContext({ viewport: { width: variant.width, height: variant.height }, deviceScaleFactor: variant.scale, userAgent: profile.userAgent, isMobile: true, hasTouch: true, locale, timezoneId: timezone, colorScheme: variant.theme, reducedMotion: "reduce", serviceWorkers: "block" });
         const errors = [];
         const page = await context.newPage();
         page.setDefaultTimeout(5000);
@@ -161,7 +163,7 @@ async function capture({ output, revision = "HEAD", sourceMode = "committed", na
           }
           return route.fulfill({ status: 200, contentType: mime(file), body });
         });
-        await page.addInitScript({ content: "window.iosFixtureLanguages=" + JSON.stringify(languages) + ";\n" + bootstrap });
+        await page.addInitScript({ content: "window.teletyptelVisualFixtureData=" + JSON.stringify(fixture.data) + ";\nwindow.iosFixtureLanguages=" + JSON.stringify(languages) + ";\n" + bootstrap });
         await page.clock.setFixedTime(new Date(epoch));
         try {
           await page.goto(origin + "/chat.html", { waitUntil: "load" });

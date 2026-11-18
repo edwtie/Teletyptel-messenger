@@ -3613,6 +3613,23 @@ not green. No TestFlight upload, signing change or server activation took place.
 
 ## Additional visual matrix follow-up
 
+### Canonical data file preparation (2026-11-18)
+
+`scripts/native-visual-audit/shared-data.json` now contains the web fixture's
+account/contact/group identities, message bodies/IDs, RTT text, frozen clock,
+locale and timezone. A bounded reader validates the exact schema and isolated
+localhost accounts, rejects unexpected fields and freezes the parsed object.
+The actual web fixture reads this file instead of duplicating those values.
+
+The local reference-refactor check at
+`artifacts/native-visual-data-refactor-20261118/web-refactor-check.json` captured
+chat, main menu and TC for all eight variants: all 24 PNGs are exactly RGBA-equal
+to the preceding web references. This checks the web-data refactor only, not
+native equality. The manifest records the data file digest under `fixtureSources`;
+it deliberately does **not** stamp `fixtureHash` or copy it into native metadata.
+Native clock/history/avatar/provider seeding and runtime verification still have
+to use the same contract before comparable native acceptance can be claimed.
+
 ### Native message-button popover (2026-11-18)
 
 The normalized activation-point attempt did not fix iPhone direct/group menu

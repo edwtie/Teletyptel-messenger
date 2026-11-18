@@ -1,9 +1,10 @@
 window.nativeVisualFixture = {
   async setup(theme) {
-    await loadLanguage("ned");
+    const fixture = window.teletyptelVisualFixtureData;
+    await loadLanguage(fixture.account.preferredLanguage);
     applyTheme(theme);
     state.mode = "xmpp";
-    state.account = { accountId: "fixture-ui", jid: "fixture@localhost", displayName: "Fictieve gebruiker", preferredLanguage: "ned" };
+    state.account = { ...fixture.account };
     applyAccountProfile(state.account);
     state.clientLifecycle.current = "active";
     state.xmppSession = { authenticated: true, phase: "ready", streamManagement: null };
@@ -16,15 +17,14 @@ window.nativeVisualFixture = {
     document.body.classList.remove("modal-open");
     state.conversations = [];
     state.activeConversationId = null;
-    const contact = ensureConversationForPeer("demo-contact@localhost", "contact", "Fictief testcontact");
-    contact.presence = "online";
-    contact.avatarColor = "#2563eb";
-    contact.phoneNumber = "+31201234567";
-    const group = ensureConversationForPeer("demo-room@conference.localhost", "group", "Fictieve groep");
+    const contact = ensureConversationForPeer(fixture.contact.jid, "contact", fixture.contact.name);
+    contact.presence = fixture.contact.presence;
+    contact.avatarColor = fixture.contact.avatarColor;
+    contact.phoneNumber = fixture.contact.phoneNumber;
+    const group = ensureConversationForPeer(fixture.group.jid, "group", fixture.group.name);
     group.joined = true;
     selectConversation(contact);
-    addMessage("peer", "Fictief ontvangen bericht", "message", contact.peer, null, contact.id, null, "fixture-peer", false, false);
-    addMessage("self", "Fictief eigen voorbeeldbericht", "message", null, null, contact.id, null, "fixture-own", false, false);
+    for (const message of fixture.messages) addMessage(message.direction, message.body, "message", message.direction === "peer" ? contact.peer : null, null, contact.id, null, message.id, false, false);
     renderConversations();
     renderActiveConversation();
     updateCallUi();
@@ -64,8 +64,8 @@ window.nativeVisualFixture = {
     state.call = createCallState("visual-call", contact.peer, "initiator", mode === "audio" ? "audio" : "video", mode === "total");
     state.call.cameraOff = true;
     state.call.remoteCameraOff = true;
-    state.call.tcRemoteText = "Fictieve realtime tekst van de ander";
-    state.call.tcLocalText = "Fictieve eigen realtime tekst";
+    state.call.tcRemoteText = window.teletyptelVisualFixtureData.rtt.peer;
+    state.call.tcLocalText = window.teletyptelVisualFixtureData.rtt.self;
     if (incoming) {
       state.doNotDisturb = true;
       state.call.incomingOffer = { type: "offer", sdp: "" };
