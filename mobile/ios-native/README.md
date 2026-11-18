@@ -3638,6 +3638,18 @@ Local checks pass 116 tests, skip one macOS-only check and fail none. Compilatio
 the simulator actions and screenshot review are still required before calling
 the iPhone defect resolved. No TestFlight upload or server change is included.
 
+The candidate is published at `08c8dd4`; its isolated unsigned
+[message-actions run 44209919205](https://github.com/edwtie/Teletyptel-messenger/actions/runs/44209919205)
+is pending. It is not reported as a successful native fix yet.
+
+The earlier startup-capture run `44207056454` built the iPad app and captured the
+light checking/offline/certificate/login states, but its test then requested the
+server field without opening the deliberately collapsed Advanced section. The
+failure hierarchy confirms the section was still collapsed. The capture test now
+uses the existing explicit Advanced action before requiring that field; the
+application's protection and no-keyboard assertions are unchanged. That failed
+run does not establish complete startup-state coverage.
+
 ### Additional matrix states (2026-11-18)
 
 The real web reference now also opens the application's authenticator challenge,

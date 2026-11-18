@@ -575,6 +575,7 @@ final class NativeStartupUITests: XCTestCase {
             snapshot("visual-login-landscape-" + theme)
             rotate(.portrait)
             settings.tap()
+            expandAdvancedServerSettings()
             let server = application.textFields["server-address"]
             XCTAssertTrue(server.waitForExistence(timeout: 5))
             XCTAssertFalse(application.keyboards.firstMatch.exists)

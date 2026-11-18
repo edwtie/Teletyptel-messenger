@@ -119,6 +119,7 @@ test("Startup visual scope records real no-keyboard, unauthenticated states rath
   assert.match(ui, /XCTAssertFalse\(application.buttons\["messenger-main-menu"\].exists\)/);
   assert.match(ui, /TELETYPTEL_NATIVE_STARTUP_PROGRESS_FIXTURE/);
   assert.match(ui, /signInFixture\("two-factor"\)/);
+  assert.match(ui, /settings.tap\(\)\s+expandAdvancedServerSettings\(\)\s+let server = application.textFields\["server-address"\]/);
   assert.doesNotMatch(ui, /typeText\("[0-9]{6}"\)|verify\.tap\(\)|check-connection.*tap/);
 });
 
