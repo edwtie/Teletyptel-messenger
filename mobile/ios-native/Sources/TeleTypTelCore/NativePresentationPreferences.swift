@@ -24,6 +24,23 @@ enum NativeChatBackground: String, CaseIterable {
     }
 }
 
+enum NativeWebNavigationLayout {
+    static func mainMenuWidth(viewportWidth: Double) -> Double {
+        guard viewportWidth.isFinite, viewportWidth > 0 else { return 320 }
+        return max(0, min(320, viewportWidth - 24))
+    }
+
+    static func mainMenuHeight(viewportHeight: Double) -> Double {
+        guard viewportHeight.isFinite, viewportHeight > 0 else { return 242 }
+        return max(0, min(242, viewportHeight - 85))
+    }
+
+    static func contactColumnWidth(viewportWidth: Double) -> Double {
+        guard viewportWidth.isFinite, viewportWidth > 0 else { return 280 }
+        return min(340, max(280, viewportWidth * 0.28))
+    }
+}
+
 enum NativeMessageMenuPlacement {
     static func prefersAbove(anchorMinimumY: Double, anchorMaximumY: Double, viewportMinimumY: Double, viewportMaximumY: Double) -> Bool {
         let values = [anchorMinimumY, anchorMaximumY, viewportMinimumY, viewportMaximumY]

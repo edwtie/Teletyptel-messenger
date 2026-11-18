@@ -104,6 +104,12 @@ struct NativeMessengerView: View {
     @StateObject private var archive = NativeConversationArchive()
     @StateObject private var contactRequests = NativeContactRequests()
     @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @Environment(\.nativeConversationViewportWidth) private var viewportWidth
+    @Environment(\.nativeConversationViewportFrame) private var viewportFrame
+
+    private var contactColumnWidth: CGFloat {
+        CGFloat(NativeWebNavigationLayout.contactColumnWidth(viewportWidth: viewportWidth))
+    }
 
     private var contacts: [NativeContact] {
         guard case .ready(let contacts) = model.roster else { return [] }
@@ -259,10 +265,11 @@ struct NativeMessengerView: View {
                 }.padding(12)
             }
             .background(NativeWebStyle.panel).foregroundStyle(NativeWebStyle.text)
+            .accessibilityElement(children: .contain).accessibilityIdentifier("messenger-contact-sidebar")
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(.hidden, for: .navigationBar)
-            .navigationSplitViewColumnWidth(min: 260, ideal: 300, max: 360)
+            .navigationSplitViewColumnWidth(min: contactColumnWidth, ideal: contactColumnWidth, max: contactColumnWidth)
         } detail: {
             if let contact = selectedContact {
                 NativeChatView(model: model, calls: calls, translation: translation, contact: contact, onClose: { selected = nil },
@@ -333,10 +340,12 @@ struct NativeMessengerView: View {
                 menuTile("Uitloggen", symbol: "rectangle.portrait.and.arrow.right", identifier: "menu-logout", destructive: true) { afterMenu { logout() } }
                 menuTile("Groepschats", symbol: "person.3", identifier: "open-groups") { afterMenu { showGroups = true } }
                 menuTile("Vertaling", symbol: "globe", identifier: "open-translation") { afterMenu { showTranslation = true } }
-            }.padding(12)
+            }.padding(12).padding(1)
         }
-        .frame(width: 252, height: verticalSizeClass == .compact ? 180 : 240)
-        .background(NativeWebStyle.panel)
+        .frame(width: CGFloat(NativeWebNavigationLayout.mainMenuWidth(viewportWidth: viewportWidth)),
+               height: CGFloat(NativeWebNavigationLayout.mainMenuHeight(viewportHeight: Double(viewportFrame.height))))
+        .background(NativeWebStyle.panel, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(NativeWebStyle.line, lineWidth: 1).allowsHitTesting(false))
         .accessibilityElement(children: .contain).accessibilityIdentifier("main-menu-grid")
     }
 

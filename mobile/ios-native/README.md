@@ -3613,6 +3613,26 @@ not green. No TestFlight upload, signing change or server activation took place.
 
 ## Additional visual matrix follow-up
 
+### Responsive navigation geometry (2026-11-18)
+
+The measured comparison still showed a 252-point native main menu against a
+320-CSS-pixel web panel, and a fixed 300-point native contact column against the
+web tablet rule `clamp(280px, 28vw, 340px)`. Native now derives both from the actual
+app viewport: menu width `min(320, viewport - 24)`, natural menu height 242 with
+the web viewport-height cap, and the tablet column's 28% clamp. The grid reserves
+the same 12-point padding, one-point border and eight-point column spacing.
+It keeps the existing symbol actions, accessibility labels and unavailable-feature
+guards. No history, translation, authentication or server behavior changes.
+
+The separate `visual-navigation` UI scope records contacts, main menu and chat
+in both themes and orientations for each family (24 intended captures), measures
+the actual menu/tile width and iPad column, and retains no-keyboard and bounds
+checks. It also runs the one new pure layout unit test, not the broad backend
+regression. Named geometry includes the actual sidebar, and the importer keeps
+explicit orientation/theme names rather than guessing them. The source checks
+are green locally; actual native screenshots/results are still pending.
+This is a layout candidate, not a completed 352-case matrix or pixel-parity claim.
+
 ### Verified evidence cohort (2026-11-18)
 
 The separate startup run

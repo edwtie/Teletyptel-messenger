@@ -5,6 +5,8 @@ const crypto = require("node:crypto");
 const { variants, caseID } = require("./catalogue");
 
 function scenarioForName(name) {
+  const navigation = /^visual-navigation-(contacts|main-menu|chat)-(portrait|landscape)-(light|dark)(?:_|$)/.exec(name);
+  if (navigation) return { screen: navigation[1], orientation: navigation[2], theme: navigation[3], priority: 3 };
   const palette = /^web-palette-(login|contacts|main-menu|settings|conversation-menu|chat-portrait|chat-landscape|tc-portrait|tc-landscape|tc-controls)-(light|dark)(?:_|$)/.exec(name);
   if (palette) {
     const [screen, explicitOrientation] = ({ settings: ["appearance"], "chat-portrait": ["chat", "portrait"], "chat-landscape": ["chat", "landscape"], "tc-portrait": ["tc", "portrait"], "tc-landscape": ["tc", "landscape"], "tc-controls": ["call-controls", "portrait"] })[palette[1]] || [palette[1]];

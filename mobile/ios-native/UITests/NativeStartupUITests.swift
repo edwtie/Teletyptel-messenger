@@ -519,6 +519,60 @@ final class NativeStartupUITests: XCTestCase {
         }
     }
 
+    func testWebNavigationLayoutInBothThemesAndOrientations() {
+        let arguments = application.launchArguments
+        for theme in ["light", "dark"] {
+            application.launchArguments = arguments + ["-teletyptel.native.theme", theme]
+            signInFixture("connected")
+            waitForStatus("XMPP verbonden als fixture@localhost")
+            for orientation: UIDeviceOrientation in [.portrait, .landscapeLeft] {
+                rotate(orientation)
+                let pose = orientation == .portrait ? "portrait" : "landscape"
+                let main = application.buttons["messenger-main-menu"]
+                XCTAssertTrue(main.waitForExistence(timeout: 10))
+                XCTAssertFalse(application.keyboards.firstMatch.exists)
+                snapshot("visual-navigation-contacts-" + pose + "-" + theme)
+                main.tap()
+                let grid = application.descendants(matching: .any)["main-menu-grid"].firstMatch
+                XCTAssertTrue(grid.waitForExistence(timeout: 5))
+                XCTAssertTrue(application.frame.contains(grid.frame))
+                let probe = application.descendants(matching: .any)["visual-native-viewport"].firstMatch
+                let value = probe.value as? String ?? ""
+                let bytes = value.data(using: .utf8) ?? Data()
+                let viewport = (try? JSONSerialization.jsonObject(with: bytes)) as? [String: Any]
+                let scale = viewport?["scale"] as? Double ?? 0
+                let pixelWidth = viewport?["width"] as? Double ?? 0
+                XCTAssertGreaterThan(scale, 0)
+                let width = pixelWidth / scale
+                let expectedMenuWidth = min(320, width - 24)
+                XCTAssertEqual(grid.frame.width, expectedMenuWidth, accuracy: 1)
+                let tile = application.buttons["open-number-dialer"]
+                XCTAssertEqual(tile.frame.width, (expectedMenuWidth - 42) / 3, accuracy: 1)
+                XCTAssertGreaterThanOrEqual(tile.frame.height, 48)
+                XCTAssertTrue(application.buttons["open-translation"].isHittable)
+                snapshot("visual-navigation-main-menu-" + pose + "-" + theme)
+                application.buttons["open-appearance"].tap()
+                let close = application.buttons["Sluiten"].firstMatch
+                XCTAssertTrue(close.waitForExistence(timeout: 10)); close.tap()
+                let contact = application.descendants(matching: .any)["contact-demo-contact@localhost"].firstMatch
+                XCTAssertTrue(contact.waitForExistence(timeout: 5)); reveal(contact); tapContact(contact)
+                let draft = application.descendants(matching: .any)["chat-draft"].firstMatch
+                XCTAssertTrue(draft.waitForExistence(timeout: 5))
+                XCTAssertFalse(application.keyboards.firstMatch.exists)
+                if UIDevice.current.userInterfaceIdiom == .pad {
+                    let sidebar = application.descendants(matching: .any)["messenger-contact-sidebar"].firstMatch
+                    XCTAssertTrue(sidebar.exists)
+                    XCTAssertEqual(sidebar.frame.width, min(340, max(280, width * 0.28)), accuracy: 1)
+                    XCTAssertLessThanOrEqual(sidebar.frame.maxX, draft.frame.minX)
+                }
+                snapshot("visual-navigation-chat-" + pose + "-" + theme)
+                application.buttons["chat-back"].tap()
+            }
+            application.terminate()
+            rotate(.portrait)
+        }
+    }
+
     func testVisualInventoryCapturesEveryMainMenuSheetInBothOrientations() {
         let arguments = application.launchArguments
         let destinations = [("dialer", "open-number-dialer"), ("history", "open-history"),
@@ -1066,7 +1120,9 @@ final class NativeStartupUITests: XCTestCase {
         add(attachment)
         let frame = application.frame
         let identifiers: [String]
-        if name.hasPrefix("web-palette-main-menu-") {
+        if name.hasPrefix("visual-navigation-") {
+            identifiers = ["messenger-brand-header", "messenger-contact-sidebar", "main-menu-grid", "chat-header", "chat-draft"]
+        } else if name.hasPrefix("web-palette-main-menu-") {
             identifiers = ["main-menu-grid"]
         } else if name.hasPrefix("web-palette-conversation-menu-") {
             identifiers = ["chat-header", "conversation-menu-panel"]

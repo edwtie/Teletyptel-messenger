@@ -34,6 +34,7 @@ function testsForScope(scope = "regression") {
   if (scope === "smileys") return ["testWebSmileyPickerUsesSharedImagesAndOnlyChangesDraft"];
   if (scope === "visual-metrics") return [...testsForScope("appearance"), "testVisualInventoryCapturesEveryMainMenuSheetInBothOrientations"];
   if (scope === "visual-startup") return ["testVisualStartupStatesInBothThemesAndOrientations"];
+  if (scope === "visual-navigation") return ["testWebNavigationLayoutInBothThemesAndOrientations"];
   if (scope === "message-actions") return ["testChatHeaderAndMessageMenuDoNotOverlapAcrossRotation",
     "testMessageMenuEditForwardAndBothDeletionOptions", "testMessageReactionTogglesAcrossRotation", "testExistingGroupJoinSendRotationAndLeave"];
   if (scope === "message-editing") return ["testMessageMenuEditForwardAndBothDeletionOptions"];
@@ -62,9 +63,15 @@ function run() {
     scope: "focused simulator UI regression; not a full unit, media or device SDK run",
     uiScope: scope, selectedTests: tests, uiTests: [] };
   const logged = (name, command, args, timeout) => executeLogged(command, args, {
-    root, reports, name, timeout: timeout ?? (["menus", "startup", "appearance", "smileys", "visual", "visual-metrics", "visual-repair", "visual-startup", "message-actions", "message-editing", "message-reactions"].includes(scope) && name.endsWith("-build") ? 1200000 : undefined)
+    root, reports, name, timeout: timeout ?? (["menus", "startup", "appearance", "smileys", "visual", "visual-metrics", "visual-repair", "visual-startup", "message-actions", "message-editing", "message-reactions", "visual-navigation"].includes(scope) && name.endsWith("-build") ? 1200000 : undefined)
   });
   try {
+    if (scope === "visual-navigation") {
+      logged("navigation-unit-tests", "swift", ["test", "--package-path", path.join(root, "mobile/ios-native"),
+        "--scratch-path", path.join(directory, "LayoutSwiftBuild"), "--filter",
+        "NativePresentationTests.testNavigationLayoutMatchesWebWindowRulesInsteadOfDeviceOrConversationPaneDimensions"]);
+      result.navigationUnitTests = true;
+    }
     const inventory = JSON.parse(logged("simulator-inventory", "xcrun", ["simctl", "list", "devices", "available", "--json"]));
     const common = ["-project", path.join(directory, "TeleTypTelNative.xcodeproj"), "-scheme", "TeleTypTelNative",
       "-derivedDataPath", path.join(directory, "DerivedData"), "CODE_SIGNING_ALLOWED=NO"];

@@ -41,6 +41,25 @@ final class NativePresentationTests: XCTestCase {
             XCTAssertNil(NativeChatBackground.none.asset(viewportWidth: width))
         }
     }
+    func testNavigationLayoutMatchesWebWindowRulesInsteadOfDeviceOrConversationPaneDimensions() {
+        XCTAssertEqual(NativeWebNavigationLayout.mainMenuWidth(viewportWidth: 320), 296)
+        XCTAssertEqual(NativeWebNavigationLayout.mainMenuWidth(viewportWidth: 402), 320)
+        XCTAssertEqual(NativeWebNavigationLayout.mainMenuWidth(viewportWidth: 834), 320)
+        XCTAssertEqual(NativeWebNavigationLayout.mainMenuWidth(viewportWidth: 20), 0)
+        XCTAssertEqual(NativeWebNavigationLayout.mainMenuHeight(viewportHeight: 381), 242)
+        XCTAssertEqual(NativeWebNavigationLayout.mainMenuHeight(viewportHeight: 250), 165)
+        XCTAssertEqual(NativeWebNavigationLayout.mainMenuHeight(viewportHeight: 60), 0)
+        XCTAssertEqual(NativeWebNavigationLayout.contactColumnWidth(viewportWidth: 834), 280)
+        XCTAssertEqual(NativeWebNavigationLayout.contactColumnWidth(viewportWidth: 1194), 334.32, accuracy: 0.000001)
+        XCTAssertEqual(NativeWebNavigationLayout.contactColumnWidth(viewportWidth: 1210), 338.8, accuracy: 0.000001)
+        XCTAssertEqual(NativeWebNavigationLayout.contactColumnWidth(viewportWidth: 1366), 340)
+        for invalid in [0.0, -1, .nan, .infinity] {
+            XCTAssertEqual(NativeWebNavigationLayout.mainMenuWidth(viewportWidth: invalid), 320)
+            XCTAssertEqual(NativeWebNavigationLayout.mainMenuHeight(viewportHeight: invalid), 242)
+            XCTAssertEqual(NativeWebNavigationLayout.contactColumnWidth(viewportWidth: invalid), 280)
+        }
+    }
+
     func testMessageMenuChoosesTheRoomierSideInsideTheActualAppViewport() {
         XCTAssertTrue(NativeMessageMenuPlacement.prefersAbove(anchorMinimumY: 736, anchorMaximumY: 780, viewportMinimumY: 62, viewportMaximumY: 840))
         XCTAssertTrue(NativeMessageMenuPlacement.prefersAbove(anchorMinimumY: 273, anchorMaximumY: 317, viewportMinimumY: 0, viewportMaximumY: 381))
