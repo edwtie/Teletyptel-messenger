@@ -293,7 +293,6 @@ struct NativeMessengerView: View {
                                     .multilineTextAlignment(.center).foregroundStyle(NativeWebStyle.muted)
                             }
                             .padding(24).frame(maxWidth: 440).foregroundStyle(NativeWebStyle.text)
-                            .background(NativeWebStyle.panel.opacity(0.94), in: RoundedRectangle(cornerRadius: 16))
                             .padding(20).accessibilityIdentifier("messenger-choose-conversation")
                         }
                 }

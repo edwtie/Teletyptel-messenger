@@ -3615,6 +3615,13 @@ not green. No TestFlight upload, signing change or server activation took place.
 
 ### Responsive navigation geometry (2026-11-18)
 
+The empty tablet conversation view no longer adds an opaque rounded card behind
+the TeleTypTel welcome logo and help text. The shared transparent logo, wallpaper,
+text, spacing and accessibility identifier are retained, matching the web's lack
+of a separate welcome-panel fill. A local source guard checks this presentation
+rule. The screenshot cohorts below predate this small follow-up; they are not
+silently replaced and do not visually verify this latest change.
+
 The measured comparison still showed a 252-point native main menu against a
 320-CSS-pixel web panel, and a fixed 300-point native contact column against the
 web tablet rule `clamp(280px, 28vw, 340px)`. Native now derives both from the actual

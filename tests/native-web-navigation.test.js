@@ -29,6 +29,24 @@ test("Navigation dimensions follow actual web rules and real window geometry, no
   assert.doesNotMatch(view, /frame\(width: 252|ideal: 300|UIScreen.main/);
 });
 
+test("The tablet welcome logo stays directly on the wallpaper without an extra native white card", () => {
+  const view = read("mobile/ios-native/App/NativeTranslationView.swift");
+  const start = view.indexOf("GeometryReader { geometry in");
+  const end = view.indexOf("private var brandHeader:");
+  assert.ok(start >= 0 && end > start);
+  const placeholder = view.slice(start, end);
+  assert.match(placeholder, /NativeConversationBackground\(\)/);
+  assert.match(placeholder, /Image\("TeleTypTelLogo"\)/);
+  assert.match(placeholder, /Text\("Kies een gesprek"\)/);
+  assert.match(placeholder, /Kies links een contact om te chatten/);
+  assert.match(placeholder, /accessibilityIdentifier\("messenger-choose-conversation"\)/);
+  assert.doesNotMatch(placeholder, /\.background\(|RoundedRectangle|\.shadow\(/);
+  const tablet = read("php/public/chat-tablet.css");
+  const webPlaceholder = tablet.split(".tablet-chat-placeholder {")[2].split("}")[0];
+  assert.match(webPlaceholder, /place-content: center/);
+  assert.doesNotMatch(webPlaceholder, /background\s*:/);
+});
+
 test("Navigation visual scope measures all eight variants and preserves keyboard, bounds, target-size and sidebar separation checks", () => {
   assert.deepEqual(testsForScope("visual-navigation"), ["testWebNavigationLayoutInBothThemesAndOrientations"]);
   const methods = read("mobile/ios-native/UITests/NativeStartupUITests.swift");
