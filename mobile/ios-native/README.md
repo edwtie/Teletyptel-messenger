@@ -3676,6 +3676,23 @@ to use the same contract before comparable native acceptance can be claimed.
 
 ### Native message-button popover (2026-11-18)
 
+The first actual candidate run
+[44209919205](https://github.com/edwtie/Teletyptel-messenger/actions/runs/44209919205)
+is **not green**. On iPhone it passed the group menu flow but failed three direct
+message checks. The direct portrait trigger opened and produced a real screenshot;
+landscape Copy and portrait Edit/reaction rows were not hittable. The actual
+accessibility hierarchy reports a 224-point content view squeezed into a
+53.7-point popover below a low landscape anchor. This is evidence of a placement
+defect, not a reason to ignore hit-testing assertions.
+
+The follow-up measures the actual button and app viewport in the same global
+coordinate space and chooses the side with more vertical room. It does not use
+physical screen sizes, device-model guesses, coordinate taps or relaxed checks.
+The rotation test additionally requires the entire menu panel to fit inside the
+app window and its close button to remain hittable. The core placement tests
+cover low/high portrait and landscape anchors, keyboard-reduced space and invalid
+measurements. A new unsigned SDK/UI result is still required for this follow-up.
+
 The normalized activation-point attempt did not fix iPhone direct/group menu
 activation in run `44203686211`. The next candidate replaces that `Menu` trigger
 with an ordinary 44-point Button and an app-owned native SwiftUI popover. It

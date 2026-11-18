@@ -41,6 +41,16 @@ final class NativePresentationTests: XCTestCase {
             XCTAssertNil(NativeChatBackground.none.asset(viewportWidth: width))
         }
     }
+    func testMessageMenuChoosesTheRoomierSideInsideTheActualAppViewport() {
+        XCTAssertTrue(NativeMessageMenuPlacement.prefersAbove(anchorMinimumY: 736, anchorMaximumY: 780, viewportMinimumY: 62, viewportMaximumY: 840))
+        XCTAssertTrue(NativeMessageMenuPlacement.prefersAbove(anchorMinimumY: 273, anchorMaximumY: 317, viewportMinimumY: 0, viewportMaximumY: 381))
+        XCTAssertFalse(NativeMessageMenuPlacement.prefersAbove(anchorMinimumY: 90, anchorMaximumY: 134, viewportMinimumY: 62, viewportMaximumY: 840))
+        XCTAssertFalse(NativeMessageMenuPlacement.prefersAbove(anchorMinimumY: 72, anchorMaximumY: 116, viewportMinimumY: 0, viewportMaximumY: 381))
+        XCTAssertTrue(NativeMessageMenuPlacement.prefersAbove(anchorMinimumY: 320, anchorMaximumY: 364, viewportMinimumY: 62, viewportMaximumY: 430))
+        XCTAssertTrue(NativeMessageMenuPlacement.prefersAbove(anchorMinimumY: 0, anchorMaximumY: 0, viewportMinimumY: 0, viewportMaximumY: 0))
+        XCTAssertTrue(NativeMessageMenuPlacement.prefersAbove(anchorMinimumY: .nan, anchorMaximumY: 317, viewportMinimumY: 0, viewportMaximumY: 381))
+    }
+
     @MainActor func testArchiveIsScopedRestorableAndDoesNotTouchHistory() async throws {
         let suite = "native-archive-test-" + UUID().uuidString
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))

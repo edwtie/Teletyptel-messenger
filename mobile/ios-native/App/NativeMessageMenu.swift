@@ -1,5 +1,10 @@
 import SwiftUI
 
+private struct NativeMessageMenuAnchorFrame: PreferenceKey {
+    static let defaultValue: CGRect = .zero
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) { value = nextValue() }
+}
+
 @MainActor
 private final class NativeMessageMenuPresentation: ObservableObject {
     @Published var isPresented = false
@@ -65,8 +70,15 @@ struct NativeMessageMenu<Content: View>: View {
     var onPresentationChange: (Bool) -> Void = { _ in }
     @ViewBuilder var content: () -> Content
     @StateObject private var presentation = NativeMessageMenuPresentation()
+    @State private var anchorFrame: CGRect = .zero
+    @Environment(\.nativeConversationViewportFrame) private var viewportFrame
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @Environment(\.scenePhase) private var scenePhase
+
+    private var arrowEdge: Edge {
+        NativeMessageMenuPlacement.prefersAbove(anchorMinimumY: Double(anchorFrame.minY), anchorMaximumY: Double(anchorFrame.maxY),
+            viewportMinimumY: Double(viewportFrame.minY), viewportMaximumY: Double(viewportFrame.maxY)) ? .bottom : .top
+    }
 
     var body: some View {
         Button { presentation.toggle() } label: {
@@ -74,9 +86,15 @@ struct NativeMessageMenu<Content: View>: View {
         }
         .buttonStyle(.plain).foregroundStyle(NativeWebStyle.muted)
         .frame(width: 44, height: 44).contentShape(Rectangle())
+        .background {
+            GeometryReader { geometry in
+                Color.clear.preference(key: NativeMessageMenuAnchorFrame.self, value: geometry.frame(in: .global))
+            }.allowsHitTesting(false).accessibilityHidden(true)
+        }
+        .onPreferenceChange(NativeMessageMenuAnchorFrame.self) { anchorFrame = $0 }
         .accessibilityLabel("Berichtmenu").accessibilityIdentifier(identifier)
         .accessibilityValue(Text(LocalizedStringKey(presentation.isPresented ? "Geopend" : "Gesloten")))
-        .popover(isPresented: $presentation.isPresented, arrowEdge: .top) {
+        .popover(isPresented: $presentation.isPresented, arrowEdge: arrowEdge) {
             VStack(spacing: 0) {
                 HStack {
                     Text("Berichtmenu").font(NativeWebStyle.font(14, weight: .bold))

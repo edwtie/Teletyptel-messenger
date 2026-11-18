@@ -4,10 +4,18 @@ private struct NativeConversationViewportWidth: EnvironmentKey {
     static let defaultValue: Double = 0
 }
 
+private struct NativeConversationViewportFrame: EnvironmentKey {
+    static let defaultValue: CGRect = .zero
+}
+
 extension EnvironmentValues {
     var nativeConversationViewportWidth: Double {
         get { self[NativeConversationViewportWidth.self] }
         set { self[NativeConversationViewportWidth.self] = newValue }
+    }
+    var nativeConversationViewportFrame: CGRect {
+        get { self[NativeConversationViewportFrame.self] }
+        set { self[NativeConversationViewportFrame.self] = newValue }
     }
 }
 
@@ -15,6 +23,7 @@ struct NativeConversationViewport: ViewModifier {
     func body(content: Content) -> some View {
         GeometryReader { geometry in
             content.environment(\.nativeConversationViewportWidth, Double(geometry.size.width))
+                .environment(\.nativeConversationViewportFrame, geometry.frame(in: .global))
         }
     }
 }

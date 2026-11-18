@@ -24,6 +24,17 @@ enum NativeChatBackground: String, CaseIterable {
     }
 }
 
+enum NativeMessageMenuPlacement {
+    static func prefersAbove(anchorMinimumY: Double, anchorMaximumY: Double, viewportMinimumY: Double, viewportMaximumY: Double) -> Bool {
+        let values = [anchorMinimumY, anchorMaximumY, viewportMinimumY, viewportMaximumY]
+        guard values.allSatisfy(\.isFinite), anchorMaximumY > anchorMinimumY,
+              viewportMaximumY > viewportMinimumY else { return true }
+        let above = max(0, anchorMinimumY - viewportMinimumY)
+        let below = max(0, viewportMaximumY - anchorMaximumY)
+        return above >= below
+    }
+}
+
 struct NativeConversationSummary: Identifiable {
     let peer: String
     let kind: String

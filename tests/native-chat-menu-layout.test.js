@@ -97,6 +97,25 @@ test("Message menus sit beside compact web-style bubbles without covering text o
   assert.match(line, /VStack\(alignment: \.trailing, spacing: 4\)/);
 });
 
+test("Message popovers choose the roomier side of measured app geometry and never force every anchor below", () => {
+  const menu = read(app + "NativeMessageMenu.swift");
+  assert.match(menu, /NativeMessageMenuPlacement.prefersAbove/);
+  assert.match(menu, /viewportMinimumY: Double\(viewportFrame.minY\), viewportMaximumY: Double\(viewportFrame.maxY\)/);
+  assert.match(menu, /\.bottom : \.top/);
+  assert.match(menu, /value: geometry.frame\(in: \.global\)/);
+  assert.match(menu, /popover\(isPresented: \$presentation.isPresented, arrowEdge: arrowEdge\)/);
+  assert.doesNotMatch(menu, /UIScreen.main|userInterfaceIdiom|accessibilityActivationPoint/);
+  const appearance = read(app + "NativeAppearanceView.swift");
+  assert.match(appearance, /environment\(\\.nativeConversationViewportFrame, geometry.frame\(in: \.global\)\)/);
+  const core = read("mobile/ios-native/Sources/TeleTypTelCore/NativePresentationPreferences.swift");
+  assert.match(core, /let above = max\(0, anchorMinimumY - viewportMinimumY\)/);
+  assert.match(core, /let below = max\(0, viewportMaximumY - anchorMaximumY\)/);
+  assert.match(core, /return above >= below/);
+  const tests = read("mobile/ios-native/UITests/NativeStartupUITests.swift");
+  assert.match(tests, /XCTAssertTrue\(application.frame.contains\(messagePanel.frame\)\)/);
+  assert.match(tests, /XCTAssertTrue\(closeMessageMenu.isHittable\)/);
+});
+
 test("Message popovers dismiss before an action, cancel stale work, and keep original permissions and read-marker gates", () => {
   const menu = read(app + "NativeMessageMenu.swift");
   const perform = menu.split("func perform(")[1].split("func cancel()")[0];

@@ -372,6 +372,7 @@ final class NativeStartupUITests: XCTestCase {
             messageMenu.tap()
             let messagePanel = application.descendants(matching: .any)["message-menu-" + identifier + "-panel"].firstMatch
             XCTAssertTrue(messagePanel.waitForExistence(timeout: 5))
+            XCTAssertTrue(application.frame.contains(messagePanel.frame))
             let copy = application.buttons["Kopiëren"]
             XCTAssertTrue(copy.waitForExistence(timeout: 5))
             XCTAssertTrue(copy.isHittable)
@@ -379,7 +380,9 @@ final class NativeStartupUITests: XCTestCase {
             expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: application.keyboards.firstMatch)
             waitForExpectations(timeout: 5)
             snapshot(orientation == .landscapeLeft ? "visual-message-menu-landscape-light" : "visual-message-menu-portrait-light")
-            application.buttons["message-menu-" + identifier + "-close"].tap()
+            let closeMessageMenu = application.buttons["message-menu-" + identifier + "-close"]
+            XCTAssertTrue(closeMessageMenu.isHittable)
+            closeMessageMenu.tap()
             expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: messagePanel)
             waitForExpectations(timeout: 5)
             application.buttons["chat-menu"].tap()
