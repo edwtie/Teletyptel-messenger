@@ -642,7 +642,7 @@ test("Native web-style chat keeps translations private, off-gated and call-bound
     assert.ok(model.includes(token), token);
   assert.doesNotMatch(model, /sendMessage|UserDefaults|print\(|NSLog|apiKey/);
   assert.match(chat, /NativeConversationBackground\(\)/);
-  assert.match(read("App/NativeAppearanceView.swift"), /background\.asset\(wide:/);
+  assert.match(read("App/NativeAppearanceView.swift"), /background\.asset\(viewportWidth:/);
   assert.match(read("Sources/TeleTypTelCore/NativePresentationPreferences.swift"), /ChatBackground/);
   assert.match(chat, /contextMenu/);
   assert.match(chat, /NativeTranslationCaption/);

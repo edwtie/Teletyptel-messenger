@@ -16,13 +16,30 @@ final class NativePresentationTests: XCTestCase {
     }
 
     func testBackgroundOptionsMapOnlyToBundledAssets() {
-        XCTAssertNil(NativeChatBackground.none.asset(wide: true))
-        XCTAssertEqual(NativeChatBackground.automatic.asset(wide: true), "ChatBackgroundWide")
-        XCTAssertEqual(NativeChatBackground.automatic.asset(wide: false), "ChatBackground")
-        XCTAssertEqual(NativeChatBackground.open.asset(wide: false), "ChatBackgroundOpen")
-        XCTAssertEqual(NativeChatBackground.right.asset(wide: true), "ChatBackgroundRight")
+        XCTAssertNil(NativeChatBackground.none.asset(viewportWidth: 834))
+        XCTAssertEqual(NativeChatBackground.automatic.asset(viewportWidth: 834), "ChatBackgroundWide")
+        XCTAssertEqual(NativeChatBackground.automatic.asset(viewportWidth: 390), "ChatBackground")
+        XCTAssertEqual(NativeChatBackground.open.asset(viewportWidth: 390), "ChatBackgroundOpen")
+        XCTAssertEqual(NativeChatBackground.right.asset(viewportWidth: 834), "ChatBackgroundRight")
         XCTAssertNil(NativeChatBackground(rawValue: "https://foreign.invalid/pixel"))
         XCTAssertNil(NativeInterfaceTheme(rawValue: "invalid"))
+    }
+
+    func testAutomaticBackgroundUsesWindowWidthIncludingRotationAndSplitView() {
+        for width in [320.0, 375, 390, 430, 520] {
+            XCTAssertEqual(NativeChatBackground.automatic.asset(viewportWidth: width), "ChatBackground")
+        }
+        for width in [520.1, 521, 724, 834, 1194, 1366] {
+            XCTAssertEqual(NativeChatBackground.automatic.asset(viewportWidth: width), "ChatBackgroundWide")
+        }
+        for width in [0.0, -1, .infinity, .nan] {
+            XCTAssertEqual(NativeChatBackground.automatic.asset(viewportWidth: width), "ChatBackgroundWide")
+        }
+        for width in [375.0, 834, 1194] {
+            XCTAssertEqual(NativeChatBackground.mobile.asset(viewportWidth: width), "ChatBackground")
+            XCTAssertEqual(NativeChatBackground.soft.asset(viewportWidth: width), "ChatBackgroundWide")
+            XCTAssertNil(NativeChatBackground.none.asset(viewportWidth: width))
+        }
     }
     @MainActor func testArchiveIsScopedRestorableAndDoesNotTouchHistory() async throws {
         let suite = "native-archive-test-" + UUID().uuidString

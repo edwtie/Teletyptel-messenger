@@ -500,6 +500,7 @@ struct NativeStartupView: View {
                 NativeMessengerView(model: loginModel, calls: calls, translation: translation, logout: logout)
             } else { startupContent }
         }
+        .modifier(NativeConversationViewport())
         .background(NativeProviderPresenter(sdk: providerSDK).frame(width: 0, height: 0))
         .modifier(NativeAppearancePresentation())
         .environmentObject(calls.pushRegistration)

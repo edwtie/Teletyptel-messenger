@@ -3613,6 +3613,18 @@ not green. No TestFlight upload, signing change or server activation took place.
 
 ## Additional visual matrix follow-up
 
+### Automatic conversation background (2026-11-18)
+
+Native automatic background selection now follows the actual web rule: the mobile
+asset is used at a window width of at most 520 points; wider windows use wide-1.
+The previous implementation selected from the conversation pane's aspect ratio,
+which gave portrait iPads a different background than the web. A root-scene
+geometry environment supplies the current app viewport, including rotation and
+resized iPad windows, without using device models or the physical screen size.
+Explicit background choices still override automatic selection. Core tests cover
+the breakpoint, both orientations, narrow split views and invalid measurements.
+The native screenshot comparison for this change is still pending.
+
 ### Canonical data file preparation (2026-11-18)
 
 `scripts/native-visual-audit/shared-data.json` now contains the web fixture's

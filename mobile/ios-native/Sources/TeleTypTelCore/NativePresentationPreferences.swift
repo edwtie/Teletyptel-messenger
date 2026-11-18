@@ -12,9 +12,9 @@ enum NativeChatBackground: String, CaseIterable {
         switch self { case .automatic: return "Automatisch"; case .none: return "Geen"; case .soft: return "Wereld zacht"
         case .open: return "Wereld open"; case .right: return "Wereld rechts"; case .mobile: return "Mobiel staand" }
     }
-    func asset(wide: Bool) -> String? {
+    func asset(viewportWidth: Double) -> String? {
         switch self {
-        case .automatic: return wide ? "ChatBackgroundWide" : "ChatBackground"
+        case .automatic: return viewportWidth.isFinite && viewportWidth > 0 && viewportWidth <= 520 ? "ChatBackground" : "ChatBackgroundWide"
         case .none: return nil
         case .soft: return "ChatBackgroundWide"
         case .open: return "ChatBackgroundOpen"

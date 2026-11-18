@@ -1,5 +1,24 @@
 import SwiftUI
 
+private struct NativeConversationViewportWidth: EnvironmentKey {
+    static let defaultValue: Double = 0
+}
+
+extension EnvironmentValues {
+    var nativeConversationViewportWidth: Double {
+        get { self[NativeConversationViewportWidth.self] }
+        set { self[NativeConversationViewportWidth.self] = newValue }
+    }
+}
+
+struct NativeConversationViewport: ViewModifier {
+    func body(content: Content) -> some View {
+        GeometryReader { geometry in
+            content.environment(\.nativeConversationViewportWidth, Double(geometry.size.width))
+        }
+    }
+}
+
 struct NativeAppearancePresentation: ViewModifier {
     @AppStorage("teletyptel.native.theme") private var theme = NativeInterfaceTheme.automatic.rawValue
     func body(content: Content) -> some View {
@@ -9,10 +28,11 @@ struct NativeAppearancePresentation: ViewModifier {
 
 struct NativeConversationBackground: View {
     @AppStorage("teletyptel.native.background") private var selection = NativeChatBackground.automatic.rawValue
+    @Environment(\.nativeConversationViewportWidth) private var viewportWidth
     var body: some View {
         GeometryReader { geometry in
             let background = NativeChatBackground(rawValue: selection) ?? .automatic
-            if let asset = background.asset(wide: geometry.size.width > geometry.size.height) {
+            if let asset = background.asset(viewportWidth: viewportWidth) {
                 Image(asset).resizable().scaledToFill().frame(width: geometry.size.width, height: geometry.size.height).clipped()
                     .overlay(NativeWebStyle.backgroundOverlay)
             } else { NativeWebStyle.background }
@@ -58,6 +78,6 @@ struct NativeAppearanceView: View {
                 .toolbar { ToolbarItem(placement: .cancellationAction) {
                     Button { dismiss() } label: { Image(systemName: "xmark").frame(width: 44, height: 44) }.accessibilityLabel("Sluiten")
                 } }
-        }.modifier(NativeAppearancePresentation())
+        }.modifier(NativeConversationViewport()).modifier(NativeAppearancePresentation())
     }
 }

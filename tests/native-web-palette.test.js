@@ -108,6 +108,22 @@ test("Shared native components use web colour roles for selection, composer, rec
   assert.match(style, /NativeWebStyle.dateBackground/);
 });
 
+test("Automatic native background follows the web window breakpoint rather than the chat-pane aspect ratio", () => {
+  assert.match(client, /body\[data-chat-background="auto"\],[\s\S]*?--chat-background-image: url\("assets\/backgrounds\/teletyptel-bg-wide-1.png"\)/);
+  const mobile = client.split("@media (max-width: 520px) {").at(-1).split(".chat-header .chat-more-toggle")[0];
+  assert.match(mobile, /body\[data-chat-background="auto"\]\s*\{\s*--chat-background-image: url\("assets\/backgrounds\/teletyptel-bg-mobile.png"\)/);
+  const core = read("mobile/ios-native/Sources/TeleTypTelCore/NativePresentationPreferences.swift");
+  assert.match(core, /viewportWidth\.isFinite && viewportWidth > 0 && viewportWidth <= 520/);
+  const appearance = read("mobile/ios-native/App/NativeAppearanceView.swift");
+  assert.match(appearance, /content.environment\(\\.nativeConversationViewportWidth, Double\(geometry.size.width\)\)/);
+  assert.match(appearance, /background.asset\(viewportWidth: viewportWidth\)/);
+  assert.doesNotMatch(appearance, /geometry.size.width > geometry.size.height|UIScreen.main|userInterfaceIdiom/);
+  assert.match(read("mobile/ios-native/App/TeleTypTelNativeApp.swift"), /modifier\(NativeConversationViewport\(\)\)/);
+  const tests = read("mobile/ios-native/Tests/TeleTypTelCoreTests/NativePresentationTests.swift");
+  assert.match(tests, /testAutomaticBackgroundUsesWindowWidthIncludingRotationAndSplitView/);
+  assert.match(tests, /520\.1, 521, 724, 834, 1194, 1366/);
+});
+
 test("Appearance comparison explicitly captures light/dark login, contacts, menus, forms, chat and TC in both orientations", () => {
   const { testsForScope } = require("../scripts/check-ios-native-ui");
   const methods = read("mobile/ios-native/UITests/NativeStartupUITests.swift");
