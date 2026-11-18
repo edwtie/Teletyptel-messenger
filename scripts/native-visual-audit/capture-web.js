@@ -92,6 +92,13 @@ function mime(file) {
   return ({ ".html": "text/html", ".js": "application/javascript", ".css": "text/css", ".png": "image/png", ".gif": "image/gif", ".svg": "image/svg+xml", ".json": "application/json", ".lng": "text/plain" })[path.extname(file)] || "application/octet-stream";
 }
 
+function profileForVariant(variant, devices) {
+  const descriptorName = variant.family === "iPad" ? "iPad Pro 11" : variant.family === "iPhone" ? "iPhone 15 Pro" : null;
+  const descriptor = descriptorName && devices[descriptorName];
+  if (!descriptor?.userAgent) throw new Error("Missing explicit Safari device classification profile");
+  return { descriptorName, userAgent: descriptor.userAgent, expectedDeviceClass: variant.family === "iPad" ? "tablet" : "phone" };
+}
+
 async function capture({ output, revision = "HEAD", sourceMode = "committed", nativeManifest, browserName = "webkit", selectedScreens = Object.keys(scenarios), selectedVariants = variants } = {}) {
   if (!output || fs.existsSync(output)) throw new Error("Choose a new output directory; existing evidence is never overwritten");
   if (!selectedScreens.length || selectedScreens.some(screen => !Object.hasOwn(scenarios, screen)) || new Set(selectedScreens).size !== selectedScreens.length || !selectedVariants.length) throw new Error("Select explicit known visual scenarios and viewports");
@@ -107,7 +114,7 @@ async function capture({ output, revision = "HEAD", sourceMode = "committed", na
   if (nativeCases.size !== native.captures.length) throw new Error("Duplicate native viewport evidence");
   fs.mkdirSync(output, { recursive: true });
   const hash = content => crypto.createHash("sha256").update(content).digest("hex");
-  const result = { captureSchema: 2, revision: sha, sourceMode, source: sourceMode + " actual chat.html/CSS/JS, API and XMPP mocked; no replacement UI", renderer: browserName, epoch, locale: "nl-NL", timezone: "Europe/Amsterdam", fixtureSources: { hook: hash(hook), bootstrap: hash(bootstrap) }, captures: [], blocked: [], caveat: "Desktop WebKit/Chromium at CSS viewport size, not physical iOS Safari. This alone is not a native pixel-equality result." };
+  const result = { captureSchema: 3, revision: sha, sourceMode, source: sourceMode + " actual chat.html/CSS/JS, API and XMPP mocked; no replacement UI", renderer: browserName, epoch, locale: "nl-NL", timezone: "Europe/Amsterdam", fixtureSources: { hook: hash(hook), bootstrap: hash(bootstrap) }, captures: [], blocked: [], caveat: "Desktop WebKit/Chromium with verified Safari phone/tablet classification and measured geometry, not physical iOS Safari. This alone is not a native pixel-equality result." };
   if (nativeManifest) result.pairedNativeRevision = native.revision;
   const browser = await playwright[browserName].launch({ headless: true });
   console.log("Visual renderer ready: " + browserName);
@@ -117,8 +124,9 @@ async function capture({ output, revision = "HEAD", sourceMode = "committed", na
         const identifier = caseID(screen.id, baseVariant);
         const measurement = nativeCases.get(identifier);
         const variant = measuredVariant(baseVariant, measurement?.viewport, measurement?.imageSize);
+        const profile = profileForVariant(variant, playwright.devices);
         console.log("Opening " + identifier);
-        const context = await browser.newContext({ viewport: { width: variant.width, height: variant.height }, deviceScaleFactor: variant.scale, isMobile: true, hasTouch: true, locale: "nl-NL", timezoneId: "Europe/Amsterdam", colorScheme: variant.theme, reducedMotion: "reduce", serviceWorkers: "block" });
+        const context = await browser.newContext({ viewport: { width: variant.width, height: variant.height }, deviceScaleFactor: variant.scale, userAgent: profile.userAgent, isMobile: true, hasTouch: true, locale: "nl-NL", timezoneId: "Europe/Amsterdam", colorScheme: variant.theme, reducedMotion: "reduce", serviceWorkers: "block" });
         const errors = [];
         const page = await context.newPage();
         page.setDefaultTimeout(5000);
@@ -154,6 +162,8 @@ async function capture({ output, revision = "HEAD", sourceMode = "committed", na
           const input = await page.evaluate(() => ({ touchPoints: navigator.maxTouchPoints, touchEvents: "ontouchstart" in window && typeof TouchEvent !== "undefined", coarse: matchMedia("(pointer: coarse)").matches, hover: matchMedia("(hover: hover)").matches }));
           if (!input.touchEvents || !input.coarse || input.hover) throw new Error("Mobile touch media do not match the native comparison target: " + JSON.stringify(input));
           await page.evaluate(theme => nativeVisualFixture.setup(theme), variant.theme);
+          const device = await page.evaluate(() => ({ platform: document.body.dataset.platform, deviceClass: document.body.dataset.deviceClass, viewportClass: document.body.dataset.viewportClass, userAgent: navigator.userAgent }));
+          if (device.platform !== "ios" || device.deviceClass !== profile.expectedDeviceClass) throw new Error("The real web application selected the wrong device family: " + JSON.stringify(device));
           console.log("Fixture ready " + identifier);
           await page.waitForTimeout(100);
           await page.evaluate(() => { document.activeElement?.blur(); });
@@ -175,7 +185,7 @@ async function capture({ output, revision = "HEAD", sourceMode = "committed", na
           await page.screenshot({ path: path.join(output, file), animations: "disabled", caret: "hide" });
           const visibleImages = await page.evaluate(() => [...document.images].filter(image => image.getClientRects().length && image.getAttribute("src")).map(image => ({ source: image.getAttribute("src"), complete: image.complete && image.naturalWidth > 0 })));
           if (visibleImages.some(image => !image.complete)) throw new Error("Visible image did not decode");
-          result.captures.push({ id: identifier, screen: screen.id, ...variant, file, geometry, visibleImages, viewportBasis: measurement?.viewport ? "native-measured" : "catalogue-default", stateVerified: true, inputVerified: true, input, presentation: presentation || "default", errors, status: "web-captured-only" });
+          result.captures.push({ id: identifier, screen: screen.id, ...variant, file, geometry, visibleImages, viewportBasis: measurement?.viewport ? "native-measured" : "catalogue-default", stateVerified: true, inputVerified: true, input, deviceVerified: true, device: { ...device, descriptorName: profile.descriptorName }, presentation: presentation || "default", errors, status: "web-captured-only" });
           console.log("Captured " + identifier);
         } catch (error) {
           await page.screenshot({ path: path.join(output, identifier + "-failed.png"), animations: "disabled" }).catch(() => {});
@@ -217,4 +227,4 @@ if (require.main === module) {
   }).catch(error => { console.error(error.message); process.exit(1); });
 }
 
-module.exports = { capture, trackedReader, scenarios };
+module.exports = { capture, trackedReader, scenarios, profileForVariant };

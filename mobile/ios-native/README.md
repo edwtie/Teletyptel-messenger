@@ -163,7 +163,7 @@ Confirmed presentation differences and concrete next acceptance work:
 | --- | --- | --- |
 | P0 | Comparable fixtures | Share message/history/avatars, clock, locale, timezone, provider availability and translation state, recording the same verified fixture hash in both captures. Do not fill missing metadata with assumed values. |
 | P0 | iPhone rotation/group menu | Resolve the failed rotation-settling and activation checks with their real screenshots/hierarchy; rerun the unchanged hit-area/nonoverlap requirements and obtain a complete capture set. |
-| P1 | Adaptive shell | At 834-point portrait width, web uses a single conversation pane while native retains a 300-point contact column. Match the web breakpoints, drawer/column behavior and header actions in both orientations. |
+| P0 | Valid web device reference | The earlier 834-point web capture had a desktop user agent, so its apparent missing tablet sidebar is not reliable iPad-target evidence. Recapture with the real app reporting `ios/tablet` before changing native columns or breakpoints. |
 | P1 | Main/conversation menus | The measured iPad main menu is 252×253 native versus 320×242 web; the conversation menu is 260×333 versus 280×223. Align placement, dimensions, symbol artwork and available actions without silently removing capabilities. |
 | P1 | Chat | Compact short bubbles are implemented, but composer dimensions, history/status rows, wallpaper sizing, message alignment and reaction/menu symbols still differ. Retest with identical message data. |
 | P1 | Forms and missing native screens | Native Forms/sheets differ from web dialogs, tabs and grids. Align app-owned account, appearance, groups, translation and dialer components. Native News/Support remain disabled placeholders, not completed equivalents. |
@@ -193,6 +193,17 @@ this is not a physical-device rotation-latency claim. The group check now also
 opens the actual message menu and selects Copy, rather than relying only on an
 `isHittable` result. New simulator results remain required before calling either
 failed check resolved. The earlier 352-case audit result is unchanged.
+
+The web capture now supplies a Safari phone/tablet user-agent descriptor and
+verifies the device class selected by TeleTypTel itself. Touch media and viewport
+size alone were insufficient: `detectClientDevice()` branches on user agent and
+platform, and tablet CSS intentionally retains a sidebar. No app CSS/body class
+is manually forced. Only the classification user agent comes from Playwright's
+descriptor; viewport/DPR continue to come from actual native measurements, not
+the descriptor's hardware dimensions. The bundled iPhone descriptor's model name
+is not a claim to emulate that physical model. Older references without
+`deviceVerified` cannot meet strict acceptance. Previous app-layout conclusions
+derived from their desktop device class must be reviewed against the new images.
 
 ## Shared web smileys (2026-11-17)
 

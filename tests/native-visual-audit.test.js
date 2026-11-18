@@ -6,7 +6,7 @@ const path = require("node:path");
 const { comparePixels, cropPixels, orientPixels, pairIssues, compareLayout, completeness, renderReport } = require("../scripts/native-visual-audit/compare");
 const { screens, variants, caseID } = require("../scripts/native-visual-audit/catalogue");
 const { scenarioForName, pngSize, measuredVariant } = require("../scripts/native-visual-audit/import-native");
-const { trackedReader } = require("../scripts/native-visual-audit/capture-web");
+const { trackedReader, profileForVariant } = require("../scripts/native-visual-audit/capture-web");
 const root = path.resolve(__dirname, "..");
 
 test("Visual inventory includes all declared screens and every device/orientation/theme; missing cases cannot pass", () => {
@@ -66,12 +66,13 @@ test("XCTest landscape PNG orientation is read from EXIF and rotated losslessly,
 });
 
 test("Unmatched fixture, language, theme, time, scale and viewport are blocked rather than misrepresented as comparisons", () => {
-  const reference = { screen: "chat", family: "iPhone", orientation: "portrait", theme: "light", width: 402, height: 778, scale: 3, locale: "nl-NL", timezone: "Europe/Amsterdam", epoch: "2026-11-17T11:00:00.000Z", fixtureHash: "a".repeat(64), stateVerified: true, inputVerified: true };
+  const reference = { screen: "chat", family: "iPhone", orientation: "portrait", theme: "light", width: 402, height: 778, scale: 3, locale: "nl-NL", timezone: "Europe/Amsterdam", epoch: "2026-11-17T11:00:00.000Z", fixtureHash: "a".repeat(64), stateVerified: true, inputVerified: true, deviceVerified: true };
   const actual = { ...reference, viewport: { source: "measured-safe-area", x: 0, y: 186, width: 1206, height: 2334 } };
   assert.deepEqual(pairIssues(reference, actual), []);
-  for (const key of Object.keys(reference).filter(key => !["stateVerified", "inputVerified"].includes(key))) assert.ok(pairIssues(reference, { ...actual, [key]: undefined }).some(issue => issue.includes(key)));
+  for (const key of Object.keys(reference).filter(key => !["stateVerified", "inputVerified", "deviceVerified"].includes(key))) assert.ok(pairIssues(reference, { ...actual, [key]: undefined }).some(issue => issue.includes(key)));
   assert.ok(pairIssues({ ...reference, stateVerified: false }, actual).some(issue => issue.includes("web screen state")));
   assert.ok(pairIssues({ ...reference, inputVerified: false }, actual).some(issue => issue.includes("touch input mode")));
+  assert.ok(pairIssues({ ...reference, deviceVerified: false }, actual).some(issue => issue.includes("phone/tablet classification")));
   assert.ok(pairIssues(reference, { ...actual, viewport: undefined }).some(issue => issue.includes("viewport")));
   assert.ok(pairIssues(reference, { ...actual, viewport: { ...actual.viewport, width: 100 } }).some(issue => issue.includes("entire declared app area")));
   assert.ok(pairIssues(reference, { ...actual, errors: ["broken image"] }).some(issue => issue.includes("runtime")));
@@ -148,6 +149,20 @@ test("Unpublished web files require an explicit local source mode and cannot sil
   assert.equal(working.read("php/config.php"), null);
   assert.equal(working.read("php/public/postnl-demo.js"), null);
   assert.ok(working.manifest().every(entry => /^[a-f0-9]{64}$/.test(entry.sha256)));
+});
+
+test("Safari device classification does not replace measured geometry and cannot silently use a desktop profile", () => {
+  const devices = { "iPad Pro 11": { userAgent: "fixture-ipad-agent" }, "iPhone 15 Pro": { userAgent: "fixture-iphone-agent" } };
+  const tablet = profileForVariant(variants.find(variant => variant.family === "iPad"), devices);
+  assert.equal(tablet.expectedDeviceClass, "tablet");
+  assert.equal(tablet.userAgent, "fixture-ipad-agent");
+  assert.equal(Object.hasOwn(tablet, "viewport"), false);
+  assert.equal(profileForVariant(variants[0], devices).expectedDeviceClass, "phone");
+  assert.throws(() => profileForVariant({ family: "desktop" }, devices), /explicit Safari/);
+  assert.throws(() => profileForVariant(variants[0], {}), /explicit Safari/);
+  const runner = fs.readFileSync(path.join(root, "scripts/native-visual-audit/capture-web.js"), "utf8");
+  assert.match(runner, /userAgent: profile.userAgent/);
+  assert.match(runner, /device.platform !== "ios" \|\| device.deviceClass !== profile.expectedDeviceClass/);
 });
 
 test("Visual simulator scope captures actual forms in both orientations and retains strict no-overlap and compactness checks", () => {
