@@ -34,6 +34,8 @@ function testsForScope(scope = "regression") {
   if (scope === "smileys") return ["testWebSmileyPickerUsesSharedImagesAndOnlyChangesDraft"];
   if (scope === "visual-metrics") return [...testsForScope("appearance"), "testVisualInventoryCapturesEveryMainMenuSheetInBothOrientations"];
   if (scope === "visual-startup") return ["testVisualStartupStatesInBothThemesAndOrientations"];
+  if (scope === "message-actions") return ["testChatHeaderAndMessageMenuDoNotOverlapAcrossRotation",
+    "testMessageMenuEditForwardAndBothDeletionOptions", "testMessageReactionTogglesAcrossRotation", "testExistingGroupJoinSendRotationAndLeave"];
   if (scope === "visual-repair") return [...testsForScope("menus"), "testExistingGroupJoinSendRotationAndLeave", "testStartupProgressStopsOnCancelAndCertificateFailure"];
   if (scope === "visual") return [...testsForScope("appearance"), ...testsForScope("menus"),
     ...testsForScope("smileys"), ...testsForScope("groups"),
@@ -58,7 +60,7 @@ function run() {
     scope: "focused simulator UI regression; not a full unit, media or device SDK run",
     uiScope: scope, selectedTests: tests, uiTests: [] };
   const logged = (name, command, args, timeout) => executeLogged(command, args, {
-    root, reports, name, timeout: timeout ?? (["menus", "startup", "appearance", "smileys", "visual", "visual-metrics", "visual-repair", "visual-startup"].includes(scope) && name.endsWith("-build") ? 1200000 : undefined)
+    root, reports, name, timeout: timeout ?? (["menus", "startup", "appearance", "smileys", "visual", "visual-metrics", "visual-repair", "visual-startup", "message-actions"].includes(scope) && name.endsWith("-build") ? 1200000 : undefined)
   });
   try {
     const inventory = JSON.parse(logged("simulator-inventory", "xcrun", ["simctl", "list", "devices", "available", "--json"]));

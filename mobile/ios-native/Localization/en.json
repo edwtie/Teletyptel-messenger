@@ -388,5 +388,6 @@
   "De verbinding kan met deze instellingen niet worden gestart. Neem contact op met de beheerder.": "The connection cannot start with these settings. Contact the administrator.",
   "Controleer je internetverbinding en probeer het opnieuw.": "Check your internet connection and try again.",
   "De verbinding met TeleTypTel is niet gelukt. Probeer het later opnieuw.": "Could not connect to TeleTypTel. Try again later.",
-  "Wijzig de serverinstellingen alleen als je weet welke server je nodig hebt. Verkeerde instellingen kunnen aanmelden verhinderen.": "Only change the server settings if you know which server you need. Incorrect settings can prevent sign-in."
+  "Wijzig de serverinstellingen alleen als je weet welke server je nodig hebt. Verkeerde instellingen kunnen aanmelden verhinderen.": "Only change the server settings if you know which server you need. Incorrect settings can prevent sign-in.",
+  "Berichtmenu sluiten": "Close message menu"
 }

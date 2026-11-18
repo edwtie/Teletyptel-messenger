@@ -343,6 +343,7 @@ final class NativeStartupUITests: XCTestCase {
     }
 
     func testChatHeaderAndMessageMenuDoNotOverlapAcrossRotation() {
+        application.launchArguments += ["-teletyptel.native.theme", "light"]
         application.launchEnvironment["TELETYPTEL_NATIVE_LONG_CONTACT_NAME"] = "1"
         signInFixture("connected")
         let contact = application.descendants(matching: .any)["contact-demo-contact@localhost"].firstMatch
@@ -368,6 +369,19 @@ final class NativeStartupUITests: XCTestCase {
             XCTAssertFalse(menuFrame.intersects(metadata.frame))
             XCTAssertLessThanOrEqual(outgoing.frame.height, 64)
             XCTAssertTrue(application.frame.contains(menuFrame))
+            messageMenu.tap()
+            let messagePanel = application.descendants(matching: .any)["message-menu-" + identifier + "-panel"].firstMatch
+            XCTAssertTrue(messagePanel.waitForExistence(timeout: 5))
+            let copy = application.buttons["Kopiëren"]
+            XCTAssertTrue(copy.waitForExistence(timeout: 5))
+            XCTAssertTrue(copy.isHittable)
+            XCTAssertGreaterThanOrEqual(copy.frame.height, 44)
+            expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: application.keyboards.firstMatch)
+            waitForExpectations(timeout: 5)
+            snapshot(orientation == .landscapeLeft ? "visual-message-menu-landscape-light" : "visual-message-menu-portrait-light")
+            application.buttons["message-menu-" + identifier + "-close"].tap()
+            expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: messagePanel)
+            waitForExpectations(timeout: 5)
             application.buttons["chat-menu"].tap()
             XCTAssertTrue(application.buttons["Spraak en video"].waitForExistence(timeout: 5))
             expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: application.keyboards.firstMatch)

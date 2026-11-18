@@ -30,6 +30,7 @@ appFiles.push("App/NativeCloudHistoryView.swift", "App/NativePushVault.swift", "
 appFiles.push("App/NativeInterpreterMedia.swift", "App/NativeInterpreterCallView.swift");
 appFiles.push("App/NativeNewContactView.swift", "App/NativeAppearanceView.swift", "App/NativeHistoryBrowserView.swift", "App/NativeAvatarEditorView.swift");
 appFiles.push("App/NativeSmileys.swift");
+appFiles.push("App/NativeMessageMenu.swift");
 
 function projectText({ pushTest = null, archive = null } = {}) {
   callPush.validate(pushTest);

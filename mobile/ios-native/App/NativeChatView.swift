@@ -18,6 +18,7 @@ struct NativeChatView: View {
     @State private var showTranslation = false
     @State private var showEmoji = false
     @State private var conversationMenuOpen = false
+    @State private var activeMessageMenu: UUID?
     @State private var showInterpreterHelp = false
     @State private var menuPresentation: Task<Void, Never>?
     @FocusState private var draftFocused: Bool
@@ -76,7 +77,7 @@ struct NativeChatView: View {
                     .overlayPreferenceValue(NativeMessageFramesKey.self) { frames in
                         GeometryReader { viewport in
                             let visible = frames.filter { CGRect(origin: .zero, size: viewport.size).contains($0.value) }.map(\.key)
-                            let enabled = scenePhase == .active && allowReadMarkers && !conversationMenuOpen && !showInterpreterHelp && !showTranslation && forwarding == nil && editing == nil && deleting == nil && calls.presentation == nil && (model.canSend || model.canReadCachedHistory)
+                            let enabled = scenePhase == .active && allowReadMarkers && !conversationMenuOpen && activeMessageMenu == nil && !showInterpreterHelp && !showTranslation && forwarding == nil && editing == nil && deleting == nil && calls.presentation == nil && (model.canSend || model.canReadCachedHistory)
                             Color.clear.allowsHitTesting(false).task(id: enabled ? visible.map(\.uuidString).sorted().joined() : "hidden") {
                                 if enabled { model.displayed(visible) }
                             }
@@ -114,7 +115,7 @@ struct NativeChatView: View {
         .onDisappear { menuPresentation?.cancel(); menuPresentation = nil; if model.visibleConversation == contact.jid { model.visibleConversation = nil } }
         .onChange(of: contact.jid) { _ in
             menuPresentation?.cancel(); menuPresentation = nil
-            conversationMenuOpen = false; showInterpreterHelp = false; draftFocused = false
+            conversationMenuOpen = false; activeMessageMenu = nil; showInterpreterHelp = false; draftFocused = false
         }
         .onChange(of: allowReadMarkers) { allowed in if !allowed { draftFocused = false } }
         .confirmationDialog("Gebarentolk oproepen", isPresented: $showInterpreterHelp, titleVisibility: .visible) {
@@ -288,10 +289,10 @@ struct NativeChatView: View {
     }
 
     private func messageMenu(_ message: NativeChatMessage) -> some View {
-        Menu { messageActions(message) } label: { Image(systemName: "ellipsis").frame(width: 44, height: 44).contentShape(Rectangle()) }
-            .buttonStyle(.plain).foregroundStyle(NativeWebStyle.muted)
-            .accessibilityActivationPoint(UnitPoint.center)
-            .accessibilityLabel("Berichtmenu").accessibilityIdentifier("message-menu-" + message.id.uuidString)
+        NativeMessageMenu(identifier: "message-menu-" + message.id.uuidString, onPresentationChange: { presented in
+            if presented { draftFocused = false; activeMessageMenu = message.id }
+            else if activeMessageMenu == message.id { activeMessageMenu = nil }
+        }) { messageActions(message) }
     }
 
     private func messageMetadata(_ message: NativeChatMessage) -> some View {
@@ -305,19 +306,19 @@ struct NativeChatView: View {
 
     @ViewBuilder private func messageActions(_ message: NativeChatMessage) -> some View {
         if !message.retracted {
-                Menu { ForEach(NativeInteractionCodec.picker, id: \.self) { emoji in Button(emoji) { model.react(message.id, emoji: emoji) } } } label: { Label("Reageren", systemImage: "face.smiling") }
+                Menu { ForEach(NativeInteractionCodec.picker, id: \.self) { emoji in NativeMessageActionButton { model.react(message.id, emoji: emoji) } label: { Text(emoji) } } } label: { Label("Reageren", systemImage: "face.smiling") }
                     .disabled(!model.canSend || message.stanzaID == nil || message.reactionPending)
-                Button { model.setDraft("> " + message.body + "\n\n" + draft, peer: contact.jid) } label: { Label("Beantwoorden", systemImage: "arrowshape.turn.up.left") }
+                NativeMessageActionButton { model.setDraft("> " + message.body + "\n\n" + draft, peer: contact.jid) } label: { Label("Beantwoorden", systemImage: "arrowshape.turn.up.left") }
                     .disabled(!NativeChatCodec.validBody("> " + message.body + "\n\n" + draft))
-                Button { UIPasteboard.general.string = message.body } label: { Label("Kopiëren", systemImage: "doc.on.doc") }
-                Button { forwarding = message } label: { Label("Doorsturen", systemImage: "arrowshape.turn.up.right") }
-                if model.canChangeMessages, model.chat.canCorrect(message.id) { Button { editing = message } label: { Label("Bewerken", systemImage: "pencil") } }
+                NativeMessageActionButton { UIPasteboard.general.string = message.body } label: { Label("Kopiëren", systemImage: "doc.on.doc") }
+                NativeMessageActionButton { forwarding = message } label: { Label("Doorsturen", systemImage: "arrowshape.turn.up.right") }
+                if model.canChangeMessages, model.chat.canCorrect(message.id) { NativeMessageActionButton { editing = message } label: { Label("Bewerken", systemImage: "pencil") } }
                 if translation.preferences.mode != "off" {
-                    Button { translation.translate(message.body, key: message.id.uuidString) } label: { Label("Vertalen", systemImage: "globe") }
+                    NativeMessageActionButton { translation.translate(message.body, key: message.id.uuidString) } label: { Label("Vertalen", systemImage: "globe") }
                         .disabled(!translation.ready || !translation.available || !translation.sharingConsent)
                 }
         }
-        Button(role: .destructive) { deleting = message } label: { Label("Verwijderen", systemImage: "trash") }
+        NativeMessageActionButton(role: .destructive) { deleting = message } label: { Label("Verwijderen", systemImage: "trash") }
             .disabled(message.state == .sending || message.actionPending)
     }
 

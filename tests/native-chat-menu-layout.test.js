@@ -62,7 +62,7 @@ test("16.9 references use a symbol-only three-column main grid and a distinct co
   assert.match(chat, /buttonStyle\(NativeTotalConversationButtonStyle\(\)\)/);
   assert.ok(chat.indexOf('accessibilityIdentifier("chat-start-total")') < chat.indexOf('accessibilityIdentifier("chat-interpreter")'));
   assert.ok(chat.indexOf('accessibilityIdentifier("chat-interpreter")') < chat.indexOf('accessibilityIdentifier("chat-menu")'));
-  assert.match(chat, /!conversationMenuOpen && !showInterpreterHelp/);
+  assert.match(chat, /!conversationMenuOpen && activeMessageMenu == nil && !showInterpreterHelp/);
   assert.match(chat, /draftFocused = false; conversationMenuOpen.toggle\(\)/);
   assert.match(chat, /onChange\(of: allowReadMarkers\) \{ allowed in if !allowed \{ draftFocused = false \} \}/);
   assert.match(chat, /onChange\(of: contact.jid\) \{ _ in\s+menuPresentation\?\.cancel\(\)/);
@@ -81,16 +81,56 @@ test("Message menus sit beside compact web-style bubbles without covering text o
   for (const source of [chat, group]) {
     assert.match(source, /HStack\(alignment: \.top, spacing: 8\)/);
     assert.match(source, /NativeInlineMessage/);
-    assert.match(source, /Image\(systemName: "ellipsis"\)\.frame\(width: 44, height: 44\)/);
-    assert.match(source, /frame\(width: 44, height: 44\)\.contentShape\(Rectangle\(\)\)/);
-    assert.match(source, /accessibilityActivationPoint\(UnitPoint.center\)/);
+    assert.match(source, /NativeMessageMenu\(identifier:/);
     assert.doesNotMatch(source, /overlay\(alignment: \.topTrailing\)|padding\(\.trailing, 44\)/);
     assert.match(source, /message-metadata-/);
   }
+  const menu = read(app + "NativeMessageMenu.swift");
+  assert.match(menu, /Button \{ presentation.toggle\(\) \} label:/);
+  assert.match(menu, /Image\(systemName: "ellipsis"\)\.frame\(width: 44, height: 44\)/);
+  assert.match(menu, /frame\(width: 44, height: 44\)\.contentShape\(Rectangle\(\)\)/);
+  assert.match(menu, /popover\(isPresented: \$presentation.isPresented/);
+  assert.doesNotMatch(menu, /accessibilityActivationPoint|coordinate\(|UITapGestureRecognizer/);
   const line = read(app + "NativeWebStyle.swift").split("struct NativeInlineMessage")[1].split("enum NativeWebStyle")[0];
   assert.match(line, /ViewThatFits\(in: \.horizontal\)/);
   assert.match(line, /HStack\(alignment: \.lastTextBaseline, spacing: 8\)/);
   assert.match(line, /VStack\(alignment: \.trailing, spacing: 4\)/);
+});
+
+test("Message popovers dismiss before an action, cancel stale work, and keep original permissions and read-marker gates", () => {
+  const menu = read(app + "NativeMessageMenu.swift");
+  const perform = menu.split("func perform(")[1].split("func cancel()")[0];
+  assert.ok(perform.indexOf("isPresented = false") < perform.indexOf("Task.sleep"));
+  assert.ok(perform.indexOf("Task.sleep") < perform.indexOf("action()"));
+  assert.match(perform, /pendingAction\?\.cancel\(\)/);
+  assert.match(perform, /guard !Task.isCancelled else \{ return \}/);
+  assert.match(menu, /onDisappear \{ presentation.cancel\(\); onPresentationChange\(false\) \}/);
+  assert.match(menu, /onChange\(of: scenePhase\) \{ if \$0 != \.active \{ presentation.cancel\(\) \} \}/);
+  assert.match(menu, /NativeWebMenuRowStyle\(destructive: role == \.destructive\)/);
+  assert.match(menu, /Button\(role: role\)/);
+  assert.match(menu, /accessibilityIdentifier\(identifier \+ "-close"\)/);
+  assert.match(read("scripts/prepare-ios-native.js"), /App\/NativeMessageMenu.swift/);
+  const direct = read(app + "NativeChatView.swift");
+  const group = read(app + "NativeGroupsView.swift");
+  for (const view of [direct, group]) {
+    assert.match(view, /activeMessageMenu == nil/);
+    assert.match(view, /draftFocused = false; activeMessageMenu = message.id/);
+    assert.match(view, /contextMenu/);
+    assert.match(view, /NativeMessageActionButton\(role: \.destructive/);
+  }
+  assert.match(direct, /model.canChangeMessages, model.chat.canCorrect\(message.id\)/);
+  assert.match(direct, /disabled\(!translation.ready \|\| !translation.available \|\| !translation.sharingConsent\)/);
+  assert.match(group, /disabled\(!canForward\)/);
+  assert.match(group, /disabled\(!canReply\)/);
+  assert.match(group, /disabled\(message.state == \.sending \|\| message.actionPending\)/);
+  assert.match(read(app + "NativeWebStyle.swift"), /destructive \? NativeWebStyle.logoutText : NativeWebStyle.buttonText/);
+  const { testsForScope } = require("../scripts/check-ios-native-ui");
+  assert.deepEqual(testsForScope("message-actions"), ["testChatHeaderAndMessageMenuDoNotOverlapAcrossRotation",
+    "testMessageMenuEditForwardAndBothDeletionOptions", "testMessageReactionTogglesAcrossRotation", "testExistingGroupJoinSendRotationAndLeave"]);
+  const methods = read("mobile/ios-native/UITests/NativeStartupUITests.swift");
+  for (const method of testsForScope("message-actions")) assert.ok(methods.includes("func " + method + "()"), method);
+  assert.match(methods, /messageMenu.tap\(\)[\s\S]+messagePanel.waitForExistence\(timeout: 5\)[\s\S]+copy.isHittable/);
+  assert.match(methods, /visual-message-menu-landscape-light/);
 });
 
 test("Rotation waits for actual native scene geometry before reading compositor pixels and still tests message-menu activation", () => {
@@ -120,9 +160,9 @@ test("Menu simulator scope measures hit targets and overlap for both orientation
     'snapshot("main-menu-symbols")', '"chat-menu-landscape" : "chat-menu-portrait"',
     'TELETYPTEL_NATIVE_LONG_CONTACT_NAME', '.portrait, .landscapeLeft, .portrait']) assert.ok(methods.includes(value), value);
   const workflow = read(".github/workflows/ios-native-preview.yml");
-  assert.match(workflow, /inputs.validation_mode == 'focused-ui' && \(inputs.ui_scope == 'menus' \|\| inputs.ui_scope == 'startup' \|\| inputs.ui_scope == 'appearance' \|\| inputs.ui_scope == 'smileys' \|\| inputs.ui_scope == 'visual' \|\| inputs.ui_scope == 'visual-metrics' \|\| inputs.ui_scope == 'visual-repair' \|\| inputs.ui_scope == 'visual-startup'\)/);
+  assert.match(workflow, /inputs.validation_mode == 'focused-ui' && \(inputs.ui_scope == 'menus' \|\| inputs.ui_scope == 'startup' \|\| inputs.ui_scope == 'appearance' \|\| inputs.ui_scope == 'smileys' \|\| inputs.ui_scope == 'visual' \|\| inputs.ui_scope == 'visual-metrics' \|\| inputs.ui_scope == 'visual-repair' \|\| inputs.ui_scope == 'visual-startup' \|\| inputs.ui_scope == 'message-actions'\)/);
   assert.match(workflow, /tests\/native-chat-menu-layout.test.js/);
-  assert.match(read("scripts/check-ios-native-ui.js"), /timeout: timeout \?\? \(\["menus", "startup", "appearance", "smileys", "visual", "visual-metrics", "visual-repair", "visual-startup"\].includes\(scope\) && name.endsWith\("-build"\) \? 1200000 : undefined\)/);
+  assert.match(read("scripts/check-ios-native-ui.js"), /timeout: timeout \?\? \(\["menus", "startup", "appearance", "smileys", "visual", "visual-metrics", "visual-repair", "visual-startup", "message-actions"\].includes\(scope\) && name.endsWith\("-build"\) \? 1200000 : undefined\)/);
 });
 
 test("Login actions take layout space instead of covering the password while the keyboard is open", () => {

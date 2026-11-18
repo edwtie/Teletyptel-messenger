@@ -313,13 +313,14 @@ struct NativeWebMenuTileStyle: ButtonStyle {
 }
 
 struct NativeWebMenuRowStyle: ButtonStyle {
+    var destructive = false
     @Environment(\.isEnabled) private var enabled
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label.font(NativeWebStyle.font())
             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
             .padding(.horizontal, 10).contentShape(Rectangle())
-            .foregroundStyle(NativeWebStyle.buttonText)
+            .foregroundStyle(destructive ? NativeWebStyle.logoutText : NativeWebStyle.buttonText)
             .background(NativeWebStyle.button, in: RoundedRectangle(cornerRadius: 6))
             .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(NativeWebStyle.buttonBorder, lineWidth: 1))
             .opacity(enabled ? (configuration.isPressed ? 0.75 : 1) : 0.4)

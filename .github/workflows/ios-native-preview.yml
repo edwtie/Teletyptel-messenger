@@ -65,7 +65,7 @@ on:
       ui_scope:
         description: Explicit test selection for focused-ui only
         type: choice
-        options: [regression, groups, tc, menus, startup, appearance, smileys, visual, visual-metrics, visual-repair, visual-startup]
+        options: [regression, groups, tc, menus, startup, appearance, smileys, visual, visual-metrics, visual-repair, visual-startup, message-actions]
         default: regression
 
 permissions:
@@ -73,7 +73,7 @@ permissions:
 
 jobs:
   native-preview:
-    runs-on: ${{ (inputs.validation_mode == 'focused-archive' || (inputs.validation_mode == 'focused-ui' && (inputs.ui_scope == 'menus' || inputs.ui_scope == 'startup' || inputs.ui_scope == 'appearance' || inputs.ui_scope == 'smileys' || inputs.ui_scope == 'visual' || inputs.ui_scope == 'visual-metrics' || inputs.ui_scope == 'visual-repair' || inputs.ui_scope == 'visual-startup'))) && 'macos-15-intel' || 'macos-15' }}
+    runs-on: ${{ (inputs.validation_mode == 'focused-archive' || (inputs.validation_mode == 'focused-ui' && (inputs.ui_scope == 'menus' || inputs.ui_scope == 'startup' || inputs.ui_scope == 'appearance' || inputs.ui_scope == 'smileys' || inputs.ui_scope == 'visual' || inputs.ui_scope == 'visual-metrics' || inputs.ui_scope == 'visual-repair' || inputs.ui_scope == 'visual-startup' || inputs.ui_scope == 'message-actions'))) && 'macos-15-intel' || 'macos-15' }}
     timeout-minutes: 45
     strategy:
       fail-fast: false

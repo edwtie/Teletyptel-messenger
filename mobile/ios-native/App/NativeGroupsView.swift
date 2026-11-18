@@ -84,6 +84,7 @@ struct NativeGroupChatView: View {
     @State private var browsingOlder = false
     @State private var preservedMessage: UUID?
     @State private var showSmileys = false
+    @State private var activeMessageMenu: UUID?
     @FocusState private var draftFocused: Bool
     private var group: NativeGroupConversation? { model.rooms.first { $0.room == room } }
 
@@ -187,7 +188,10 @@ struct NativeGroupChatView: View {
                                 onReact: { emoji in model.react(room: room, identifier: message.id, emoji: emoji) },
                                 canReply: NativeChatCodec.validBody("> " + message.nickname + ": " + message.body + "\n\n" + group.draft), onForward: { forwarding = message },
                                 onReply: { model.setDraft("> " + message.nickname + ": " + message.body + "\n\n" + (self.group?.draft ?? ""), room: room) },
-                                onDelete: { deleting = message }).id(message.id)
+                                onDelete: { deleting = message }, onMenuPresentationChange: { presented in
+                                    if presented { draftFocused = false; activeMessageMenu = message.id }
+                                    else if activeMessageMenu == message.id { activeMessageMenu = nil }
+                                }).id(message.id)
                                 .background(GeometryReader { geometry in Color.clear.preference(key: NativeMessageFramesKey.self,
                                     value: [message.id: geometry.frame(in: .named("native-group-messages"))]) })
                         }
@@ -203,7 +207,7 @@ struct NativeGroupChatView: View {
             .overlayPreferenceValue(NativeMessageFramesKey.self) { frames in
                 GeometryReader { viewport in
                     let visible = frames.filter { CGRect(origin: .zero, size: viewport.size).contains($0.value) }.map(\.key)
-                    let enabled = scenePhase == .active && !showParticipants && !showInvite && forwarding == nil && deleting == nil
+                    let enabled = scenePhase == .active && !showParticipants && !showInvite && activeMessageMenu == nil && forwarding == nil && deleting == nil
                     Color.clear.allowsHitTesting(false).task(id: enabled ? visible.map(\.uuidString).sorted().joined() : "hidden") {
                         if enabled { model.markRead(room: room, identifiers: visible) }
                     }
@@ -266,6 +270,7 @@ private struct NativeGroupBubble: View {
     var onForward: () -> Void = {}
     var onReply: () -> Void = {}
     var onDelete: () -> Void = {}
+    var onMenuPresentationChange: (Bool) -> Void = { _ in }
     private var fillColor: Color { message.own ? NativeWebStyle.outgoing : NativeWebStyle.incoming }
     private var borderColor: Color { message.own ? NativeWebStyle.outgoingLine : NativeWebStyle.incomingLine }
     private var description: String { message.nickname + ": " + (message.retracted ? "Bericht ingetrokken" : message.body) + ". " + message.state.label }
@@ -315,22 +320,19 @@ private struct NativeGroupBubble: View {
     }
 
     private var messageMenu: some View {
-        Menu { actions } label: { Image(systemName: "ellipsis").frame(width: 44, height: 44).contentShape(Rectangle()) }
-            .buttonStyle(.plain).foregroundStyle(NativeWebStyle.muted)
-            .accessibilityActivationPoint(UnitPoint.center)
-            .accessibilityLabel("Berichtmenu").accessibilityIdentifier("group-message-menu-" + message.id.uuidString)
+        NativeMessageMenu(identifier: "group-message-menu-" + message.id.uuidString, onPresentationChange: onMenuPresentationChange) { actions }
     }
 
     @ViewBuilder private var actions: some View {
         if !message.retracted {
-            Menu { ForEach(NativeInteractionCodec.picker, id: \.self) { emoji in Button(emoji) { onReact(emoji) } } } label: { Label("Reageren", systemImage: "face.smiling") }.disabled(!canReact)
-            Button(action: onReply) { Label("Beantwoorden", systemImage: "arrowshape.turn.up.left") }
+            Menu { ForEach(NativeInteractionCodec.picker, id: \.self) { emoji in NativeMessageActionButton { onReact(emoji) } label: { Text(emoji) } } } label: { Label("Reageren", systemImage: "face.smiling") }.disabled(!canReact)
+            NativeMessageActionButton(action: onReply) { Label("Beantwoorden", systemImage: "arrowshape.turn.up.left") }
                 .disabled(!canReply)
-            Button { UIPasteboard.general.string = message.body } label: { Label("Kopiëren", systemImage: "doc.on.doc") }
-            Button(action: onForward) { Label("Doorsturen", systemImage: "arrowshape.turn.up.right") }.disabled(!canForward)
+            NativeMessageActionButton { UIPasteboard.general.string = message.body } label: { Label("Kopiëren", systemImage: "doc.on.doc") }
+            NativeMessageActionButton(action: onForward) { Label("Doorsturen", systemImage: "arrowshape.turn.up.right") }.disabled(!canForward)
             if let translation = translation { NativeGroupTranslationAction(model: translation, message: message) }
         }
-        Button(role: .destructive, action: onDelete) { Label("Verwijderen", systemImage: "trash") }
+        NativeMessageActionButton(role: .destructive, action: onDelete) { Label("Verwijderen", systemImage: "trash") }
             .disabled(message.state == .sending || message.actionPending)
     }
 
@@ -347,7 +349,7 @@ private struct NativeGroupTranslationAction: View {
     let message: NativeGroupText
     var body: some View {
         if model.preferences.mode != "off" {
-            Button { model.translate(message.body, key: "group:" + message.room + ":" + message.id.uuidString) } label: {
+            NativeMessageActionButton { model.translate(message.body, key: "group:" + message.room + ":" + message.id.uuidString) } label: {
                 Label("Vertalen", systemImage: "globe")
             }.disabled(!model.ready || !model.available || !model.sharingConsent)
         }

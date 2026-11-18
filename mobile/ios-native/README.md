@@ -3613,6 +3613,31 @@ not green. No TestFlight upload, signing change or server activation took place.
 
 ## Additional visual matrix follow-up
 
+### Native message-button popover (2026-11-18)
+
+The normalized activation-point attempt did not fix iPhone direct/group menu
+activation in run `44203686211`. The next candidate replaces that `Menu` trigger
+with an ordinary 44-point Button and an app-owned native SwiftUI popover. It
+retains the existing message actions, nested reactions and long-press context
+menus, and adds an explicit localized close button. The bounded popover scrolls
+in landscape; action rows keep 44-point targets and destructive actions stay red.
+
+Opening releases only the relevant draft focus and suppresses read markers while
+the menu covers messages. Actions dismiss the popover before opening edit,
+forward or delete UI. Queued actions are cancelled when reopening, closing,
+leaving the row or backgrounding, rather than executing later in another screen.
+Existing send, correction, retraction, reaction and translation consent guards
+are unchanged. This change does not send a message, grant consent or enable a
+provider by itself.
+
+The unsigned `message-actions` scope checks the real direct-message trigger,
+rotation/overlap, copy access, edit/forward/both delete choices, reactions and the
+group-message Copy action. Direct-menu captures are explicitly light-themed and
+named for both orientations; the importer does not infer dark-theme evidence.
+Local checks pass 116 tests, skip one macOS-only check and fail none. Compilation,
+the simulator actions and screenshot review are still required before calling
+the iPhone defect resolved. No TestFlight upload or server change is included.
+
 ### Additional matrix states (2026-11-18)
 
 The real web reference now also opens the application's authenticator challenge,
