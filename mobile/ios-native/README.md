@@ -3615,6 +3615,24 @@ not green. No TestFlight upload, signing change or server activation took place.
 
 ### Verified evidence cohort (2026-11-18)
 
+The separate startup run
+[44213137796](https://github.com/edwtie/Teletyptel-messenger/actions/runs/44213137796)
+on `c7a3855fd02d209360c6f223f9a568a1b5a0da4f` passed its selected UI test
+on both families. All 48 named captures (checking/offline/certificate/login/
+advanced settings/two-factor, both themes and orientations) are retained at
+`artifacts/native-startup-cohort-44213137796`. They are a separate source cohort,
+not silently merged into the 100-image presentation cohort below. The successful
+test now explicitly opens Advanced before accessing the server fields; it does
+not remove their default visibility guard.
+
+The menu-placement follow-up on
+`f1dc6f3` passed all **256 selected Swift tests**, native RTT checks and unsigned
+generic-device builds in each job of
+[44216055278](https://github.com/edwtie/Teletyptel-messenger/actions/runs/44216055278).
+Its real iPhone/iPad menu UI regression is a separate run and remains pending
+until its actual screenshots and results are checked. No TestFlight upload or
+push activation was performed.
+
 Unsigned simulator run
 [44207060897](https://github.com/edwtie/Teletyptel-messenger/actions/runs/44207060897)
 passed all three selected presentation tests on each family: iPhone 16 Pro and
@@ -3684,6 +3702,9 @@ landscape Copy and portrait Edit/reaction rows were not hittable. The actual
 accessibility hierarchy reports a 224-point content view squeezed into a
 53.7-point popover below a low landscape anchor. This is evidence of a placement
 defect, not a reason to ignore hit-testing assertions.
+The iPad job passed the layout/rotation and group-menu checks but failed the Edit
+and reaction checks. The same follow-up must therefore be verified on both
+families, not only on the phone.
 
 The follow-up measures the actual button and app viewport in the same global
 coordinate space and chooses the side with more vertical room. It does not use
