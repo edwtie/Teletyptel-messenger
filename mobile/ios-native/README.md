@@ -3585,6 +3585,29 @@ not green. No TestFlight upload, signing change or server activation took place.
 
 ## Primary references
 
+### Additional matrix states (2026-11-18)
+
+The real web reference now also opens the application's authenticator challenge,
+reaction picker and own-message editor. The editor check verifies both the real
+editing-message identity and the unchanged input text; its developer-only status
+label is hidden by the web UI and is not used as a visibility requirement. All
+24 added phone/tablet, portrait/landscape, light/dark captures passed locally in
+Chromium. These are reference captures only, not 24 proven native matches.
+
+The separate unsigned `visual-startup` scope prepares captures of checking,
+offline, certificate failure, ordinary login, advanced login settings and a
+pending two-factor challenge in both themes and orientations for each family.
+It checks that these states do not open the keyboard or bypass authentication.
+The importer accepts only their explicit scenario/orientation/theme names.
+Simulator execution and the actual exported screenshots are still required;
+adding the test or importer does not count any of these cases as completed.
+
+The rotation helper requests device orientation between launches without trying
+to measure a nonexistent app window. With the app running it still waits for
+both the real scene bounds/orientation and compositor screenshot before asserting
+the accessibility window aspect. This fixes a test-lifecycle defect; it does not
+remove active-app rotation checks or establish physical-device performance.
+
 ### Selected-contact colour follow-up (2026-11-18)
 
 The correctly classified tablet web reference exposed another real difference:

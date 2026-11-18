@@ -18,6 +18,7 @@ async function bounded(promise, milliseconds, message) {
 const scenarios = {
   login: async page => page.evaluate(() => nativeVisualFixture.login()),
   "login-settings": async page => { await page.evaluate(() => nativeVisualFixture.login()); await page.locator("#dialogServerSettingsButton").tap(); },
+  "two-factor-login": async page => page.evaluate(() => nativeVisualFixture.twoFactorLogin()),
   contacts: async page => page.evaluate(() => nativeVisualFixture.contacts()),
   "main-menu": async page => {
     if (await page.locator("#mobileActionsToggle").isVisible()) { await page.locator("#mobileActionsToggle").tap(); return "popover"; }
@@ -29,6 +30,12 @@ const scenarios = {
     return "persistent-web-actions";
   },
   "message-menu": async page => page.evaluate(() => nativeVisualFixture.messageMenu()),
+  "message-reactions": async page => page.locator("#messageTimeline .message-reaction-button").last().tap(),
+  "message-edit": async page => {
+    await page.evaluate(() => nativeVisualFixture.messageMenu());
+    await page.locator("#messageContextEditButton").tap();
+    await page.evaluate(() => nativeVisualFixture.verifyMessageEdit());
+  },
   smileys: async page => page.locator("#emojiButton").tap(),
   attachments: async page => page.locator("#attachmentMenuButton").tap(),
   account: async page => page.evaluate(() => nativeVisualFixture.settings()),
@@ -57,8 +64,10 @@ const scenarios = {
 
 const visibleState = {
   login: "#accountDialog:not([hidden])", "login-settings": '[data-settings-panel="server"]:not([hidden])',
+  "two-factor-login": "#loginTwoFactorSection:not([hidden])",
   contacts: "#conversationSidebar", chat: "#messageTimeline .message-body", "contact-profile": "#contactProfileDialog:not([hidden])",
   "message-menu": "#messageContextMenu:not([hidden])", smileys: "#smileyPickerPanel:not([hidden])", attachments: "#attachmentMenuPanel:not([hidden])",
+  "message-reactions": '.message-reaction-picker[role="menu"]', "message-edit": "#messageInput",
   account: "#accountDialog:not([hidden])", appearance: '[data-settings-panel="preferences"]:not([hidden])',
   translation: '[data-settings-panel="privacy"]:not([hidden])', "account-security": '[data-settings-panel="security"]:not([hidden])',
   "profile-edit": '[data-settings-panel="profile"]:not([hidden])', "group-management": "#groupManagementDialog:not([hidden])",

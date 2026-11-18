@@ -38,6 +38,10 @@ window.nativeVisualFixture = {
     state.xmppSocket = null;
     openAccountDialog({ required: true });
   },
+  twoFactorLogin() {
+    this.login();
+    showLoginTwoFactorChallenge({ accountId: "fixture-ui", method: "authenticator" }, { connectAfterSave: true });
+  },
   contacts() {
     document.body.classList.remove("mobile-conversation-open");
     document.body.classList.remove("conversation-open");
@@ -73,6 +77,10 @@ window.nativeVisualFixture = {
     if (!message) throw new Error("The real message renderer produced no own message");
     const bounds = message.getBoundingClientRect();
     message.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: bounds.right - 15, clientY: bounds.top + 10 }));
+  },
+  verifyMessageEdit() {
+    const message = activeConversation()?.messages.find(item => item.id === state.editingMessage?.messageId);
+    if (!message || message.direction !== "self" || el.messageInput.value !== message.text) throw new Error("The real message editor did not preserve the selected own message");
   },
   cleanup() {
     state.call = null;

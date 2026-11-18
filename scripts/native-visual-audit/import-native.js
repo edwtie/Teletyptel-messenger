@@ -12,6 +12,8 @@ function scenarioForName(name) {
   }
   const inventory = /^visual-(dialer|history|archive|appearance|profile-edit|account|groups|translation)-(portrait|landscape)-(light|dark)(?:_|$)/.exec(name);
   if (inventory) return { screen: inventory[1], orientation: inventory[2], theme: inventory[3], priority: 2 };
+  const startup = /^visual-(login|login-settings|startup-checking|startup-offline|startup-certificate|two-factor-login)-(portrait|landscape)-(light|dark)(?:_|$)/.exec(name);
+  if (startup) return { screen: startup[1], orientation: startup[2], theme: startup[3], priority: 2 };
   const smileys = /^web-smileys-(portrait|landscape)(?:_|$)/.exec(name);
   if (smileys) return { screen: "smileys", orientation: smileys[1], theme: "light", priority: 1 };
   return null;

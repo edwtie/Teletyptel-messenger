@@ -9,6 +9,19 @@ const { scenarioForName, pngSize, measuredVariant } = require("../scripts/native
 const { trackedReader, profileForVariant } = require("../scripts/native-visual-audit/capture-web");
 const root = path.resolve(__dirname, "..");
 
+test("Additional references open real 2FA, reaction and own-message editor states without submitting data", () => {
+  const { scenarios } = require("../scripts/native-visual-audit/capture-web");
+  for (const name of ["two-factor-login", "message-reactions", "message-edit"]) assert.equal(typeof scenarios[name], "function");
+  const hook = fs.readFileSync(path.join(root, "scripts/native-visual-audit/web-hook.js"), "utf8");
+  assert.match(hook, /showLoginTwoFactorChallenge\(/);
+  assert.match(hook, /message.direction !== "self" \|\| el.messageInput.value !== message.text/);
+  assert.doesNotMatch(hook, /innerHTML|insertAdjacentHTML|createElement\("style"\)/);
+  const runner = fs.readFileSync(path.join(root, "scripts/native-visual-audit/capture-web.js"), "utf8");
+  assert.match(runner, /#messageContextEditButton/);
+  assert.match(runner, /#loginTwoFactorSection:not\(\[hidden\]\)/);
+  assert.match(runner, /\.message-reaction-picker\[role="menu"\]/);
+});
+
 test("Visual inventory includes all declared screens and every device/orientation/theme; missing cases cannot pass", () => {
   assert.equal(screens.length, 44);
   assert.equal(new Set(screens.map(screen => screen.id)).size, screens.length);
@@ -81,9 +94,25 @@ test("Unmatched fixture, language, theme, time, scale and viewport are blocked r
 test("Native import matches known real screenshot cases and never relabels a failure or another state as accepted", () => {
   assert.deepEqual(scenarioForName("web-palette-chat-landscape-dark_0_A.png"), { screen: "chat", orientation: "landscape", theme: "dark", priority: 1 });
   assert.deepEqual(scenarioForName("visual-account-portrait-light_0_A.png"), { screen: "account", orientation: "portrait", theme: "light", priority: 2 });
+  assert.deepEqual(scenarioForName("visual-two-factor-login-landscape-dark_0_A.png"), { screen: "two-factor-login", orientation: "landscape", theme: "dark", priority: 2 });
+  assert.deepEqual(scenarioForName("visual-startup-certificate-portrait-light_0_A.png"), { screen: "startup-certificate", orientation: "portrait", theme: "light", priority: 2 });
   assert.equal(scenarioForName("failure-state_0.png"), null);
   assert.equal(scenarioForName("web-smileys-inline_0.png"), null);
   assert.throws(() => pngSize(Buffer.from("not an image")), /not a PNG/);
+});
+
+test("Startup visual scope records real no-keyboard, unauthenticated states rather than bypassing the gate", () => {
+  const { testsForScope } = require("../scripts/check-ios-native-ui");
+  assert.deepEqual(testsForScope("visual-startup"), ["testVisualStartupStatesInBothThemesAndOrientations"]);
+  const ui = fs.readFileSync(path.join(root, "mobile/ios-native/UITests/NativeStartupUITests.swift"), "utf8")
+    .split("func testVisualStartupStatesInBothThemesAndOrientations()")[1].split("func testMainMenuRemainsSeparateFromConversationMenu()")[0];
+  for (const state of ["startup-checking", "startup-offline", "startup-certificate", "login-settings", "two-factor-login"]) assert.ok(ui.includes(state), state);
+  assert.match(ui, /for theme in \["light", "dark"\]/);
+  assert.match(ui, /XCTAssertFalse\(application.keyboards.firstMatch.exists\)/);
+  assert.match(ui, /XCTAssertFalse\(application.buttons\["messenger-main-menu"\].exists\)/);
+  assert.match(ui, /TELETYPTEL_NATIVE_STARTUP_PROGRESS_FIXTURE/);
+  assert.match(ui, /signInFixture\("two-factor"\)/);
+  assert.doesNotMatch(ui, /typeText\("[0-9]{6}"\)|verify\.tap\(\)|check-connection.*tap/);
 });
 
 test("Report states full-catalogue failure explicitly, escapes evidence and distinguishes review screenshots from proof", () => {

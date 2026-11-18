@@ -99,6 +99,9 @@ test("Rotation waits for actual native scene geometry before reading compositor 
   assert.match(style, /window.windowScene\?\.interfaceOrientation.rawValue/);
   const methods = read("mobile/ios-native/UITests/NativeStartupUITests.swift");
   const rotate = methods.split("private func rotate(")[1].split("private func signInFixture")[0];
+  assert.match(rotate, /guard application.state != \.notRunning else \{ return \}/);
+  assert.ok(rotate.indexOf("XCUIDevice.shared.orientation = orientation") < rotate.indexOf("guard application.state"));
+  assert.ok(rotate.indexOf("guard application.state") < rotate.indexOf('"visual-native-viewport"'));
   assert.match(rotate, /expectation\(for: windowSettled, evaluatedWith: probe\)[\s\S]+expectation\(for: screenSettled, evaluatedWith: application\)/);
   assert.match(rotate, /interfaceOrientation.isLandscape == landscape && \(width > height\) == landscape/);
   assert.match(rotate, /XCTAssertEqual\(frame.width > frame.height, landscape\)/);
@@ -117,9 +120,9 @@ test("Menu simulator scope measures hit targets and overlap for both orientation
     'snapshot("main-menu-symbols")', '"chat-menu-landscape" : "chat-menu-portrait"',
     'TELETYPTEL_NATIVE_LONG_CONTACT_NAME', '.portrait, .landscapeLeft, .portrait']) assert.ok(methods.includes(value), value);
   const workflow = read(".github/workflows/ios-native-preview.yml");
-  assert.match(workflow, /inputs.validation_mode == 'focused-ui' && \(inputs.ui_scope == 'menus' \|\| inputs.ui_scope == 'startup' \|\| inputs.ui_scope == 'appearance' \|\| inputs.ui_scope == 'smileys' \|\| inputs.ui_scope == 'visual' \|\| inputs.ui_scope == 'visual-metrics' \|\| inputs.ui_scope == 'visual-repair'\)/);
+  assert.match(workflow, /inputs.validation_mode == 'focused-ui' && \(inputs.ui_scope == 'menus' \|\| inputs.ui_scope == 'startup' \|\| inputs.ui_scope == 'appearance' \|\| inputs.ui_scope == 'smileys' \|\| inputs.ui_scope == 'visual' \|\| inputs.ui_scope == 'visual-metrics' \|\| inputs.ui_scope == 'visual-repair' \|\| inputs.ui_scope == 'visual-startup'\)/);
   assert.match(workflow, /tests\/native-chat-menu-layout.test.js/);
-  assert.match(read("scripts/check-ios-native-ui.js"), /timeout: timeout \?\? \(\["menus", "startup", "appearance", "smileys", "visual", "visual-metrics", "visual-repair"\].includes\(scope\) && name.endsWith\("-build"\) \? 1200000 : undefined\)/);
+  assert.match(read("scripts/check-ios-native-ui.js"), /timeout: timeout \?\? \(\["menus", "startup", "appearance", "smileys", "visual", "visual-metrics", "visual-repair", "visual-startup"\].includes\(scope\) && name.endsWith\("-build"\) \? 1200000 : undefined\)/);
 });
 
 test("Login actions take layout space instead of covering the password while the keyboard is open", () => {

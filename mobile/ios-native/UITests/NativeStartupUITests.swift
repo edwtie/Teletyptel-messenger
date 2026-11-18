@@ -529,6 +529,63 @@ final class NativeStartupUITests: XCTestCase {
         }
     }
 
+    func testVisualStartupStatesInBothThemesAndOrientations() {
+        let arguments = application.launchArguments
+        for theme in ["light", "dark"] {
+            application.launchArguments = arguments + ["-teletyptel.native.theme", theme]
+            for (fixture, screen, identifier) in [("checking", "startup-checking", "startup-progress"),
+                                                  ("offline", "startup-offline", "startup-retry"),
+                                                  ("certificate", "startup-certificate", "startup-failure-title")] {
+                application.launchEnvironment["TELETYPTEL_NATIVE_UI_FIXTURE"] = "connected"
+                application.launchEnvironment["TELETYPTEL_NATIVE_STARTUP_PROGRESS_FIXTURE"] = fixture
+                application.launch()
+                let state = application.descendants(matching: .any)[identifier].firstMatch
+                XCTAssertTrue(state.waitForExistence(timeout: 10))
+                XCTAssertFalse(application.textFields["login-jid"].exists)
+                XCTAssertFalse(application.keyboards.firstMatch.exists)
+                snapshot("visual-" + screen + "-portrait-" + theme)
+                rotate(.landscapeLeft)
+                XCTAssertTrue(state.exists)
+                XCTAssertTrue(application.frame.contains(state.frame))
+                snapshot("visual-" + screen + "-landscape-" + theme)
+                application.terminate()
+                rotate(.portrait)
+            }
+            application.launchEnvironment.removeValue(forKey: "TELETYPTEL_NATIVE_STARTUP_PROGRESS_FIXTURE")
+            application.launch()
+            let settings = application.buttons["login-settings"]
+            XCTAssertTrue(settings.waitForExistence(timeout: 10))
+            snapshot("visual-login-portrait-" + theme)
+            rotate(.landscapeLeft)
+            XCTAssertTrue(settings.isHittable)
+            snapshot("visual-login-landscape-" + theme)
+            rotate(.portrait)
+            settings.tap()
+            let server = application.textFields["server-address"]
+            XCTAssertTrue(server.waitForExistence(timeout: 5))
+            XCTAssertFalse(application.keyboards.firstMatch.exists)
+            snapshot("visual-login-settings-portrait-" + theme)
+            rotate(.landscapeLeft)
+            XCTAssertTrue(server.exists)
+            XCTAssertFalse(application.keyboards.firstMatch.exists)
+            snapshot("visual-login-settings-landscape-" + theme)
+            application.terminate()
+            rotate(.portrait)
+            signInFixture("two-factor")
+            let code = application.secureTextFields["two-factor-code"]
+            XCTAssertTrue(code.waitForExistence(timeout: 10))
+            XCTAssertFalse(application.buttons["messenger-main-menu"].exists)
+            XCTAssertFalse(application.keyboards.firstMatch.exists)
+            snapshot("visual-two-factor-login-portrait-" + theme)
+            rotate(.landscapeLeft)
+            XCTAssertTrue(code.exists)
+            XCTAssertFalse(application.buttons["messenger-main-menu"].exists)
+            snapshot("visual-two-factor-login-landscape-" + theme)
+            application.terminate()
+            rotate(.portrait)
+        }
+    }
+
     func testMainMenuRemainsSeparateFromConversationMenu() {
         signInFixture("connected")
         let main = application.buttons["messenger-main-menu"]
@@ -1019,6 +1076,7 @@ final class NativeStartupUITests: XCTestCase {
 
     private func rotate(_ orientation: UIDeviceOrientation) {
         XCUIDevice.shared.orientation = orientation
+        guard application.state != .notRunning else { return }
         let landscape = orientation == .landscapeLeft || orientation == .landscapeRight
         let probe = application.descendants(matching: .any)["visual-native-viewport"].firstMatch
         XCTAssertTrue(probe.waitForExistence(timeout: 5))
