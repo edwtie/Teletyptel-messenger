@@ -3630,8 +3630,34 @@ the actual menu/tile width and iPad column, and retains no-keyboard and bounds
 checks. It also runs the one new pure layout unit test, not the broad backend
 regression. Named geometry includes the actual sidebar, and the importer keeps
 explicit orientation/theme names rather than guessing them. The source checks
-are green locally; actual native screenshots/results are still pending.
-This is a layout candidate, not a completed 352-case matrix or pixel-parity claim.
+are green locally. On source `592b16a`,
+[run 44358702422](https://github.com/edwtie/Teletyptel-messenger/actions/runs/44358702422)
+passed the one selected layout unit test in each job and the one selected UI test
+on iPhone. Its 12 actual phone captures and measured-viewport web references
+are retained under `artifacts/native-navigation-phone-44358702422-attempt1` and
+`artifacts/native-navigation-web-phone-44358702422-contacts-state`.
+The menu-width difference is now zero in all four phone variants (previously
+minus 68 points). Native popover positioning/chrome, action inventory, contents
+and typography still differ; width equality is not pixel equality.
+
+The first iPad attempt built successfully but timed out before any UI-test output;
+its incomplete result bundle is not a test pass. An unchanged-source retry did
+execute the test and failed the sidebar-container measurement: the accessibility
+union reported x=-100/width=380 while the screenshot visibly ended the column at
+280. Both attempts remain retained, not relabeled as successful. The next candidate
+gives the regular-width sidebar an explicit content frame and records its actual
+UIView bounds with a transparent, noninteractive, DEBUG/environment-gated probe.
+It keeps the raw accessibility union separately and does not clip, clamp or infer
+the measured rectangle. The same width, left-edge and no-overlap checks apply to
+the directly measured rectangle; its native result is still pending.
+
+The web main-menu scenario now explicitly returns to contacts and verifies no
+active conversation before opening the real toolbar button, matching the native
+capture instead of comparing different underlying screens. The corrected phone
+report at `artifacts/native-navigation-phone-review-44358702422-contacts-state`
+still has **0/352 accepted** and 12 diagnostic pairs. These small same-source
+cohorts do not replace or silently merge the earlier full catalogue evidence.
+No TestFlight upload, APNs activation or server change was performed.
 
 ### Verified evidence cohort (2026-11-18)
 

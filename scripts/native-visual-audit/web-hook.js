@@ -48,6 +48,7 @@ window.nativeVisualFixture = {
     document.body.classList.remove("mobile-chat-open");
     const back = el.backToContactsButton;
     if (back) back.click();
+    if (activeConversation() || el.conversationItems.querySelector(".conversation-item.selected") || document.body.classList.contains("conversation-open")) throw new Error("Contacts capture still has an active conversation");
   },
   profile() { openAccountDialog({ mode: "profile" }); },
   settings() { openAccountDialog(); },

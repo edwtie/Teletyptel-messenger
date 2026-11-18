@@ -22,6 +22,7 @@ test("Navigation dimensions follow actual web rules and real window geometry, no
   assert.match(core, /min\(340, max\(280, viewportWidth \* 0.28\)\)/);
   const view = read("mobile/ios-native/App/NativeTranslationView.swift");
   assert.match(view, /navigationSplitViewColumnWidth\(min: contactColumnWidth, ideal: contactColumnWidth, max: contactColumnWidth\)/);
+  assert.match(view, /frame\(width: horizontalSizeClass == \.regular \? contactColumnWidth : nil\)/);
   assert.match(view, /NativeWebNavigationLayout.mainMenuWidth\(viewportWidth: viewportWidth\)/);
   assert.match(view, /NativeWebNavigationLayout.mainMenuHeight\(viewportHeight: Double\(viewportFrame.height\)\)/);
   assert.match(view, /padding\(12\).padding\(1\)/);
@@ -37,7 +38,9 @@ test("Navigation visual scope measures all eight variants and preserves keyboard
     'XCTAssertTrue(application.frame.contains(grid.frame))', 'XCTAssertFalse(application.keyboards.firstMatch.exists)',
     'XCTAssertEqual(grid.frame.width, expectedMenuWidth, accuracy: 1)', '(expectedMenuWidth - 42) / 3',
     'XCTAssertGreaterThanOrEqual(tile.frame.height, 48)', 'XCTAssertTrue(application.buttons["open-translation"].isHittable)',
-    'min(340, max(280, width * 0.28))', 'XCTAssertLessThanOrEqual(sidebar.frame.maxX, draft.frame.minX)']) assert.ok(selected.includes(token), token);
+    'min(340, max(280, width * 0.28))', 'try measuredElementBounds("messenger-contact-sidebar-view-bounds")',
+    'XCTAssertGreaterThanOrEqual(bounds.minX, application.frame.minX)',
+    'XCTAssertLessThanOrEqual(bounds.maxX, draft.frame.minX)']) assert.ok(selected.includes(token), token);
   const runner = read("scripts/check-ios-native-ui.js");
   assert.match(runner, /scope === "visual-navigation"[\s\S]*?logged\("navigation-unit-tests", "swift"/);
   assert.match(runner, /result.navigationUnitTests = true/);
@@ -53,9 +56,30 @@ test("Named navigation captures retain explicit state, orientation and theme and
   assert.equal(scenarioForName("visual-navigation-chat-return-portrait-light_0_A.png"), null);
   const layout = compareLayout({ geometry: { ".conversation-list": [{ x: 0, y: 60, width: 280, height: 1106 }] } },
     { viewport: { source: "measured-safe-area", x: 0, y: 48 }, scale: 2,
-      geometry: { units: "points", elements: [{ id: "messenger-contact-sidebar", x: 0, y: 84, width: 300, height: 1106 }] } });
+      geometry: { units: "points", elements: [{ id: "messenger-contact-sidebar-view-bounds", source: "measured-view-bounds", x: 0, y: 84, width: 300, height: 1106 }] } });
   assert.equal(layout.length, 1);
   assert.equal(layout[0].delta.width, 20);
   assert.equal(layout[0].delta.y, 0);
   assert.equal(Object.hasOwn(layout[0], "acceptanceEligible"), false);
+});
+
+test("Sidebar evidence uses direct DEBUG view bounds and never substitutes the overflowing accessibility-container union", () => {
+  const style = read("mobile/ios-native/App/NativeWebStyle.swift");
+  const measurement = style.split("private final class NativeVisualElementValue")[1].split("#endif")[0];
+  assert.match(measurement, /let area = convert\(bounds, to: window\)/);
+  assert.match(measurement, /"source": "measured-view-bounds", "units": "points"/);
+  assert.doesNotMatch(measurement, /min\(|max\(|intersection|inset|280|340/);
+  const capture = style.split("struct NativeVisualElementCapture")[1].split("struct NativeStartupProgress")[0];
+  assert.match(capture, /#if DEBUG/);
+  assert.match(capture, /TELETYPTEL_NATIVE_VISUAL_METRICS/);
+  assert.match(capture, /allowsHitTesting\(false\)/);
+  assert.match(capture, /#else\s+content\s+#endif/);
+  const reference = { geometry: { ".conversation-list": [{ x: 0, y: 0, width: 280, height: 1106 }] } };
+  const actual = { scale: 2, viewport: { source: "measured-safe-area", x: 0, y: 48 },
+    geometry: { units: "points", elements: [{ id: "messenger-contact-sidebar", x: -100, y: 24, width: 380, height: 1106 }] } };
+  assert.deepEqual(compareLayout(reference, actual), []);
+  actual.geometry.elements[0].id = "messenger-contact-sidebar-view-bounds";
+  assert.deepEqual(compareLayout(reference, actual), []);
+  actual.geometry.elements[0].source = "measured-view-bounds";
+  assert.equal(compareLayout(reference, actual)[0].delta.width, 100);
 });

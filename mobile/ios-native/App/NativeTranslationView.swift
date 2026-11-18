@@ -104,6 +104,7 @@ struct NativeMessengerView: View {
     @StateObject private var archive = NativeConversationArchive()
     @StateObject private var contactRequests = NativeContactRequests()
     @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.nativeConversationViewportWidth) private var viewportWidth
     @Environment(\.nativeConversationViewportFrame) private var viewportFrame
 
@@ -264,7 +265,9 @@ struct NativeMessengerView: View {
                         .accessibilityLabel("Contacten en groepen toevoegen")
                 }.padding(12)
             }
+            .frame(width: horizontalSizeClass == .regular ? contactColumnWidth : nil)
             .background(NativeWebStyle.panel).foregroundStyle(NativeWebStyle.text)
+            .modifier(NativeVisualElementCapture(identifier: "messenger-contact-sidebar-view-bounds"))
             .accessibilityElement(children: .contain).accessibilityIdentifier("messenger-contact-sidebar")
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)

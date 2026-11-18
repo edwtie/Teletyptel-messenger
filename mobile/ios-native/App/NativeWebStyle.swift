@@ -123,6 +123,34 @@ private final class NativeVisualViewportValue: UIView {
     }
 }
 
+struct NativeVisualElementProbe: UIViewRepresentable {
+    let identifier: String
+    func makeUIView(context: Context) -> UIView {
+        let view = NativeVisualElementValue()
+        view.isAccessibilityElement = true
+        view.accessibilityIdentifier = "visual-native-geometry-" + identifier
+        view.accessibilityLabel = "Testmeting van een zichtbaar appvlak"
+        view.backgroundColor = .clear
+        view.isUserInteractionEnabled = false
+        return view
+    }
+    func updateUIView(_ view: UIView, context: Context) {}
+}
+
+private final class NativeVisualElementValue: UIView {
+    override var accessibilityValue: String? {
+        get {
+            guard let window = window, !bounds.isEmpty else { return nil }
+            let area = convert(bounds, to: window)
+            let value: [String: Any] = ["source": "measured-view-bounds", "units": "points",
+                "x": area.minX, "y": area.minY, "width": area.width, "height": area.height]
+            guard let data = try? JSONSerialization.data(withJSONObject: value, options: [.sortedKeys]) else { return nil }
+            return String(data: data, encoding: .utf8)
+        }
+        set {}
+    }
+}
+
 #endif
 
 #if DEBUG
@@ -163,6 +191,24 @@ struct NativeVisualViewportCapture: ViewModifier {
         if ProcessInfo.processInfo.environment["TELETYPTEL_NATIVE_VISUAL_METRICS"] == "1" {
             content.overlay(alignment: .topLeading) {
                 NativeVisualViewportProbe().frame(width: 1, height: 1).allowsHitTesting(false)
+            }
+        } else { content }
+#else
+        content
+#endif
+    }
+}
+
+struct NativeVisualElementCapture: ViewModifier {
+    let identifier: String
+    @ViewBuilder func body(content: Content) -> some View {
+#if DEBUG
+        if ProcessInfo.processInfo.environment["TELETYPTEL_NATIVE_VISUAL_METRICS"] == "1" {
+            content.overlay {
+                GeometryReader { geometry in
+                    NativeVisualElementProbe(identifier: identifier)
+                        .frame(width: geometry.size.width, height: geometry.size.height).allowsHitTesting(false)
+                }.allowsHitTesting(false)
             }
         } else { content }
 #else

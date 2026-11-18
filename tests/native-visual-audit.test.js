@@ -42,6 +42,30 @@ test("Additional references open real 2FA, reaction and own-message editor state
   assert.match(runner, /\.message-reaction-picker\[role="menu"\]/);
 });
 
+test("Main menu reference opens from verified contacts, matching the native capture instead of covering a chat", async () => {
+  const { scenarios } = require("../scripts/native-visual-audit/capture-web");
+  const vm = require("node:vm");
+  for (const mobile of [true, false]) {
+    const events = [];
+    const page = {
+      evaluate(callback) {
+        return vm.runInNewContext("(" + callback.toString() + ")()", { nativeVisualFixture: { contacts() { events.push("contacts"); } } });
+      },
+      locator(selector) {
+        assert.equal(selector, "#mobileActionsToggle");
+        assert.deepEqual(events, ["contacts"]);
+        return { isVisible: async () => mobile, tap: async () => events.push("open-menu") };
+      }
+    };
+    assert.equal(await scenarios["main-menu"](page), mobile ? "popover" : "persistent-web-toolbar");
+    assert.deepEqual(events, mobile ? ["contacts", "open-menu"] : ["contacts"]);
+  }
+  const hook = fs.readFileSync(path.join(root, "scripts/native-visual-audit/web-hook.js"), "utf8");
+  assert.match(hook, /back\.click\(\)/);
+  assert.match(hook, /if \(activeConversation\(\) \|\| el.conversationItems.querySelector\("\.conversation-item.selected"\)/);
+  assert.match(hook, /throw new Error\("Contacts capture still has an active conversation"\)/);
+});
+
 test("Visual inventory includes all declared screens and every device/orientation/theme; missing cases cannot pass", () => {
   assert.equal(screens.length, 44);
   assert.equal(new Set(screens.map(screen => screen.id)).size, screens.length);

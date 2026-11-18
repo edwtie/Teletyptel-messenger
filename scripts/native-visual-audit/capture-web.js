@@ -21,6 +21,7 @@ const scenarios = {
   "two-factor-login": async page => page.evaluate(() => nativeVisualFixture.twoFactorLogin()),
   contacts: async page => page.evaluate(() => nativeVisualFixture.contacts()),
   "main-menu": async page => {
+    await page.evaluate(() => nativeVisualFixture.contacts());
     if (await page.locator("#mobileActionsToggle").isVisible()) { await page.locator("#mobileActionsToggle").tap(); return "popover"; }
     return "persistent-web-toolbar";
   },

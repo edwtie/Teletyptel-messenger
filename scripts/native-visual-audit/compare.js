@@ -105,7 +105,7 @@ function evidencePath(directory, file) {
 
 function compareLayout(reference, actual) {
   if (actual?.geometry?.units !== "points" || actual.viewport?.source !== "measured-safe-area" || ![actual.viewport.x, actual.viewport.y, actual.scale].every(Number.isFinite) || actual.scale <= 0) return [];
-  const mappings = [["messenger-brand-header", ".topbar"], ["messenger-contact-sidebar", ".conversation-list"], ["chat-header", ".chat-header"],
+  const mappings = [["messenger-brand-header", ".topbar"], ["messenger-contact-sidebar-view-bounds", ".conversation-list"], ["chat-header", ".chat-header"],
     ["chat-draft", "#messageInput"], ["main-menu-grid", "#mobileActionsPanel"],
     ["conversation-menu-panel", "#chatMorePanel"], ["smiley-picker", "#smileyPickerPanel"]];
   const fields = ["x", "y", "width", "height"];
@@ -113,6 +113,7 @@ function compareLayout(reference, actual) {
     const nativeFrame = actual.geometry.elements?.find(element => element.id === identifier);
     const webFrame = reference?.geometry?.[selector]?.[0];
     if (!nativeFrame || !webFrame || !fields.every(field => Number.isFinite(nativeFrame[field]) && Number.isFinite(webFrame[field]))) return [];
+    if (identifier === "messenger-contact-sidebar-view-bounds" && nativeFrame.source !== "measured-view-bounds") return [];
     const native = { x: nativeFrame.x - actual.viewport.x / actual.scale, y: nativeFrame.y - actual.viewport.y / actual.scale, width: nativeFrame.width, height: nativeFrame.height };
     const web = Object.fromEntries(fields.map(field => [field, webFrame[field]]));
     const delta = Object.fromEntries(fields.map(field => [field, native[field] - web[field]]));

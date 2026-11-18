@@ -519,7 +519,7 @@ final class NativeStartupUITests: XCTestCase {
         }
     }
 
-    func testWebNavigationLayoutInBothThemesAndOrientations() {
+    func testWebNavigationLayoutInBothThemesAndOrientations() throws {
         let arguments = application.launchArguments
         for theme in ["light", "dark"] {
             application.launchArguments = arguments + ["-teletyptel.native.theme", theme]
@@ -562,8 +562,10 @@ final class NativeStartupUITests: XCTestCase {
                 if UIDevice.current.userInterfaceIdiom == .pad {
                     let sidebar = application.descendants(matching: .any)["messenger-contact-sidebar"].firstMatch
                     XCTAssertTrue(sidebar.exists)
-                    XCTAssertEqual(sidebar.frame.width, min(340, max(280, width * 0.28)), accuracy: 1)
-                    XCTAssertLessThanOrEqual(sidebar.frame.maxX, draft.frame.minX)
+                    let bounds = try measuredElementBounds("messenger-contact-sidebar-view-bounds")
+                    XCTAssertEqual(bounds.width, min(340, max(280, width * 0.28)), accuracy: 1)
+                    XCTAssertGreaterThanOrEqual(bounds.minX, application.frame.minX)
+                    XCTAssertLessThanOrEqual(bounds.maxX, draft.frame.minX)
                 }
                 snapshot("visual-navigation-chat-" + pose + "-" + theme)
                 application.buttons["chat-back"].tap()
@@ -1135,11 +1137,17 @@ final class NativeStartupUITests: XCTestCase {
         } else {
             identifiers = []
         }
-        let elements = identifiers.compactMap { identifier -> [String: Any]? in
+        var elements = identifiers.compactMap { identifier -> [String: Any]? in
             let element = application.descendants(matching: .any)[identifier].firstMatch
             guard element.exists else { return nil }
             let bounds = element.frame
             return ["id": identifier, "x": bounds.minX, "y": bounds.minY, "width": bounds.width, "height": bounds.height]
+        }
+        let sidebarProbe = application.descendants(matching: .any)["visual-native-geometry-messenger-contact-sidebar-view-bounds"].firstMatch
+        if name.hasPrefix("visual-navigation-"), sidebarProbe.exists,
+           let bounds = try? measuredElementBounds("messenger-contact-sidebar-view-bounds") {
+            elements.append(["id": "messenger-contact-sidebar-view-bounds", "source": "measured-view-bounds",
+                "x": bounds.minX, "y": bounds.minY, "width": bounds.width, "height": bounds.height])
         }
         var geometry: [String: Any] = ["schema": 1, "name": name, "units": "points", "appFrame": ["x": frame.minX, "y": frame.minY, "width": frame.width, "height": frame.height], "imageSize": ["width": screenshot.image.size.width, "height": screenshot.image.size.height, "scale": screenshot.image.scale], "elements": elements, "fixture": "isolated-native-connected-v1", "pixelEquality": "not-evaluated"]
         let probe = application.descendants(matching: .any)["visual-native-viewport"].firstMatch
@@ -1153,6 +1161,24 @@ final class NativeStartupUITests: XCTestCase {
             metrics.lifetime = .keepAlways
             add(metrics)
         }
+    }
+
+    private func measuredElementBounds(_ identifier: String) throws -> CGRect {
+        let probe = application.descendants(matching: .any)["visual-native-geometry-" + identifier].firstMatch
+        XCTAssertTrue(probe.waitForExistence(timeout: 5))
+        let value = try XCTUnwrap(probe.value as? String)
+        let data = try XCTUnwrap(value.data(using: .utf8))
+        let measurement = try XCTUnwrap(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual(measurement["source"] as? String, "measured-view-bounds")
+        XCTAssertEqual(measurement["units"] as? String, "points")
+        let originX = try XCTUnwrap(measurement["x"] as? Double)
+        let originY = try XCTUnwrap(measurement["y"] as? Double)
+        let width = try XCTUnwrap(measurement["width"] as? Double)
+        let height = try XCTUnwrap(measurement["height"] as? Double)
+        XCTAssertTrue([originX, originY, width, height].allSatisfy(\.isFinite))
+        XCTAssertGreaterThan(width, 0)
+        XCTAssertGreaterThan(height, 0)
+        return CGRect(x: originX, y: originY, width: width, height: height)
     }
 
     private func rotate(_ orientation: UIDeviceOrientation) {
