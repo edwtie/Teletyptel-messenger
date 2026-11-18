@@ -3649,7 +3649,7 @@ gives the regular-width sidebar an explicit content frame and records its actual
 UIView bounds with a transparent, noninteractive, DEBUG/environment-gated probe.
 It keeps the raw accessibility union separately and does not clip, clamp or infer
 the measured rectangle. The same width, left-edge and no-overlap checks apply to
-the directly measured rectangle; its native result is still pending.
+the directly measured rectangle, subsequently verified in the follow-up below.
 
 The web main-menu scenario now explicitly returns to contacts and verifies no
 active conversation before opening the real toolbar button, matching the native
@@ -3667,8 +3667,37 @@ UIImage-size predicate was correct or that sidebar validation passed. The next
 test-only candidate reads the actual screenshot PNG's pixel size and declared
 EXIF orientation (only 1/3/6/8), using the same lossless orientation rule as the
 importer, and records those measurements. The original ten-second window/screen
-waits and independent app-frame orientation assertion are retained. Native results
-for this test-only follow-up are pending; no screenshots are resized or relabeled.
+waits and independent app-frame orientation assertion are retained; no screenshots
+are resized or relabeled.
+
+Actual follow-up
+[run 44384059371](https://github.com/edwtie/Teletyptel-messenger/actions/runs/44384059371)
+on `7971cbb26a29cb12afb7356a008aaa9b229a3a8f` passed **one selected UI test and
+one selected layout unit test per family**, each with zero failures. The UI flow
+covers both themes and orientations and retains its menu bounds, tile dimensions,
+last-row hit target, no-keyboard, directly measured column and no-overlap checks.
+The iPad log explicitly records portrait PNG orientation 1 and landscape orientation
+8. These results do not retroactively pass the previous failed attempts.
+
+All **24 distinct native screenshots from this one revision** are retained at
+`artifacts/native-navigation-cohort-44384059371`; 24 fresh working-tree web
+references use those exact measured viewports at
+`artifacts/native-navigation-web-44384059371`, with zero failed captures.
+Their actual side-by-side report is
+`artifacts/native-navigation-review-44384059371/index.html`. The phone menu and
+portrait iPad chat report panels were rendered, their three original/reference/diff
+images decoded, and the resulting report screenshots visually reviewed.
+
+The native menu width is 320 in all eight variants, matching the web width. The
+iPad portrait column and chat-header x origin now measure 280, matching web;
+landscape measures 339 against web 338.796875, a remaining 0.203125-point difference
+that is reported, not rounded away. Vertical offsets, popover arrow/chrome,
+symbol/action inventory, composer geometry and different fixture content still
+require work. Shared native locale/clock/history/avatar/provider data must be
+verified before any strict pixel acceptance. This focused cohort has **24
+diagnostic pairs, 0/352 accepted and 328 missing counterparts per side**; earlier
+larger but different-source cohorts remain separate. The final local guard set
+passed 126 tests, skipped one macOS-only test, and had zero failures.
 No TestFlight upload, APNs activation or server change was performed.
 
 ### Verified evidence cohort (2026-11-18)
