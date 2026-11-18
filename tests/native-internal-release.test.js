@@ -71,7 +71,7 @@ test("Internal upload requires successful archive checks, the protected branch e
   assert.match(job, /needs: native-preview/);
   assert.match(job, /environment: ios-testflight/);
   assert.match(job, /runs-on: macos-15-intel/);
-  assert.match(workflow, /runs-on: \$\{\{ \(inputs.validation_mode == 'focused-archive' \|\| \(inputs.validation_mode == 'focused-ui' && \(inputs.ui_scope == 'menus' \|\| inputs.ui_scope == 'startup' \|\| inputs.ui_scope == 'appearance' \|\| inputs.ui_scope == 'smileys' \|\| inputs.ui_scope == 'visual' \|\| inputs.ui_scope == 'visual-metrics' \|\| inputs.ui_scope == 'visual-repair' \|\| inputs.ui_scope == 'visual-startup' \|\| inputs.ui_scope == 'message-actions'\)\)\) && 'macos-15-intel' \|\| 'macos-15' \}\}/);
+  assert.match(workflow, /runs-on: \$\{\{ \(inputs.validation_mode == 'focused-archive' \|\| \(inputs.validation_mode == 'focused-ui' && \(inputs.ui_scope == 'menus' \|\| inputs.ui_scope == 'startup' \|\| inputs.ui_scope == 'appearance' \|\| inputs.ui_scope == 'smileys' \|\| inputs.ui_scope == 'visual' \|\| inputs.ui_scope == 'visual-metrics' \|\| inputs.ui_scope == 'visual-repair' \|\| inputs.ui_scope == 'visual-startup' \|\| inputs.ui_scope == 'message-actions' \|\| inputs.ui_scope == 'message-editing' \|\| inputs.ui_scope == 'message-reactions'\)\)\) && 'macos-15-intel' \|\| 'macos-15' \}\}/);
   assert.match(job, /inputs.native_push_test == true && inputs.validation_mode == 'focused-archive'/);
   assert.match(job, /github.event_name == 'workflow_dispatch'/);
   assert.match(job, /inputs.internal_upload == true/);

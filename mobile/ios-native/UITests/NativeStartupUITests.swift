@@ -358,7 +358,11 @@ final class NativeStartupUITests: XCTestCase {
         let identifier = String(outgoing.identifier.dropFirst("chat-message-".count))
         let messageMenu = application.buttons["message-menu-" + identifier]
         let metadata = application.descendants(matching: .any)["message-metadata-" + identifier].firstMatch
-        for orientation: UIDeviceOrientation in [.portrait, .landscapeLeft, .portrait] {
+        let menuPoses: [(name: String, orientation: UIDeviceOrientation)] = [
+            ("portrait-light", .portrait), ("landscape-light", .landscapeLeft), ("portrait-light-return", .portrait)
+        ]
+        for pose in menuPoses {
+            let orientation = pose.orientation
             rotate(orientation)
             assertConversationHeader("chat", actions: ["chat-start-total", "chat-interpreter", "chat-menu"])
             XCTAssertTrue(messageMenu.isHittable)
@@ -379,7 +383,7 @@ final class NativeStartupUITests: XCTestCase {
             XCTAssertGreaterThanOrEqual(copy.frame.height, 44)
             expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: application.keyboards.firstMatch)
             waitForExpectations(timeout: 5)
-            snapshot(orientation == .landscapeLeft ? "visual-message-menu-landscape-light" : "visual-message-menu-portrait-light")
+            snapshot("visual-message-menu-" + pose.name)
             let closeMessageMenu = application.buttons["message-menu-" + identifier + "-close"]
             XCTAssertTrue(closeMessageMenu.isHittable)
             closeMessageMenu.tap()
@@ -698,8 +702,11 @@ final class NativeStartupUITests: XCTestCase {
         reveal(menu); menu.tap(); application.buttons["Verwijderen"].tap()
         let retract = application.buttons["Voor iedereen intrekken"]
         XCTAssertTrue(retract.waitForExistence(timeout: 5)); retract.tap()
-        let tombstone = NSPredicate(format: "label CONTAINS %@", "Bericht ingetrokken")
-        expectation(for: tombstone, evaluatedWith: edited); waitForExpectations(timeout: 10)
+        let tombstone = NSPredicate { _, _ in
+            let updated = self.application.descendants(matching: .any).matching(identifier: "chat-message-" + messageID).firstMatch
+            return updated.exists && updated.label.contains("Bericht ingetrokken")
+        }
+        expectation(for: tombstone, evaluatedWith: nil); waitForExpectations(timeout: 10)
         snapshot("message-actions-retracted-portrait")
         rotate(.landscapeLeft)
         snapshot("message-actions-retracted-landscape")

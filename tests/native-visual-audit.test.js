@@ -123,6 +123,7 @@ test("Native import matches known real screenshot cases and never relabels a fai
   assert.deepEqual(scenarioForName("visual-two-factor-login-landscape-dark_0_A.png"), { screen: "two-factor-login", orientation: "landscape", theme: "dark", priority: 2 });
   assert.deepEqual(scenarioForName("visual-startup-certificate-portrait-light_0_A.png"), { screen: "startup-certificate", orientation: "portrait", theme: "light", priority: 2 });
   assert.deepEqual(scenarioForName("visual-message-menu-landscape-light_0_A.png"), { screen: "message-menu", orientation: "landscape", theme: "light", priority: 2 });
+  assert.equal(scenarioForName("visual-message-menu-portrait-light-return_0_A.png"), null);
   assert.equal(scenarioForName("failure-state_0.png"), null);
   assert.equal(scenarioForName("web-smileys-inline_0.png"), null);
   assert.throws(() => pngSize(Buffer.from("not an image")), /not a PNG/);

@@ -3629,9 +3629,26 @@ The menu-placement follow-up on
 `f1dc6f3` passed all **256 selected Swift tests**, native RTT checks and unsigned
 generic-device builds in each job of
 [44216055278](https://github.com/edwtie/Teletyptel-messenger/actions/runs/44216055278).
-Its real iPhone/iPad menu UI regression is a separate run and remains pending
-until its actual screenshots and results are checked. No TestFlight upload or
-push activation was performed.
+Its separate
+[menu UI run 44216059338](https://github.com/edwtie/Teletyptel-messenger/actions/runs/44216059338)
+passed all four selected tests on iPhone. The actual landscape screenshot shows
+the menu above its low anchor instead of clipped below it. On iPad the log records
+passed layout/rotation and group-menu tests. Its Edit/forward/delete test reached
+the retraction check but timed out waiting on a previously resolved UI element;
+the failure hierarchy already contains the same message ID with the exact
+`Bericht ingetrokken` label. The suite then reached its 20-minute process limit
+during the reaction test; its result bundle was incomplete. This is **not** a
+four-test iPad pass and is not treated as proof that the app hung.
+
+The retraction assertion now freshly queries the same message ID on every poll,
+still requires the exact retracted-text condition and keeps the ten-second limit.
+The remaining Edit and reaction flows have separate focused scopes, and manual
+focused-UI dispatch can select iPad only. Default/full/archive validation still
+covers both families, and the process/job time limits have not been increased.
+Portrait return captures now have a distinct `-return` name; the strict matrix
+importer does not silently choose between two same-priority portrait images.
+The new test-only follow-up still requires actual iPad results. No TestFlight
+upload or push activation was performed.
 
 Unsigned simulator run
 [44207060897](https://github.com/edwtie/Teletyptel-messenger/actions/runs/44207060897)
@@ -3712,7 +3729,8 @@ physical screen sizes, device-model guesses, coordinate taps or relaxed checks.
 The rotation test additionally requires the entire menu panel to fit inside the
 app window and its close button to remain hittable. The core placement tests
 cover low/high portrait and landscape anchors, keyboard-reduced space and invalid
-measurements. A new unsigned SDK/UI result is still required for this follow-up.
+measurements. SDK/logic validation and the four iPhone UI checks passed; the
+remaining iPad checks are tracked separately above.
 
 The normalized activation-point attempt did not fix iPhone direct/group menu
 activation in run `44203686211`. The next candidate replaces that `Menu` trigger
@@ -3733,13 +3751,14 @@ The unsigned `message-actions` scope checks the real direct-message trigger,
 rotation/overlap, copy access, edit/forward/both delete choices, reactions and the
 group-message Copy action. Direct-menu captures are explicitly light-themed and
 named for both orientations; the importer does not infer dark-theme evidence.
-Local checks pass 116 tests, skip one macOS-only check and fail none. Compilation,
-the simulator actions and screenshot review are still required before calling
-the iPhone defect resolved. No TestFlight upload or server change is included.
+Local checks pass 120 tests, skip one macOS-only check and fail none. This does
+not replace the separately recorded native UI results or establish full visual
+parity. No TestFlight upload or server change is included.
 
-The candidate is published at `08c8dd4`; its isolated unsigned
+The initial candidate was published at `08c8dd4`; its isolated unsigned
 [message-actions run 44209919205](https://github.com/edwtie/Teletyptel-messenger/actions/runs/44209919205)
-is pending. It is not reported as a successful native fix yet.
+failed as described above. The placement fix is `f1dc6f3`; later changes in this
+follow-up adjust only tests, their scopes and the evidence documentation.
 
 The earlier startup-capture run `44207056454` built the iPad app and captured the
 light checking/offline/certificate/login states, but its test then requested the

@@ -65,20 +65,25 @@ on:
       ui_scope:
         description: Explicit test selection for focused-ui only
         type: choice
-        options: [regression, groups, tc, menus, startup, appearance, smileys, visual, visual-metrics, visual-repair, visual-startup, message-actions]
+        options: [regression, groups, tc, menus, startup, appearance, smileys, visual, visual-metrics, visual-repair, visual-startup, message-actions, message-editing, message-reactions]
         default: regression
+      ui_family:
+        description: Device family for focused-ui only; other modes always validate both
+        type: choice
+        options: [both, iPhone, iPad]
+        default: both
 
 permissions:
   contents: read
 
 jobs:
   native-preview:
-    runs-on: ${{ (inputs.validation_mode == 'focused-archive' || (inputs.validation_mode == 'focused-ui' && (inputs.ui_scope == 'menus' || inputs.ui_scope == 'startup' || inputs.ui_scope == 'appearance' || inputs.ui_scope == 'smileys' || inputs.ui_scope == 'visual' || inputs.ui_scope == 'visual-metrics' || inputs.ui_scope == 'visual-repair' || inputs.ui_scope == 'visual-startup' || inputs.ui_scope == 'message-actions'))) && 'macos-15-intel' || 'macos-15' }}
+    runs-on: ${{ (inputs.validation_mode == 'focused-archive' || (inputs.validation_mode == 'focused-ui' && (inputs.ui_scope == 'menus' || inputs.ui_scope == 'startup' || inputs.ui_scope == 'appearance' || inputs.ui_scope == 'smileys' || inputs.ui_scope == 'visual' || inputs.ui_scope == 'visual-metrics' || inputs.ui_scope == 'visual-repair' || inputs.ui_scope == 'visual-startup' || inputs.ui_scope == 'message-actions' || inputs.ui_scope == 'message-editing' || inputs.ui_scope == 'message-reactions'))) && 'macos-15-intel' || 'macos-15' }}
     timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
-        family: [iPhone, iPad]
+        family: ${{ inputs.validation_mode == 'focused-ui' && inputs.ui_family == 'iPhone' && fromJSON('["iPhone"]') || inputs.validation_mode == 'focused-ui' && inputs.ui_family == 'iPad' && fromJSON('["iPad"]') || fromJSON('["iPhone","iPad"]') }}
     env:
       TELETYPTEL_NATIVE_TEST_FAMILY: ${{ matrix.family }}
       TELETYPTEL_NATIVE_PUSH_TEST: ${{ inputs.native_push_test && '1' || '0' }}

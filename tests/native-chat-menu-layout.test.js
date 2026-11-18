@@ -149,7 +149,26 @@ test("Message popovers dismiss before an action, cancel stale work, and keep ori
   const methods = read("mobile/ios-native/UITests/NativeStartupUITests.swift");
   for (const method of testsForScope("message-actions")) assert.ok(methods.includes("func " + method + "()"), method);
   assert.match(methods, /messageMenu.tap\(\)[\s\S]+messagePanel.waitForExistence\(timeout: 5\)[\s\S]+copy.isHittable/);
-  assert.match(methods, /visual-message-menu-landscape-light/);
+  assert.match(methods, /\("landscape-light", \.landscapeLeft\)/);
+  assert.match(methods, /\("portrait-light-return", \.portrait\)/);
+  assert.match(methods, /snapshot\("visual-message-menu-" \+ pose.name\)/);
+});
+
+test("Focused message checks can isolate iPad without weakening default device coverage or retraction assertions", () => {
+  const { testsForScope } = require("../scripts/check-ios-native-ui");
+  assert.deepEqual(testsForScope("message-editing"), ["testMessageMenuEditForwardAndBothDeletionOptions"]);
+  assert.deepEqual(testsForScope("message-reactions"), ["testMessageReactionTogglesAcrossRotation"]);
+  const methods = read("mobile/ios-native/UITests/NativeStartupUITests.swift");
+  const editing = methods.split("func testMessageMenuEditForwardAndBothDeletionOptions()")[1].split("func testMessageReactionTogglesAcrossRotation()")[0];
+  assert.match(editing, /matching\(identifier: "chat-message-" \+ messageID\).firstMatch/);
+  assert.match(editing, /updated.exists && updated.label.contains\("Bericht ingetrokken"\)/);
+  assert.match(editing, /expectation\(for: tombstone, evaluatedWith: nil\); waitForExpectations\(timeout: 10\)/);
+  const workflow = read(".github/workflows/ios-native-preview.yml");
+  assert.match(workflow, /ui_family:[\s\S]*?options: \[both, iPhone, iPad\][\s\S]*?default: both/);
+  assert.ok(workflow.includes("inputs.validation_mode == 'focused-ui' && inputs.ui_family == 'iPad' && fromJSON('[\"iPad\"]')"));
+  assert.ok(workflow.includes("|| fromJSON('[\"iPhone\",\"iPad\"]')"));
+  assert.match(workflow, /timeout-minutes: 45/);
+  assert.match(read("scripts/check-ios-native.js"), /test-without-building"\], 1200000\)/);
 });
 
 test("Rotation waits for actual native scene geometry before reading compositor pixels and still tests message-menu activation", () => {
@@ -179,9 +198,9 @@ test("Menu simulator scope measures hit targets and overlap for both orientation
     'snapshot("main-menu-symbols")', '"chat-menu-landscape" : "chat-menu-portrait"',
     'TELETYPTEL_NATIVE_LONG_CONTACT_NAME', '.portrait, .landscapeLeft, .portrait']) assert.ok(methods.includes(value), value);
   const workflow = read(".github/workflows/ios-native-preview.yml");
-  assert.match(workflow, /inputs.validation_mode == 'focused-ui' && \(inputs.ui_scope == 'menus' \|\| inputs.ui_scope == 'startup' \|\| inputs.ui_scope == 'appearance' \|\| inputs.ui_scope == 'smileys' \|\| inputs.ui_scope == 'visual' \|\| inputs.ui_scope == 'visual-metrics' \|\| inputs.ui_scope == 'visual-repair' \|\| inputs.ui_scope == 'visual-startup' \|\| inputs.ui_scope == 'message-actions'\)/);
+  assert.match(workflow, /inputs.validation_mode == 'focused-ui' && \(inputs.ui_scope == 'menus' \|\| inputs.ui_scope == 'startup' \|\| inputs.ui_scope == 'appearance' \|\| inputs.ui_scope == 'smileys' \|\| inputs.ui_scope == 'visual' \|\| inputs.ui_scope == 'visual-metrics' \|\| inputs.ui_scope == 'visual-repair' \|\| inputs.ui_scope == 'visual-startup' \|\| inputs.ui_scope == 'message-actions' \|\| inputs.ui_scope == 'message-editing' \|\| inputs.ui_scope == 'message-reactions'\)/);
   assert.match(workflow, /tests\/native-chat-menu-layout.test.js/);
-  assert.match(read("scripts/check-ios-native-ui.js"), /timeout: timeout \?\? \(\["menus", "startup", "appearance", "smileys", "visual", "visual-metrics", "visual-repair", "visual-startup", "message-actions"\].includes\(scope\) && name.endsWith\("-build"\) \? 1200000 : undefined\)/);
+  assert.match(read("scripts/check-ios-native-ui.js"), /timeout: timeout \?\? \(\["menus", "startup", "appearance", "smileys", "visual", "visual-metrics", "visual-repair", "visual-startup", "message-actions", "message-editing", "message-reactions"\].includes\(scope\) && name.endsWith\("-build"\) \? 1200000 : undefined\)/);
 });
 
 test("Login actions take layout space instead of covering the password while the keyboard is open", () => {

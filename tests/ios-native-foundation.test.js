@@ -202,7 +202,7 @@ test("Native simulator matrix must cover both supported families and rejects inv
   }
   const workflow = fs.readFileSync(path.join(root, ".github/workflows/ios-native-preview.yml"), "utf8");
   assert.match(workflow, /fail-fast: false/);
-  assert.match(workflow, /family: \[iPhone, iPad\]/);
+  assert.ok(workflow.includes("family: ${{ inputs.validation_mode == 'focused-ui' && inputs.ui_family == 'iPhone' && fromJSON('[\"iPhone\"]') || inputs.validation_mode == 'focused-ui' && inputs.ui_family == 'iPad' && fromJSON('[\"iPad\"]') || fromJSON('[\"iPhone\",\"iPad\"]') }}"));
   assert.match(workflow, /TELETYPTEL_NATIVE_TEST_FAMILY: \$\{\{ matrix\.family \}\}/);
   assert.match(workflow, /name: ios-native-preview-\$\{\{ github\.run_id \}\}-\$\{\{ matrix\.family \}\}/);
 });
