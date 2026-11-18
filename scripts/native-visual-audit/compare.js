@@ -80,7 +80,16 @@ function completeness(entries) {
   }
   if (known.size) throw new Error("Unexpected cases cannot substitute for missing screens: " + [...known.keys()].join(", "));
   const proven = matrix.filter(entry => entry.status === "pixels-identical" && entry.identical === true && entry.acceptanceEligible === true).length;
-  return { total: matrix.length, proven, complete: proven === matrix.length, matrix };
+  const evidence = {
+    web: matrix.filter(entry => entry.webFile).length,
+    native: matrix.filter(entry => entry.nativeFile).length,
+    paired: matrix.filter(entry => entry.webFile && entry.nativeFile).length,
+    diagnostic: matrix.filter(entry => entry.status === "diagnostic-only").length,
+    failedWebCaptures: matrix.filter(entry => entry.status === "web-capture-failed").length
+  };
+  evidence.missingWeb = matrix.length - evidence.web;
+  evidence.missingNative = matrix.length - evidence.native;
+  return { total: matrix.length, proven, complete: proven === matrix.length, evidence, matrix };
 }
 
 function escaped(value) {
@@ -112,6 +121,8 @@ function compareLayout(reference, actual) {
 }
 
 function renderReport(report, output) {
+  const evidence = report.coverage.evidence;
+  const coverageSummary = evidence ? '<h2>Bewijsdekking — geen acceptatiescore</h2><p>' + evidence.web + '/' + report.coverage.total + ' webbeelden; ' + evidence.native + '/' + report.coverage.total + ' native beelden; ' + evidence.paired + ' beeldparen, waarvan ' + evidence.diagnostic + ' alleen diagnostisch. Er ontbreken ' + evidence.missingWeb + ' webbeelden en ' + evidence.missingNative + ' native beelden. Mislukte webopnames: ' + evidence.failedWebCaptures + '.</p>' : '';
   const image = (file, label) => file ? '<figure><figcaption>' + label + '</figcaption><img loading="lazy" src="' + escaped(path.relative(output, file).replace(/\\/g, "/")) + '" alt="' + label + '"></figure>' : "";
   const renderCase = entry => {
     const review = entry.reviewMetrics ? '<p>Diagnostische pixelverschillen: ' + (entry.reviewMetrics.differentFraction * 100).toFixed(2) + '%. De testinhoud is niet gelijk; dit is geen acceptatiescore.</p>' : "";
@@ -122,7 +133,7 @@ function renderReport(report, output) {
   return '<!doctype html><html lang="nl"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>TeleTypTel visuele vergelijking</title><style>body{font:16px/1.5 system-ui;margin:24px;max-width:1500px;color:#0f172a;background:#f8fafc}h1{font-size:28px}table{border-collapse:collapse;width:100%;background:white}th,td{padding:8px;text-align:left;border:1px solid #cbd5e1}summary{cursor:pointer;padding:12px;font-weight:bold}details{background:white;margin:12px 0;border:1px solid #cbd5e1}.images{display:flex;flex-wrap:wrap;gap:16px;padding:16px}figure{margin:0;max-width:46%;min-width:180px}img{max-width:100%;max-height:700px;object-fit:contain;object-position:top;outline:1px solid #94a3b8}figcaption{font-weight:bold}.warning{border-left:5px solid #b45309;background:#fff7ed;padding:16px}code{overflow-wrap:anywhere}</style><h1>TeleTypTel: web ↔ native iOS</h1><p class="warning">' + report.coverage.proven + ' van ' + report.coverage.total + ' gevallen aantoonbaar pixelgelijk. <strong>' + (report.coverage.complete ? "Volledige catalogus bewezen." : "Volledige pixelgelijkheid NIET bewezen.") + '</strong> Ontbrekende beelden, afwijkende testinhoud en niet-gemeten uitsneden tellen nooit als geslaagd.</p><p>Webreferentie: <code>' + escaped(report.webRevision) + '</code>. Native bron: <code>' + escaped(report.nativeRevision || "niet aangeleverd") + '</code>. Strikte vergelijking: elk RGBA-kanaal gelijk; geen tolerantiedrempel, schalen, automatische uitlijning of genegeerde appgebieden.</p><p>De onderstaande beelden zijn echte renders. Beoordelingsbeelden zonder identieke fixture blijven diagnostisch en zijn geen bewijs van pixelgelijkheid.</p><h2>Afbakening</h2><ul>' + exclusions.map(item => '<li>' + escaped(item) + '</li>').join("") + '</ul><h2>Schermdekking</h2><table><tr><th>Scherm</th><th>Webbeelden</th><th>Native beelden</th><th>Bewezen</th></tr>' + screens.map(screen => {
     const cases = report.coverage.matrix.filter(entry => entry.screen === screen.id);
     return '<tr><td>' + escaped(screen.title) + '</td><td>' + cases.filter(entry => entry.webFile).length + '/8</td><td>' + cases.filter(entry => entry.nativeFile).length + '/8</td><td>' + cases.filter(entry => entry.acceptanceEligible && entry.identical).length + '/8</td></tr>';
-  }).join("") + '</table><h2>Vergelijkingsbeelden en afwijkingen</h2>' + report.coverage.matrix.filter(entry => entry.webFile || entry.nativeFile).map(renderCase).join("") + '</html>';
+  }).join("") + '</table>' + coverageSummary + '<h2>Vergelijkingsbeelden en afwijkingen</h2>' + report.coverage.matrix.filter(entry => entry.webFile || entry.nativeFile).map(renderCase).join("") + '</html>';
 }
 
 function audit({ webDirectory, nativeDirectory, output, pngModule, diagnostic = false }) {

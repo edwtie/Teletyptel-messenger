@@ -29,12 +29,18 @@ test("Visual inventory includes all declared screens and every device/orientatio
   assert.equal(variants.length, 8);
   assert.equal(completeness([]).total, 352);
   assert.equal(completeness([]).complete, false);
+  assert.deepEqual(completeness([]).evidence, { web: 0, native: 0, paired: 0, diagnostic: 0, failedWebCaptures: 0, missingWeb: 352, missingNative: 352 });
   const single = { id: caseID("chat", variants[0]), screen: "chat", ...variants[0], status: "pixels-identical", identical: true, acceptanceEligible: true };
   assert.equal(completeness([single]).proven, 1);
   assert.equal(completeness([single]).complete, false);
   assert.equal(completeness([{ ...single, acceptanceEligible: false }]).proven, 0);
   assert.throws(() => completeness([single, single]), /Duplicate/);
   assert.throws(() => completeness([{ ...single, id: "unexpected" }]), /Unexpected/);
+  const diagnostic = completeness([{ ...single, status: "diagnostic-only", acceptanceEligible: false, webFile: "web.png", nativeFile: "native.png" }]);
+  assert.equal(diagnostic.evidence.paired, 1);
+  assert.equal(diagnostic.evidence.diagnostic, 1);
+  assert.equal(diagnostic.evidence.missingNative, 351);
+  assert.equal(diagnostic.proven, 0);
 });
 
 test("Pixel equality is exact RGBA, not a tolerant similarity score or ignored antialiasing", () => {
@@ -122,6 +128,8 @@ test("Report states full-catalogue failure explicitly, escapes evidence and dist
   assert.match(html, /pixelgelijkheid NIET bewezen/);
   assert.doesNotMatch(html, /<script>/);
   assert.match(html, /geen bewijs/);
+  assert.match(html, /Bewijsdekking — geen acceptatiescore/);
+  assert.match(html, /Er ontbreken 352 webbeelden en 352 native beelden/);
 });
 
 test("Layout diagnostics use measured safe-area coordinates without rescaling screenshots or asserting pixel equality", () => {

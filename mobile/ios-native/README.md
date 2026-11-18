@@ -163,8 +163,8 @@ Confirmed presentation differences and concrete next acceptance work:
 | --- | --- | --- |
 | P0 | Comparable fixtures | Share message/history/avatars, clock, locale, timezone, provider availability and translation state, recording the same verified fixture hash in both captures. Do not fill missing metadata with assumed values. |
 | P0 | iPhone rotation/group menu | Resolve the failed rotation-settling and activation checks with their real screenshots/hierarchy; rerun the unchanged hit-area/nonoverlap requirements and obtain a complete capture set. |
-| P0 | Valid web device reference | The earlier 834-point web capture had a desktop user agent, so its apparent missing tablet sidebar is not reliable iPad-target evidence. Recapture with the real app reporting `ios/tablet` before changing native columns or breakpoints. |
-| P1 | Main/conversation menus | The measured iPad main menu is 252×253 native versus 320×242 web; the conversation menu is 260×333 versus 280×223. Align placement, dimensions, symbol artwork and available actions without silently removing capabilities. |
+| P0 | Valid web device reference | Corrected device detection is now verified in 216 committed WebKit references. Replace the earlier desktop-class references before accepting tablet column or breakpoint conclusions. |
+| P1 | Main/conversation menus | Re-measure placement and dimensions against the corrected phone/tablet reference; earlier web dimensions were collected with the wrong device classification. Align symbol artwork and available actions without silently removing capabilities. |
 | P1 | Chat | Compact short bubbles are implemented, but composer dimensions, history/status rows, wallpaper sizing, message alignment and reaction/menu symbols still differ. Retest with identical message data. |
 | P1 | Forms and missing native screens | Native Forms/sheets differ from web dialogs, tabs and grids. Align app-owned account, appearance, groups, translation and dialer components. Native News/Support remain disabled placeholders, not completed equivalents. |
 | P2 | Complete proof | Capture every remaining catalogue state, fix measured differences and rerun exact RGBA comparisons. Any deliberate platform exception must be documented, not hidden with masks, scaling, tolerances or automatic baseline approval. |
@@ -204,6 +204,34 @@ the descriptor's hardware dimensions. The bundled iPhone descriptor's model name
 is not a claim to emulate that physical model. Older references without
 `deviceVerified` cannot meet strict acceptance. Previous app-layout conclusions
 derived from their desktop device class must be reviewed against the new images.
+
+[WebKit run 44205030967](https://github.com/edwtie/Teletyptel-messenger/actions/runs/44205030967)
+passed with 216 captured states at web source `94d533b`, all with verified
+phone/tablet classification, touch input and requested screen visibility. The
+artifact is retained locally under
+`artifacts/native-visual-webkit-device-44205030967/`. This is reference evidence,
+not 216 native matches. A separate local Chromium check opened 24 additional
+real two-factor/reaction/editor states across all eight variants; it did not
+submit a code, reaction, correction or provider request.
+
+The earlier [repair run 44203686211](https://github.com/edwtie/Teletyptel-messenger/actions/runs/44203686211)
+compiled both simulator families, but is not green: iPhone passed one of four
+tests and failed direct/group message-menu activation plus the stopped-app
+rotation check; iPad passed three of four, including actually opening the group
+message menu and selecting Copy, and failed the stopped-app check. The normalized
+activation-point attempt therefore did **not** resolve the iPhone menu defect.
+The stopped-app test-helper correction is prepared at `204bece`; it must not be
+confused with a production fix for the remaining iPhone menu activation issue.
+
+After the selected-colour/header changes and stopped-app rotation correction,
+the focused [startup capture run 44207056454](https://github.com/edwtie/Teletyptel-messenger/actions/runs/44207056454)
+and [presentation capture run 44207060897](https://github.com/edwtie/Teletyptel-messenger/actions/runs/44207060897)
+use native source `204bece`. They are unsigned, with TestFlight and APNs explicitly
+off. Their results remain pending and must not be described as passed. The
+earlier `44206105148` appearance run was cancelled as superseded: its test helper
+still tried to inspect a terminated app window. Local checks for this follow-up
+pass 115 tests, skip one macOS-only check and fail none; they do not replace
+simulator captures or the full matrix comparison.
 
 ## Shared web smileys (2026-11-17)
 
@@ -3583,7 +3611,7 @@ This is an outstanding simulator-validation limitation, not a passed iPad check
 or an observed app/menu assertion failure. The overall workflow is therefore
 not green. No TestFlight upload, signing change or server activation took place.
 
-## Primary references
+## Additional visual matrix follow-up
 
 ### Additional matrix states (2026-11-18)
 
@@ -3601,6 +3629,23 @@ It checks that these states do not open the keyboard or bypass authentication.
 The importer accepts only their explicit scenario/orientation/theme names.
 Simulator execution and the actual exported screenshots are still required;
 adding the test or importer does not count any of these cases as completed.
+
+The corrected local baseline review is
+`artifacts/native-visual-mobile-review-20261118/index.html`: 240 verified real
+web captures, the 50 retained iPad captures at `f7f4039`, 46 diagnostic pairs,
+194 web-only cases, four native-only cases and 108 cases with neither image in
+that set. It reports **0/352 accepted**, with 112 web and 302 native counterparts
+missing. The report and its three-image chat comparison were opened headlessly,
+checked for decoded evidence images and visually reviewed. It supersedes the old
+desktop-class reference review; it is a pre-fix native baseline, not validation
+of the later colour/header corrections.
+
+An additional 44 distinct iPhone captures from `f728039` are retained separately
+under `artifacts/native-visual-iphone-44203690577/`. That run passed TC and form
+inventory capture but failed the palette test on the stopped-app rotation helper
+(two of three tests passed). Its source differs from the retained iPad baseline,
+so the two are not silently merged into a single-revision acceptance matrix.
+The full review still requires one coherent native revision and shared fixture.
 
 The rotation helper requests device orientation between launches without trying
 to measure a nonexistent app window. With the app running it still waits for
@@ -3626,6 +3671,8 @@ stay in the existing main menu on both iOS families, rather than being repeated
 beside the logo. Their menu actions, authorization and session cleanup are
 unchanged. The focused menu test checks that the duplicate header actions are
 absent while all existing main-menu destinations remain available.
+
+## Primary references
 
 - [RFC 7395: XMPP over WebSocket](https://www.rfc-editor.org/rfc/rfc7395.html):
   subprotocol and framed XML stream. This probe implements only pre-authentication
