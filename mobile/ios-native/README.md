@@ -3647,8 +3647,16 @@ focused-UI dispatch can select iPad only. Default/full/archive validation still
 covers both families, and the process/job time limits have not been increased.
 Portrait return captures now have a distinct `-return` name; the strict matrix
 importer does not silently choose between two same-priority portrait images.
-The new test-only follow-up still requires actual iPad results. No TestFlight
-upload or push activation was performed.
+The test-only follow-up on `22d12f8` now has actual successful iPad results:
+[editing run 44222420259](https://github.com/edwtie/Teletyptel-messenger/actions/runs/44222420259)
+passed its one selected Edit/forward/both-deletions flow, and
+[reaction run 44222424110](https://github.com/edwtie/Teletyptel-messenger/actions/runs/44222424110)
+passed its one selected reaction/rotation flow, each with zero failures. The
+unchanged exported screenshots, summaries, selected-test lists and file digests
+are retained under `artifacts/native-ipad-message-checks-22d12f8`. The retracted
+message screenshot has also been visually reviewed. These are isolated follow-up
+passes, not a retroactive pass for the earlier timed-out four-test iPad run.
+No TestFlight upload or push activation was performed.
 
 Unsigned simulator run
 [44207060897](https://github.com/edwtie/Teletyptel-messenger/actions/runs/44207060897)
