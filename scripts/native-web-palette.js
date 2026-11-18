@@ -68,6 +68,7 @@ function palette(clientCSS, controlsCSS) {
       return value;
     };
     const media = "body.call-menu-active #callControlsMenu .call-media-controls > .call-media-icon-button";
+    const selectedButton = body + " button.selected:not(.social-login-button):not(.google-sdk-login-overlay)";
     const values = {
       panel: read(".modal-card", "background", true),
       background: read(body, "background-color"),
@@ -82,7 +83,7 @@ function palette(clientCSS, controlsCSS) {
       logoutLine: read(".logout-icon-button", "border-color"),
       outgoing: "var(--bubble-self)", incoming: "var(--bubble-peer)",
       outgoingLine: read(".message.self .message-body", "border-color"), incomingLine: border(".message-body"),
-      selection: "var(--selection-bg)", selectionBorder: "var(--selection-border)", selectionText: "var(--selection-text)",
+      selection: read(selectedButton, "background"), selectionBorder: "var(--selection-border)", selectionText: read(selectedButton, "color"),
       composer: read(".composer-input-row", "background", true),
       composerButton: read(".composer-round-button", "background", true),
       composerButtonText: read(".composer-round-button", "color", true),

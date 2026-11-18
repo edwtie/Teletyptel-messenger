@@ -103,7 +103,6 @@ struct NativeMessengerView: View {
     @StateObject private var avatars = NativeAvatarCache()
     @StateObject private var archive = NativeConversationArchive()
     @StateObject private var contactRequests = NativeContactRequests()
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     private var contacts: [NativeContact] {
@@ -301,17 +300,6 @@ struct NativeMessengerView: View {
                 .font(NativeWebStyle.font(10)).foregroundStyle(NativeWebStyle.muted).lineLimit(2)
                 .accessibilityLabel(connectionStatus).accessibilityIdentifier("startup-status")
             Spacer(minLength: 0)
-            if horizontalSizeClass == .regular {
-                Button { showDialer = true } label: { Image(systemName: "phone") }
-                    .buttonStyle(NativeWebIconStyle()).accessibilityLabel("Nummer bellen")
-                    .accessibilityIdentifier("toolbar-number-dialer")
-                Button { showAccount = true } label: { Image(systemName: "gearshape") }
-                    .buttonStyle(NativeWebIconStyle()).accessibilityLabel("Accountinstellingen")
-                    .accessibilityIdentifier("toolbar-account-settings")
-                Button(action: logout) { Image(systemName: "rectangle.portrait.and.arrow.right") }
-                    .buttonStyle(NativeWebIconStyle(logout: true))
-                    .accessibilityLabel("Uitloggen").accessibilityIdentifier("disconnect-session")
-            }
             Button { searchFocused = false; mainMenuOpen.toggle() } label: { Image(systemName: "line.3.horizontal") }
                 .buttonStyle(NativeWebIconStyle(prominent: mainMenuOpen)).accessibilityLabel("Hoofdmenu")
                 .accessibilityValue(Text(LocalizedStringKey(mainMenuOpen ? "Geopend" : "Gesloten")))

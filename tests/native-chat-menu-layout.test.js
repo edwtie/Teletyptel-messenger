@@ -53,6 +53,9 @@ test("16.9 references use a symbol-only three-column main grid and a distinct co
   assert.match(grid, /Klantenservice · nog niet beschikbaar in deze app[^\n]+disabled\(true\)/);
   assert.match(main, /allowReadMarkers: !mainMenuOpen && !showProfile/);
   assert.match(main, /searchFocused = false; mainMenuOpen.toggle\(\)/);
+  const header = main.split("private var brandHeader")[1].split("private var mainMenuGrid")[0];
+  assert.doesNotMatch(header, /toolbar-number-dialer|toolbar-account-settings|disconnect-session/);
+  assert.match(header, /accessibilityIdentifier\("messenger-main-menu"\)/);
   const chat = read(app + "NativeChatView.swift");
   assert.match(chat, /popover\(isPresented: \$conversationMenuOpen, arrowEdge: \.top\)/);
   assert.match(chat, /NativeWebCompactPopover\(\)/);

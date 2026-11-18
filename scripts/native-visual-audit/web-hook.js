@@ -82,7 +82,7 @@ window.nativeVisualFixture = {
     for (const dialog of document.querySelectorAll("dialog[open]")) dialog.close();
   },
   captureGeometry() {
-    const selectors = [".topbar", ".chat-header", ".message-body", ".message-inline-meta", ".message-avatar", ".composer", "#messageInput", "#mobileActionsPanel", "#chatMorePanel", "#callControlsMenu", "#accountDialog", "#smileyPickerPanel", "#phoneDialerDialog"];
+    const selectors = [".topbar", ".conversation-list", ".conversation-item.selected", ".chat-header", ".message-body", ".message-inline-meta", ".message-avatar", ".composer", "#messageInput", "#mobileActionsPanel", "#chatMorePanel", "#callControlsMenu", "#accountDialog", "#smileyPickerPanel", "#phoneDialerDialog"];
     return Object.fromEntries(selectors.map(selector => [selector, [...document.querySelectorAll(selector)].filter(element => element.getClientRects().length).map(element => {
       const rect = element.getBoundingClientRect();
       const style = getComputedStyle(element);

@@ -3585,6 +3585,25 @@ not green. No TestFlight upload, signing change or server activation took place.
 
 ## Primary references
 
+### Selected-contact colour follow-up (2026-11-18)
+
+The correctly classified tablet web reference exposed another real difference:
+the native selected-contact asset followed `--selection-bg`, but the actual web
+button is overridden by the more specific themed `button.selected` rule. Native
+asset generation now reads that rule's background and foreground for each theme
+instead of the overridden variables. The existing selected border is unchanged.
+Source tests cover both themes, CSS changes and missing rules. Web captures now
+also retain the actual selected row and sidebar's computed styles and geometry,
+so this mapping can be checked against rendered output. This is one colour fix,
+not evidence that other screens or the complete matrix are pixel-identical.
+
+The tablet brand header also had three duplicate actions that are absent from
+the actual tablet web header. Number calling, account settings and logout now
+stay in the existing main menu on both iOS families, rather than being repeated
+beside the logo. Their menu actions, authorization and session cleanup are
+unchanged. The focused menu test checks that the duplicate header actions are
+absent while all existing main-menu destinations remain available.
+
 - [RFC 7395: XMPP over WebSocket](https://www.rfc-editor.org/rfc/rfc7395.html):
   subprotocol and framed XML stream. This probe implements only pre-authentication
   availability, not the full protocol.

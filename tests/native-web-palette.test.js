@@ -14,7 +14,7 @@ test("Native colour assets derive both appearances from the rendered web roles, 
   const expected = {
     panel: ["#ffffff", "#151f2d"], background: ["#eef2f7", "#0f1724"], panelStrong: ["#edf3fb", "#1f2937"],
     button: ["#edf4ff", "#16243a"], buttonText: ["#0f172a", "#f9fafb"],
-    selection: ["#dbeafe", "#213858"], selectionText: ["#0f172a", "#ffffff"],
+    selection: ["#2563eb", "#2563eb"], selectionText: ["#ffffff", "#ffffff"],
     composer: ["#ffffff", "#0f1724"], composerButton: ["#eef2f7", "#1f2d43"],
     composerSend: ["#2563eb", "#1f2d43"], callBackground: ["#07111f", "#07111f"],
     callLine: ["#24528a", "#24528a"], totalConversation: ["#1559c4", "#1559c4"],
@@ -61,6 +61,11 @@ test("Web colour changes propagate to native output and missing, cyclic or unsup
   const changed = client.replace("background: #1f2d43;", "background: #123456;");
   assert.deepEqual(palette(changed, controls).composerButton.dark, rgba("#123456"));
   assert.deepEqual(palette(changed, controls).composerSend.dark, rgba("#123456"));
+  const selected = 'body[data-theme="light"] button.selected:not(.social-login-button):not(.google-sdk-login-overlay)';
+  assert.deepEqual(palette(client + selected + " { background: #123456; color: #abcdef; }", controls).selection.light, rgba("#123456"));
+  assert.deepEqual(palette(client + selected + " { background: #123456; color: #abcdef; }", controls).selectionText.light, rgba("#abcdef"));
+  assert.deepEqual(palette(client.replaceAll("--selection-bg: #dbeafe;", "--selection-bg: #ff0000;"), controls).selection.light, rgba("#2563eb"));
+  assert.throws(() => palette(client.replaceAll(selected, "body .removed-selected-rule"), controls), /Missing web palette property/);
   assert.throws(() => palette(client.replaceAll("--bubble-self: #ddf8ea;", "--bubble-self: not-a-colour;"), controls));
   assert.throws(() => palette(client, ""), /Missing web call-control/);
   assert.deepEqual(rgba("#abcd"), rgba("#aabbccdd"));
