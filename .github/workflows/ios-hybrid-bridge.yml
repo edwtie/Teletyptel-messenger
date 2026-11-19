@@ -1,0 +1,46 @@
+name: Hybrid iOS bridge unsigned validation
+
+on:
+  push:
+    branches: [codex/ios-hybrid-webui]
+    paths:
+      - .github/workflows/ios-hybrid-bridge.yml
+      - mobile/ios-hybrid/**
+      - scripts/ios-hybrid/**
+      - tests/ios-hybrid-*.test.js
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hybrid-bridge-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  bridge:
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: 22
+      - name: Select installed Xcode 26
+        run: |
+          XCODE_PATH=$(find /Applications -maxdepth 1 -name 'Xcode_26*.app' -type d | sort -r | head -n 1)
+          test -n "$XCODE_PATH"
+          echo "DEVELOPER_DIR=$XCODE_PATH/Contents/Developer" >> "$GITHUB_ENV"
+      - name: Validate pinned UI and JavaScript boundary
+        run: node --test tests/ios-hybrid-baseline.test.js tests/ios-hybrid-session.test.js
+      - name: Test native session bridge with fictional accounts
+        run: swift test --package-path mobile/ios-hybrid --scratch-path "$RUNNER_TEMP/teletyptel-hybrid-macos"
+      - name: Compile unsigned iOS simulator library
+        run: |
+          swift build --package-path mobile/ios-hybrid \
+            --scratch-path "$RUNNER_TEMP/teletyptel-hybrid-ios" \
+            --triple arm64-apple-ios16.0-simulator \
+            --sdk "$(xcrun --sdk iphonesimulator --show-sdk-path)"
