@@ -61,6 +61,13 @@ test("native failures are redacted and there is no browser fallback", async () =
   }
 });
 
+test("second-factor retry state is compact and does not expose raw native errors", () => {
+  assert.equal(safeState(state(2, "awaitingSecondFactor", "invalidSecondFactor")).errorCode, "invalidSecondFactor");
+  assert.throws(() => safeState(state(2, "connected", "invalidSecondFactor")), /invalidNativeReply/);
+  assert.throws(() => safeState(state(2, "failed", "invalidSecondFactor")), /invalidNativeReply/);
+  assert.throws(() => safeState(state(2, "awaitingSecondFactor", "invalidCredentials")), /invalidNativeReply/);
+});
+
 test("timeouts disposal and pending limits ignore late native replies", async () => {
   let expire;
   let resolveNative;

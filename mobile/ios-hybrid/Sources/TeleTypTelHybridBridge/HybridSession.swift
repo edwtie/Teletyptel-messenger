@@ -42,7 +42,8 @@ public final class HybridSession {
             guard model.isAwaitingSecondFactor, !model.isBackground else { throw HybridFailure.invalidState }
             model.verifySecondFactor(code: request.arguments["code"]!)
         case "session.cancel":
-            guard model.isWorking || model.isAwaitingSecondFactor else { throw HybridFailure.invalidState }
+            guard !model.isBackground, !model.isReconnecting,
+                  model.isWorking || model.isAwaitingSecondFactor else { throw HybridFailure.invalidState }
             model.reset()
         case "session.logout":
             guard model.phase != .signedOut else { throw HybridFailure.invalidState }
