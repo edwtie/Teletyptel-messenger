@@ -1,12 +1,23 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const crypto = require("node:crypto");
-const { createClient, safeState, install } = require("../mobile/ios-hybrid/Web/native-session");
+const { createClient, safeState, install, secureID } = require("../mobile/ios-hybrid/Web/native-session");
 
 const state = (sequence = 1, phase = "idle", errorCode) => ({ version: 1, sequence, phase, errorCode,
   chatAvailable: false, callsAvailable: false, socialLoginAvailable: false });
 const reply = (body, snapshot = state()) => ({ version: 1, id: JSON.parse(body).id.toLowerCase(), snapshot });
 const client = postMessage => createClient({ postMessage, makeID: crypto.randomUUID });
+
+test("custom-scheme documents can generate secure UUIDs without randomUUID", () => {
+  const values = new Set();
+  for (let index = 0; index < 50; index += 1) {
+    const value = secureID({ getRandomValues: bytes => crypto.getRandomValues(bytes) });
+    assert.match(value, /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/);
+    values.add(value);
+  }
+  assert.equal(values.size, 50);
+  assert.throws(() => secureID({}), /nativeUnavailable/);
+});
 
 test("hybrid login sends only the versioned command and consumes safe state", async () => {
   const commands = [];

@@ -6,8 +6,18 @@
   const failures = new Set(["invalidRequest", "untrustedDocument", "replayedRequest", "sessionBusy", "invalidState", "unavailable"]);
   const uuidPattern = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
 
+  function secureID(cryptoValue) {
+    if (typeof cryptoValue?.randomUUID === "function") return cryptoValue.randomUUID();
+    if (typeof cryptoValue?.getRandomValues !== "function") throw new Error("nativeUnavailable");
+    const bytes = cryptoValue.getRandomValues(new Uint8Array(16));
+    bytes[6] = (bytes[6] & 15) | 64;
+    bytes[8] = (bytes[8] & 63) | 128;
+    const hex = Array.from(bytes, value => value.toString(16).padStart(2, "0")).join("");
+    return [hex.slice(0, 8), hex.slice(8, 12), hex.slice(12, 16), hex.slice(16, 20), hex.slice(20)].join("-");
+  }
+
   function safeState(value) {
-    const keys = ["version", "sequence", "phase", "errorCode", "chatAvailable", "callsAvailable", "socialLoginAvailable"];
+    const keys = ["version", "sequence", "phase", "errorCode", "chatAvailable", "callsAvailable", "socialLoginAvailable", "settingsAvailable"];
     if (!value || typeof value !== "object" || Array.isArray(value)
         || Object.keys(value).some(key => !keys.includes(key)) || value.version !== 1
         || !Number.isSafeInteger(value.sequence) || value.sequence < 0 || !phases.has(value.phase)
@@ -15,11 +25,12 @@
         || (value.phase === "failed" && (value.errorCode == null || value.errorCode === "invalidSecondFactor"))
         || (value.phase !== "failed" && value.errorCode != null
           && !(value.phase === "awaitingSecondFactor" && value.errorCode === "invalidSecondFactor"))
-        || value.chatAvailable !== false || value.callsAvailable !== false || value.socialLoginAvailable !== false) {
+        || value.chatAvailable !== false || value.callsAvailable !== false || value.socialLoginAvailable !== false
+        || (value.settingsAvailable !== undefined && typeof value.settingsAvailable !== "boolean")) {
       throw new Error("invalidNativeReply");
     }
     return Object.freeze({ version: 1, sequence: value.sequence, phase: value.phase, errorCode: value.errorCode ?? null,
-      chatAvailable: false, callsAvailable: false, socialLoginAvailable: false });
+      chatAvailable: false, callsAvailable: false, socialLoginAvailable: false, settingsAvailable: value.settingsAvailable === true });
   }
 
   function createClient(options) {
@@ -94,6 +105,7 @@
         ? request("session.verifySecondFactor", { code }) : Promise.reject(new Error("invalidRequest")),
       cancel: () => request("session.cancel"),
       logout: () => request("session.logout"),
+      openSettings: () => request("app.openSettings"),
       receive,
       subscribe: listener => {
         if (disposed || typeof listener !== "function") throw new Error("bridgeClosed");
@@ -141,7 +153,7 @@
       Object.defineProperty(windowValue.navigator, name, { value: blocked, writable: false, configurable: false });
     }
     const handler = windowValue.webkit.messageHandlers.teletyptelNative;
-    const client = createClient({ postMessage: body => handler.postMessage(body), makeID: () => windowValue.crypto.randomUUID() });
+    const client = createClient({ postMessage: body => handler.postMessage(body), makeID: () => secureID(windowValue.crypto) });
     const receive = event => { try { client.receive(event.detail); } catch { } };
     windowValue.addEventListener("teletyptel:native-state", receive);
     windowValue.addEventListener("pagehide", () => {
@@ -152,6 +164,6 @@
     return client;
   }
 
-  if (typeof module === "object" && module.exports) module.exports = { createClient, safeState, install };
+  if (typeof module === "object" && module.exports) module.exports = { createClient, safeState, install, secureID };
   else install(root);
 })(typeof window === "undefined" ? globalThis : window);

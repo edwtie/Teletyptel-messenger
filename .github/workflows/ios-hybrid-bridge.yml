@@ -36,6 +36,17 @@ jobs:
           echo "DEVELOPER_DIR=$XCODE_PATH/Contents/Developer" >> "$GITHUB_ENV"
       - name: Validate pinned UI and JavaScript boundary
         run: node --test tests/ios-hybrid-baseline.test.js tests/ios-hybrid-session.test.js
+      - name: Prepare pinned login content without legacy engines
+        run: |
+          export TELETYPTEL_HYBRID_CONTENT="$RUNNER_TEMP/teletyptel-hybrid-content.json"
+          node scripts/ios-hybrid/build-content.js
+          echo "TELETYPTEL_HYBRID_CONTENT=$TELETYPTEL_HYBRID_CONTENT" >> "$GITHUB_ENV"
+      - name: Install isolated browser test dependencies
+        run: |
+          npm ci --ignore-scripts
+          npx playwright install chromium webkit
+      - name: Test login layout and rotation in Chromium and WebKit
+        run: node --test tests/ios-hybrid-presentation.test.js
       - name: Test native session bridge with fictional accounts
         run: swift test --package-path mobile/ios-hybrid --scratch-path "$RUNNER_TEMP/teletyptel-hybrid-macos"
       - name: Compile unsigned iOS simulator library

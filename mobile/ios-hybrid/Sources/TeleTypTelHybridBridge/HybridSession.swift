@@ -8,15 +8,18 @@ public final class HybridSession {
     private let model: NativeLoginModel
     private let configuration: ServerConfiguration
     private let nativeLogout: () -> Void
+    private let nativeSettings: (() -> Void)?
     private var observation: AnyCancellable?
     private var requestIDs: [UUID] = []
     private var sequence = 0
     private var lastPhase: NativeLoginModel.Phase?
 
-    public init(model: NativeLoginModel, configuration: ServerConfiguration, nativeLogout: @escaping () -> Void) {
+    public init(model: NativeLoginModel, configuration: ServerConfiguration, nativeLogout: @escaping () -> Void,
+                nativeSettings: (() -> Void)? = nil) {
         self.model = model
         self.configuration = configuration
         self.nativeLogout = nativeLogout
+        self.nativeSettings = nativeSettings
         observation = model.$phase.sink { [weak self] _ in
             Task { @MainActor [weak self] in self?.publish() }
         }
@@ -51,6 +54,10 @@ public final class HybridSession {
             if model.phase != .signedOut { model.disconnect() }
         case "session.snapshot":
             break
+        case "app.openSettings":
+            guard !model.isWorking, !model.isBackground, !model.isSecondFactorPending else { throw HybridFailure.sessionBusy }
+            guard let nativeSettings = nativeSettings else { throw HybridFailure.unavailable }
+            nativeSettings()
         default:
             throw HybridFailure.unavailable
         }
@@ -87,7 +94,8 @@ public final class HybridSession {
             }
         }
         return HybridSnapshot(version: 1, sequence: sequence, phase: phase, errorCode: errorCode,
-                              chatAvailable: false, callsAvailable: false, socialLoginAvailable: false)
+                              chatAvailable: false, callsAvailable: false, socialLoginAvailable: false,
+                              settingsAvailable: nativeSettings != nil)
     }
 
     private func publish() {

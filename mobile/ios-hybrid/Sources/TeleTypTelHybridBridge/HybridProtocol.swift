@@ -52,7 +52,7 @@ struct HybridRequest: Decodable, CustomStringConvertible, CustomDebugStringConve
                   code.utf8.count == 6, code.utf8.allSatisfy({ (48...57).contains($0) }) else {
                 throw HybridFailure.invalidRequest
             }
-        case "session.snapshot", "session.cancel", "session.logout":
+        case "session.snapshot", "session.cancel", "session.logout", "app.openSettings":
             guard arguments.isEmpty else { throw HybridFailure.invalidRequest }
         default:
             throw HybridFailure.unavailable
@@ -75,6 +75,7 @@ public struct HybridSnapshot: Codable, Equatable {
     public let chatAvailable: Bool
     public let callsAvailable: Bool
     public let socialLoginAvailable: Bool
+    public let settingsAvailable: Bool
 }
 
 public struct HybridReply: Encodable {

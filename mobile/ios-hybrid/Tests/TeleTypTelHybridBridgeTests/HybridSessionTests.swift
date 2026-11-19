@@ -1,5 +1,9 @@
 import Foundation
 import XCTest
+import WebKit
+#if os(macOS)
+import AppKit
+#endif
 @testable import TeleTypTelCore
 @testable import TeleTypTelHybridBridge
 
@@ -126,8 +130,8 @@ final class HybridSessionTests: XCTestCase {
         try session.handle(encoded(command, arguments), document: document, mainFrame: true)
     }
 
-    private func eventually(_ predicate: () async -> Bool, file: StaticString = #filePath, line: UInt = #line) async {
-        for _ in 0..<200 {
+    private func eventually(attempts: Int = 200, _ predicate: () async -> Bool, file: StaticString = #filePath, line: UInt = #line) async {
+        for _ in 0..<attempts {
             if await predicate() { return }
             try? await Task.sleep(nanoseconds: 5_000_000)
         }
@@ -228,5 +232,64 @@ final class HybridSessionTests: XCTestCase {
         XCTAssertThrowsError(try command(session, "session.login", ["jid": "fixture@localhost", "password": "secret"]))
         XCTAssertEqual(session.snapshot().phase, "suspended")
         model.disconnect()
+    }
+
+    func testAdvancedSettingsAreNativeOnlyAndUnavailableUnlessConfigured() throws {
+        let fixture = SessionFixture()
+        let model = NativeLoginModel(checker: fixture, authenticator: fixture, connection: fixture)
+        let configuration = try ServerConfiguration(address: "https://fixture.invalid", domain: "localhost")
+        let disabled = HybridSession(model: model, configuration: configuration, nativeLogout: {})
+        XCTAssertFalse(disabled.snapshot().settingsAvailable)
+        XCTAssertThrowsError(try command(disabled, "app.openSettings")) {
+            XCTAssertEqual($0 as? HybridFailure, .unavailable)
+        }
+        var openings = 0
+        let enabled = HybridSession(model: model, configuration: configuration, nativeLogout: {}, nativeSettings: { openings += 1 })
+        XCTAssertTrue(enabled.snapshot().settingsAvailable)
+        _ = try command(enabled, "app.openSettings")
+        XCTAssertEqual(openings, 1)
+        XCTAssertEqual(model.phase, .idle)
+        XCTAssertThrowsError(try command(enabled, "app.openSettings", ["address": "https://other.invalid"]))
+    }
+
+    func testBundledWebKitLoginActuallyReachesNativeAndSurvivesPresentationDetach() async throws {
+        guard let path = ProcessInfo.processInfo.environment["TELETYPTEL_HYBRID_CONTENT"] else {
+            throw XCTSkip("Generate pinned content on the disposable macOS runner to exercise WebKit.")
+        }
+        #if os(macOS)
+        _ = NSApplication.shared
+        #endif
+        let content = try HybridContent(data: Data(contentsOf: URL(fileURLWithPath: path)))
+        let fixture = SessionFixture()
+        let (model, session) = try makeSession(fixture)
+        let configuration = WKWebViewConfiguration()
+        configuration.websiteDataStore = .nonPersistent()
+        configuration.setURLSchemeHandler(HybridContentHandler(content: content), forURLScheme: "capacitor")
+        let webView = WKWebView(frame: CGRect(x: 0, y: 0, width: 390, height: 844), configuration: configuration)
+        let navigation = HybridNavigationPolicy()
+        webView.navigationDelegate = navigation
+        webView.uiDelegate = navigation
+        let bridge = HybridWebKitBridge(session: session)
+        try bridge.attach(to: webView)
+        defer { bridge.detach(); webView.stopLoading(); model.disconnect() }
+        webView.load(URLRequest(url: document))
+        await eventually(attempts: 2000) {
+            (try? await webView.evaluateJavaScript("document.getElementById('accountDialog')?.hidden === false")) as? Bool == true
+        }
+        let activeTag = try await webView.evaluateJavaScript("document.activeElement.tagName") as? String
+        XCTAssertEqual(activeTag, "BODY")
+        _ = try await webView.evaluateJavaScript("document.getElementById('dialogJidInput').value='fixture@localhost'; document.getElementById('dialogPasswordInput').value='fixture-password'; document.getElementById('dialogPasswordInput').dispatchEvent(new Event('input')); document.getElementById('dialogConnectButton').click();")
+        await eventually { model.isConnected }
+        await eventually {
+            (try? await webView.evaluateJavaScript("document.getElementById('hybridConnected')?.hidden === false")) as? Bool == true
+        }
+        let password = try await webView.evaluateJavaScript("document.getElementById('dialogPasswordInput').value") as? String
+        XCTAssertEqual(password, "")
+        let blocked = try await webView.evaluateJavaScript("(() => { try { new WebSocket('wss://other.invalid'); return false; } catch { return true; } })()") as? Bool
+        XCTAssertEqual(blocked, true)
+        bridge.detach()
+        XCTAssertTrue(model.isConnected)
+        let connections = await fixture.connections
+        XCTAssertEqual(connections, 1)
     }
 }
