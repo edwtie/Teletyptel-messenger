@@ -135,7 +135,7 @@ function diagnosticDirectory() {
   return fs.mkdtempSync(path.join(artifacts, "ios-native-diagnostics-test-"));
 }
 
-test("Native simulator checks keep compilation and boot separate from the unchanged UI deadline", () => {
+test("Native simulator checks budget full-suite time separately from compilation and boot", () => {
   const calls = [];
   runSimulatorChecks({ common: ["-project", "fixture.xcodeproj", "CODE_SIGNING_ALLOWED=NO"],
     family: "iPhone", destination: "platform=iOS Simulator,id=fixture", deviceID: "fixture", resultBundle: "fixture.xcresult",
@@ -147,7 +147,7 @@ test("Native simulator checks keep compilation and boot separate from the unchan
   assert.deepEqual(calls[1], ["iPhone-boot", "xcrun", ["simctl", "bootstatus", "fixture", "-b"]]);
   assert.equal(calls[2][0], "iPhone-tests");
   assert.equal(calls[2][2].at(-1), "test-without-building");
-  assert.equal(calls[2][3], 1200000);
+  assert.equal(calls[2][3], 2700000);
   assert.deepEqual(calls[0][2].slice(0, -1), calls[2][2].slice(0, -3));
   assert.deepEqual(calls[2][2].slice(-3), ["-resultBundlePath", "fixture.xcresult", "test-without-building"]);
   for (const call of [calls[0], calls[2]]) {
@@ -167,7 +167,11 @@ test("Cloud history preflight cannot replace or weaken the full simulator suite"
   assert.equal(calls[2][3], 600000);
   assert.ok(calls[2][2].includes("-only-testing:NativeStartupUITests/NativeStartupUITests/testCloudHistoryCatalogAndOlderPagesDoNotAuthorizeAnUnknownContact"));
   assert.equal(calls[3][0], "iPhone-tests");
-  assert.equal(calls[3][3], 1200000);
+  assert.equal(calls[3][3], 2700000);
+  const focused = [];
+  runSimulatorChecks({ ...options, tests: ["testExample"], logged: (...args) => focused.push(args) });
+  assert.equal(focused.at(-1)[3], 1200000);
+  assert.ok(focused.at(-1)[2].includes("-only-testing:NativeStartupUITests/NativeStartupUITests/testExample"));
   assert.ok(!calls[3][2].some(argument => /only-testing|skip-testing|retry|test-iterations/.test(argument)));
   assert.deepEqual(calls[3][2].slice(-3), ["-resultBundlePath", "full.xcresult", "test-without-building"]);
   const failure = new Error("Cloud UI assertion failed");

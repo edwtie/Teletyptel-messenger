@@ -324,8 +324,9 @@ final class NativeStartupUITests: XCTestCase {
             outgoing.exists && outgoing.isHittable && outgoing.frame.maxY <= draft.frame.minY &&
                 outgoing.frame.minY >= self.application.descendants(matching: .any)["chat-header"].firstMatch.frame.maxY - 1
         }
-        expectation(for: latestVisible, evaluatedWith: outgoing)
-        waitForExpectations(timeout: 10)
+        let rotatedMessage = XCTNSPredicateExpectation(predicate: latestVisible, object: outgoing)
+        XCTAssertEqual(XCTWaiter.wait(for: [rotatedMessage], timeout: 10), .completed,
+                       "Rotated group: viewport=\(viewport.frame), message=\(outgoing.frame), draft=\(draft.frame), menu hittable=\(outgoingMenu.isHittable)")
         snapshot("chat-landscape-keyboard")
         rotate(.portrait)
         XCUIDevice.shared.press(.home)
@@ -922,9 +923,10 @@ final class NativeStartupUITests: XCTestCase {
         application.buttons["attachment-picker"].tap()
         let selection = application.buttons["fixture-attachment-selection"]
         XCTAssertTrue(selection.waitForExistence(timeout: 5)); selection.tap()
-        let upload = application.buttons["attachment-upload"]; reveal(upload); upload.tap()
+        let form = application.descendants(matching: .any)["attachment-form"].firstMatch
+        let upload = application.buttons["attachment-upload"]; reveal(upload, within: form); upload.tap()
         let stage = application.buttons["attachment-stage"]
-        XCTAssertTrue(stage.waitForExistence(timeout: 10)); reveal(stage)
+        reveal(stage, within: form)
         snapshot("attachment-uploaded-not-sent"); stage.tap()
         let draft = application.descendants(matching: .any)["chat-draft"].firstMatch
         XCTAssertTrue((draft.value as? String)?.contains("Bestand: test.txt") == true)
@@ -939,10 +941,11 @@ final class NativeStartupUITests: XCTestCase {
         waitForStatus("XMPP verbonden als fixture@localhost")
         application.buttons["Hoofdmenu"].tap(); application.buttons["open-groups"].tap()
         let discovery = application.buttons["Beschikbare groepen ophalen"]
-        reveal(discovery); XCTAssertTrue(discovery.waitForExistence(timeout: 5)); discovery.tap()
+        let list = application.descendants(matching: .any)["group-directory-list"].firstMatch
+        reveal(discovery, within: list); XCTAssertTrue(discovery.waitForExistence(timeout: 5)); discovery.tap()
         let discovered = application.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Fictieve testgroep")).firstMatch
-        XCTAssertTrue(discovered.waitForExistence(timeout: 5)); reveal(discovered); discovered.tap()
-        let nickname = application.textFields["group-nickname"]; reveal(nickname); nickname.tap(); nickname.typeText("Testnaam")
+        reveal(discovered, within: list); discovered.tap()
+        let nickname = application.textFields["group-nickname"]; reveal(nickname, upward: false, within: list); nickname.tap(); nickname.typeText("Testnaam")
         let join = application.buttons["group-join"]; reveal(join); join.tap()
         let room = application.descendants(matching: .any)["group-room-fixture@conference.localhost"].firstMatch
         XCTAssertTrue(room.waitForExistence(timeout: 5)); reveal(room); room.tap()
@@ -1247,15 +1250,21 @@ final class NativeStartupUITests: XCTestCase {
         login.tap()
     }
 
-    private func reveal(_ element: XCUIElement, upward: Bool = true) {
+    private func reveal(_ element: XCUIElement, upward: Bool = true, within container: XCUIElement? = nil) {
+        if let container, !container.waitForExistence(timeout: 5) {
+            XCTFail("Missing scroll container: \(container)")
+            return
+        }
         for _ in 0..<16 {
             if isUsable(element) { return }
-            let viewport = usableViewport()
+            let screen = usableViewport()
+            let viewport = container.map { $0.frame.intersection(screen) } ?? screen
+            guard !viewport.isEmpty else { break }
             let scrollUp = element.exists && !element.frame.isEmpty
                 ? element.frame.midY > viewport.midY : upward
             let distance = min(120, max(40, viewport.height * 0.35))
             let origin = application.coordinate(withNormalizedOffset: .zero)
-            let horizontal = viewport.minX + viewport.width * 0.15
+            let horizontal = container == nil ? viewport.minX + viewport.width * 0.15 : viewport.midX
             let start = origin.withOffset(CGVector(dx: horizontal, dy: viewport.midY))
             let end = origin.withOffset(CGVector(dx: horizontal,
                                                  dy: viewport.midY + (scrollUp ? -distance : distance)))

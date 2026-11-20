@@ -69,6 +69,7 @@ struct NativeAttachmentPicker: View {
                 Section("Locatie") { NativeLocationOptions { text in stage(text); dismiss() } }
             }
             .nativeWebForm()
+            .accessibilityIdentifier("attachment-form")
             .navigationTitle("Bijlage")
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button { dismiss() } label: { Image(systemName: "xmark").frame(width: 44, height: 44) }.accessibilityLabel("Sluiten") } }
         }

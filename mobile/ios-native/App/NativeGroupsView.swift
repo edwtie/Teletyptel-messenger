@@ -50,6 +50,7 @@ struct NativeGroupsView: View {
                 NativeRoomDiscovery(model: model.management) { room = $0 }
             }
             .nativeWebForm()
+            .accessibilityIdentifier("group-directory-list")
             .navigationTitle("Groepschats")
             .toolbar { ToolbarItem(placement: .cancellationAction) {
                 Button { dismiss() } label: { Image(systemName: "xmark").frame(width: 44, height: 44) }.accessibilityLabel("Sluiten")

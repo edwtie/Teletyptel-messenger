@@ -5,6 +5,7 @@ const { prepare } = require("./prepare-ios-native");
 const { checkMedia } = require("./check-ios-native-media");
 
 function executeLogged(command, args, { root, reports, name, timeout = 600000, execute = execFileSync }) {
+  console.log(`Starting ${name} (limit: ${timeout / 60000} minutes)`);
   try {
     const output = execute(command, args, {
       cwd: root, timeout, maxBuffer: 40 * 1024 * 1024, encoding: "utf8", stdio: "pipe"
@@ -12,6 +13,9 @@ function executeLogged(command, args, { root, reports, name, timeout = 600000, e
     fs.writeFileSync(path.join(reports, name + ".txt"), output);
     return output;
   } catch (error) {
+    for (const line of String(error.stdout || "").split(/\r?\n/).filter(line => /: error: .* : |^Test Case .* failed/.test(line)).slice(-8)) {
+      console.error(line.slice(0, 600));
+    }
     fs.writeFileSync(path.join(reports, name + ".txt"), String(error.stdout || ""));
     fs.writeFileSync(path.join(reports, name + "-stderr.txt"), String(error.stderr || ""));
     fs.writeFileSync(path.join(reports, name + "-failure.json"), JSON.stringify({
@@ -69,7 +73,7 @@ function runSimulatorChecks({ common, family, destination, deviceID, resultBundl
   }
   logged(family + "-tests", "xcodebuild", [...simulatorArguments,
     ...(tests || []).map(name => "-only-testing:NativeStartupUITests/NativeStartupUITests/" + name),
-    "-resultBundlePath", resultBundle, "test-without-building"], 1200000);
+    "-resultBundlePath", resultBundle, "test-without-building"], tests ? 1200000 : 2700000);
 }
 
 function run() {

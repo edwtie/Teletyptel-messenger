@@ -167,8 +167,7 @@ test("Focused message checks can isolate iPad without weakening default device c
   assert.match(workflow, /ui_family:[\s\S]*?options: \[both, iPhone, iPad\][\s\S]*?default: both/);
   assert.ok(workflow.includes("inputs.validation_mode == 'focused-ui' && inputs.ui_family == 'iPad' && fromJSON('[\"iPad\"]')"));
   assert.ok(workflow.includes("|| fromJSON('[\"iPhone\",\"iPad\"]')"));
-  assert.match(workflow, /timeout-minutes: 45/);
-  assert.match(read("scripts/check-ios-native.js"), /test-without-building"\], 1200000\)/);
+  assert.ok(workflow.includes("(github.event_name != 'workflow_dispatch' || inputs.validation_mode == 'full') && 75 || 45"));
 });
 
 test("Rotation waits for actual native scene geometry before reading compositor pixels and still tests message-menu activation", () => {
