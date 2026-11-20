@@ -310,6 +310,27 @@ final class HybridSessionTests: XCTestCase {
         XCTAssertEqual(session.snapshot().phase, "idle")
     }
 
+    func testForegroundAfterInterruptedFirstLoginReturnsToFormWithoutReusingCredentials() async throws {
+        let fixture = SessionFixture(holdAuthentication: true)
+        let (model, session) = try makeSession(fixture)
+        var opened = false
+        session.nativeSettings = { opened = true }
+        _ = try command(session, "session.login", ["jid": "fixture@localhost", "password": "fixture-password"])
+        await eventually { await fixture.hasPendingAuthentication() }
+        model.beginBackground()
+        model.suspend()
+        XCTAssertThrowsError(try command(session, "app.openSettings"))
+        model.resume()
+        XCTAssertEqual(session.snapshot().phase, "idle")
+        _ = try command(session, "app.openSettings")
+        XCTAssertTrue(opened)
+        await fixture.releaseAuthentication()
+        for _ in 0..<10 { await Task.yield() }
+        XCTAssertEqual(model.phase, .idle)
+        let connections = await fixture.connections
+        XCTAssertEqual(connections, 0)
+    }
+
     func testSuspendedNativeSessionCannotBeReplacedByWebLogin() async throws {
         let (model, session) = try makeSession(SessionFixture())
         _ = try command(session, "session.login", ["jid": "fixture@localhost", "password": "secret"])
@@ -336,6 +357,12 @@ final class HybridSessionTests: XCTestCase {
         XCTAssertEqual(openings, 1)
         XCTAssertEqual(model.phase, .idle)
         XCTAssertThrowsError(try command(enabled, "app.openSettings", ["address": "https://other.invalid"]))
+        let replacement = try ServerConfiguration(address: "https://new.invalid", domain: "test.invalid")
+        let previousEpoch = enabled.snapshot().epoch
+        try enabled.changeServer(replacement)
+        XCTAssertEqual(enabled.configuration, replacement)
+        XCTAssertNotEqual(enabled.snapshot().epoch, previousEpoch)
+        XCTAssertEqual(model.phase, .idle)
     }
 
     func testRosterAndPresenceUpdatesAreMinimalAndClearedDuringBackgroundAndLogout() async throws {

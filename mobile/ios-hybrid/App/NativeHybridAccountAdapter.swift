@@ -13,7 +13,7 @@ final class NativeHybridAccountAdapter: HybridAccountPort {
     private let editor = NativeContactEditor()
     private let requests = NativeContactRequests()
     private weak var login: NativeLoginModel?
-    private let configuration: ServerConfiguration
+    var configuration: ServerConfiguration { didSet { refresh() } }
     private var epoch: String?
     private var active = false
     private var lastPhase: NativeLoginModel.Phase?

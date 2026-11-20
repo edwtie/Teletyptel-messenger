@@ -23,7 +23,7 @@
       "dialogSaveAccountButton", "dialogResetPasswordButton", "cancelAccountDialogButton", "closeAccountDialogButton",
       "dialogServerSettingsButton", "loginTwoFactorSection", "loginTwoFactorCodeInput", "verifyLoginTwoFactorButton",
       "dialogRememberPasswordToggle", "hybridStartup", "hybridStartupStatus", "hybridProgress", "hybridRetry", "hybridCancel",
-      "hybridBack", "hybridConnected", "hybridLogout"].map(name => [name, byID(name)]));
+      "hybridBack", "hybridStartupSettings", "hybridConnected", "hybridLogout"].map(name => [name, byID(name)]));
     const accountGrid = document.querySelector(".account-auth-section > .account-dialog-grid");
     const busyPhases = new Set(["checking", "authenticating", "connecting"]);
     const networkErrors = new Set(["certificate", "configuration", "offline", "timeout", "serverResponse", "connectionLost"]);
@@ -81,6 +81,8 @@
       nodes.hybridCancel.hidden = !busyPhases.has(phase);
       nodes.hybridCancel.disabled = pending;
       nodes.hybridBack.hidden = !networkFailure;
+      nodes.hybridStartupSettings.hidden = !networkFailure || !state?.settingsAvailable;
+      nodes.hybridStartupSettings.disabled = busy;
       nodes.hybridStartupStatus.textContent = bridgeError ? "De native appverbinding is niet beschikbaar. Probeer opnieuw."
         : messages[state?.errorCode] || messages[phase] || "TeleTypTel starten…";
       nodes.accountDialogTitle.textContent = twoFactor ? text("account.login_two_factor_title", "Tweestapsverificatie") : text("account.start_title", "Aanmelden");
@@ -101,6 +103,7 @@
       nodes.loginTwoFactorCodeInput.disabled = busy;
       nodes.dialogServerSettingsButton.disabled = busy || twoFactor || state?.settingsAvailable !== true;
       nodes.dialogServerSettingsButton.title = state?.settingsAvailable ? "Geavanceerde instellingen" : unavailable;
+      nodes.dialogServerSettingsButton.setAttribute("aria-label", "Serverinstellingen");
       nodes.hybridLogout.disabled = pending || busyPhases.has(phase);
       const account = state?.account;
       for (const [id, provider] of [["dialogGoogleLoginFallbackButton", "google"], ["dialogFacebookLoginButton", "facebook"]]) {
@@ -170,7 +173,9 @@
       nodes.loginTwoFactorCodeInput.value = "";
       void perform(() => client.logout());
     });
-    listen(nodes.dialogServerSettingsButton, "click", () => { void perform(() => client.openSettings()); });
+    for (const button of [nodes.dialogServerSettingsButton, nodes.hybridStartupSettings]) {
+      listen(button, "click", () => { nodes.dialogPasswordInput.value = ""; void perform(() => client.openSettings()); });
+    }
     for (const [id, provider] of [["dialogGoogleLoginFallbackButton", "google"], ["dialogFacebookLoginButton", "facebook"]]) {
       listen(byID(id), "click", () => { nodes.dialogPasswordInput.value = ""; nodes.dialogRememberPasswordToggle.checked = false; void perform(() => client.accountCommand("auth.social", { provider })); });
     }

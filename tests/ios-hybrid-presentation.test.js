@@ -609,6 +609,8 @@ for (const engine of [chromium, webkit]) {
       await page.evaluate(() => window.emitNative("failed", "certificate"));
       assert.match(await page.locator("#hybridStartupStatus").textContent(), /certificaat/);
       assert.equal(await page.locator("#hybridProgress").isVisible(), false);
+      await page.locator("#hybridStartupSettings").click();
+      assert.equal(await page.evaluate(() => window.nativeSettingsCount), 2);
       await page.locator("#hybridBack").click();
       await page.locator("#accountDialog").waitFor({ state: "visible" });
       assert.equal(await page.locator("#dialogJidInput").inputValue(), "fixture@localhost");
