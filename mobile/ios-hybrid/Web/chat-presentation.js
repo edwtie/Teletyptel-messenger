@@ -103,7 +103,6 @@
         const bubble = document.createElement("div");
         bubble.className = "hybrid-bubble";
         const body = document.createElement("div");
-        body.className = "message-body";
         body.textContent = message.body;
         document.defaultView.TeleTypTelHybridSmileys?.body(body, message.body);
         if (message.sender && kind === "group") {

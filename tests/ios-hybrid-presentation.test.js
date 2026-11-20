@@ -463,6 +463,38 @@ for (const engine of [chromium, webkit]) {
     } finally { await browser.close(); }
   });
 
+  test(engine.name() + ": phone chat keeps message text in the wide column", { timeout: 45000 }, async () => {
+    const { browser, page } = await setup(engine);
+    try {
+      await page.evaluate(() => window.emitRoster([{ jid: "peer@localhost", name: "peer@localhost", presence: "online", canCall: true }]));
+      await page.locator("#conversationItems .conversation-item").click();
+      await page.evaluate(() => window.emitMessages([
+        window.fixtureMessage("Totale conversatie - beëindigd", true),
+        window.fixtureMessage("Totale conversatie - beëindigd", false),
+        window.fixtureMessage("x".repeat(240), true)
+      ]));
+      await page.waitForFunction(() => document.querySelectorAll("#hybridMessages article").length === 3);
+      for (const width of [320, 390, 844]) {
+        await page.setViewportSize({ width, height: width === 844 ? 390 : 844 });
+        const title = await page.locator("#hybridContactTitle").boundingBox();
+        const presence = await page.locator("#hybridContactPresence").boundingBox();
+        assert.ok(title && presence && presence.y >= title.y + title.height - 1);
+        const geometry = await page.locator("#hybridMessages article").evaluateAll(rows => rows.map(row => {
+          const avatar = row.querySelector(".avatar").getBoundingClientRect();
+          const bubble = row.querySelector(".hybrid-bubble").getBoundingClientRect();
+          const body = row.querySelector(".hybrid-bubble > div:first-child");
+          const range = document.createRange();
+          range.selectNodeContents(body);
+          return { rightAvatar: avatar.left >= bubble.right - 1, leftAvatar: avatar.right <= bubble.left + 1,
+            lines: range.getClientRects().length, fits: row.scrollWidth <= row.clientWidth + 1 && bubble.right <= innerWidth };
+        }));
+        assert.ok(geometry[0].rightAvatar && geometry[1].leftAvatar, JSON.stringify(geometry));
+        assert.ok(geometry.slice(0, 2).every(value => value.lines <= 3), JSON.stringify(geometry));
+        assert.ok(geometry.every(value => value.fits), JSON.stringify(geometry));
+      }
+    } finally { await browser.close(); }
+  });
+
   test(engine.name() + ": native chat sends safely, displays real receipts and exposes message actions", { timeout: 45000 }, async () => {
     const { browser, page, errors } = await setup(engine);
     try {
