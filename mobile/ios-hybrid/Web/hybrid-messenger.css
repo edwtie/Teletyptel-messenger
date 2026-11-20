@@ -1,4 +1,6 @@
 .hybrid-contact-preview .chat-header {
+  position: relative;
+  z-index: 40;
   flex: 0 0 auto;
   gap: 8px;
 }

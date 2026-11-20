@@ -61,5 +61,6 @@ test("native attachment and translation adapters retain selection consent and fo
   assert.match(source, /translation\.setSharingConsent\(false\)/);
   assert.match(source, /NativeTranslationModel\.sameLanguage/);
   assert.match(source, /scopeEpoch == epoch/);
+  assert.match(source, /translation\.pendingCount < 4/);
   assert.doesNotMatch(source, /sendDraft|sendMessage|URLSession\(|Data\(base64Encoded/);
 });

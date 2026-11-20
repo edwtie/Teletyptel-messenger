@@ -181,6 +181,11 @@ for (const engine of [chromium, webkit]) {
       assert.equal(await page.evaluate(() => window.nativeCommands.find(value => value.command === "chat.send").arguments.kind), "group");
       assert.equal(await page.locator(".hybrid-message-receipt.is-read").count(), 0);
       await page.locator("#hybridStartMenu summary").click();
+      const groupMenuReachable = await page.locator("#hybridManageGroup").evaluate(button => {
+        const bounds = button.getBoundingClientRect();
+        return button.contains(document.elementFromPoint(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2));
+      });
+      assert.equal(groupMenuReachable, true, "chat bubbles cannot cover the group menu");
       await page.locator("#hybridManageGroup").click();
       await page.locator("#hybridGroupSubject").fill("Nieuw onderwerp");
       await page.locator("#hybridGroupSubjectSave").click();
@@ -228,6 +233,9 @@ for (const engine of [chromium, webkit]) {
       await page.locator("#hybridTranslationOptions").click();
       await page.locator("#hybridTranslationConsent").uncheck();
       await page.waitForFunction(() => window.nativeCommands.some(value => value.command === "translation.disable"));
+      await page.locator('[data-close-feature="hybridTranslationSettings"]').click();
+      await page.locator("#hybridLogout").click();
+      assert.equal(await page.locator("#hybridTranslationConsent").isChecked(), false);
       assert.equal(await page.evaluate(() => window.nativeCommands.filter(value => value.command === "chat.send").length), 0);
       assert.equal(requests.some(url => /\/api\/|googleapis|translate\.google/.test(url)), false);
       assert.deepEqual(errors, []);

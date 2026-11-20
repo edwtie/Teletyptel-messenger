@@ -55,7 +55,7 @@ swift test --package-path mobile/ios-hybrid
 
 Swift vereist hier macOS/Xcode. De geïsoleerde workflow `ios-hybrid-bridge.yml` genereert de inhoud uitsluitend in de tijdelijke cloudrunner. Chromium en WebKit controleren het inloggen, zoeken, contactselectie, statuswijzigingen en iPhone/iPad-formaatwisselingen. Een Swift-test laadt dezelfde inhoud in een echte WKWebView, meldt zich aan via de native brug met een fictieve motor, toont een native rostercontact en controleert dat loskoppelen van de presentatie de native sessie niet beëindigt. Native tests controleren ook achtergrondprivacy en late updates uit een vorige accountsessie. Zonder gegenereerde inhoud wordt uitsluitend die WebKit-koppelingstest expliciet overgeslagen.
 
-De workflow compileert de library en de afzonderlijk geassembleerde app voor de iOS-simulator. Geen ondertekening, APNs-activering, sleutels, TestFlight-upload of wijziging aan de eigen server. De cloudrunner is tijdelijk; er worden geen bouwmappen of screenshots naar deze laptop gekopieerd. Dit bewijst nog geen fysieke iPhone-oproep of volledige appstartketen.
+De workflow compileert de library en de afzonderlijk geassembleerde app voor de iOS-simulator. Daarna controleren iPhone- en iPad-simulatoren koud opstarten en draaien zonder inloggen. Groepen, uploads en vertaalprivacy gebruiken daarnaast de bestaande native tests met fictieve gegevens. Geen ondertekening, APNs-activering, sleutels, TestFlight-upload of wijziging aan de eigen server. De cloudrunner is tijdelijk; er worden geen bouwmappen of screenshots naar deze laptop gekopieerd. Dit bewijst nog geen fysieke iPhone-oproep of volledige aanmeld- en oproepketen.
 
 ## Nog aansluiten
 

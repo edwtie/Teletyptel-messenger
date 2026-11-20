@@ -56,6 +56,12 @@
     }
     const unsubscribe = client.subscribe(value => {
       if (disposed) return;
+      if (state && state.epoch !== value.epoch) {
+        groupTicket = undefined; returnFocus = undefined;
+        byID("hybridGroupJoinForm").reset(); byID("hybridTranslationForm").reset();
+        byID("hybridGroupSubject").value = "";
+        options(byID("hybridGroupOccupant"), []); options(byID("hybridGroupInviteTarget"), []);
+      }
       if (state && (state.epoch !== value.epoch || value.phase !== "connected" || !["idle", "failed"].includes(value.call.phase))) {
         for (const dialog of document.querySelectorAll(".hybrid-feature-dialog")) dialog.hidden = true;
       }
