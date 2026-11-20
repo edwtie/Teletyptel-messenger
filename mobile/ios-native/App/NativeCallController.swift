@@ -91,6 +91,7 @@ final class NativeCallController: ObservableObject, NativePushRegistering {
     var backgroundCallEnded: (() -> Void)?
     var hasLiveCall: Bool { runtime?.platform.coordinator.currentHandle != nil }
     var hybridCallIdentifier: UUID? { runtime?.platform.coordinator.currentHandle?.id ?? activeID ?? pendingPush?.id }
+    var hybridCallPeer: String? { callPeerJID.flatMap(NativeChatCodec.bareJID) }
     var hybridCallProfile: NativeCallMedia? { presentation?.profile ?? runtime?.platform.coordinator.lifecycle.current?.invitation.media }
 
     func answerFromHybrid() {

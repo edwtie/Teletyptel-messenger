@@ -183,8 +183,19 @@ final class NativeCallPlatform: NSObject, PKPushRegistryDelegate, CXProviderDele
     }
 
     func requestAnswer(id: UUID, completion: @escaping (Bool) -> Void) {
-        guard coordinator.currentHandle?.id == id, coordinator.lifecycle.current?.phase == .ringing else { completion(false); return }
-        system.requestAnswer(id: id, completion: completion)
+        Task { @MainActor [weak self] in
+            for _ in 0..<50 {
+                guard let self = self, self.coordinator.currentHandle?.id == id else { completion(false); return }
+                if self.coordinator.lifecycle.current?.phase == .ringing {
+                    self.system.requestAnswer(id: id, completion: completion)
+                    return
+                }
+                guard self.coordinator.lifecycle.current?.phase == .reporting else { completion(false); return }
+                do { try await Task.sleep(nanoseconds: 20_000_000) }
+                catch { completion(false); return }
+            }
+            completion(false)
+        }
     }
 
     nonisolated func provider(_ provider: CXProvider, perform action: CXSetHeldCallAction) {

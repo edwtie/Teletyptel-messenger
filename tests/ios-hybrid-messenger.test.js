@@ -106,6 +106,7 @@ test("hybrid assembly reuses the existing CallKit provider and never starts a se
   assert.match(app, /NativeCallController\.shared/);
   assert.match(app, /calls\.attach\(login\)/);
   assert.match(adapter, /controller\.answerFromHybrid\(\)/);
+  assert.match(adapter, /controller\.hybridCallPeer/);
   assert.match(adapter, /RTCMTLVideoView/);
   assert.doesNotMatch(app + adapter, /CXProvider\(|RTCPeerConnectionFactory\(|URLSessionWebSocketTask/);
   const previous = process.env.GITHUB_ACTIONS;

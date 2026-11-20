@@ -80,7 +80,7 @@ final class NativeHybridCallAdapter: HybridCallPort {
         case .failed: identifier = nil; systemIdentifier = nil; answering = nil; value.phase = "failed"; return value
         case .calling(let target): value.phase = "calling"; peer = target
         case .ringing(let target): value.phase = "ringing"; peer = target
-        case .active(let target): value.phase = "active"; peer = target
+        case .active: value.phase = "active"; peer = ""
         }
         let currentSystem = controller.hybridCallIdentifier
         if identifier == nil || (systemIdentifier != nil && currentSystem != nil && systemIdentifier != currentSystem) {
@@ -88,7 +88,7 @@ final class NativeHybridCallAdapter: HybridCallPort {
         }
         if currentSystem != nil { systemIdentifier = currentSystem }
         value.id = identifier!.uuidString.lowercased()
-        value.peer = NativeChatCodec.bareJID(peer) ?? "TeleTypTel"
+        value.peer = controller.hybridCallPeer ?? NativeChatCodec.bareJID(peer) ?? "TeleTypTel"
         value.mode = controller.hybridCallProfile?.rawValue ?? requestedMode
         value.muted = controller.isMuted
         value.cameraEnabled = controller.presentation?.cameraEnabled ?? false
