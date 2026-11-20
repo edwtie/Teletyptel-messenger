@@ -55,8 +55,8 @@ final class NativeHybridHistoryAdapter: HybridHistoryPort {
 
     private func canChat(_ peer: String, _ kind: String) -> Bool {
         guard let login = login, !login.isBlocked(peer) else { return false }
-        if kind == "group" { return login.groups.rooms.contains { $0.room == peer && $0.snapshot != nil } }
-        if case .ready(let contacts) = login.roster { return contacts.contains { $0.jid == peer } }
+        if kind == "group" { return login.groups.rooms.prefix(8).contains { $0.room == peer && $0.snapshot != nil } }
+        if case .ready(let contacts) = login.roster { return contacts.count <= 100 && peer != login.currentOwner && contacts.contains { $0.jid == peer } }
         return false
     }
 

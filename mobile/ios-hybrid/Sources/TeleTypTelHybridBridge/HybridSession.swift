@@ -38,6 +38,7 @@ public final class HybridSession {
         if let history = history {
             history.onOpen = { [weak self] peer, kind in
                 guard let self = self, !self.callBusy, (try? self.permittedPeer(peer, kind: kind)) != nil else { return false }
+                guard kind == "group" ? self.groupProjection().contains(where: { $0.room == peer && $0.joined }) : self.roster().contacts.contains(where: { $0.jid == peer }) else { return false }
                 self.selectedPeer = peer; self.selectedKind = kind; self.model.visibleConversation = nil
                 return true
             }

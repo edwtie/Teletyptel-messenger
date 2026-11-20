@@ -264,6 +264,7 @@ for (const engine of [chromium, webkit]) {
         await window.nativeFixtureClient.joinGroup("familie", "Fixture", false);
         window.emitAdministration({ room: "familie@conference.localhost", busy: false, canConfigure: true, canManageMembers: true, configuration: null, affiliation: null, members: [] });
       });
+      await page.locator("#hybridStartMenu summary").click();
       await page.locator("#hybridManageGroup").click(); await page.locator("#hybridGroupLoadConfiguration").click();
       await page.locator("#hybridGroupName").fill("Nieuwe familie");
       assert.equal(await page.locator("#hybridGroupModerated").isDisabled(), true);

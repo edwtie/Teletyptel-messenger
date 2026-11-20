@@ -77,4 +77,13 @@ final class HybridHistoryTests: XCTestCase {
             XCTAssertThrowsError(try HybridRequest.decode(encoded(name, args, epoch: UUID().uuidString)))
         }
     }
+
+    func testHistoryCannotOpenAContactThatIsNotInTheBoundedUiRoster() async throws {
+        let history = HistoryFixture(); let (fixture, login, session) = try await connected(history); defer { login.disconnect() }
+        let contacts = (0..<101).map { NativeContact(jid: "peer\($0)@localhost", name: "Peer", groups: [], subscription: "both") }
+        await fixture.emitRoster(.ready(contacts))
+        await eventually { session.snapshot().roster.status == "unavailable" }
+        XCTAssertFalse(history.onOpen?("peer0@localhost", "direct") == true)
+        XCTAssertNil(session.snapshot().conversation)
+    }
 }
