@@ -38,6 +38,15 @@ test("malformed message receipts, duplicated IDs and invalid call phases fail cl
   assert.throws(() => safeState({ ...connected(), phase: "signedOut" }), /invalidNativeReply/);
 });
 
+test("interpreter media and text belong only to the connected third participant", () => {
+  const live = { ...call(), interpreter: "connected", interpreterVideo: true, interpreterText: "Hallo!" };
+  assert.equal(safeCall(live).interpreterText, "Hallo!");
+  assert.equal(safeCall(call()).interpreter, "unavailable");
+  for (const changes of [{ phase: "ringing" }, { interpreter: "consent" }, { interpreter: "unknown" }, { interpreterVideo: 1 }, { interpreterText: "\0" }, { room_id: "hidden" }]) {
+    assert.throws(() => safeCall({ ...live, ...changes }), /invalidNativeReply/);
+  }
+});
+
 test("chat, RTT and DTMF use separate scoped native commands without a browser transport", async () => {
   const commands = [];
   let sequence = 1;

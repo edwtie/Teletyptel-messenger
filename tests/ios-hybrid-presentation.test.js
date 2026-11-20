@@ -542,6 +542,15 @@ for (const engine of [chromium, webkit]) {
       await page.evaluate(() => window.emitCall({ cameraEnabled: false, remoteCamera: "off", remoteText: "Tekst van de ander" }));
       await page.waitForFunction(() => document.getElementById("hybridCallPanel").classList.contains("is-rtt-only"));
       assert.equal(await page.locator("#hybridVideoSurface").isVisible(), false);
+      assert.equal(await page.locator("#hybridCallInterpreter").isVisible(), false);
+      await page.evaluate(() => window.emitCall({ interpreter: "consent" }));
+      await page.locator("#hybridCallInterpreter").click();
+      await page.waitForFunction(() => window.nativeCommands.some(value => value.command === "calls.control" && value.arguments.action === "interpreter" && value.arguments.value === undefined));
+      await page.evaluate(() => window.emitCall({ interpreter: "connected", interpreterVideo: true, interpreterText: "Live van de tolk" }));
+      assert.equal(await page.locator("#hybridVideoSurface").isVisible(), true);
+      assert.equal(await page.locator("#hybridInterpreterText").textContent(), "Live van de tolk");
+      await page.evaluate(() => window.emitCall({ interpreter: "available", interpreterVideo: false, interpreterText: "" }));
+      assert.equal(await page.locator("#hybridInterpreterRtt").isVisible(), false);
       for (const [width, height] of [[390, 844], [844, 390], [834, 1194], [1194, 834], [390, 410]]) {
         await page.setViewportSize({ width, height });
         assert.equal(await page.locator("#hybridOwnRtt").inputValue(), "Dit is live RTT, geen chatbericht");

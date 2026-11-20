@@ -1,6 +1,7 @@
 <div id="hybridCallFailure" class="hybrid-call-failure" hidden role="alert"><span>Oproep mislukt. Probeer bewust opnieuw.</span><button id="hybridCallRetry" type="button" aria-label="Oproepmelding sluiten">Sluiten</button></div>
 <section id="hybridCallPanel" class="hybrid-call-panel" hidden role="dialog" aria-modal="true" aria-labelledby="hybridCallTitle" tabindex="-1">
   <header class="hybrid-call-header"><div><strong id="hybridCallTitle">Gesprek</strong><p id="hybridCallStatus" role="status" aria-live="polite"></p></div>
+    <button id="hybridCallInterpreter" class="icon-button" type="button" hidden aria-label="Gebarentolk" title="Gebarentolk"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="9" cy="7" r="3"/><path d="M2 21v-3a7 7 0 0 1 14 0v3m0-17a4 4 0 0 1 0 7m2 2a6 6 0 0 1 4 6v2"/></svg></button>
     <button id="hybridSwitchCamera" class="icon-button" type="button" aria-label="Camera omdraaien" title="Camera omdraaien"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 8a8 8 0 0 0-14-3L3 8m0-5v5h5m-4 8a8 8 0 0 0 14 3l3-3m0 5v-5h-5"/></svg></button>
   </header>
   <div id="hybridVideoSurface" class="hybrid-video-surface" aria-label="Native videobeeld"><span>Wachten op videobeeld…</span></div>
@@ -9,6 +10,7 @@
     <section class="hybrid-rtt-box"><strong>Ik</strong><textarea id="hybridOwnRtt" aria-label="Mijn realtime tekst" placeholder="Typ hier live" spellcheck="true"></textarea><div id="hybridOwnTranslation" class="hybrid-translation"></div></section>
   </div>
   <div id="hybridCallNotice" role="status" aria-live="polite"></div>
+  <div id="hybridInterpreterRtt" class="hybrid-rtt-box" hidden><strong>Gebarentolk</strong><div id="hybridInterpreterText" role="log" aria-label="Realtime tekst van de gebarentolk"></div></div>
   <div class="hybrid-call-controls" role="toolbar" aria-label="Gespreksbediening">
     <button id="hybridAnswerCall" class="icon-button is-on" type="button" aria-label="Oproep opnemen" title="Opnemen"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 3h4l2 5-3 2a15 15 0 0 0 6 6l2-3 5 2v4a2 2 0 0 1-2 2C10 21 3 14 3 5a2 2 0 0 1 2-2Z"/></svg></button>
     <button id="hybridCallCamera" class="icon-button" type="button" aria-label="Camera" title="Camera" aria-pressed="false"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="12" height="14" rx="2"/><path d="m15 10 6-4v12l-6-4"/></svg></button>

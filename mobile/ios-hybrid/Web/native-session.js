@@ -241,10 +241,15 @@
 
   function safeCall(value) {
     const empty = { phase: "idle", id: null, peer: null, mode: null, muted: false, cameraEnabled: false, remoteCamera: "unknown",
-      rttReady: false, canSwitchCamera: false, canSendDtmf: false, ownText: "", remoteText: "", videoFit: "contain" };
+      rttReady: false, canSwitchCamera: false, canSendDtmf: false, ownText: "", remoteText: "", videoFit: "contain",
+      interpreter: "unavailable", interpreterVideo: false, interpreterText: "" };
     if (value === undefined) return Object.freeze(empty);
     if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).some(key => !Object.hasOwn(empty, key))) throw new Error("invalidNativeReply");
     const result = { ...empty, ...value };
+    if (!["unavailable", "available", "consent", "waiting", "connected"].includes(result.interpreter)
+        || (result.phase !== "active" && result.interpreter !== "unavailable")
+        || typeof result.interpreterVideo !== "boolean" || !safeRttText(result.interpreterText)
+        || (result.interpreter !== "connected" && (result.interpreterVideo || result.interpreterText))) throw new Error("invalidNativeReply");
     if (!["idle", "calling", "ringing", "active", "failed"].includes(result.phase)
         || ["muted", "cameraEnabled", "rttReady", "canSwitchCamera", "canSendDtmf"].some(key => typeof result[key] !== "boolean")
         || !["unknown", "on", "off"].includes(result.remoteCamera) || !["contain", "cover"].includes(result.videoFit)

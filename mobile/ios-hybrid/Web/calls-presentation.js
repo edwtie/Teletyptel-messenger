@@ -44,6 +44,14 @@
       const call = value.call;
       const active = busy();
       const opening = active && panel.hidden;
+      const interpreterButton = byID("hybridCallInterpreter");
+      interpreterButton.hidden = call.interpreter === "unavailable";
+      interpreterButton.disabled = interpreterButton.hidden || pending.has("interpreter");
+      byID("hybridInterpreterRtt").hidden = !call.interpreterText;
+      if (byID("hybridInterpreterText").textContent !== call.interpreterText) {
+        byID("hybridInterpreterText").textContent = call.interpreterText;
+        byID("hybridInterpreterText").scrollTop = byID("hybridInterpreterText").scrollHeight;
+      }
       if (currentID !== call.id) {
         currentID = call.id; pendingRtt = null; dirty = false; layoutKey = ""; pending.clear();
         ownText.value = call.ownText; remoteText.textContent = ""; error("");
@@ -64,12 +72,13 @@
       const contact = value.roster.contacts.find(item => item.jid === call.peer);
       byID("hybridCallTitle").textContent = contact?.name || call.peer;
       byID("hybridRemoteRttName").textContent = contact?.name || "Ander";
-      byID("hybridCallStatus").textContent = call.phase === "ringing" ? "Inkomende oproep" : call.phase === "calling" ? "Bellen…" : "Verbonden";
+      const interpreterStatus = { consent: "Toestemming voor gebarentolk gevraagd", waiting: "Wachten op gebarentolk", connected: "Gebarentolk verbonden" };
+      byID("hybridCallStatus").textContent = interpreterStatus[call.interpreter] || (call.phase === "ringing" ? "Inkomende oproep" : call.phase === "calling" ? "Bellen…" : "Verbonden");
       const hasVideo = ["video", "total"].includes(call.mode);
       const hasRtt = ["audio-rtt", "total"].includes(call.mode);
-      const allCamerasOff = !hasVideo || (!call.cameraEnabled && call.remoteCamera === "off");
+      const allCamerasOff = !call.interpreterVideo && (!hasVideo || (!call.cameraEnabled && call.remoteCamera === "off"));
       panel.classList.toggle("is-rtt-only", hasRtt && allCamerasOff);
-      video.hidden = !hasVideo || allCamerasOff;
+      video.hidden = allCamerasOff;
       byID("hybridCallRtt").hidden = !hasRtt;
       ownText.disabled = !call.rttReady || call.phase !== "active";
       if (!dirty || call.ownText === ownText.value) { ownText.value = call.ownText; dirty = false; }
@@ -135,6 +144,7 @@
     byID("hybridCallCamera").onclick = () => { void control("camera"); };
     byID("hybridCallMute").onclick = () => { void control("mute"); };
     byID("hybridSwitchCamera").onclick = () => { void control("switchCamera"); };
+    byID("hybridCallInterpreter").onclick = () => { void control("interpreter"); };
     byID("hybridVideoFit").onclick = () => { void control("fit", state.call.videoFit === "contain" ? "cover" : "contain"); };
     byID("hybridDtmfToggle").onclick = () => {
       byID("hybridDtmf").hidden = !byID("hybridDtmf").hidden;

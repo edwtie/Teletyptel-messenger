@@ -19,7 +19,8 @@ struct TeleTypTelHybridApp: App {
                 if let url = sheet.privacy {
                     HybridPrivacyView(url: url)
                 } else if let panel = sheet.panel {
-                    if panel == "dialer" { NativeDialerView(login: owner.login, calls: owner.calls) }
+                    if panel == "interpreter" { NativeInterpreterCallView(session: owner.calls.interpreter) }
+                    else if panel == "dialer" { NativeDialerView(login: owner.login, calls: owner.calls) }
                     else if panel == "security" { NativeAccountSecurityView(login: owner.login, credentialsChanged: owner.signOutFromNative) }
                     else {
                         NativeAccountSettingsView(login: owner.login, translation: owner.features.nativeTranslation, avatars: owner.account.avatars,
@@ -59,6 +60,7 @@ final class NativeHybridOwner: ObservableObject {
     private let background = NativeBackgroundController()
     private var observation: AnyCancellable?
     private var groupObservation: AnyCancellable?
+    private var interpreterObservation: AnyCancellable?
     private var attemptedRestore = false
 
     init() {
@@ -85,6 +87,17 @@ final class NativeHybridOwner: ObservableObject {
         content = Bundle.main.url(forResource: "hybrid-content", withExtension: "json")
             .flatMap { try? Data(contentsOf: $0) }.flatMap { try? HybridContent(data: $0) }
         calls.attach(login)
+        port.presentInterpreter = { [weak self] identifier in
+            guard let self = self, self.fileSheet == nil, !self.login.isBackground else { return false }
+            let snapshot = self.session.snapshot()
+            guard snapshot.call.phase == "active", snapshot.call.id == identifier else { return false }
+            self.fileSheet = HybridFileSheet(context: HybridExtrasContext(epoch: snapshot.epoch, conversation: nil, call: snapshot.call), body: nil, panel: "interpreter")
+            return true
+        }
+        interpreterObservation = port.changes.sink { [weak self] state in
+            guard let self = self, let sheet = self.fileSheet, sheet.panel == "interpreter" else { return }
+            if state.id != sheet.context.call.id || state.interpreter == "unavailable" { self.fileSheet = nil }
+        }
         NativeMessageNotifications.shared.connect(login)
         features.presentPicker = { [weak self] context in self?.fileSheet = HybridFileSheet(context: context, body: nil) }
         features.presentFile = { [weak self] body, context in self?.fileSheet = HybridFileSheet(context: context, body: body) }
@@ -119,6 +132,7 @@ final class NativeHybridOwner: ObservableObject {
 
     func sceneChanged(_ phase: ScenePhase) {
         if phase == .background {
+            if fileSheet?.panel == "interpreter" { fileSheet = nil }
             calls.setForeground(false)
             calls.backgroundCallEnded = { [weak self] in
                 guard let self = self else { return }

@@ -133,6 +133,12 @@ final class HybridMessengerTests: XCTestCase {
         }
         XCTAssertEqual(calls.state.ownText, "Live tekst")
         XCTAssertEqual(calls.actions, ["rtt", "dtmf", "mute", "camera"])
+        let openInterpreter = ["id": identifier, "action": "interpreter"]
+        XCTAssertThrowsError(try command(session, "calls.control", openInterpreter))
+        calls.state.interpreter = "available"
+        _ = try command(session, "calls.control", openInterpreter)
+        XCTAssertEqual(calls.actions.last, "interpreter")
+        XCTAssertThrowsError(try command(session, "calls.control", ["id": identifier, "action": "interpreter", "value": "allow"]))
         XCTAssertTrue(model.chat.messages.isEmpty)
         _ = try command(session, "calls.layout", ["id": identifier, "x": "0", "y": "55", "width": "390", "height": "300", "viewportWidth": "390", "viewportHeight": "844"])
         XCTAssertEqual(calls.placement?.height, 300)

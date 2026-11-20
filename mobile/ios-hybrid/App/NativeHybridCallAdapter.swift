@@ -7,6 +7,8 @@ import WebRTC
 final class NativeHybridVideoHost: UIView {
     private let remote = RTCMTLVideoView(frame: .zero)
     private let local = RTCMTLVideoView(frame: .zero)
+    private let interpreter = RTCMTLVideoView(frame: .zero)
+    private var interpreterTrack: RTCVideoTrack?
     private var remoteTrack: RTCVideoTrack?
     private var localTrack: RTCVideoTrack?
 
@@ -20,6 +22,11 @@ final class NativeHybridVideoHost: UIView {
         local.backgroundColor = .black
         addSubview(remote)
         addSubview(local)
+        interpreter.videoContentMode = .scaleAspectFit
+        interpreter.backgroundColor = .black
+        interpreter.accessibilityLabel = "Gebarentolk"
+        interpreter.isAccessibilityElement = true
+        addSubview(interpreter)
     }
 
     @available(*, unavailable)
@@ -30,9 +37,12 @@ final class NativeHybridVideoHost: UIView {
         remote.frame = bounds
         let width = min(140, bounds.width * 0.30)
         local.frame = remoteTrack == nil ? bounds : CGRect(x: max(0, bounds.width - width - 10), y: 10, width: width, height: min(bounds.height * 0.30, width * 0.75))
+        let tileWidth = min(240, bounds.width * 0.45)
+        let tileHeight = min(bounds.height * 0.45, tileWidth)
+        interpreter.frame = remoteTrack == nil && localTrack == nil ? bounds : CGRect(x: 0, y: bounds.height - tileHeight, width: tileWidth, height: tileHeight)
     }
 
-    func update(_ presentation: NativeCallPresentation?, fit: String) {
+    func update(_ presentation: NativeCallPresentation?, fit: String, interpreterVideo: RTCVideoTrack?) {
         let remoteValue = presentation?.remoteCameraEnabled == false ? nil : presentation?.remoteVideo
         let localValue = presentation?.cameraEnabled == true ? presentation?.localVideo : nil
         if remoteTrack !== remoteValue {
@@ -44,7 +54,11 @@ final class NativeHybridVideoHost: UIView {
         remote.videoContentMode = fit == "cover" ? .scaleAspectFill : .scaleAspectFit
         local.videoContentMode = remoteValue == nil && fit == "contain" ? .scaleAspectFit : .scaleAspectFill
         local.isHidden = localValue == nil
-        isHidden = remoteValue == nil && localValue == nil
+        if interpreterTrack !== interpreterVideo {
+            interpreterTrack?.remove(interpreter); interpreterTrack = interpreterVideo; interpreterVideo?.add(interpreter)
+        }
+        interpreter.isHidden = interpreterVideo == nil
+        isHidden = remoteValue == nil && localValue == nil && interpreterVideo == nil
         setNeedsLayout()
     }
 }
@@ -61,10 +75,14 @@ final class NativeHybridCallAdapter: HybridCallPort {
     private var requestedMode = "total"
     private var fit = "contain"
     private var answering: String?
+    var presentInterpreter: ((String) -> Bool)?
 
     init(controller: NativeCallController, login: NativeLoginModel) {
         self.controller = controller
         self.login = login
+        observations.append(controller.interpreter.objectWillChange.sink { [weak self] _ in
+            Task { @MainActor [weak self] in self?.refresh() }
+        })
         observations.append(Publishers.CombineLatest4(controller.$status, controller.$presentation, controller.$isMuted, controller.$isHeld).sink { [weak self] _ in
             Task { @MainActor [weak self] in self?.refresh() }
         })
@@ -99,14 +117,23 @@ final class NativeHybridCallAdapter: HybridCallPort {
         value.ownText = controller.presentation?.ownText ?? ""
         value.remoteText = controller.presentation?.remoteText ?? ""
         value.videoFit = fit
+        if value.phase == "active", !controller.isHeld, controller.interpreter.available {
+            let session = controller.interpreter
+            value.interpreter = session.needsConsent ? "consent" : session.connected ? "connected" : session.room != nil ? "waiting" : "available"
+            if value.interpreter == "connected" {
+                value.interpreterVideo = controller.interpreterMedia?.remoteVideo != nil
+                if HybridRequest.text(session.remoteText, maximumBytes: 131072) { value.interpreterText = session.remoteText }
+            }
+        }
         if value.phase != "ringing" { answering = nil }
         return value
     }
 
     func refresh() {
         let current = state
-        videoView.update(["active", "calling"].contains(current.phase) ? controller.presentation : nil, fit: fit)
-        subject.send(current)
+        videoView.update(["active", "calling"].contains(current.phase) ? controller.presentation : nil, fit: fit,
+                         interpreterVideo: current.interpreterVideo ? controller.interpreterMedia?.remoteVideo : nil)
+        if subject.value != current { subject.send(current) }
     }
 
     func canCall(peer: String) -> Bool {
@@ -128,6 +155,9 @@ final class NativeHybridCallAdapter: HybridCallPort {
         let current = state
         guard current.id == id else { throw HybridFailure.invalidState }
         switch action {
+        case "interpreter":
+            guard current.phase == "active", current.interpreter != "unavailable",
+                  presentInterpreter?(id) == true else { throw HybridFailure.invalidState }
         case "end": controller.endFromHybrid()
         case "answer":
             guard current.phase == "ringing", answering != id else { throw HybridFailure.invalidState }

@@ -77,7 +77,9 @@ De workflow compileert de library en de afzonderlijk geassembleerde app voor de 
 
 ## Nog aansluiten
 
-1. Groepsoproepen verbinden; de resterende webschermen en native instellingen visueel vergelijken. Historische berichtvensters hebben bewust geen verzend-, wijzigings- of doorstuurmenu.
+1. Algemene MUC-groepsoproepen verbinden; de resterende webschermen en native instellingen visueel vergelijken. Historische berichtvensters hebben bewust geen verzend-, wijzigings- of doorstuurmenu.
+
+**Gebarentolk tijdens een actief gesprek:** de knop in de hybride gesprekskop opent het bestaande native toestemmingsscherm. Openen is geen toestemming. De eigen TeleTypTel-tolksessie beheert deelname en media; er gaat geen oproep naar Tolkcontact. De tolk heeft een apart videobeeld en een eigen RTT-vak zodra tekst binnenkomt. Met beide andere camera’s uit blijft beschikbaar tolkbeeld zichtbaar. Dit is geen algemene MUC-conferentie. Voor een praktijkproef zijn drie toegestemde deelnemers en echte toestellen nodig.
 2. Ondertekende toestelevaluatie van chat, native video, audio, RTT, toetsenbord en CallKit-opnemen/beëindigen uitvoeren.
 3. Achtergrondherstel en APNs met een echt geregistreerd toestel afzonderlijk activeren en testen; de CI-assemblage activeert geen push.
 4. Volledige webgelijkheid, schermlezerbediening en de resterende navigatieschermen beoordelen voordat de bestaande TestFlight-app wordt vervangen.

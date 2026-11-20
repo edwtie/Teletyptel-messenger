@@ -440,6 +440,14 @@
   margin: 2px 0;
 }
 
+#hybridInterpreterText {
+  flex: 0 1 auto;
+  max-height: min(14vh, 5em);
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .hybrid-video-surface {
   flex: 1;
   min-height: 0;

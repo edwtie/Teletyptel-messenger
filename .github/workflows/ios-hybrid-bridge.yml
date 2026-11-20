@@ -67,7 +67,7 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           swift test --package-path mobile/ios-native --scratch-path "$RUNNER_TEMP/teletyptel-native-feature-tests" \
-            --filter 'NativeGroupModelTests|NativeGroupManagementTests|NativeAccountFeaturesTests|NativeServicesTests|NativeSavedLoginTests|NativeContactTests|NativeFeatureCompletionTests|NativeCloudMergeTests|NativeCloudSyncTests|NativeCloudHistoryTests|NativePresentationTests'
+            --filter 'NativeGroupModelTests|NativeGroupManagementTests|NativeAccountFeaturesTests|NativeServicesTests|NativeSavedLoginTests|NativeContactTests|NativeFeatureCompletionTests|NativeCloudMergeTests|NativeCloudSyncTests|NativeCloudHistoryTests|NativePresentationTests|NativeInterpreterTests'
       - name: Assemble the isolated hybrid app with the existing native engine
         if: ${{ !cancelled() }}
         run: node scripts/ios-hybrid/prepare-app.js

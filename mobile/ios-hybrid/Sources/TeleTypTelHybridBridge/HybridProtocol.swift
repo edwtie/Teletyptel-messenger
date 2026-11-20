@@ -174,7 +174,7 @@ struct HybridRequest: Decodable, CustomStringConvertible, CustomDebugStringConve
             guard Set(arguments.keys).isSubset(of: Set(["id", "action", "value"])),
                   arguments["id"] != nil, arguments["action"] != nil,
                   UUID(uuidString: arguments["id"] ?? "") != nil,
-                  let action = arguments["action"], ["answer", "end", "mute", "camera", "switchCamera", "rtt", "dtmf", "fit"].contains(action) else { throw HybridFailure.invalidRequest }
+                  let action = arguments["action"], ["answer", "end", "mute", "camera", "switchCamera", "rtt", "dtmf", "fit", "interpreter"].contains(action) else { throw HybridFailure.invalidRequest }
             if action == "rtt" {
                 guard let value = arguments["value"], Self.text(value, maximumBytes: 131072), value.unicodeScalars.count <= 32768 else { throw HybridFailure.invalidRequest }
             }

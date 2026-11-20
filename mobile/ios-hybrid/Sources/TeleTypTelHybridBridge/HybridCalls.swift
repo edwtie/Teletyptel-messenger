@@ -15,6 +15,9 @@ public struct HybridCallState: Codable, Equatable {
     public var ownText = ""
     public var remoteText = ""
     public var videoFit = "contain"
+    public var interpreter = "unavailable"
+    public var interpreterVideo = false
+    public var interpreterText = ""
 
     public init() {}
 }

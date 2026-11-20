@@ -225,6 +225,10 @@ public final class HybridSession {
                   calls.state.id == request.arguments["id"] else { throw HybridFailure.invalidState }
             model.visibleConversation = nil
             if request.command == "calls.layout" { try calls.placeVideo(id: request.arguments["id"]!, placement: HybridVideoPlacement(arguments: request.arguments)) }
+            else if request.arguments["action"] == "interpreter" {
+                guard calls.state.phase == "active", calls.state.interpreter != "unavailable" else { throw HybridFailure.unavailable }
+                try calls.control(id: request.arguments["id"]!, action: "interpreter", value: nil)
+            }
             else { try calls.control(id: request.arguments["id"]!, action: request.arguments["action"]!, value: request.arguments["value"]) }
         case "calls.reset":
             guard model.isConnected, !model.isBackground, let calls = calls, calls.state.phase == "failed" else { throw HybridFailure.invalidState }
