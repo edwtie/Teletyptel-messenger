@@ -81,6 +81,27 @@ final class NativeColdCallContextTests: XCTestCase {
         XCTAssertFalse(model.consented)
     }
 
+    func testForegroundLoginReattachesRestoredRegistrationWithoutRevokingIt() async throws {
+        struct ReadyRegistry: NativePushRegistryServing {
+            func backgroundAnswerReady() async throws -> Bool { true }
+            func register(deviceID: UUID, token: Data, consented: Bool) async throws -> NativePushRegistration {
+                XCTFail("No new token was supplied")
+                throw NativePushRegistryFailure.rejected
+            }
+            func revoke(deviceID: UUID) async throws { XCTFail("The account did not change") }
+        }
+        let store = ColdPushStore(), driver = ColdPushDriver(), saved = record()
+        store.value = saved
+        let model = NativePushRegistrationModel(enabled: true, store: store, driver: driver, now: { 100 })
+        XCTAssertNotNil(model.restoreColdRegistration())
+        await model.connect(ReadyRegistry(), scope: saved.scope)
+        model.setForeground(false)
+        XCTAssertEqual(model.coldCallContext()?.registration.deviceID, saved.deviceID)
+        XCTAssertTrue(model.consented)
+        XCTAssertEqual(store.value?.pendingRevocation, false)
+        XCTAssertEqual(driver.registrations, 0)
+    }
+
     func testClientRejectsOtherDeviceBeforeAnyNetworkRequest() async throws {
         let context = try NativeColdCallContext.restore(record(), now: 100)
         let client = NativeCallRecoveryClient(context: context, now: { 100 })

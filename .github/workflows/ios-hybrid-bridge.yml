@@ -93,7 +93,7 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           swift test --package-path mobile/ios-native --scratch-path "$RUNNER_TEMP/teletyptel-native-feature-tests" \
-            --filter 'NativeLoginModelTests|NativeMUCTests|NativeTwoFactorHTTPTests|NativeGroupModelTests|NativeGroupManagementTests|NativeAccountFeaturesTests|NativeServicesTests|NativeSavedLoginTests|NativeContactTests|NativeFeatureCompletionTests|NativeCloudMergeTests|NativeCloudSyncTests|NativeCloudHistoryTests|NativePresentationTests|NativeInterpreterTests'
+            --filter 'NativeLoginModelTests|NativeMUCTests|NativeTwoFactorHTTPTests|NativeGroupModelTests|NativeGroupManagementTests|NativeAccountFeaturesTests|NativeServicesTests|NativeSavedLoginTests|NativeContactTests|NativeFeatureCompletionTests|NativeCloudMergeTests|NativeCloudSyncTests|NativeCloudHistoryTests|NativePresentationTests|NativeInterpreterTests|NativeColdCallContextTests|NativePushRegistrationModelTests'
   simulator:
     runs-on: xcode-27
     timeout-minutes: 40

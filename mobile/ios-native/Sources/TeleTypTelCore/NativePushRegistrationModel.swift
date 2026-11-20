@@ -95,7 +95,7 @@ final class NativePushRegistrationModel: ObservableObject {
     func connect(_ client: (any NativePushRegistryServing)?, scope: NativePushScope?) async {
         guard enabled, let client = client, let scope = scope else { return }
         guard self.scope != scope || self.client == nil || !available else { flushToken(); return }
-        if self.scope != nil { logout() }
+        if let previous = self.scope, previous != scope { logout() }
         epoch = UUID()
         var attempt = epoch
         self.scope = scope; self.client = client
@@ -116,6 +116,11 @@ final class NativePushRegistrationModel: ObservableObject {
             guard epoch == attempt else { return }
             available = ready
             guard ready else { notice = "De server ondersteunt veilig oproepherstel op de achtergrond nog niet."; return }
+            if coldCallContext() != nil {
+                notice = "Oproepregistratie bevestigd."
+                startRenewal()
+                return
+            }
             notice = "Oproepmeldingen staan uit. Inschakelen vraagt eerst jouw toestemming."
             if record?.consented == true { await enable(consented: true) }
         } catch {

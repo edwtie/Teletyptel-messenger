@@ -64,6 +64,7 @@ final class NativeHybridOwner: ObservableObject {
     @Published var fileSheet: HybridFileSheet? { didSet { if fileSheet != nil { account.setPresentation(true) } } }
     private let background = NativeBackgroundController()
     private var observation: AnyCancellable?
+    private var connectedPushScope: NativePushScope?
     private var groupObservation: AnyCancellable?
     private var interpreterObservation: AnyCancellable?
     private var attemptedRestore = false
@@ -141,6 +142,13 @@ final class NativeHybridOwner: ObservableObject {
                 self.callPort.refresh()
                 NativeMessageNotifications.shared.updateBadge()
                 if !self.login.isConnected && !self.login.isWorking { NativeMessageNotifications.shared.clear() }
+                let scope = self.login.activeWebSession.flatMap { session in
+                    self.login.activeAccountID.map { NativePushScope(origin: session.configuration.origin.absoluteString, accountID: $0) }
+                }
+                if self.connectedPushScope != scope {
+                    self.connectedPushScope = scope
+                    if scope != nil { await self.calls.synchronizePush() }
+                }
             }
         }
         groupObservation = login.groups.objectWillChange.sink { [weak self] _ in Task { @MainActor in

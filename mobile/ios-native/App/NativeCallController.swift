@@ -209,8 +209,7 @@ final class NativeCallController: ObservableObject, NativePushRegistering {
             if let lease = warmLease, hasLiveCall, login?.permitsWarmCall(lease) == true { return }
             if login?.isReconnecting == true {
                 resetCall()
-                account = nil
-                runtime?.logout()
+                if !pushRegistration.consented { account = nil; runtime?.logout() }
             }
             break
         case .suspended:
