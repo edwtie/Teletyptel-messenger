@@ -189,6 +189,11 @@
       byID("hybridHistoryStatus").textContent = conversation.history === "loading" ? "Geschiedenis laden…" : conversation.history === "failed" ? "Geschiedenis kon niet worden geladen." : "";
       const contact = value.roster.contacts.find(item => item.jid === peer);
       for (const name of ["hybridStartTotal", "hybridStartAudio", "hybridStartVideo"]) byID(name).disabled = kind !== "direct" || !value.callsAvailable || !contact?.canCall;
+      if (kind === "group") {
+        const group = value.groups.find(item => item.room === peer);
+        byID("hybridStartTotal").disabled = !conversation.canSend || !group?.joined || group.participants.length > 4;
+      }
+      byID("hybridStartTotal").setAttribute("aria-label", kind === "group" ? "Groepsoproep openen" : "Totale conversatie starten");
       renderMessages(conversation);
       if (!value.account.presentation && !value.account.busy) scheduleDisplayed();
     }

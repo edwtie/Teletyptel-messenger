@@ -358,6 +358,7 @@
       disableTranslation: () => request("translation.disable"),
       translationSettings: settings => request("translation.settings", Object.fromEntries(Object.entries(settings).map(([key, value]) => [key, String(value)]))),
       startCall: (peer, mode, epoch) => request("calls.start", { peer, mode }, epoch),
+      startGroupCall: (room, epoch) => request("groups.call", { room }, epoch),
       resetCallFailure: () => request("calls.reset"),
       controlCall: (id, action, value) => action === "rtt" && !safeRttText(value) ? Promise.reject(new Error("invalidRequest"))
         : request("calls.control", { id, action, ...(value === undefined ? {} : { value }) }),

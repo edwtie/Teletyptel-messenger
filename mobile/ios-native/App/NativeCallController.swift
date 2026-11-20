@@ -72,7 +72,7 @@ final class NativeCallController: ObservableObject, NativePushRegistering {
     let interpreter = NativeInterpreterSession()
     @Published private(set) var interpreterMedia: NativeInterpreterMedia?
     private static let initializeWebRTC = RTCInitializeSSL()
-    private var factory: RTCPeerConnectionFactory?
+    private(set) var factory: RTCPeerConnectionFactory?
     private var capture: NativeMediaCapture?
     private var router: NativePeerRouter?
     private var runtime: NativeCallRuntime?

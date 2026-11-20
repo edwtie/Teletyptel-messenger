@@ -19,6 +19,7 @@ public final class HybridSession {
     let administration: HybridGroupAdministration
     var selectedPeer: String?
     var selectedKind = "direct"
+    public var presentRoomCall: ((String) -> Bool)?
     private var accountEpoch = UUID()
     private var requestIDs: [UUID] = []
     private var sequence = 0
@@ -105,7 +106,7 @@ public final class HybridSession {
         case "account.refresh", "account.save", "account.avatar", "account.panel", "contacts.add", "contacts.respond", "contacts.rename", "contacts.block", "contacts.remove", "contacts.dnd":
             guard let account = account, model.isConnected, !model.isBackground, !callBusy else { throw HybridFailure.invalidState }
             try account.command(request.command, arguments: request.arguments)
-        case "groups.join", "groups.leave", "groups.subject", "groups.invite", "groups.role", "groups.configuration", "groups.configure", "groups.members", "groups.affiliation":
+        case "groups.call", "groups.join", "groups.leave", "groups.subject", "groups.invite", "groups.role", "groups.configuration", "groups.configure", "groups.members", "groups.affiliation":
             try groupCommand(request)
         case "files.pick", "files.open", "translation.settings", "translation.message", "translation.disable":
             guard let extras = extras, let context = extrasContext() else { throw HybridFailure.unavailable }

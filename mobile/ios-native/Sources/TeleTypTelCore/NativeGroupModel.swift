@@ -27,6 +27,11 @@ public final class NativeGroupModel: ObservableObject {
     @Published public private(set) var error: String?
     @Published public private(set) var available = false
     private var sender: (any NativeGroupSending)?
+    public var onRoomCall: ((String, String, NativeRoomCallSignal) -> Void)?
+    public func sendRoomCall(room: String, nick: String, signal: NativeRoomCallSignal) async throws {
+        guard available, let transport = sender as? any NativeRoomCallSending else { throw NativeGroupFailure.disconnected }
+        try await transport.sendRoomCall(room: room, nick: nick, signal: signal)
+    }
     private var owner: String?
     private var generation = UUID()
     private var joins: [String: Task<Void, Never>] = [:]
@@ -397,6 +402,7 @@ public final class NativeGroupModel: ObservableObject {
             if let before = before, before != rooms[index].messages { acceptedHistoryChange?(before, rooms[index].messages) }
         }
         switch event {
+        case .callSignal(let nick, let signal): onRoomCall?(room, nick, signal); return
         case .corrected(let target, let nickname, let occupant, let body, let request):
             let matches = rooms[index].messages.indices.filter {
                 let message = rooms[index].messages[$0]

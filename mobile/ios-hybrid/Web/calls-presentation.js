@@ -126,13 +126,15 @@
 
     async function start(mode) {
       const peer = state?.conversation?.peer;
+      const group = state?.conversation?.kind === "group";
       const epoch = state?.epoch;
       if (!peer || busy() || pending.has("start")) return;
       pending.add("start");
       byID("hybridStartMenu").open = false;
       try {
         await document.defaultView.TeleTypTelHybridChat?.flush();
-        await client.startCall(peer, mode, epoch);
+        if (group && mode === "total") await client.startGroupCall(peer, epoch);
+        else if (!group) await client.startCall(peer, mode, epoch);
       } catch { byID("hybridChatNotice").textContent = "Oproep niet gestart. Controleer de verbinding en gespreksrechten."; }
       finally { pending.delete("start"); }
     }

@@ -80,6 +80,14 @@ jobs:
             -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath "$RUNNER_TEMP/teletyptel-hybrid-app" \
             ARCHS="$(uname -m)" ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO build
+      - name: Exercise simultaneous three-member group media without devices or external services
+        if: ${{ !cancelled() && steps.app-build.outcome == 'success' }}
+        run: |
+          FRAMEWORK=$(node -e 'process.stdout.write(require("./scripts/ios-testflight/native-webrtc-test").findFramework(process.argv[1]))' "$RUNNER_TEMP/teletyptel-hybrid-app/SourcePackages/artifacts")
+          xcrun swiftc -swift-version 5 -F "$FRAMEWORK" -framework WebRTC -Xlinker -rpath -Xlinker "$FRAMEWORK" \
+            mobile/ios-native/Sources/TeleTypTelCore/*.swift mobile/ios-native/App/NativeInterpreterMedia.swift \
+            mobile/ios-hybrid/MediaTests/RoomMeshLoopback.swift -o "$RUNNER_TEMP/room-mesh-loopback"
+          "$RUNNER_TEMP/room-mesh-loopback"
       - name: Smoke-test the assembled app on iPhone and iPad simulators
         if: ${{ !cancelled() && steps.app-build.outcome == 'success' }}
         run: |

@@ -15,11 +15,13 @@ struct TeleTypTelHybridApp: App {
                     HybridLoginView(session: owner.session, content: content, videoView: owner.callPort.videoView)
                 } else { Text("De lokale TeleTypTel-interface kon niet worden geladen.") }
             }
+            .safeAreaInset(edge: .top) { HybridRoomInvitation(call: owner.roomCall, open: { _ = owner.openRoomCall($0) }) }
             .sheet(item: $owner.fileSheet, onDismiss: { owner.account.setPresentation(owner.fileSheet != nil) }) { sheet in
                 if let url = sheet.privacy {
                     HybridPrivacyView(url: url)
                 } else if let panel = sheet.panel {
                     if panel == "interpreter" { NativeInterpreterCallView(session: owner.calls.interpreter) }
+                    else if panel == "room-call" { HybridRoomCallView(call: owner.roomCall) }
                     else if panel == "dialer" { NativeDialerView(login: owner.login, calls: owner.calls) }
                     else if panel == "security" { NativeAccountSecurityView(login: owner.login, credentialsChanged: owner.signOutFromNative) }
                     else {
@@ -50,6 +52,7 @@ struct TeleTypTelHybridApp: App {
 final class NativeHybridOwner: ObservableObject {
     let login: NativeLoginModel
     let calls: NativeCallController
+    let roomCall: HybridRoomCall
     let callPort: NativeHybridCallAdapter
     let session: HybridSession
     let content: HybridContent?
@@ -68,6 +71,7 @@ final class NativeHybridOwner: ObservableObject {
         let calls = NativeCallController.shared
         self.login = login
         self.calls = calls
+        roomCall = HybridRoomCall(login: login, controller: calls)
         let port = NativeHybridCallAdapter(controller: calls, login: login)
         callPort = port
         let features = NativeHybridExtrasAdapter(login: login)
@@ -87,6 +91,10 @@ final class NativeHybridOwner: ObservableObject {
         content = Bundle.main.url(forResource: "hybrid-content", withExtension: "json")
             .flatMap { try? Data(contentsOf: $0) }.flatMap { try? HybridContent(data: $0) }
         calls.attach(login)
+        session.presentRoomCall = { [weak self] in self?.openRoomCall($0) == true }
+        login.groups.onRoomCall = { [weak self] room, nick, signal in
+            self?.roomCall.receive(room: room, nick: nick, signal: signal)
+        }
         port.presentInterpreter = { [weak self] identifier in
             guard let self = self, self.fileSheet == nil, !self.login.isBackground else { return false }
             let snapshot = self.session.snapshot()
@@ -95,6 +103,7 @@ final class NativeHybridOwner: ObservableObject {
             return true
         }
         interpreterObservation = port.changes.sink { [weak self] state in
+            self?.checkRoomCall()
             guard let self = self, let sheet = self.fileSheet, sheet.panel == "interpreter" else { return }
             if state.id != sheet.context.call.id || state.interpreter == "unavailable" { self.fileSheet = nil }
         }
@@ -122,16 +131,33 @@ final class NativeHybridOwner: ObservableObject {
             Task { @MainActor [weak self] in
                 guard let self = self else { return }
                 self.calls.synchronize(self.login.phase)
+                self.checkRoomCall()
                 self.callPort.refresh()
                 NativeMessageNotifications.shared.updateBadge()
                 if !self.login.isConnected && !self.login.isWorking { NativeMessageNotifications.shared.clear() }
             }
         }
-        groupObservation = login.groups.objectWillChange.sink { _ in Task { @MainActor in NativeMessageNotifications.shared.updateBadge() } }
+        groupObservation = login.groups.objectWillChange.sink { [weak self] _ in Task { @MainActor in
+            self?.checkRoomCall(); NativeMessageNotifications.shared.updateBadge()
+        } }
+    }
+
+    func openRoomCall(_ room: String) -> Bool {
+        guard fileSheet == nil, roomCall.open(room) else { return false }
+        let snapshot = session.snapshot()
+        fileSheet = HybridFileSheet(context: HybridExtrasContext(epoch: snapshot.epoch, conversation: nil, call: snapshot.call), body: nil, panel: "room-call")
+        return true
+    }
+
+    private func checkRoomCall() {
+        roomCall.reconcile()
+        if fileSheet?.panel == "room-call", roomCall.room == nil { fileSheet = nil }
     }
 
     func sceneChanged(_ phase: ScenePhase) {
         if phase == .background {
+            roomCall.dismissInvite()
+            if fileSheet?.panel == "room-call" { roomCall.stop(); fileSheet = nil }
             if fileSheet?.panel == "interpreter" { fileSheet = nil }
             calls.setForeground(false)
             calls.backgroundCallEnded = { [weak self] in

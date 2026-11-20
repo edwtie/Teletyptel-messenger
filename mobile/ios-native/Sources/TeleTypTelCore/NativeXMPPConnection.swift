@@ -150,7 +150,7 @@ private final class NativeSessionClosure {
     }
 }
 
-private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, NativeArchiveSending, NativeGroupManaging, NativeMessageChanging, NativeGroupMessageChanging, NativeGroupCorrecting, NativeGroupReacting, NativeChatInteracting, NativeCallRecoverySending, NativeContactManaging, @unchecked Sendable {
+private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, NativeArchiveSending, NativeGroupManaging, NativeMessageChanging, NativeGroupMessageChanging, NativeGroupCorrecting, NativeGroupReacting, NativeRoomCallSending, NativeChatInteracting, NativeCallRecoverySending, NativeContactManaging, @unchecked Sendable {
     private let configuration: ServerConfiguration
     private let ownerJID: String
     private var boundJID: String?
@@ -498,6 +498,17 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             queue.async {
                 guard let snapshot = self.groups[room]?.stream.snapshot, snapshot.canSpeak, snapshot.lastOwnLiveID == target else {
+                    continuation.resume(throwing: NativeGroupFailure.denied); return
+                }
+                self.enqueueMessage(frame, continuation: continuation)
+            }
+        }
+    }
+
+    func sendRoomCall(room: String, nick: String, signal: NativeRoomCallSignal) async throws {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            queue.async {
+                guard let frame = try? self.groups[room]?.stream.callFrame(nick: nick, signal: signal) else {
                     continuation.resume(throwing: NativeGroupFailure.denied); return
                 }
                 self.enqueueMessage(frame, continuation: continuation)

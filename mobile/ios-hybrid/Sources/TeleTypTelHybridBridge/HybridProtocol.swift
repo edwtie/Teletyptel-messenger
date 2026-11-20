@@ -107,8 +107,8 @@ struct HybridRequest: Decodable, CustomStringConvertible, CustomDebugStringConve
             guard Set(arguments.keys) == required, Self.peer(arguments["room"]),
                   (command == "groups.members" ? ["member", "admin", "outcast"] : ["none", "member", "admin", "outcast"]).contains(arguments["affiliation"] ?? "") else { throw HybridFailure.invalidRequest }
             if command == "groups.affiliation", (!Self.peer(arguments["peer"]) || arguments["confirmed"] != "true") { throw HybridFailure.invalidRequest }
-        case "groups.leave", "groups.subject", "groups.invite", "groups.role":
-            let required = command == "groups.leave" ? Set(["room"]) : command == "groups.subject" ? Set(["room", "subject"])
+        case "groups.call", "groups.leave", "groups.subject", "groups.invite", "groups.role":
+            let required = ["groups.call", "groups.leave"].contains(command) ? Set(["room"]) : command == "groups.subject" ? Set(["room", "subject"])
                 : command == "groups.invite" ? Set(["room", "peer"]) : Set(["room", "nickname", "role"])
             guard Set(arguments.keys) == required, Self.peer(arguments["room"]) else { throw HybridFailure.invalidRequest }
             if command == "groups.subject" { guard let text = arguments["subject"], Self.text(text), text.utf8.count <= 512 else { throw HybridFailure.invalidRequest } }

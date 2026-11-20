@@ -50,6 +50,9 @@ extension HybridSession {
             try administration.command(request.command, room: room, arguments: request.arguments); return
         }
         switch request.command {
+        case "groups.call":
+            guard let snapshot = group.snapshot, snapshot.canSpeak, snapshot.participants.count <= 4,
+                  presentRoomCall?(room) == true else { throw HybridFailure.invalidState }
         case "groups.leave": model.groups.leave(room: room)
         case "groups.subject":
             guard group.snapshot?.canSpeak == true else { throw HybridFailure.invalidState }

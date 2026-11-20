@@ -61,6 +61,11 @@ final class HybridFeatureTests: XCTestCase {
         let room = "familie@conference.localhost"
         _ = try command(session, "groups.join", ["room": room, "nickname": "Fixture", "create": "false"])
         await eventually { session.snapshot().groups.first?.joined == true && login.groups.invitationModel.available }
+        var presented: [String] = []
+        session.presentRoomCall = { presented.append($0); return true }
+        _ = try command(session, "groups.call", ["room": room])
+        XCTAssertEqual(presented, [room])
+        XCTAssertThrowsError(try command(session, "groups.call", ["room": "other@conference.localhost"]))
         _ = try command(session, "groups.subject", ["room": room, "subject": "Nieuw onderwerp"])
         await eventually { session.snapshot().groups.first?.subject == "Nieuw onderwerp" }
         _ = try command(session, "groups.invite", ["room": room, "peer": "peer@localhost"])
@@ -69,6 +74,7 @@ final class HybridFeatureTests: XCTestCase {
         await eventually { await fixture.groupRoles == ["Peer:visitor"] }
         XCTAssertThrowsError(try command(session, "groups.role", ["room": room, "nickname": "Unknown", "role": "moderator"]))
         _ = try command(session, "groups.leave", ["room": room])
+        XCTAssertThrowsError(try command(session, "groups.call", ["room": room]))
         XCTAssertFalse(session.snapshot().conversation!.canSend)
         XCTAssertThrowsError(try command(session, "chat.send", ["peer": room, "kind": "group", "body": "Niet meer deelnemen"]))
     }
