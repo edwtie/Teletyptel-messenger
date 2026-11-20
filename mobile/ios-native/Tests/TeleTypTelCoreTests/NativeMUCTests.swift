@@ -4,6 +4,29 @@ import XCTest
 final class NativeMUCTests: XCTestCase {
     private let room = "room@conference.localhost"
 
+    func testPrivateRoomCallSignalsCannotBecomeMessagesOrReachUnknownMembers() throws {
+        var stream = try joined()
+        _ = stream.receive(try ProbeXML.parse(presence(nickname: "Third", codes: [])))
+        let signal = NativeRoomCallSignal(.ready, source: UUID(), target: UUID())
+        for nick in ["Peer", "Third"] {
+            let frame = try stream.callFrame(nick: nick, signal: signal)
+            let incoming = frame.replacingOccurrences(of: "to='\(room)/\(nick)'", with: "from='\(room)/\(nick)'")
+            let events = stream.receive(try ProbeXML.parse(incoming)).events
+            guard events.count == 1, case .callSignal(let sender, let value) = events[0] else { return XCTFail("Missing private signal") }
+            XCTAssertEqual(sender, nick); XCTAssertEqual(value, signal)
+            for invalid in [incoming.replacingOccurrences(of: "type='chat'", with: "type='groupchat'"),
+                            incoming.replacingOccurrences(of: "/\(nick)'", with: "/Unknown'"),
+                            incoming.replacingOccurrences(of: "</message>", with: "<delay xmlns='urn:xmpp:delay'/></message>")] {
+                XCTAssertTrue(stream.receive(try ProbeXML.parse(invalid)).events.isEmpty)
+            }
+        }
+        XCTAssertThrowsError(try stream.callFrame(nick: "Unknown", signal: signal))
+        XCTAssertThrowsError(try stream.callFrame(nick: "Peer", signal: .init(.answer, source: UUID(), sdp: "v=0")))
+        _ = stream.receive(try ProbeXML.parse(presence(nickname: "Peer", role: "none", codes: [], type: "type='unavailable'")))
+        XCTAssertThrowsError(try stream.callFrame(nick: "Peer", signal: signal))
+        XCTAssertNoThrow(try stream.callFrame(nick: "Third", signal: signal))
+    }
+
     func testReactionsRequireAdvertisedRoomIDsStableOccupantAndJoinedSender() throws {
         var stream = try stream()
         let discovery = info(stream).replacingOccurrences(of: "</query>", with: "<feature var='urn:xmpp:occupant-id:0'/><feature var='urn:xmpp:sid:0'/></query>")
@@ -41,6 +64,28 @@ final class NativeMUCTests: XCTestCase {
         var legacy = try joined()
         XCTAssertTrue(legacy.receive(try ProbeXML.parse(retract)).events.isEmpty)
     }
+    func testCorrectionRequiresLastLiveMessageBySameOccupantSinceJoining() throws {
+        var stream = try stream()
+        let disco = info(stream).replacingOccurrences(of: "</query>", with: "<feature var='urn:xmpp:occupant-id:0'/></query>")
+        _ = stream.receive(try ProbeXML.parse(disco))
+        _ = stream.receive(try ProbeXML.parse(presence(nickname: "Peer", codes: [])))
+        _ = stream.receive(try ProbeXML.parse(presence()))
+        let original = "<message xmlns='jabber:client' from='\(room)/Peer' type='groupchat' id='first'><body>Hoi</body><occupant-id xmlns='urn:xmpp:occupant-id:0' id='author'/></message>"
+        let edit = original.replacingOccurrences(of: "</body>", with: " daar</body><replace xmlns='urn:xmpp:message-correct:0' id='first'/>")
+            .replacingOccurrences(of: "type='groupchat' id='first'", with: "type='groupchat' id='second'")
+        XCTAssertTrue(stream.receive(try ProbeXML.parse(edit)).events.isEmpty)
+        _ = stream.receive(try ProbeXML.parse(original))
+        XCTAssertTrue(stream.receive(try ProbeXML.parse(edit.replacingOccurrences(of: "'author'", with: "'someone'"))).events.isEmpty)
+        guard case .corrected("first", "Peer", "author", "Hoi daar", "second") = stream.receive(try ProbeXML.parse(edit)).events.first else {
+            return XCTFail("Expected a correction, not a second chat message")
+        }
+        _ = stream.receive(try ProbeXML.parse(original.replacingOccurrences(of: "'first'", with: "'newer'")))
+        XCTAssertTrue(stream.receive(try ProbeXML.parse(edit)).events.isEmpty)
+        _ = stream.receive(try ProbeXML.parse(presence(nickname: "Peer", codes: [], type: "type='unavailable'")))
+        _ = stream.receive(try ProbeXML.parse(presence(nickname: "Peer", codes: [])))
+        XCTAssertTrue(stream.receive(try ProbeXML.parse(edit.replacingOccurrences(of: "id='first'", with: "id='newer'"))).events.isEmpty)
+    }
+
     private func stream() throws -> NativeMUCStream { try NativeMUCStream(room: room, nickname: "Me", boundJID: "owner@localhost/phone") }
     private func info(_ stream: NativeMUCStream) -> String {
         "<iq xmlns='jabber:client' from='\(room)' id='\(stream.identifier)' type='result'><query xmlns='http://jabber.org/protocol/disco#info'><feature var='http://jabber.org/protocol/muc'/></query></iq>"

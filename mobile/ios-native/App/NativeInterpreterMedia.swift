@@ -28,6 +28,7 @@ final class NativeInterpreterMedia: ObservableObject, NativeInterpreterMediaDriv
     private(set) var remoteText = ""
     private let factory: RTCPeerConnectionFactory
     private let tracks: () -> (RTCAudioTrack, RTCVideoTrack?)?
+    private let roomMesh: Bool
     private var peer: RTCPeerConnection?
     private var channel: RTCDataChannel?
     private var events: NativeInterpreterEvents?
@@ -44,8 +45,8 @@ final class NativeInterpreterMedia: ObservableObject, NativeInterpreterMediaDriv
     private(set) var failed = false
     var connected: Bool { peer?.connectionState == .connected && channel?.readyState == .open && !failed }
 
-    init(factory: RTCPeerConnectionFactory, tracks: @escaping () -> (RTCAudioTrack, RTCVideoTrack?)?) {
-        self.factory = factory; self.tracks = tracks
+    init(factory: RTCPeerConnectionFactory, roomMesh: Bool = false, tracks: @escaping () -> (RTCAudioTrack, RTCVideoTrack?)?) {
+        self.factory = factory; self.roomMesh = roomMesh; self.tracks = tracks
     }
     func start(offerer: Bool, rtc: NativeInterpreterRTC,
                send: @escaping (NativeInterpreterPayload) async throws -> Void, changed: @escaping () -> Void) async throws {
@@ -64,7 +65,8 @@ final class NativeInterpreterMedia: ObservableObject, NativeInterpreterMediaDriv
         events.changed = { [weak self] in Task { @MainActor in
             guard let self = self, self.generation == attempt else { return }
             self.failed = self.peer?.connectionState == .failed || self.peer?.connectionState == .closed || self.channel?.readyState == .closed
-            self.remoteVideo = self.peer?.transceivers.compactMap { $0.receiver.track as? RTCVideoTrack }.first
+            let track = self.peer?.transceivers.compactMap { $0.receiver.track as? RTCVideoTrack }.first
+            if self.remoteVideo?.trackId != track?.trackId { self.remoteVideo = track }
             self.flushText(); self.changed?()
         } }
         events.opened = { [weak self] channel in Task { @MainActor in
@@ -78,7 +80,12 @@ final class NativeInterpreterMedia: ObservableObject, NativeInterpreterMediaDriv
         } }
         guard peer.add(tracks.0, streamIds: ["interpreter"]) != nil else { stop(); throw NativeInterpreterFailure.media }
         if let camera = tracks.1 {
-            guard peer.add(camera, streamIds: ["interpreter"]) != nil else { stop(); throw NativeInterpreterFailure.media }
+            guard let sender = peer.add(camera, streamIds: ["interpreter"]) else { stop(); throw NativeInterpreterFailure.media }
+            if roomMesh {
+                let codecs = factory.rtpSenderCapabilities(forKind: "video").codecs.filter { $0.name.uppercased() == "VP8" }
+                guard !codecs.isEmpty, let transceiver = peer.transceivers.first(where: { $0.sender.senderId == sender.senderId }) else { stop(); throw NativeInterpreterFailure.media }
+                try transceiver.setCodecPreferences(codecs)
+            }
         } else {
             let initialization = RTCRtpTransceiverInit(); initialization.direction = .recvOnly
             guard peer.addTransceiver(of: .video, init: initialization) != nil else { stop(); throw NativeInterpreterFailure.media }

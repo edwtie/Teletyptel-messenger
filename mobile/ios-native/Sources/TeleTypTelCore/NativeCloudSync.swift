@@ -238,7 +238,7 @@ enum NativeCloudRecordFactory {
               let identifier = message.cloudID ?? message.identifier else { return nil }
         return make(identifier: identifier, peer: message.room, kind: "group", name: message.room,
                     sender: message.room + "/" + message.nickname, own: message.own,
-                    body: message.body, date: message.date, edited: false, retracted: message.retracted,
+                    body: message.body, date: message.date, edited: message.edited == true, retracted: message.retracted,
                     reactions: message.reactions, delivery: .unconfirmed)
     }
 

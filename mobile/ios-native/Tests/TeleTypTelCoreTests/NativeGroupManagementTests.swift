@@ -21,6 +21,7 @@ final class NativeGroupManagementTests: XCTestCase {
     func testConfigurationPreservesUnknownFieldsButRejectsSecretsAndWrongForms() throws {
         let payload = "<iq xmlns='jabber:client' type='result' from='\(room)'><query xmlns='http://jabber.org/protocol/muc#owner'><x xmlns='jabber:x:data' type='form'><field var='FORM_TYPE'><value>http://jabber.org/protocol/muc#roomconfig</value></field><field type='fixed'><value>Uitleg</value></field><field var='muc#roomconfig_roomname'><value>Naam</value></field><field var='custom-field'><value>Behouden</value></field></x></query></iq>"
         guard case .configuration(var configuration) = try NativeGroupManagementCodec.decode(ProbeXML.parse(payload), command: .configuration(room), account: account) else { return XCTFail("No configuration") }
+        XCTAssertEqual(configuration.editableFields, ["name"])
         configuration.name = "Nieuwe naam"
         let request = try NativeGroupManagementCodec.request(.configure(room, configuration), account: account, identifier: "test")
         XCTAssertTrue(request.contains("Nieuwe naam")); XCTAssertTrue(request.contains("Behouden"))

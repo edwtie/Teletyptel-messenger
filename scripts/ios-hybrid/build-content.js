@@ -1,0 +1,121 @@
+"use strict";
+
+const fs = require("node:fs");
+const path = require("node:path");
+const { baseline, check, readReference } = require("./check-baseline");
+const { resolveCatalog } = require("./smileys");
+const root = path.resolve(__dirname, "../..");
+
+function element(source, selector) {
+  const opening = selector.exec(source);
+  if (!opening) throw new Error("Missing pinned UI element.");
+  const tag = /^<([a-z]+)/i.exec(opening[0])[1];
+  const tokens = new RegExp("</?" + tag + "\\b[^>]*>", "gi");
+  tokens.lastIndex = opening.index;
+  let depth = 0;
+  for (let token; (token = tokens.exec(source));) {
+    depth += token[0].startsWith("</") ? -1 : 1;
+    if (depth === 0) return source.slice(opening.index, tokens.lastIndex);
+  }
+  throw new Error("Unbalanced pinned UI element.");
+}
+
+function createContent() {
+  check();
+  const reference = name => readReference(name).toString("utf8");
+  const original = reference("chat.html");
+  const account = element(original, /<div\b[^>]*\bid="accountDialog"[^>]*>/);
+  const header = element(account, /<div\b[^>]*\bclass="modal-header"[^>]*>/);
+  const authentication = element(account, /<section\b[^>]*\bclass="modal-section account-auth-section"[^>]*>/);
+  const actions = element(account, /<div\b[^>]*\bclass="modal-actions"[^>]*>/);
+  const messenger = fs.readFileSync(path.join(root, "mobile/ios-hybrid/Web/messenger-fragment.html"), "utf8");
+  const chatActions = element(messenger, /<div\b[^>]*\bid="hybridChatActions"[^>]*>/);
+  const chatBody = messenger.replace(chatActions, "");
+  const calls = fs.readFileSync(path.join(root, "mobile/ios-hybrid/Web/calls-fragment.html"), "utf8");
+  const features = fs.readFileSync(path.join(root, "mobile/ios-hybrid/Web/features-fragment.html"), "utf8");
+  const accountFeatures = fs.readFileSync(path.join(root, "mobile/ios-hybrid/Web/account-fragment.html"), "utf8");
+  const history = fs.readFileSync(path.join(root, "mobile/ios-hybrid/Web/history-fragment.html"), "utf8");
+  const sidebar = element(original, /<aside\b[^>]*\bid="conversationSidebar"[^>]*>/)
+    .replace('<div id="conversationItems"', '<p id="hybridRosterStatus" class="security-status" role="status" aria-live="polite"></p><div id="conversationItems"');
+  const legacy = reference("chat-client.js");
+  const smileys = resolveCatalog(legacy, readReference);
+  const icon = /\bsettings:\s*\{\s*viewBox:\s*"([\d -]+)",\s*paths:\s*(\[[^\]]*\])/.exec(legacy);
+  if (!icon) throw new Error("Missing pinned settings symbol.");
+  const paths = JSON.parse(icon[2]);
+  if (!paths.length || paths.some(value => typeof value !== "string" || !/^[a-zA-Z0-9., -]+$/.test(value))) throw new Error("Invalid settings symbol.");
+  const symbol = '<svg viewBox="' + icon[1] + '" fill="currentColor" aria-hidden="true">'
+    + paths.map(value => '<path d="' + value + '"/>').join("") + "</svg>";
+  const footer = actions.replace(/<span class="material-icon" data-icon="settings"[^>]*><\/span>/, symbol);
+  const nativeMenu = [
+    ["settings", "Geavanceerde instellingen", "M4 7h16M4 17h16M8 3v8m8 2v8"],
+    ["security", "Accountbeveiliging", "M12 3 3 7v5c0 6 9 9 9 9s9-3 9-9V7Z"],
+    ["dialer", "Nummerbellen", "M4 3h5l2 5-3 2a15 15 0 0 0 6 6l2-3 5 2v5C11 22 2 13 4 3Z"]
+  ].map(([panel, label, pathData]) => '<button class="icon-button" type="button" data-native-panel="' + panel + '" aria-label="' + label + '" title="' + label + '"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="' + pathData + '"/></svg></button>').join("")
+    + '<button id="hybridOpenContacts" class="icon-button" type="button" aria-label="Contactbeheer" title="Contactbeheer"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="9" cy="7" r="3"/><path d="M3 21v-4a6 6 0 0 1 12 0v4m2-17a3 3 0 0 1 0 6m2 11v-4a6 6 0 0 0-2-4"/></svg></button>'
+    + '<button id="hybridDnd" class="icon-button" type="button" aria-label="Niet storen" title="Niet storen" aria-pressed="false"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4M3 3l18 18"/></svg></button>';
+  const html = `<!doctype html><html lang="nl"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' capacitor:; style-src 'self' capacitor:; img-src 'self' capacitor: data:; connect-src 'none'; media-src 'none'; frame-src 'none'; worker-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<title>TeleTypTel</title><link rel="stylesheet" href="chat-client.css"><link rel="stylesheet" href="xmpp-availability.css"><link rel="stylesheet" href="hybrid-login.css"><link rel="stylesheet" href="hybrid-messenger.css">
+<script src="ui-language.js" defer></script><script src="smileys-catalog.js" defer></script><script src="native-session.js" defer></script><script src="smileys-presentation.js" defer></script><script src="login-presentation.js" defer></script><script src="account-presentation.js" defer></script><script src="contacts-presentation.js" defer></script><script src="features-presentation.js" defer></script><script src="chat-presentation.js" defer></script><script src="history-presentation.js" defer></script><script src="calls-presentation.js" defer></script>
+</head><body class="account-gate account-booting" data-theme="light">
+<section id="hybridStartup" class="xmpp-availability native-startup" open aria-label="TeleTypTel starten"><div class="xmpp-availability__panel">
+<img class="xmpp-availability__brand" src="assets/brand/teletyptel-logo-header@2x.png" width="599" height="128" alt="TeleTypTel">
+<div id="hybridProgress" class="xmpp-availability__progress" role="progressbar" aria-label="Bezig"></div>
+<p id="hybridStartupStatus" role="status" aria-live="polite">TeleTypTel starten…</p>
+<div class="xmpp-availability__actions"><button id="hybridRetry" type="button" hidden>Opnieuw proberen</button><button id="hybridCancel" type="button" hidden>Annuleren</button><button id="hybridBack" type="button" hidden>Terug naar aanmelden</button></div>
+</div></section>
+<div id="accountDialog" class="modal-shell account-start-dialog" hidden role="dialog" aria-modal="true" aria-labelledby="accountDialogTitle">
+<div class="modal-card account-dialog-card">${header}<div class="modal-body account-dialog-body">
+<div id="dialogAccountStatus" class="dialog-status" role="status" aria-live="polite"></div>${authentication}
+<p id="hybridFeatureNotice" class="security-status"></p>
+<div id="hybridSavedLoginActions"><button id="hybridBiometric" type="button" hidden>Face ID / Touch ID</button><button id="hybridForgetLogin" type="button" hidden>Bewaarde aanmelding verwijderen</button><button id="hybridAuthCancel" type="button" hidden>Annuleren</button></div>
+</div>${footer}</div></div>
+<div id="hybridConnected" class="app-shell" hidden><header class="topbar"><img src="assets/brand/teletyptel-logo-header@2x.png" width="240" height="51" alt="TeleTypTel"><span id="connectionSummary" role="status">XMPP verbonden</span><details id="hybridMainMenu" class="hybrid-start-menu"><summary class="icon-button" aria-label="Hoofdmenu" title="Hoofdmenu"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg></summary><div>
+<button id="hybridOpenProfile" class="icon-button" type="button" aria-label="Accountinstellingen" title="Accountinstellingen">${symbol}</button>
+<button id="hybridMenuTranslation" class="icon-button" type="button" aria-label="Vertaalinstellingen" title="Vertaalinstellingen"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a18 18 0 0 0 0 18 18 18 0 0 0 0-18"/></svg></button>
+${nativeMenu}<button id="hybridOpenHistory" class="icon-button" type="button" aria-label="Geschiedenis" title="Geschiedenis"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 11a9 9 0 1 1 2 7M3 4v7h7M12 7v5l3 2"/></svg></button><button id="hybridOpenArchive" class="icon-button" type="button" aria-label="Archief" title="Archief"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 4h18v5H3Zm2 5v12h14V9M9 13h6"/></svg></button></div></details><button id="hybridLogout" class="icon-button logout-icon-button" type="button" aria-label="Uitloggen"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 4H4v16h5m6-13 5 5-5 5m-7-5h12"/></svg></button></header>
+<main class="client-grid">${sidebar}<section id="hybridContactPreview" class="hybrid-contact-preview" aria-labelledby="hybridContactTitle">
+<div class="chat-header"><button id="hybridContactsBack" class="icon-button" type="button" aria-label="Terug naar contacten" hidden><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m14 6-6 6 6 6M8 12h13"/></svg></button><span id="hybridContactAvatar" class="avatar" aria-hidden="true" hidden></span><div class="chat-title"><strong id="hybridContactTitle">Kies een contact</strong><span id="hybridContactPresence"></span></div>${chatActions}</div>
+<div id="hybridEmptyChat" class="hybrid-contact-details"><p id="hybridContactJid"></p><p id="hybridContactHint">Kies een contact om te chatten of een gesprek te starten.</p></div>${chatBody}
+</section></main>${features}<div id="hybridContactRequests" role="region" aria-label="Statusverzoeken"></div></div>${accountFeatures}${history}${calls}
+</body></html>`;
+  if (/\bon\w+\s*=|<script\b[^>]*>(?!\s*<\/script>)/i.test(html)) throw new Error("Executable legacy HTML is not allowed.");
+  const files = {};
+  const add = (name, mime, data) => { files[name] = { mime, base64: Buffer.from(data).toString("base64") }; };
+  add("chat.html", "text/html", html);
+  const styles = ["chat-client.css", "xmpp-availability.css"];
+  const images = new Set(["assets/brand/teletyptel-logo-header@2x.png"]);
+  for (const name of styles) {
+    const css = reference(name);
+    add(name, "text/css", css);
+    for (const match of css.matchAll(/url\(["']?(assets\/[a-zA-Z0-9_@./-]+)["']?\)/g)) images.add(match[1]);
+  }
+  for (const name of images) add(name, name.endsWith(".svg") ? "image/svg+xml" : "image/png", readReference(name));
+  for (const smiley of smileys) add(smiley.file, smiley.file.endsWith(".svg") ? "image/svg+xml" : "image/gif", readReference(smiley.file));
+  add("smileys-catalog.js", "text/javascript", "window.TeleTypTelSmileyCatalog=Object.freeze(" + JSON.stringify(smileys).replace(/</g, "\\u003c") + ");\n");
+  add("smileys-presentation.js", "text/javascript", fs.readFileSync(path.join(root, "mobile/ios-hybrid/Web/smileys-presentation.js")));
+  for (const [name, mime] of [["native-session.js", "text/javascript"], ["login-presentation.js", "text/javascript"], ["account-presentation.js", "text/javascript"], ["contacts-presentation.js", "text/javascript"], ["features-presentation.js", "text/javascript"], ["chat-presentation.js", "text/javascript"], ["history-presentation.js", "text/javascript"], ["calls-presentation.js", "text/javascript"], ["hybrid-login.css", "text/css"], ["hybrid-messenger.css", "text/css"]]) {
+    add(name, mime, fs.readFileSync(path.join(root, "mobile/ios-hybrid/Web", name)));
+  }
+  const translations = {};
+  for (const line of reference("lang/ned.lng").split(/\r?\n/)) {
+    const match = /^([a-zA-Z0-9_.-]+)=(.*)$/.exec(line);
+    if (match) translations[match[1]] = match[2];
+  }
+  add("ui-language.js", "text/javascript", "window.TeleTypTelHybridTranslations=Object.freeze(" + JSON.stringify(translations).replace(/</g, "\\u003c") + ");\n");
+  return { version: 1, revision: baseline.revision, files };
+}
+
+if (require.main === module) {
+  const destination = process.env.TELETYPTEL_HYBRID_CONTENT;
+  const temporary = process.env.RUNNER_TEMP;
+  if (!destination || !temporary || path.resolve(destination) !== path.join(path.resolve(temporary), "teletyptel-hybrid-content.json")) {
+    throw new Error("Content output is restricted to the disposable CI runner.");
+  }
+  const content = createContent();
+  fs.writeFileSync(destination, JSON.stringify(content), { flag: "wx" });
+  process.stdout.write(JSON.stringify({ files: Object.keys(content.files).length, revision: content.revision }) + "\n");
+}
+
+module.exports = { createContent, element };

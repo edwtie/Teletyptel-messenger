@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "stage": "reference-only",
+  "referenceBuild": "16.9",
+  "revision": "334688e73c5218be27ad6270c7f96809c94de460",
+  "entrypoint": "chat.html",
+  "evidence": {
+    "runId": "42213575105",
+    "jobId": "127881680684",
+    "buildNumber": "16.9",
+    "url": "https://github.com/edwtie/Teletyptel-messenger/actions/runs/42213575105",
+    "verifiedOn": "2026-11-19"
+  },
+  "fingerprints": {
+    "chat.html": "6abfe72d1f27cded5e1f76d16638e3745ae0fc976e544591cff9a1fb83aa54be",
+    "chat-client.css": "d940188111cbededb37ff993ad3abf7cf43a67c52f9c0790807d0acf11d57039",
+    "chat-client.js": "29c0f4cb00588b2cd0a9cbe71534a067dd389ab6be1b24dd416c58d6af64c6de"
+  },
+  "policy": {
+    "preserveNativeEngine": true,
+    "allowBrowserSignalingInApp": false,
+    "allowBrowserMediaInApp": false,
+    "allowTestFlightUpload": false
+  }
+}

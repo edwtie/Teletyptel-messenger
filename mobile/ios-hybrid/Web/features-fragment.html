@@ -1,0 +1,44 @@
+<div id="hybridGroupJoin" class="modal-shell hybrid-feature-dialog" hidden role="dialog" aria-modal="true" aria-labelledby="hybridGroupJoinTitle"><form class="modal-card" id="hybridGroupJoinForm">
+  <header class="modal-header"><h2 id="hybridGroupJoinTitle">Groep openen</h2></header><div class="modal-body">
+    <label>Groepsnaam of adres<input id="hybridGroupRoom" type="text" required placeholder="familie" autocapitalize="none" autocomplete="off"></label>
+    <label>Bijnaam<input id="hybridGroupNickname" type="text" required maxlength="128" autocomplete="nickname"></label>
+    <label><input id="hybridGroupCreate" type="checkbox">Nieuwe groep maken</label>
+    <p id="hybridGroupJoinNotice" role="status"></p>
+  </div><footer class="modal-actions"><button type="submit">Openen</button><button type="button" data-close-feature="hybridGroupJoin">Annuleren</button></footer>
+</form></div>
+<div id="hybridGroupManage" class="modal-shell hybrid-feature-dialog" hidden role="dialog" aria-modal="true" aria-labelledby="hybridGroupManageTitle"><div class="modal-card">
+  <header class="modal-header"><h2 id="hybridGroupManageTitle">Groepsbeheer</h2></header><div class="modal-body">
+    <label>Onderwerp<input id="hybridGroupSubject" type="text" maxlength="512"></label><button id="hybridGroupSubjectSave" type="button">Onderwerp opslaan</button>
+    <label>Contact uitnodigen<select id="hybridGroupInviteTarget"></select></label><button id="hybridGroupInvite" type="button">Uitnodigen</button>
+    <label>Deelnemers<select id="hybridGroupOccupant"></select></label>
+    <div id="hybridGroupModeration" hidden><label>Rol<select id="hybridGroupRole"><option value="participant">Deelnemer</option><option value="visitor">Alleen lezen</option><option value="moderator">Moderator</option><option value="none">Verwijderen uit gesprek</option></select></label><button id="hybridGroupRoleSave" type="button">Rol aanvragen</button></div>
+    <section id="hybridGroupOwner" hidden><h3>Groepsinstellingen</h3><button id="hybridGroupLoadConfiguration" type="button">Instellingen ophalen</button>
+      <div id="hybridGroupConfiguration" hidden>
+        <label>Naam<input id="hybridGroupName" type="text" maxlength="120"></label><label>Beschrijving<textarea id="hybridGroupDescription" maxlength="1024"></textarea></label>
+        <label><input id="hybridGroupMembersOnly" type="checkbox">Alleen leden</label><label><input id="hybridGroupModerated" type="checkbox">Gemodereerd</label>
+        <label><input id="hybridGroupPublicRoom" type="checkbox">Zichtbaar in openbare groepslijst</label><label><input id="hybridGroupPersistent" type="checkbox">Blijvende groep</label>
+        <label><input id="hybridGroupAllowInvites" type="checkbox">Leden mogen uitnodigen</label>
+        <label><input id="hybridGroupConfigurationConfirm" type="checkbox">Ik bevestig de wijzigingen, inclusief toegang en zichtbaarheid</label>
+        <button id="hybridGroupSaveConfiguration" type="button">Instellingen aanvragen</button>
+      </div>
+    </section>
+    <section id="hybridGroupMembers" hidden><h3>Ledenbeheer</h3>
+      <label>Lijst<select id="hybridGroupAffiliationList"><option value="member">Leden</option><option value="admin">Beheerders</option><option value="outcast">Geblokkeerd</option></select></label><button id="hybridGroupLoadMembers" type="button">Lijst ophalen</button>
+      <p id="hybridGroupMemberCount" role="status"></p><label>Contact of opgehaald lid<select id="hybridGroupMemberTarget"></select></label>
+      <label>Bevoegdheid<select id="hybridGroupAffiliation"><option value="member">Lid</option><option value="none">Geen lidmaatschap</option><option value="outcast">Blokkeren</option><option value="admin">Beheerder</option></select></label>
+      <label><input id="hybridGroupAffiliationConfirm" type="checkbox">Ik bevestig deze wijziging voor dit account</label><button id="hybridGroupSaveAffiliation" type="button">Bevoegdheid aanvragen</button>
+    </section>
+    <p id="hybridGroupManageNotice" role="status" aria-live="polite"></p><button id="hybridGroupLeave" type="button">Groep verlaten</button>
+  </div><footer class="modal-actions"><button type="button" data-close-feature="hybridGroupManage">Sluiten</button></footer>
+</div></div>
+<div id="hybridTranslationSettings" class="modal-shell hybrid-feature-dialog" hidden role="dialog" aria-modal="true" aria-labelledby="hybridTranslationTitle"><form id="hybridTranslationForm" class="modal-card">
+  <header class="modal-header"><h2 id="hybridTranslationTitle">Vertaling</h2></header><div class="modal-body">
+    <label>Taal<select id="hybridTranslationLanguage"><option value="nl">Nederlands</option><option value="en">English</option><option value="de">Deutsch</option><option value="fr">Français</option><option value="es">Español</option><option value="it">Italiano</option><option value="pt">Português</option><option value="pl">Polski</option><option value="tr">Türkçe</option><option value="ar">العربية</option><option value="uk">Українська</option><option value="zh-CN">简体中文</option></select></label>
+    <label>Vertaling<select id="hybridTranslationMode"><option value="off">Uit</option><option value="manual">Handmatig via berichtmenu</option><option value="automatic">Automatisch</option></select></label>
+    <p>Vertaling is alleen op jouw scherm. De gekozen tekst gaat via TeleTypTel naar Google Cloud Translation. Het origineel blijft behouden.</p>
+    <label><input id="hybridTranslationConsent" type="checkbox">Ik geef toestemming voor deze vertaling</label>
+    <label><input id="hybridTranslationLive" type="checkbox">Ontvangen live RTT vertalen</label>
+    <label><input id="hybridTranslationOwnLive" type="checkbox">Mijn eigen live RTT vertalen</label>
+    <p id="hybridTranslationNotice" role="status" aria-live="polite"></p>
+  </div><footer class="modal-actions"><button id="hybridTranslationSave" type="submit">Instellingen opslaan</button><button type="button" data-close-feature="hybridTranslationSettings">Sluiten</button></footer>
+</form></div>

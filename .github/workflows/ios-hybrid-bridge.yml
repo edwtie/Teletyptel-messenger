@@ -1,0 +1,171 @@
+name: Hybrid iOS bridge unsigned validation
+
+on:
+  push:
+    branches: [codex/ios-hybrid-webui]
+    paths:
+      - .github/workflows/ios-hybrid-bridge.yml
+      - mobile/ios-hybrid/**
+      - scripts/ios-hybrid/**
+      - tests/ios-hybrid-*.test.js
+      - scripts/prepare-ios-native.js
+      - mobile/ios-native/App/NativeCallController.swift
+      - mobile/ios-native/App/NativeCallPlatform.swift
+      - mobile/ios-native/App/NativeAttachmentsView.swift
+      - mobile/ios-native/Sources/TeleTypTelCore/NativeGroupManagement.swift
+      - mobile/ios-native/Tests/TeleTypTelCoreTests/NativeGroupManagementTests.swift
+  workflow_dispatch:
+    inputs:
+      internal_build:
+        description: "Internal TestFlight build number (empty: unsigned validation only)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hybrid-bridge-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  room-media:
+    runs-on: macos-15
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - name: Test three simultaneous room members without devices or external services
+        run: |
+          export DEVELOPER_DIR="$(find /Applications -maxdepth 1 -name 'Xcode_26*.app' -type d | sort -r | head -n 1)/Contents/Developer"
+          SDK_VERSION=$(node -p 'require("./scripts/ios-testflight/native-webrtc").version')
+          DIGEST=$(node -p 'require("./scripts/ios-testflight/native-webrtc").checksum')
+          ARCHIVE="$RUNNER_TEMP/room-media.zip"
+          curl --fail --silent --show-error --location --retry 2 "https://github.com/stasel/WebRTC/releases/download/$SDK_VERSION/WebRTC-M${SDK_VERSION%%.*}.xcframework.zip" -o "$ARCHIVE"
+          echo "$DIGEST  $ARCHIVE" | shasum -a 256 -c -
+          unzip -q "$ARCHIVE" '*macos-x86_64_arm64/*' -d "$RUNNER_TEMP/room-sdk"
+          FRAMEWORK=$(node -e 'process.stdout.write(require("./scripts/ios-testflight/native-webrtc-test").findFramework(process.argv[1]))' "$RUNNER_TEMP/room-sdk")
+          xcrun swiftc -swift-version 5 -F "$FRAMEWORK" -framework WebRTC -Xlinker -rpath -Xlinker "$FRAMEWORK" \
+            mobile/ios-native/Sources/TeleTypTelCore/*.swift mobile/ios-native/App/NativeInterpreterMedia.swift \
+            mobile/ios-hybrid/MediaTests/RoomMeshLoopback.swift -o "$RUNNER_TEMP/room-mesh-loopback"
+          "$RUNNER_TEMP/room-mesh-loopback"
+  bridge:
+    runs-on: macos-15
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: 22
+      - name: Select installed Xcode 26
+        run: |
+          XCODE_PATH=$(find /Applications -maxdepth 1 -name 'Xcode_26*.app' -type d | sort -r | head -n 1)
+          test -n "$XCODE_PATH"
+          echo "DEVELOPER_DIR=$XCODE_PATH/Contents/Developer" >> "$GITHUB_ENV"
+      - name: Validate pinned UI and JavaScript boundary
+        run: node --test tests/ios-hybrid-baseline.test.js tests/ios-hybrid-session.test.js tests/ios-hybrid-contacts.test.js tests/ios-hybrid-messenger.test.js tests/ios-hybrid-features.test.js tests/ios-hybrid-accounts.test.js tests/ios-hybrid-history-smileys.test.js
+      - name: Prepare pinned login content without legacy engines
+        run: |
+          export TELETYPTEL_HYBRID_CONTENT="$RUNNER_TEMP/teletyptel-hybrid-content.json"
+          node scripts/ios-hybrid/build-content.js
+          echo "TELETYPTEL_HYBRID_CONTENT=$TELETYPTEL_HYBRID_CONTENT" >> "$GITHUB_ENV"
+      - name: Install isolated browser test dependencies
+        run: |
+          npm ci --ignore-scripts
+          npx playwright install chromium webkit
+      - name: Test login layout and rotation in Chromium and WebKit
+        run: node --test tests/ios-hybrid-presentation.test.js
+      - name: Test native session bridge with fictional accounts
+        if: ${{ !cancelled() }}
+        run: swift test --package-path mobile/ios-hybrid --scratch-path "$RUNNER_TEMP/teletyptel-hybrid-macos"
+      - name: Compile unsigned iOS simulator library
+        if: ${{ !cancelled() }}
+        run: |
+          swift build --package-path mobile/ios-hybrid \
+            --scratch-path "$RUNNER_TEMP/teletyptel-hybrid-ios" \
+            --triple arm64-apple-ios16.0-simulator \
+            --sdk "$(xcrun --sdk iphonesimulator --show-sdk-path)"
+      - name: Test existing native group upload and translation privacy rules with fixtures
+        if: ${{ !cancelled() }}
+        run: |
+          swift test --package-path mobile/ios-native --scratch-path "$RUNNER_TEMP/teletyptel-native-feature-tests" \
+            --filter 'NativeMUCTests|NativeTwoFactorHTTPTests|NativeGroupModelTests|NativeGroupManagementTests|NativeAccountFeaturesTests|NativeServicesTests|NativeSavedLoginTests|NativeContactTests|NativeFeatureCompletionTests|NativeCloudMergeTests|NativeCloudSyncTests|NativeCloudHistoryTests|NativePresentationTests|NativeInterpreterTests'
+      - name: Assemble the isolated hybrid app with the existing native engine
+        if: ${{ !cancelled() }}
+        run: node scripts/ios-hybrid/prepare-app.js
+      - name: Compile the complete app without signing or push activation
+        id: app-build
+        if: ${{ !cancelled() }}
+        run: |
+          xcodebuild -project artifacts/ios-native-hybrid-validation/TeleTypTelNative.xcodeproj \
+            -scheme TeleTypTelNative -configuration Debug -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/teletyptel-hybrid-app" \
+            ARCHS="$(uname -m)" ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO build
+      - name: Smoke-test the assembled app on iPhone and iPad simulators
+        if: ${{ !cancelled() && steps.app-build.outcome == 'success' }}
+        run: |
+          python3 - <<'PY'
+          import json, platform, subprocess
+          architecture = platform.machine()
+          if architecture not in ['arm64', 'x86_64']:
+              raise RuntimeError('Unsupported runner architecture')
+          devices = json.loads(subprocess.check_output(['xcrun', 'simctl', 'list', 'devices', 'available', '-j']))['devices']
+          available = [(runtime, device) for runtime, values in devices.items() if '.iOS-' in runtime for device in values if device.get('isAvailable')]
+          for kind in ['iPhone', 'iPad']:
+              candidates = [(runtime, device) for runtime, device in available if device['name'].startswith(kind)]
+              if not candidates:
+                  raise RuntimeError('Missing simulator: ' + kind)
+              runtime, device = sorted(candidates, key=lambda item: (item[0], item[1]['name']), reverse=True)[0]
+              subprocess.run(['xcodebuild', 'test', '-project', 'artifacts/ios-native-hybrid-validation/TeleTypTelNative.xcodeproj',
+                  '-scheme', 'TeleTypTelNative', '-configuration', 'Debug', '-destination', 'platform=iOS Simulator,arch=' + architecture + ',id=' + device['udid'],
+                  '-derivedDataPath', __import__('os').environ['RUNNER_TEMP'] + '/teletyptel-hybrid-app',
+                  '-only-testing:NativeStartupUITests/HybridStartupUITests', '-parallel-testing-enabled', 'NO',
+                  'ARCHS=' + architecture, 'ONLY_ACTIVE_ARCH=YES', 'CODE_SIGNING_ALLOWED=NO'], check=True)
+          PY
+  internal-hybrid-upload:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/codex/teletyptel-beta-polish' && inputs.internal_build != ''
+    needs: [room-media, bridge]
+    runs-on: macos-15-intel
+    timeout-minutes: 40
+    environment: ios-testflight
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: 22
+      - name: Prepare verified hybrid interface without signing credentials
+        run: |
+          XCODE_PATH=$(find /Applications -maxdepth 1 -name 'Xcode_26*.app' -type d | sort -r | head -n 1)
+          test -n "$XCODE_PATH"
+          echo "DEVELOPER_DIR=$XCODE_PATH/Contents/Developer" >> "$GITHUB_ENV"
+          export TELETYPTEL_HYBRID_CONTENT="$RUNNER_TEMP/teletyptel-hybrid-content.json"
+          node scripts/ios-hybrid/build-content.js
+          echo "TELETYPTEL_HYBRID_CONTENT=$TELETYPTEL_HYBRID_CONTENT" >> "$GITHUB_ENV"
+          node --test tests/native-internal-release.test.js tests/native-runtime-linkage.test.js
+      - name: Sign verified candidate and upload for internal testers only
+        env:
+          TELETYPTEL_NATIVE_BUILD_NUMBER: ${{ inputs.internal_build }}
+          IOS_NATIVE_PROVISION_PROFILE_BASE64: ${{ secrets.IOS_NATIVE_PROVISION_PROFILE_BASE64 }}
+          IOS_DISTRIBUTION_P12_BASE64: ${{ secrets.IOS_DISTRIBUTION_P12_BASE64 }}
+          IOS_DISTRIBUTION_P12_PASSWORD: ${{ secrets.IOS_DISTRIBUTION_P12_PASSWORD }}
+          IOS_ASC_KEY_P8: ${{ secrets.IOS_ASC_KEY_P8 }}
+          IOS_ASC_KEY_ID: ${{ secrets.IOS_ASC_KEY_ID }}
+          IOS_ASC_ISSUER_ID: ${{ secrets.IOS_ASC_ISSUER_ID }}
+          IOS_FACEBOOK_APP_ID: ${{ secrets.IOS_FACEBOOK_APP_ID }}
+          IOS_FACEBOOK_CLIENT_TOKEN: ${{ secrets.IOS_FACEBOOK_CLIENT_TOKEN }}
+        run: node scripts/native-internal-release.js --upload-hybrid-internal
+      - name: Save non-secret upload result
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        with:
+          name: hybrid-internal-upload-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/ios-native-internal-*/reports/result.json
+          retention-days: 3

@@ -65,7 +65,8 @@ function signingProject(source, uuid, fingerprint) {
 }
 
 function run() {
-  if (process.platform !== "darwin" || process.argv.length !== 3 || process.argv[2] !== "--upload-internal") throw new Error("Choose the protected macOS internal-upload path explicitly");
+  const hybrid = process.argv[2] === "--upload-hybrid-internal";
+  if (process.platform !== "darwin" || process.argv.length !== 3 || (!hybrid && process.argv[2] !== "--upload-internal")) throw new Error("Choose the protected macOS internal-upload path explicitly");
   const names = ["IOS_NATIVE_PROVISION_PROFILE_BASE64", "IOS_DISTRIBUTION_P12_BASE64", "IOS_DISTRIBUTION_P12_PASSWORD", "IOS_ASC_KEY_P8", "IOS_ASC_KEY_ID", "IOS_ASC_ISSUER_ID"];
   const secrets = Object.fromEntries(names.map(name => [name, process.env[name]]));
   if (names.some(name => !secrets[name])) throw new Error("Missing protected native signing configuration");
@@ -75,7 +76,8 @@ function run() {
   metadata.validate(expected, pushTest);
   const configured = providers(process.env);
   process.umask(0o077);
-  const directory = prepare("ios-native-internal-" + Date.now(), { archive: expected, pushTest, providers: configured });
+  const assemble = hybrid ? require("./ios-hybrid/prepare-app").prepare : prepare;
+  const directory = assemble("ios-native-internal-" + Date.now(), { archive: expected, pushTest, providers: configured });
   const reports = path.join(directory, "reports"), logs = path.join(directory, "private-logs");
   fs.mkdirSync(reports); fs.mkdirSync(logs);
   const childEnvironment = { ...process.env };
@@ -158,6 +160,9 @@ function run() {
     const unpacked = path.join(temporary, "exported");
     command("ditto", ["-x", "-k", path.join(output, packages[0]), unpacked]);
     const exportedApp = path.join(unpacked, "Payload/TeleTypTelNative.app");
+    if (hybrid && !fs.readFileSync(path.join(exportedApp, "hybrid-content.json")).equals(fs.readFileSync(process.env.TELETYPTEL_HYBRID_CONTENT))) {
+      throw new Error("Exported package does not contain the validated hybrid interface");
+    }
     result.exportedRuntime = runtime.inspect(exportedApp, command);
     const exportedInfo = plist(path.join(exportedApp, "Info.plist"));
     metadata.inspect({ app: exportedInfo, archive: { ApplicationProperties: properties }, expected });

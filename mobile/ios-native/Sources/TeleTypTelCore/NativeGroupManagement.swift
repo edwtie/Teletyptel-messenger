@@ -23,6 +23,11 @@ public struct NativeRoomConfiguration: Equatable, Sendable {
     public var persistent: Bool
     public var allowInvites: Bool
     var fields: [String: [String]]
+    public var editableFields: [String] {
+        let names = ["name": "roomname", "description": "roomdesc", "membersOnly": "membersonly", "moderated": "moderatedroom",
+                     "publicRoom": "publicroom", "persistent": "persistentroom", "allowInvites": "allowinvites"]
+        return names.keys.filter { fields["muc#roomconfig_" + names[$0]!] != nil }.sorted()
+    }
 }
 
 public enum NativeGroupCommand: Sendable {

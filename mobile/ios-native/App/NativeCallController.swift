@@ -72,7 +72,7 @@ final class NativeCallController: ObservableObject, NativePushRegistering {
     let interpreter = NativeInterpreterSession()
     @Published private(set) var interpreterMedia: NativeInterpreterMedia?
     private static let initializeWebRTC = RTCInitializeSSL()
-    private var factory: RTCPeerConnectionFactory?
+    private(set) var factory: RTCPeerConnectionFactory?
     private var capture: NativeMediaCapture?
     private var router: NativePeerRouter?
     private var runtime: NativeCallRuntime?
@@ -90,6 +90,26 @@ final class NativeCallController: ObservableObject, NativePushRegistering {
     private var isForeground = true
     var backgroundCallEnded: (() -> Void)?
     var hasLiveCall: Bool { runtime?.platform.coordinator.currentHandle != nil }
+    var hybridCallIdentifier: UUID? { runtime?.platform.coordinator.currentHandle?.id ?? activeID ?? pendingPush?.id }
+    var hybridCallPeer: String? { callPeerJID.flatMap(NativeChatCodec.bareJID) }
+    var hybridCallProfile: NativeCallMedia? { presentation?.profile ?? runtime?.platform.coordinator.lifecycle.current?.invitation.media }
+
+    func answerFromHybrid() {
+        guard case .ringing = status, let id = runtime?.platform.coordinator.currentHandle?.id else { return }
+        runtime?.platform.requestAnswer(id: id) { [weak self] accepted in
+            guard let self = self, self.hybridCallIdentifier == id else { return }
+            if !accepted { self.endCall() }
+        }
+    }
+
+    func endFromHybrid() {
+        if hasLiveCall { endCall() }
+        else { resetCall() }
+    }
+
+    func clearHybridFailure() {
+        if status == .failed && !hasLiveCall { status = .idle }
+    }
     var pushCallActive: Bool { hasLiveCall }
     lazy var pushRegistration = NativePushRegistrationModel(
         enabled: Bundle.main.object(forInfoDictionaryKey: "TeleTypTelNativeCallPushEnabled") as? Bool == true,

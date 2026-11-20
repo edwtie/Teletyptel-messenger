@@ -47,6 +47,12 @@ private final class NativeCallKitSystem: NativeCallSystem {
         controller.request(CXTransaction(action: CXSetHeldCallAction(call: id, onHold: held))) { _ in }
     }
 
+    func requestAnswer(id: UUID, completion: @escaping (Bool) -> Void) {
+        controller.request(CXTransaction(action: CXAnswerCallAction(call: id))) { error in
+            Task { @MainActor in completion(error == nil) }
+        }
+    }
+
     func setDtmfEnabled(id: UUID, enabled: Bool, hasVideo: Bool, canHold: Bool) {
         let update = CXCallUpdate()
         update.supportsDTMF = enabled
@@ -174,6 +180,22 @@ final class NativeCallPlatform: NSObject, PKPushRegistryDelegate, CXProviderDele
     func requestHeld(id: UUID, held: Bool) {
         guard coordinator.currentHandle?.id == id, coordinator.isConnected, !coordinator.holdPending else { return }
         system.requestHeld(id: id, held: held)
+    }
+
+    func requestAnswer(id: UUID, completion: @escaping (Bool) -> Void) {
+        Task { @MainActor [weak self] in
+            for _ in 0..<50 {
+                guard let self = self, self.coordinator.currentHandle?.id == id else { completion(false); return }
+                if self.coordinator.lifecycle.current?.phase == .ringing {
+                    self.system.requestAnswer(id: id, completion: completion)
+                    return
+                }
+                guard self.coordinator.lifecycle.current?.phase == .reporting else { completion(false); return }
+                do { try await Task.sleep(nanoseconds: 20_000_000) }
+                catch { completion(false); return }
+            }
+            completion(false)
+        }
     }
 
     nonisolated func provider(_ provider: CXProvider, perform action: CXSetHeldCallAction) {
