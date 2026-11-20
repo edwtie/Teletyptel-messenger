@@ -1,0 +1,31 @@
+<div id="hybridEntry" class="modal-shell hybrid-account-dialog" hidden role="dialog" aria-modal="true" aria-labelledby="hybridEntryTitle"><form id="hybridEntryForm" class="modal-card">
+  <header class="modal-header"><h2 id="hybridEntryTitle">Nieuwe gebruiker</h2></header><div class="modal-body">
+    <label>XMPP-account of e-mail<input id="hybridEntryJid" type="text" required maxlength="320" autocapitalize="none" autocomplete="username"></label>
+    <div id="hybridRegistrationFields"><label>Naam<input id="hybridEntryName" type="text" maxlength="120" autocomplete="name"></label>
+      <label>Wachtwoord<input id="hybridEntryPassword" type="password" maxlength="1024" autocomplete="new-password"></label>
+      <label>Herhaal wachtwoord<input id="hybridEntryRepeat" type="password" maxlength="1024" autocomplete="new-password"></label>
+      <p>Minimaal 10 tekens: hoofdletter, kleine letter, cijfer en speciaal teken.</p>
+      <button id="hybridEntryPrivacy" type="button">Privacy-informatie lezen</button>
+      <label><input id="hybridEntryConsent" type="checkbox">Ik heb de privacy-informatie gelezen en wil dit account aanmaken</label>
+    </div><p id="hybridEntryNotice" role="status" aria-live="polite"></p>
+  </div><footer class="modal-actions"><button id="hybridEntrySubmit" type="submit">Account aanmaken</button><button type="button" data-close-account="hybridEntry">Sluiten</button></footer>
+</form></div>
+<div id="hybridProfile" class="modal-shell hybrid-account-dialog" hidden role="dialog" aria-modal="true" aria-labelledby="hybridProfileTitle"><form id="hybridProfileForm" class="modal-card">
+  <header class="modal-header"><h2 id="hybridProfileTitle">Accountinstellingen</h2></header><div class="modal-body">
+    <p id="hybridProfileJid"></p><button id="hybridEditAvatar" type="button">Profielfoto wijzigen</button>
+    <label>Naam<input id="hybridProfileName" type="text" maxlength="120" required autocomplete="name"></label>
+    <label>Telefoonnummer<input id="hybridProfilePhone" type="tel" maxlength="64" autocomplete="tel"></label>
+    <label>Profieltaal<select id="hybridProfileLanguage"><option value="nl">Nederlands</option><option value="en">English</option><option value="de">Deutsch</option><option value="fr">Français</option><option value="es">Español</option><option value="it">Italiano</option><option value="pt">Português</option><option value="pl">Polski</option><option value="tr">Türkçe</option><option value="ar">العربية</option><option value="uk">Українська</option><option value="zh-CN">简体中文</option></select></label>
+    <label>Avatarkleur<input id="hybridProfileColor" type="color" value="#2563eb"></label>
+    <p>Profieltaal verandert niet je vertaaltoestemming.</p><p id="hybridProfileNotice" role="status" aria-live="polite"></p>
+  </div><footer class="modal-actions"><button id="hybridProfileSave" type="submit">Instellingen opslaan</button><button id="hybridProfileReload" type="button">Opnieuw ophalen</button><button type="button" data-close-account="hybridProfile">Sluiten</button></footer>
+</form></div>
+<div id="hybridNewContact" class="modal-shell hybrid-account-dialog" hidden role="dialog" aria-modal="true" aria-labelledby="hybridNewContactTitle"><form id="hybridNewContactForm" class="modal-card">
+  <header class="modal-header"><h2 id="hybridNewContactTitle">Nieuw contact</h2></header><div class="modal-body">
+    <label>XMPP-adres<input id="hybridNewContactJid" type="text" required autocapitalize="none" autocomplete="off" maxlength="1023" placeholder="naam@chatserver.nl"></label>
+    <label>Naam<input id="hybridNewContactName" type="text" maxlength="120" autocomplete="off"></label>
+    <p>Een gewoon e-mailadres of telefoonnummer is niet automatisch een Messenger-account.</p>
+    <label><input id="hybridNewContactPresence" type="checkbox">Toestemming voor online status vragen</label>
+    <p id="hybridNewContactNotice" role="status" aria-live="polite"></p>
+  </div><footer class="modal-actions"><button id="hybridNewContactSave" type="submit">Contact toevoegen</button><button type="button" data-close-account="hybridNewContact">Sluiten</button></footer>
+</form></div>

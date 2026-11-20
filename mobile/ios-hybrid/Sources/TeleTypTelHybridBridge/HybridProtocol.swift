@@ -48,10 +48,30 @@ struct HybridRequest: Decodable, CustomStringConvertible, CustomDebugStringConve
         arguments = rawArguments
         epoch = try values.decodeIfPresent(UUID.self, forKey: Key(stringValue: "epoch")!)
         guard version == 1 else { throw HybridFailure.invalidRequest }
-        if ["chat.", "calls.", "groups.", "files.", "translation."].contains(where: command.hasPrefix) {
+        if ["session.cancel", "session.logout", "session.verifySecondFactor"].contains(command) || ["chat.", "calls.", "groups.", "files.", "translation.", "auth.", "account.", "contacts."].contains(where: command.hasPrefix) {
             guard epoch != nil else { throw HybridFailure.invalidRequest }
         }
         switch command {
+        case "auth.social":
+            guard Set(arguments.keys) == Set(["provider"]), ["google", "facebook"].contains(arguments["provider"] ?? "") else { throw HybridFailure.invalidRequest }
+        case "auth.biometric", "auth.forget", "auth.privacy", "account.refresh", "account.avatar":
+            guard arguments.isEmpty else { throw HybridFailure.invalidRequest }
+        case "auth.recover":
+            guard Set(arguments.keys) == Set(["jid"]), let jid = arguments["jid"], !jid.isEmpty, Self.text(jid, maximumBytes: 320) else { throw HybridFailure.invalidRequest }
+        case "auth.register":
+            guard Set(arguments.keys) == Set(["jid", "name", "password", "consent"]), Self.peer(arguments["jid"]),
+                  let name = arguments["name"], !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, Self.text(name, maximumBytes: 120),
+                  let password = arguments["password"], !password.isEmpty, Self.text(password, maximumBytes: 1024), arguments["consent"] == "true" else { throw HybridFailure.invalidRequest }
+        case "account.save":
+            guard Set(arguments.keys) == Set(["name", "phone", "language", "color"]), let name = arguments["name"], !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                  Self.text(name, maximumBytes: 120), let phone = arguments["phone"], Self.text(phone, maximumBytes: 64),
+                  ["nl", "en", "de", "fr", "es", "it", "pt", "pl", "tr", "ar", "uk", "zh-CN"].contains(arguments["language"] ?? ""),
+                  arguments["color"]?.range(of: #"\A#[a-fA-F0-9]{6}\z"#, options: .regularExpression) != nil else { throw HybridFailure.invalidRequest }
+        case "contacts.add":
+            guard Set(arguments.keys) == Set(["jid", "name", "presence"]), Self.peer(arguments["jid"]), let name = arguments["name"], Self.text(name, maximumBytes: 120),
+                  ["true", "false"].contains(arguments["presence"] ?? "") else { throw HybridFailure.invalidRequest }
+        case "contacts.respond":
+            guard Set(arguments.keys) == Set(["jid", "allow"]), Self.peer(arguments["jid"]), ["true", "false"].contains(arguments["allow"] ?? "") else { throw HybridFailure.invalidRequest }
         case "groups.join":
             guard Set(arguments.keys) == Set(["room", "nickname", "create"]), Self.peer(arguments["room"]),
                   let nickname = arguments["nickname"], !nickname.isEmpty, nickname.utf8.count <= 128,
@@ -78,7 +98,9 @@ struct HybridRequest: Decodable, CustomStringConvertible, CustomDebugStringConve
         case "files.pick", "translation.disable":
             guard arguments.isEmpty else { throw HybridFailure.invalidRequest }
         case "session.login":
-            guard Set(arguments.keys) == Set(["jid", "password"]),
+            guard Set(arguments.keys) == Set(["jid", "password"]) || Set(arguments.keys) == Set(["jid", "password", "remember"]) else { throw HybridFailure.invalidRequest }
+            guard arguments["remember"] == nil || ["true", "false"].contains(arguments["remember"]!) else { throw HybridFailure.invalidRequest }
+            guard
                   let jid = arguments["jid"], !jid.isEmpty, jid.utf8.count <= 1023,
                   let password = arguments["password"], !password.isEmpty, password.utf8.count <= 1024,
                   !jid.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }),
@@ -178,6 +200,7 @@ public struct HybridSnapshot: Codable, Equatable {
     public var groupsAvailable = false
     public var groupNotice: String? = nil
     public var extras = HybridExtrasState()
+    public var account = HybridAccountState()
 }
 
 public struct HybridContact: Codable, Equatable {

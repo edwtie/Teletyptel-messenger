@@ -17,7 +17,7 @@
   }
 
   function safeState(value) {
-    const keys = ["version", "sequence", "epoch", "phase", "errorCode", "chatAvailable", "callsAvailable", "socialLoginAvailable", "settingsAvailable", "roster", "conversation", "call", "groups", "groupsAvailable", "groupNotice", "extras"];
+    const keys = ["version", "sequence", "epoch", "phase", "errorCode", "chatAvailable", "callsAvailable", "socialLoginAvailable", "settingsAvailable", "roster", "conversation", "call", "groups", "groupsAvailable", "groupNotice", "extras", "account"];
     if (!value || typeof value !== "object" || Array.isArray(value)
         || Object.keys(value).some(key => !keys.includes(key)) || value.version !== 1
         || !Number.isSafeInteger(value.sequence) || value.sequence < 0 || !phases.has(value.phase)
@@ -26,12 +26,14 @@
         || (value.phase === "failed" && (value.errorCode == null || value.errorCode === "invalidSecondFactor"))
         || (value.phase !== "failed" && value.errorCode != null
           && !(value.phase === "awaitingSecondFactor" && value.errorCode === "invalidSecondFactor"))
-        || typeof value.chatAvailable !== "boolean" || typeof value.callsAvailable !== "boolean" || value.socialLoginAvailable !== false
+        || typeof value.chatAvailable !== "boolean" || typeof value.callsAvailable !== "boolean" || typeof value.socialLoginAvailable !== "boolean"
         || (value.phase !== "connected" && (value.chatAvailable || value.callsAvailable))
         || (value.settingsAvailable !== undefined && typeof value.settingsAvailable !== "boolean")) {
       throw new Error("invalidNativeReply");
     }
     const roster = safeRoster(value.roster, value.phase);
+    const account = safeAccount(value.account, roster, value.phase);
+    if (value.socialLoginAvailable !== (account.providers.length > 0)) throw new Error("invalidNativeReply");
     const groups = safeGroups(value.groups ?? []);
     const extras = safeExtras(value.extras);
     if ((value.groupsAvailable !== undefined && typeof value.groupsAvailable !== "boolean") || !safeText(value.groupNotice ?? "")
@@ -41,9 +43,36 @@
     if ((value.phase !== "connected" && (conversation || call.phase !== "idle"))
         || (!value.chatAvailable && conversation) || (!value.callsAvailable && !["idle", "failed"].includes(call.phase))) throw new Error("invalidNativeReply");
     return Object.freeze({ version: 1, sequence: value.sequence, epoch: value.epoch ?? null, phase: value.phase, errorCode: value.errorCode ?? null,
-      chatAvailable: value.chatAvailable, callsAvailable: value.callsAvailable, socialLoginAvailable: false,
+      chatAvailable: value.chatAvailable, callsAvailable: value.callsAvailable, socialLoginAvailable: value.socialLoginAvailable,
       settingsAvailable: value.settingsAvailable === true, roster, conversation, call, groups,
-      groupsAvailable: value.groupsAvailable === true, groupNotice: value.groupNotice ?? null, extras });
+      groupsAvailable: value.groupsAvailable === true, groupNotice: value.groupNotice ?? null, extras, account });
+  }
+
+  function safeAccount(value, roster, phase) {
+    const empty = { providers: [], entryAvailable: false, registrationAvailable: false, rememberAvailable: false, savedLogin: false,
+      busy: false, contactsAvailable: false, owner: null, requests: [], profile: null, avatars: {}, notice: null };
+    if (value === undefined) value = empty;
+    const validJid = jid => typeof jid === "string" && jid.length > 0 && new TextEncoder().encode(jid).length <= 1023 && !/[\s/\u0000-\u001f\u007f-\u009f]/u.test(jid);
+    if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).some(key => !Object.hasOwn(empty, key))) throw new Error("invalidNativeReply");
+    const result = { ...empty, ...value };
+    if (["entryAvailable", "registrationAvailable", "rememberAvailable", "savedLogin", "busy", "contactsAvailable"].some(key => typeof result[key] !== "boolean")
+        || !Array.isArray(result.providers) || result.providers.length > 2 || new Set(result.providers).size !== result.providers.length || result.providers.some(name => !["google", "facebook"].includes(name))
+        || (result.owner !== null && !validJid(result.owner)) || !Array.isArray(result.requests) || result.requests.length > 32 || result.requests.some(jid => !validJid(jid))
+        || (result.notice !== null && !safeText(result.notice)) || !result.avatars || typeof result.avatars !== "object" || Array.isArray(result.avatars)
+        || Object.keys(result.avatars).length > 101 || (phase !== "connected" && (result.owner || result.profile || result.contactsAvailable || result.requests.length || Object.keys(result.avatars).length))) throw new Error("invalidNativeReply");
+    if (result.profile !== null) {
+      const profile = result.profile;
+      if (!profile || typeof profile !== "object" || Object.keys(profile).sort().join(",") !== "color,jid,language,name,phone" || profile.jid !== result.owner
+          || !safeText(profile.name, 120) || !safeText(profile.phone, 64) || !["nl", "en", "de", "fr", "es", "it", "pt", "pl", "tr", "ar", "uk", "zh-CN"].includes(profile.language)
+          || typeof profile.color !== "string" || !/^#[a-f0-9]{6}$/i.test(profile.color)) throw new Error("invalidNativeReply");
+      result.profile = Object.freeze({ ...profile });
+    }
+    let bytes = 0;
+    for (const [jid, image] of Object.entries(result.avatars)) {
+      if (!(jid === result.owner || roster.contacts.some(contact => contact.jid === jid)) || typeof image !== "string" || image.length > 32768
+          || !/^data:image\/jpeg;base64,\/9j\/[A-Za-z0-9+/]*={0,2}$/.test(image) || (bytes += image.length) > 786432) throw new Error("invalidNativeReply");
+    }
+    return Object.freeze({ ...result, providers: Object.freeze([...result.providers]), requests: Object.freeze([...result.requests]), avatars: Object.freeze({ ...result.avatars }) });
   }
 
   function safeRoster(value, phase) {
@@ -188,7 +217,7 @@
       if (pendingCount >= 8) return Promise.reject(new Error("bridgeBusy"));
       const id = makeID();
       if (!uuidPattern.test(id)) return Promise.reject(new Error("invalidRequest"));
-      const scoped = ["chat.", "calls.", "groups.", "files.", "translation."].some(prefix => command.startsWith(prefix));
+      const scoped = ["session.cancel", "session.logout", "session.verifySecondFactor"].includes(command) || ["chat.", "calls.", "groups.", "files.", "translation.", "auth.", "account.", "contacts."].some(prefix => command.startsWith(prefix));
       if (scoped && (!expectedEpoch || expectedEpoch !== latest?.epoch)) return Promise.reject(new Error("invalidState"));
       const body = JSON.stringify({ version: 1, id, command, arguments: argumentsValue, ...(scoped ? { epoch: expectedEpoch } : {}) });
       if (new TextEncoder().encode(body).length > 262144) return Promise.reject(new Error("invalidRequest"));
@@ -227,14 +256,16 @@
 
     return Object.freeze({
       snapshot: () => request("session.snapshot"),
-      login: (jid, password) => {
+      login: (jid, password, remember = false) => {
         if (typeof jid !== "string" || typeof password !== "string" || !jid || !password
             || new TextEncoder().encode(jid).length > 1023 || new TextEncoder().encode(password).length > 1024
             || /[\u0000-\u001f\u007f]/.test(jid) || password.includes("\u0000")) {
           return Promise.reject(new Error("invalidRequest"));
         }
-        return request("session.login", { jid, password });
+        if (typeof remember !== "boolean") return Promise.reject(new Error("invalidRequest"));
+        return request("session.login", { jid, password, ...(remember ? { remember: "true" } : {}) });
       },
+      accountCommand: (name, args = {}, epoch) => request(name, Object.fromEntries(Object.entries(args).map(([key, value]) => [key, String(value)])), epoch),
       verifySecondFactor: code => typeof code === "string" && /^[0-9]{6}$/.test(code)
         ? request("session.verifySecondFactor", { code }) : Promise.reject(new Error("invalidRequest")),
       cancel: () => request("session.cancel"),
@@ -320,6 +351,6 @@
     return client;
   }
 
-  if (typeof module === "object" && module.exports) module.exports = { createClient, safeState, install, secureID, safeRoster, safeCall, safeConversation, safeText, safeGroups, safeExtras };
+  if (typeof module === "object" && module.exports) module.exports = { createClient, safeState, install, secureID, safeRoster, safeCall, safeConversation, safeText, safeGroups, safeExtras, safeAccount };
   else install(root);
 })(typeof window === "undefined" ? globalThis : window);

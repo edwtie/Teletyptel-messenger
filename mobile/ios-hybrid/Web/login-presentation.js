@@ -67,9 +67,9 @@
       const phase = state?.phase || "starting";
       const twoFactor = phase === "awaitingSecondFactor";
       const connected = phase === "connected";
-      const busy = pending || busyPhases.has(phase);
+      const busy = pending || busyPhases.has(phase) || state?.account.busy;
       const networkFailure = phase === "failed" && networkErrors.has(state.errorCode) && !allowForm;
-      const startup = bridgeError || (!state) || busy || networkFailure || phase === "suspended";
+      const startup = bridgeError || (!state) || pending || busyPhases.has(phase) || networkFailure || phase === "suspended";
       document.body.classList.toggle("account-booting", startup);
       document.body.classList.toggle("account-gate", !connected || startup);
       document.body.classList.toggle("modal-open", !startup && !connected);
@@ -101,7 +101,20 @@
       nodes.loginTwoFactorCodeInput.disabled = busy;
       nodes.dialogServerSettingsButton.disabled = busy || twoFactor || state?.settingsAvailable !== true;
       nodes.dialogServerSettingsButton.title = state?.settingsAvailable ? "Geavanceerde instellingen" : unavailable;
-      nodes.hybridLogout.disabled = busy;
+      nodes.hybridLogout.disabled = pending || busyPhases.has(phase);
+      const account = state?.account;
+      for (const [id, provider] of [["dialogGoogleLoginFallbackButton", "google"], ["dialogFacebookLoginButton", "facebook"]]) {
+        byID(id).disabled = busy || !account?.providers.includes(provider);
+        byID(id).title = account?.providers.includes(provider) ? "Aanmelden met " + provider : "Niet geconfigureerd in deze appbuild";
+      }
+      byID("dialogForgotPasswordButton").disabled = busy || !account?.entryAvailable;
+      byID("dialogCreateAccountButton").disabled = busy || !account?.registrationAvailable;
+      nodes.dialogRememberPasswordToggle.disabled = busy || !account?.rememberAvailable;
+      nodes.dialogRememberPasswordToggle.title = "Alleen op dit apparaat, na toestemming voor Face ID of Touch ID";
+      byID("hybridBiometric").hidden = !account?.savedLogin; byID("hybridBiometric").disabled = busy;
+      byID("hybridForgetLogin").hidden = !account?.savedLogin; byID("hybridForgetLogin").disabled = busy;
+      byID("hybridAuthCancel").hidden = !account?.busy || busyPhases.has(phase);
+      byID("hybridFeatureNotice").textContent = account?.notice || (!state?.socialLoginAvailable ? "Google/Facebook zijn nog niet geconfigureerd in deze appbuild." : "Je meldt je aan via de native app, niet via een ingebouwde webbrowser.");
     }
 
     async function perform(action) {
@@ -128,7 +141,7 @@
       nodes.dialogPasswordInput.value = "";
       nodes.dialogPasswordInput.blur();
       allowForm = false;
-      void perform(() => client.login(jid, password));
+      void perform(() => client.login(jid, password, nodes.dialogRememberPasswordToggle.checked));
     }
 
     listen(nodes.dialogConnectButton, "click", signIn);
@@ -156,9 +169,16 @@
       void perform(() => client.logout());
     });
     listen(nodes.dialogServerSettingsButton, "click", () => { void perform(() => client.openSettings()); });
+    for (const [id, provider] of [["dialogGoogleLoginFallbackButton", "google"], ["dialogFacebookLoginButton", "facebook"]]) {
+      listen(byID(id), "click", () => { nodes.dialogPasswordInput.value = ""; void perform(() => client.accountCommand("auth.social", { provider })); });
+    }
+    listen(byID("hybridBiometric"), "click", () => { void perform(() => client.accountCommand("auth.biometric")); });
+    listen(byID("hybridForgetLogin"), "click", () => { void perform(() => client.accountCommand("auth.forget")); });
+    listen(byID("hybridAuthCancel"), "click", () => { void perform(() => client.cancel()); });
     const unsubscribe = client.subscribe(value => {
       if (disposed) return;
       state = value;
+      if (value.phase === "signedOut") nodes.dialogRememberPasswordToggle.checked = false;
       bridgeError = false;
       if (value.phase === "signedOut" || value.phase === "idle") nodes.loginTwoFactorCodeInput.value = "";
       render();

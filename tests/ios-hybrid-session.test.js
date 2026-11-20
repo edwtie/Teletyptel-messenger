@@ -3,7 +3,8 @@ const assert = require("node:assert/strict");
 const crypto = require("node:crypto");
 const { createClient, safeState, install, secureID } = require("../mobile/ios-hybrid/Web/native-session");
 
-const state = (sequence = 1, phase = "idle", errorCode) => ({ version: 1, sequence, phase, errorCode,
+const fixtureEpoch = crypto.randomUUID();
+const state = (sequence = 1, phase = "idle", errorCode) => ({ version: 1, sequence, phase, errorCode, epoch: fixtureEpoch,
   chatAvailable: false, callsAvailable: false, socialLoginAvailable: false });
 const reply = (body, snapshot = state()) => ({ version: 1, id: JSON.parse(body).id.toLowerCase(), snapshot });
 const client = postMessage => createClient({ postMessage, makeID: crypto.randomUUID });

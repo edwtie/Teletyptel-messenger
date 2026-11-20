@@ -185,6 +185,71 @@
   z-index: 25020;
 }
 
+.hybrid-account-dialog {
+  z-index: 25030;
+}
+
+.hybrid-account-dialog .modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+}
+
+.hybrid-account-dialog input:not([type="checkbox"]),
+.hybrid-account-dialog select {
+  display: block;
+  width: 100%;
+  font-size: 16px;
+}
+
+#hybridConnected .topbar {
+  position: relative;
+  z-index: 50;
+  flex-wrap: nowrap;
+  gap: 6px;
+}
+
+#hybridConnected .topbar img {
+  max-width: min(40vw, 240px);
+}
+
+#hybridConnected #connectionSummary {
+  flex: 1;
+  min-width: 0;
+  font-size: 10px;
+}
+
+#hybridMainMenu summary {
+  min-width: 40px;
+  min-height: 40px;
+}
+
+#hybridMainMenu > div {
+  width: max-content;
+}
+
+#hybridConnected .avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+#hybridContactRequests:not(:empty) {
+  padding: 8px;
+  border-top: 1px solid var(--line);
+  background: var(--panel);
+}
+
+#hybridContactRequests > div {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
 .hybrid-feature-dialog .modal-body {
   display: flex;
   flex-direction: column;

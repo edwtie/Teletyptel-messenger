@@ -14,6 +14,11 @@ Deze afzonderlijke variant combineert de webvormgeving van TestFlight 16.9 met d
 - Groepschat gebruikt nu de bestaande native MUC-motor: openen/maken, deelnemen, onderwerp, uitnodigen, verlaten en moderatorrollen aanvragen. Groepsrechten en bevestigingen blijven van de server; de UI verzint geen groepsleesbevestigingen. Bewerken van groepsberichten en groepsoproepen zijn niet aangesloten.
 - De plusknop opent de bestaande native bijlageselectie. Foto's/documenten worden pas na een afzonderlijke uploadactie opgeslagen; de link komt daarna uitsluitend op verzoek in het actuele concept. Native bekijken/opslaan werkt via een geselecteerd bericht-ID, niet via een door JavaScript aangeleverd bestandspad.
 - Vertaalinstellingen, compacte privévertalingen van beide chatrichtingen en optionele live RTT-vertaling gebruiken de bestaande native vertaalsessie. Uitgeschakelde vertaling, ingetrokken toestemming, gelijke brontaal en doeltaal, accountwisseling en een beëindigd gesprek mogen geen oude vertaalbijschriften terugplaatsen.
+- Google/Facebook gebruiken de bestaande native SDK en aanmeldketen, inclusief serverchallenge en eventuele tweestapsverificatie. Alleen daadwerkelijk in de appbuild geconfigureerde providers worden ingeschakeld. OAuth-bewijzen, clientconfiguratie en cookies gaan niet naar JavaScript.
+- Account bewaren is optioneel. De bestaande apparaatgebonden biometrische sleutelhanger bewaart pas na bevestigde aanmelding én toestemming. Automatisch herstellen vereist eerder vastgelegde biometrische toestemming; uitloggen verwijdert de bewaarde aanmelding. Er is geen wachtwoordopslag in de weblaag.
+- Het symbolenmenu opent profielvelden en vertaalinstellingen. De nieuwe-contactknop en toestemmingsverzoeken gebruiken de bestaande native contactbeheerder. Profielwijzigingen accepteren alleen naam, telefoonnummer, profieltaal en kleur; account-ID en CSRF blijven native.
+- Contacten, chatballonnen en de chatkop tonen begrensde JPEG-miniaturen uit de bestaande native avatarcache. Alleen het actuele account en diens huidige contacten krijgen een afbeelding; willekeurige foto-URL's, SVG en accountvreemde avatars zijn geweigerd. Bewerken van de eigen foto gebruikt de bestaande native fotokiezer.
+- Wachtwoordherstel en registratie gebruiken de bestaande native account-API. Registratie blijft beperkt tot het door die API ondersteunde lokale XMPP-domein; een extern e-mailprofiel wordt niet als nieuw XMPP-account gepresenteerd. De privacyknop opent uitsluitend de vaste privacypagina van de native geconfigureerde installatie, buiten de sessie-WebView.
 - Een afzonderlijke CI-appassemblage combineert de presentatie met de bestaande native appbronnen. De oude SwiftUI-root verliest alleen in de tijdelijke kopie zijn `@main`; de werkende app wordt niet vervangen. `reference-only` en `testFlightReady: false` blijven staan.
 
 ## Eigendom en beveiliging
@@ -38,9 +43,9 @@ De verplichte `nativeLogout`-callback moet bij uiteindelijke appassemblage dezel
 
 Het opstartlogo en de blauwe voortgang gebruiken één bestaande webweergave. Bij openen wordt alleen de native brug opgehaald; de echte servercontrole gebeurt tijdens de native aanmeldactie. Er wordt geen invoerveld automatisch gefocust. Draaien behoudt ingevulde tekst. Wachtwoord en verificatiecode worden na de opdracht gewist en niet in webopslag bewaard. UUID's gebruiken ook bij custom schemes een cryptografische bron, zonder terugval naar `Math.random`.
 
-`chatAvailable` volgt de actieve native sessie. `callsAvailable` vereist daarnaast een geïnjecteerde oproepadapter; ieder contact krijgt een native `canCall`-vlag. `socialLoginAvailable` blijft `false`. Er is geen terugval naar de oude webmotor. Berichten worden pas via een expliciete viewportbevestiging lokaal gelezen gemarkeerd; blauwe vinkjes vereisen de native ontvangst van een weergavebevestiging, niet alleen online aanwezigheid.
+`chatAvailable` volgt de actieve native sessie. `callsAvailable` vereist daarnaast een geïnjecteerde oproepadapter; ieder contact krijgt een native `canCall`-vlag. `socialLoginAvailable` volgt uitsluitend de native providerconfiguratie. Er is geen terugval naar de oude webmotor. Berichten worden pas via een expliciete viewportbevestiging lokaal gelezen gemarkeerd; blauwe vinkjes vereisen de native ontvangst van een weergavebevestiging, niet alleen online aanwezigheid.
 
-Google/Facebook, wachtwoordherstel, nieuwe gebruiker en account bewaren zijn in deze testpresentatie nog uitgeschakeld. Nieuwe contacten blijven uitgeschakeld onder de plusknop; groepen vereisen de native groepsfunctie. Profielfoto's, volledige smileyselectie, uitgebreid kamerconfiguratiebeheer en groepsoproepen volgen nog. Het aanmeldveld vraagt een werkelijk XMPP-account; e-mailaliasaanmelding is niet als voltooid gepresenteerd.
+Niet geconfigureerde providers blijven zichtbaar maar uitgeschakeld. Volledige smileyselectie, overige geavanceerde instellingen, uitgebreid kamerconfiguratiebeheer en groepsoproepen volgen nog. Het wachtwoordveld vraagt nog een werkelijk XMPP-account; e-mailaliasaanmelding via dat veld is niet als voltooid gepresenteerd. De native providerroute kan wel een door de server geverifieerd Google/Facebook-account koppelen.
 
 Tijdens TC verdwijnt gewone chat. Live tekst gebruikt uitsluitend de native RTT-opdracht. Als alle camera's aantoonbaar uitstaan vullen de RTT-vakken het gesprek; een onbekende camerastatus wordt niet als uitgeschakeld behandeld. Videotracks worden door native `RTCMTLVideoView` getoond, niet via browsermedia. De videopositie wordt begrensd aan de native viewport. Concepten blijven binnen hetzelfde account behouden als een gesprek de chat onderbreekt.
 
@@ -59,7 +64,7 @@ De workflow compileert de library en de afzonderlijk geassembleerde app voor de 
 
 ## Nog aansluiten
 
-1. Providerlogin, profielfoto's, overige instellingen, contactwijzigingen, uitgebreide kamerconfiguratie en groepsoproepen verbinden.
+1. Overige geavanceerde instellingen, bestaande contacten hernoemen/verwijderen/blokkeren, volledige smileyselectie, uitgebreide kamerconfiguratie en groepsoproepen verbinden.
 2. Ondertekende toestelevaluatie van chat, native video, audio, RTT, toetsenbord en CallKit-opnemen/beëindigen uitvoeren.
 3. Achtergrondherstel en APNs met een echt geregistreerd toestel afzonderlijk activeren en testen; de CI-assemblage activeert geen push.
 4. Volledige webgelijkheid, schermlezerbediening en de resterende navigatieschermen beoordelen voordat de bestaande TestFlight-app wordt vervangen.

@@ -17,7 +17,7 @@ test("hybrid login reuses pinned markup styling and symbols without shipping web
   assert.ok(html.includes(element(original, /<section\b[^>]*\bclass="modal-section account-auth-section"[^>]*>/)));
   assert.match(html, /id="dialogServerSettingsButton"[\s\S]*?<svg viewBox="0 -960 960 960"/);
   assert.match(html, /connect-src 'none'/);
-  assert.deepEqual([...html.matchAll(/<script src="([^"]+)"/g)].map(match => match[1]), ["ui-language.js", "native-session.js", "login-presentation.js", "contacts-presentation.js", "features-presentation.js", "chat-presentation.js", "calls-presentation.js"]);
+  assert.deepEqual([...html.matchAll(/<script src="([^"]+)"/g)].map(match => match[1]), ["ui-language.js", "native-session.js", "login-presentation.js", "account-presentation.js", "contacts-presentation.js", "features-presentation.js", "chat-presentation.js", "calls-presentation.js"]);
   assert.match(html, /id="conversationSidebar"/);
   assert.match(html, /id="conversationSearchInput"/);
   for (const name of Object.keys(content.files)) assert.doesNotMatch(name, /chat-client\.js|jingle|native-server|config|php|demo/i);
@@ -58,6 +58,11 @@ async function setup(engine, viewport = { width: 390, height: 844 }) {
         window.nativeState = { ...window.nativeState, sequence: ++sequence, extras: { ...window.nativeState.extras, ...changes } };
         window.nativeFixtureClient.receive(window.nativeState);
       };
+      window.emitAccount = changes => {
+        const account = { ...window.nativeState.account, ...changes };
+        window.nativeState = { ...window.nativeState, sequence: ++sequence, account, socialLoginAvailable: account.providers?.length > 0 };
+        window.nativeFixtureClient.receive(window.nativeState);
+      };
       window.stageFixtureAttachment = () => {
         drafts.set(selectedPeer, (drafts.get(selectedPeer) || "") + "\nBestand: fixture.pdf\nhttps://fixture.invalid/api/file.php?id=" + "a".repeat(32));
         window.nativeState = { ...window.nativeState, sequence: ++sequence, conversation: conversation() };
@@ -79,13 +84,19 @@ async function setup(engine, viewport = { width: 390, height: 844 }) {
         const client = factory.createClient({ makeID: () => crypto.randomUUID(), postMessage: body => {
           const command = JSON.parse(body);
           window.nativeCommands.push(command);
+          if ((/^(chat|calls|groups|files|translation|auth|account|contacts)\./.test(command.command) || ["session.logout", "session.cancel", "session.verifySecondFactor"].includes(command.command)) && command.epoch !== epoch) return Promise.reject(new Error("invalidState"));
           if (command.command === "session.login") { epoch = crypto.randomUUID(); window.nativeState = state("checking"); }
+          if (["auth.social", "auth.biometric"].includes(command.command)) { epoch = crypto.randomUUID(); window.nativeState = state("checking"); }
           if (command.command === "session.verifySecondFactor") window.nativeState = state("authenticating");
           if (command.command === "session.cancel") window.nativeState = state("idle");
           if (command.command === "session.logout") { epoch = crypto.randomUUID(); messages.clear(); drafts.clear(); selectedPeer = null; window.nativeState = state("signedOut"); }
           if (command.command === "app.openSettings") window.nativeSettingsCount += 1;
           const apply = () => {
             const args = command.arguments;
+            if (/^(account|contacts|auth)\./.test(command.command)) window.nativeState = { ...window.nativeState, sequence: ++sequence };
+            if (["auth.register", "auth.recover", "contacts.add"].includes(command.command)) window.nativeState.account = { ...window.nativeState.account, notice: "Aanvraag ontvangen; controleer de bevestiging." };
+            if (command.command === "account.save") window.nativeState.account = { ...window.nativeState.account,
+              profile: { ...window.nativeState.account.profile, name: args.name, phone: args.phone, language: args.language, color: args.color }, notice: "Accountinstellingen opgeslagen." };
             if (/^(chat|calls|groups|files|translation)\./.test(command.command)) {
               if (command.epoch !== epoch) return Promise.reject(new Error("invalidState"));
               window.nativeState = { ...window.nativeState, sequence: ++sequence };
@@ -162,6 +173,79 @@ async function setup(engine, viewport = { width: 390, height: 844 }) {
 }
 
 for (const engine of [chromium, webkit]) {
+  test(engine.name() + ": provider login, biometric controls and account entry never use browser authentication", { timeout: 60000 }, async () => {
+    const { browser, page, errors, requests } = await setup(engine);
+    try {
+      for (const [provider, button] of [["google", "dialogGoogleLoginFallbackButton"], ["facebook", "dialogFacebookLoginButton"]]) {
+        await page.evaluate(() => { window.emitNative("idle"); window.emitAccount({ providers: ["google", "facebook"], entryAvailable: true, registrationAvailable: true, rememberAvailable: true, savedLogin: true }); });
+        await page.locator("#" + button).click();
+        await page.waitForFunction(name => window.nativeCommands.some(value => value.command === "auth.social" && value.arguments.provider === name), provider);
+        await page.locator("#hybridCancel").click();
+      }
+      await page.evaluate(() => window.emitAccount({ entryAvailable: true, registrationAvailable: true, savedLogin: true, rememberAvailable: true }));
+      await page.locator("#hybridBiometric").click();
+      await page.waitForFunction(() => window.nativeCommands.some(value => value.command === "auth.biometric"));
+      await page.locator("#hybridCancel").click();
+      await page.evaluate(() => window.emitAccount({ entryAvailable: true, registrationAvailable: true }));
+      await page.locator("#dialogForgotPasswordButton").click();
+      await page.locator("#hybridEntryJid").fill("fixture@example.invalid");
+      await page.locator("#hybridEntrySubmit").click();
+      await page.waitForFunction(() => window.nativeCommands.some(value => value.command === "auth.recover"));
+      await page.locator('[data-close-account="hybridEntry"]').click();
+      await page.locator("#dialogCreateAccountButton").click();
+      await page.locator("#hybridEntryJid").fill("new@localhost");
+      await page.locator("#hybridEntryName").fill("Fictieve gebruiker");
+      await page.locator("#hybridEntryPassword").fill("Fictional123!");
+      await page.locator("#hybridEntryRepeat").fill("Fictional123!");
+      await page.locator("#hybridEntryConsent").check();
+      await page.locator("#hybridEntrySubmit").click();
+      await page.waitForFunction(() => window.nativeCommands.some(value => value.command === "auth.register"));
+      assert.equal(await page.locator("#hybridEntryPassword").inputValue(), "");
+      assert.equal(await page.locator("#hybridEntryRepeat").inputValue(), "");
+      assert.deepEqual(await page.evaluate(() => Object.keys(localStorage)), []);
+      assert.equal(requests.some(url => /\/api\/|facebook\.com|google\.com/.test(url)), false);
+      assert.deepEqual(errors, []);
+    } finally { await browser.close(); }
+  });
+
+  test(engine.name() + ": profile forms, native avatars and new contacts remain account scoped", { timeout: 45000 }, async () => {
+    const { browser, page, errors } = await setup(engine);
+    try {
+      await page.evaluate(() => {
+        window.emitRoster([{ jid: "peer@localhost", name: "Peer", presence: "online" }]);
+        const canvas = document.createElement("canvas"); canvas.width = 48; canvas.height = 48;
+        const context = canvas.getContext("2d"); context.fillStyle = "#2563eb"; context.fillRect(0, 0, 48, 48);
+        const image = canvas.toDataURL("image/jpeg");
+        window.emitAccount({ entryAvailable: true, contactsAvailable: true, owner: "fixture@localhost", requests: ["new@localhost"],
+          profile: { jid: "fixture@localhost", name: "Fixture", phone: "", language: "nl", color: "#2563eb" },
+          avatars: { "fixture@localhost": image, "peer@localhost": image } });
+      });
+      assert.equal(await page.locator("#conversationItems .avatar img").count(), 1);
+      await page.locator("#hybridMainMenu summary").click();
+      await page.locator("#hybridOpenProfile").click();
+      await page.locator("#hybridProfileName").fill("Nieuwe naam");
+      await page.locator("#hybridProfileLanguage").selectOption("en");
+      await page.locator("#hybridProfileSave").click();
+      await page.waitForFunction(() => window.nativeCommands.some(value => value.command === "account.save" && value.arguments.name === "Nieuwe naam"));
+      assert.equal(await page.evaluate(() => Object.hasOwn(window.nativeCommands.find(value => value.command === "account.save").arguments, "accountId")), false);
+      await page.locator('[data-close-account="hybridProfile"]').click();
+      await page.locator("#conversationActionsToggle").click();
+      await page.locator("#addConversationButton").click();
+      await page.locator("#hybridNewContactJid").fill("other@localhost");
+      await page.locator("#hybridNewContactName").fill("Other");
+      await page.locator("#hybridNewContactSave").click();
+      await page.waitForFunction(() => window.nativeCommands.some(value => value.command === "contacts.add" && value.arguments.presence === "false"));
+      await page.locator('[data-close-account="hybridNewContact"]').click();
+      await page.locator("#conversationItems .conversation-item").click();
+      await page.evaluate(() => window.emitMessages([window.fixtureMessage("Hallo", false), window.fixtureMessage("Hoi", true)]));
+      assert.equal(await page.locator("#hybridMessages .avatar img").count(), 2);
+      await page.locator("#hybridLogout").click();
+      assert.equal(await page.locator("#hybridProfileName").inputValue(), "");
+      assert.equal(await page.locator("#hybridConnected .avatar img").count(), 0);
+      assert.deepEqual(errors, []);
+    } finally { await browser.close(); }
+  });
+
   test(engine.name() + ": group join, messaging, invitations and moderation retain native authority", { timeout: 45000 }, async () => {
     const { browser, page, errors } = await setup(engine);
     try {

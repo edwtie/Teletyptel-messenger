@@ -83,7 +83,7 @@
     }
 
     function renderMessages(conversation) {
-      const signature = JSON.stringify([peer, kind, conversation.messages, state.extras.translations, state.extras.fileMessages]);
+      const signature = JSON.stringify([peer, kind, conversation.messages, state.extras.translations, state.extras.fileMessages, state.account.avatars]);
       if (signature === renderedSignature) return;
       const atBottom = messages.scrollHeight - messages.scrollTop - messages.clientHeight < 60;
       const existing = new Map(Array.from(messages.children, row => [row.dataset.messageId, row]));
@@ -97,6 +97,8 @@
         avatar.setAttribute("aria-hidden", "true");
         const contact = state.roster.contacts.find(value => value.jid === peer);
         avatar.textContent = message.outgoing ? "IK" : (contact?.name || peer).slice(0, 2).toUpperCase();
+        document.defaultView.TeleTypTelHybridAvatar?.(avatar, message.outgoing ? state.account.owner : kind === "direct" ? peer : null,
+          message.outgoing ? "IK" : (message.sender || contact?.name || peer).slice(0, 2).toUpperCase(), state.account);
         const bubble = document.createElement("div");
         bubble.className = "hybrid-bubble";
         const body = document.createElement("div");

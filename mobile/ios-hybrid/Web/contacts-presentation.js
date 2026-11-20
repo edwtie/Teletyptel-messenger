@@ -64,6 +64,7 @@
       back.hidden = selected === null;
       avatar.hidden = selected === null;
       avatar.textContent = contact ? initials(contact.name) : "";
+      if (contact) document.defaultView.TeleTypTelHybridAvatar?.(avatar, contact.kind === "direct" ? contact.jid : null, initials(contact.name), latestState?.account);
       title.textContent = contact?.name || "Kies een contact";
       jid.textContent = contact?.jid || "";
       presence.textContent = contact ? (contact.kind === "group" ? "Groep" : presenceLabels[contact.presence]) : "";
@@ -100,6 +101,7 @@
         picture.className = "avatar avatar-list";
         picture.setAttribute("aria-hidden", "true");
         picture.textContent = initials(value.name);
+        document.defaultView.TeleTypTelHybridAvatar?.(picture, value.kind === "direct" ? value.jid : null, initials(value.name), latestState?.account);
         const text = document.createElement("span");
         text.className = "conversation-text";
         const name = document.createElement("strong");
@@ -144,7 +146,7 @@
       groups = state.groups;
       if (state.conversation) { selected = state.conversation.peer; selectedKind = state.conversation.kind; }
       roster = next;
-      const signature = JSON.stringify([next, groups, state.groupsAvailable, state.conversation?.peer || null, state.conversation?.kind]);
+      const signature = JSON.stringify([next, groups, state.groupsAvailable, state.conversation?.peer || null, state.conversation?.kind, state.account.avatars]);
       if (signature === rosterSignature) return;
       rosterSignature = signature;
       render();
