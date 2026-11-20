@@ -4,6 +4,12 @@ Deze afzonderlijke variant combineert de webvormgeving van TestFlight 16.9 met d
 
 ## Status
 
+**Groepsoproep (iPhone/iPad, voorgrond):** open een bestaande groepskamer en tik op de blauwe TC-knop. Kies **Deelnemen** om camera en microfoon te starten. Andere aanwezige hybride clients kunnen de uitnodiging bekijken of zelf vanuit de groep deelnemen. Een uitnodiging alleen start geen media.
+
+Een kleine kamer (maximaal vier aanwezigen) gebruikt per deelnemer een eigen WebRTC-verbinding naar ieder ander. Camera en microfoon worden één keer geopend. Je ziet per deelnemer beeld, verbindingsstatus en live tekst; RTT wordt niet als chatbericht opgeslagen. Bij vertrek blijven de overige verbindingen bestaan. Bij verlaten van de app of verlies van kamertoegang stopt de lokale oproep. Er wordt geen tolk, SIP-dienst of publiek conferentieplatform aangeroepen.
+
+De signalering loopt via privéberichten aan kamerleden en is specifiek voor deze hybride client. Geen achtergrondbelofte of interoperabiliteitsclaim voor andere clients. Praktijktest: voer met drie verschillende accounts in dezelfde kamer gelijktijdig beeld, spraak en RTT uit; laat één deelnemer vertrekken en controleer of de andere twee doorgaan.
+
 - De exacte 16.9-bronnen zijn vastgelegd in `ui-baseline.json`, inclusief workflowbewijs en bronvingerafdrukken.
 - De nieuwe Swift-library koppelt wachtwoordaanmelding, tweestapsverificatie, annuleren, uitloggen en verbindingsstatus aan een aangeleverde `NativeLoginModel`.
 - De brug maakt zelf geen tweede XMPP-sessie, WebRTC-motor of CallKit-provider aan.

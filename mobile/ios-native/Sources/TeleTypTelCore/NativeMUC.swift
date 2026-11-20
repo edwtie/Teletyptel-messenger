@@ -167,6 +167,7 @@ struct NativeMUCStream {
     func callFrame(nick: String, signal: NativeRoomCallSignal) throws -> String {
         guard callPermitted(nick), signal.valid else { throw NativeGroupFailure.denied }
         let payload = try JSONEncoder().encode(signal).base64EncodedString()
+        guard payload.utf8.count <= 48000 else { throw NativeGroupFailure.limit }
         return "<message xmlns='jabber:client' type='chat' to='\(Self.escape(room + "/" + nick))'><call xmlns='\(Self.callNamespace)'>\(payload)</call><no-store xmlns='urn:xmpp:hints'/><no-copy xmlns='urn:xmpp:hints'/></message>"
     }
     mutating func confirmCreation() { creationConfigured = true }

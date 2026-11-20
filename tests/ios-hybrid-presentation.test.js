@@ -393,7 +393,9 @@ for (const engine of [chromium, webkit]) {
       await page.locator("#hybridGroupJoinForm button[type=submit]").click();
       await page.locator("#hybridConversation").waitFor({ state: "visible" });
       assert.equal(await page.locator("#hybridContactPresence").textContent(), "Groep");
-      assert.equal(await page.locator("#hybridStartTotal").isDisabled(), true);
+      await page.getByRole("button", { name: "Groepsoproep openen" }).click();
+      await page.waitForFunction(() => window.nativeCommands.some(value => value.command === "groups.call" && value.arguments.room === "familie@conference.localhost"));
+      assert.equal(await page.evaluate(() => window.nativeCommands.some(value => value.command === "calls.start")), false);
       await page.locator("#hybridMessageInput").fill("Bericht voor de groep");
       await page.locator("#hybridSend").click();
       await page.locator("#hybridMessages .message").waitFor();
