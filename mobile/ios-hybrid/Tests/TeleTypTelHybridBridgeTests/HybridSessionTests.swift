@@ -365,6 +365,35 @@ final class HybridSessionTests: XCTestCase {
         XCTAssertEqual(model.phase, .idle)
     }
 
+    func testReturningAfterInterruptedResumeRestoresOnlyAuthorizedChatAndDraft() async throws {
+        let fixture = SessionFixture()
+        let (model, session) = try makeSession(fixture)
+        let peer = NativeContact(jid: "peer@localhost", name: "Peer", groups: [], subscription: "both")
+        _ = try command(session, "session.login", ["jid": "fixture@localhost", "password": "fixture-password"])
+        await eventually { model.canSend }
+        await fixture.emitRoster(.ready([peer]))
+        await eventually { session.snapshot().roster.contacts.count == 1 }
+        _ = try command(session, "chat.open", ["peer": peer.jid])
+        _ = try command(session, "chat.draft", ["peer": peer.jid, "body": "Niet versturen"])
+        model.beginBackground(); model.suspend()
+        await eventually { session.snapshot().phase == "suspended" }
+        XCTAssertNil(session.snapshot().conversation)
+        model.resume()
+        XCTAssertEqual(model.phase, .checking)
+        model.beginBackground(); model.suspend()
+        model.resume()
+        await eventually { model.canSend }
+        XCTAssertNil(session.snapshot().conversation)
+        await fixture.emitRoster(.ready([peer]))
+        await eventually { session.snapshot().conversation?.draft == "Niet versturen" }
+        let sent = await fixture.sentBodies
+        XCTAssertTrue(sent.isEmpty)
+        _ = try command(session, "session.logout")
+        model.resume()
+        XCTAssertEqual(model.phase, .signedOut)
+        XCTAssertNil(session.snapshot().conversation)
+    }
+
     func testRosterAndPresenceUpdatesAreMinimalAndClearedDuringBackgroundAndLogout() async throws {
         let fixture = SessionFixture()
         let (model, session) = try makeSession(fixture)

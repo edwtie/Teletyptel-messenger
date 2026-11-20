@@ -57,6 +57,7 @@ public final class NativeLoginModel: ObservableObject {
     @Published private var sender: (any NativeChatSending)?
     var onJingle: ((NativeJingleRequest, any NativeJingleSending) -> Void)?
     private var resumableAccount: NativeAuthenticatedAccount?
+    public private(set) var hasEstablishedSession = false
     private var callAuthorization = UUID()
     private var sendTasks: [UUID: Task<Void, Never>] = [:]
     private var earlyMessages: [NativeChatEvent] = []
@@ -595,6 +596,7 @@ public final class NativeLoginModel: ObservableObject {
                     self.phase = .failed(.connection(.invalidResponse))
                     return
                 }
+                self.hasEstablishedSession = true
                 self.phase = .connected(jid)
                 self.stableConnection?.cancel()
                 self.stableConnection = Task { [weak self] in
@@ -832,6 +834,10 @@ public final class NativeLoginModel: ObservableObject {
                 NSURLErrorNotConnectedToInternet, NSURLErrorCannotConnectToHost, NSURLErrorCannotFindHost,
                 NSURLErrorDNSLookupFailed].contains(failure.code)
         }
+        if transient, isBackground, hasEstablishedSession {
+            suspend()
+            return
+        }
         if transient, !isBackground, reconnectAttempt < 5, let account = resumableAccount {
             let next = reconnectAttempt + 1
             invalidate(clearChat: false, keepAccount: true, keepReconnect: true)
@@ -867,8 +873,7 @@ public final class NativeLoginModel: ObservableObject {
 
     public func suspend() {
         guard isWorking || isConnected || isAwaitingSecondFactor else { return }
-        let keepAccount = isConnected || isReconnecting
-        invalidate(clearChat: false, keepAccount: keepAccount)
+        invalidate(clearChat: false, keepAccount: hasEstablishedSession, preserveBackground: true)
         phase = .suspended
     }
 
@@ -885,7 +890,7 @@ public final class NativeLoginModel: ObservableObject {
         for key in Array(historyStates.keys) where historyStates[key] == .loading { historyStates[key] = .idle }
     }
 
-    private func invalidate(clearChat: Bool = true, keepAccount: Bool = false, keepReconnect: Bool = false) {
+    private func invalidate(clearChat: Bool = true, keepAccount: Bool = false, keepReconnect: Bool = false, preserveBackground: Bool = false) {
         contactActionTask?.cancel()
         contactActionTask = nil
         contactActionBusy = false
@@ -914,7 +919,7 @@ public final class NativeLoginModel: ObservableObject {
         earlyCallIntents.removeAll(); callPolicy.reset()
         jingleSender = nil
         sender = nil
-        isBackground = false
+        if !preserveBackground { isBackground = false }
         chat.interrupt()
         if clearChat {
             visibleConversation = nil
@@ -922,6 +927,7 @@ public final class NativeLoginModel: ObservableObject {
             chat = NativeChatStore(); chatError = nil; historyStates.removeAll()
         }
         if !keepAccount {
+            hasEstablishedSession = false
             callAuthorization = UUID()
             if let session = resumableAccount?.webSession { Task { await session.close() } }
             resumableAccount = nil

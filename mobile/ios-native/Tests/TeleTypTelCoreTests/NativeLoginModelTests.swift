@@ -664,6 +664,30 @@ final class NativeLoginModelTests: XCTestCase {
     }
 
     @MainActor
+    func testBackgroundTransportLossWaitsForForegroundWithoutLosingEstablishedAccount() async {
+        let fixture = LoginFixture()
+        let login = model(fixture)
+        start(login)
+        await eventually { await fixture.runCount() == 1 }
+        await fixture.ready(0)
+        await eventually { login.isConnected }
+        login.beginBackground()
+        await fixture.fail(0, error: XMPPSessionFailure.streamClosed)
+        await eventually { login.phase == .suspended }
+        XCTAssertTrue(login.isBackground)
+        XCTAssertFalse(login.canSend)
+        let beforeResume = await fixture.runCount()
+        XCTAssertEqual(beforeResume, 1)
+        login.resume()
+        await eventually { await fixture.runCount() == 2 }
+        await fixture.ready(1)
+        await eventually { login.canSend }
+        let events = await fixture.history()
+        XCTAssertEqual(events.filter { $0 == "account" }.count, 1)
+        login.disconnect()
+    }
+
+    @MainActor
     func testTransientFailureReconnectsWithoutReauthenticatingOrResendingDraft() async {
         let fixture = LoginFixture()
         let model = NativeLoginModel(checker: fixture, authenticator: fixture, connection: fixture, reconnectWait: { _ in })

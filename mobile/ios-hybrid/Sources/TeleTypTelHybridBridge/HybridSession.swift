@@ -375,7 +375,7 @@ public final class HybridSession {
     private func publish() {
         account?.update(epoch: accountEpoch.uuidString.lowercased(), active: model.isConnected && !model.isBackground)
         if !model.isConnected || model.isBackground {
-            selectedPeer = nil
+            if !model.hasEstablishedSession { selectedPeer = nil }
             model.visibleConversation = nil
         }
         if callBusy { model.visibleConversation = nil }
