@@ -279,6 +279,19 @@ test("Native runner retains assertion output and propagates the original failure
   assert.equal(JSON.parse(fs.readFileSync(path.join(reports, "iPhone-tests-failure.json"))).status, 65);
 });
 
+test("Native runner surfaces Swift compiler locations from stdout and stderr", testContext => {
+  const reports = diagnosticDirectory();
+  testContext.after(() => fs.rmSync(reports, { recursive: true, force: true }));
+  const log = testContext.mock.method(console, "error", () => {});
+  const first = "Tests.swift:329:51: error: cannot find 'viewport' in scope";
+  const second = "Tests.swift:329:133: error: cannot find 'outgoingMenu' in scope";
+  const failure = Object.assign(new Error("build failed"), { stdout: first, stderr: second, status: 65 });
+  assert.throws(() => executeLogged("xcodebuild", [], {
+    root, reports, name: "iPad-build", execute: () => { throw failure; }
+  }), error => error === failure);
+  assert.deepEqual(log.mock.calls.map(call => call.arguments[0]), [first, second]);
+});
+
 test("Native runner preserves timeout cause even if stderr contains only a warning", () => {
   const reports = diagnosticDirectory();
   const failure = Object.assign(new Error("spawnSync xcodebuild ETIMEDOUT"), {

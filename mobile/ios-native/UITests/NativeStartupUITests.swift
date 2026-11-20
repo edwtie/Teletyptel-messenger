@@ -324,9 +324,8 @@ final class NativeStartupUITests: XCTestCase {
             outgoing.exists && outgoing.isHittable && outgoing.frame.maxY <= draft.frame.minY &&
                 outgoing.frame.minY >= self.application.descendants(matching: .any)["chat-header"].firstMatch.frame.maxY - 1
         }
-        let rotatedMessage = XCTNSPredicateExpectation(predicate: latestVisible, object: outgoing)
-        XCTAssertEqual(XCTWaiter.wait(for: [rotatedMessage], timeout: 10), .completed,
-                       "Rotated group: viewport=\(viewport.frame), message=\(outgoing.frame), draft=\(draft.frame), menu hittable=\(outgoingMenu.isHittable)")
+        expectation(for: latestVisible, evaluatedWith: outgoing)
+        waitForExpectations(timeout: 10)
         snapshot("chat-landscape-keyboard")
         rotate(.portrait)
         XCUIDevice.shared.press(.home)
@@ -849,8 +848,9 @@ final class NativeStartupUITests: XCTestCase {
             let draftFrame = draft.frame
             return outgoingMenu.isHittable && viewportFrame.contains(messageFrame) && messageFrame.maxY <= draftFrame.minY
         }
-        expectation(for: latestVisible, evaluatedWith: outgoing)
-        waitForExpectations(timeout: 10)
+        let rotatedMessage = XCTNSPredicateExpectation(predicate: latestVisible, object: outgoing)
+        XCTAssertEqual(XCTWaiter.wait(for: [rotatedMessage], timeout: 10), .completed,
+                       "Rotated group: viewport=\(viewport.frame), message=\(outgoing.frame), draft=\(draft.frame), menu hittable=\(outgoingMenu.isHittable)")
         snapshot("group-landscape")
         outgoingMenu.tap()
         let copy = application.buttons["Kopiëren"]

@@ -13,7 +13,8 @@ function executeLogged(command, args, { root, reports, name, timeout = 600000, e
     fs.writeFileSync(path.join(reports, name + ".txt"), output);
     return output;
   } catch (error) {
-    for (const line of String(error.stdout || "").split(/\r?\n/).filter(line => /: error: .* : |^Test Case .* failed/.test(line)).slice(-8)) {
+    const diagnostics = [error.stdout, error.stderr].filter(Boolean).join("\n").split(/\r?\n/);
+    for (const line of diagnostics.filter(line => /:\d+:\d+: (?:fatal )?error: |: error: .* : |^Test Case .* failed/.test(line)).slice(-8)) {
       console.error(line.slice(0, 600));
     }
     fs.writeFileSync(path.join(reports, name + ".txt"), String(error.stdout || ""));
