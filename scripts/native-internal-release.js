@@ -165,6 +165,12 @@ function run() {
     }
     result.exportedRuntime = runtime.inspect(exportedApp, command);
     const exportedInfo = plist(path.join(exportedApp, "Info.plist"));
+    if (hybrid) {
+      if (!/^iphoneos27\.2(?:\.\d+)?$/.test(exportedInfo.DTSDKName) || exportedInfo.DTSDKName !== app.DTSDKName) {
+        throw new Error("Unexpected iOS SDK in hybrid archive or exported app");
+      }
+      result.sdk = exportedInfo.DTSDKName;
+    }
     metadata.inspect({ app: exportedInfo, archive: { ApplicationProperties: properties }, expected });
     validateApp(exportedInfo, configured);
     command("codesign", ["--verify", "--deep", "--strict", exportedApp]);

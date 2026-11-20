@@ -24,13 +24,16 @@ on:
 permissions:
   contents: read
 
+env:
+  DEVELOPER_DIR: /Applications/Xcode_27.2.app/Contents/Developer
+
 concurrency:
   group: hybrid-bridge-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   room-media:
-    runs-on: macos-15
+    runs-on: xcode-27
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
@@ -38,7 +41,7 @@ jobs:
           persist-credentials: false
       - name: Test three simultaneous room members without devices or external services
         run: |
-          export DEVELOPER_DIR="$(find /Applications -maxdepth 1 -name 'Xcode_26*.app' -type d | sort -r | head -n 1)/Contents/Developer"
+          bash scripts/ios-hybrid/check-toolchain.sh
           SDK_VERSION=$(node -p 'require("./scripts/ios-testflight/native-webrtc").version')
           DIGEST=$(node -p 'require("./scripts/ios-testflight/native-webrtc").checksum')
           ARCHIVE="$RUNNER_TEMP/room-media.zip"
@@ -51,7 +54,7 @@ jobs:
             mobile/ios-hybrid/MediaTests/RoomMeshLoopback.swift -o "$RUNNER_TEMP/room-mesh-loopback"
           "$RUNNER_TEMP/room-mesh-loopback"
   bridge:
-    runs-on: macos-15
+    runs-on: xcode-27
     timeout-minutes: 50
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
@@ -61,11 +64,8 @@ jobs:
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
         with:
           node-version: 22
-      - name: Select installed Xcode 26
-        run: |
-          XCODE_PATH=$(find /Applications -maxdepth 1 -name 'Xcode_26*.app' -type d | sort -r | head -n 1)
-          test -n "$XCODE_PATH"
-          echo "DEVELOPER_DIR=$XCODE_PATH/Contents/Developer" >> "$GITHUB_ENV"
+      - name: Verify Xcode and both iOS SDKs
+        run: bash scripts/ios-hybrid/check-toolchain.sh
       - name: Validate pinned UI and JavaScript boundary
         run: node --test tests/ios-hybrid-baseline.test.js tests/ios-hybrid-session.test.js tests/ios-hybrid-contacts.test.js tests/ios-hybrid-messenger.test.js tests/ios-hybrid-features.test.js tests/ios-hybrid-accounts.test.js tests/ios-hybrid-history-smileys.test.js
       - name: Prepare pinned login content without legacy engines
@@ -115,7 +115,7 @@ jobs:
           if architecture not in ['arm64', 'x86_64']:
               raise RuntimeError('Unsupported runner architecture')
           devices = json.loads(subprocess.check_output(['xcrun', 'simctl', 'list', 'devices', 'available', '-j']))['devices']
-          available = [(runtime, device) for runtime, values in devices.items() if '.iOS-' in runtime for device in values if device.get('isAvailable')]
+          available = [(runtime, device) for runtime, values in devices.items() if runtime.endswith('.iOS-27-2') for device in values if device.get('isAvailable')]
           for kind in ['iPhone', 'iPad']:
               candidates = [(runtime, device) for runtime, device in available if device['name'].startswith(kind)]
               if not candidates:
@@ -130,7 +130,7 @@ jobs:
   internal-hybrid-upload:
     if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/codex/teletyptel-beta-polish' && inputs.internal_build != ''
     needs: [room-media, bridge]
-    runs-on: macos-15-intel
+    runs-on: xcode-27
     timeout-minutes: 40
     environment: ios-testflight
     steps:
@@ -143,9 +143,7 @@ jobs:
           node-version: 22
       - name: Prepare verified hybrid interface without signing credentials
         run: |
-          XCODE_PATH=$(find /Applications -maxdepth 1 -name 'Xcode_26*.app' -type d | sort -r | head -n 1)
-          test -n "$XCODE_PATH"
-          echo "DEVELOPER_DIR=$XCODE_PATH/Contents/Developer" >> "$GITHUB_ENV"
+          bash scripts/ios-hybrid/check-toolchain.sh
           export TELETYPTEL_HYBRID_CONTENT="$RUNNER_TEMP/teletyptel-hybrid-content.json"
           node scripts/ios-hybrid/build-content.js
           echo "TELETYPTEL_HYBRID_CONTENT=$TELETYPTEL_HYBRID_CONTENT" >> "$GITHUB_ENV"
