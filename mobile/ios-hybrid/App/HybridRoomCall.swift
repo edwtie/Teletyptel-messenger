@@ -110,7 +110,7 @@ final class HybridRoomCall: ObservableObject {
                 remove(nick)
             }
             guard links.count < 3 else { return }
-            let media = NativeInterpreterMedia(factory: capture.factory, tracks: { [weak capture] in capture?.tracks })
+            let media = NativeInterpreterMedia(factory: capture.factory, roomMesh: true, tracks: { [weak capture] in capture?.tracks })
             let link = Link(signal.source, media)
             links[nick] = link
             let offerer = id.uuidString < signal.source.uuidString

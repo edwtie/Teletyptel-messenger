@@ -24,6 +24,27 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  room-media:
+    runs-on: macos-15
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - name: Test three simultaneous room members without devices or external services
+        run: |
+          export DEVELOPER_DIR="$(find /Applications -maxdepth 1 -name 'Xcode_26*.app' -type d | sort -r | head -n 1)/Contents/Developer"
+          SDK_VERSION=$(node -p 'require("./scripts/ios-testflight/native-webrtc").version')
+          DIGEST=$(node -p 'require("./scripts/ios-testflight/native-webrtc").checksum')
+          ARCHIVE="$RUNNER_TEMP/room-media.zip"
+          curl --fail --silent --show-error --location --retry 2 "https://github.com/stasel/WebRTC/releases/download/$SDK_VERSION/WebRTC-M${SDK_VERSION%%.*}.xcframework.zip" -o "$ARCHIVE"
+          echo "$DIGEST  $ARCHIVE" | shasum -a 256 -c -
+          unzip -q "$ARCHIVE" '*macos-x86_64_arm64/*' -d "$RUNNER_TEMP/room-sdk"
+          FRAMEWORK=$(node -e 'process.stdout.write(require("./scripts/ios-testflight/native-webrtc-test").findFramework(process.argv[1]))' "$RUNNER_TEMP/room-sdk")
+          xcrun swiftc -swift-version 5 -F "$FRAMEWORK" -framework WebRTC -Xlinker -rpath -Xlinker "$FRAMEWORK" \
+            mobile/ios-native/Sources/TeleTypTelCore/*.swift mobile/ios-native/App/NativeInterpreterMedia.swift \
+            mobile/ios-hybrid/MediaTests/RoomMeshLoopback.swift -o "$RUNNER_TEMP/room-mesh-loopback"
+          "$RUNNER_TEMP/room-mesh-loopback"
   bridge:
     runs-on: macos-15
     timeout-minutes: 50
@@ -80,14 +101,6 @@ jobs:
             -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath "$RUNNER_TEMP/teletyptel-hybrid-app" \
             ARCHS="$(uname -m)" ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO build
-      - name: Exercise simultaneous three-member group media without devices or external services
-        if: ${{ !cancelled() && steps.app-build.outcome == 'success' }}
-        run: |
-          FRAMEWORK=$(node -e 'process.stdout.write(require("./scripts/ios-testflight/native-webrtc-test").findFramework(process.argv[1]))' "$RUNNER_TEMP/teletyptel-hybrid-app/SourcePackages/artifacts")
-          xcrun swiftc -swift-version 5 -F "$FRAMEWORK" -framework WebRTC -Xlinker -rpath -Xlinker "$FRAMEWORK" \
-            mobile/ios-native/Sources/TeleTypTelCore/*.swift mobile/ios-native/App/NativeInterpreterMedia.swift \
-            mobile/ios-hybrid/MediaTests/RoomMeshLoopback.swift -o "$RUNNER_TEMP/room-mesh-loopback"
-          "$RUNNER_TEMP/room-mesh-loopback"
       - name: Smoke-test the assembled app on iPhone and iPad simulators
         if: ${{ !cancelled() && steps.app-build.outcome == 'success' }}
         run: |
