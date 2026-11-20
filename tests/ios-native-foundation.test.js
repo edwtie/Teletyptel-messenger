@@ -535,7 +535,12 @@ test("Native MUC uses existing rooms, membership acknowledgement and isolated gr
   assert.ok(transport.includes('self.groups.count < 8'));
   assert.ok(transport.includes('.now() + 15'));
   assert.ok(transport.includes('NativeGroupFailure.disconnected'));
-  assert.doesNotMatch(stream + model, /UserDefaults|FileManager|JSONEncoder|NSLog|print\(/);
+  assert.doesNotMatch(stream + model, /UserDefaults|FileManager|\.write\(to:|NSLog|print\(/);
+  assert.doesNotMatch(model, /JSONEncoder/);
+  const callFrame = stream.slice(stream.indexOf("func callFrame("), stream.indexOf("mutating func confirmCreation("));
+  assert.ok(callFrame.includes("JSONEncoder().encode(signal).base64EncodedString()"));
+  assert.equal((stream.match(/JSONEncoder/g) || []).length, 1);
+  for (const hint of ["no-store", "no-copy"]) assert.ok(callFrame.includes(`<${hint} xmlns='urn:xmpp:hints'/>`));
   assert.ok(projectText().project.includes('App/NativeGroupsView.swift'));
   assert.ok(projectText().project.includes('Core/NativeMUC.swift'));
   assert.ok(projectText().project.includes('Core/NativeGroupModel.swift'));
