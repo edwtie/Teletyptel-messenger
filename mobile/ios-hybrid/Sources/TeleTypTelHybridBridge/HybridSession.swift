@@ -7,28 +7,46 @@ import TeleTypTelCore
 @MainActor
 public final class HybridSession {
     public var onStateChange: ((HybridSnapshot) -> Void)?
-    private let model: NativeLoginModel
-    private let configuration: ServerConfiguration
+    let model: NativeLoginModel
+    let configuration: ServerConfiguration
     private let nativeLogout: () -> Void
     private let nativeSettings: (() -> Void)?
     private var observations: [AnyCancellable] = []
     private let calls: (any HybridCallPort)?
-    private var selectedPeer: String?
+    private let extras: (any HybridExtrasPort)?
+    var selectedPeer: String?
+    var selectedKind = "direct"
     private var accountEpoch = UUID()
     private var requestIDs: [UUID] = []
     private var sequence = 0
     private var lastPublished: HybridSnapshot?
 
     public init(model: NativeLoginModel, configuration: ServerConfiguration, nativeLogout: @escaping () -> Void,
-                nativeSettings: (() -> Void)? = nil, calls: (any HybridCallPort)? = nil) {
+                nativeSettings: (() -> Void)? = nil, calls: (any HybridCallPort)? = nil, extras: (any HybridExtrasPort)? = nil) {
         self.model = model
         self.configuration = configuration
         self.nativeLogout = nativeLogout
         self.nativeSettings = nativeSettings
         self.calls = calls
+        self.extras = extras
         observations.append(model.objectWillChange.sink { [weak self] _ in
             Task { @MainActor [weak self] in self?.publish() }
         })
+        observations.append(model.groups.objectWillChange.sink { [weak self] _ in
+            Task { @MainActor [weak self] in self?.publish() }
+        })
+        observations.append(model.groups.management.objectWillChange.sink { [weak self] _ in
+            Task { @MainActor [weak self] in self?.publish() }
+        })
+        observations.append(model.groups.invitationModel.objectWillChange.sink { [weak self] _ in
+            Task { @MainActor [weak self] in self?.publish() }
+        })
+        if let extras = extras {
+            extras.onStage = { [weak self] text, context in self?.stageAttachment(text, context: context) ?? false }
+            observations.append(extras.changes.sink { [weak self] _ in
+                Task { @MainActor [weak self] in self?.publish() }
+            })
+        }
         if let calls = calls {
             observations.append(calls.changes.sink { [weak self] _ in
                 Task { @MainActor [weak self] in self?.publish() }
@@ -39,13 +57,22 @@ public final class HybridSession {
     public func handle(_ data: Data, document: URL?, mainFrame: Bool) throws -> HybridReply {
         guard HybridDocumentPolicy.permits(document, mainFrame: mainFrame) else { throw HybridFailure.untrustedDocument }
         let request = try HybridRequest.decode(data)
-        if request.command.hasPrefix("chat.") || request.command.hasPrefix("calls.") {
+        if ["chat.", "calls.", "groups.", "files.", "translation."].contains(where: request.command.hasPrefix) {
             guard request.epoch == accountEpoch else { throw HybridFailure.invalidState }
         }
         guard !requestIDs.contains(request.id) else { throw HybridFailure.replayedRequest }
         requestIDs.append(request.id)
         if requestIDs.count > 128 { requestIDs.removeFirst() }
         switch request.command {
+        case "groups.join", "groups.leave", "groups.subject", "groups.invite", "groups.role":
+            try groupCommand(request)
+        case "files.pick", "files.open", "translation.settings", "translation.message", "translation.disable":
+            guard let extras = extras, let context = extrasContext() else { throw HybridFailure.unavailable }
+            if !["translation.settings", "translation.disable"].contains(request.command) { guard context.conversation != nil, !callBusy else { throw HybridFailure.invalidState } }
+            if let id = request.arguments["id"] {
+                guard context.conversation?.messages.contains(where: { $0.id == id.lowercased() && !$0.retracted }) == true else { throw HybridFailure.invalidState }
+            }
+            try extras.command(request.command, arguments: request.arguments, context: context)
         case "session.login":
             guard !model.isBackground else { throw HybridFailure.invalidState }
             switch model.phase {
@@ -78,18 +105,31 @@ public final class HybridSession {
             guard let nativeSettings = nativeSettings else { throw HybridFailure.unavailable }
             nativeSettings()
         case "chat.open":
-            let peer = try permittedPeer(request.arguments["peer"]!)
+            let peer = try permittedPeer(request.arguments["peer"]!, kind: request.kind)
             guard !callBusy else { throw HybridFailure.sessionBusy }
             selectedPeer = peer
+            selectedKind = request.kind
             model.visibleConversation = nil
-            model.loadHistory(for: peer)
+            if selectedKind == "direct" { model.loadHistory(for: peer) }
+            else if let group = model.groups.rooms.first(where: { $0.room == peer }), group.snapshot == nil, !group.joining, model.groups.available {
+                model.groups.join(room: peer, nickname: group.nickname)
+            }
         case "chat.close":
             selectedPeer = nil
             model.visibleConversation = nil
         case "chat.draft", "chat.send":
-            let peer = try permittedPeer(request.arguments["peer"]!)
-            guard selectedPeer == peer, request.command == "chat.draft" || !callBusy else { throw HybridFailure.invalidState }
+            let peer = try permittedPeer(request.arguments["peer"]!, kind: request.kind)
+            guard selectedPeer == peer, selectedKind == request.kind, request.command == "chat.draft" || !callBusy else { throw HybridFailure.invalidState }
             let body = request.arguments["body"]!
+            if selectedKind == "group" {
+                if request.command == "chat.send" {
+                    guard model.groups.available, model.groups.rooms.first(where: { $0.room == peer })?.snapshot?.canSpeak == true else { throw HybridFailure.invalidState }
+                    let before = Set(model.groups.rooms.first(where: { $0.room == peer })!.messages.map(\.id))
+                    model.groups.setDraft(body, room: peer); model.groups.send(room: peer)
+                    guard model.groups.rooms.first(where: { $0.room == peer })!.messages.contains(where: { !before.contains($0.id) }) else { throw HybridFailure.invalidState }
+                } else { model.groups.setDraft(body, room: peer) }
+                break
+            }
             if request.command == "chat.send" {
                 guard model.canSend else { throw HybridFailure.invalidState }
                 let previous = Set(model.chat.messages.map(\.id))
@@ -98,15 +138,17 @@ public final class HybridSession {
                 guard model.chat.messages.contains(where: { $0.peer == peer && !previous.contains($0.id) }) else { throw HybridFailure.invalidState }
             } else { model.setDraft(body, peer: peer) }
         case "chat.displayed":
-            let peer = try permittedPeer(request.arguments["peer"]!)
-            guard selectedPeer == peer, !callBusy else { throw HybridFailure.invalidState }
+            let peer = try permittedPeer(request.arguments["peer"]!, kind: request.kind)
+            guard selectedPeer == peer, selectedKind == request.kind, !callBusy else { throw HybridFailure.invalidState }
             let ids = request.arguments["ids"]!.split(separator: ",").compactMap { UUID(uuidString: String($0)) }
             let visible = Set(conversation()?.messages.filter { !$0.outgoing }.map(\.id) ?? [])
             guard ids.allSatisfy({ visible.contains($0.uuidString.lowercased()) }) else { throw HybridFailure.invalidState }
-            model.displayed(ids)
+            if selectedKind == "group" { model.groups.markRead(room: peer, identifiers: ids) }
+            else { model.displayed(ids) }
         case "chat.edit", "chat.hide", "chat.retract", "chat.forward", "chat.react":
+            if request.kind == "group" { try groupMessageCommand(request); break }
             let peer = try permittedPeer(request.arguments["peer"]!)
-            guard selectedPeer == peer, !callBusy, let id = UUID(uuidString: request.arguments["id"]!),
+            guard selectedPeer == peer, selectedKind == request.kind, !callBusy, let id = UUID(uuidString: request.arguments["id"]!),
                   let target = model.chat.messages.first(where: { $0.id == id && $0.peer == peer && !$0.hidden }) else { throw HybridFailure.invalidState }
             if request.command == "chat.hide" {
                 model.hideMessage(id)
@@ -179,15 +221,26 @@ public final class HybridSession {
             case .xmpp: errorCode = "connectionLost"
             }
         }
-        return HybridSnapshot(version: 1, sequence: sequence, epoch: accountEpoch.uuidString.lowercased(), phase: phase, errorCode: errorCode,
+        var result = HybridSnapshot(version: 1, sequence: sequence, epoch: accountEpoch.uuidString.lowercased(), phase: phase, errorCode: errorCode,
                               chatAvailable: model.isConnected && !model.isBackground, callsAvailable: calls != nil && model.isConnected && !model.isBackground, socialLoginAvailable: false,
                               settingsAvailable: nativeSettings != nil, roster: roster(), conversation: conversation(),
                               call: model.isConnected && !model.isBackground ? (calls?.state ?? HybridCallState()) : HybridCallState())
+        if model.isConnected && !model.isBackground {
+            result.groups = groupProjection()
+            result.groupsAvailable = model.groups.available
+            result.groupNotice = model.groups.management.status ?? model.groups.error ?? model.groups.invitationModel.notice
+            result.extras = extras?.state ?? HybridExtrasState()
+        }
+        return result
     }
 
-    private var callBusy: Bool { calls.map { !["idle", "failed"].contains($0.state.phase) } ?? false }
+    var callBusy: Bool { calls.map { !["idle", "failed"].contains($0.state.phase) } ?? false }
 
-    private func permittedPeer(_ peer: String) throws -> String {
+    func permittedPeer(_ peer: String, kind: String = "direct") throws -> String {
+        if kind == "group" {
+            guard model.isConnected, !model.isBackground, model.groups.rooms.contains(where: { $0.room == peer }) else { throw HybridFailure.invalidState }
+            return peer
+        }
         guard model.isConnected, !model.isBackground, !model.isBlocked(peer),
               case .ready(let contacts) = model.roster, contacts.contains(where: { $0.jid == peer }) else { throw HybridFailure.invalidState }
         if case .connected(let owner) = model.phase, peer == owner { throw HybridFailure.invalidState }
@@ -195,15 +248,19 @@ public final class HybridSession {
     }
 
     private func conversation() -> HybridConversation? {
-        guard let peer = selectedPeer, (try? permittedPeer(peer)) != nil, !callBusy else { return nil }
+        guard let peer = selectedPeer, (try? permittedPeer(peer, kind: selectedKind)) != nil, !callBusy else { return nil }
+        if selectedKind == "group" { return groupConversation(peer) }
         let messages = model.chat.messages.filter { $0.peer == peer && !$0.hidden }.suffix(100).map { message in
             var counts: [String: Int] = [:]
             for values in message.reactions.values { for emoji in values { counts[emoji, default: 0] += 1 } }
-            return HybridMessage(id: message.id.uuidString.lowercased(), body: message.retracted ? "Bericht verwijderd" : message.body,
+            var result = HybridMessage(id: message.id.uuidString.lowercased(), body: message.retracted ? "Bericht verwijderd" : message.body,
                           outgoing: message.state != .incoming, timestamp: message.date.timeIntervalSince1970,
                           state: message.state.rawValue, delivery: message.delivery.rawValue,
                           edited: message.edited, retracted: message.retracted,
                           reactions: counts.keys.sorted().prefix(16).map { HybridReaction(emoji: $0, count: counts[$0]!) })
+            result.canRetract = model.canChangeMessages && model.chat.canRetract(message.id)
+            result.canReact = model.canSend && !message.retracted
+            return result
         }
         let history: String
         switch model.historyStates[peer] ?? .idle {
@@ -250,10 +307,27 @@ public final class HybridSession {
             model.visibleConversation = nil
         }
         if callBusy { model.visibleConversation = nil }
+        extras?.update(extrasContext())
         let current = makeSnapshot(sequence: 0)
         guard current != lastPublished else { return }
         lastPublished = current
         sequence += 1
         onStateChange?(snapshot())
+    }
+
+    private func extrasContext() -> HybridExtrasContext? {
+        guard model.isConnected, !model.isBackground else { return nil }
+        return HybridExtrasContext(epoch: accountEpoch.uuidString.lowercased(), conversation: conversation(), call: calls?.state ?? HybridCallState())
+    }
+
+    private func stageAttachment(_ text: String, context: HybridExtrasContext) -> Bool {
+        guard let original = context.conversation, let current = conversation(), current.canSend, !callBusy,
+              context.epoch == accountEpoch.uuidString.lowercased(), original.peer == current.peer, original.kind == current.kind else { return false }
+        let body = current.draft.isEmpty ? text : current.draft + "\n" + text
+        guard HybridRequest.text(body) else { return false }
+        if current.kind == "group" { model.groups.setDraft(body, room: current.peer) }
+        else { model.setDraft(body, peer: current.peer) }
+        publish()
+        return true
     }
 }

@@ -144,6 +144,63 @@
   margin-top: 4px;
 }
 
+.hybrid-message-sender {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 5px;
+}
+
+.hybrid-translation:not(:empty) {
+  border-top: 1px solid var(--line);
+  margin-top: 6px;
+  padding-top: 4px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 140px;
+  overflow: auto;
+}
+
+.hybrid-translation details {
+  font-size: 11px;
+}
+
+.hybrid-translation summary {
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.hybrid-translation details p {
+  margin: 4px 0;
+}
+
+.hybrid-rtt-box .hybrid-translation {
+  flex: 0 1 auto;
+  font-size: 13px;
+}
+
+.hybrid-feature-dialog {
+  z-index: 25020;
+}
+
+.hybrid-feature-dialog .modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: auto;
+}
+
+.hybrid-feature-dialog label {
+  display: block;
+}
+
+.hybrid-feature-dialog input:not([type="checkbox"]),
+.hybrid-feature-dialog select {
+  display: block;
+  width: 100%;
+  font-size: 16px;
+}
+
 .hybrid-composer {
   position: relative;
   display: flex;

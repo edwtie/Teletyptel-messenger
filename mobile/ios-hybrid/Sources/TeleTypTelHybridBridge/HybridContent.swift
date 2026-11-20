@@ -14,7 +14,7 @@ public struct HybridContent {
     }
 
     private let resources: [String: (mime: String, data: Data)]
-    private static let scripts: Set<String> = ["native-session.js", "login-presentation.js", "contacts-presentation.js", "chat-presentation.js", "calls-presentation.js", "ui-language.js"]
+    private static let scripts: Set<String> = ["native-session.js", "login-presentation.js", "contacts-presentation.js", "features-presentation.js", "chat-presentation.js", "calls-presentation.js", "ui-language.js"]
     private static let styles: Set<String> = ["chat-client.css", "xmpp-availability.css", "hybrid-login.css", "hybrid-messenger.css"]
 
     public init(data: Data) throws {

@@ -14,6 +14,17 @@ struct TeleTypTelHybridApp: App {
                     HybridLoginView(session: owner.session, content: content, videoView: owner.callPort.videoView)
                 } else { Text("De lokale TeleTypTel-interface kon niet worden geladen.") }
             }
+            .sheet(item: $owner.fileSheet) { sheet in
+                if let body = sheet.body {
+                    NavigationStack {
+                        Form { NativeFileMessageButton(bodyText: body, session: owner.login.activeWebSession) }
+                            .navigationTitle("Bijlage")
+                            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Sluiten") { owner.fileSheet = nil } } }
+                    }
+                } else {
+                    NativeAttachmentPicker(login: owner.login) { text in owner.features.stage(text, context: sheet.context) }
+                }
+            }
             .onChange(of: scenePhase) { owner.sceneChanged($0) }
         }
     }
@@ -26,6 +37,8 @@ final class NativeHybridOwner: ObservableObject {
     let callPort: NativeHybridCallAdapter
     let session: HybridSession
     let content: HybridContent?
+    let features: NativeHybridExtrasAdapter
+    @Published var fileSheet: HybridFileSheet?
     private let background = NativeBackgroundController()
     private var observation: AnyCancellable?
 
@@ -36,15 +49,20 @@ final class NativeHybridOwner: ObservableObject {
         self.calls = calls
         let port = NativeHybridCallAdapter(controller: calls, login: login)
         callPort = port
+        let features = NativeHybridExtrasAdapter(login: login)
+        self.features = features
         let configuration = try! ServerConfiguration(address: NativeServerDefaults.address, domain: NativeServerDefaults.domain)
         session = HybridSession(model: login, configuration: configuration, nativeLogout: {
             calls.pushRegistration.logout()
             calls.endFromHybrid()
             login.disconnect()
-        }, calls: port)
+        }, calls: port, extras: features)
         content = Bundle.main.url(forResource: "hybrid-content", withExtension: "json")
             .flatMap { try? Data(contentsOf: $0) }.flatMap { try? HybridContent(data: $0) }
         calls.attach(login)
+        features.presentPicker = { [weak self] context in self?.fileSheet = HybridFileSheet(context: context, body: nil) }
+        features.presentFile = { [weak self] body, context in self?.fileSheet = HybridFileSheet(context: context, body: body) }
+        features.dismissPresentation = { [weak self] in self?.fileSheet = nil }
         observation = login.objectWillChange.sink { [weak self] _ in
             Task { @MainActor [weak self] in
                 guard let self = self else { return }
@@ -69,4 +87,10 @@ final class NativeHybridOwner: ObservableObject {
             callPort.refresh()
         }
     }
+}
+
+struct HybridFileSheet: Identifiable {
+    let id = UUID()
+    let context: HybridExtrasContext
+    let body: String?
 }

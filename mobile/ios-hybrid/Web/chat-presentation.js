@@ -14,6 +14,8 @@
     let state = null;
     let epoch = null;
     let peer = null;
+    let kind = "direct";
+    const draftKey = () => kind + ":" + peer;
     let dirty = false;
     let sending = false;
     let revision = 0;
@@ -26,8 +28,8 @@
 
     function remember() {
       if (!peer || !epoch) return;
-      drafts.set(peer, input.value);
-      nextDraft = { peer, epoch, body: input.value };
+      drafts.set(draftKey(), input.value);
+      nextDraft = { peer, epoch, kind, body: input.value };
     }
 
     function flush() {
@@ -37,7 +39,7 @@
           while (nextDraft) {
             const value = nextDraft;
             nextDraft = null;
-            await client.setDraft(value.peer, value.body, value.epoch);
+            await client.setDraft(value.peer, value.body, value.epoch, value.kind);
           }
         })().finally(() => { draftWork = null; });
       }
@@ -67,7 +69,8 @@
       const own = message.outgoing && message.state === "submitted" && !message.retracted;
       for (const button of menu.querySelectorAll("button")) {
         const action = button.dataset.messageAction;
-        button.hidden = (action === "edit" || action === "retract") && !(own && state.conversation.canChange);
+        button.hidden = (action === "edit" && !(own && state.conversation.canChange)) || (action === "retract" && !message.canRetract)
+          || (action === "react" && !message.canReact) || (action === "translate" && (!state.extras.ready || !state.extras.available || state.extras.mode === "off" || !state.extras.consent || message.retracted));
         button.disabled = action !== "hide" && !state.conversation.canSend;
       }
       menu.hidden = false;
@@ -80,7 +83,7 @@
     }
 
     function renderMessages(conversation) {
-      const signature = JSON.stringify([peer, conversation.messages]);
+      const signature = JSON.stringify([peer, kind, conversation.messages, state.extras.translations, state.extras.fileMessages]);
       if (signature === renderedSignature) return;
       const atBottom = messages.scrollHeight - messages.scrollTop - messages.clientHeight < 60;
       const existing = new Map(Array.from(messages.children, row => [row.dataset.messageId, row]));
@@ -99,6 +102,10 @@
         const body = document.createElement("div");
         body.className = "message-body";
         body.textContent = message.body;
+        if (message.sender && kind === "group") {
+          const sender = document.createElement("strong"); sender.className = "hybrid-message-sender"; sender.textContent = message.sender;
+          bubble.append(sender);
+        }
         const footer = document.createElement("div");
         footer.className = "hybrid-message-footer";
         const time = document.createElement("time");
@@ -123,6 +130,15 @@
         actions.addEventListener("click", event => { event.stopPropagation(); showMenu(message, actions); });
         row.oncontextmenu = event => { event.preventDefault(); showMenu(message, actions); };
         bubble.append(body, footer, actions);
+        if (state.extras.fileMessages.includes(message.id)) {
+          const file = document.createElement("button"); file.type = "button"; file.className = "hybrid-file-button";
+          file.textContent = "Bijlage openen";
+          file.onclick = () => { void client.openAttachment(message.id).catch(() => setNotice("Bijlage niet geopend. Controleer de verbinding.")); };
+          bubble.append(file);
+        }
+        const translated = document.createElement("div"); translated.className = "hybrid-translation";
+        document.defaultView.TeleTypTelHybridCaption?.(translated, state.extras.translations[message.id]);
+        if (translated.childNodes.length) bubble.append(translated);
         if (message.reactions.length) {
           const reactions = document.createElement("div");
           reactions.className = "hybrid-message-reactions";
@@ -155,18 +171,20 @@
         messages.replaceChildren(); renderedSignature = "";
         return;
       }
-      if (peer !== conversation.peer) {
+      if (peer !== conversation.peer || kind !== conversation.kind) {
         peer = conversation.peer;
-        input.value = drafts.get(peer) ?? conversation.draft;
-        dirty = drafts.has(peer) && drafts.get(peer) !== conversation.draft;
+        kind = conversation.kind;
+        input.value = drafts.get(draftKey()) ?? conversation.draft;
+        dirty = drafts.has(draftKey()) && drafts.get(draftKey()) !== conversation.draft;
         renderedSignature = "";
         displayed.clear();
-      } else if (!dirty && !sending) input.value = conversation.draft;
+      } else if (!sending && input.value === conversation.draft) { dirty = false; drafts.delete(draftKey()); }
+      else if (!dirty && !sending) { input.value = conversation.draft; drafts.delete(draftKey()); }
       byID("hybridSend").disabled = sending || !conversation.canSend || !input.value.trim() || new TextEncoder().encode(input.value).length > 8192;
       input.disabled = !conversation.canSend;
       byID("hybridHistoryStatus").textContent = conversation.history === "loading" ? "Geschiedenis laden…" : conversation.history === "failed" ? "Geschiedenis kon niet worden geladen." : "";
       const contact = value.roster.contacts.find(item => item.jid === peer);
-      for (const name of ["hybridStartTotal", "hybridStartAudio", "hybridStartVideo"]) byID(name).disabled = !value.callsAvailable || !contact?.canCall;
+      for (const name of ["hybridStartTotal", "hybridStartAudio", "hybridStartVideo"]) byID(name).disabled = kind !== "direct" || !value.callsAvailable || !contact?.canCall;
       renderMessages(conversation);
     }
 
@@ -183,16 +201,17 @@
       const version = revision;
       const target = peer;
       const scope = epoch;
+      const targetKind = kind;
       if (new TextEncoder().encode(body).length > 8192) return;
       sending = true;
       remember();
       render(state);
       try {
         await flush();
-        await client.sendMessage(target, body, scope);
-        if (epoch === scope && peer === target && revision === version) {
-          input.value = ""; dirty = false; drafts.delete(target); nextDraft = null;
-        } else if (epoch === scope && peer === target) {
+        await client.sendMessage(target, body, scope, targetKind);
+        if (epoch === scope && peer === target && kind === targetKind && revision === version) {
+          input.value = ""; dirty = false; drafts.delete(draftKey()); nextDraft = null;
+        } else if (epoch === scope && peer === target && kind === targetKind) {
           remember();
           await flush();
         }
@@ -234,6 +253,7 @@
         if (action === "hide") await client.hideMessage(peer, message.id);
         else if (action === "retract") await client.retractMessage(peer, message.id);
         else if (action === "react") await client.reactMessage(peer, message.id, "👍");
+        else if (action === "translate") await client.translateMessage(message.id);
       } catch { setNotice("Berichtactie niet uitgevoerd. Het bericht blijft behouden."); }
     };
     for (const button of menu.querySelectorAll("button")) button.onclick = () => { void act(button.dataset.messageAction); };

@@ -11,6 +11,9 @@ Deze afzonderlijke variant combineert de webvormgeving van TestFlight 16.9 met d
 - De weergave ondersteunt native aanmeldstatus, tweestapsverificatie, certificaatfouten, annuleren en uitloggen. Het tandwiel opent uitsluitend een optionele native instellingenactie; servervelden verschijnen niet in de webweergave.
 - Na aanmelden toont de webpresentatie de native contactenlijst en één-op-éénchat: concepten, verzenden, ontvangen, geschiedenis, reacties, doorsturen, bewerken en verwijderen volgens de bestaande native rechten. De aanvullende chatbediening is geen bewezen pixelkopie van 16.9.
 - Audio, video, TC, RTT, microfoon, camera, camerawissel, beeldpassing en DTMF gebruiken `NativeCallController.shared`. Opnemen loopt via een CallKit-transactie, niet via een tweede provider.
+- Groepschat gebruikt nu de bestaande native MUC-motor: openen/maken, deelnemen, onderwerp, uitnodigen, verlaten en moderatorrollen aanvragen. Groepsrechten en bevestigingen blijven van de server; de UI verzint geen groepsleesbevestigingen. Bewerken van groepsberichten en groepsoproepen zijn niet aangesloten.
+- De plusknop opent de bestaande native bijlageselectie. Foto's/documenten worden pas na een afzonderlijke uploadactie opgeslagen; de link komt daarna uitsluitend op verzoek in het actuele concept. Native bekijken/opslaan werkt via een geselecteerd bericht-ID, niet via een door JavaScript aangeleverd bestandspad.
+- Vertaalinstellingen, compacte privévertalingen van beide chatrichtingen en optionele live RTT-vertaling gebruiken de bestaande native vertaalsessie. Uitgeschakelde vertaling, ingetrokken toestemming, gelijke brontaal en doeltaal, accountwisseling en een beëindigd gesprek mogen geen oude vertaalbijschriften terugplaatsen.
 - Een afzonderlijke CI-appassemblage combineert de presentatie met de bestaande native appbronnen. De oude SwiftUI-root verliest alleen in de tijdelijke kopie zijn `@main`; de werkende app wordt niet vervangen. `reference-only` en `testFlightReady: false` blijven staan.
 
 ## Eigendom en beveiliging
@@ -37,7 +40,7 @@ Het opstartlogo en de blauwe voortgang gebruiken één bestaande webweergave. Bi
 
 `chatAvailable` volgt de actieve native sessie. `callsAvailable` vereist daarnaast een geïnjecteerde oproepadapter; ieder contact krijgt een native `canCall`-vlag. `socialLoginAvailable` blijft `false`. Er is geen terugval naar de oude webmotor. Berichten worden pas via een expliciete viewportbevestiging lokaal gelezen gemarkeerd; blauwe vinkjes vereisen de native ontvangst van een weergavebevestiging, niet alleen online aanwezigheid.
 
-Google/Facebook, wachtwoordherstel, nieuwe gebruiker en account bewaren zijn in deze testpresentatie nog uitgeschakeld. Nieuwe contacten en groepen blijven uitgeschakeld onder de plusknop. Profielfoto's, volledige smileyselectie, vertaling, bijlagen en groepsbediening zijn nog niet gekoppeld. Het aanmeldveld vraagt een werkelijk XMPP-account; e-mailaliasaanmelding is niet als voltooid gepresenteerd.
+Google/Facebook, wachtwoordherstel, nieuwe gebruiker en account bewaren zijn in deze testpresentatie nog uitgeschakeld. Nieuwe contacten blijven uitgeschakeld onder de plusknop; groepen vereisen de native groepsfunctie. Profielfoto's, volledige smileyselectie, uitgebreid kamerconfiguratiebeheer en groepsoproepen volgen nog. Het aanmeldveld vraagt een werkelijk XMPP-account; e-mailaliasaanmelding is niet als voltooid gepresenteerd.
 
 Tijdens TC verdwijnt gewone chat. Live tekst gebruikt uitsluitend de native RTT-opdracht. Als alle camera's aantoonbaar uitstaan vullen de RTT-vakken het gesprek; een onbekende camerastatus wordt niet als uitgeschakeld behandeld. Videotracks worden door native `RTCMTLVideoView` getoond, niet via browsermedia. De videopositie wordt begrensd aan de native viewport. Concepten blijven binnen hetzelfde account behouden als een gesprek de chat onderbreekt.
 
@@ -56,7 +59,7 @@ De workflow compileert de library en de afzonderlijk geassembleerde app voor de 
 
 ## Nog aansluiten
 
-1. Providerlogin, profielfoto's, instellingen, contactwijzigingen, bijlagen, groepen en vertaling via afgebakende native opdrachten verbinden.
+1. Providerlogin, profielfoto's, overige instellingen, contactwijzigingen, uitgebreide kamerconfiguratie en groepsoproepen verbinden.
 2. Ondertekende toestelevaluatie van chat, native video, audio, RTT, toetsenbord en CallKit-opnemen/beëindigen uitvoeren.
 3. Achtergrondherstel en APNs met een echt geregistreerd toestel afzonderlijk activeren en testen; de CI-assemblage activeert geen push.
 4. Volledige webgelijkheid, schermlezerbediening en de resterende navigatieschermen beoordelen voordat de bestaande TestFlight-app wordt vervangen.

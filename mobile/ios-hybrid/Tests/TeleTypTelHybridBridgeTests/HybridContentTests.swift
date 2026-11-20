@@ -7,7 +7,7 @@ final class HybridContentTests: XCTestCase {
         let entry: (String) -> [String: String] = { ["mime": $0, "base64": Data("fixture".utf8).base64EncodedString()] }
         var files: [String: Any] = ["chat.html": entry("text/html"), "chat-client.css": entry("text/css"),
             "xmpp-availability.css": entry("text/css"), "hybrid-login.css": entry("text/css"), "hybrid-messenger.css": entry("text/css"),
-            "chat-presentation.js": entry("text/javascript"), "calls-presentation.js": entry("text/javascript"),
+            "chat-presentation.js": entry("text/javascript"), "calls-presentation.js": entry("text/javascript"), "features-presentation.js": entry("text/javascript"),
             "native-session.js": entry("text/javascript"), "login-presentation.js": entry("text/javascript"), "contacts-presentation.js": entry("text/javascript"),
             "ui-language.js": entry("text/javascript"), "assets/brand/teletyptel-logo-header@2x.png": entry("image/png")]
         files.merge(extra) { _, incoming in incoming }

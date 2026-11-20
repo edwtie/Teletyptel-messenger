@@ -31,6 +31,7 @@ function createContent() {
   const chatActions = element(messenger, /<div\b[^>]*\bid="hybridChatActions"[^>]*>/);
   const chatBody = messenger.replace(chatActions, "");
   const calls = fs.readFileSync(path.join(root, "mobile/ios-hybrid/Web/calls-fragment.html"), "utf8");
+  const features = fs.readFileSync(path.join(root, "mobile/ios-hybrid/Web/features-fragment.html"), "utf8");
   const sidebar = element(original, /<aside\b[^>]*\bid="conversationSidebar"[^>]*>/)
     .replace('<div id="conversationItems"', '<p id="hybridRosterStatus" class="security-status" role="status" aria-live="polite"></p><div id="conversationItems"');
   const legacy = reference("chat-client.js");
@@ -45,7 +46,7 @@ function createContent() {
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' capacitor:; style-src 'self' capacitor:; img-src 'self' capacitor:; connect-src 'none'; media-src 'none'; frame-src 'none'; worker-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <title>TeleTypTel</title><link rel="stylesheet" href="chat-client.css"><link rel="stylesheet" href="xmpp-availability.css"><link rel="stylesheet" href="hybrid-login.css"><link rel="stylesheet" href="hybrid-messenger.css">
-<script src="ui-language.js" defer></script><script src="native-session.js" defer></script><script src="login-presentation.js" defer></script><script src="contacts-presentation.js" defer></script><script src="chat-presentation.js" defer></script><script src="calls-presentation.js" defer></script>
+<script src="ui-language.js" defer></script><script src="native-session.js" defer></script><script src="login-presentation.js" defer></script><script src="contacts-presentation.js" defer></script><script src="features-presentation.js" defer></script><script src="chat-presentation.js" defer></script><script src="calls-presentation.js" defer></script>
 </head><body class="account-gate account-booting" data-theme="light">
 <section id="hybridStartup" class="xmpp-availability native-startup" open aria-label="TeleTypTel starten"><div class="xmpp-availability__panel">
 <img class="xmpp-availability__brand" src="assets/brand/teletyptel-logo-header@2x.png" width="599" height="128" alt="TeleTypTel">
@@ -62,7 +63,7 @@ function createContent() {
 <main class="client-grid">${sidebar}<section id="hybridContactPreview" class="hybrid-contact-preview" aria-labelledby="hybridContactTitle">
 <div class="chat-header"><button id="hybridContactsBack" class="icon-button" type="button" aria-label="Terug naar contacten" hidden><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m14 6-6 6 6 6M8 12h13"/></svg></button><span id="hybridContactAvatar" class="avatar" aria-hidden="true" hidden></span><div class="chat-title"><strong id="hybridContactTitle">Kies een contact</strong><span id="hybridContactPresence"></span></div>${chatActions}</div>
 <div id="hybridEmptyChat" class="hybrid-contact-details"><p id="hybridContactJid"></p><p id="hybridContactHint">Kies een contact om te chatten of een gesprek te starten.</p></div>${chatBody}
-</section></main></div>${calls}
+</section></main>${features}</div>${calls}
 </body></html>`;
   if (/\bon\w+\s*=|<script\b[^>]*>(?!\s*<\/script>)/i.test(html)) throw new Error("Executable legacy HTML is not allowed.");
   const files = {};
@@ -76,7 +77,7 @@ function createContent() {
     for (const match of css.matchAll(/url\(["']?(assets\/[a-zA-Z0-9_@./-]+)["']?\)/g)) images.add(match[1]);
   }
   for (const name of images) add(name, name.endsWith(".svg") ? "image/svg+xml" : "image/png", readReference(name));
-  for (const [name, mime] of [["native-session.js", "text/javascript"], ["login-presentation.js", "text/javascript"], ["contacts-presentation.js", "text/javascript"], ["chat-presentation.js", "text/javascript"], ["calls-presentation.js", "text/javascript"], ["hybrid-login.css", "text/css"], ["hybrid-messenger.css", "text/css"]]) {
+  for (const [name, mime] of [["native-session.js", "text/javascript"], ["login-presentation.js", "text/javascript"], ["contacts-presentation.js", "text/javascript"], ["features-presentation.js", "text/javascript"], ["chat-presentation.js", "text/javascript"], ["calls-presentation.js", "text/javascript"], ["hybrid-login.css", "text/css"], ["hybrid-messenger.css", "text/css"]]) {
     add(name, mime, fs.readFileSync(path.join(root, "mobile/ios-hybrid/Web", name)));
   }
   const translations = {};

@@ -17,7 +17,7 @@
   }
 
   function safeState(value) {
-    const keys = ["version", "sequence", "epoch", "phase", "errorCode", "chatAvailable", "callsAvailable", "socialLoginAvailable", "settingsAvailable", "roster", "conversation", "call"];
+    const keys = ["version", "sequence", "epoch", "phase", "errorCode", "chatAvailable", "callsAvailable", "socialLoginAvailable", "settingsAvailable", "roster", "conversation", "call", "groups", "groupsAvailable", "groupNotice", "extras"];
     if (!value || typeof value !== "object" || Array.isArray(value)
         || Object.keys(value).some(key => !keys.includes(key)) || value.version !== 1
         || !Number.isSafeInteger(value.sequence) || value.sequence < 0 || !phases.has(value.phase)
@@ -32,13 +32,18 @@
       throw new Error("invalidNativeReply");
     }
     const roster = safeRoster(value.roster, value.phase);
+    const groups = safeGroups(value.groups ?? []);
+    const extras = safeExtras(value.extras);
+    if ((value.groupsAvailable !== undefined && typeof value.groupsAvailable !== "boolean") || !safeText(value.groupNotice ?? "")
+        || (value.phase !== "connected" && (groups.length || value.groupsAvailable || extras.ready || extras.attachmentAvailable))) throw new Error("invalidNativeReply");
     const call = safeCall(value.call);
-    const conversation = safeConversation(value.conversation, roster);
+    const conversation = safeConversation(value.conversation, roster, groups);
     if ((value.phase !== "connected" && (conversation || call.phase !== "idle"))
         || (!value.chatAvailable && conversation) || (!value.callsAvailable && !["idle", "failed"].includes(call.phase))) throw new Error("invalidNativeReply");
     return Object.freeze({ version: 1, sequence: value.sequence, epoch: value.epoch ?? null, phase: value.phase, errorCode: value.errorCode ?? null,
       chatAvailable: value.chatAvailable, callsAvailable: value.callsAvailable, socialLoginAvailable: false,
-      settingsAvailable: value.settingsAvailable === true, roster, conversation, call });
+      settingsAvailable: value.settingsAvailable === true, roster, conversation, call, groups,
+      groupsAvailable: value.groupsAvailable === true, groupNotice: value.groupNotice ?? null, extras });
   }
 
   function safeRoster(value, phase) {
@@ -74,17 +79,53 @@
     return safeText(value, 131072) && Array.from(value).length <= 32768;
   }
 
-  function safeConversation(value, roster) {
+  function safeGroups(value) {
+    if (!Array.isArray(value) || value.length > 8) throw new Error("invalidNativeReply");
+    const rooms = new Set();
+    return Object.freeze(value.map(group => {
+      const fields = ["room", "name", "joined", "joining", "canSpeak", "subject", "participants", "canModerate"];
+      if (!group || Object.keys(group).sort().join(",") !== fields.sort().join(",") || typeof group.room !== "string"
+          || !group.room || group.room.length > 1023 || /[\s/\u0000-\u001f]/u.test(group.room) || rooms.has(group.room)
+          || !safeText(group.name) || !safeText(group.subject) || !Array.isArray(group.participants) || group.participants.length > 200
+          || group.participants.some(name => !safeText(name) || new TextEncoder().encode(name).length > 128)
+          || ["joined", "joining", "canSpeak", "canModerate"].some(key => typeof group[key] !== "boolean")) throw new Error("invalidNativeReply");
+      rooms.add(group.room);
+      return Object.freeze({ ...group, participants: Object.freeze([...group.participants]) });
+    }));
+  }
+
+  function safeExtras(value) {
+    const empty = { ready: false, available: false, mode: "off", language: "nl", consent: false, liveConsent: false, ownLiveConsent: false,
+      busy: false, attachmentAvailable: false, fileMessages: [], translations: {}, ownRtt: null, remoteRtt: null, notice: null };
+    if (value === undefined) value = empty;
+    if (!value || Object.keys(value).some(key => !Object.hasOwn(empty, key))) throw new Error("invalidNativeReply");
+    const result = { ...empty, ...value };
+    if (["ready", "available", "consent", "liveConsent", "ownLiveConsent", "busy", "attachmentAvailable"].some(key => typeof result[key] !== "boolean")
+        || !["off", "manual", "automatic"].includes(result.mode)
+        || !["nl", "en", "de", "fr", "es", "it", "pt", "pl", "tr", "ar", "uk", "zh-CN"].includes(result.language)
+        || !Array.isArray(result.fileMessages) || result.fileMessages.length > 100 || result.fileMessages.some(id => typeof id !== "string" || !uuidPattern.test(id))
+        || !result.translations || typeof result.translations !== "object" || Array.isArray(result.translations) || Object.keys(result.translations).length > 100
+        || Object.entries(result.translations).some(([id, text]) => !uuidPattern.test(id) || !safeText(text, 65536))
+        || [result.ownRtt, result.remoteRtt, result.notice].some(text => text !== null && !safeText(text, 65536))
+        || ((result.mode === "off" || !result.consent || !result.ready || !result.available) && (Object.keys(result.translations).length || result.ownRtt || result.remoteRtt))
+        || (!result.liveConsent && result.remoteRtt) || (!result.ownLiveConsent && result.ownRtt)) throw new Error("invalidNativeReply");
+    return Object.freeze({ ...result, translations: Object.freeze({ ...result.translations }), fileMessages: Object.freeze([...result.fileMessages]) });
+  }
+
+  function safeConversation(value, roster, groups = []) {
     if (value == null) return null;
-    const keys = ["peer", "draft", "messages", "history", "canSend", "canChange"];
-    if (typeof value !== "object" || Array.isArray(value) || Object.keys(value).sort().join(",") !== keys.sort().join(",")
-        || !roster.contacts.some(contact => contact.jid === value.peer) || !safeText(value.draft)
+    const keys = ["peer", "draft", "messages", "history", "canSend", "canChange", "kind"];
+    const kind = value.kind ?? "direct";
+    if (typeof value !== "object" || Array.isArray(value) || Object.keys(value).some(key => !keys.includes(key))
+        || !["direct", "group"].includes(kind) || !(kind === "group" ? groups.some(group => group.room === value.peer) : roster.contacts.some(contact => contact.jid === value.peer)) || !safeText(value.draft)
         || !Array.isArray(value.messages) || value.messages.length > 100 || typeof value.canSend !== "boolean" || typeof value.canChange !== "boolean"
         || !["idle", "loading", "ready", "unavailable", "failed"].includes(value.history)) throw new Error("invalidNativeReply");
     const identifiers = new Set();
     const messages = value.messages.map(message => {
       const fields = ["id", "body", "outgoing", "timestamp", "state", "delivery", "edited", "retracted", "reactions"];
-      if (!message || typeof message !== "object" || Object.keys(message).sort().join(",") !== fields.sort().join(",")
+      if (!message || typeof message !== "object" || Object.keys(message).some(key => ![...fields, "sender", "canRetract", "canReact"].includes(key))
+          || (message.sender !== undefined && message.sender !== null && !safeText(message.sender))
+          || ["canRetract", "canReact"].some(key => message[key] !== undefined && typeof message[key] !== "boolean")
           || !uuidPattern.test(message.id) || identifiers.has(message.id) || !safeText(message.body)
           || typeof message.outgoing !== "boolean" || !Number.isFinite(message.timestamp) || Math.abs(message.timestamp) > 8640000000000
           || !["incoming", "sending", "submitted", "uncertain", "rejected"].includes(message.state)
@@ -99,9 +140,10 @@
             || !Number.isSafeInteger(reaction.count) || reaction.count < 1 || reaction.count > 10000) throw new Error("invalidNativeReply");
         return Object.freeze({ emoji: reaction.emoji, count: reaction.count });
       });
-      return Object.freeze({ ...message, reactions: Object.freeze(reactions) });
+      return Object.freeze({ ...message, reactions: Object.freeze(reactions), canRetract: message.canRetract ?? (value.canChange && message.outgoing && !message.retracted),
+        canReact: message.canReact ?? (value.canSend && !message.retracted) });
     });
-    return Object.freeze({ peer: value.peer, draft: value.draft, history: value.history,
+    return Object.freeze({ peer: value.peer, kind, draft: value.draft, history: value.history,
       canSend: value.canSend, canChange: value.canChange, messages: Object.freeze(messages) });
   }
 
@@ -146,7 +188,7 @@
       if (pendingCount >= 8) return Promise.reject(new Error("bridgeBusy"));
       const id = makeID();
       if (!uuidPattern.test(id)) return Promise.reject(new Error("invalidRequest"));
-      const scoped = command.startsWith("chat.") || command.startsWith("calls.");
+      const scoped = ["chat.", "calls.", "groups.", "files.", "translation."].some(prefix => command.startsWith(prefix));
       if (scoped && (!expectedEpoch || expectedEpoch !== latest?.epoch)) return Promise.reject(new Error("invalidState"));
       const body = JSON.stringify({ version: 1, id, command, arguments: argumentsValue, ...(scoped ? { epoch: expectedEpoch } : {}) });
       if (new TextEncoder().encode(body).length > 262144) return Promise.reject(new Error("invalidRequest"));
@@ -198,16 +240,23 @@
       cancel: () => request("session.cancel"),
       logout: () => request("session.logout"),
       openSettings: () => request("app.openSettings"),
-      openChat: (peer, epoch) => request("chat.open", { peer }, epoch),
+      openChat: (peer, epoch, kind = "direct") => request("chat.open", { peer, kind }, epoch),
       closeChat: epoch => request("chat.close", {}, epoch),
-      setDraft: (peer, body, epoch) => safeText(body) ? request("chat.draft", { peer, body }, epoch) : Promise.reject(new Error("invalidRequest")),
-      sendMessage: (peer, body, epoch) => safeText(body) && body.trim() ? request("chat.send", { peer, body }, epoch) : Promise.reject(new Error("invalidRequest")),
-      displayed: (peer, ids) => request("chat.displayed", { peer, ids: ids.join(",") }),
-      editMessage: (peer, id, body) => request("chat.edit", { peer, id, body }),
-      hideMessage: (peer, id) => request("chat.hide", { peer, id }),
-      retractMessage: (peer, id) => request("chat.retract", { peer, id }),
-      forwardMessage: (peer, id, target) => request("chat.forward", { peer, id, target }),
-      reactMessage: (peer, id, emoji) => request("chat.react", { peer, id, emoji }),
+      setDraft: (peer, body, epoch, kind = latest?.conversation?.kind ?? "direct") => safeText(body) ? request("chat.draft", { peer, body, kind }, epoch) : Promise.reject(new Error("invalidRequest")),
+      sendMessage: (peer, body, epoch, kind = latest?.conversation?.kind ?? "direct") => safeText(body) && body.trim() ? request("chat.send", { peer, body, kind }, epoch) : Promise.reject(new Error("invalidRequest")),
+      displayed: (peer, ids) => request("chat.displayed", { peer, ids: ids.join(","), kind: latest?.conversation?.kind ?? "direct" }),
+      editMessage: (peer, id, body) => request("chat.edit", { peer, id, body, kind: latest?.conversation?.kind ?? "direct" }),
+      hideMessage: (peer, id) => request("chat.hide", { peer, id, kind: latest?.conversation?.kind ?? "direct" }),
+      retractMessage: (peer, id) => request("chat.retract", { peer, id, kind: latest?.conversation?.kind ?? "direct" }),
+      forwardMessage: (peer, id, target) => request("chat.forward", { peer, id, target, kind: latest?.conversation?.kind ?? "direct" }),
+      reactMessage: (peer, id, emoji) => request("chat.react", { peer, id, emoji, kind: latest?.conversation?.kind ?? "direct" }),
+      joinGroup: (room, nickname, create) => request("groups.join", { room, nickname, create: String(create) }),
+      groupAction: (action, argumentsValue) => request("groups." + action, argumentsValue),
+      pickAttachment: epoch => request("files.pick", {}, epoch),
+      openAttachment: id => request("files.open", { id }),
+      translateMessage: id => request("translation.message", { id }),
+      disableTranslation: () => request("translation.disable"),
+      translationSettings: settings => request("translation.settings", Object.fromEntries(Object.entries(settings).map(([key, value]) => [key, String(value)]))),
       startCall: (peer, mode, epoch) => request("calls.start", { peer, mode }, epoch),
       resetCallFailure: () => request("calls.reset"),
       controlCall: (id, action, value) => action === "rtt" && !safeRttText(value) ? Promise.reject(new Error("invalidRequest"))
@@ -271,6 +320,6 @@
     return client;
   }
 
-  if (typeof module === "object" && module.exports) module.exports = { createClient, safeState, install, secureID, safeRoster, safeCall, safeConversation, safeText };
+  if (typeof module === "object" && module.exports) module.exports = { createClient, safeState, install, secureID, safeRoster, safeCall, safeConversation, safeText, safeGroups, safeExtras };
   else install(root);
 })(typeof window === "undefined" ? globalThis : window);

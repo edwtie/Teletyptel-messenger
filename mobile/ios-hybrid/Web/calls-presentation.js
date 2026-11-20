@@ -56,6 +56,8 @@
       byID("hybridConnected").inert = active;
       if (active) byID("hybridConnected").setAttribute("aria-hidden", "true"); else byID("hybridConnected").removeAttribute("aria-hidden");
       if (!active) {
+        byID("hybridRemoteTranslation").replaceChildren(); byID("hybridOwnTranslation").replaceChildren();
+        byID("hybridRemoteTranslation").dataset.text = ""; byID("hybridOwnTranslation").dataset.text = "";
         return;
       }
       if (opening) panel.focus({ preventScroll: true });
@@ -75,6 +77,12 @@
         const atBottom = remoteText.scrollHeight - remoteText.scrollTop - remoteText.clientHeight < 40;
         remoteText.textContent = call.remoteText;
         if (atBottom) remoteText.scrollTop = remoteText.scrollHeight;
+      }
+      for (const [id, text] of [["hybridRemoteTranslation", value.extras.remoteRtt], ["hybridOwnTranslation", value.extras.ownRtt]]) {
+        if (byID(id).dataset.text !== (text || "")) {
+          byID(id).dataset.text = text || "";
+          document.defaultView.TeleTypTelHybridCaption?.(byID(id), text);
+        }
       }
       byID("hybridAnswerCall").hidden = call.phase !== "ringing";
       byID("hybridAnswerCall").disabled = pending.has("answer");

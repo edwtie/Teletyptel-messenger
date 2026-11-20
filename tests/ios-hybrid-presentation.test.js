@@ -17,7 +17,7 @@ test("hybrid login reuses pinned markup styling and symbols without shipping web
   assert.ok(html.includes(element(original, /<section\b[^>]*\bclass="modal-section account-auth-section"[^>]*>/)));
   assert.match(html, /id="dialogServerSettingsButton"[\s\S]*?<svg viewBox="0 -960 960 960"/);
   assert.match(html, /connect-src 'none'/);
-  assert.deepEqual([...html.matchAll(/<script src="([^"]+)"/g)].map(match => match[1]), ["ui-language.js", "native-session.js", "login-presentation.js", "contacts-presentation.js", "chat-presentation.js", "calls-presentation.js"]);
+  assert.deepEqual([...html.matchAll(/<script src="([^"]+)"/g)].map(match => match[1]), ["ui-language.js", "native-session.js", "login-presentation.js", "contacts-presentation.js", "features-presentation.js", "chat-presentation.js", "calls-presentation.js"]);
   assert.match(html, /id="conversationSidebar"/);
   assert.match(html, /id="conversationSearchInput"/);
   for (const name of Object.keys(content.files)) assert.doesNotMatch(name, /chat-client\.js|jingle|native-server|config|php|demo/i);
@@ -39,6 +39,7 @@ async function setup(engine, viewport = { width: 390, height: 844 }) {
       const messages = new Map();
       const drafts = new Map();
       let selectedPeer = null;
+      let selectedKind = "direct";
       const state = phase => ({ version: 1, sequence: ++sequence, phase, errorCode: null,
         epoch, chatAvailable: phase === "connected", callsAvailable: phase === "connected", socialLoginAvailable: false, settingsAvailable: true,
         roster: { status: phase === "connected" ? "loading" : "hidden", contacts: [] }, conversation: null, call: { phase: "idle" } });
@@ -51,7 +52,17 @@ async function setup(engine, viewport = { width: 390, height: 844 }) {
         window.nativeState = { ...state("connected"), roster: { status, contacts } };
         window.nativeFixtureClient.receive(window.nativeState);
       };
-      const conversation = () => ({ peer: selectedPeer, draft: drafts.get(selectedPeer) || "", messages: messages.get(selectedPeer) || [], history: "ready", canSend: true, canChange: true });
+      const conversation = () => ({ peer: selectedPeer, kind: selectedKind, draft: drafts.get(selectedPeer) || "", messages: messages.get(selectedPeer) || [], history: "ready",
+        canSend: selectedKind === "direct" || window.nativeState.groups?.find(group => group.room === selectedPeer)?.canSpeak === true, canChange: selectedKind === "direct" });
+      window.emitExtras = changes => {
+        window.nativeState = { ...window.nativeState, sequence: ++sequence, extras: { ...window.nativeState.extras, ...changes } };
+        window.nativeFixtureClient.receive(window.nativeState);
+      };
+      window.stageFixtureAttachment = () => {
+        drafts.set(selectedPeer, (drafts.get(selectedPeer) || "") + "\nBestand: fixture.pdf\nhttps://fixture.invalid/api/file.php?id=" + "a".repeat(32));
+        window.nativeState = { ...window.nativeState, sequence: ++sequence, conversation: conversation() };
+        window.nativeFixtureClient.receive(window.nativeState);
+      };
       window.fixtureMessage = (body, outgoing = false, delivery = "unconfirmed") => ({ id: crypto.randomUUID(), body, outgoing, timestamp: 1780000000,
         state: outgoing ? "submitted" : "incoming", delivery, edited: false, retracted: false, reactions: [] });
       window.emitMessages = values => {
@@ -75,16 +86,31 @@ async function setup(engine, viewport = { width: 390, height: 844 }) {
           if (command.command === "app.openSettings") window.nativeSettingsCount += 1;
           const apply = () => {
             const args = command.arguments;
-            if (/^(chat|calls)\./.test(command.command)) {
+            if (/^(chat|calls|groups|files|translation)\./.test(command.command)) {
               if (command.epoch !== epoch) return Promise.reject(new Error("invalidState"));
               window.nativeState = { ...window.nativeState, sequence: ++sequence };
             }
-            if (command.command === "chat.open") { selectedPeer = args.peer; window.nativeState.conversation = conversation(); }
+            if (command.command === "chat.open") { selectedPeer = args.peer; selectedKind = args.kind || "direct"; window.nativeState.conversation = conversation(); }
             if (command.command === "chat.close") window.nativeState.conversation = null;
             if (command.command === "chat.draft") { drafts.set(args.peer, args.body); if (selectedPeer === args.peer) window.nativeState.conversation = conversation(); }
             if (command.command === "chat.send") {
               messages.set(args.peer, [...(messages.get(args.peer) || []), window.fixtureMessage(args.body, true)]);
               drafts.set(args.peer, ""); window.nativeState.conversation = conversation();
+            }
+            if (command.command === "groups.join") {
+              const room = args.room.includes("@") ? args.room : args.room + "@conference.localhost";
+              selectedPeer = room; selectedKind = "group";
+              window.nativeState.groups = [{ room, name: "Familie", joined: true, joining: false, canSpeak: true, subject: "", participants: [args.nickname, "Peer"], canModerate: true }];
+              window.nativeState.groupsAvailable = true; window.nativeState.conversation = conversation();
+            }
+            if (command.command === "groups.subject") { window.nativeState.groups[0].subject = args.subject; window.nativeState.groupNotice = "Onderwerp bevestigd."; }
+            if (command.command === "groups.invite") window.nativeState.groupNotice = "Uitnodiging verzonden.";
+            if (command.command === "groups.role") window.nativeState.groupNotice = "Rol bevestigd door groepsserver.";
+            if (command.command === "groups.leave") { window.nativeState.groups[0].joined = false; window.nativeState.groups[0].canSpeak = false; window.nativeState.conversation = conversation(); }
+            if (command.command === "translation.disable") window.nativeState.extras = { ...window.nativeState.extras, consent: false, translations: {}, ownRtt: null, remoteRtt: null };
+            if (command.command === "translation.settings") {
+              window.nativeState.extras = { ...window.nativeState.extras, mode: args.mode, language: args.language, consent: args.consent === "true",
+                liveConsent: args.liveConsent === "true", ownLiveConsent: args.ownLiveConsent === "true", translations: {}, ownRtt: null, remoteRtt: null };
             }
             if (["chat.edit", "chat.hide", "chat.retract", "chat.react"].includes(command.command)) {
               const values = messages.get(selectedPeer) || [];
@@ -136,6 +162,78 @@ async function setup(engine, viewport = { width: 390, height: 844 }) {
 }
 
 for (const engine of [chromium, webkit]) {
+  test(engine.name() + ": group join, messaging, invitations and moderation retain native authority", { timeout: 45000 }, async () => {
+    const { browser, page, errors } = await setup(engine);
+    try {
+      await page.evaluate(() => { window.emitRoster([{ jid: "peer@localhost", name: "Peer", presence: "online" }]); window.nativeState.groupsAvailable = true; window.emitExtras({}); });
+      await page.locator("#conversationActionsToggle").click();
+      await page.locator("#addGroupButton").click();
+      await page.locator("#hybridGroupRoom").fill("familie");
+      await page.locator("#hybridGroupNickname").fill("Fixture");
+      await page.locator("#hybridGroupCreate").check();
+      await page.locator("#hybridGroupJoinForm button[type=submit]").click();
+      await page.locator("#hybridConversation").waitFor({ state: "visible" });
+      assert.equal(await page.locator("#hybridContactPresence").textContent(), "Groep");
+      assert.equal(await page.locator("#hybridStartTotal").isDisabled(), true);
+      await page.locator("#hybridMessageInput").fill("Bericht voor de groep");
+      await page.locator("#hybridSend").click();
+      await page.locator("#hybridMessages .message").waitFor();
+      assert.equal(await page.evaluate(() => window.nativeCommands.find(value => value.command === "chat.send").arguments.kind), "group");
+      assert.equal(await page.locator(".hybrid-message-receipt.is-read").count(), 0);
+      await page.locator("#hybridStartMenu summary").click();
+      await page.locator("#hybridManageGroup").click();
+      await page.locator("#hybridGroupSubject").fill("Nieuw onderwerp");
+      await page.locator("#hybridGroupSubjectSave").click();
+      await page.waitForFunction(() => window.nativeCommands.some(value => value.command === "groups.subject"));
+      await page.locator("#hybridGroupInvite").click();
+      await page.waitForFunction(() => window.nativeCommands.some(value => value.command === "groups.invite"));
+      await page.locator("#hybridGroupOccupant").selectOption("Peer");
+      await page.locator("#hybridGroupRole").selectOption("visitor");
+      await page.locator("#hybridGroupRoleSave").click();
+      await page.waitForFunction(() => window.nativeCommands.some(value => value.command === "groups.role" && value.arguments.nickname === "Peer"));
+      await page.locator("#hybridGroupLeave").click();
+      await page.locator('[data-close-feature="hybridGroupManage"]').click();
+      assert.equal(await page.locator("#hybridMessageInput").isDisabled(), true);
+      assert.deepEqual(errors, []);
+    } finally { await browser.close(); }
+  });
+
+  test(engine.name() + ": private compact translations and native attachment staging do not send messages", { timeout: 45000 }, async () => {
+    const { browser, page, errors, requests } = await setup(engine);
+    try {
+      await page.evaluate(() => window.emitRoster([{ jid: "peer@localhost", name: "Fixture", presence: "online" }]));
+      await page.locator("#conversationItems .conversation-item").click();
+      await page.evaluate(() => window.emitExtras({ ready: true, available: true, attachmentAvailable: true, mode: "manual", language: "en", consent: true }));
+      await page.locator("#hybridMessageInput").fill("Mijn concept");
+      await page.locator("#hybridPickAttachment").click();
+      await page.waitForFunction(() => window.nativeCommands.some(value => value.command === "files.pick"));
+      await page.evaluate(() => window.stageFixtureAttachment());
+      await page.waitForFunction(() => document.getElementById("hybridMessageInput").value.includes("fixture.pdf"));
+      assert.match(await page.locator("#hybridMessageInput").inputValue(), /^Mijn concept/);
+      await page.evaluate(() => window.emitMessages([window.fixtureMessage("Hallo van de ander", false)]));
+      await page.locator("#hybridMessages .message button.hybrid-message-more").click();
+      await page.locator('[data-message-action="translate"]').click();
+      await page.waitForFunction(() => window.nativeCommands.some(value => value.command === "translation.message"));
+      await page.evaluate(() => {
+        const id = window.nativeState.conversation.messages[0].id;
+        window.emitExtras({ translations: { [id]: "Hello from the other person" }, fileMessages: [id] });
+      });
+      await page.locator("#hybridMessages .hybrid-translation summary").waitFor();
+      assert.equal(await page.locator("#hybridMessages .hybrid-translation summary").textContent(), "Vertaling");
+      await page.locator("#hybridMessages .hybrid-file-button").click();
+      await page.waitForFunction(() => window.nativeCommands.some(value => value.command === "files.open"));
+      await page.evaluate(() => window.emitExtras({ translations: {} }));
+      await page.waitForFunction(() => !document.querySelector("#hybridMessages .hybrid-translation"));
+      await page.locator("#hybridStartMenu summary").click();
+      await page.locator("#hybridTranslationOptions").click();
+      await page.locator("#hybridTranslationConsent").uncheck();
+      await page.waitForFunction(() => window.nativeCommands.some(value => value.command === "translation.disable"));
+      assert.equal(await page.evaluate(() => window.nativeCommands.filter(value => value.command === "chat.send").length), 0);
+      assert.equal(requests.some(url => /\/api\/|googleapis|translate\.google/.test(url)), false);
+      assert.deepEqual(errors, []);
+    } finally { await browser.close(); }
+  });
+
   test(engine.name() + ": native chat sends safely, displays real receipts and exposes message actions", { timeout: 45000 }, async () => {
     const { browser, page, errors } = await setup(engine);
     try {

@@ -20,6 +20,7 @@ struct HybridRequest: Decodable, CustomStringConvertible, CustomDebugStringConve
     let command: String
     let arguments: [String: String]
     let epoch: UUID?
+    let kind: String
 
     var description: String { "HybridRequest(redacted)" }
     var debugDescription: String { description }
@@ -40,13 +41,42 @@ struct HybridRequest: Decodable, CustomStringConvertible, CustomDebugStringConve
         version = try values.decode(Int.self, forKey: Key(stringValue: "version")!)
         id = try values.decode(UUID.self, forKey: Key(stringValue: "id")!)
         command = try values.decode(String.self, forKey: Key(stringValue: "command")!)
-        arguments = try values.decode([String: String].self, forKey: Key(stringValue: "arguments")!)
+        var rawArguments = try values.decode([String: String].self, forKey: Key(stringValue: "arguments")!)
+        guard rawArguments["kind"] == nil || command.hasPrefix("chat.") else { throw HybridFailure.invalidRequest }
+        kind = rawArguments.removeValue(forKey: "kind") ?? "direct"
+        guard ["direct", "group"].contains(kind), kind == "direct" || command.hasPrefix("chat.") else { throw HybridFailure.invalidRequest }
+        arguments = rawArguments
         epoch = try values.decodeIfPresent(UUID.self, forKey: Key(stringValue: "epoch")!)
         guard version == 1 else { throw HybridFailure.invalidRequest }
-        if command.hasPrefix("chat.") || command.hasPrefix("calls.") {
+        if ["chat.", "calls.", "groups.", "files.", "translation."].contains(where: command.hasPrefix) {
             guard epoch != nil else { throw HybridFailure.invalidRequest }
         }
         switch command {
+        case "groups.join":
+            guard Set(arguments.keys) == Set(["room", "nickname", "create"]), Self.peer(arguments["room"]),
+                  let nickname = arguments["nickname"], !nickname.isEmpty, nickname.utf8.count <= 128,
+                  !nickname.contains("/"), Self.text(nickname), !nickname.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains),
+                  ["true", "false"].contains(arguments["create"] ?? "") else { throw HybridFailure.invalidRequest }
+        case "groups.leave", "groups.subject", "groups.invite", "groups.role":
+            let required = command == "groups.leave" ? Set(["room"]) : command == "groups.subject" ? Set(["room", "subject"])
+                : command == "groups.invite" ? Set(["room", "peer"]) : Set(["room", "nickname", "role"])
+            guard Set(arguments.keys) == required, Self.peer(arguments["room"]) else { throw HybridFailure.invalidRequest }
+            if command == "groups.subject" { guard let text = arguments["subject"], Self.text(text), text.utf8.count <= 512 else { throw HybridFailure.invalidRequest } }
+            if command == "groups.invite", !Self.peer(arguments["peer"]) { throw HybridFailure.invalidRequest }
+            if command == "groups.role" {
+                guard let nick = arguments["nickname"], !nick.isEmpty, nick.utf8.count <= 128, Self.text(nick),
+                      ["none", "visitor", "participant", "moderator"].contains(arguments["role"] ?? "") else { throw HybridFailure.invalidRequest }
+            }
+        case "translation.settings":
+            guard Set(arguments.keys) == Set(["mode", "language", "consent", "liveConsent", "ownLiveConsent"]),
+                  ["off", "manual", "automatic"].contains(arguments["mode"] ?? ""),
+                  ["nl", "en", "de", "fr", "es", "it", "pt", "pl", "tr", "ar", "uk", "zh-CN"].contains(arguments["language"] ?? ""),
+                  ["consent", "liveConsent", "ownLiveConsent"].allSatisfy({ ["true", "false"].contains(arguments[$0] ?? "") }),
+                  arguments["mode"] == "off" || arguments["consent"] == "true" else { throw HybridFailure.invalidRequest }
+        case "translation.message", "files.open":
+            guard Set(arguments.keys) == Set(["id"]), UUID(uuidString: arguments["id"] ?? "") != nil else { throw HybridFailure.invalidRequest }
+        case "files.pick", "translation.disable":
+            guard arguments.isEmpty else { throw HybridFailure.invalidRequest }
         case "session.login":
             guard Set(arguments.keys) == Set(["jid", "password"]),
                   let jid = arguments["jid"], !jid.isEmpty, jid.utf8.count <= 1023,
@@ -144,6 +174,10 @@ public struct HybridSnapshot: Codable, Equatable {
     public let roster: HybridRoster
     public let conversation: HybridConversation?
     public let call: HybridCallState
+    public var groups: [HybridGroup] = []
+    public var groupsAvailable = false
+    public var groupNotice: String? = nil
+    public var extras = HybridExtrasState()
 }
 
 public struct HybridContact: Codable, Equatable {

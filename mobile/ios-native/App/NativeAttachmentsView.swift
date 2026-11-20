@@ -18,7 +18,7 @@ struct NativeAttachmentButton: View {
     }
 }
 
-private struct NativeAttachmentPicker: View {
+struct NativeAttachmentPicker: View {
     @ObservedObject var login: NativeLoginModel
     let stage: (String) -> Void
     @StateObject private var model = NativeFileTransferModel()
@@ -29,6 +29,10 @@ private struct NativeAttachmentPicker: View {
     @State private var link: String?
     @State private var task: Task<Void, Never>?
     @Environment(\.dismiss) private var dismiss
+    init(login: NativeLoginModel, stage: @escaping (String) -> Void) {
+        self._login = ObservedObject(wrappedValue: login)
+        self.stage = stage
+    }
     var body: some View {
         NavigationStack {
             Form {

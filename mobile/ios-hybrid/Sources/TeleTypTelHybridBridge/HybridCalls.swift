@@ -67,6 +67,9 @@ public struct HybridMessage: Codable, Equatable {
     public let edited: Bool
     public let retracted: Bool
     public let reactions: [HybridReaction]
+    public var sender: String? = nil
+    public var canRetract: Bool = false
+    public var canReact: Bool = false
 }
 
 public struct HybridReaction: Codable, Equatable {
@@ -81,4 +84,5 @@ public struct HybridConversation: Codable, Equatable {
     public let history: String
     public let canSend: Bool
     public let canChange: Bool
+    public var kind = "direct"
 }

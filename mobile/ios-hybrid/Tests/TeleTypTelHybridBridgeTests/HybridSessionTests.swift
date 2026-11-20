@@ -17,7 +17,7 @@ private final class SecondFactorFixture: NativeSecondFactorSession {
     }
 }
 
-actor SessionFixture: ServerChecking, NativeAccountChallenging, NativeXMPPConnecting, NativeChatInteracting, NativeMessageChanging {
+actor SessionFixture: ServerChecking, NativeAccountChallenging, NativeXMPPConnecting, NativeChatInteracting, NativeMessageChanging, NativeGroupManaging {
     private let probeFailure: ConnectionFailure?
     private let accountFailure: NativeAccountFailure?
     private let holdAuthentication: Bool
@@ -30,6 +30,10 @@ actor SessionFixture: ServerChecking, NativeAccountChallenging, NativeXMPPConnec
     private(set) var sentBodies: [String] = []
     private(set) var interactions: [NativeChatInteraction] = []
     var rejectSends = false
+    private var groupObservers: [String: @Sendable (NativeGroupEvent) -> Void] = [:]
+    private(set) var groupBodies: [String] = []
+    private(set) var groupInvites: [String] = []
+    private(set) var groupRoles: [String] = []
 
     init(probeFailure: ConnectionFailure? = nil, accountFailure: NativeAccountFailure? = nil, holdAuthentication: Bool = false,
          secondFactor: Bool = false) {
@@ -108,6 +112,26 @@ actor SessionFixture: ServerChecking, NativeAccountChallenging, NativeXMPPConnec
     }
 
     func changeMessage(to peer: String, change: NativeMessageChange, identifier: String) async throws {}
+
+    func joinGroup(room: String, nickname: String, onEvent: @escaping @Sendable (NativeGroupEvent) -> Void) async throws {
+        groupObservers[room] = onEvent
+        var snapshot = NativeGroupSnapshot(room: room, nickname: nickname, participants: [nickname, "Peer"], canSpeak: true)
+        snapshot.ownRole = "moderator"
+        onEvent(.snapshot(snapshot))
+    }
+    func createGroup(room: String, nickname: String, onEvent: @escaping @Sendable (NativeGroupEvent) -> Void) async throws {
+        try await joinGroup(room: room, nickname: nickname, onEvent: onEvent)
+    }
+    func sendGroup(room: String, body: String, identifier: String) async throws { groupBodies.append(body) }
+    func leaveGroup(room: String) async { groupObservers[room]?(.ended(nil)) }
+    func observeGroupInvitations(_ observer: @escaping @Sendable (NativeGroupInvitationEvent) -> Void) async {}
+    func inviteToGroup(room: String, peer: String, identifier: String) async throws { groupInvites.append(peer) }
+    func declineGroupInvitation(_ invitation: NativeGroupInvitation) async throws {}
+    func setGroupSubject(room: String, subject: String) async throws { groupObservers[room]?(.subject(subject)) }
+    func manageGroup(_ command: NativeGroupCommand) async throws -> NativeGroupReply {
+        if case .role(_, let nickname, let role) = command { groupRoles.append(nickname + ":" + role) }
+        return .confirmed
+    }
 }
 
 final class HybridProtocolTests: XCTestCase {

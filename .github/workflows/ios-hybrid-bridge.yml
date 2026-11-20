@@ -11,6 +11,7 @@ on:
       - scripts/prepare-ios-native.js
       - mobile/ios-native/App/NativeCallController.swift
       - mobile/ios-native/App/NativeCallPlatform.swift
+      - mobile/ios-native/App/NativeAttachmentsView.swift
   workflow_dispatch:
 
 permissions:
@@ -38,7 +39,7 @@ jobs:
           test -n "$XCODE_PATH"
           echo "DEVELOPER_DIR=$XCODE_PATH/Contents/Developer" >> "$GITHUB_ENV"
       - name: Validate pinned UI and JavaScript boundary
-        run: node --test tests/ios-hybrid-baseline.test.js tests/ios-hybrid-session.test.js tests/ios-hybrid-contacts.test.js tests/ios-hybrid-messenger.test.js
+        run: node --test tests/ios-hybrid-baseline.test.js tests/ios-hybrid-session.test.js tests/ios-hybrid-contacts.test.js tests/ios-hybrid-messenger.test.js tests/ios-hybrid-features.test.js
       - name: Prepare pinned login content without legacy engines
         run: |
           export TELETYPTEL_HYBRID_CONTENT="$RUNNER_TEMP/teletyptel-hybrid-content.json"
@@ -60,6 +61,11 @@ jobs:
             --scratch-path "$RUNNER_TEMP/teletyptel-hybrid-ios" \
             --triple arm64-apple-ios16.0-simulator \
             --sdk "$(xcrun --sdk iphonesimulator --show-sdk-path)"
+      - name: Test existing native group upload and translation privacy rules with fixtures
+        if: ${{ !cancelled() }}
+        run: |
+          swift test --package-path mobile/ios-native --scratch-path "$RUNNER_TEMP/teletyptel-native-feature-tests" \
+            --filter 'NativeGroupModelTests|NativeGroupManagementTests|NativeAccountFeaturesTests|NativeServicesTests.testTranslation|NativeServicesTests.testDetectedSameLanguage'
       - name: Assemble the isolated hybrid app with the existing native engine
         if: ${{ !cancelled() }}
         run: node scripts/ios-hybrid/prepare-app.js
