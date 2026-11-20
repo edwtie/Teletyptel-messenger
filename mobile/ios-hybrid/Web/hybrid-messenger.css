@@ -215,6 +215,23 @@
   color: #e2e8f0;
 }
 
+.hybrid-call-failure {
+  position: fixed;
+  z-index: 24000;
+  top: max(12px, env(safe-area-inset-top));
+  left: 12px;
+  right: 12px;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--danger);
+  border-radius: 8px;
+}
+
 .hybrid-call-header {
   display: flex;
   justify-content: space-between;

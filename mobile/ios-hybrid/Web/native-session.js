@@ -65,9 +65,13 @@
     return Object.freeze({ status: value.status, contacts: Object.freeze(contacts) });
   }
 
-  function safeText(value) {
-    return typeof value === "string" && new TextEncoder().encode(value).length <= 8192
-      && !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\ufffe\uffff]/u.test(value);
+  function safeText(value, maximumBytes = 8192) {
+    return typeof value === "string" && new TextEncoder().encode(value).length <= maximumBytes
+      && !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\ud800-\udfff\ufffe\uffff]/u.test(value);
+  }
+
+  function safeRttText(value) {
+    return safeText(value, 131072) && Array.from(value).length <= 32768;
   }
 
   function safeConversation(value, roster) {
@@ -110,7 +114,7 @@
     if (!["idle", "calling", "ringing", "active", "failed"].includes(result.phase)
         || ["muted", "cameraEnabled", "rttReady", "canSwitchCamera", "canSendDtmf"].some(key => typeof result[key] !== "boolean")
         || !["unknown", "on", "off"].includes(result.remoteCamera) || !["contain", "cover"].includes(result.videoFit)
-        || !safeText(result.ownText) || !safeText(result.remoteText)) throw new Error("invalidNativeReply");
+        || !safeRttText(result.ownText) || !safeRttText(result.remoteText)) throw new Error("invalidNativeReply");
     if (["idle", "failed"].includes(result.phase)) {
       if (result.id || result.peer || result.mode || result.ownText || result.remoteText) throw new Error("invalidNativeReply");
     } else if (!uuidPattern.test(result.id || "") || typeof result.peer !== "string" || !result.peer
@@ -145,7 +149,7 @@
       const scoped = command.startsWith("chat.") || command.startsWith("calls.");
       if (scoped && (!expectedEpoch || expectedEpoch !== latest?.epoch)) return Promise.reject(new Error("invalidState"));
       const body = JSON.stringify({ version: 1, id, command, arguments: argumentsValue, ...(scoped ? { epoch: expectedEpoch } : {}) });
-      if (new TextEncoder().encode(body).length > 65536) return Promise.reject(new Error("invalidRequest"));
+      if (new TextEncoder().encode(body).length > 262144) return Promise.reject(new Error("invalidRequest"));
       pendingCount += 1;
       return new Promise((resolve, reject) => {
         let finished = false;
@@ -206,7 +210,8 @@
       reactMessage: (peer, id, emoji) => request("chat.react", { peer, id, emoji }),
       startCall: (peer, mode, epoch) => request("calls.start", { peer, mode }, epoch),
       resetCallFailure: () => request("calls.reset"),
-      controlCall: (id, action, value) => request("calls.control", { id, action, ...(value === undefined ? {} : { value }) }),
+      controlCall: (id, action, value) => action === "rtt" && !safeRttText(value) ? Promise.reject(new Error("invalidRequest"))
+        : request("calls.control", { id, action, ...(value === undefined ? {} : { value }) }),
       placeVideo: (id, frame) => request("calls.layout", { id, ...Object.fromEntries(Object.entries(frame).map(([key, value]) => [key, String(value)])) }),
       receive,
       subscribe: listener => {

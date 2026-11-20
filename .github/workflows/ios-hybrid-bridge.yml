@@ -23,7 +23,7 @@ concurrency:
 jobs:
   bridge:
     runs-on: macos-15
-    timeout-minutes: 40
+    timeout-minutes: 50
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
@@ -64,9 +64,27 @@ jobs:
         if: ${{ !cancelled() }}
         run: node scripts/ios-hybrid/prepare-app.js
       - name: Compile the complete app without signing or push activation
+        id: app-build
         if: ${{ !cancelled() }}
         run: |
           xcodebuild -project artifacts/ios-native-hybrid-validation/TeleTypTelNative.xcodeproj \
             -scheme TeleTypTelNative -configuration Debug -sdk iphonesimulator \
             -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath "$RUNNER_TEMP/teletyptel-hybrid-app" CODE_SIGNING_ALLOWED=NO build
+      - name: Smoke-test the assembled app on iPhone and iPad simulators
+        if: ${{ !cancelled() && steps.app-build.outcome == 'success' }}
+        run: |
+          python3 - <<'PY'
+          import json, subprocess
+          devices = json.loads(subprocess.check_output(['xcrun', 'simctl', 'list', 'devices', 'available', '-j']))['devices']
+          available = [(runtime, device) for runtime, values in devices.items() if '.iOS-' in runtime for device in values if device.get('isAvailable')]
+          for kind in ['iPhone', 'iPad']:
+              candidates = [(runtime, device) for runtime, device in available if device['name'].startswith(kind)]
+              if not candidates:
+                  raise RuntimeError('Missing simulator: ' + kind)
+              runtime, device = sorted(candidates, key=lambda item: (item[0], item[1]['name']), reverse=True)[0]
+              subprocess.run(['xcodebuild', 'test', '-project', 'artifacts/ios-native-hybrid-validation/TeleTypTelNative.xcodeproj',
+                  '-scheme', 'TeleTypTelNative', '-configuration', 'Debug', '-destination', 'platform=iOS Simulator,id=' + device['udid'],
+                  '-derivedDataPath', __import__('os').environ['RUNNER_TEMP'] + '/teletyptel-hybrid-app',
+                  '-only-testing:NativeStartupUITests/HybridStartupUITests', 'CODE_SIGNING_ALLOWED=NO'], check=True)
+          PY

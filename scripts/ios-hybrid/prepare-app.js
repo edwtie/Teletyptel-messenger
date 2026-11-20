@@ -24,6 +24,7 @@ function prepare() {
     }
   }
   fs.copyFileSync(payload, path.join(hybrid, "hybrid-content.json"));
+  fs.copyFileSync(path.join(root, "mobile/ios-hybrid/UITests/HybridStartupUITests.swift"), path.join(directory, "UITests/NativeStartupUITests.swift"));
   const original = path.join(directory, "App/TeleTypTelNativeApp.swift");
   const application = fs.readFileSync(original, "utf8");
   if ((application.match(/@main/g) || []).length !== 1) throw new Error("Expected exactly one original app entrypoint.");

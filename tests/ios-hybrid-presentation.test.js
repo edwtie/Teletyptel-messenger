@@ -212,6 +212,8 @@ for (const engine of [chromium, webkit]) {
       await page.locator("#hybridCallMute").click();
       await page.waitForFunction(() => document.getElementById("hybridCallMute").classList.contains("is-off"));
       await page.locator("#hybridCallCamera").click();
+      await page.evaluate(() => window.emitCall({ cameraEnabled: false, remoteCamera: "unknown" }));
+      assert.equal(await page.locator("#hybridVideoSurface").isVisible(), true);
       await page.evaluate(() => window.emitCall({ cameraEnabled: false, remoteCamera: "off", remoteText: "Tekst van de ander" }));
       await page.waitForFunction(() => document.getElementById("hybridCallPanel").classList.contains("is-rtt-only"));
       assert.equal(await page.locator("#hybridVideoSurface").isVisible(), false);
@@ -237,6 +239,11 @@ for (const engine of [chromium, webkit]) {
       await page.locator("#hybridCallPanel").waitFor({ state: "visible" });
       assert.equal(await page.locator("#hybridCallCamera").isVisible(), false);
       assert.equal(await page.locator("#hybridCallRtt").isVisible(), false);
+      await page.locator("#hybridEndCall").click();
+      await page.evaluate(() => window.emitCall({ phase: "ringing", id: crypto.randomUUID(), peer: "peer@localhost", mode: "audio" }));
+      await page.locator("#hybridAnswerCall").click();
+      await page.waitForFunction(() => document.getElementById("hybridCallStatus").textContent === "Verbonden");
+      assert.equal(await page.evaluate(() => window.nativeCommands.filter(value => value.command === "calls.control" && value.arguments.action === "answer").length), 1);
       await page.locator("#hybridEndCall").click();
       assert.equal(requests.some(url => /\/api\/|jingle|chat-client\.js/.test(url)), false);
       assert.deepEqual(errors, []);

@@ -93,7 +93,9 @@ struct HybridRequest: Decodable, CustomStringConvertible, CustomDebugStringConve
                   arguments["id"] != nil, arguments["action"] != nil,
                   UUID(uuidString: arguments["id"] ?? "") != nil,
                   let action = arguments["action"], ["answer", "end", "mute", "camera", "switchCamera", "rtt", "dtmf", "fit"].contains(action) else { throw HybridFailure.invalidRequest }
-            if action == "rtt" { guard let value = arguments["value"], Self.text(value) else { throw HybridFailure.invalidRequest } }
+            if action == "rtt" {
+                guard let value = arguments["value"], Self.text(value, maximumBytes: 131072), value.unicodeScalars.count <= 32768 else { throw HybridFailure.invalidRequest }
+            }
             else if action == "dtmf" { guard let value = arguments["value"], value.count == 1, "0123456789*#ABCD".contains(value) else { throw HybridFailure.invalidRequest } }
             else if action == "fit" { guard ["contain", "cover"].contains(arguments["value"] ?? "") else { throw HybridFailure.invalidRequest } }
             else if arguments["value"] != nil { throw HybridFailure.invalidRequest }
@@ -109,7 +111,7 @@ struct HybridRequest: Decodable, CustomStringConvertible, CustomDebugStringConve
     }
 
     static func decode(_ data: Data) throws -> Self {
-        guard !data.isEmpty, data.count <= 65536 else { throw HybridFailure.invalidRequest }
+        guard !data.isEmpty, data.count <= 262144 else { throw HybridFailure.invalidRequest }
         do { return try JSONDecoder().decode(Self.self, from: data) }
         catch let failure as HybridFailure { throw failure }
         catch { throw HybridFailure.invalidRequest }
@@ -121,8 +123,8 @@ struct HybridRequest: Decodable, CustomStringConvertible, CustomDebugStringConve
             && !value.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) || CharacterSet.whitespacesAndNewlines.contains($0) })
     }
 
-    static func text(_ value: String) -> Bool {
-        value.utf8.count <= 8192 && value.unicodeScalars.allSatisfy {
+    static func text(_ value: String, maximumBytes: Int = 8192) -> Bool {
+        value.utf8.count <= maximumBytes && value.unicodeScalars.allSatisfy {
             $0.value == 9 || $0.value == 10 || $0.value == 13 || (0x20...0xD7FF).contains($0.value)
                 || (0xE000...0xFFFD).contains($0.value) || (0x10000...0x10FFFF).contains($0.value)
         }

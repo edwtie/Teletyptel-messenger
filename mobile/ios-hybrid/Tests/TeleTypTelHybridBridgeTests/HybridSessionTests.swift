@@ -161,14 +161,14 @@ func encoded(_ command: String, _ arguments: [String: String] = [:], id: UUID = 
 final class HybridSessionTests: XCTestCase {
     private let document = URL(string: "capacitor://localhost/chat.html")!
 
-    private func makeSession(_ fixture: SessionFixture, logout: @escaping () -> Void = {}) throws -> (NativeLoginModel, HybridSession) {
+    private func makeSession(_ fixture: SessionFixture, logout: @escaping () -> Void = {}, calls: (any HybridCallPort)? = nil) throws -> (NativeLoginModel, HybridSession) {
         let model = NativeLoginModel(checker: fixture, authenticator: fixture, connection: fixture)
         let configuration = try ServerConfiguration(address: "https://fixture.invalid", domain: "localhost")
-        return (model, HybridSession(model: model, configuration: configuration, nativeLogout: logout))
+        return (model, HybridSession(model: model, configuration: configuration, nativeLogout: logout, calls: calls))
     }
 
     private func command(_ session: HybridSession, _ command: String, _ arguments: [String: String] = [:]) throws -> HybridReply {
-        try session.handle(encoded(command, arguments), document: document, mainFrame: true)
+        try session.handle(encoded(command, arguments, epoch: session.snapshot().epoch), document: document, mainFrame: true)
     }
 
     private func eventually(attempts: Int = 200, _ predicate: () async -> Bool, file: StaticString = #filePath, line: UInt = #line) async {
@@ -369,7 +369,8 @@ final class HybridSessionTests: XCTestCase {
         #endif
         let content = try HybridContent(data: Data(contentsOf: URL(fileURLWithPath: path)))
         let fixture = SessionFixture()
-        let (model, session) = try makeSession(fixture)
+        let calls = CallFixture()
+        let (model, session) = try makeSession(fixture, calls: calls)
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .nonPersistent()
         configuration.setURLSchemeHandler(HybridContentHandler(content: content), forURLScheme: "capacitor")
@@ -388,7 +389,7 @@ final class HybridSessionTests: XCTestCase {
         XCTAssertEqual(activeTag, "BODY")
         _ = try await webView.evaluateJavaScript("document.getElementById('dialogJidInput').value='fixture@localhost'; document.getElementById('dialogPasswordInput').value='fixture-password'; document.getElementById('dialogPasswordInput').dispatchEvent(new Event('input')); document.getElementById('dialogConnectButton').click();")
         await eventually { model.isConnected }
-        let peer = NativeContact(jid: "web-peer@localhost", name: "WebKit Fixture", groups: ["hidden-group"], subscription: "both", presence: .online)
+        let peer = NativeContact(jid: "peer@localhost", name: "WebKit Fixture", groups: ["hidden-group"], subscription: "both", presence: .online)
         await fixture.emitRoster(.ready([peer]))
         await eventually {
             (try? await webView.evaluateJavaScript("document.querySelectorAll('#conversationItems .conversation-item').length")) as? Int == 1
@@ -402,6 +403,25 @@ final class HybridSessionTests: XCTestCase {
         }
         let password = try await webView.evaluateJavaScript("document.getElementById('dialogPasswordInput').value") as? String
         XCTAssertEqual(password, "")
+        await eventually { session.snapshot().conversation?.peer == "peer@localhost" }
+        _ = try await webView.evaluateJavaScript("document.getElementById('hybridMessageInput').value='Via echte WKWebView'; document.getElementById('hybridMessageInput').dispatchEvent(new Event('input')); document.getElementById('hybridComposer').dispatchEvent(new Event('submit', {cancelable:true}));")
+        await eventually { model.chat.messages.first?.state == .submitted }
+        let bodies = await fixture.sentBodies
+        XCTAssertEqual(bodies, ["Via echte WKWebView"])
+        await eventually {
+            (try? await webView.evaluateJavaScript("document.querySelectorAll('#hybridMessages .message.self').length")) as? Int == 1
+        }
+        _ = try await webView.evaluateJavaScript("document.getElementById('hybridStartTotal').click()")
+        await eventually { calls.starts == 1 }
+        await eventually {
+            (try? await webView.evaluateJavaScript("document.getElementById('hybridCallPanel').hidden === false && document.getElementById('hybridConversation').hidden")) as? Bool == true
+        }
+        _ = try await webView.evaluateJavaScript("document.getElementById('hybridOwnRtt').value='Live WK RTT'; document.getElementById('hybridOwnRtt').dispatchEvent(new Event('input'))")
+        await eventually { calls.state.ownText == "Live WK RTT" }
+        XCTAssertEqual(model.chat.messages.count, 1)
+        _ = try await webView.evaluateJavaScript("document.getElementById('hybridEndCall').click()")
+        await eventually { calls.state.phase == "idle" }
+        XCTAssertEqual(calls.actions, ["rtt", "end"])
         let blocked = try await webView.evaluateJavaScript("(() => { try { new WebSocket('wss://other.invalid'); return false; } catch { return true; } })()") as? Bool
         XCTAssertEqual(blocked, true)
         bridge.detach()

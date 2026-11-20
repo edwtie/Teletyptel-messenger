@@ -5,7 +5,7 @@ import XCTest
 @testable import TeleTypTelHybridBridge
 
 @MainActor
-private final class CallFixture: HybridCallPort {
+final class CallFixture: HybridCallPort {
     var state = HybridCallState()
     let subject = PassthroughSubject<HybridCallState, Never>()
     var changes: AnyPublisher<HybridCallState, Never> { subject.eraseToAnyPublisher() }
@@ -162,7 +162,9 @@ final class HybridMessengerTests: XCTestCase {
             XCTAssertThrowsError(try HybridRequest.decode(encoded("calls.control", args, epoch: epoch)))
         }
         XCTAssertThrowsError(try HybridRequest.decode(encoded("chat.draft", ["peer": "peer@localhost", "body": String(repeating: "a", count: 8193)], epoch: epoch)))
-        XCTAssertThrowsError(try HybridRequest.decode(Data(repeating: 32, count: 65537)))
+        XCTAssertThrowsError(try HybridRequest.decode(Data(repeating: 32, count: 262145)))
+        XCTAssertNoThrow(try HybridRequest.decode(encoded("calls.control", ["id": UUID().uuidString, "action": "rtt", "value": String(repeating: "🤟", count: 32768)], epoch: epoch)))
+        XCTAssertThrowsError(try HybridRequest.decode(encoded("calls.control", ["id": UUID().uuidString, "action": "rtt", "value": String(repeating: "a", count: 32769)], epoch: epoch)))
         XCTAssertNoThrow(try HybridRequest.decode(encoded("chat.send", ["peer": "peer@localhost", "body": String(repeating: "\n", count: 8191) + "x"], epoch: epoch)))
         XCTAssertThrowsError(try HybridVideoPlacement(arguments: ["x": "390", "y": "0", "width": "100", "height": "100", "viewportWidth": "390", "viewportHeight": "844"]))
         XCTAssertThrowsError(try HybridVideoPlacement(arguments: ["x": "nan", "y": "0", "width": "100", "height": "100", "viewportWidth": "390", "viewportHeight": "844"]))

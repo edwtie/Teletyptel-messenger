@@ -71,6 +71,24 @@ test("queued old-account work and oversized drafts never cross the bridge", asyn
   client.dispose();
 });
 
+test("a long TC conversation retains the native RTT scalar budget without enlarging chat messages", async () => {
+  const text = "🤟".repeat(32768);
+  assert.equal(safeCall({ ...call(), remoteText: text }).remoteText, text);
+  assert.throws(() => safeCall({ ...call(), remoteText: "a".repeat(32769) }), /invalidNativeReply/);
+  const commands = [];
+  const client = createClient({ makeID: crypto.randomUUID, postMessage: body => {
+    commands.push(JSON.parse(body));
+    return { version: 1, id: commands.at(-1).id, snapshot: { ...connected(), sequence: 2 } };
+  } });
+  client.receive(connected());
+  await client.controlCall(crypto.randomUUID(), "rtt", text);
+  await assert.rejects(client.sendMessage(peer, text), /invalidRequest/);
+  await assert.rejects(client.controlCall(crypto.randomUUID(), "rtt", "a".repeat(32769)), /invalidRequest/);
+  assert.equal(commands.length, 1);
+  assert.equal(commands[0].arguments.value, text);
+  client.dispose();
+});
+
 test("the app generator adds the bridge to one target without changing the default target", () => {
   const normal = projectText().project;
   assert.doesNotMatch(normal, /TELETYPTEL_HYBRID_EMBEDDED|hybrid-content\.json/);

@@ -43,6 +43,7 @@
       state = value;
       const call = value.call;
       const active = busy();
+      const opening = active && panel.hidden;
       if (currentID !== call.id) {
         currentID = call.id; pendingRtt = null; dirty = false; layoutKey = ""; pending.clear();
         ownText.value = call.ownText; remoteText.textContent = ""; error("");
@@ -50,17 +51,14 @@
         byID("hybridDtmfToggle").setAttribute("aria-expanded", "false");
       }
       panel.hidden = !active;
+      byID("hybridCallFailure").hidden = call.phase !== "failed";
       document.body.classList.toggle("hybrid-call-active", active);
       byID("hybridConnected").inert = active;
       if (active) byID("hybridConnected").setAttribute("aria-hidden", "true"); else byID("hybridConnected").removeAttribute("aria-hidden");
       if (!active) {
-        if (call.phase === "failed") {
-          byID("hybridChatNotice").textContent = "Oproep mislukt. Sluit de melding om opnieuw te proberen.";
-          byID("hybridCallRetry").hidden = false;
-        }
         return;
       }
-      byID("hybridCallRetry").hidden = true;
+      if (opening) panel.focus({ preventScroll: true });
       const contact = value.roster.contacts.find(item => item.jid === call.peer);
       byID("hybridCallTitle").textContent = contact?.name || call.peer;
       byID("hybridRemoteRttName").textContent = contact?.name || "Ander";
@@ -87,6 +85,7 @@
       byID("hybridCallCamera").classList.toggle("is-on", call.cameraEnabled);
       byID("hybridCallCamera").classList.toggle("is-off", !call.cameraEnabled);
       byID("hybridCallCamera").setAttribute("aria-pressed", String(call.cameraEnabled));
+      byID("hybridCallCamera").setAttribute("aria-label", call.cameraEnabled ? "Camera uitschakelen" : "Camera inschakelen");
       byID("hybridCallMute").disabled = call.phase !== "active" || pending.has("mute");
       byID("hybridCallMute").classList.toggle("is-on", !call.muted);
       byID("hybridCallMute").classList.toggle("is-off", call.muted);
@@ -136,12 +135,14 @@
     };
     for (const button of byID("hybridDtmf").querySelectorAll("button")) button.onclick = () => { void control("dtmf", button.dataset.tone); };
     byID("hybridCallRetry").onclick = () => {
-      void client.resetCallFailure().then(() => { byID("hybridCallRetry").hidden = true; byID("hybridChatNotice").textContent = ""; }).catch(() => {});
+      void client.resetCallFailure().catch(() => {});
     };
     ownText.oninput = () => {
       if (!state?.call.rttReady || !currentID) return;
-      if (new TextEncoder().encode(ownText.value).length > 8192) { error("De RTT-tekst is te lang. Je tekst blijft staan."); return; }
       dirty = true;
+      if (Array.from(ownText.value).length > 32768 || new TextEncoder().encode(ownText.value).length > 131072) {
+        pendingRtt = null; error("De RTT-tekst is te lang. Je tekst blijft staan."); return;
+      }
       pendingRtt = { id: currentID, value: ownText.value };
       if (!rttWork) {
         rttWork = (async () => {
