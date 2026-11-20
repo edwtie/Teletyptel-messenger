@@ -59,6 +59,7 @@ test("provider login keychain and avatars reuse native code without a browser au
   for (const name of ["NativeProviderSDK", "NativeSavedLoginModel", "NativeAccountSettingsModel", "NativeAvatarCache", "NativeContactEditor", "NativeContactRequests"]) assert.ok(source.includes(name));
   assert.match(source, /provider\.configured/); assert.match(source, /CGImageSourceCreateThumbnailAtIndex/);
   assert.match(source, /encoded\.count <= 24000/); assert.match(source, /profile\.accountId == login\.activeAccountID/);
+  assert.match(source, /func prepareLogin[\s\S]*?saved\.forget\(\)[\s\S]*?saved\.prepare\(/);
   assert.doesNotMatch(source, /URLSession\(|UserDefaults.*password|startSipCall/);
 });
 

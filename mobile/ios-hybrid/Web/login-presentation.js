@@ -112,7 +112,7 @@
       byID("dialogForgotPasswordButton").title = account?.entryAvailable ? "Wachtwoord herstellen" : unavailable;
       byID("dialogCreateAccountButton").title = account?.registrationAvailable ? "Nieuwe gebruiker" : "Deze server ondersteunt hier geen nieuwe XMPP-accounts";
       nodes.dialogRememberPasswordToggle.disabled = busy || !account?.rememberAvailable;
-      nodes.dialogRememberPasswordToggle.title = "Alleen op dit apparaat, na toestemming voor Face ID of Touch ID";
+      nodes.dialogRememberPasswordToggle.title = "Voor wachtwoordaanmelding: alleen op dit apparaat, na toestemming voor Face ID of Touch ID";
       byID("hybridBiometric").hidden = !account?.savedLogin; byID("hybridBiometric").disabled = busy;
       byID("hybridForgetLogin").hidden = !account?.savedLogin; byID("hybridForgetLogin").disabled = busy;
       byID("hybridAuthCancel").hidden = !account?.busy || busyPhases.has(phase);
@@ -172,7 +172,7 @@
     });
     listen(nodes.dialogServerSettingsButton, "click", () => { void perform(() => client.openSettings()); });
     for (const [id, provider] of [["dialogGoogleLoginFallbackButton", "google"], ["dialogFacebookLoginButton", "facebook"]]) {
-      listen(byID(id), "click", () => { nodes.dialogPasswordInput.value = ""; void perform(() => client.accountCommand("auth.social", { provider })); });
+      listen(byID(id), "click", () => { nodes.dialogPasswordInput.value = ""; nodes.dialogRememberPasswordToggle.checked = false; void perform(() => client.accountCommand("auth.social", { provider })); });
     }
     listen(byID("hybridBiometric"), "click", () => { void perform(() => client.accountCommand("auth.biometric")); });
     listen(byID("hybridForgetLogin"), "click", () => { void perform(() => client.accountCommand("auth.forget")); });

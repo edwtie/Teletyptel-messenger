@@ -26,6 +26,7 @@ final class NativeHybridAccountAdapter: HybridAccountPort {
     private var images: [String: String] = [:]
     private var noticeChannel = "profile"
     private var presentation = false
+    private var storageNotice: String?
     private let subject = CurrentValueSubject<HybridAccountState, Never>(HybridAccountState())
     var presentAvatar: (() -> Void)?
     var presentPrivacy: ((URL) -> Void)?
@@ -73,7 +74,10 @@ final class NativeHybridAccountAdapter: HybridAccountPort {
         refresh()
     }
 
-    func prepareLogin(jid: String, password: String, remember: Bool) {
+    func prepareLogin(jid: String, password: String, remember: Bool) throws {
+        saved.forget()
+        storageNotice = saved.hasSavedLogin ? saved.notice : nil
+        guard !saved.hasSavedLogin else { refresh(); throw HybridFailure.invalidState }
         saved.prepare(address: configuration.origin.absoluteString, domain: configuration.domain, jid: jid, password: password, consented: remember)
     }
 
@@ -82,7 +86,7 @@ final class NativeHybridAccountAdapter: HybridAccountPort {
         refresh()
     }
 
-    func logout() { cancelAuthentication(); saved.forget(); clearConnected(); refresh() }
+    func logout() { cancelAuthentication(); saved.forget(); storageNotice = saved.hasSavedLogin ? saved.notice : nil; clearConnected(); refresh() }
 
     private func clearConnected() {
         profileTask?.cancel(); profileTask = nil; profile.detach(); editor.detach(); requests.detach(); avatars.detach()
@@ -108,7 +112,8 @@ final class NativeHybridAccountAdapter: HybridAccountPort {
         switch name {
         case "auth.social":
             guard let providerName = NativeIdentityProvider(rawValue: arguments["provider"]!), provider.configured(providerName) else { throw HybridFailure.unavailable }
-            saved.cancel()
+            saved.forget(); storageNotice = saved.hasSavedLogin ? saved.notice : nil
+            guard !saved.hasSavedLogin else { refresh(); throw HybridFailure.invalidState }
             login.loginSocial(address: configuration.origin.absoluteString, domain: configuration.domain, provider: providerName, signer: provider)
         case "auth.biometric":
             guard saved.hasSavedLogin else { throw HybridFailure.unavailable }
@@ -118,7 +123,7 @@ final class NativeHybridAccountAdapter: HybridAccountPort {
                       value.address == self.configuration.origin.absoluteString, value.domain == self.configuration.domain else { return }
                 login.login(address: value.address, domain: value.domain, jid: value.jid, password: value.password)
             }
-        case "auth.forget": saved.forget()
+        case "auth.forget": saved.forget(); storageNotice = saved.hasSavedLogin ? saved.notice : nil
         case "auth.privacy":
             guard let presentPrivacy = presentPrivacy else { throw HybridFailure.unavailable }
             presentPrivacy(configuration.origin.appendingPathComponent("privacy.html"))
@@ -195,6 +200,7 @@ final class NativeHybridAccountAdapter: HybridAccountPort {
         value.nativePanels = presentPanel != nil
         value.presentation = presentation
         value.notice = active ? (noticeChannel == "contacts.add" ? editor.notice : noticeChannel == "contacts.respond" ? requests.notice : noticeChannel.hasPrefix("contacts.") ? login?.contactActionNotice : profile.status ?? saved.notice) : (lifecycle.status ?? saved.notice)
+        if let storageNotice = storageNotice { value.notice = storageNotice }
         if active, let login = login {
             value.owner = login.currentOwner
             value.contactsAvailable = login.canSend && login.contactManager != nil

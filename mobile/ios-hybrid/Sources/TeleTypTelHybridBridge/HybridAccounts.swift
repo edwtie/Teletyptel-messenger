@@ -34,7 +34,7 @@ public protocol HybridAccountPort: AnyObject {
     var state: HybridAccountState { get }
     var changes: AnyPublisher<HybridAccountState, Never> { get }
     func update(epoch: String, active: Bool)
-    func prepareLogin(jid: String, password: String, remember: Bool)
+    func prepareLogin(jid: String, password: String, remember: Bool) throws
     func command(_ name: String, arguments: [String: String]) throws
     func cancelAuthentication()
     func logout()

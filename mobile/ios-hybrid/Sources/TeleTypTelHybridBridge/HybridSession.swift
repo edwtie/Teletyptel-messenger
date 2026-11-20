@@ -101,7 +101,7 @@ public final class HybridSession {
                 selectedPeer = nil
                 account?.update(epoch: accountEpoch.uuidString.lowercased(), active: false)
                 guard request.arguments["remember"] != "true" || account?.state.rememberAvailable == true else { throw HybridFailure.unavailable }
-                account?.prepareLogin(jid: request.arguments["jid"]!, password: request.arguments["password"]!, remember: request.arguments["remember"] == "true")
+                try account?.prepareLogin(jid: request.arguments["jid"]!, password: request.arguments["password"]!, remember: request.arguments["remember"] == "true")
                 model.login(address: configuration.origin.absoluteString, domain: configuration.domain,
                             jid: request.arguments["jid"]!, password: request.arguments["password"]!)
             default:
