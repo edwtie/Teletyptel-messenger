@@ -70,7 +70,7 @@
       const own = message.outgoing && message.state === "submitted" && !message.retracted;
       for (const button of menu.querySelectorAll("button")) {
         const action = button.dataset.messageAction;
-        button.hidden = (action === "edit" && !(own && state.conversation.canChange)) || (action === "retract" && !message.canRetract)
+        button.hidden = (action === "edit" && !(own && message.canEdit)) || (action === "retract" && !message.canRetract)
           || (action === "react" && !message.canReact) || (action === "translate" && (!state.extras.ready || !state.extras.available || state.extras.mode === "off" || !state.extras.consent || message.retracted));
         button.disabled = action !== "hide" && !state.conversation.canSend;
       }

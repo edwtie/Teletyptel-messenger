@@ -469,7 +469,8 @@ public final class NativeLoginModel: ObservableObject {
         let configuration: ServerConfiguration
         do { configuration = try ServerConfiguration(address: address, domain: domain) }
         catch { phase = .failed(.connection(.configuration)); return }
-        guard NativeAuthenticatedAccount.validJID(jid, domain: configuration.domain),
+        let alias = authenticator is NativeTwoFactorAccountClient && NativeAuthenticatedAccount.isEmailAlias(jid, domain: configuration.domain)
+        guard alias || NativeAuthenticatedAccount.validJID(jid, domain: configuration.domain),
               !password.isEmpty, password.utf8.count <= 1024,
               !password.unicodeScalars.contains(where: { $0.value == 0 }) else {
             phase = .failed(.account(.invalidCredentials))
@@ -488,9 +489,9 @@ public final class NativeLoginModel: ObservableObject {
                     }
                     switch step {
                     case .authenticated(let account):
-                        try await self.completeAuthentication(account, configuration: configuration, jid: jid, attempt: attempt)
+                        try await self.completeAuthentication(account, configuration: configuration, jid: alias ? nil : jid, attempt: attempt)
                     case .challenge(let challenge):
-                        self.stageChallenge(challenge, configuration: configuration, jid: jid, attempt: attempt)
+                        self.stageChallenge(challenge, configuration: configuration, jid: alias ? nil : jid, attempt: attempt)
                     }
                 } else {
                     let account = try await authenticator.login(configuration: configuration, jid: jid, password: password)

@@ -313,6 +313,7 @@ public final class HybridSession {
                           edited: message.edited, retracted: message.retracted,
                           reactions: counts.keys.sorted().prefix(16).map { HybridReaction(emoji: $0, count: counts[$0]!) })
             result.canRetract = model.canChangeMessages && model.chat.canRetract(message.id)
+            result.canEdit = model.canChangeMessages && model.chat.canCorrect(message.id)
             result.canReact = model.canSend && !message.retracted
             return result
         }

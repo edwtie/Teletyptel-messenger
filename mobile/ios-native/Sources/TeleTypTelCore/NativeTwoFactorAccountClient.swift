@@ -32,7 +32,8 @@ public struct NativeTwoFactorAccountClient: NativeAccountChallenging {
     }
 
     func begin(configuration: ServerConfiguration, jid: String, password: String) async throws -> NativeAccountLoginStep {
-        guard NativeAuthenticatedAccount.validJID(jid, domain: configuration.domain),
+        let alias = NativeAuthenticatedAccount.isEmailAlias(jid, domain: configuration.domain)
+        guard alias || NativeAuthenticatedAccount.validJID(jid, domain: configuration.domain),
               !password.isEmpty, password.utf8.count <= 1024,
               !password.unicodeScalars.contains(where: { $0.value == 0 }) else {
             throw NativeAccountFailure.invalidCredentials
@@ -48,7 +49,7 @@ public struct NativeTwoFactorAccountClient: NativeAccountChallenging {
         let session = URLSession(configuration: settings, delegate: NativeSecondFactorRedirectGuard(), delegateQueue: nil)
         do {
             let (data, status, response) = try await Self.request(session, configuration: configuration, input: [
-                "action": "login", "jid": jid, "password": password, "rememberPassword": false,
+                "action": "login", (alias ? "loginEmail" : "jid"): jid, "password": password, "rememberPassword": false,
                 "xmppDomain": configuration.domain, "xmppWebSocket": configuration.webSocket.absoluteString,
                 "xmppTlsMode": "websocket"
             ])
@@ -67,7 +68,7 @@ public struct NativeTwoFactorAccountClient: NativeAccountChallenging {
                                                                 jid: jid, accountID: accountID, cookie: cookie))
             }
             var account = try NativeAuthenticatedAccount.decode(data, status: status, configuration: configuration)
-            guard account.jid == jid else { throw NativeAccountFailure.invalidResponse }
+            guard alias ? account.accountID?.isEmpty == false : account.jid == jid else { throw NativeAccountFailure.invalidResponse }
             if let cookie = Self.sessionCookie(response, origin: configuration.origin) {
                 account.webSession = NativeAccountWebSession(configuration: configuration, cookie: cookie)
             }
@@ -188,7 +189,9 @@ private final class NativeHTTPSecondFactorSession: NativeSecondFactorSession,
             }
             guard ContinuousClock.now < deadline else { throw NativeSecondFactorFailure.expired }
             var account = try NativeAuthenticatedAccount.decode(data, status: status, configuration: configuration)
-            guard account.jid == jid else { throw NativeAccountFailure.invalidResponse }
+            guard NativeAuthenticatedAccount.isEmailAlias(jid, domain: configuration.domain) ? account.accountID == accountID : account.jid == jid else {
+                throw NativeAccountFailure.invalidResponse
+            }
             let authenticatedCookie = NativeTwoFactorAccountClient.sessionCookie(response, origin: configuration.origin) ?? cookie
             account.webSession = NativeAccountWebSession(configuration: configuration, cookie: authenticatedCookie)
             cancel()

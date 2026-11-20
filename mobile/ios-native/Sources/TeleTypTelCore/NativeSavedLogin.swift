@@ -46,6 +46,7 @@ final class NativeSavedLoginModel: ObservableObject {
     @Published private(set) var isWorking = false
     @Published private(set) var notice: String?
     private var candidate: NativeSavedLogin?
+    private var pendingAlias: (configuration: ServerConfiguration, password: String)?
     private var generation = UUID()
     private var task: Task<Void, Never>?
     private let vault: any NativeLoginVault
@@ -61,11 +62,21 @@ final class NativeSavedLoginModel: ObservableObject {
         cancel()
         notice = nil
         if consented {
-            candidate = try? NativeSavedLogin(address: address, domain: domain, jid: jid, password: password)
+            if let configuration = try? ServerConfiguration(address: address, domain: domain),
+               NativeAuthenticatedAccount.isEmailAlias(jid, domain: configuration.domain) {
+                pendingAlias = (configuration, password)
+            } else {
+                candidate = try? NativeSavedLogin(address: address, domain: domain, jid: jid, password: password)
+            }
         }
     }
 
     func connected(jid: String) {
+        if let pending = pendingAlias {
+            pendingAlias = nil
+            candidate = try? NativeSavedLogin(address: pending.configuration.origin.absoluteString, domain: pending.configuration.domain,
+                                               jid: jid, password: pending.password)
+        }
         guard let value = candidate else { return }
         candidate = nil
         guard value.jid == jid else { return }
@@ -124,6 +135,7 @@ final class NativeSavedLoginModel: ObservableObject {
     func cancel() {
         generation = UUID()
         candidate = nil
+        pendingAlias = nil
         task?.cancel()
         task = nil
         vault.cancel()

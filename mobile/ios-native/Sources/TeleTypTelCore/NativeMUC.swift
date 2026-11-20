@@ -24,6 +24,10 @@ public protocol NativeGroupSending: NativeChatSending {
     func leaveGroup(room: String) async
 }
 
+public protocol NativeGroupCorrecting: NativeGroupSending {
+    func correctGroupMessage(room: String, target: String, body: String, identifier: String) async throws
+}
+
 public protocol NativeGroupMessageChanging: NativeGroupSending {
     func retractGroupMessage(room: String, target: String, identifier: String) async throws
 }
@@ -43,6 +47,7 @@ public struct NativeGroupSnapshot: Equatable, Sendable {
     public var supportsRetraction = false
     public var supportsReactions = false
     public var ownOccupantID: String? = nil
+    public var lastOwnLiveID: String? = nil
 }
 
 public struct NativeGroupText: Identifiable, Codable, Equatable, Sendable {
@@ -63,18 +68,20 @@ public struct NativeGroupText: Identifiable, Codable, Equatable, Sendable {
     public var actionRequestID: String? = nil
     public var actionNotice: String? = nil
     public var locallyRead: Bool? = nil
+    public var edited: Bool? = nil
     public var reactions: [String: [String]] = [:]
     public var cloudMessageID: String? { cloudID ?? identifier }
 }
 
 extension NativeCloudMerge {
     static func protected(_ message: NativeGroupText) -> Bool {
-        message.hidden || message.retracted || message.actionPending || message.actionRequestID != nil || message.actionNotice != nil ||
+        message.hidden || message.retracted || message.edited == true || message.actionPending || message.actionRequestID != nil || message.actionNotice != nil ||
             ![.incoming, .submitted].contains(message.state)
     }
 }
 
 public enum NativeGroupEvent: Sendable {
+    case corrected(target: String, nickname: String, occupantID: String, body: String, request: String?)
     case reactions(target: String, occupantID: String, values: [String])
     case retracted(target: String, occupantID: String)
     case subject(String)
@@ -101,6 +108,7 @@ struct NativeMUCStream {
     private let owner: String
     private let creating: Bool
     private var stableOccupants = false
+    private var lastLive: [String: (identifier: String, occupant: String)] = [:]
     private var stableMessageIDs = false
     private var ownOccupantID: String?
     private var retractionsSupported = false
@@ -134,7 +142,8 @@ struct NativeMUCStream {
             ownRole: participants[nickname] ?? "visitor", ownAffiliation: affiliations[nickname] ?? "none",
             occupants: participants.keys.sorted().map { NativeGroupOccupant(nickname: $0, role: participants[$0]!, affiliation: affiliations[$0] ?? "none") },
             supportsRetraction: stableOccupants && retractionsSupported,
-            supportsReactions: stableOccupants && stableMessageIDs && ownOccupantID != nil, ownOccupantID: ownOccupantID)
+            supportsReactions: stableOccupants && stableMessageIDs && ownOccupantID != nil, ownOccupantID: ownOccupantID,
+            lastOwnLiveID: lastLive[nickname]?.occupant == ownOccupantID ? lastLive[nickname]?.identifier : nil)
     }
 
     func message(body: String, identifier: String) throws -> String {
@@ -196,6 +205,11 @@ struct NativeMUCStream {
             return NativeMUCOutput(events: [.reactions(target: target, occupantID: occupant, values: values)])
         }
         if NativeMessageActionCodec.hasChange(root) {
+            if case .correct(let target, let body) = NativeMessageActionCodec.decode(root) {
+                guard let occupant = validOccupant, let last = lastLive[nick], last.identifier == target, last.occupant == occupant,
+                      !root.children.contains(where: { $0.namespace == "urn:xmpp:delay" || $0.namespace == "jabber:x:delay" }) else { return NativeMUCOutput() }
+                return NativeMUCOutput(events: [.corrected(target: target, nickname: nick, occupantID: occupant, body: body, request: root.attributes["id"])])
+            }
             guard stableOccupants, retractionsSupported, let occupant = validOccupant,
                   case .retract(let target) = NativeMessageActionCodec.decode(root) else { return NativeMUCOutput() }
             return NativeMUCOutput(events: [.retracted(target: target, occupantID: occupant)])
@@ -215,10 +229,17 @@ struct NativeMUCStream {
             guard let parsed = fractional ?? formatter.date(from: stamp) else { return NativeMUCOutput() }
             date = parsed
         }
-        return NativeMUCOutput(events: [.message(NativeGroupText(id: UUID(), room: room, nickname: nick,
+        let live = delays.isEmpty && !root.children.contains { $0.namespace == "jabber:x:delay" }
+        if live {
+            lastLive[nick] = nil
+            if let identifier = messageID, let occupant = validOccupant { lastLive[nick] = (identifier, occupant) }
+        }
+        var output = NativeMUCOutput(events: [.message(NativeGroupText(id: UUID(), room: room, nickname: nick,
             identifier: messageID, archiveID: NativeArchiveQuery.trustedArchiveID(root, owner: room),
             body: body.text, date: date, own: nick == nickname, state: nick == nickname ? .submitted : .incoming, occupantID: validOccupant,
             locallyRead: delays.isEmpty && nick != nickname ? false : nil))])
+        if live && nick == nickname { output.events.append(.snapshot(snapshot)) }
+        return output
     }
 
     private mutating func presence(_ root: ProbeElement, nick: String) -> NativeMUCOutput {
@@ -243,6 +264,7 @@ struct NativeMUCStream {
         }
         if root.attributes["type"] == "unavailable" {
             participants.removeValue(forKey: nick)
+            lastLive[nick] = nil
             affiliations.removeValue(forKey: nick)
         } else {
             guard root.attributes["type"] == nil,

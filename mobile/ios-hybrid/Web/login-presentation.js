@@ -32,7 +32,7 @@
       certificate: "Het servercertificaat is niet vertrouwd. Controleer het certificaat in de iOS-instellingen.",
       offline: "De chatserver is offline of niet bereikbaar.", timeout: "De server reageert niet op tijd.",
       configuration: "Controleer de serverinstellingen via het tandwiel.", serverResponse: "De server geeft geen geldig antwoord.",
-      connectionLost: "De verbinding is verbroken.", invalidCredentials: "Het XMPP-account of wachtwoord is niet juist.",
+      connectionLost: "De verbinding is verbroken.", invalidCredentials: "Aanmelden mislukt. Controleer je gegevens of gebruik je XMPP-account.",
       accountRejected: "Aanmelden is geweigerd.", secondFactorRequired: "Voor dit account is tweestapsverificatie nodig.",
       invalidSecondFactor: "De code is niet juist. Probeer opnieuw.", suspended: "De native sessie is onderbroken. Keer terug naar de app."
     };
@@ -57,8 +57,8 @@
     nodes.dialogConnectButton.textContent = text("button.sign_in", "Aanmelden");
     nodes.dialogCreateAccountButton.textContent = text("button.sign_up", "Nieuwe gebruiker");
     const usernameLabel = nodes.dialogJidInput.closest("label").querySelector("span");
-    usernameLabel.textContent = "XMPP-account";
-    nodes.dialogJidInput.placeholder = "naam@xmpp-domein";
+    usernameLabel.textContent = "E-mailadres of XMPP-account";
+    nodes.dialogJidInput.placeholder = "naam@domein.nl";
     nodes.dialogJidInput.setAttribute("autocapitalize", "none");
     nodes.dialogJidInput.spellcheck = false;
 
@@ -85,9 +85,9 @@
         : messages[state?.errorCode] || messages[phase] || "TeleTypTel starten…";
       nodes.accountDialogTitle.textContent = twoFactor ? text("account.login_two_factor_title", "Tweestapsverificatie") : text("account.start_title", "Aanmelden");
       nodes.accountDialogSubtitle.textContent = twoFactor ? text("account.login_two_factor_subtitle", "Gebruik de code uit je authenticator-app.")
-        : "Gebruik je XMPP-account.";
+        : "Gebruik je gekoppelde e-mailadres of XMPP-account.";
       nodes.dialogRealAccountTitle.textContent = text("section.sign_in", "Aanmelden");
-      nodes.dialogAccountStatus.textContent = messages[state?.errorCode] || "Meld je aan met je XMPP-account.";
+      nodes.dialogAccountStatus.textContent = messages[state?.errorCode] || "Gebruik je TeleTypTel-wachtwoord.";
       accountGrid.hidden = twoFactor;
       nodes.loginTwoFactorSection.hidden = !twoFactor;
       nodes.dialogConnectButton.hidden = twoFactor;

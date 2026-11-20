@@ -111,11 +111,12 @@ public final class NativeGroupModel: ObservableObject {
                 if NativeCloudMerge.protected(merged[message]) { continue }
                 merged[message].cloudID = merged[message].cloudID ?? record.messageID
                 if record.edited || merged[message].identifier == nil { merged[message].body = record.text }
+                if record.edited { merged[message].edited = true }
                 merged[message].reactions = record.reactions
             } else {
                 merged.append(NativeGroupText(id: UUID(), room: room, nickname: nickname, identifier: nil, cloudID: record.messageID,
                     archiveID: nil, body: record.retracted ? "" : record.text, date: record.date, own: own,
-                    state: own ? .submitted : .incoming, retracted: record.retracted, reactions: record.retracted ? [:] : record.reactions))
+                    state: own ? .submitted : .incoming, retracted: record.retracted, edited: record.edited ? true : nil, reactions: record.retracted ? [:] : record.reactions))
                 retained.insert(merged[merged.count - 1].id)
             }
         }
@@ -336,26 +337,51 @@ public final class NativeGroupModel: ObservableObject {
             message.archiveID != nil && message.occupantID != nil
     }
 
+    public func canCorrect(room: String, identifier: UUID) -> Bool {
+        guard available, sender is any NativeGroupCorrecting, let group = rooms.first(where: { $0.room == room }),
+              let snapshot = group.snapshot, snapshot.canSpeak, let target = snapshot.lastOwnLiveID, let occupant = snapshot.ownOccupantID,
+              let message = group.messages.first(where: { $0.id == identifier }), message.identifier == target else { return false }
+        return message.own && message.nickname == snapshot.nickname && message.occupantID == occupant &&
+            message.state == .submitted && !message.hidden && !message.retracted && !message.actionPending
+    }
+
     public func retract(room: String, identifier: UUID) {
-        guard canRetract(room: room, identifier: identifier), sends.count < 8,
-              let sender = sender as? any NativeGroupMessageChanging,
+        change(room: room, identifier: identifier, body: nil)
+    }
+
+    public func correct(room: String, identifier: UUID, body: String) {
+        change(room: room, identifier: identifier, body: body)
+    }
+
+    private func change(room: String, identifier: UUID, body: String?) {
+        guard sends.count < 8, sends[identifier] == nil,
               let index = rooms.firstIndex(where: { $0.room == room }),
-              let message = rooms[index].messages.firstIndex(where: { $0.id == identifier }),
-              let target = rooms[index].messages[message].archiveID else { return }
+              let message = rooms[index].messages.firstIndex(where: { $0.id == identifier }) else { return }
+        let submit: (String) async throws -> Void
+        if let body {
+            guard canCorrect(room: room, identifier: identifier), NativeChatCodec.validBody(body),
+                  let target = rooms[index].messages[message].identifier, let sender = sender as? any NativeGroupCorrecting else { return }
+            submit = { try await sender.correctGroupMessage(room: room, target: target, body: body, identifier: $0) }
+        } else {
+            guard canRetract(room: room, identifier: identifier), let target = rooms[index].messages[message].archiveID,
+                  let sender = sender as? any NativeGroupMessageChanging else { return }
+            submit = { try await sender.retractGroupMessage(room: room, target: target, identifier: $0) }
+        }
         let request = UUID().uuidString
         rooms[index].messages[message].actionPending = true
         rooms[index].messages[message].actionRequestID = request
-        rooms[index].messages[message].actionNotice = "Intrekverzoek wordt verzonden…"
+        let label = body == nil ? "Intrekverzoek" : "Wijziging"
+        rooms[index].messages[message].actionNotice = label + " wordt verzonden…"
         let attempt = generation
         sends[identifier] = Task { [weak self] in
             var submitted = false
-            do { try await sender.retractGroupMessage(room: room, target: target, identifier: request); submitted = true } catch { }
+            do { try await submit(request); submitted = true } catch { }
             guard let self = self, self.generation == attempt,
                   let index = self.rooms.firstIndex(where: { $0.room == room }),
                   let message = self.rooms[index].messages.firstIndex(where: { $0.id == identifier }),
                   self.rooms[index].messages[message].actionPending else { self?.sends[identifier] = nil; return }
             self.rooms[index].messages[message].actionPending = false
-            self.rooms[index].messages[message].actionNotice = submitted ? "Intrekverzoek verzonden; verwerking door de groep niet bevestigd." : "Intrekverzoek onzeker; niet automatisch opnieuw verzonden."
+            self.rooms[index].messages[message].actionNotice = label + (submitted ? " verzonden; verwerking door de groep niet bevestigd." : " onzeker; niet automatisch opnieuw verzonden.")
             self.sends[identifier] = nil
         }
     }
@@ -364,13 +390,27 @@ public final class NativeGroupModel: ObservableObject {
         guard let index = rooms.firstIndex(where: { $0.room == room }) else { return }
         let before: [NativeGroupText]?
         switch event {
-        case .message, .reactions, .retracted: before = rooms[index].messages
+        case .message, .reactions, .retracted, .corrected: before = rooms[index].messages
         default: before = nil
         }
         defer {
             if let before = before, before != rooms[index].messages { acceptedHistoryChange?(before, rooms[index].messages) }
         }
         switch event {
+        case .corrected(let target, let nickname, let occupant, let body, let request):
+            let matches = rooms[index].messages.indices.filter {
+                let message = rooms[index].messages[$0]
+                return message.identifier == target && message.nickname == nickname && message.occupantID == occupant
+            }
+            guard matches.count == 1, let message = matches.first, NativeChatCodec.validBody(body),
+                  !rooms[index].messages[message].hidden, !rooms[index].messages[message].retracted else { return }
+            rooms[index].messages[message].body = body
+            rooms[index].messages[message].edited = true
+            if let request, rooms[index].messages[message].own, rooms[index].messages[message].actionRequestID == request {
+                rooms[index].messages[message].actionPending = false
+                rooms[index].messages[message].actionRequestID = nil
+                rooms[index].messages[message].actionNotice = nil
+            }
         case .reactions(let target, let occupant, let values):
             guard rooms[index].snapshot?.supportsReactions == true, NativeMessageActionCodec.validID(occupant),
                   values.count <= 16, values.allSatisfy(NativeInteractionCodec.validReaction) else { return }

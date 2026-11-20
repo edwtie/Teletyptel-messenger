@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'Database.php';
+require_once dirname(__DIR__, 2) . '/lib/PasswordLoginAlias.php';
 
 const TELETYPTEL_OAUTH_HANDOFF_TTL_SECONDS = 2592000;
 const TELETYPTEL_2FA_PENDING_ACCOUNT_SESSION_KEY = 'teletyptel_2fa_pending_account_id';
@@ -234,8 +235,10 @@ function consumeOAuthLoginToken(string $accountId, string $token): bool
 function loginAccount(array $input): void
 {
     $jid = bareJid(cleanText($input['jid'] ?? '', 255));
+    $alias = array_key_exists('loginEmail', $input);
+    $email = is_string($input['loginEmail'] ?? null) ? strtolower(trim($input['loginEmail'])) : '';
     $password = cleanText($input['password'] ?? '', 1024);
-    if ($jid === '' || $password === '') {
+    if ((!$alias && $jid === '') || ($alias && (isset($input['jid']) || strlen($email) > 254 || !filter_var($email, FILTER_VALIDATE_EMAIL))) || $password === '') {
         http_response_code(400);
         echo json_encode(['ok' => false, 'error' => 'missing_credentials']);
         return;
@@ -243,12 +246,16 @@ function loginAccount(array $input): void
 
     $pdo = Database::connect();
     ensureAccountProfileSchema($pdo);
-    $statement = $pdo->prepare('SELECT * FROM account_profiles WHERE jid = :jid');
-    $statement->execute(['jid' => $jid]);
-    $row = $statement->fetch();
+    if ($alias) {
+        $row = PasswordLoginAlias::resolve($pdo, $email);
+    } else {
+        $statement = $pdo->prepare('SELECT * FROM account_profiles WHERE jid = :jid');
+        $statement->execute(['jid' => $jid]);
+        $row = $statement->fetch();
+    }
     $authenticated = is_array($row) && verifyAccountPassword($pdo, $row, $password);
 
-    if (!$authenticated) {
+    if (!$authenticated && !$alias) {
         if (verifyXmppAccountPassword($jid, $password)) {
             $account = normalizeAccount([
                 'jid' => $jid,

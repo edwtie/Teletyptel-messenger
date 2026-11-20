@@ -38,6 +38,11 @@ public struct NativeAuthenticatedAccount: CustomStringConvertible, CustomDebugSt
         return value
     }
 
+    static func isEmailAlias(_ input: String, domain: String) -> Bool {
+        !validJID(input, domain: domain) && input.utf8.count <= 254 &&
+            input.range(of: #"\A[A-Za-z0-9_+%'-]+(?:\.[A-Za-z0-9_+%'-]+)*@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+\z"#, options: .regularExpression) != nil
+    }
+
     static func validJID(_ jid: String, domain: String) -> Bool {
         let parts = jid.split(separator: "@", omittingEmptySubsequences: false)
         return parts.count == 2 && parts[1] == domain && !parts[0].isEmpty && jid.utf8.count <= 1023 &&

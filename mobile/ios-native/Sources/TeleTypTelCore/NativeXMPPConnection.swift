@@ -150,7 +150,7 @@ private final class NativeSessionClosure {
     }
 }
 
-private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, NativeArchiveSending, NativeGroupManaging, NativeMessageChanging, NativeGroupMessageChanging, NativeGroupReacting, NativeChatInteracting, NativeCallRecoverySending, NativeContactManaging, @unchecked Sendable {
+private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, NativeArchiveSending, NativeGroupManaging, NativeMessageChanging, NativeGroupMessageChanging, NativeGroupCorrecting, NativeGroupReacting, NativeChatInteracting, NativeCallRecoverySending, NativeContactManaging, @unchecked Sendable {
     private let configuration: ServerConfiguration
     private let ownerJID: String
     private var boundJID: String?
@@ -485,6 +485,19 @@ private final class SessionOperation: NSObject, URLSessionWebSocketDelegate, Nat
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             queue.async {
                 guard self.groups[room]?.stream.snapshot.supportsReactions == true, self.groups[room]?.stream.canSpeak == true else {
+                    continuation.resume(throwing: NativeGroupFailure.denied); return
+                }
+                self.enqueueMessage(frame, continuation: continuation)
+            }
+        }
+    }
+
+    func correctGroupMessage(room: String, target: String, body: String, identifier: String) async throws {
+        let frame = try NativeMessageActionCodec.encode(to: room, change: .correct(target: target, body: body), identifier: identifier, group: true)
+        try Task.checkCancellation()
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            queue.async {
+                guard let snapshot = self.groups[room]?.stream.snapshot, snapshot.canSpeak, snapshot.lastOwnLiveID == target else {
                     continuation.resume(throwing: NativeGroupFailure.denied); return
                 }
                 self.enqueueMessage(frame, continuation: continuation)

@@ -60,6 +60,17 @@ final class NativeTwoFactorHTTPTests: XCTestCase {
         return session
     }
 
+    func testPasswordAliasUsesExplicitServerLookupAndCanonicalLocalJID() async throws {
+        TwoFactorHTTPFixture.handler = { request in
+            let body = try TwoFactorHTTPFixture.body(request)
+            XCTAssertEqual(body["loginEmail"] as? String, "fixture@example.invalid")
+            XCTAssertNil(body["jid"])
+            return (200, #"{"ok":true,"account":{"accountId":"fixture","jid":"local@localhost","password":"test"}}"#, [:])
+        }
+        let account = try await client().login(configuration: configuration(), jid: "fixture@example.invalid", password: "test")
+        XCTAssertEqual(account.jid, "local@localhost")
+    }
+
     func testChallengeUsesSamePrivateCookieSessionAndThenReturnsExpectedAccount() async throws {
         var requests = 0
         let challenge = challenge

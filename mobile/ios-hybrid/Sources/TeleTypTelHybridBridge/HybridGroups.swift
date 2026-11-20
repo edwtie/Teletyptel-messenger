@@ -19,8 +19,9 @@ extension HybridSession {
             for values in message.reactions.values { for emoji in values { counts[emoji, default: 0] += 1 } }
             var value = HybridMessage(id: message.id.uuidString.lowercased(), body: message.retracted ? "Bericht verwijderd" : message.body,
                 outgoing: message.own, timestamp: message.date.timeIntervalSince1970, state: message.state.rawValue, delivery: "unconfirmed",
-                edited: false, retracted: message.retracted, reactions: counts.keys.sorted().prefix(16).map { HybridReaction(emoji: $0, count: counts[$0]!) })
+                edited: message.edited == true, retracted: message.retracted, reactions: counts.keys.sorted().prefix(16).map { HybridReaction(emoji: $0, count: counts[$0]!) })
             value.sender = message.nickname
+            value.canEdit = model.groups.canCorrect(room: peer, identifier: message.id)
             value.canRetract = model.groups.canRetract(room: peer, identifier: message.id)
             value.canReact = model.groups.canReact(room: peer, identifier: message.id)
             return value
@@ -74,6 +75,10 @@ extension HybridSession {
         case "chat.hide":
             model.groups.hideMessage(room: peer, identifier: id)
             guard model.groups.rooms.first(where: { $0.room == peer })?.messages.first(where: { $0.id == id })?.hidden == true else { throw HybridFailure.invalidState }
+        case "chat.edit":
+            guard let body = request.arguments["body"], model.groups.canCorrect(room: peer, identifier: id) else { throw HybridFailure.invalidState }
+            model.groups.correct(room: peer, identifier: id, body: body)
+            guard model.groups.rooms.first(where: { $0.room == peer })?.messages.first(where: { $0.id == id })?.actionPending == true else { throw HybridFailure.invalidState }
         case "chat.retract":
             guard model.groups.canRetract(room: peer, identifier: id) else { throw HybridFailure.invalidState }
             model.groups.retract(room: peer, identifier: id)

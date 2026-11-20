@@ -41,6 +41,28 @@ final class NativeMUCTests: XCTestCase {
         var legacy = try joined()
         XCTAssertTrue(legacy.receive(try ProbeXML.parse(retract)).events.isEmpty)
     }
+    func testCorrectionRequiresLastLiveMessageBySameOccupantSinceJoining() throws {
+        var stream = try stream()
+        let disco = info(stream).replacingOccurrences(of: "</query>", with: "<feature var='urn:xmpp:occupant-id:0'/></query>")
+        _ = stream.receive(try ProbeXML.parse(disco))
+        _ = stream.receive(try ProbeXML.parse(presence(nickname: "Peer", codes: [])))
+        _ = stream.receive(try ProbeXML.parse(presence()))
+        let original = "<message xmlns='jabber:client' from='\(room)/Peer' type='groupchat' id='first'><body>Hoi</body><occupant-id xmlns='urn:xmpp:occupant-id:0' id='author'/></message>"
+        let edit = original.replacingOccurrences(of: "</body>", with: " daar</body><replace xmlns='urn:xmpp:message-correct:0' id='first'/>")
+            .replacingOccurrences(of: "type='groupchat' id='first'", with: "type='groupchat' id='second'")
+        XCTAssertTrue(stream.receive(try ProbeXML.parse(edit)).events.isEmpty)
+        _ = stream.receive(try ProbeXML.parse(original))
+        XCTAssertTrue(stream.receive(try ProbeXML.parse(edit.replacingOccurrences(of: "'author'", with: "'someone'"))).events.isEmpty)
+        guard case .corrected("first", "Peer", "author", "Hoi daar", "second") = stream.receive(try ProbeXML.parse(edit)).events.first else {
+            return XCTFail("Expected a correction, not a second chat message")
+        }
+        _ = stream.receive(try ProbeXML.parse(original.replacingOccurrences(of: "'first'", with: "'newer'")))
+        XCTAssertTrue(stream.receive(try ProbeXML.parse(edit)).events.isEmpty)
+        _ = stream.receive(try ProbeXML.parse(presence(nickname: "Peer", codes: [], type: "type='unavailable'")))
+        _ = stream.receive(try ProbeXML.parse(presence(nickname: "Peer", codes: [])))
+        XCTAssertTrue(stream.receive(try ProbeXML.parse(edit.replacingOccurrences(of: "id='first'", with: "id='newer'"))).events.isEmpty)
+    }
+
     private func stream() throws -> NativeMUCStream { try NativeMUCStream(room: room, nickname: "Me", boundJID: "owner@localhost/phone") }
     private func info(_ stream: NativeMUCStream) -> String {
         "<iq xmlns='jabber:client' from='\(room)' id='\(stream.identifier)' type='result'><query xmlns='http://jabber.org/protocol/disco#info'><feature var='http://jabber.org/protocol/muc'/></query></iq>"

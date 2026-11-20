@@ -215,9 +215,9 @@
     const identifiers = new Set();
     const messages = value.messages.map(message => {
       const fields = ["id", "body", "outgoing", "timestamp", "state", "delivery", "edited", "retracted", "reactions"];
-      if (!message || typeof message !== "object" || Object.keys(message).some(key => ![...fields, "sender", "canRetract", "canReact"].includes(key))
+      if (!message || typeof message !== "object" || Object.keys(message).some(key => ![...fields, "sender", "canRetract", "canReact", "canEdit"].includes(key))
           || (message.sender !== undefined && message.sender !== null && !safeText(message.sender))
-          || ["canRetract", "canReact"].some(key => message[key] !== undefined && typeof message[key] !== "boolean")
+          || ["canRetract", "canReact", "canEdit"].some(key => message[key] !== undefined && typeof message[key] !== "boolean")
           || !uuidPattern.test(message.id) || identifiers.has(message.id) || !safeText(message.body)
           || typeof message.outgoing !== "boolean" || !Number.isFinite(message.timestamp) || Math.abs(message.timestamp) > 8640000000000
           || !["incoming", "sending", "submitted", "uncertain", "rejected"].includes(message.state)
@@ -232,7 +232,7 @@
             || !Number.isSafeInteger(reaction.count) || reaction.count < 1 || reaction.count > 10000) throw new Error("invalidNativeReply");
         return Object.freeze({ emoji: reaction.emoji, count: reaction.count });
       });
-      return Object.freeze({ ...message, reactions: Object.freeze(reactions), canRetract: message.canRetract ?? (value.canChange && message.outgoing && !message.retracted),
+      return Object.freeze({ ...message, reactions: Object.freeze(reactions), canEdit: message.canEdit ?? (value.canChange && message.outgoing && !message.retracted), canRetract: message.canRetract ?? (value.canChange && message.outgoing && !message.retracted),
         canReact: message.canReact ?? (value.canSend && !message.retracted) });
     });
     return Object.freeze({ peer: value.peer, kind, draft: value.draft, history: value.history,

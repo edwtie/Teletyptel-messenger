@@ -72,6 +72,7 @@ public struct HybridMessage: Codable, Equatable {
     public let reactions: [HybridReaction]
     public var sender: String? = nil
     public var canRetract: Bool = false
+    public var canEdit: Bool? = nil
     public var canReact: Bool = false
 }
 
