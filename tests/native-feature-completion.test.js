@@ -110,7 +110,8 @@ test("Reconnect is bounded, cancellable and cannot bypass certificate or authent
   assert.match(source, /failure == \.offline \|\| failure == \.timeout/);
   assert.match(source, /generation == retry/);
   assert.match(source, /keepAccount: true, keepReconnect: true/);
-  assert.match(source, /let keepAccount = isConnected \|\| isReconnecting/);
+  assert.match(source, /if transient, isBackground, hasEstablishedSession/);
+  assert.match(source, /keepAccount: hasEstablishedSession, preserveBackground: true/);
   assert.doesNotMatch(source, /transient = .*certificate/);
   assert.match(source, /chat\.markRead\(identifiers\)\s+guard canSend, chat\.preferences\.sendDisplayed/);
 });

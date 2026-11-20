@@ -30,16 +30,26 @@ class SimulatorSmokeTests(unittest.TestCase):
     def test_runs_real_ui_suite_on_inventory_udid_and_propagates_failure(self):
         inventory = Mock(stdout=json.dumps({"devices": {runtime: [device("iPhone")]}}))
         with patch("platform.machine", return_value="arm64"), patch.dict("os.environ", RUNNER_TEMP="/tmp"), \
-                patch("subprocess.run", side_effect=[inventory, subprocess.CalledProcessError(65, "test")]) as run:
+                patch("subprocess.run", side_effect=[inventory, Mock(), subprocess.CalledProcessError(65, "test")]) as run:
             with self.assertRaises(subprocess.CalledProcessError):
                 module["smoke"]("iPhone")
-        self.assertEqual(run.call_count, 2)
-        first, second = run.call_args_list
+        first, boot, second = run.call_args_list
+        self.assertEqual(boot.args[0], ["xcrun", "simctl", "bootstatus", identifier, "-b"])
+        self.assertTrue(boot.kwargs["check"])
+        self.assertGreater(boot.kwargs["timeout"], 0)
         self.assertEqual(first.args[0], ["xcrun", "simctl", "list", "devices", "available", "-j"])
         self.assertEqual(second.args[0][:2], ["xcodebuild", "test"])
         self.assertIn("platform=iOS Simulator,arch=arm64,id=" + identifier, second.args[0])
         self.assertIn("-only-testing:NativeStartupUITests/HybridStartupUITests", second.args[0])
         self.assertTrue(second.kwargs["check"])
+
+    def test_boot_timeout_does_not_start_ui_tests(self):
+        inventory = Mock(stdout=json.dumps({"devices": {runtime: [device("iPad")]}}))
+        with patch("platform.machine", return_value="arm64"), \
+                patch("subprocess.run", side_effect=[inventory, subprocess.TimeoutExpired("bootstatus", 300)]) as run:
+            with self.assertRaises(subprocess.TimeoutExpired):
+                module["smoke"]("iPad")
+        self.assertEqual(run.call_count, 2)
 
 
 if __name__ == "__main__":

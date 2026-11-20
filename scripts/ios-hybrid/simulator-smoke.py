@@ -24,6 +24,7 @@ def smoke(kind):
     device = select_device(json.loads(inventory.stdout)["devices"], kind)
     identifier = device["udid"]
     print(f"UI-test op bestaande {device['name']} ({identifier}, {device['state']}, iOS 27.2)", flush=True)
+    subprocess.run(["xcrun", "simctl", "bootstatus", identifier, "-b"], check=True, timeout=300)
     subprocess.run(["xcodebuild", "test", "-project", "artifacts/ios-native-hybrid-validation/TeleTypTelNative.xcodeproj",
                     "-scheme", "TeleTypTelNative", "-configuration", "Debug", "-destination",
                     f"platform=iOS Simulator,arch={architecture},id={identifier}", "-derivedDataPath",

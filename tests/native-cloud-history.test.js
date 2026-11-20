@@ -50,7 +50,7 @@ test("Native cloud loads cannot manufacture XMPP receipt or membership authority
   assert.match(read("mobile/ios-native/App/NativeCloudHistoryView.swift"), /minHeight: 58/);
   assert.match(read("mobile/ios-native/App/NativeCloudHistoryView.swift"), /\.accessibilityElement\(children: \.combine\)/);
   assert.doesNotMatch(read("mobile/ios-native/App/NativeCloudHistoryView.swift"), /}\s*\.accessibilityIdentifier\(state\.ready/);
-  assert.match(read("mobile/ios-native/App/NativeCloudHistoryView.swift"), /\.foregroundStyle\(selected == conversation\.peer \? Color\.white : NativeWebStyle\.muted\)/);
+  assert.match(read("mobile/ios-native/App/NativeCloudHistoryView.swift"), /\.foregroundStyle\(selected == conversation\.peer \? NativeWebStyle\.selectionText : NativeWebStyle\.muted\)/);
   assert.match(read("mobile/ios-native/App/NativeTranslationView.swift"), /NativeHistoricalContacts\([^\n]*selected: selected, archived: archive\.entries\)/);
 });
 
