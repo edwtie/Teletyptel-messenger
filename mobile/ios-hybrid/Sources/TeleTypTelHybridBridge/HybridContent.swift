@@ -14,14 +14,14 @@ public struct HybridContent {
     }
 
     private let resources: [String: (mime: String, data: Data)]
-    private static let scripts: Set<String> = ["native-session.js", "login-presentation.js", "account-presentation.js", "contacts-presentation.js", "features-presentation.js", "chat-presentation.js", "calls-presentation.js", "ui-language.js"]
+    private static let scripts: Set<String> = ["native-session.js", "login-presentation.js", "account-presentation.js", "contacts-presentation.js", "features-presentation.js", "chat-presentation.js", "calls-presentation.js", "ui-language.js", "smileys-catalog.js", "smileys-presentation.js", "history-presentation.js"]
     private static let styles: Set<String> = ["chat-client.css", "xmpp-availability.css", "hybrid-login.css", "hybrid-messenger.css"]
 
     public init(data: Data) throws {
         guard data.count <= 24 * 1024 * 1024,
               let manifest = try? JSONDecoder().decode(Manifest.self, from: data), manifest.version == 1,
               manifest.revision == "334688e73c5218be27ad6270c7f96809c94de460",
-              manifest.files.count <= 32 else { throw HybridFailure.invalidRequest }
+              manifest.files.count <= 96 else { throw HybridFailure.invalidRequest }
         let required = Self.scripts.union(Self.styles).union(["chat.html", "assets/brand/teletyptel-logo-header@2x.png"])
         guard required.isSubset(of: Set(manifest.files.keys)) else { throw HybridFailure.invalidRequest }
         var resources: [String: (mime: String, data: Data)] = [:]
@@ -41,6 +41,9 @@ public struct HybridContent {
         if path == "chat.html" { return "text/html" }
         if scripts.contains(path) { return "text/javascript" }
         if styles.contains(path) { return "text/css" }
+        if path.range(of: #"\Asmileys/[a-z0-9_-]{1,40}\.(gif|svg)\z"#, options: .regularExpression) != nil {
+            return path.hasSuffix(".gif") ? "image/gif" : "image/svg+xml"
+        }
         guard path.range(of: #"\Aassets/(brand|backgrounds|icons)/[a-zA-Z0-9_@/-]+\.(png|svg)\z"#, options: .regularExpression) != nil else { return nil }
         return path.hasSuffix(".svg") ? "image/svg+xml" : "image/png"
     }

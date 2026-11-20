@@ -48,7 +48,17 @@ Het opstartlogo en de blauwe voortgang gebruiken één bestaande webweergave. Bi
 
 `chatAvailable` volgt de actieve native sessie. `callsAvailable` vereist daarnaast een geïnjecteerde oproepadapter; ieder contact krijgt een native `canCall`-vlag. `socialLoginAvailable` volgt uitsluitend de native providerconfiguratie. Er is geen terugval naar de oude webmotor. Berichten worden pas via een expliciete viewportbevestiging lokaal gelezen gemarkeerd; blauwe vinkjes vereisen de native ontvangst van een weergavebevestiging, niet alleen online aanwezigheid.
 
-Niet geconfigureerde providers blijven zichtbaar maar uitgeschakeld. Volledige smileyselectie, overige geavanceerde instellingen, uitgebreid kamerconfiguratiebeheer en groepsoproepen volgen nog. Het wachtwoordveld vraagt nog een werkelijk XMPP-account; e-mailaliasaanmelding via dat veld is niet als voltooid gepresenteerd. De native providerroute kan wel een door de server geverifieerd Google/Facebook-account koppelen.
+Niet geconfigureerde providers blijven zichtbaar maar uitgeschakeld. Groepsoproepen en resterende geavanceerde webschermen volgen nog. Het wachtwoordveld vraagt nog een werkelijk XMPP-account; e-mailaliasaanmelding via dat veld is niet als voltooid gepresenteerd. De native providerroute kan wel een door de server geverifieerd Google/Facebook-account koppelen.
+
+## Geschiedenis, archief en groepsinstellingen
+
+- Het hoofdmenu bevat aparte geschiedenis- en archiefsymbolen. Zoeken werkt binnen de beschikbare gesprekken; het is geen volledige serverbrede tekstzoekfunctie. Cloudgeschiedenis gebruikt de bestaande native API, privésessie en cursors; zonder die dienst blijft beschikbare lokale geschiedenis zichtbaar.
+- Een geschiedenisvenster toont maximaal de 200 berichten die de native motor bewaart. Eerdere cloudpagina's worden via die motor opgehaald en samengevoegd; oudere pagina's kunnen recentere berichten uit het begrensde venster verdringen. Verversen vraagt opnieuw de recente pagina. Bekijken verstuurt geen leesbevestiging, bericht of uitnodiging en voegt geen onbekend contact toe. Gewone chat openen kan alleen voor een bekend contact of een reeds verbonden groep.
+- Archiveren en herstellen gebruiken de bestaande apparaatgebonden, per server en account gescheiden voorkeur. Dit verbergt gesprekken uit de contactenlijst zonder berichten of concepten te verwijderen; archiefstatus wordt niet naar andere toestellen gesynchroniseerd.
+- Alle 41 oorspronkelijke websmileys zijn beschikbaar, inclusief hun oorspronkelijke codes. Ontbrekende GIF-bestanden gebruiken dezelfde meegeleverde SVG-terugval als de webclient. Afbeeldingen komen uitsluitend uit de vastgezette 16.9-revisie. Een bericht bevat nog steeds de oorspronkelijke tekstcode; de ontvanger krijgt geen gewijzigde tekst of HTML.
+- Groepseigenaren kunnen ondersteunde serverinstellingen ophalen en aanvragen. Alleen door het serverformulier aangeboden velden zijn wijzigbaar. Een kort geldige, eenmalige formulierreferentie voorkomt opslaan vanuit een oud gesprek; onbekende servervelden blijven uitsluitend native behouden. Toegang en zichtbaarheid wijzigen vraagt expliciete bevestiging.
+- Eigenaren/beheerders kunnen leden-, beheerders- en blokkeerlijsten opvragen. Wijzigingen zijn beperkt tot bekende contacten of expliciet opgehaalde leden. Zelfwijziging en eigendomsoverdracht worden niet aangeboden; een gewone beheerder kan geen beheerder benoemen. Een aanvraag geldt pas als bevestigd wanneer de native groepsserver dat terugmeldt.
+- Accountwisseling, achtergrond en actieve oproepen sluiten deze vensters. Serverrechten worden bij elke opdracht opnieuw gecontroleerd. Cloud-API-interoperabiliteit en deze gebruikersstromen op echte toestellen blijven apart te beoordelen.
 
 Tijdens TC verdwijnt gewone chat. Live tekst gebruikt uitsluitend de native RTT-opdracht. Als alle camera's aantoonbaar uitstaan vullen de RTT-vakken het gesprek; een onbekende camerastatus wordt niet als uitgeschakeld behandeld. Videotracks worden door native `RTCMTLVideoView` getoond, niet via browsermedia. De videopositie wordt begrensd aan de native viewport. Concepten blijven binnen hetzelfde account behouden als een gesprek de chat onderbreekt.
 
@@ -67,7 +77,7 @@ De workflow compileert de library en de afzonderlijk geassembleerde app voor de 
 
 ## Nog aansluiten
 
-1. Volledige smileyselectie, aparte archiefnavigatie, uitgebreide kamerconfiguratie en groepsoproepen verbinden; de resterende webschermen en native instellingen visueel vergelijken.
+1. Groepsoproepen verbinden; de resterende webschermen en native instellingen visueel vergelijken. Historische berichtvensters hebben bewust geen verzend-, wijzigings- of doorstuurmenu.
 2. Ondertekende toestelevaluatie van chat, native video, audio, RTT, toetsenbord en CallKit-opnemen/beëindigen uitvoeren.
 3. Achtergrondherstel en APNs met een echt geregistreerd toestel afzonderlijk activeren en testen; de CI-assemblage activeert geen push.
 4. Volledige webgelijkheid, schermlezerbediening en de resterende navigatieschermen beoordelen voordat de bestaande TestFlight-app wordt vervangen.

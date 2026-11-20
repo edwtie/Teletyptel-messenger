@@ -56,6 +56,15 @@ struct HybridRequest: Decodable, CustomStringConvertible, CustomDebugStringConve
             guard Set(arguments.keys) == Set(["provider"]), ["google", "facebook"].contains(arguments["provider"] ?? "") else { throw HybridFailure.invalidRequest }
         case "auth.biometric", "auth.forget", "auth.privacy", "account.refresh", "account.avatar":
             guard arguments.isEmpty else { throw HybridFailure.invalidRequest }
+        case "history.search":
+            guard Set(arguments.keys) == Set(["query", "archived"]), let query = arguments["query"], Self.text(query, maximumBytes: 256),
+                  ["true", "false"].contains(arguments["archived"] ?? "") else { throw HybridFailure.invalidRequest }
+        case "history.open", "history.archive", "history.earlier", "history.refresh", "history.chat":
+            guard Set(arguments.keys) == (command == "history.archive" ? Set(["id", "archived"]) : Set(["id"])),
+                  UUID(uuidString: arguments["id"] ?? "") != nil else { throw HybridFailure.invalidRequest }
+            if command == "history.archive", !["true", "false"].contains(arguments["archived"] ?? "") { throw HybridFailure.invalidRequest }
+        case "history.close":
+            guard arguments.isEmpty else { throw HybridFailure.invalidRequest }
         case "auth.recover":
             guard Set(arguments.keys) == Set(["jid"]), let jid = arguments["jid"], !jid.isEmpty, Self.text(jid, maximumBytes: 320) else { throw HybridFailure.invalidRequest }
         case "auth.register":
@@ -86,6 +95,18 @@ struct HybridRequest: Decodable, CustomStringConvertible, CustomDebugStringConve
                   let nickname = arguments["nickname"], !nickname.isEmpty, nickname.utf8.count <= 128,
                   !nickname.contains("/"), Self.text(nickname), !nickname.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains),
                   ["true", "false"].contains(arguments["create"] ?? "") else { throw HybridFailure.invalidRequest }
+        case "groups.configuration":
+            guard Set(arguments.keys) == Set(["room"]), Self.peer(arguments["room"]) else { throw HybridFailure.invalidRequest }
+        case "groups.configure":
+            guard Set(arguments.keys) == Set(["room", "token", "name", "description", "membersOnly", "moderated", "publicRoom", "persistent", "allowInvites", "confirmed"]),
+                  Self.peer(arguments["room"]), UUID(uuidString: arguments["token"] ?? "") != nil, arguments["confirmed"] == "true",
+                  let name = arguments["name"], Self.text(name, maximumBytes: 120), let description = arguments["description"], Self.text(description, maximumBytes: 1024),
+                  ["membersOnly", "moderated", "publicRoom", "persistent", "allowInvites"].allSatisfy({ ["true", "false"].contains(arguments[$0] ?? "") }) else { throw HybridFailure.invalidRequest }
+        case "groups.members", "groups.affiliation":
+            let required = command == "groups.members" ? Set(["room", "affiliation"]) : Set(["room", "peer", "affiliation", "confirmed"])
+            guard Set(arguments.keys) == required, Self.peer(arguments["room"]),
+                  (command == "groups.members" ? ["member", "admin", "outcast"] : ["none", "member", "admin", "outcast"]).contains(arguments["affiliation"] ?? "") else { throw HybridFailure.invalidRequest }
+            if command == "groups.affiliation", (!Self.peer(arguments["peer"]) || arguments["confirmed"] != "true") { throw HybridFailure.invalidRequest }
         case "groups.leave", "groups.subject", "groups.invite", "groups.role":
             let required = command == "groups.leave" ? Set(["room"]) : command == "groups.subject" ? Set(["room", "subject"])
                 : command == "groups.invite" ? Set(["room", "peer"]) : Set(["room", "nickname", "role"])
@@ -210,6 +231,8 @@ public struct HybridSnapshot: Codable, Equatable {
     public var groupNotice: String? = nil
     public var extras = HybridExtrasState()
     public var account = HybridAccountState()
+    public var history = HybridHistoryState()
+    public var groupAdministration: HybridGroupAdministrationState?
 }
 
 public struct HybridContact: Codable, Equatable {

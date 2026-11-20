@@ -69,7 +69,8 @@
       jid.textContent = contact?.jid || "";
       presence.textContent = contact ? (contact.kind === "group" ? "Groep" : presenceLabels[contact.presence]) : "";
       const query = normalized(search.value);
-      const contacts = entries.filter(value => !query || normalized(value.name + " " + value.jid).includes(query));
+      const contacts = entries.filter(value => (value.jid === selected && value.kind === selectedKind || !latestState?.history.archived.some(item => item.peer === value.jid && item.kind === value.kind))
+        && (!query || normalized(value.name + " " + value.jid).includes(query)));
       search.disabled = roster.status !== "ready";
       toggle.disabled = roster.status !== "ready";
       status.textContent = roster.status === "loading" ? "Contacten laden…" : roster.status === "unavailable" ? "Contacten zijn niet beschikbaar."
@@ -148,8 +149,9 @@
       }
       groups = state.groups;
       if (state.conversation) { selected = state.conversation.peer; selectedKind = state.conversation.kind; }
+      else selected = null;
       roster = next;
-      const signature = JSON.stringify([next, groups, state.groupsAvailable, state.conversation?.peer || null, state.conversation?.kind, state.account.avatars, state.account.blocked]);
+      const signature = JSON.stringify([next, groups, state.groupsAvailable, state.conversation?.peer || null, state.conversation?.kind, state.account.avatars, state.account.blocked, state.history.archived]);
       if (signature === rosterSignature) return;
       rosterSignature = signature;
       render();

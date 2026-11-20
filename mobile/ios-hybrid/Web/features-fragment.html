@@ -12,6 +12,22 @@
     <label>Contact uitnodigen<select id="hybridGroupInviteTarget"></select></label><button id="hybridGroupInvite" type="button">Uitnodigen</button>
     <label>Deelnemers<select id="hybridGroupOccupant"></select></label>
     <div id="hybridGroupModeration" hidden><label>Rol<select id="hybridGroupRole"><option value="participant">Deelnemer</option><option value="visitor">Alleen lezen</option><option value="moderator">Moderator</option><option value="none">Verwijderen uit gesprek</option></select></label><button id="hybridGroupRoleSave" type="button">Rol aanvragen</button></div>
+    <section id="hybridGroupOwner" hidden><h3>Groepsinstellingen</h3><button id="hybridGroupLoadConfiguration" type="button">Instellingen ophalen</button>
+      <div id="hybridGroupConfiguration" hidden>
+        <label>Naam<input id="hybridGroupName" type="text" maxlength="120"></label><label>Beschrijving<textarea id="hybridGroupDescription" maxlength="1024"></textarea></label>
+        <label><input id="hybridGroupMembersOnly" type="checkbox">Alleen leden</label><label><input id="hybridGroupModerated" type="checkbox">Gemodereerd</label>
+        <label><input id="hybridGroupPublicRoom" type="checkbox">Zichtbaar in openbare groepslijst</label><label><input id="hybridGroupPersistent" type="checkbox">Blijvende groep</label>
+        <label><input id="hybridGroupAllowInvites" type="checkbox">Leden mogen uitnodigen</label>
+        <label><input id="hybridGroupConfigurationConfirm" type="checkbox">Ik bevestig de wijzigingen, inclusief toegang en zichtbaarheid</label>
+        <button id="hybridGroupSaveConfiguration" type="button">Instellingen aanvragen</button>
+      </div>
+    </section>
+    <section id="hybridGroupMembers" hidden><h3>Ledenbeheer</h3>
+      <label>Lijst<select id="hybridGroupAffiliationList"><option value="member">Leden</option><option value="admin">Beheerders</option><option value="outcast">Geblokkeerd</option></select></label><button id="hybridGroupLoadMembers" type="button">Lijst ophalen</button>
+      <p id="hybridGroupMemberCount" role="status"></p><label>Contact of opgehaald lid<select id="hybridGroupMemberTarget"></select></label>
+      <label>Bevoegdheid<select id="hybridGroupAffiliation"><option value="member">Lid</option><option value="none">Geen lidmaatschap</option><option value="outcast">Blokkeren</option><option value="admin">Beheerder</option></select></label>
+      <label><input id="hybridGroupAffiliationConfirm" type="checkbox">Ik bevestig deze wijziging voor dit account</label><button id="hybridGroupSaveAffiliation" type="button">Bevoegdheid aanvragen</button>
+    </section>
     <p id="hybridGroupManageNotice" role="status" aria-live="polite"></p><button id="hybridGroupLeave" type="button">Groep verlaten</button>
   </div><footer class="modal-actions"><button type="button" data-close-feature="hybridGroupManage">Sluiten</button></footer>
 </div></div>

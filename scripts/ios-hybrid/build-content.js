@@ -3,6 +3,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { baseline, check, readReference } = require("./check-baseline");
+const { resolveCatalog } = require("./smileys");
 const root = path.resolve(__dirname, "../..");
 
 function element(source, selector) {
@@ -33,9 +34,11 @@ function createContent() {
   const calls = fs.readFileSync(path.join(root, "mobile/ios-hybrid/Web/calls-fragment.html"), "utf8");
   const features = fs.readFileSync(path.join(root, "mobile/ios-hybrid/Web/features-fragment.html"), "utf8");
   const accountFeatures = fs.readFileSync(path.join(root, "mobile/ios-hybrid/Web/account-fragment.html"), "utf8");
+  const history = fs.readFileSync(path.join(root, "mobile/ios-hybrid/Web/history-fragment.html"), "utf8");
   const sidebar = element(original, /<aside\b[^>]*\bid="conversationSidebar"[^>]*>/)
     .replace('<div id="conversationItems"', '<p id="hybridRosterStatus" class="security-status" role="status" aria-live="polite"></p><div id="conversationItems"');
   const legacy = reference("chat-client.js");
+  const smileys = resolveCatalog(legacy, readReference);
   const icon = /\bsettings:\s*\{\s*viewBox:\s*"([\d -]+)",\s*paths:\s*(\[[^\]]*\])/.exec(legacy);
   if (!icon) throw new Error("Missing pinned settings symbol.");
   const paths = JSON.parse(icon[2]);
@@ -54,7 +57,7 @@ function createContent() {
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' capacitor:; style-src 'self' capacitor:; img-src 'self' capacitor: data:; connect-src 'none'; media-src 'none'; frame-src 'none'; worker-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <title>TeleTypTel</title><link rel="stylesheet" href="chat-client.css"><link rel="stylesheet" href="xmpp-availability.css"><link rel="stylesheet" href="hybrid-login.css"><link rel="stylesheet" href="hybrid-messenger.css">
-<script src="ui-language.js" defer></script><script src="native-session.js" defer></script><script src="login-presentation.js" defer></script><script src="account-presentation.js" defer></script><script src="contacts-presentation.js" defer></script><script src="features-presentation.js" defer></script><script src="chat-presentation.js" defer></script><script src="calls-presentation.js" defer></script>
+<script src="ui-language.js" defer></script><script src="smileys-catalog.js" defer></script><script src="native-session.js" defer></script><script src="smileys-presentation.js" defer></script><script src="login-presentation.js" defer></script><script src="account-presentation.js" defer></script><script src="contacts-presentation.js" defer></script><script src="features-presentation.js" defer></script><script src="chat-presentation.js" defer></script><script src="history-presentation.js" defer></script><script src="calls-presentation.js" defer></script>
 </head><body class="account-gate account-booting" data-theme="light">
 <section id="hybridStartup" class="xmpp-availability native-startup" open aria-label="TeleTypTel starten"><div class="xmpp-availability__panel">
 <img class="xmpp-availability__brand" src="assets/brand/teletyptel-logo-header@2x.png" width="599" height="128" alt="TeleTypTel">
@@ -71,11 +74,11 @@ function createContent() {
 <div id="hybridConnected" class="app-shell" hidden><header class="topbar"><img src="assets/brand/teletyptel-logo-header@2x.png" width="240" height="51" alt="TeleTypTel"><span id="connectionSummary" role="status">XMPP verbonden</span><details id="hybridMainMenu" class="hybrid-start-menu"><summary class="icon-button" aria-label="Hoofdmenu" title="Hoofdmenu"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg></summary><div>
 <button id="hybridOpenProfile" class="icon-button" type="button" aria-label="Accountinstellingen" title="Accountinstellingen">${symbol}</button>
 <button id="hybridMenuTranslation" class="icon-button" type="button" aria-label="Vertaalinstellingen" title="Vertaalinstellingen"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a18 18 0 0 0 0 18 18 18 0 0 0 0-18"/></svg></button>
-${nativeMenu}</div></details><button id="hybridLogout" class="icon-button logout-icon-button" type="button" aria-label="Uitloggen"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 4H4v16h5m6-13 5 5-5 5m-7-5h12"/></svg></button></header>
+${nativeMenu}<button id="hybridOpenHistory" class="icon-button" type="button" aria-label="Geschiedenis" title="Geschiedenis"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 11a9 9 0 1 1 2 7M3 4v7h7M12 7v5l3 2"/></svg></button><button id="hybridOpenArchive" class="icon-button" type="button" aria-label="Archief" title="Archief"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 4h18v5H3Zm2 5v12h14V9M9 13h6"/></svg></button></div></details><button id="hybridLogout" class="icon-button logout-icon-button" type="button" aria-label="Uitloggen"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 4H4v16h5m6-13 5 5-5 5m-7-5h12"/></svg></button></header>
 <main class="client-grid">${sidebar}<section id="hybridContactPreview" class="hybrid-contact-preview" aria-labelledby="hybridContactTitle">
 <div class="chat-header"><button id="hybridContactsBack" class="icon-button" type="button" aria-label="Terug naar contacten" hidden><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m14 6-6 6 6 6M8 12h13"/></svg></button><span id="hybridContactAvatar" class="avatar" aria-hidden="true" hidden></span><div class="chat-title"><strong id="hybridContactTitle">Kies een contact</strong><span id="hybridContactPresence"></span></div>${chatActions}</div>
 <div id="hybridEmptyChat" class="hybrid-contact-details"><p id="hybridContactJid"></p><p id="hybridContactHint">Kies een contact om te chatten of een gesprek te starten.</p></div>${chatBody}
-</section></main>${features}<div id="hybridContactRequests" role="region" aria-label="Statusverzoeken"></div></div>${accountFeatures}${calls}
+</section></main>${features}<div id="hybridContactRequests" role="region" aria-label="Statusverzoeken"></div></div>${accountFeatures}${history}${calls}
 </body></html>`;
   if (/\bon\w+\s*=|<script\b[^>]*>(?!\s*<\/script>)/i.test(html)) throw new Error("Executable legacy HTML is not allowed.");
   const files = {};
@@ -89,7 +92,10 @@ ${nativeMenu}</div></details><button id="hybridLogout" class="icon-button logout
     for (const match of css.matchAll(/url\(["']?(assets\/[a-zA-Z0-9_@./-]+)["']?\)/g)) images.add(match[1]);
   }
   for (const name of images) add(name, name.endsWith(".svg") ? "image/svg+xml" : "image/png", readReference(name));
-  for (const [name, mime] of [["native-session.js", "text/javascript"], ["login-presentation.js", "text/javascript"], ["account-presentation.js", "text/javascript"], ["contacts-presentation.js", "text/javascript"], ["features-presentation.js", "text/javascript"], ["chat-presentation.js", "text/javascript"], ["calls-presentation.js", "text/javascript"], ["hybrid-login.css", "text/css"], ["hybrid-messenger.css", "text/css"]]) {
+  for (const smiley of smileys) add(smiley.file, smiley.file.endsWith(".svg") ? "image/svg+xml" : "image/gif", readReference(smiley.file));
+  add("smileys-catalog.js", "text/javascript", "window.TeleTypTelSmileyCatalog=Object.freeze(" + JSON.stringify(smileys).replace(/</g, "\\u003c") + ");\n");
+  add("smileys-presentation.js", "text/javascript", fs.readFileSync(path.join(root, "mobile/ios-hybrid/Web/smileys-presentation.js")));
+  for (const [name, mime] of [["native-session.js", "text/javascript"], ["login-presentation.js", "text/javascript"], ["account-presentation.js", "text/javascript"], ["contacts-presentation.js", "text/javascript"], ["features-presentation.js", "text/javascript"], ["chat-presentation.js", "text/javascript"], ["history-presentation.js", "text/javascript"], ["calls-presentation.js", "text/javascript"], ["hybrid-login.css", "text/css"], ["hybrid-messenger.css", "text/css"]]) {
     add(name, mime, fs.readFileSync(path.join(root, "mobile/ios-hybrid/Web", name)));
   }
   const translations = {};

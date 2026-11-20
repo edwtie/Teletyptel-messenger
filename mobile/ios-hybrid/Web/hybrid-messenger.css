@@ -264,6 +264,7 @@
 }
 
 .hybrid-feature-dialog input:not([type="checkbox"]),
+.hybrid-feature-dialog textarea,
 .hybrid-feature-dialog select {
   display: block;
   width: 100%;
@@ -312,6 +313,71 @@
   border: 1px solid var(--line);
   border-radius: 10px;
   background: var(--panel);
+  max-height: min(280px, 40vh);
+  max-width: min(340px, calc(100vw - 32px));
+  overflow: auto;
+}
+
+.hybrid-emoji-panel button {
+  width: 44px;
+  height: 44px;
+  padding: 6px;
+}
+
+.hybrid-history-entry {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+  align-items: center;
+}
+
+.hybrid-history-entry > button:first-child {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+
+.hybrid-history-entry strong,
+.hybrid-history-entry span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hybrid-history-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.hybrid-history-messages {
+  max-height: 45vh;
+  overflow: auto;
+  padding: 8px;
+  background: var(--bg);
+}
+
+.hybrid-history-message {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px;
+  margin: 8px 8% 8px 0;
+  background: var(--panel);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.hybrid-history-message.outgoing {
+  margin: 8px 0 8px 8%;
+  background: var(--self-bg, #dcf8ec);
+}
+
+.hybrid-history-message time {
+  display: block;
+  font-size: 12px;
+  text-align: right;
+  margin-top: 8px;
 }
 
 #hybridMessageMenu {

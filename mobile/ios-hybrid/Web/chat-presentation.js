@@ -105,6 +105,7 @@
         const body = document.createElement("div");
         body.className = "message-body";
         body.textContent = message.body;
+        document.defaultView.TeleTypTelHybridSmileys?.body(body, message.body);
         if (message.sender && kind === "group") {
           const sender = document.createElement("strong"); sender.className = "hybrid-message-sender"; sender.textContent = message.sender;
           bubble.append(sender);
@@ -232,9 +233,11 @@
       const picker = byID("hybridEmojiPanel"); picker.hidden = !picker.hidden;
       byID("hybridEmojiToggle").setAttribute("aria-expanded", String(!picker.hidden));
     };
+    const insertEmoji = emoji => { input.setRangeText(emoji, input.selectionStart, input.selectionEnd, "end"); onInput(); input.focus(); };
+    document.defaultView.TeleTypTelHybridSmileys?.picker(byID("hybridEmojiPanel"), insertEmoji);
     for (const emoji of ["😀", "😊", "👍", "❤️", "👋", "🙏", "😂", "🤟"]) {
       const button = document.createElement("button"); button.type = "button"; button.textContent = emoji; button.setAttribute("aria-label", emoji);
-      button.onclick = () => { input.setRangeText(emoji, input.selectionStart, input.selectionEnd, "end"); onInput(); input.focus(); };
+      button.onclick = () => insertEmoji(emoji);
       byID("hybridEmojiPanel").append(button);
     }
     const act = async action => {

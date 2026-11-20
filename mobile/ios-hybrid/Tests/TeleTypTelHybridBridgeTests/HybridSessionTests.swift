@@ -34,6 +34,18 @@ actor SessionFixture: ServerChecking, NativeAccountChallenging, NativeXMPPConnec
     private(set) var groupBodies: [String] = []
     private(set) var groupInvites: [String] = []
     private(set) var groupRoles: [String] = []
+    private var groupAffiliation = "none"
+    private(set) var configurationSaves: [NativeRoomConfiguration] = []
+    private(set) var affiliationSaves: [String] = []
+
+    func setGroupAffiliation(_ value: String, room: String? = nil) {
+        groupAffiliation = value
+        if let room = room {
+            var snapshot = NativeGroupSnapshot(room: room, nickname: "Fixture", participants: ["Fixture", "Peer"], canSpeak: true)
+            snapshot.ownRole = "moderator"; snapshot.ownAffiliation = value
+            groupObservers[room]?(.snapshot(snapshot))
+        }
+    }
 
     init(probeFailure: ConnectionFailure? = nil, accountFailure: NativeAccountFailure? = nil, holdAuthentication: Bool = false,
          secondFactor: Bool = false) {
@@ -117,6 +129,7 @@ actor SessionFixture: ServerChecking, NativeAccountChallenging, NativeXMPPConnec
         groupObservers[room] = onEvent
         var snapshot = NativeGroupSnapshot(room: room, nickname: nickname, participants: [nickname, "Peer"], canSpeak: true)
         snapshot.ownRole = "moderator"
+        snapshot.ownAffiliation = groupAffiliation
         onEvent(.snapshot(snapshot))
     }
     func createGroup(room: String, nickname: String, onEvent: @escaping @Sendable (NativeGroupEvent) -> Void) async throws {
@@ -129,6 +142,14 @@ actor SessionFixture: ServerChecking, NativeAccountChallenging, NativeXMPPConnec
     func declineGroupInvitation(_ invitation: NativeGroupInvitation) async throws {}
     func setGroupSubject(room: String, subject: String) async throws { groupObservers[room]?(.subject(subject)) }
     func manageGroup(_ command: NativeGroupCommand) async throws -> NativeGroupReply {
+        if case .configuration = command {
+            return .configuration(NativeRoomConfiguration(name: "Familie", description: "Besloten", membersOnly: true, moderated: false,
+                publicRoom: false, persistent: true, allowInvites: true, fields: ["FORM_TYPE": ["http://jabber.org/protocol/muc#roomconfig"],
+                    "muc#roomconfig_roomname": ["Familie"], "muc#roomconfig_membersonly": ["1"], "custom-server-field": ["preserve-me"]]))
+        }
+        if case .configure(_, let form) = command { configurationSaves.append(form) }
+        if case .members = command { return .members(["member@localhost"]) }
+        if case .affiliation(_, let peer, let affiliation) = command { affiliationSaves.append(peer + ":" + affiliation) }
         if case .role(_, let nickname, let role) = command { groupRoles.append(nickname + ":" + role) }
         return .confirmed
     }

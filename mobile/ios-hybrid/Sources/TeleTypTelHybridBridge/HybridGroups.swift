@@ -45,6 +45,9 @@ extension HybridSession {
         }
         _ = try permittedPeer(room, kind: "group")
         guard selectedPeer == room, selectedKind == "group", let group = model.groups.rooms.first(where: { $0.room == room }) else { throw HybridFailure.invalidState }
+        if ["groups.configuration", "groups.configure", "groups.members", "groups.affiliation"].contains(request.command) {
+            try administration.command(request.command, room: room, arguments: request.arguments); return
+        }
         switch request.command {
         case "groups.leave": model.groups.leave(room: room)
         case "groups.subject":

@@ -17,7 +17,7 @@ test("hybrid login reuses pinned markup styling and symbols without shipping web
   assert.ok(html.includes(element(original, /<section\b[^>]*\bclass="modal-section account-auth-section"[^>]*>/)));
   assert.match(html, /id="dialogServerSettingsButton"[\s\S]*?<svg viewBox="0 -960 960 960"/);
   assert.match(html, /connect-src 'none'/);
-  assert.deepEqual([...html.matchAll(/<script src="([^"]+)"/g)].map(match => match[1]), ["ui-language.js", "native-session.js", "login-presentation.js", "account-presentation.js", "contacts-presentation.js", "features-presentation.js", "chat-presentation.js", "calls-presentation.js"]);
+  assert.deepEqual([...html.matchAll(/<script src="([^"]+)"/g)].map(match => match[1]), ["ui-language.js", "smileys-catalog.js", "native-session.js", "smileys-presentation.js", "login-presentation.js", "account-presentation.js", "contacts-presentation.js", "features-presentation.js", "chat-presentation.js", "history-presentation.js", "calls-presentation.js"]);
   assert.match(html, /id="conversationSidebar"/);
   assert.match(html, /id="conversationSearchInput"/);
   for (const name of Object.keys(content.files)) assert.doesNotMatch(name, /chat-client\.js|jingle|native-server|config|php|demo/i);
@@ -63,6 +63,15 @@ async function setup(engine, viewport = { width: 390, height: 844 }) {
         window.nativeState = { ...window.nativeState, sequence: ++sequence, account, socialLoginAvailable: account.providers?.length > 0 };
         window.nativeFixtureClient.receive(window.nativeState);
       };
+      window.emitHistory = value => {
+        window.fixtureHistoryEntries = structuredClone(value.entries);
+        window.nativeState = { ...window.nativeState, sequence: ++sequence, history: value };
+        window.nativeFixtureClient.receive(window.nativeState);
+      };
+      window.emitAdministration = value => {
+        window.nativeState = { ...window.nativeState, sequence: ++sequence, groupAdministration: value };
+        window.nativeFixtureClient.receive(window.nativeState);
+      };
       window.stageFixtureAttachment = () => {
         drafts.set(selectedPeer, (drafts.get(selectedPeer) || "") + "\nBestand: fixture.pdf\nhttps://fixture.invalid/api/file.php?id=" + "a".repeat(32));
         window.nativeState = { ...window.nativeState, sequence: ++sequence, conversation: conversation() };
@@ -84,7 +93,7 @@ async function setup(engine, viewport = { width: 390, height: 844 }) {
         const client = factory.createClient({ makeID: () => crypto.randomUUID(), postMessage: body => {
           const command = JSON.parse(body);
           window.nativeCommands.push(command);
-          if ((/^(chat|calls|groups|files|translation|auth|account|contacts)\./.test(command.command) || ["session.logout", "session.cancel", "session.verifySecondFactor"].includes(command.command)) && command.epoch !== epoch) return Promise.reject(new Error("invalidState"));
+          if ((/^(chat|calls|groups|files|translation|auth|account|contacts|history)\./.test(command.command) || ["session.logout", "session.cancel", "session.verifySecondFactor"].includes(command.command)) && command.epoch !== epoch) return Promise.reject(new Error("invalidState"));
           if (command.command === "session.login") { epoch = crypto.randomUUID(); window.nativeState = state("checking"); }
           if (["auth.social", "auth.biometric"].includes(command.command)) { epoch = crypto.randomUUID(); window.nativeState = state("checking"); }
           if (command.command === "session.verifySecondFactor") window.nativeState = state("authenticating");
@@ -120,6 +129,33 @@ async function setup(engine, viewport = { width: 390, height: 844 }) {
             if (command.command === "groups.invite") window.nativeState.groupNotice = "Uitnodiging verzonden.";
             if (command.command === "groups.role") window.nativeState.groupNotice = "Rol bevestigd door groepsserver.";
             if (command.command === "groups.leave") { window.nativeState.groups[0].joined = false; window.nativeState.groups[0].canSpeak = false; window.nativeState.conversation = conversation(); }
+            if (["chat.open", "chat.close", "calls.start", "groups.leave"].includes(command.command)) window.nativeState.groupAdministration = null;
+            if (command.command === "groups.configuration") window.nativeState.groupAdministration = { ...window.nativeState.groupAdministration,
+              configuration: { token: crypto.randomUUID(), name: "Familie", description: "Besloten", membersOnly: true, moderated: false, publicRoom: false, persistent: true, allowInvites: true,
+                editableFields: ["name", "description", "membersOnly", "publicRoom"] } };
+            if (command.command === "groups.configure") window.nativeState.groupAdministration = { ...window.nativeState.groupAdministration, configuration: null };
+            if (command.command === "groups.members") window.nativeState.groupAdministration = { ...window.nativeState.groupAdministration, affiliation: args.affiliation, members: ["member@localhost"], configuration: null };
+            if (command.command === "groups.affiliation") window.nativeState.groupNotice = "Wijziging bevestigd door de groepsserver.";
+            if (command.command.startsWith("history.")) {
+              const history = window.nativeState.history;
+              window.nativeState.sequence = ++sequence;
+              if (command.command === "history.archive") {
+                const entry = window.fixtureHistoryEntries.find(value => value.id === args.id); entry.archived = args.archived === "true";
+                history.archived = window.fixtureHistoryEntries.filter(value => value.archived).map(value => ({ peer: value.peer, kind: value.kind }));
+                if (entry.archived && selectedPeer === entry.peer) { selectedPeer = null; window.nativeState.conversation = null; }
+              }
+              if (command.command === "history.search") { history.query = args.query; history.archivedOnly = args.archived === "true"; }
+              history.entries = window.fixtureHistoryEntries.filter(value => (!history.archivedOnly || value.archived) && (value.name + value.preview).includes(history.query));
+              if (command.command === "history.open") {
+                const entry = window.fixtureHistoryEntries.find(value => value.id === args.id);
+                history.window = { id: entry.id, title: entry.name, messages: [{ id: crypto.randomUUID(), body: "Alleen bekijken :)", outgoing: false, timestamp: 1780000000 }], loading: false, hasEarlier: true, canChat: true };
+              }
+              if (command.command === "history.earlier") { history.window.messages.unshift({ id: crypto.randomUUID(), body: "Eerder bericht", outgoing: true, timestamp: 1770000000 }); history.window.hasEarlier = false; }
+              if (command.command === "history.chat") {
+                selectedPeer = window.fixtureHistoryEntries.find(value => value.id === args.id).peer; selectedKind = "direct"; window.nativeState.conversation = conversation(); history.window = null;
+              }
+              if (command.command === "history.close") history.window = null;
+            }
             if (command.command === "translation.disable") window.nativeState.extras = { ...window.nativeState.extras, consent: false, translations: {}, ownRtt: null, remoteRtt: null };
             if (command.command === "translation.settings") {
               window.nativeState.extras = { ...window.nativeState.extras, mode: args.mode, language: args.language, consent: args.consent === "true",
@@ -175,6 +211,78 @@ async function setup(engine, viewport = { width: 390, height: 844 }) {
 }
 
 for (const engine of [chromium, webkit]) {
+  test(engine.name() + ": original web smileys render and insert aliases without changing native messages", { timeout: 60000 }, async () => {
+    const { browser, page, errors, requests } = await setup(engine);
+    try {
+      await page.evaluate(() => window.emitRoster([{ jid: "peer@localhost", name: "Peer", presence: "online", canCall: false }]));
+      await page.locator('[data-contact-jid="peer@localhost"]').click();
+      await page.locator("#hybridEmojiToggle").click();
+      assert.equal(await page.locator("#hybridEmojiPanel .smiley-picker-option").count(), 41);
+      await page.locator('#hybridEmojiPanel .smiley-picker-option[aria-label="smile :)"]').click();
+      assert.equal(await page.locator("#hybridMessageInput").inputValue(), ":)");
+      await page.locator("#hybridMessageInput").press("Enter");
+      await page.locator("#hybridMessages .smiley-image").waitFor();
+      assert.equal(await page.locator("#hybridMessages .smiley-image").getAttribute("src"), "smileys/smile.svg");
+      const sent = await page.evaluate(() => window.nativeCommands.find(command => command.command === "chat.send"));
+      assert.equal(sent.arguments.body, ":)");
+      await page.evaluate(() => window.emitMessages([window.fixtureMessage('<img src="https://tracker.invalid/x"> 🤟 :)')]));
+      assert.equal(await page.locator("#hybridMessages img:not(.smiley-image)").count(), 0);
+      assert.equal(requests.some(url => url.includes("tracker.invalid")), false); assert.deepEqual(errors, []);
+    } finally { await browser.close(); }
+  });
+
+  test(engine.name() + ": archive history stays read-only restores contacts and closes before normal chat", { timeout: 60000 }, async () => {
+    const { browser, page, errors } = await setup(engine);
+    try {
+      await page.evaluate(() => {
+        window.emitRoster([{ jid: "peer@localhost", name: "Peer", presence: "online", canCall: false }]);
+        window.emitHistory({ available: true, query: "", archivedOnly: false, entries: [{ id: crypto.randomUUID(), peer: "peer@localhost", kind: "direct", name: "Peer", preview: "Hallo", archived: false }], archived: [], window: null });
+      });
+      await page.locator("#hybridMainMenu summary").click(); await page.locator("#hybridOpenHistory").click();
+      await page.locator("#hybridHistoryEntries button").filter({ hasText: "Archiveren" }).click();
+      assert.equal(await page.locator('[data-contact-jid="peer@localhost"]').count(), 0);
+      await page.locator("#hybridHistoryEntries button").filter({ hasText: "Herstellen" }).click();
+      assert.equal(await page.locator('[data-contact-jid="peer@localhost"]').count(), 1);
+      await page.locator("#hybridHistoryEntries button[data-history-id]").click();
+      await page.locator("#hybridHistoryMessages .smiley-image").waitFor();
+      await page.locator("#hybridHistoryEarlier").click();
+      assert.match(await page.locator("#hybridHistoryMessages").textContent(), /Eerder bericht/);
+      assert.equal(await page.evaluate(() => window.nativeCommands.filter(value => value.command === "chat.displayed" || value.command === "chat.send").length), 0);
+      await page.locator("#hybridHistoryChat").click(); await page.locator("#hybridHistory").waitFor({ state: "hidden" });
+      assert.equal(await page.locator("#hybridContactTitle").textContent(), "Peer");
+      await page.locator("#hybridMainMenu summary").click(); await page.locator("#hybridOpenArchive").click();
+      await page.keyboard.press("Escape"); assert.equal(await page.locator("#hybridHistory").isVisible(), false);
+      assert.deepEqual(errors, []);
+    } finally { await browser.close(); }
+  });
+
+  test(engine.name() + ": owner settings and member authority require explicit confirmation", { timeout: 60000 }, async () => {
+    const { browser, page, errors } = await setup(engine);
+    try {
+      await page.evaluate(async () => {
+        window.emitRoster([{ jid: "peer@localhost", name: "Peer", presence: "online", canCall: false }]);
+        await window.nativeFixtureClient.joinGroup("familie", "Fixture", false);
+        window.emitAdministration({ room: "familie@conference.localhost", busy: false, canConfigure: true, canManageMembers: true, configuration: null, affiliation: null, members: [] });
+      });
+      await page.locator("#hybridManageGroup").click(); await page.locator("#hybridGroupLoadConfiguration").click();
+      await page.locator("#hybridGroupName").fill("Nieuwe familie");
+      assert.equal(await page.locator("#hybridGroupModerated").isDisabled(), true);
+      await page.locator("#hybridGroupSaveConfiguration").click();
+      assert.equal(await page.evaluate(() => window.nativeCommands.some(value => value.command === "groups.configure")), false);
+      await page.locator("#hybridGroupConfigurationConfirm").check(); await page.locator("#hybridGroupSaveConfiguration").click();
+      await page.locator("#hybridGroupConfiguration").waitFor({ state: "hidden" });
+      const command = await page.evaluate(() => window.nativeCommands.find(value => value.command === "groups.configure"));
+      assert.equal(command.arguments.name, "Nieuwe familie"); assert.equal(command.arguments.confirmed, "true");
+      await page.locator("#hybridGroupLoadMembers").click(); await page.locator("#hybridGroupMemberTarget").selectOption("member@localhost");
+      await page.locator("#hybridGroupAffiliation").selectOption("outcast"); await page.locator("#hybridGroupAffiliationConfirm").check();
+      await page.locator("#hybridGroupSaveAffiliation").click();
+      assert.equal(await page.evaluate(() => window.nativeCommands.find(value => value.command === "groups.affiliation").arguments.peer), "member@localhost");
+      await page.evaluate(() => window.emitAdministration({ room: "familie@conference.localhost", busy: false, canConfigure: false, canManageMembers: false, configuration: null, affiliation: null, members: [] }));
+      assert.equal(await page.locator("#hybridGroupOwner").isVisible(), false); assert.equal(await page.locator("#hybridGroupMembers").isVisible(), false);
+      assert.deepEqual(errors, []);
+    } finally { await browser.close(); }
+  });
+
   test(engine.name() + ": provider login, biometric controls and account entry never use browser authentication", { timeout: 60000 }, async () => {
     const { browser, page, errors, requests } = await setup(engine);
     try {

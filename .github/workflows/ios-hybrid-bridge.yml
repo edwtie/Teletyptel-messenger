@@ -12,6 +12,8 @@ on:
       - mobile/ios-native/App/NativeCallController.swift
       - mobile/ios-native/App/NativeCallPlatform.swift
       - mobile/ios-native/App/NativeAttachmentsView.swift
+      - mobile/ios-native/Sources/TeleTypTelCore/NativeGroupManagement.swift
+      - mobile/ios-native/Tests/TeleTypTelCoreTests/NativeGroupManagementTests.swift
   workflow_dispatch:
 
 permissions:
@@ -39,7 +41,7 @@ jobs:
           test -n "$XCODE_PATH"
           echo "DEVELOPER_DIR=$XCODE_PATH/Contents/Developer" >> "$GITHUB_ENV"
       - name: Validate pinned UI and JavaScript boundary
-        run: node --test tests/ios-hybrid-baseline.test.js tests/ios-hybrid-session.test.js tests/ios-hybrid-contacts.test.js tests/ios-hybrid-messenger.test.js tests/ios-hybrid-features.test.js tests/ios-hybrid-accounts.test.js
+        run: node --test tests/ios-hybrid-baseline.test.js tests/ios-hybrid-session.test.js tests/ios-hybrid-contacts.test.js tests/ios-hybrid-messenger.test.js tests/ios-hybrid-features.test.js tests/ios-hybrid-accounts.test.js tests/ios-hybrid-history-smileys.test.js
       - name: Prepare pinned login content without legacy engines
         run: |
           export TELETYPTEL_HYBRID_CONTENT="$RUNNER_TEMP/teletyptel-hybrid-content.json"
@@ -65,7 +67,7 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           swift test --package-path mobile/ios-native --scratch-path "$RUNNER_TEMP/teletyptel-native-feature-tests" \
-            --filter 'NativeGroupModelTests|NativeGroupManagementTests|NativeAccountFeaturesTests|NativeServicesTests|NativeSavedLoginTests|NativeContactTests|NativeFeatureCompletionTests'
+            --filter 'NativeGroupModelTests|NativeGroupManagementTests|NativeAccountFeaturesTests|NativeServicesTests|NativeSavedLoginTests|NativeContactTests|NativeFeatureCompletionTests|NativeCloudMergeTests|NativeCloudSyncTests|NativeCloudHistoryTests|NativePresentationTests'
       - name: Assemble the isolated hybrid app with the existing native engine
         if: ${{ !cancelled() }}
         run: node scripts/ios-hybrid/prepare-app.js

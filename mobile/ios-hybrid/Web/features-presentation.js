@@ -18,6 +18,8 @@
     let groupTicket;
     let disposed = false;
     let returnFocus;
+    let configurationToken;
+    const configurationFields = { name: "Name", description: "Description", membersOnly: "MembersOnly", moderated: "Moderated", publicRoom: "PublicRoom", persistent: "Persistent", allowInvites: "AllowInvites" };
     function close(name) {
       byID(name).hidden = true;
       byID("hybridMessages").dispatchEvent(new document.defaultView.Event("scroll"));
@@ -44,6 +46,30 @@
       open("hybridTranslationSettings");
     }
     function renderGroup(group, value) {
+      const admin = value.groupAdministration;
+      byID("hybridGroupOwner").hidden = !admin?.canConfigure;
+      byID("hybridGroupMembers").hidden = !admin?.canManageMembers;
+      byID("hybridGroupLoadConfiguration").disabled = !admin?.canConfigure || admin.busy;
+      byID("hybridGroupLoadMembers").disabled = !admin?.canManageMembers || admin.busy;
+      const form = admin?.configuration;
+      byID("hybridGroupConfiguration").hidden = !form;
+      if (configurationToken !== form?.token) {
+        configurationToken = form?.token;
+        byID("hybridGroupConfigurationConfirm").checked = false;
+        for (const [key, suffix] of Object.entries(configurationFields)) {
+          const field = byID("hybridGroup" + suffix);
+          if (field.type === "checkbox") field.checked = form?.[key] === true; else field.value = form?.[key] || "";
+          field.disabled = !form?.editableFields.includes(key);
+        }
+      }
+      byID("hybridGroupSaveConfiguration").disabled = !form || admin.busy;
+      const members = new Map(value.roster.contacts.filter(contact => contact.jid !== value.account.owner).map(contact => [contact.jid, contact.name]));
+      for (const peer of admin?.members || []) if (peer !== value.account.owner) members.set(peer, peer);
+      options(byID("hybridGroupMemberTarget"), [...members]);
+      byID("hybridGroupMemberCount").textContent = admin?.affiliation ? (admin.busy ? "Lijst laden…" : admin.members.length + " accounts in opgehaalde lijst.") : "";
+      byID("hybridGroupAffiliation").querySelector('[value="admin"]').disabled = !admin?.canConfigure;
+      if (!admin?.canConfigure && byID("hybridGroupAffiliation").value === "admin") byID("hybridGroupAffiliation").value = "member";
+      byID("hybridGroupSaveAffiliation").disabled = !admin?.canManageMembers || admin.busy || !members.size;
       options(byID("hybridGroupOccupant"), group.participants.map(name => [name, name]));
       byID("hybridGroupModeration").hidden = !group.canModerate;
       byID("hybridGroupSubjectSave").disabled = !group.canSpeak;
@@ -58,6 +84,7 @@
     const unsubscribe = client.subscribe(value => {
       if (disposed) return;
       if (state && state.epoch !== value.epoch) {
+        configurationToken = undefined;
         groupTicket = undefined; returnFocus = undefined;
         byID("hybridGroupJoinForm").reset(); byID("hybridTranslationForm").reset();
         byID("hybridGroupSubject").value = "";
@@ -93,6 +120,8 @@
       const group = state.groups.find(group => group.room === state.conversation?.peer && state.conversation?.kind === "group");
       if (!group) return;
       groupTicket = { room: group.room, epoch: state.epoch };
+      byID("hybridGroupConfigurationConfirm").checked = false;
+      byID("hybridGroupAffiliationConfirm").checked = false;
       byID("hybridGroupSubject").value = group.subject;
       options(byID("hybridGroupInviteTarget"), state.roster.contacts.map(contact => [contact.jid, contact.name]));
       renderGroup(group, state);
@@ -102,6 +131,21 @@
     byID("hybridGroupInvite").onclick = () => { void groupAction("invite", { peer: byID("hybridGroupInviteTarget").value }); };
     byID("hybridGroupRoleSave").onclick = () => { void groupAction("role", { nickname: byID("hybridGroupOccupant").value, role: byID("hybridGroupRole").value }); };
     byID("hybridGroupLeave").onclick = () => { void groupAction("leave"); };
+    byID("hybridGroupLoadConfiguration").onclick = () => { configurationToken = undefined; void groupAction("configuration"); };
+    byID("hybridGroupSaveConfiguration").onclick = () => {
+      if (!configurationToken || !byID("hybridGroupConfigurationConfirm").checked) { byID("hybridGroupManageNotice").textContent = "Bevestig eerst de wijzigingen."; return; }
+      const values = Object.fromEntries(Object.entries(configurationFields).map(([key, suffix]) => {
+        const field = byID("hybridGroup" + suffix); return [key, field.type === "checkbox" ? String(field.checked) : field.value];
+      }));
+      void groupAction("configure", { token: configurationToken, ...values, confirmed: "true" });
+    };
+    byID("hybridGroupLoadMembers").onclick = () => { byID("hybridGroupAffiliationConfirm").checked = false; void groupAction("members", { affiliation: byID("hybridGroupAffiliationList").value }); };
+    for (const id of ["hybridGroupMemberTarget", "hybridGroupAffiliation"]) byID(id).onchange = () => { byID("hybridGroupAffiliationConfirm").checked = false; };
+    byID("hybridGroupSaveAffiliation").onclick = () => {
+      if (!byID("hybridGroupAffiliationConfirm").checked) { byID("hybridGroupManageNotice").textContent = "Bevestig eerst de bevoegdheidswijziging."; return; }
+      byID("hybridGroupAffiliationConfirm").checked = false;
+      void groupAction("affiliation", { peer: byID("hybridGroupMemberTarget").value, affiliation: byID("hybridGroupAffiliation").value, confirmed: "true" });
+    };
     byID("hybridTranslationOptions").onclick = settings;
     byID("hybridTranslationForm").onsubmit = async event => {
       event.preventDefault();
@@ -124,7 +168,7 @@
       if (!dialog) return;
       if (event.key === "Escape") { event.preventDefault(); close(dialog.id); }
       if (event.key === "Tab") {
-        const fields = Array.from(dialog.querySelectorAll("button:not(:disabled), input:not(:disabled), select:not(:disabled)")).filter(value => value.getClientRects().length);
+        const fields = Array.from(dialog.querySelectorAll("button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled)")).filter(value => value.getClientRects().length);
         const index = fields.indexOf(document.activeElement);
         if (event.shiftKey && index <= 0) { event.preventDefault(); fields.at(-1)?.focus(); }
         else if (!event.shiftKey && (index < 0 || index === fields.length - 1)) { event.preventDefault(); fields[0]?.focus(); }

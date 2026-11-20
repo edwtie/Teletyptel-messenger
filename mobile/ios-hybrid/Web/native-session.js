@@ -17,7 +17,7 @@
   }
 
   function safeState(value) {
-    const keys = ["version", "sequence", "epoch", "phase", "errorCode", "chatAvailable", "callsAvailable", "socialLoginAvailable", "settingsAvailable", "roster", "conversation", "call", "groups", "groupsAvailable", "groupNotice", "extras", "account"];
+    const keys = ["version", "sequence", "epoch", "phase", "errorCode", "chatAvailable", "callsAvailable", "socialLoginAvailable", "settingsAvailable", "roster", "conversation", "call", "groups", "groupsAvailable", "groupNotice", "extras", "account", "history", "groupAdministration"];
     if (!value || typeof value !== "object" || Array.isArray(value)
         || Object.keys(value).some(key => !keys.includes(key)) || value.version !== 1
         || !Number.isSafeInteger(value.sequence) || value.sequence < 0 || !phases.has(value.phase)
@@ -45,7 +45,69 @@
     return Object.freeze({ version: 1, sequence: value.sequence, epoch: value.epoch ?? null, phase: value.phase, errorCode: value.errorCode ?? null,
       chatAvailable: value.chatAvailable, callsAvailable: value.callsAvailable, socialLoginAvailable: value.socialLoginAvailable,
       settingsAvailable: value.settingsAvailable === true, roster, conversation, call, groups,
-      groupsAvailable: value.groupsAvailable === true, groupNotice: value.groupNotice ?? null, extras, account });
+      groupsAvailable: value.groupsAvailable === true, groupNotice: value.groupNotice ?? null, extras, account, history: safeHistory(value.history, value.phase),
+      groupAdministration: safeAdministration(value.groupAdministration, conversation, groups) });
+  }
+
+  function safeAdministration(value, conversation, groups) {
+    if (value == null) return null;
+    const fields = ["room", "busy", "canConfigure", "canManageMembers", "configuration", "affiliation", "members"];
+    if (!value || Array.isArray(value) || Object.keys(value).some(key => !fields.includes(key)) || typeof value.room !== "string" || value.room !== conversation?.peer || conversation?.kind !== "group"
+        || !groups.some(group => group.room === value.room && group.joined)
+        || ["busy", "canConfigure", "canManageMembers"].some(key => typeof value[key] !== "boolean")
+        || (value.canConfigure && !value.canManageMembers) || (value.affiliation != null && (!["member", "admin", "outcast"].includes(value.affiliation) || !value.canManageMembers))
+        || !Array.isArray(value.members) || value.members.length > 128 || (value.members.length && (!value.affiliation || value.busy))
+        || value.members.some(peer => typeof peer !== "string" || !peer || peer.length > 1023 || /[\s/\u0000-\u001f]/u.test(peer))) throw new Error("invalidNativeReply");
+    if (value.configuration != null) {
+      const form = value.configuration; const booleans = ["membersOnly", "moderated", "publicRoom", "persistent", "allowInvites"];
+      const editable = ["name", "description", ...booleans];
+      if (!value.canConfigure || value.busy || !form || Object.keys(form).sort().join(",") !== ["token", "editableFields", ...editable].sort().join(",")
+          || !uuidPattern.test(form.token) || !safeText(form.name, 120) || !safeText(form.description, 1024)
+          || booleans.some(key => typeof form[key] !== "boolean") || !Array.isArray(form.editableFields) || form.editableFields.length > 7
+          || new Set(form.editableFields).size !== form.editableFields.length || form.editableFields.some(key => !editable.includes(key))) throw new Error("invalidNativeReply");
+    }
+    return Object.freeze({ ...value, members: Object.freeze([...value.members]), configuration: value.configuration == null ? null
+      : Object.freeze({ ...value.configuration, editableFields: Object.freeze([...value.configuration.editableFields]) }) });
+  }
+
+  function safeHistory(value, phase) {
+    const empty = { available: false, query: "", archivedOnly: false, entries: [], archived: [], window: null, notice: null };
+    if (value === undefined) value = empty;
+    if (!value || Array.isArray(value) || Object.keys(value).some(key => !Object.hasOwn(empty, key))) throw new Error("invalidNativeReply");
+    const result = { ...empty, ...value };
+    const peer = value => typeof value === "string" && value.length > 0 && value.length <= 1023 && !/[\s/\u0000-\u001f\u007f-\u009f]/u.test(value);
+    const time = value => typeof value === "number" && Number.isFinite(value) && Math.abs(value) < 1e12;
+    const kind = value => ["direct", "group"].includes(value);
+    const keys = (value, required, optional = []) => value && typeof value === "object" && !Array.isArray(value)
+      && required.every(key => Object.hasOwn(value, key)) && Object.keys(value).every(key => required.includes(key) || optional.includes(key));
+    if (typeof result.available !== "boolean" || typeof result.archivedOnly !== "boolean" || !safeText(result.query, 256)
+        || !Array.isArray(result.entries) || result.entries.length > 200 || !Array.isArray(result.archived) || result.archived.length > 512
+        || (result.notice !== null && !safeText(result.notice))
+        || ((!result.available || phase !== "connected") && (result.available || result.entries.length || result.archived.length || result.window))) throw new Error("invalidNativeReply");
+    const ids = new Set();
+    result.entries = result.entries.map(entry => {
+      if (!keys(entry, ["id", "peer", "kind", "name", "preview", "archived"], ["timestamp"]) || !uuidPattern.test(entry.id) || ids.has(entry.id)
+          || !peer(entry.peer) || !kind(entry.kind) || !safeText(entry.name, 240) || !safeText(entry.preview, 512)
+          || typeof entry.archived !== "boolean" || (entry.timestamp != null && !time(entry.timestamp))) throw new Error("invalidNativeReply");
+      ids.add(entry.id); return Object.freeze({ ...entry });
+    });
+    result.archived = result.archived.map(entry => {
+      if (!keys(entry, ["peer", "kind"]) || !peer(entry.peer) || !kind(entry.kind)) throw new Error("invalidNativeReply");
+      return Object.freeze({ ...entry });
+    });
+    if (result.window !== null) {
+      const window = result.window; const messageIDs = new Set();
+      if (!keys(window, ["id", "title", "messages", "loading", "hasEarlier", "canChat"], ["notice"]) || !uuidPattern.test(window.id) || !safeText(window.title, 240)
+          || ["loading", "hasEarlier", "canChat"].some(key => typeof window[key] !== "boolean") || (window.notice != null && !safeText(window.notice))
+          || !Array.isArray(window.messages) || window.messages.length > 200) throw new Error("invalidNativeReply");
+      const messages = window.messages.map(message => {
+        if (!keys(message, ["id", "body", "outgoing", "timestamp"], ["sender"]) || !uuidPattern.test(message.id) || messageIDs.has(message.id)
+            || !safeText(message.body) || typeof message.outgoing !== "boolean" || !time(message.timestamp) || (message.sender != null && !safeText(message.sender, 128))) throw new Error("invalidNativeReply");
+        messageIDs.add(message.id); return Object.freeze({ ...message });
+      });
+      result.window = Object.freeze({ ...window, messages: Object.freeze(messages) });
+    }
+    return Object.freeze({ ...result, entries: Object.freeze(result.entries), archived: Object.freeze(result.archived) });
   }
 
   function safeAccount(value, roster, phase) {
@@ -218,7 +280,7 @@
       if (pendingCount >= 8) return Promise.reject(new Error("bridgeBusy"));
       const id = makeID();
       if (!uuidPattern.test(id)) return Promise.reject(new Error("invalidRequest"));
-      const scoped = ["session.cancel", "session.logout", "session.verifySecondFactor"].includes(command) || ["chat.", "calls.", "groups.", "files.", "translation.", "auth.", "account.", "contacts."].some(prefix => command.startsWith(prefix));
+      const scoped = ["session.cancel", "session.logout", "session.verifySecondFactor"].includes(command) || ["chat.", "calls.", "groups.", "files.", "translation.", "auth.", "account.", "contacts.", "history."].some(prefix => command.startsWith(prefix));
       if (scoped && (!expectedEpoch || expectedEpoch !== latest?.epoch)) return Promise.reject(new Error("invalidState"));
       const body = JSON.stringify({ version: 1, id, command, arguments: argumentsValue, ...(scoped ? { epoch: expectedEpoch } : {}) });
       if (new TextEncoder().encode(body).length > 262144) return Promise.reject(new Error("invalidRequest"));
@@ -267,6 +329,7 @@
         return request("session.login", { jid, password, ...(remember ? { remember: "true" } : {}) });
       },
       accountCommand: (name, args = {}, epoch) => request(name, Object.fromEntries(Object.entries(args).map(([key, value]) => [key, String(value)])), epoch),
+      historyCommand: (action, args = {}, epoch) => request("history." + action, Object.fromEntries(Object.entries(args).map(([key, value]) => [key, String(value)])), epoch),
       verifySecondFactor: code => typeof code === "string" && /^[0-9]{6}$/.test(code)
         ? request("session.verifySecondFactor", { code }) : Promise.reject(new Error("invalidRequest")),
       cancel: () => request("session.cancel"),
@@ -352,6 +415,6 @@
     return client;
   }
 
-  if (typeof module === "object" && module.exports) module.exports = { createClient, safeState, install, secureID, safeRoster, safeCall, safeConversation, safeText, safeGroups, safeExtras, safeAccount };
+  if (typeof module === "object" && module.exports) module.exports = { createClient, safeState, install, secureID, safeRoster, safeCall, safeConversation, safeText, safeGroups, safeExtras, safeAccount, safeHistory, safeAdministration };
   else install(root);
 })(typeof window === "undefined" ? globalThis : window);

@@ -54,6 +54,7 @@ final class NativeHybridOwner: ObservableObject {
     let content: HybridContent?
     let features: NativeHybridExtrasAdapter
     let account: NativeHybridAccountAdapter
+    let history: NativeHybridHistoryAdapter
     @Published var fileSheet: HybridFileSheet? { didSet { if fileSheet != nil { account.setPresentation(true) } } }
     private let background = NativeBackgroundController()
     private var observation: AnyCancellable?
@@ -74,11 +75,13 @@ final class NativeHybridOwner: ObservableObject {
         let configuration = try! ServerConfiguration(address: server.address, domain: server.domain)
         let account = NativeHybridAccountAdapter(login: login, configuration: configuration)
         self.account = account
+        let history = NativeHybridHistoryAdapter(login: login, configuration: configuration)
+        self.history = history
         session = HybridSession(model: login, configuration: configuration, nativeLogout: {
             calls.pushRegistration.logout()
             calls.endFromHybrid()
             login.disconnect()
-        }, calls: port, extras: features, account: account)
+        }, calls: port, extras: features, account: account, history: history)
         content = Bundle.main.url(forResource: "hybrid-content", withExtension: "json")
             .flatMap { try? Data(contentsOf: $0) }.flatMap { try? HybridContent(data: $0) }
         calls.attach(login)
