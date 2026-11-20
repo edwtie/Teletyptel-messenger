@@ -116,9 +116,14 @@ jobs:
               if not candidates:
                   raise RuntimeError('Missing simulator: ' + kind)
               runtime, device = sorted(candidates, key=lambda item: (item[0], item[1]['name']), reverse=True)[0]
-              subprocess.run(['xcodebuild', 'test', '-project', 'artifacts/ios-native-hybrid-validation/TeleTypTelNative.xcodeproj',
-                  '-scheme', 'TeleTypTelNative', '-configuration', 'Debug', '-destination', 'platform=iOS Simulator,arch=' + architecture + ',id=' + device['udid'],
-                  '-derivedDataPath', __import__('os').environ['RUNNER_TEMP'] + '/teletyptel-hybrid-app',
-                  '-only-testing:NativeStartupUITests/HybridStartupUITests', '-parallel-testing-enabled', 'NO',
-                  'ARCHS=' + architecture, 'ONLY_ACTIVE_ARCH=YES', 'CODE_SIGNING_ALLOWED=NO'], check=True)
+              print('Starting UI test on', device['name'], runtime, flush=True)
+              try:
+                  subprocess.run(['xcrun', 'simctl', 'bootstatus', device['udid'], '-b'], timeout=420, check=True)
+                  subprocess.run(['xcodebuild', 'test', '-project', 'artifacts/ios-native-hybrid-validation/TeleTypTelNative.xcodeproj',
+                      '-scheme', 'TeleTypTelNative', '-configuration', 'Debug', '-destination', 'platform=iOS Simulator,arch=' + architecture + ',id=' + device['udid'],
+                      '-derivedDataPath', __import__('os').environ['RUNNER_TEMP'] + '/teletyptel-hybrid-app',
+                      '-only-testing:NativeStartupUITests/HybridStartupUITests', '-parallel-testing-enabled', 'NO',
+                      'ARCHS=' + architecture, 'ONLY_ACTIVE_ARCH=YES', 'CODE_SIGNING_ALLOWED=NO'], check=True)
+              finally:
+                  subprocess.run(['xcrun', 'simctl', 'shutdown', 'all'], check=True)
           PY
