@@ -1,0 +1,25 @@
+<section id="hybridCallPanel" class="hybrid-call-panel" hidden role="dialog" aria-modal="true" aria-labelledby="hybridCallTitle">
+  <header class="hybrid-call-header"><div><strong id="hybridCallTitle">Gesprek</strong><p id="hybridCallStatus" role="status" aria-live="polite"></p></div>
+    <button id="hybridSwitchCamera" class="icon-button" type="button" aria-label="Camera omdraaien" title="Camera omdraaien"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 8a8 8 0 0 0-14-3L3 8m0-5v5h5m-4 8a8 8 0 0 0 14 3l3-3m0 5v-5h-5"/></svg></button>
+  </header>
+  <div id="hybridVideoSurface" class="hybrid-video-surface" aria-label="Native videobeeld"><span>Wachten op videobeeld…</span></div>
+  <div id="hybridCallRtt" class="hybrid-call-rtt" hidden>
+    <section class="hybrid-rtt-box"><strong id="hybridRemoteRttName">Ander</strong><div id="hybridRemoteRtt" role="log" aria-label="Ontvangen realtime tekst" aria-live="polite"></div></section>
+    <section class="hybrid-rtt-box"><strong>Ik</strong><textarea id="hybridOwnRtt" aria-label="Mijn realtime tekst" placeholder="Typ hier live" spellcheck="true"></textarea></section>
+  </div>
+  <div id="hybridCallNotice" role="status" aria-live="polite"></div>
+  <div class="hybrid-call-controls" role="toolbar" aria-label="Gespreksbediening">
+    <button id="hybridAnswerCall" class="icon-button is-on" type="button" aria-label="Oproep opnemen" title="Opnemen"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 3h4l2 5-3 2a15 15 0 0 0 6 6l2-3 5 2v4a2 2 0 0 1-2 2C10 21 3 14 3 5a2 2 0 0 1 2-2Z"/></svg></button>
+    <button id="hybridCallCamera" class="icon-button" type="button" aria-label="Camera" title="Camera" aria-pressed="false"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="12" height="14" rx="2"/><path d="m15 10 6-4v12l-6-4"/></svg></button>
+    <button id="hybridCallMute" class="icon-button" type="button" aria-label="Microfoon dempen" title="Microfoon" aria-pressed="false"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2m-7 9v3m-4 0h8"/></svg></button>
+    <button id="hybridVideoFit" class="icon-button" type="button" aria-label="Videobeeld passend of beeldvullend" title="Beeld passend of beeldvullend"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 9V3h6m6 0h6v6m0 6v6h-6m-6 0H3v-6"/></svg></button>
+    <button id="hybridDtmfToggle" class="icon-button" type="button" aria-label="Nummertoetsen tijdens gesprek" title="Nummertoetsen" aria-expanded="false" aria-controls="hybridDtmf"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M4 3h4v4H4zm6 0h4v4h-4zm6 0h4v4h-4zM4 9h4v4H4zm6 0h4v4h-4zm6 0h4v4h-4zM4 15h4v4H4zm6 0h4v4h-4zm6 0h4v4h-4z"/></svg></button>
+    <button id="hybridEndCall" class="icon-button is-off" type="button" aria-label="Gesprek beëindigen of oproep weigeren" title="Beëindigen"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="M3 16v-5q9-9 18 0v5h-5v-5a12 12 0 0 0-8 0v5Z"/></svg></button>
+  </div>
+  <div id="hybridDtmf" class="hybrid-dtmf" hidden aria-label="DTMF-toetsen">
+    <button type="button" data-tone="1">1</button><button type="button" data-tone="2">2<span>ABC</span></button><button type="button" data-tone="3">3<span>DEF</span></button>
+    <button type="button" data-tone="4">4<span>GHI</span></button><button type="button" data-tone="5">5<span>JKL</span></button><button type="button" data-tone="6">6<span>MNO</span></button>
+    <button type="button" data-tone="7">7<span>PQRS</span></button><button type="button" data-tone="8">8<span>TUV</span></button><button type="button" data-tone="9">9<span>WXYZ</span></button>
+    <button type="button" data-tone="*">*</button><button type="button" data-tone="0">0</button><button type="button" data-tone="#">#</button>
+  </div>
+</section>

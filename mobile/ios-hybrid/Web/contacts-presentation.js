@@ -32,6 +32,8 @@
     let roster = { status: "hidden", contacts: [] };
     let selected = null;
     let disposed = false;
+    let latestState = null;
+    let rosterSignature = "";
     document.querySelector("#conversationSidebar .section-heading > span").textContent = "Contacten";
     const searchIcon = document.querySelector(".conversation-search .material-icon");
     searchIcon.replaceChildren();
@@ -76,7 +78,13 @@
           row = document.createElement("button");
           row.type = "button";
           row.dataset.contactJid = value.jid;
-          row.addEventListener("click", () => { selected = value.jid; render(); });
+          row.addEventListener("click", () => {
+            selected = value.jid;
+            render();
+            const epoch = latestState?.epoch;
+            Promise.resolve(document.defaultView.TeleTypTelHybridChat?.flush()).then(() => client.openChat(value.jid, epoch))
+              .catch(() => { selected = null; render(); status.textContent = "Chat is niet beschikbaar. Probeer opnieuw."; });
+          });
         }
         rows.delete(value.jid);
         row.className = "conversation-item" + (value.jid === selected ? " selected" : "");
@@ -106,7 +114,11 @@
     }
 
     const changeSearch = () => render();
-    const showList = () => { selected = null; render(); };
+    const showList = () => {
+      const epoch = latestState?.epoch;
+      Promise.resolve(document.defaultView.TeleTypTelHybridChat?.flush()).then(() => client.closeChat(epoch)).then(() => { selected = null; render(); })
+        .catch(() => { status.textContent = "Teruggaan is niet gelukt. Probeer opnieuw."; });
+    };
     const toggleActions = () => {
       actions.hidden = !actions.hidden;
       toggle.setAttribute("aria-expanded", String(!actions.hidden));
@@ -115,6 +127,7 @@
     back.addEventListener("click", showList);
     toggle.addEventListener("click", toggleActions);
     const unsubscribe = client.subscribe(state => {
+      latestState = state;
       const next = state.roster || { status: "hidden", contacts: [] };
       if (next.status === "hidden") {
         search.value = "";
@@ -122,7 +135,11 @@
         actions.hidden = true;
         toggle.setAttribute("aria-expanded", "false");
       }
+      if (state.conversation) selected = state.conversation.peer;
       roster = next;
+      const signature = JSON.stringify([next, state.conversation?.peer || null]);
+      if (signature === rosterSignature) return;
+      rosterSignature = signature;
       render();
     });
     const dispose = () => {

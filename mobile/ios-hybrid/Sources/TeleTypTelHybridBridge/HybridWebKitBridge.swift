@@ -34,7 +34,7 @@ public final class HybridWebKitBridge: NSObject, WKScriptMessageHandlerWithReply
             replyHandler(nil, HybridFailure.untrustedDocument.rawValue)
             return
         }
-        guard let body = message.body as? String, body.utf8.count <= 8192 else {
+        guard let body = message.body as? String, body.utf8.count <= 65536 else {
             replyHandler(nil, HybridFailure.invalidRequest.rawValue)
             return
         }

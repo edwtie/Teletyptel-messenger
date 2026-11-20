@@ -1,0 +1,34 @@
+<div id="hybridChatActions" class="hybrid-chat-actions" hidden>
+  <button id="hybridStartTotal" class="icon-button total-conversation-button" type="button" aria-label="Totale conversatie starten" title="Totale conversatie"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 4h13M16 4l-3 16M8 20h10M2 8h6M1 12h6M0 16h6"/></svg></button>
+  <details id="hybridStartMenu" class="hybrid-start-menu"><summary class="icon-button" aria-label="Gespreksopties" title="Gespreksopties"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></summary><div>
+    <button id="hybridStartAudio" class="icon-button" type="button" aria-label="Audiogesprek starten" title="Audio"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 3h4l2 5-3 2a15 15 0 0 0 6 6l2-3 5 2v4a2 2 0 0 1-2 2C10 21 3 14 3 5a2 2 0 0 1 2-2Z"/></svg></button>
+    <button id="hybridStartVideo" class="icon-button" type="button" aria-label="Videogesprek starten" title="Audio en video"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="12" height="14" rx="2"/><path d="m15 10 6-4v12l-6-4"/></svg></button>
+  </div></details>
+</div>
+<section id="hybridConversation" class="hybrid-conversation" hidden aria-label="Berichten">
+  <p id="hybridHistoryStatus" class="security-status" role="status" aria-live="polite"></p>
+  <div id="hybridMessages" class="messages" role="log" aria-label="Chatberichten" aria-live="polite" aria-relevant="additions" tabindex="0"></div>
+  <div id="hybridChatNotice" class="security-status" role="status" aria-live="polite"></div>
+  <button id="hybridCallRetry" type="button" hidden>Oproepmelding sluiten</button>
+  <form id="hybridComposer" class="hybrid-composer" autocomplete="off">
+    <button class="icon-button" type="button" disabled aria-label="Bijlage toevoegen" title="Bijlagen worden nog aangesloten"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 4v16M4 12h16"/></svg></button>
+    <button id="hybridEmojiToggle" class="icon-button" type="button" aria-label="Emoji kiezen" aria-controls="hybridEmojiPanel" aria-expanded="false" title="Emoji"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 14q4 5 8 0"/><path d="M8 8h1m6 0h1"/></svg></button>
+    <textarea id="hybridMessageInput" rows="1" aria-label="Bericht" placeholder="Typ een bericht" enterkeyhint="send"></textarea>
+    <button id="hybridSend" class="icon-button" type="submit" aria-label="Versturen" title="Versturen"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m4 3 18 9-18 9 3-9-3-9Zm3 9h15"/></svg></button>
+    <div id="hybridEmojiPanel" class="hybrid-emoji-panel" hidden aria-label="Emoji"></div>
+  </form>
+</section>
+<div id="hybridMessageMenu" class="context-menu message-context-menu" role="menu" aria-label="Berichtacties" hidden>
+  <button type="button" data-message-action="edit" role="menuitem">Bewerken</button>
+  <button type="button" data-message-action="hide" role="menuitem">Verwijderen voor mij</button>
+  <button type="button" data-message-action="retract" role="menuitem">Verwijderen voor iedereen</button>
+  <button type="button" data-message-action="forward" role="menuitem">Doorsturen</button>
+  <button type="button" data-message-action="react" role="menuitem" aria-label="Reageren met duim omhoog">👍</button>
+</div>
+<div id="hybridMessageAction" class="modal-shell" hidden role="dialog" aria-modal="true" aria-labelledby="hybridMessageActionTitle"><div class="modal-card">
+  <header class="modal-header"><h2 id="hybridMessageActionTitle">Berichtactie</h2></header><div class="modal-body">
+    <label id="hybridEditLabel">Bericht<textarea id="hybridEditBody" rows="4"></textarea></label>
+    <label id="hybridForwardLabel" hidden>Ontvanger<select id="hybridForwardTarget"></select></label>
+    <p id="hybridActionNotice" role="status"></p>
+  </div><footer class="modal-actions"><button id="hybridConfirmAction" type="button">Bevestigen</button><button id="hybridCancelAction" type="button">Annuleren</button></footer>
+</div></div>

@@ -17,7 +17,7 @@ private final class SecondFactorFixture: NativeSecondFactorSession {
     }
 }
 
-private actor SessionFixture: ServerChecking, NativeAccountChallenging, NativeXMPPConnecting {
+actor SessionFixture: ServerChecking, NativeAccountChallenging, NativeXMPPConnecting, NativeChatInteracting, NativeMessageChanging {
     private let probeFailure: ConnectionFailure?
     private let accountFailure: NativeAccountFailure?
     private let holdAuthentication: Bool
@@ -26,6 +26,10 @@ private actor SessionFixture: ServerChecking, NativeAccountChallenging, NativeXM
     private var heldAccount: NativeAuthenticatedAccount?
     private(set) var connections = 0
     private var rosterObservers: [@Sendable (NativeRosterState) -> Void] = []
+    private var chatObservers: [@Sendable (NativeChatEvent) -> Void] = []
+    private(set) var sentBodies: [String] = []
+    private(set) var interactions: [NativeChatInteraction] = []
+    var rejectSends = false
 
     init(probeFailure: ConnectionFailure? = nil, accountFailure: NativeAccountFailure? = nil, holdAuthentication: Bool = false,
          secondFactor: Bool = false) {
@@ -82,6 +86,28 @@ private actor SessionFixture: ServerChecking, NativeAccountChallenging, NativeXM
         let index = run ?? (rosterObservers.count - 1)
         if rosterObservers.indices.contains(index) { rosterObservers[index](value) }
     }
+
+    func run(account: NativeAuthenticatedAccount, onConnected: @escaping @Sendable (String) -> Void,
+             onRoster: @escaping @Sendable (NativeRosterState) -> Void,
+             onChat: @escaping @Sendable (NativeChatEvent) -> Void,
+             onSender: @escaping @Sendable (any NativeChatSending) -> Void) async throws {
+        chatObservers.append(onChat)
+        onSender(self)
+        try await run(account: account, onConnected: onConnected, onRoster: onRoster)
+    }
+
+    func emitChat(_ value: NativeChatEvent) { chatObservers.last?(value) }
+
+    func sendMessage(to jid: String, body: String, identifier: String) async throws {
+        if rejectSends { throw NativeChatFailure.disconnected }
+        sentBodies.append(body)
+    }
+
+    func interact(to peer: String, interaction: NativeChatInteraction, identifier: String) async throws {
+        interactions.append(interaction)
+    }
+
+    func changeMessage(to peer: String, change: NativeMessageChange, identifier: String) async throws {}
 }
 
 final class HybridProtocolTests: XCTestCase {
@@ -125,8 +151,10 @@ final class HybridProtocolTests: XCTestCase {
     }
 }
 
-private func encoded(_ command: String, _ arguments: [String: String] = [:], id: UUID = UUID()) -> Data {
-    try! JSONSerialization.data(withJSONObject: ["version": 1, "id": id.uuidString, "command": command, "arguments": arguments])
+func encoded(_ command: String, _ arguments: [String: String] = [:], id: UUID = UUID(), epoch: String? = nil) -> Data {
+    var value: [String: Any] = ["version": 1, "id": id.uuidString, "command": command, "arguments": arguments]
+    if let epoch = epoch { value["epoch"] = epoch }
+    return try! JSONSerialization.data(withJSONObject: value)
 }
 
 @MainActor
@@ -166,7 +194,7 @@ final class HybridSessionTests: XCTestCase {
         XCTAssertEqual(connectionCount, 1)
         let reply = try command(session, "session.snapshot")
         XCTAssertEqual(reply.snapshot.phase, "connected")
-        XCTAssertFalse(reply.snapshot.chatAvailable)
+        XCTAssertTrue(reply.snapshot.chatAvailable)
         XCTAssertFalse(reply.snapshot.callsAvailable)
         let serialized = String(decoding: try JSONEncoder().encode(reply), as: UTF8.self)
         for secret in ["fixture@localhost", "fixture-private-password", "native-private-resource", "cookie", "token"] {

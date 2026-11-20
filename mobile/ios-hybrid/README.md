@@ -9,14 +9,15 @@ Deze afzonderlijke variant combineert de webvormgeving van TestFlight 16.9 met d
 - De brug maakt zelf geen tweede XMPP-sessie, WebRTC-motor of CallKit-provider aan.
 - De inlogpresentatie gebruikt nu de originele 16.9-aanmeldmarkup, CSS, logo's en tandwielsymbolen, zonder de oude webclient uit te voeren. Een afzonderlijke UIKit/SwiftUI-host laadt deze inhoud via een lokale WebKit-schemehandler.
 - De weergave ondersteunt native aanmeldstatus, tweestapsverificatie, certificaatfouten, annuleren en uitloggen. Het tandwiel opent uitsluitend een optionele native instellingenactie; servervelden verschijnen niet in de webweergave.
-- Na aanmelden toont de webpresentatie nu de native XMPP-contactenlijst, met zoeken, aanwezigheidsstatus en contactselectie. De zijbalk, rijen en plusknop gebruiken de 16.9-structuur. Contactselectie opent voorlopig alleen een leesbaar contactoverzicht, zonder berichten als gelezen te markeren.
-- Dit is nog geen installeerbare hybride app. `reference-only` en `testFlightReady: false` blijven bewust staan.
+- Na aanmelden toont de webpresentatie de native contactenlijst en één-op-éénchat: concepten, verzenden, ontvangen, geschiedenis, reacties, doorsturen, bewerken en verwijderen volgens de bestaande native rechten. De aanvullende chatbediening is geen bewezen pixelkopie van 16.9.
+- Audio, video, TC, RTT, microfoon, camera, camerawissel, beeldpassing en DTMF gebruiken `NativeCallController.shared`. Opnemen loopt via een CallKit-transactie, niet via een tweede provider.
+- Een afzonderlijke CI-appassemblage combineert de presentatie met de bestaande native appbronnen. De oude SwiftUI-root verliest alleen in de tijdelijke kopie zijn `@main`; de werkende app wordt niet vervangen. `reference-only` en `testFlightReady: false` blijven staan.
 
 ## Eigendom en beveiliging
 
 De native schil bezit serverconfiguratie, sessie, cookieopslag, sleutelhanger en oproepmotor. JavaScript mag geen serveradres of willekeurige HTTP-opdracht opgeven. De brug accepteert uitsluitend de hoofdframepagina `capacitor://localhost/chat.html`, zonder query of fragment. Remote pagina's en iframes krijgen geen sessietoegang.
 
-Het protocol gebruikt versie 1, UUID-opdracht-ID's, maximaal 8192 bytes per opdracht en vaste argumenten. De laatste 128 ID's worden tegen herhaling gecontroleerd. Verbindingsstatus bevat geen eigen JID, wachtwoord, cookies of tokens. Een wachtwoord gaat uitsluitend in de tijdelijke aanmeldopdracht naar native; de brug bewaart het niet in webopslag en logt het niet. De native motor verwerkt de authenticatie.
+Het protocol gebruikt versie 1, UUID-opdracht-ID's, maximaal 65536 bytes per JSON-opdracht en vaste argumenten. Tekstvelden hebben een limiet van 8192 UTF-8-bytes; het ruimere envelopformaat laat JSON-escaping toe. De laatste 128 ID's worden tegen herhaling gecontroleerd. Chat- en oproepopdrachten vereisen het actuele account-epoch. Oude opdrachten mogen geen nieuw account veranderen. Een wachtwoord gaat uitsluitend in de tijdelijke aanmeldopdracht naar native; de brug bewaart of logt het niet.
 
 De aanvullende rosterprojectie bevat uitsluitend het bare JID, de weergavenaam en de aanwezigheidsstatus van maximaal 100 contacten uit de actieve native sessie. Het eigen account wordt niet als contact getoond. Groepslabels, abonnementen op aanwezigheid, oproepresources en profiel-URL's worden niet doorgegeven. Gegevens verdwijnen bij uitloggen, accountwisseling, verbindingsverlies en overgang naar de achtergrond. Er wordt geen oude lijst uit een vorige accountsessie teruggeplaatst. Rosterupdates verhogen ook zonder fasewisseling het volgnummer van de brug.
 
@@ -34,28 +35,30 @@ De verplichte `nativeLogout`-callback moet bij uiteindelijke appassemblage dezel
 
 Het opstartlogo en de blauwe voortgang gebruiken één bestaande webweergave. Bij openen wordt alleen de native brug opgehaald; de echte servercontrole gebeurt tijdens de native aanmeldactie. Er wordt geen invoerveld automatisch gefocust. Draaien behoudt ingevulde tekst. Wachtwoord en verificatiecode worden na de opdracht gewist en niet in webopslag bewaard. UUID's gebruiken ook bij custom schemes een cryptografische bron, zonder terugval naar `Math.random`.
 
-`chatAvailable`, `callsAvailable` en `socialLoginAvailable` blijven `false` totdat hun volledige koppelingen zijn gerealiseerd. Er is geen automatische terugval naar de oude webmotor.
+`chatAvailable` volgt de actieve native sessie. `callsAvailable` vereist daarnaast een geïnjecteerde oproepadapter; ieder contact krijgt een native `canCall`-vlag. `socialLoginAvailable` blijft `false`. Er is geen terugval naar de oude webmotor. Berichten worden pas via een expliciete viewportbevestiging lokaal gelezen gemarkeerd; blauwe vinkjes vereisen de native ontvangst van een weergavebevestiging, niet alleen online aanwezigheid.
 
-Daarom zijn Google/Facebook, wachtwoordherstel, nieuwe gebruiker en account bewaren in deze afzonderlijke testpresentatie zichtbaar maar uitgeschakeld. Nieuwe contacten en groepen blijven uitgeschakeld onder de plusknop. De contactenlijst komt werkelijk uit het native loginmodel; het contactoverzicht bevat nog geen berichtinvoer. Avatarinitialen zijn beschikbaar; koppeling met de native profielfotocache en persoonlijke avatarkleuren volgt nog. Het aanmeldveld vraagt hier een werkelijk XMPP-account; e-mailaliasaanmelding is niet als voltooid gepresenteerd.
+Google/Facebook, wachtwoordherstel, nieuwe gebruiker en account bewaren zijn in deze testpresentatie nog uitgeschakeld. Nieuwe contacten en groepen blijven uitgeschakeld onder de plusknop. Profielfoto's, volledige smileyselectie, vertaling, bijlagen en groepsbediening zijn nog niet gekoppeld. Het aanmeldveld vraagt een werkelijk XMPP-account; e-mailaliasaanmelding is niet als voltooid gepresenteerd.
+
+Tijdens TC verdwijnt gewone chat. Live tekst gebruikt uitsluitend de native RTT-opdracht. Als alle camera's aantoonbaar uitstaan vullen de RTT-vakken het gesprek; een onbekende camerastatus wordt niet als uitgeschakeld behandeld. Videotracks worden door native `RTCMTLVideoView` getoond, niet via browsermedia. De videopositie wordt begrensd aan de native viewport. Concepten blijven binnen hetzelfde account behouden als een gesprek de chat onderbreekt.
 
 ## Controles
 
 Vanaf de repositoryroot:
 
 ```text
-node --test tests/ios-hybrid-baseline.test.js tests/ios-hybrid-session.test.js tests/ios-hybrid-contacts.test.js tests/ios-hybrid-presentation.test.js
+node --test tests/ios-hybrid-*.test.js
 swift test --package-path mobile/ios-hybrid
 ```
 
 Swift vereist hier macOS/Xcode. De geïsoleerde workflow `ios-hybrid-bridge.yml` genereert de inhoud uitsluitend in de tijdelijke cloudrunner. Chromium en WebKit controleren het inloggen, zoeken, contactselectie, statuswijzigingen en iPhone/iPad-formaatwisselingen. Een Swift-test laadt dezelfde inhoud in een echte WKWebView, meldt zich aan via de native brug met een fictieve motor, toont een native rostercontact en controleert dat loskoppelen van de presentatie de native sessie niet beëindigt. Native tests controleren ook achtergrondprivacy en late updates uit een vorige accountsessie. Zonder gegenereerde inhoud wordt uitsluitend die WebKit-koppelingstest expliciet overgeslagen.
 
-De workflow compileert de library ook voor de iOS-simulator. Geen ondertekening, APNs-activering, sleutels, TestFlight-upload of wijziging aan de eigen server. De cloudrunner is tijdelijk; er worden geen bouwmappen of screenshots naar deze laptop gekopieerd. Dit is geen fysieke iPhone-test en geen volledige appstarttest.
+De workflow compileert de library en de afzonderlijk geassembleerde app voor de iOS-simulator. Geen ondertekening, APNs-activering, sleutels, TestFlight-upload of wijziging aan de eigen server. De cloudrunner is tijdelijk; er worden geen bouwmappen of screenshots naar deze laptop gekopieerd. Dit bewijst nog geen fysieke iPhone-oproep of volledige appstartketen.
 
 ## Nog aansluiten
 
-1. De losse `HybridLoginView` assembleren in een afzonderlijk appdoel met de bestaande native eigenaar van sessie, instellingen en levenscyclus. De werkende SwiftUI-app wordt nog niet vervangen.
-2. Google/Facebook, profielfoto's, contactwijzigingen, geschiedenis, chat, groepen en vertaling via afgebakende native opdrachten en gebeurtenissen. De huidige contactselectie is nog geen chatselectie.
-3. Eén bestaande CallKit/PushKit-coördinator, native video-oppervlakken, audio en RTT koppelen. De oude Capacitor-oproepcoördinator niet daarnaast registreren.
-4. Navigatiebeleid, applevenscyclus en terugkeer uit aanmelden afwerken; fysieke iPhone/iPad-tests, inclusief vergrendeld scherm, uitvoeren.
+1. Providerlogin, profielfoto's, instellingen, contactwijzigingen, bijlagen, groepen en vertaling via afgebakende native opdrachten verbinden.
+2. Ondertekende toestelevaluatie van chat, native video, audio, RTT, toetsenbord en CallKit-opnemen/beëindigen uitvoeren.
+3. Achtergrondherstel en APNs met een echt geregistreerd toestel afzonderlijk activeren en testen; de CI-assemblage activeert geen push.
+4. Volledige webgelijkheid, schermlezerbediening en de resterende navigatieschermen beoordelen voordat de bestaande TestFlight-app wordt vervangen.
 
 Een geslaagde librarytest bewijst geen werkende achtergrondoproep of App Store-acceptatie.

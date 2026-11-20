@@ -7,14 +7,16 @@ import WebKit
 public struct HybridLoginView: UIViewControllerRepresentable {
     private let session: HybridSession
     private let content: HybridContent
+    private let videoView: UIView?
 
-    public init(session: HybridSession, content: HybridContent) {
+    public init(session: HybridSession, content: HybridContent, videoView: UIView? = nil) {
         self.session = session
         self.content = content
+        self.videoView = videoView
     }
 
     public func makeUIViewController(context: Context) -> HybridLoginViewController {
-        HybridLoginViewController(session: session, content: content)
+        HybridLoginViewController(session: session, content: content, videoView: videoView)
     }
 
     public func updateUIViewController(_ uiViewController: HybridLoginViewController, context: Context) {}
@@ -30,10 +32,12 @@ public final class HybridLoginViewController: UIViewController {
     private let sessionBridge: HybridWebKitBridge
     private let navigationPolicy = HybridNavigationPolicy()
     private var webView: WKWebView?
+    private let videoView: UIView?
 
-    public init(session: HybridSession, content: HybridContent) {
+    public init(session: HybridSession, content: HybridContent, videoView: UIView? = nil) {
         self.content = content
         self.sessionBridge = HybridWebKitBridge(session: session)
+        self.videoView = videoView
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -55,6 +59,11 @@ public final class HybridLoginViewController: UIViewController {
         webView.scrollView.bounces = false
         self.webView = webView
         view = webView
+        if let videoView = videoView {
+            videoView.isUserInteractionEnabled = false
+            videoView.isHidden = true
+            webView.addSubview(videoView)
+        }
         do {
             try sessionBridge.attach(to: webView)
             webView.load(URLRequest(url: URL(string: "capacitor://localhost/chat.html")!))
@@ -70,6 +79,8 @@ public final class HybridLoginViewController: UIViewController {
     }
 
     public func detachPresentation() {
+        videoView?.isHidden = true
+        videoView?.removeFromSuperview()
         sessionBridge.detach()
         webView?.stopLoading()
         webView?.navigationDelegate = nil

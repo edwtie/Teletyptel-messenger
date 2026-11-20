@@ -17,7 +17,7 @@ test("hybrid login reuses pinned markup styling and symbols without shipping web
   assert.ok(html.includes(element(original, /<section\b[^>]*\bclass="modal-section account-auth-section"[^>]*>/)));
   assert.match(html, /id="dialogServerSettingsButton"[\s\S]*?<svg viewBox="0 -960 960 960"/);
   assert.match(html, /connect-src 'none'/);
-  assert.deepEqual([...html.matchAll(/<script src="([^"]+)"/g)].map(match => match[1]), ["ui-language.js", "native-session.js", "login-presentation.js", "contacts-presentation.js"]);
+  assert.deepEqual([...html.matchAll(/<script src="([^"]+)"/g)].map(match => match[1]), ["ui-language.js", "native-session.js", "login-presentation.js", "contacts-presentation.js", "chat-presentation.js", "calls-presentation.js"]);
   assert.match(html, /id="conversationSidebar"/);
   assert.match(html, /id="conversationSearchInput"/);
   for (const name of Object.keys(content.files)) assert.doesNotMatch(name, /chat-client\.js|jingle|native-server|config|php|demo/i);
@@ -35,9 +35,13 @@ async function setup(engine, viewport = { width: 390, height: 844 }) {
       let sequence = 0;
       window.nativeCommands = [];
       window.nativeSettingsCount = 0;
+      let epoch = crypto.randomUUID();
+      const messages = new Map();
+      const drafts = new Map();
+      let selectedPeer = null;
       const state = phase => ({ version: 1, sequence: ++sequence, phase, errorCode: null,
-        chatAvailable: false, callsAvailable: false, socialLoginAvailable: false, settingsAvailable: true,
-        roster: { status: phase === "connected" ? "loading" : "hidden", contacts: [] } });
+        epoch, chatAvailable: phase === "connected", callsAvailable: phase === "connected", socialLoginAvailable: false, settingsAvailable: true,
+        roster: { status: phase === "connected" ? "loading" : "hidden", contacts: [] }, conversation: null, call: { phase: "idle" } });
       window.nativeState = state("idle");
       window.emitNative = (phase, errorCode = null) => {
         window.nativeState = { ...state(phase), errorCode };
@@ -47,17 +51,70 @@ async function setup(engine, viewport = { width: 390, height: 844 }) {
         window.nativeState = { ...state("connected"), roster: { status, contacts } };
         window.nativeFixtureClient.receive(window.nativeState);
       };
+      const conversation = () => ({ peer: selectedPeer, draft: drafts.get(selectedPeer) || "", messages: messages.get(selectedPeer) || [], history: "ready", canSend: true, canChange: true });
+      window.fixtureMessage = (body, outgoing = false, delivery = "unconfirmed") => ({ id: crypto.randomUUID(), body, outgoing, timestamp: 1780000000,
+        state: outgoing ? "submitted" : "incoming", delivery, edited: false, retracted: false, reactions: [] });
+      window.emitMessages = values => {
+        messages.set(selectedPeer, values);
+        window.nativeState = { ...window.nativeState, sequence: ++sequence, conversation: conversation() };
+        window.nativeFixtureClient.receive(window.nativeState);
+      };
+      window.emitCall = changes => {
+        window.nativeState = { ...window.nativeState, sequence: ++sequence, call: { ...window.nativeState.call, ...changes }, conversation: null };
+        window.nativeFixtureClient.receive(window.nativeState);
+      };
       window.module = {};
       Object.defineProperty(window.module, "exports", { get: () => ({}), set(factory) {
         const client = factory.createClient({ makeID: () => crypto.randomUUID(), postMessage: body => {
           const command = JSON.parse(body);
           window.nativeCommands.push(command);
-          if (command.command === "session.login") window.nativeState = state("checking");
+          if (command.command === "session.login") { epoch = crypto.randomUUID(); window.nativeState = state("checking"); }
           if (command.command === "session.verifySecondFactor") window.nativeState = state("authenticating");
           if (command.command === "session.cancel") window.nativeState = state("idle");
-          if (command.command === "session.logout") window.nativeState = state("signedOut");
+          if (command.command === "session.logout") { epoch = crypto.randomUUID(); messages.clear(); drafts.clear(); selectedPeer = null; window.nativeState = state("signedOut"); }
           if (command.command === "app.openSettings") window.nativeSettingsCount += 1;
-          return Promise.resolve({ version: 1, id: command.id, snapshot: window.nativeState });
+          const apply = () => {
+            const args = command.arguments;
+            if (/^(chat|calls)\./.test(command.command)) {
+              if (command.epoch !== epoch) return Promise.reject(new Error("invalidState"));
+              window.nativeState = { ...window.nativeState, sequence: ++sequence };
+            }
+            if (command.command === "chat.open") { selectedPeer = args.peer; window.nativeState.conversation = conversation(); }
+            if (command.command === "chat.close") window.nativeState.conversation = null;
+            if (command.command === "chat.draft") { drafts.set(args.peer, args.body); if (selectedPeer === args.peer) window.nativeState.conversation = conversation(); }
+            if (command.command === "chat.send") {
+              messages.set(args.peer, [...(messages.get(args.peer) || []), window.fixtureMessage(args.body, true)]);
+              drafts.set(args.peer, ""); window.nativeState.conversation = conversation();
+            }
+            if (["chat.edit", "chat.hide", "chat.retract", "chat.react"].includes(command.command)) {
+              const values = messages.get(selectedPeer) || [];
+              const message = values.find(value => value.id === args.id);
+              if (command.command === "chat.hide") messages.set(selectedPeer, values.filter(value => value.id !== args.id));
+              if (command.command === "chat.edit") { message.body = args.body; message.edited = true; }
+              if (command.command === "chat.retract") { message.body = "Bericht verwijderd"; message.retracted = true; }
+              if (command.command === "chat.react") message.reactions = [{ emoji: args.emoji, count: 1 }];
+              window.nativeState.conversation = conversation();
+            }
+            if (command.command === "calls.start") {
+              window.nativeState.conversation = null;
+              window.nativeState.call = { phase: "active", id: crypto.randomUUID(), peer: args.peer, mode: args.mode, muted: false,
+                cameraEnabled: ["video", "total"].includes(args.mode), remoteCamera: "on", rttReady: ["audio-rtt", "total"].includes(args.mode),
+                ownText: "", remoteText: "", canSwitchCamera: true, canSendDtmf: true, videoFit: "contain" };
+            }
+            if (command.command === "calls.control") {
+              const call = window.nativeState.call;
+              if (args.id !== call.id) return Promise.reject(new Error("invalidState"));
+              if (args.action === "end") { window.nativeState.call = { phase: "idle" }; window.nativeState.conversation = conversation(); }
+              if (args.action === "mute") call.muted = !call.muted;
+              if (args.action === "camera") call.cameraEnabled = !call.cameraEnabled;
+              if (args.action === "rtt") call.ownText = args.value;
+              if (args.action === "fit") call.videoFit = args.value;
+              if (args.action === "answer") call.phase = "active";
+            }
+            return { version: 1, id: command.id, snapshot: structuredClone(window.nativeState) };
+          };
+          if (command.command === "chat.send" && window.holdSend) return new Promise(resolve => { window.releaseSend = () => resolve(apply()); });
+          return Promise.resolve(apply());
         } });
         window.nativeFixtureClient = client;
         window.TeleTypTelNativeSession = client;
@@ -79,6 +136,113 @@ async function setup(engine, viewport = { width: 390, height: 844 }) {
 }
 
 for (const engine of [chromium, webkit]) {
+  test(engine.name() + ": native chat sends safely, displays real receipts and exposes message actions", { timeout: 45000 }, async () => {
+    const { browser, page, errors } = await setup(engine);
+    try {
+      await page.evaluate(() => window.emitRoster([{ jid: "peer@localhost", name: "Fictieve Gebruiker", presence: "online", canCall: true }]));
+      await page.locator("#conversationItems .conversation-item").click();
+      await page.locator("#hybridMessageInput").fill("Hallo vanuit de webballon");
+      await page.locator("#hybridSend").click();
+      await page.locator("#hybridMessages .message.self").waitFor();
+      assert.match(await page.locator("#hybridMessages").textContent(), /Hallo vanuit de webballon/);
+      assert.equal(await page.locator("#hybridMessageInput").inputValue(), "");
+      assert.equal(await page.locator(".hybrid-message-receipt.is-read").count(), 0);
+      await page.evaluate(() => window.emitMessages([
+        window.fixtureMessage("<img src=x onerror=alert(1)>", false),
+        window.fixtureMessage("Afgeleverd", true, "delivered"), window.fixtureMessage("Gelezen", true, "displayed")
+      ]));
+      await page.waitForFunction(() => document.querySelectorAll("#hybridMessages .message").length === 3);
+      assert.equal(await page.locator("#hybridMessages img, #hybridMessages script").count(), 0);
+      assert.equal(await page.locator(".hybrid-message-receipt.is-read").count(), 1);
+      await page.waitForFunction(() => window.nativeCommands.some(value => value.command === "chat.displayed"));
+      await page.locator("#hybridMessages .message.self").last().locator("button").click();
+      await page.locator('[data-message-action="edit"]').click();
+      await page.locator("#hybridEditBody").fill("Bewerkt bericht");
+      await page.locator("#hybridConfirmAction").click();
+      await page.waitForFunction(() => document.getElementById("hybridMessages").textContent.includes("Bewerkt bericht"));
+      await page.locator("#hybridMessages .message.self").last().locator("button").click();
+      await page.locator('[data-message-action="react"]').click();
+      await page.locator(".hybrid-message-reactions").waitFor();
+      await page.locator("#hybridMessages .message.self").last().locator("button").click();
+      await page.locator('[data-message-action="retract"]').click();
+      await page.waitForFunction(() => document.getElementById("hybridMessages").textContent.includes("Bericht verwijderd"));
+      await page.locator("#hybridMessages .message").first().locator("button").click();
+      await page.locator('[data-message-action="hide"]').click();
+      await page.waitForFunction(() => document.querySelectorAll("#hybridMessages .message").length === 2);
+      assert.deepEqual(errors, []);
+    } finally { await browser.close(); }
+  });
+
+  test(engine.name() + ": typing during an outstanding send survives replies and account changes", { timeout: 45000 }, async () => {
+    const { browser, page, errors } = await setup(engine);
+    try {
+      await page.evaluate(() => window.emitRoster([{ jid: "peer@localhost", name: "Fixture", presence: "online", canCall: true }]));
+      await page.locator("#conversationItems .conversation-item").click();
+      await page.locator("#hybridMessageInput").fill("Eerste bericht");
+      await page.evaluate(() => { window.holdSend = true; });
+      await page.locator("#hybridSend").click();
+      await page.waitForFunction(() => Boolean(window.releaseSend));
+      await page.locator("#hybridMessageInput").fill("Nieuw concept tijdens verzenden");
+      await page.evaluate(() => window.releaseSend());
+      await page.waitForFunction(() => !document.getElementById("hybridSend").disabled);
+      assert.equal(await page.locator("#hybridMessageInput").inputValue(), "Nieuw concept tijdens verzenden");
+      assert.equal(await page.locator("#hybridMessages .message").count(), 1);
+      await page.locator("#hybridLogout").click();
+      await page.locator("#accountDialog").waitFor({ state: "visible" });
+      assert.equal(await page.locator("#hybridMessageInput").inputValue(), "");
+      assert.equal(await page.locator("#hybridMessages .message").count(), 0);
+      assert.deepEqual(await page.evaluate(() => Object.keys(localStorage)), []);
+      assert.deepEqual(errors, []);
+    } finally { await browser.close(); }
+  });
+
+  test(engine.name() + ": chat and TC share one native engine; RTT, DTMF and rotation stay separate", { timeout: 45000 }, async () => {
+    const { browser, page, errors, requests } = await setup(engine);
+    try {
+      await page.evaluate(() => window.emitRoster([{ jid: "peer@localhost", name: "Fixture", presence: "online", canCall: true }]));
+      await page.locator("#conversationItems .conversation-item").click();
+      await page.locator("#hybridMessageInput").fill("Bewaard concept");
+      await page.locator("#hybridStartTotal").click();
+      await page.locator("#hybridCallPanel").waitFor({ state: "visible" });
+      assert.equal(await page.locator("#hybridConversation").isVisible(), false);
+      assert.equal(await page.locator("#hybridConnected").evaluate(value => value.inert), true);
+      await page.locator("#hybridOwnRtt").fill("Dit is live RTT, geen chatbericht");
+      await page.waitForFunction(() => window.nativeCommands.some(value => value.command === "calls.control" && value.arguments.action === "rtt"));
+      assert.equal(await page.evaluate(() => window.nativeCommands.filter(value => value.command === "chat.send").length), 0);
+      await page.locator("#hybridCallMute").click();
+      await page.waitForFunction(() => document.getElementById("hybridCallMute").classList.contains("is-off"));
+      await page.locator("#hybridCallCamera").click();
+      await page.evaluate(() => window.emitCall({ cameraEnabled: false, remoteCamera: "off", remoteText: "Tekst van de ander" }));
+      await page.waitForFunction(() => document.getElementById("hybridCallPanel").classList.contains("is-rtt-only"));
+      assert.equal(await page.locator("#hybridVideoSurface").isVisible(), false);
+      for (const [width, height] of [[390, 844], [844, 390], [834, 1194], [1194, 834], [390, 410]]) {
+        await page.setViewportSize({ width, height });
+        assert.equal(await page.locator("#hybridOwnRtt").inputValue(), "Dit is live RTT, geen chatbericht");
+        assert.equal(await page.locator("#hybridRemoteRtt").textContent(), "Tekst van de ander");
+        for (const selector of ["#hybridEndCall", "#hybridOwnRtt"]) {
+          const box = await page.locator(selector).boundingBox();
+          assert.ok(box && box.height > 0 && box.x >= 0 && box.y >= 0 && box.x + box.width <= width + 1 && box.y + box.height <= height + 1, selector + " reachable after rotation");
+        }
+      }
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.locator("#hybridDtmfToggle").click();
+      assert.deepEqual(await page.locator("#hybridDtmf button").evaluateAll(values => values.map(value => value.dataset.tone)), ["1", "2", "3", "4", "5", "6", "7", "8", "9", "*", "0", "#"]);
+      await page.locator('#hybridDtmf button[data-tone="#"]').click();
+      await page.waitForFunction(() => window.nativeCommands.some(value => value.command === "calls.control" && value.arguments.action === "dtmf" && value.arguments.value === "#"));
+      await page.locator("#hybridEndCall").click();
+      await page.locator("#hybridConversation").waitFor({ state: "visible" });
+      assert.equal(await page.locator("#hybridMessageInput").inputValue(), "Bewaard concept");
+      await page.locator("#hybridStartMenu summary").click();
+      await page.locator("#hybridStartAudio").click();
+      await page.locator("#hybridCallPanel").waitFor({ state: "visible" });
+      assert.equal(await page.locator("#hybridCallCamera").isVisible(), false);
+      assert.equal(await page.locator("#hybridCallRtt").isVisible(), false);
+      await page.locator("#hybridEndCall").click();
+      assert.equal(requests.some(url => /\/api\/|jingle|chat-client\.js/.test(url)), false);
+      assert.deepEqual(errors, []);
+    } finally { await browser.close(); }
+  });
+
   test(engine.name() + ": login native states two-factor errors settings and logout", { timeout: 45000 }, async () => {
     const { browser, page, errors, requests } = await setup(engine);
     try {
@@ -184,8 +348,8 @@ for (const engine of [chromium, webkit]) {
       assert.match(await page.locator("#conversationItems .conversation-item").getAttribute("aria-label"), /Afwezig/);
       await page.locator("#conversationItems .conversation-item").press("Enter");
       assert.equal(await page.locator("#hybridContactTitle").textContent(), "Édward Fixture");
-      assert.match(await page.locator("#hybridContactHint").textContent(), /worden nog aangesloten/);
-      assert.equal(await page.locator("textarea, #messageInput").count(), 0);
+      await page.locator("#hybridConversation").waitFor({ state: "visible" });
+      assert.equal(await page.locator("#hybridMessageInput").isDisabled(), false);
       for (const [width, height] of [[390, 844], [844, 390], [834, 1194], [1194, 834]]) {
         await page.setViewportSize({ width, height });
         assert.equal(await page.locator("#hybridContactTitle").textContent(), "Édward Fixture");

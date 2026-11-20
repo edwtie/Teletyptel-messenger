@@ -10,7 +10,7 @@ const state = (sequence, phase, roster) => ({ version: 1, sequence, phase, error
 
 test("authenticated roster is a frozen minimal projection without endpoints or profile data", () => {
   const result = safeRoster({ status: "ready", contacts: [contact] }, "connected");
-  assert.deepEqual(result.contacts[0], contact);
+  assert.deepEqual(result.contacts[0], { ...contact, canCall: false });
   assert.ok(Object.isFrozen(result) && Object.isFrozen(result.contacts) && Object.isFrozen(result.contacts[0]));
   for (const extra of ["password", "token", "callEndpoint", "groups", "subscription", "avatarUrl"]) {
     assert.throws(() => safeRoster({ status: "ready", contacts: [{ ...contact, [extra]: "private" }] }, "connected"), /invalidNativeReply/);

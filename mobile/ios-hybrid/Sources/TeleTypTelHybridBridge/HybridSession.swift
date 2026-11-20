@@ -1,6 +1,8 @@
 import Combine
 import Foundation
+#if !TELETYPTEL_HYBRID_EMBEDDED
 import TeleTypTelCore
+#endif
 
 @MainActor
 public final class HybridSession {
@@ -9,25 +11,37 @@ public final class HybridSession {
     private let configuration: ServerConfiguration
     private let nativeLogout: () -> Void
     private let nativeSettings: (() -> Void)?
-    private var observation: AnyCancellable?
+    private var observations: [AnyCancellable] = []
+    private let calls: (any HybridCallPort)?
+    private var selectedPeer: String?
+    private var accountEpoch = UUID()
     private var requestIDs: [UUID] = []
     private var sequence = 0
     private var lastPublished: HybridSnapshot?
 
     public init(model: NativeLoginModel, configuration: ServerConfiguration, nativeLogout: @escaping () -> Void,
-                nativeSettings: (() -> Void)? = nil) {
+                nativeSettings: (() -> Void)? = nil, calls: (any HybridCallPort)? = nil) {
         self.model = model
         self.configuration = configuration
         self.nativeLogout = nativeLogout
         self.nativeSettings = nativeSettings
-        observation = Publishers.CombineLatest3(model.$phase, model.$roster, model.$isBackground).sink { [weak self] _ in
+        self.calls = calls
+        observations.append(model.objectWillChange.sink { [weak self] _ in
             Task { @MainActor [weak self] in self?.publish() }
+        })
+        if let calls = calls {
+            observations.append(calls.changes.sink { [weak self] _ in
+                Task { @MainActor [weak self] in self?.publish() }
+            })
         }
     }
 
     public func handle(_ data: Data, document: URL?, mainFrame: Bool) throws -> HybridReply {
         guard HybridDocumentPolicy.permits(document, mainFrame: mainFrame) else { throw HybridFailure.untrustedDocument }
         let request = try HybridRequest.decode(data)
+        if request.command.hasPrefix("chat.") || request.command.hasPrefix("calls.") {
+            guard request.epoch == accountEpoch else { throw HybridFailure.invalidState }
+        }
         guard !requestIDs.contains(request.id) else { throw HybridFailure.replayedRequest }
         requestIDs.append(request.id)
         if requestIDs.count > 128 { requestIDs.removeFirst() }
@@ -36,6 +50,8 @@ public final class HybridSession {
             guard !model.isBackground else { throw HybridFailure.invalidState }
             switch model.phase {
             case .idle, .signedOut, .failed:
+                accountEpoch = UUID()
+                selectedPeer = nil
                 model.login(address: configuration.origin.absoluteString, domain: configuration.domain,
                             jid: request.arguments["jid"]!, password: request.arguments["password"]!)
             default:
@@ -51,13 +67,79 @@ public final class HybridSession {
         case "session.logout":
             guard model.phase != .signedOut else { throw HybridFailure.invalidState }
             nativeLogout()
+            accountEpoch = UUID()
             if model.phase != .signedOut { model.disconnect() }
+            selectedPeer = nil
+            model.visibleConversation = nil
         case "session.snapshot":
             break
         case "app.openSettings":
             guard !model.isWorking, !model.isBackground, !model.isSecondFactorPending else { throw HybridFailure.sessionBusy }
             guard let nativeSettings = nativeSettings else { throw HybridFailure.unavailable }
             nativeSettings()
+        case "chat.open":
+            let peer = try permittedPeer(request.arguments["peer"]!)
+            guard !callBusy else { throw HybridFailure.sessionBusy }
+            selectedPeer = peer
+            model.visibleConversation = nil
+            model.loadHistory(for: peer)
+        case "chat.close":
+            selectedPeer = nil
+            model.visibleConversation = nil
+        case "chat.draft", "chat.send":
+            let peer = try permittedPeer(request.arguments["peer"]!)
+            guard selectedPeer == peer, request.command == "chat.draft" || !callBusy else { throw HybridFailure.invalidState }
+            let body = request.arguments["body"]!
+            if request.command == "chat.send" {
+                guard model.canSend else { throw HybridFailure.invalidState }
+                let previous = Set(model.chat.messages.map(\.id))
+                model.setDraft(body, peer: peer)
+                model.sendDraft(to: peer)
+                guard model.chat.messages.contains(where: { $0.peer == peer && !previous.contains($0.id) }) else { throw HybridFailure.invalidState }
+            } else { model.setDraft(body, peer: peer) }
+        case "chat.displayed":
+            let peer = try permittedPeer(request.arguments["peer"]!)
+            guard selectedPeer == peer, !callBusy else { throw HybridFailure.invalidState }
+            let ids = request.arguments["ids"]!.split(separator: ",").compactMap { UUID(uuidString: String($0)) }
+            let visible = Set(conversation()?.messages.filter { !$0.outgoing }.map(\.id) ?? [])
+            guard ids.allSatisfy({ visible.contains($0.uuidString.lowercased()) }) else { throw HybridFailure.invalidState }
+            model.displayed(ids)
+        case "chat.edit", "chat.hide", "chat.retract", "chat.forward", "chat.react":
+            let peer = try permittedPeer(request.arguments["peer"]!)
+            guard selectedPeer == peer, !callBusy, let id = UUID(uuidString: request.arguments["id"]!),
+                  let target = model.chat.messages.first(where: { $0.id == id && $0.peer == peer && !$0.hidden }) else { throw HybridFailure.invalidState }
+            if request.command == "chat.hide" {
+                model.hideMessage(id)
+                guard model.chat.messages.first(where: { $0.id == id })?.hidden == true else { throw HybridFailure.invalidState }
+            }
+            else if request.command == "chat.forward" {
+                let destination = try permittedPeer(request.arguments["target"]!)
+                guard !target.retracted, model.forwardMessage(target.body, to: destination) else { throw HybridFailure.invalidState }
+            } else if request.command == "chat.react" {
+                guard model.canSend, !target.retracted else { throw HybridFailure.invalidState }
+                model.react(id, emoji: request.arguments["emoji"]!)
+                guard model.chat.messages.first(where: { $0.id == id })?.reactionPending == true else { throw HybridFailure.invalidState }
+            }
+            else {
+                guard model.canChangeMessages, target.state == .submitted, !target.retracted else { throw HybridFailure.invalidState }
+                guard request.command == "chat.edit" ? model.chat.canCorrect(id) : model.chat.canRetract(id) else { throw HybridFailure.invalidState }
+                model.changeMessage(id, correctedBody: request.command == "chat.edit" ? request.arguments["body"] : nil)
+                guard model.chat.messages.first(where: { $0.id == id })?.actionPending == true else { throw HybridFailure.invalidState }
+            }
+        case "calls.start":
+            let peer = try permittedPeer(request.arguments["peer"]!)
+            guard !callBusy, let calls = calls, calls.canCall(peer: peer) else { throw HybridFailure.unavailable }
+            model.visibleConversation = nil
+            try calls.start(peer: peer, mode: request.arguments["mode"]!)
+        case "calls.control", "calls.layout":
+            guard model.isConnected, !model.isBackground, let calls = calls,
+                  calls.state.id == request.arguments["id"] else { throw HybridFailure.invalidState }
+            model.visibleConversation = nil
+            if request.command == "calls.layout" { try calls.placeVideo(id: request.arguments["id"]!, placement: HybridVideoPlacement(arguments: request.arguments)) }
+            else { try calls.control(id: request.arguments["id"]!, action: request.arguments["action"]!, value: request.arguments["value"]) }
+        case "calls.reset":
+            guard model.isConnected, !model.isBackground, let calls = calls, calls.state.phase == "failed" else { throw HybridFailure.invalidState }
+            try calls.resetFailure()
         default:
             throw HybridFailure.unavailable
         }
@@ -97,9 +179,42 @@ public final class HybridSession {
             case .xmpp: errorCode = "connectionLost"
             }
         }
-        return HybridSnapshot(version: 1, sequence: sequence, phase: phase, errorCode: errorCode,
-                              chatAvailable: false, callsAvailable: false, socialLoginAvailable: false,
-                              settingsAvailable: nativeSettings != nil, roster: roster())
+        return HybridSnapshot(version: 1, sequence: sequence, epoch: accountEpoch.uuidString.lowercased(), phase: phase, errorCode: errorCode,
+                              chatAvailable: model.isConnected && !model.isBackground, callsAvailable: calls != nil && model.isConnected && !model.isBackground, socialLoginAvailable: false,
+                              settingsAvailable: nativeSettings != nil, roster: roster(), conversation: conversation(),
+                              call: model.isConnected && !model.isBackground ? (calls?.state ?? HybridCallState()) : HybridCallState())
+    }
+
+    private var callBusy: Bool { calls.map { !["idle", "failed"].contains($0.state.phase) } ?? false }
+
+    private func permittedPeer(_ peer: String) throws -> String {
+        guard model.isConnected, !model.isBackground, !model.isBlocked(peer),
+              case .ready(let contacts) = model.roster, contacts.contains(where: { $0.jid == peer }) else { throw HybridFailure.invalidState }
+        if case .connected(let owner) = model.phase, peer == owner { throw HybridFailure.invalidState }
+        return peer
+    }
+
+    private func conversation() -> HybridConversation? {
+        guard let peer = selectedPeer, (try? permittedPeer(peer)) != nil, !callBusy else { return nil }
+        let messages = model.chat.messages.filter { $0.peer == peer && !$0.hidden }.suffix(100).map { message in
+            var counts: [String: Int] = [:]
+            for values in message.reactions.values { for emoji in values { counts[emoji, default: 0] += 1 } }
+            return HybridMessage(id: message.id.uuidString.lowercased(), body: message.retracted ? "Bericht verwijderd" : message.body,
+                          outgoing: message.state != .incoming, timestamp: message.date.timeIntervalSince1970,
+                          state: message.state.rawValue, delivery: message.delivery.rawValue,
+                          edited: message.edited, retracted: message.retracted,
+                          reactions: counts.keys.sorted().prefix(16).map { HybridReaction(emoji: $0, count: counts[$0]!) })
+        }
+        let history: String
+        switch model.historyStates[peer] ?? .idle {
+        case .idle: history = "idle"
+        case .loading: history = "loading"
+        case .ready: history = "ready"
+        case .unavailable: history = "unavailable"
+        case .failed: history = "failed"
+        }
+        return HybridConversation(peer: peer, draft: model.chat.drafts[peer] ?? "", messages: messages,
+                                  history: history, canSend: model.canSend, canChange: model.canChangeMessages)
     }
 
     private func roster() -> HybridRoster {
@@ -122,13 +237,19 @@ public final class HybridSession {
             let projected = contacts.filter { $0.jid != owner }.map { contact in
                 let scalars = contact.displayName.unicodeScalars.filter { !CharacterSet.controlCharacters.contains($0) }.prefix(256)
                 let name = String(String.UnicodeScalarView(scalars))
-                return HybridContact(jid: contact.jid, name: name.isEmpty ? contact.jid : name, presence: contact.presence.rawValue)
+                return HybridContact(jid: contact.jid, name: name.isEmpty ? contact.jid : name, presence: contact.presence.rawValue,
+                                     canCall: !model.isBlocked(contact.jid) && (calls?.canCall(peer: contact.jid) ?? false))
             }
             return HybridRoster(status: "ready", contacts: projected)
         }
     }
 
     private func publish() {
+        if !model.isConnected || model.isBackground {
+            selectedPeer = nil
+            model.visibleConversation = nil
+        }
+        if callBusy { model.visibleConversation = nil }
         let current = makeSnapshot(sequence: 0)
         guard current != lastPublished else { return }
         lastPublished = current

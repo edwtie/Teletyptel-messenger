@@ -8,6 +8,9 @@ on:
       - mobile/ios-hybrid/**
       - scripts/ios-hybrid/**
       - tests/ios-hybrid-*.test.js
+      - scripts/prepare-ios-native.js
+      - mobile/ios-native/App/NativeCallController.swift
+      - mobile/ios-native/App/NativeCallPlatform.swift
   workflow_dispatch:
 
 permissions:
@@ -20,7 +23,7 @@ concurrency:
 jobs:
   bridge:
     runs-on: macos-15
-    timeout-minutes: 20
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
@@ -35,7 +38,7 @@ jobs:
           test -n "$XCODE_PATH"
           echo "DEVELOPER_DIR=$XCODE_PATH/Contents/Developer" >> "$GITHUB_ENV"
       - name: Validate pinned UI and JavaScript boundary
-        run: node --test tests/ios-hybrid-baseline.test.js tests/ios-hybrid-session.test.js tests/ios-hybrid-contacts.test.js
+        run: node --test tests/ios-hybrid-baseline.test.js tests/ios-hybrid-session.test.js tests/ios-hybrid-contacts.test.js tests/ios-hybrid-messenger.test.js
       - name: Prepare pinned login content without legacy engines
         run: |
           export TELETYPTEL_HYBRID_CONTENT="$RUNNER_TEMP/teletyptel-hybrid-content.json"
@@ -55,3 +58,11 @@ jobs:
             --scratch-path "$RUNNER_TEMP/teletyptel-hybrid-ios" \
             --triple arm64-apple-ios16.0-simulator \
             --sdk "$(xcrun --sdk iphonesimulator --show-sdk-path)"
+      - name: Assemble the isolated hybrid app with the existing native engine
+        run: node scripts/ios-hybrid/prepare-app.js
+      - name: Compile the complete app without signing or push activation
+        run: |
+          xcodebuild -project artifacts/ios-native-hybrid-validation/TeleTypTelNative.xcodeproj \
+            -scheme TeleTypTelNative -configuration Debug -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/teletyptel-hybrid-app" CODE_SIGNING_ALLOWED=NO build

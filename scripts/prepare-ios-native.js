@@ -32,9 +32,12 @@ appFiles.push("App/NativeNewContactView.swift", "App/NativeAppearanceView.swift"
 appFiles.push("App/NativeSmileys.swift");
 appFiles.push("App/NativeMessageMenu.swift");
 
-function projectText({ pushTest = null, archive = null } = {}) {
+function projectText({ pushTest = null, archive = null, extraSources = [], extraResources = [], hybrid = false } = {}) {
   callPush.validate(pushTest);
   nativeArchive.validate(archive, pushTest);
+  for (const file of [...extraSources, ...extraResources]) {
+    if (typeof file !== "string" || !/^Hybrid\/[a-zA-Z0-9_-]+\.(?:swift|json)$/.test(file)) throw new Error("Invalid isolated hybrid project file");
+  }
   const objects = new Map();
   const identifier = name => crypto.createHash("sha256").update("teletyptel-native:" + name).digest("hex").slice(0, 24).toUpperCase();
   const quote = value => JSON.stringify(value);
@@ -47,7 +50,7 @@ function projectText({ pushTest = null, archive = null } = {}) {
   };
   const refs = [];
   const buildFiles = [];
-  for (const file of [...appFiles, ...coreFiles.map(file => "Core/" + file), ...mediaFiles.map(file => "Media/" + file)]) {
+  for (const file of [...appFiles, ...coreFiles.map(file => "Core/" + file), ...mediaFiles.map(file => "Media/" + file), ...extraSources]) {
     const ref = object(file, `{isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ${quote(file)}; sourceTree = "<group>";}`);
     refs.push(ref);
     buildFiles.push(object(file + "-build", `{isa = PBXBuildFile; fileRef = ${ref};}`));
@@ -74,6 +77,11 @@ function projectText({ pushTest = null, archive = null } = {}) {
   const app = object("app", '{isa = PBXFileReference; explicitFileType = wrapper.application; path = TeleTypTelNative.app; sourceTree = BUILT_PRODUCTS_DIR;}');
   const tests = object("tests", '{isa = PBXFileReference; explicitFileType = wrapper.cfbundle; path = NativeStartupUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR;}');
   const products = object("products", `{isa = PBXGroup; name = Products; children = ${list([app, tests])}; sourceTree = "<group>";}`);
+  const extraResourceBuilds = extraResources.map(file => {
+    const ref = object(file, `{isa = PBXFileReference; lastKnownFileType = text.json; path = ${quote(file)}; sourceTree = "<group>";}`);
+    refs.push(ref);
+    return object(file + "-build", `{isa = PBXBuildFile; fileRef = ${ref};}`);
+  });
   const main = object("main", `{isa = PBXGroup; children = ${list([...refs, products])}; sourceTree = "<group>";}`);
   const phase = (name, type, files) => object(name, `{isa = ${type}; buildActionMask = 2147483647; files = ${list(files)}; runOnlyForDeploymentPostprocessing = 0;}`);
   const rtcPackage = object("webrtc-package", `{isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/stasel/WebRTC.git"; requirement = {kind = revision; revision = ${quote(webRTC.revision)};};}`);
@@ -94,11 +102,11 @@ function projectText({ pushTest = null, archive = null } = {}) {
       providerBuilds.push(object(name + "-build", `{isa = PBXBuildFile; productRef = ${product};}`));
     }
   }
-  const appPhases = [phase("sources", "PBXSourcesBuildPhase", buildFiles), phase("frameworks", "PBXFrameworksBuildPhase", [rtcBuild, ...providerBuilds]), phase("resources", "PBXResourcesBuildPhase", [assetBuild, translationBuild, permissionBuild, privacyBuild])];
+  const appPhases = [phase("sources", "PBXSourcesBuildPhase", buildFiles), phase("frameworks", "PBXFrameworksBuildPhase", [rtcBuild, ...providerBuilds]), phase("resources", "PBXResourcesBuildPhase", [assetBuild, translationBuild, permissionBuild, privacyBuild, ...extraResourceBuilds])];
   const testPhases = [phase("test-sources", "PBXSourcesBuildPhase", [testBuild]), phase("test-frameworks", "PBXFrameworksBuildPhase", []), phase("test-resources", "PBXResourcesBuildPhase", [])];
   const configurations = (name, settings) => {
     const configs = ["Debug", "Release"].map(mode => object(name + mode,
-      `{isa = XCBuildConfiguration; name = ${mode}; buildSettings = {${settings} SWIFT_OPTIMIZATION_LEVEL = ${quote(mode === "Debug" ? "-Onone" : "-O")}; SWIFT_ACTIVE_COMPILATION_CONDITIONS = ${quote(mode === "Debug" ? "DEBUG" : "")};};}`));
+      `{isa = XCBuildConfiguration; name = ${mode}; buildSettings = {${settings} SWIFT_OPTIMIZATION_LEVEL = ${quote(mode === "Debug" ? "-Onone" : "-O")}; SWIFT_ACTIVE_COMPILATION_CONDITIONS = ${quote((mode === "Debug" ? "DEBUG" : "") + (hybrid ? " TELETYPTEL_HYBRID_EMBEDDED" : ""))};};}`));
     return object(name + "-configs", `{isa = XCConfigurationList; buildConfigurations = ${list(configs)}; defaultConfigurationIsVisible = 0; defaultConfigurationName = Release;}`);
   };
   const common = 'IPHONEOS_DEPLOYMENT_TARGET = 16.0; SDKROOT = iphoneos; SWIFT_VERSION = 5.0; CLANG_ENABLE_MODULES = YES; TARGETED_DEVICE_FAMILY = "1,2"; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; CODE_SIGNING_ALLOWED = NO;';
