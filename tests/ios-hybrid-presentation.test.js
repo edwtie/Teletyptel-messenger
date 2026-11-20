@@ -165,6 +165,12 @@ for (const engine of [chromium, webkit]) {
         { jid: "other@localhost", name: "<img src=x onerror=alert(1)>", presence: "unknown" }
       ]));
       assert.equal(await page.locator("#conversationItems .conversation-item").count(), 2);
+      for (const row of await page.locator("#conversationItems .conversation-item").all()) {
+        const rowBox = await row.boundingBox();
+        const dotBox = await row.locator(".presence-dot").boundingBox();
+        assert.ok(rowBox && dotBox && dotBox.x >= rowBox.x && dotBox.x + dotBox.width <= rowBox.x + rowBox.width + 1,
+          "presence dot remains inside its contact row");
+      }
       assert.equal(await page.locator("#conversationItems img, #conversationItems script").count(), 0);
       assert.match(await page.locator("#conversationItems").textContent(), /<img src=x onerror=alert\(1\)>/);
       await page.locator("#conversationSearchInput").fill("edward");

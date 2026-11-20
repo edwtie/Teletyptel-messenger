@@ -76,6 +76,16 @@ html, body {
   grid-template-columns: 34px minmax(0, 1fr) 16px;
 }
 
+#hybridConnected .conversation-row-meta {
+  min-width: 0;
+  grid-template-columns: 10px;
+  column-gap: 0;
+}
+
+#hybridConnected .conversation-search .material-icon svg {
+  fill: none;
+}
+
 #hybridConnected .presence-unknown {
   background: #64748b;
 }
