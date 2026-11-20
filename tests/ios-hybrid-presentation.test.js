@@ -17,7 +17,9 @@ test("hybrid login reuses pinned markup styling and symbols without shipping web
   assert.ok(html.includes(element(original, /<section\b[^>]*\bclass="modal-section account-auth-section"[^>]*>/)));
   assert.match(html, /id="dialogServerSettingsButton"[\s\S]*?<svg viewBox="0 -960 960 960"/);
   assert.match(html, /connect-src 'none'/);
-  assert.deepEqual([...html.matchAll(/<script src="([^"]+)"/g)].map(match => match[1]), ["ui-language.js", "native-session.js", "login-presentation.js"]);
+  assert.deepEqual([...html.matchAll(/<script src="([^"]+)"/g)].map(match => match[1]), ["ui-language.js", "native-session.js", "login-presentation.js", "contacts-presentation.js"]);
+  assert.match(html, /id="conversationSidebar"/);
+  assert.match(html, /id="conversationSearchInput"/);
   for (const name of Object.keys(content.files)) assert.doesNotMatch(name, /chat-client\.js|jingle|native-server|config|php|demo/i);
   assert.throws(() => element("<div id=missing>", /<section>/), /Missing/);
 });
@@ -34,10 +36,15 @@ async function setup(engine, viewport = { width: 390, height: 844 }) {
       window.nativeCommands = [];
       window.nativeSettingsCount = 0;
       const state = phase => ({ version: 1, sequence: ++sequence, phase, errorCode: null,
-        chatAvailable: false, callsAvailable: false, socialLoginAvailable: false, settingsAvailable: true });
+        chatAvailable: false, callsAvailable: false, socialLoginAvailable: false, settingsAvailable: true,
+        roster: { status: phase === "connected" ? "loading" : "hidden", contacts: [] } });
       window.nativeState = state("idle");
       window.emitNative = (phase, errorCode = null) => {
         window.nativeState = { ...state(phase), errorCode };
+        window.nativeFixtureClient.receive(window.nativeState);
+      };
+      window.emitRoster = (contacts, status = "ready") => {
+        window.nativeState = { ...state("connected"), roster: { status, contacts } };
         window.nativeFixtureClient.receive(window.nativeState);
       };
       window.module = {};
@@ -144,6 +151,58 @@ for (const engine of [chromium, webkit]) {
       }
       const colors = await page.locator("#dialogConnectButton").evaluate(button => ({ background: getComputedStyle(button).backgroundColor, color: getComputedStyle(button).color }));
       assert.deepEqual(colors, { background: "rgb(37, 99, 235)", color: "rgb(255, 255, 255)" });
+      assert.deepEqual(errors, []);
+    } finally { await browser.close(); }
+  });
+
+  test(engine.name() + ": native contacts search presence selection privacy and rotation", { timeout: 45000 }, async () => {
+    const { browser, page, errors, requests } = await setup(engine);
+    try {
+      await page.evaluate(() => window.emitNative("connected"));
+      await page.locator("#hybridConnected").waitFor({ state: "visible" });
+      await page.evaluate(() => window.emitRoster([
+        { jid: "peer@localhost", name: "Édward Fixture", presence: "online" },
+        { jid: "other@localhost", name: "<img src=x onerror=alert(1)>", presence: "unknown" }
+      ]));
+      assert.equal(await page.locator("#conversationItems .conversation-item").count(), 2);
+      assert.equal(await page.locator("#conversationItems img, #conversationItems script").count(), 0);
+      assert.match(await page.locator("#conversationItems").textContent(), /<img src=x onerror=alert\(1\)>/);
+      await page.locator("#conversationSearchInput").fill("edward");
+      assert.equal(await page.locator("#conversationItems .conversation-item").count(), 1);
+      await page.locator("#conversationItems .conversation-item").focus();
+      await page.evaluate(() => window.emitRoster([
+        { jid: "peer@localhost", name: "Édward Fixture", presence: "away" },
+        { jid: "other@localhost", name: "<img src=x onerror=alert(1)>", presence: "offline" }
+      ]));
+      assert.equal(await page.evaluate(() => document.activeElement.dataset.contactJid), "peer@localhost");
+      assert.match(await page.locator("#conversationItems .conversation-item").getAttribute("aria-label"), /Afwezig/);
+      await page.locator("#conversationItems .conversation-item").press("Enter");
+      assert.equal(await page.locator("#hybridContactTitle").textContent(), "Édward Fixture");
+      assert.match(await page.locator("#hybridContactHint").textContent(), /worden nog aangesloten/);
+      assert.equal(await page.locator("textarea, #messageInput").count(), 0);
+      for (const [width, height] of [[390, 844], [844, 390], [834, 1194], [1194, 834]]) {
+        await page.setViewportSize({ width, height });
+        assert.equal(await page.locator("#hybridContactTitle").textContent(), "Édward Fixture");
+        assert.equal(await page.locator("#conversationSearchInput").inputValue(), "edward");
+        assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
+        const box = await page.locator("#hybridLogout").boundingBox();
+        assert.ok(box && box.x >= 0 && box.y >= 0 && box.x + box.width <= width + 1 && box.y + box.height <= height + 1);
+      }
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.locator("#hybridContactsBack").click();
+      await page.locator("#conversationSearchInput").fill("");
+      await page.locator("#conversationActionsToggle").click();
+      assert.equal(await page.locator("#addConversationButton").isDisabled(), true);
+      assert.equal(await page.locator("#addGroupButton").isDisabled(), true);
+      await page.evaluate(() => window.emitRoster([], "unavailable"));
+      assert.equal(await page.locator("#conversationItems .conversation-item").count(), 0);
+      assert.match(await page.locator("#hybridRosterStatus").textContent(), /niet beschikbaar/);
+      await page.locator("#hybridLogout").click();
+      await page.locator("#accountDialog").waitFor({ state: "visible" });
+      assert.equal(await page.locator("#conversationItems .conversation-item").count(), 0);
+      assert.equal(await page.locator("#conversationSearchInput").inputValue(), "");
+      assert.equal(await page.locator("#hybridContactJid").textContent(), "");
+      assert.equal(requests.some(url => /\/api\/|chat-client\.js|jingle/.test(url)), false);
       assert.deepEqual(errors, []);
     } finally { await browser.close(); }
   });

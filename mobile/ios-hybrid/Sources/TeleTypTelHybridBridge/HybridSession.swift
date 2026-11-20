@@ -12,7 +12,7 @@ public final class HybridSession {
     private var observation: AnyCancellable?
     private var requestIDs: [UUID] = []
     private var sequence = 0
-    private var lastPhase: NativeLoginModel.Phase?
+    private var lastPublished: HybridSnapshot?
 
     public init(model: NativeLoginModel, configuration: ServerConfiguration, nativeLogout: @escaping () -> Void,
                 nativeSettings: (() -> Void)? = nil) {
@@ -20,7 +20,7 @@ public final class HybridSession {
         self.configuration = configuration
         self.nativeLogout = nativeLogout
         self.nativeSettings = nativeSettings
-        observation = model.$phase.sink { [weak self] _ in
+        observation = Publishers.CombineLatest3(model.$phase, model.$roster, model.$isBackground).sink { [weak self] _ in
             Task { @MainActor [weak self] in self?.publish() }
         }
     }
@@ -66,6 +66,10 @@ public final class HybridSession {
     }
 
     public func snapshot() -> HybridSnapshot {
+        makeSnapshot(sequence: sequence)
+    }
+
+    private func makeSnapshot(sequence: Int) -> HybridSnapshot {
         var phase: String
         var errorCode: String?
         switch model.phase {
@@ -95,12 +99,39 @@ public final class HybridSession {
         }
         return HybridSnapshot(version: 1, sequence: sequence, phase: phase, errorCode: errorCode,
                               chatAvailable: false, callsAvailable: false, socialLoginAvailable: false,
-                              settingsAvailable: nativeSettings != nil)
+                              settingsAvailable: nativeSettings != nil, roster: roster())
+    }
+
+    private func roster() -> HybridRoster {
+        guard case .connected(let owner) = model.phase, !model.isBackground else {
+            return HybridRoster(status: "hidden", contacts: [])
+        }
+        switch model.roster {
+        case .idle, .loading:
+            return HybridRoster(status: "loading", contacts: [])
+        case .unavailable:
+            return HybridRoster(status: "unavailable", contacts: [])
+        case .ready(let contacts):
+            guard contacts.count <= 100, Set(contacts.map(\.jid)).count == contacts.count,
+                  contacts.allSatisfy({ contact in
+                      !contact.jid.isEmpty && contact.jid.utf8.count <= 1023 && !contact.jid.contains("/")
+                          && !contact.jid.unicodeScalars.contains(where: {
+                              CharacterSet.controlCharacters.contains($0) || CharacterSet.whitespacesAndNewlines.contains($0)
+                          })
+                  }) else { return HybridRoster(status: "unavailable", contacts: []) }
+            let projected = contacts.filter { $0.jid != owner }.map { contact in
+                let scalars = contact.displayName.unicodeScalars.filter { !CharacterSet.controlCharacters.contains($0) }.prefix(256)
+                let name = String(String.UnicodeScalarView(scalars))
+                return HybridContact(jid: contact.jid, name: name.isEmpty ? contact.jid : name, presence: contact.presence.rawValue)
+            }
+            return HybridRoster(status: "ready", contacts: projected)
+        }
     }
 
     private func publish() {
-        guard model.phase != lastPhase else { return }
-        lastPhase = model.phase
+        let current = makeSnapshot(sequence: 0)
+        guard current != lastPublished else { return }
+        lastPublished = current
         sequence += 1
         onStateChange?(snapshot())
     }

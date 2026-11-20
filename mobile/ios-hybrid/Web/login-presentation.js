@@ -13,8 +13,8 @@
     for (const element of document.querySelectorAll("[data-i18n]")) {
       if (translations[element.dataset.i18n]) element.textContent = translations[element.dataset.i18n];
     }
-    for (const element of document.querySelectorAll("[data-i18n-title], [data-i18n-aria-label]")) {
-      for (const [attribute, key] of [["title", element.dataset.i18nTitle], ["aria-label", element.dataset.i18nAriaLabel]]) {
+    for (const element of document.querySelectorAll("[data-i18n-title], [data-i18n-aria-label], [data-i18n-placeholder]")) {
+      for (const [attribute, key] of [["title", element.dataset.i18nTitle], ["aria-label", element.dataset.i18nAriaLabel], ["placeholder", element.dataset.i18nPlaceholder]]) {
         if (translations[key]) element.setAttribute(attribute, translations[key]);
       }
     }

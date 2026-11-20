@@ -35,7 +35,7 @@ jobs:
           test -n "$XCODE_PATH"
           echo "DEVELOPER_DIR=$XCODE_PATH/Contents/Developer" >> "$GITHUB_ENV"
       - name: Validate pinned UI and JavaScript boundary
-        run: node --test tests/ios-hybrid-baseline.test.js tests/ios-hybrid-session.test.js
+        run: node --test tests/ios-hybrid-baseline.test.js tests/ios-hybrid-session.test.js tests/ios-hybrid-contacts.test.js
       - name: Prepare pinned login content without legacy engines
         run: |
           export TELETYPTEL_HYBRID_CONTENT="$RUNNER_TEMP/teletyptel-hybrid-content.json"

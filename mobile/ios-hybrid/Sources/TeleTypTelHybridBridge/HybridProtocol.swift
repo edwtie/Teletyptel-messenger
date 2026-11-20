@@ -76,6 +76,18 @@ public struct HybridSnapshot: Codable, Equatable {
     public let callsAvailable: Bool
     public let socialLoginAvailable: Bool
     public let settingsAvailable: Bool
+    public let roster: HybridRoster
+}
+
+public struct HybridContact: Codable, Equatable {
+    public let jid: String
+    public let name: String
+    public let presence: String
+}
+
+public struct HybridRoster: Codable, Equatable {
+    public let status: String
+    public let contacts: [HybridContact]
 }
 
 public struct HybridReply: Encodable {

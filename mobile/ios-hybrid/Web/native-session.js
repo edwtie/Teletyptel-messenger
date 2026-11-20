@@ -17,7 +17,7 @@
   }
 
   function safeState(value) {
-    const keys = ["version", "sequence", "phase", "errorCode", "chatAvailable", "callsAvailable", "socialLoginAvailable", "settingsAvailable"];
+    const keys = ["version", "sequence", "phase", "errorCode", "chatAvailable", "callsAvailable", "socialLoginAvailable", "settingsAvailable", "roster"];
     if (!value || typeof value !== "object" || Array.isArray(value)
         || Object.keys(value).some(key => !keys.includes(key)) || value.version !== 1
         || !Number.isSafeInteger(value.sequence) || value.sequence < 0 || !phases.has(value.phase)
@@ -29,8 +29,32 @@
         || (value.settingsAvailable !== undefined && typeof value.settingsAvailable !== "boolean")) {
       throw new Error("invalidNativeReply");
     }
+    const roster = safeRoster(value.roster, value.phase);
     return Object.freeze({ version: 1, sequence: value.sequence, phase: value.phase, errorCode: value.errorCode ?? null,
-      chatAvailable: false, callsAvailable: false, socialLoginAvailable: false, settingsAvailable: value.settingsAvailable === true });
+      chatAvailable: false, callsAvailable: false, socialLoginAvailable: false, settingsAvailable: value.settingsAvailable === true, roster });
+  }
+
+  function safeRoster(value, phase) {
+    if (value === undefined) return Object.freeze({ status: "hidden", contacts: Object.freeze([]) });
+    if (!value || typeof value !== "object" || Array.isArray(value)
+        || Object.keys(value).sort().join(",") !== "contacts,status"
+        || !["hidden", "loading", "ready", "unavailable"].includes(value.status)
+        || !Array.isArray(value.contacts) || value.contacts.length > 100
+        || (value.status !== "ready" && value.contacts.length !== 0)
+        || (phase !== "connected" && value.status !== "hidden")) throw new Error("invalidNativeReply");
+    const identifiers = new Set();
+    const contacts = value.contacts.map(contact => {
+      if (!contact || typeof contact !== "object" || Array.isArray(contact)
+          || Object.keys(contact).sort().join(",") !== "jid,name,presence"
+          || typeof contact.jid !== "string" || !contact.jid || new TextEncoder().encode(contact.jid).length > 1023
+          || /[\s\u0000-\u001f\u007f-\u009f/]/u.test(contact.jid) || identifiers.has(contact.jid)
+          || typeof contact.name !== "string" || !contact.name || new TextEncoder().encode(contact.name).length > 4096
+          || /[\u0000-\u001f\u007f-\u009f]/u.test(contact.name)
+          || !["unknown", "offline", "online", "away", "extendedAway", "busy"].includes(contact.presence)) throw new Error("invalidNativeReply");
+      identifiers.add(contact.jid);
+      return Object.freeze({ jid: contact.jid, name: contact.name, presence: contact.presence });
+    });
+    return Object.freeze({ status: value.status, contacts: Object.freeze(contacts) });
   }
 
   function createClient(options) {
@@ -164,6 +188,6 @@
     return client;
   }
 
-  if (typeof module === "object" && module.exports) module.exports = { createClient, safeState, install, secureID };
+  if (typeof module === "object" && module.exports) module.exports = { createClient, safeState, install, secureID, safeRoster };
   else install(root);
 })(typeof window === "undefined" ? globalThis : window);

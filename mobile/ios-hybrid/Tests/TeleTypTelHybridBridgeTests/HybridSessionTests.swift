@@ -25,6 +25,7 @@ private actor SessionFixture: ServerChecking, NativeAccountChallenging, NativeXM
     private var authentication: CheckedContinuation<NativeAuthenticatedAccount, Error>?
     private var heldAccount: NativeAuthenticatedAccount?
     private(set) var connections = 0
+    private var rosterObservers: [@Sendable (NativeRosterState) -> Void] = []
 
     init(probeFailure: ConnectionFailure? = nil, accountFailure: NativeAccountFailure? = nil, holdAuthentication: Bool = false,
          secondFactor: Bool = false) {
@@ -66,8 +67,20 @@ private actor SessionFixture: ServerChecking, NativeAccountChallenging, NativeXM
 
     func run(account: NativeAuthenticatedAccount, onConnected: @escaping @Sendable (String) -> Void) async throws {
         connections += 1
-        onConnected("fixture@localhost/native-private-resource")
+        onConnected(account.jid + "/native-private-resource")
         try await Task.sleep(nanoseconds: 60_000_000_000)
+    }
+
+    func run(account: NativeAuthenticatedAccount, onConnected: @escaping @Sendable (String) -> Void,
+             onRoster: @escaping @Sendable (NativeRosterState) -> Void) async throws {
+        rosterObservers.append(onRoster)
+        onRoster(.ready([]))
+        try await run(account: account, onConnected: onConnected)
+    }
+
+    func emitRoster(_ value: NativeRosterState, run: Int? = nil) {
+        let index = run ?? (rosterObservers.count - 1)
+        if rosterObservers.indices.contains(index) { rosterObservers[index](value) }
     }
 }
 
@@ -252,6 +265,73 @@ final class HybridSessionTests: XCTestCase {
         XCTAssertThrowsError(try command(enabled, "app.openSettings", ["address": "https://other.invalid"]))
     }
 
+    func testRosterAndPresenceUpdatesAreMinimalAndClearedDuringBackgroundAndLogout() async throws {
+        let fixture = SessionFixture()
+        let (model, session) = try makeSession(fixture)
+        var events: [HybridSnapshot] = []
+        session.onStateChange = { events.append($0) }
+        _ = try command(session, "session.login", ["jid": "fixture@localhost", "password": "fixture-password"])
+        await eventually { model.isConnected }
+        var peer = NativeContact(jid: "peer@localhost", name: "Fictieve Gebruiker", groups: ["private-group"], subscription: "both",
+                                 presence: .online, callEndpoint: "peer@localhost/private-call-endpoint")
+        let own = NativeContact(jid: "fixture@localhost", name: "Own account", groups: [], subscription: "both")
+        await fixture.emitRoster(.ready([own, peer]))
+        await eventually { events.last?.roster.contacts.count == 1 }
+        XCTAssertEqual(session.snapshot().roster.contacts.first?.presence, "online")
+        let previousSequence = events.last!.sequence
+        peer.presence = .away
+        await fixture.emitRoster(.ready([own, peer]))
+        await eventually { events.last?.roster.contacts.first?.presence == "away" }
+        XCTAssertGreaterThan(events.last!.sequence, previousSequence)
+        let serialized = String(decoding: try JSONEncoder().encode(session.snapshot()), as: UTF8.self)
+        for hidden in ["fixture@localhost", "private-group", "private-call-endpoint", "subscription", "callEndpoint"] {
+            XCTAssertFalse(serialized.contains(hidden))
+        }
+        XCTAssertNil(model.visibleConversation)
+        model.beginBackground()
+        await eventually { events.last?.roster.status == "hidden" }
+        XCTAssertTrue(session.snapshot().roster.contacts.isEmpty)
+        _ = try command(session, "session.logout")
+        await fixture.emitRoster(.ready([peer]))
+        for _ in 0..<10 { await Task.yield() }
+        XCTAssertEqual(session.snapshot().phase, "signedOut")
+        XCTAssertTrue(session.snapshot().roster.contacts.isEmpty)
+    }
+
+    func testLateRosterFromThePreviousAccountCannotEnterANewSession() async throws {
+        let fixture = SessionFixture()
+        let (model, session) = try makeSession(fixture)
+        _ = try command(session, "session.login", ["jid": "fixture@localhost", "password": "fixture-password"])
+        await eventually { model.isConnected }
+        _ = try command(session, "session.logout")
+        _ = try command(session, "session.login", ["jid": "second@localhost", "password": "second-fixture-password"])
+        await eventually { model.isConnected }
+        let peer = NativeContact(jid: "old-peer@localhost", name: "Previous account contact", groups: [], subscription: "both")
+        await fixture.emitRoster(.ready([peer]), run: 0)
+        for _ in 0..<10 { await Task.yield() }
+        XCTAssertTrue(session.snapshot().roster.contacts.isEmpty)
+        model.disconnect()
+    }
+
+    func testInvalidOrOversizedRosterIsNotForwardedToWebKit() async throws {
+        let fixture = SessionFixture()
+        let (model, session) = try makeSession(fixture)
+        _ = try command(session, "session.login", ["jid": "fixture@localhost", "password": "fixture-password"])
+        await eventually { model.isConnected }
+        let invalid = NativeContact(jid: "peer@localhost/resource", name: "Fixture", groups: [], subscription: "both")
+        await fixture.emitRoster(.ready([invalid]))
+        await eventually { session.snapshot().roster.status == "unavailable" }
+        let contacts = (0..<101).map { NativeContact(jid: "peer\($0)@localhost", name: "Fixture", groups: [], subscription: "both") }
+        await fixture.emitRoster(.ready(contacts))
+        for _ in 0..<10 { await Task.yield() }
+        XCTAssertTrue(session.snapshot().roster.contacts.isEmpty)
+        let peer = NativeContact(jid: "peer@localhost", name: "Fixture", groups: [], subscription: "both")
+        await fixture.emitRoster(.ready([peer, peer]))
+        for _ in 0..<10 { await Task.yield() }
+        XCTAssertEqual(session.snapshot().roster.status, "unavailable")
+        model.disconnect()
+    }
+
     func testBundledWebKitLoginActuallyReachesNativeAndSurvivesPresentationDetach() async throws {
         guard let path = ProcessInfo.processInfo.environment["TELETYPTEL_HYBRID_CONTENT"] else {
             throw XCTSkip("Generate pinned content on the disposable macOS runner to exercise WebKit.")
@@ -280,6 +360,15 @@ final class HybridSessionTests: XCTestCase {
         XCTAssertEqual(activeTag, "BODY")
         _ = try await webView.evaluateJavaScript("document.getElementById('dialogJidInput').value='fixture@localhost'; document.getElementById('dialogPasswordInput').value='fixture-password'; document.getElementById('dialogPasswordInput').dispatchEvent(new Event('input')); document.getElementById('dialogConnectButton').click();")
         await eventually { model.isConnected }
+        let peer = NativeContact(jid: "web-peer@localhost", name: "WebKit Fixture", groups: ["hidden-group"], subscription: "both", presence: .online)
+        await fixture.emitRoster(.ready([peer]))
+        await eventually {
+            (try? await webView.evaluateJavaScript("document.querySelectorAll('#conversationItems .conversation-item').length")) as? Int == 1
+        }
+        _ = try await webView.evaluateJavaScript("document.querySelector('#conversationItems .conversation-item').click()")
+        let contactTitle = try await webView.evaluateJavaScript("document.getElementById('hybridContactTitle').textContent") as? String
+        XCTAssertEqual(contactTitle, "WebKit Fixture")
+        XCTAssertNil(model.visibleConversation)
         await eventually {
             (try? await webView.evaluateJavaScript("document.getElementById('hybridConnected')?.hidden === false")) as? Bool == true
         }
