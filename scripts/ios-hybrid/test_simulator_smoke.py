@@ -1,56 +1,45 @@
+import json
 import runpy
 import subprocess
 import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
-from uuid import uuid4
 
 
-smoke = runpy.run_path(str(Path(__file__).with_name("simulator-smoke.py")))["smoke"]
+module = runpy.run_path(str(Path(__file__).with_name("simulator-smoke.py")))
+runtime = "com.apple.CoreSimulator.SimRuntime.iOS-27-2"
+identifier = "17def893-ca31-47cd-bf37-dcb2651ac010"
+
+
+def device(name, state="Shutdown", available=True):
+    return dict(name=name, state=state, isAvailable=available, udid=identifier)
 
 
 class SimulatorSmokeTests(unittest.TestCase):
-    def exercise(self, statuses, app_error=None, cleanup_timeout=False):
-        created, deleted = [], []
-        statuses = iter(statuses)
+    def test_selects_ready_device_of_requested_family(self):
+        devices = {runtime: [device("iPad", "Booted"), device("iPhone B"), device("iPhone A", "Booted")]}
+        self.assertEqual(module["select_device"](devices, "iPhone")["name"], "iPhone A")
+        self.assertEqual(module["select_device"](devices, "iPad")["name"], "iPad")
 
-        def control(command, *arguments, **kwargs):
-            if command == "create":
-                created.append(str(uuid4()))
-                return Mock(stdout=created[-1])
-            if command == "bootstatus":
-                return Mock(stdout=next(statuses), returncode=0)
-            if command == "delete":
-                deleted.append(arguments[0])
-            if cleanup_timeout and command in ("shutdown", "delete"):
-                raise subprocess.TimeoutExpired(command, 30)
-
-        with patch.dict(smoke.__globals__, simctl=control), patch.dict("os.environ", RUNNER_TEMP="/tmp"), \
-                patch("subprocess.run", side_effect=app_error) as build:
-            try:
-                smoke("iPhone", "runtime", "type", "arm64")
-            finally:
-                self.assertEqual(created, deleted)
-                self.assertEqual(len(created), len(set(created)))
-                self.attempts, self.test_calls = len(created), build.call_count
-
-    def test_terminal_migration_failure_even_with_zero_exit(self):
-        self.exercise(["Status=3, isTerminal=YES\n\tData Migration Failed\n", "Finished"])
-        self.assertEqual((self.attempts, self.test_calls), (2, 1))
-
-    def test_no_app_test_after_two_failed_boots(self):
+    def test_wrong_runtime_unavailable_and_transitional_devices_are_excluded(self):
+        devices = {runtime: [device("iPhone", available=False), device("iPhone", "Creating")],
+                   "iOS-26": [device("iPhone", "Booted")]}
         with self.assertRaises(RuntimeError):
-            self.exercise(["Data Migration Failed"] * 2)
-        self.assertEqual((self.attempts, self.test_calls), (2, 0))
+            module["select_device"](devices, "iPhone")
 
-    def test_cleanup_timeouts_do_not_block_next_boot(self):
-        self.exercise(["Data Migration Failed", "Finished"], cleanup_timeout=True)
-        self.assertEqual((self.attempts, self.test_calls), (2, 1))
-
-    def test_failed_app_assertion_is_not_retried(self):
-        with self.assertRaises(subprocess.CalledProcessError):
-            self.exercise(["Finished"], subprocess.CalledProcessError(65, "xcodebuild"), cleanup_timeout=True)
-        self.assertEqual((self.attempts, self.test_calls), (1, 1))
+    def test_runs_real_ui_suite_on_inventory_udid_and_propagates_failure(self):
+        inventory = Mock(stdout=json.dumps({"devices": {runtime: [device("iPhone")]}}))
+        with patch("platform.machine", return_value="arm64"), patch.dict("os.environ", RUNNER_TEMP="/tmp"), \
+                patch("subprocess.run", side_effect=[inventory, subprocess.CalledProcessError(65, "test")]) as run:
+            with self.assertRaises(subprocess.CalledProcessError):
+                module["smoke"]("iPhone")
+        self.assertEqual(run.call_count, 2)
+        first, second = run.call_args_list
+        self.assertEqual(first.args[0], ["xcrun", "simctl", "list", "devices", "available", "-j"])
+        self.assertEqual(second.args[0][:2], ["xcodebuild", "test"])
+        self.assertIn("platform=iOS Simulator,arch=arm64,id=" + identifier, second.args[0])
+        self.assertIn("-only-testing:NativeStartupUITests/HybridStartupUITests", second.args[0])
+        self.assertTrue(second.kwargs["check"])
 
 
 if __name__ == "__main__":
