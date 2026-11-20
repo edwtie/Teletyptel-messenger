@@ -85,6 +85,7 @@
           row.dataset.contactJid = value.jid;
           row.dataset.conversationKind = value.kind;
           row.addEventListener("click", () => {
+            if (value.kind === "direct" && latestState?.account.blocked.includes(value.jid)) { document.defaultView.TeleTypTelHybridManageContact?.(value.jid); return; }
             selected = value.jid;
             selectedKind = value.kind;
             render();
@@ -92,10 +93,12 @@
             Promise.resolve(document.defaultView.TeleTypTelHybridChat?.flush()).then(() => client.openChat(value.jid, epoch, value.kind))
               .catch(() => { selected = null; render(); status.textContent = "Chat is niet beschikbaar. Probeer opnieuw."; });
           });
+          row.oncontextmenu = event => { if (value.kind === "direct") { event.preventDefault(); document.defaultView.TeleTypTelHybridManageContact?.(value.jid); } };
         }
         rows.delete(key);
         row.className = "conversation-item" + (value.jid === selected ? " selected" : "");
-        row.setAttribute("aria-label", value.name + " · " + presenceLabels[value.presence]);
+        const blocked = value.kind === "direct" && latestState?.account.blocked.includes(value.jid);
+        row.setAttribute("aria-label", value.name + " · " + (blocked ? "Geblokkeerd" : presenceLabels[value.presence]));
         if (value.jid === selected) row.setAttribute("aria-current", "true"); else row.removeAttribute("aria-current");
         const picture = document.createElement("span");
         picture.className = "avatar avatar-list";
@@ -107,7 +110,7 @@
         const name = document.createElement("strong");
         name.textContent = value.name;
         const label = document.createElement("span");
-        label.textContent = value.kind === "group" ? "Groep" : presenceLabels[value.presence];
+        label.textContent = value.kind === "group" ? "Groep" : blocked ? "Geblokkeerd" : presenceLabels[value.presence];
         text.append(name, label);
         const meta = document.createElement("span");
         meta.className = "conversation-row-meta";
@@ -146,7 +149,7 @@
       groups = state.groups;
       if (state.conversation) { selected = state.conversation.peer; selectedKind = state.conversation.kind; }
       roster = next;
-      const signature = JSON.stringify([next, groups, state.groupsAvailable, state.conversation?.peer || null, state.conversation?.kind, state.account.avatars]);
+      const signature = JSON.stringify([next, groups, state.groupsAvailable, state.conversation?.peer || null, state.conversation?.kind, state.account.avatars, state.account.blocked]);
       if (signature === rosterSignature) return;
       rosterSignature = signature;
       render();

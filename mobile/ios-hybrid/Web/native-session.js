@@ -50,16 +50,17 @@
 
   function safeAccount(value, roster, phase) {
     const empty = { providers: [], entryAvailable: false, registrationAvailable: false, rememberAvailable: false, savedLogin: false,
-      busy: false, contactsAvailable: false, owner: null, requests: [], profile: null, avatars: {}, notice: null };
+      busy: false, contactsAvailable: false, nativePanels: false, presentation: false, blocked: [], doNotDisturb: false, owner: null, requests: [], profile: null, avatars: {}, notice: null };
     if (value === undefined) value = empty;
     const validJid = jid => typeof jid === "string" && jid.length > 0 && new TextEncoder().encode(jid).length <= 1023 && !/[\s/\u0000-\u001f\u007f-\u009f]/u.test(jid);
     if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).some(key => !Object.hasOwn(empty, key))) throw new Error("invalidNativeReply");
     const result = { ...empty, ...value };
-    if (["entryAvailable", "registrationAvailable", "rememberAvailable", "savedLogin", "busy", "contactsAvailable"].some(key => typeof result[key] !== "boolean")
+    if (["entryAvailable", "registrationAvailable", "rememberAvailable", "savedLogin", "busy", "contactsAvailable", "nativePanels", "presentation", "doNotDisturb"].some(key => typeof result[key] !== "boolean")
         || !Array.isArray(result.providers) || result.providers.length > 2 || new Set(result.providers).size !== result.providers.length || result.providers.some(name => !["google", "facebook"].includes(name))
         || (result.owner !== null && !validJid(result.owner)) || !Array.isArray(result.requests) || result.requests.length > 32 || result.requests.some(jid => !validJid(jid))
         || (result.notice !== null && !safeText(result.notice)) || !result.avatars || typeof result.avatars !== "object" || Array.isArray(result.avatars)
-        || Object.keys(result.avatars).length > 101 || (phase !== "connected" && (result.owner || result.profile || result.contactsAvailable || result.requests.length || Object.keys(result.avatars).length))) throw new Error("invalidNativeReply");
+        || !Array.isArray(result.blocked) || result.blocked.length > 100 || result.blocked.some(jid => !roster.contacts.some(contact => contact.jid === jid))
+        || Object.keys(result.avatars).length > 101 || (phase !== "connected" && (result.owner || result.profile || result.contactsAvailable || result.requests.length || result.blocked.length || result.doNotDisturb || Object.keys(result.avatars).length))) throw new Error("invalidNativeReply");
     if (result.profile !== null) {
       const profile = result.profile;
       if (!profile || typeof profile !== "object" || Object.keys(profile).sort().join(",") !== "color,jid,language,name,phone" || profile.jid !== result.owner
@@ -72,7 +73,7 @@
       if (!(jid === result.owner || roster.contacts.some(contact => contact.jid === jid)) || typeof image !== "string" || image.length > 32768
           || !/^data:image\/jpeg;base64,\/9j\/[A-Za-z0-9+/]*={0,2}$/.test(image) || (bytes += image.length) > 786432) throw new Error("invalidNativeReply");
     }
-    return Object.freeze({ ...result, providers: Object.freeze([...result.providers]), requests: Object.freeze([...result.requests]), avatars: Object.freeze({ ...result.avatars }) });
+    return Object.freeze({ ...result, providers: Object.freeze([...result.providers]), requests: Object.freeze([...result.requests]), blocked: Object.freeze([...result.blocked]), avatars: Object.freeze({ ...result.avatars }) });
   }
 
   function safeRoster(value, phase) {

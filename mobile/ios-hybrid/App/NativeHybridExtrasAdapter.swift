@@ -9,6 +9,7 @@ final class NativeHybridExtrasAdapter: HybridExtrasPort {
     var dismissPresentation: (() -> Void)?
     private weak var login: NativeLoginModel?
     private let translation = NativeTranslationModel()
+    var nativeTranslation: NativeTranslationModel { translation }
     private let subject = CurrentValueSubject<HybridExtrasState, Never>(HybridExtrasState())
     private var observation: AnyCancellable?
     private var context: HybridExtrasContext?

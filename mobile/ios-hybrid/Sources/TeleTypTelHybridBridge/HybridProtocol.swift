@@ -67,6 +67,15 @@ struct HybridRequest: Decodable, CustomStringConvertible, CustomDebugStringConve
                   Self.text(name, maximumBytes: 120), let phone = arguments["phone"], Self.text(phone, maximumBytes: 64),
                   ["nl", "en", "de", "fr", "es", "it", "pt", "pl", "tr", "ar", "uk", "zh-CN"].contains(arguments["language"] ?? ""),
                   arguments["color"]?.range(of: #"\A#[a-fA-F0-9]{6}\z"#, options: .regularExpression) != nil else { throw HybridFailure.invalidRequest }
+        case "account.panel":
+            guard Set(arguments.keys) == Set(["panel"]), ["settings", "security", "dialer"].contains(arguments["panel"] ?? "") else { throw HybridFailure.invalidRequest }
+        case "contacts.rename", "contacts.block", "contacts.remove", "contacts.dnd":
+            let required = command == "contacts.rename" ? Set(["jid", "name"]) : command == "contacts.block" ? Set(["jid", "blocked"]) : command == "contacts.remove" ? Set(["jid"]) : Set(["enabled"])
+            guard Set(arguments.keys) == required else { throw HybridFailure.invalidRequest }
+            if command != "contacts.dnd", !Self.peer(arguments["jid"]) { throw HybridFailure.invalidRequest }
+            if command == "contacts.rename" { guard let name = arguments["name"], Self.text(name, maximumBytes: 120) else { throw HybridFailure.invalidRequest } }
+            if command == "contacts.block", !["true", "false"].contains(arguments["blocked"] ?? "") { throw HybridFailure.invalidRequest }
+            if command == "contacts.dnd", !["true", "false"].contains(arguments["enabled"] ?? "") { throw HybridFailure.invalidRequest }
         case "contacts.add":
             guard Set(arguments.keys) == Set(["jid", "name", "presence"]), Self.peer(arguments["jid"]), let name = arguments["name"], Self.text(name, maximumBytes: 120),
                   ["true", "false"].contains(arguments["presence"] ?? "") else { throw HybridFailure.invalidRequest }

@@ -109,6 +109,8 @@
       }
       byID("dialogForgotPasswordButton").disabled = busy || !account?.entryAvailable;
       byID("dialogCreateAccountButton").disabled = busy || !account?.registrationAvailable;
+      byID("dialogForgotPasswordButton").title = account?.entryAvailable ? "Wachtwoord herstellen" : unavailable;
+      byID("dialogCreateAccountButton").title = account?.registrationAvailable ? "Nieuwe gebruiker" : "Deze server ondersteunt hier geen nieuwe XMPP-accounts";
       nodes.dialogRememberPasswordToggle.disabled = busy || !account?.rememberAvailable;
       nodes.dialogRememberPasswordToggle.title = "Alleen op dit apparaat, na toestemming voor Face ID of Touch ID";
       byID("hybridBiometric").hidden = !account?.savedLogin; byID("hybridBiometric").disabled = busy;

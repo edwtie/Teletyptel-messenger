@@ -15,9 +15,16 @@ struct TeleTypTelHybridApp: App {
                     HybridLoginView(session: owner.session, content: content, videoView: owner.callPort.videoView)
                 } else { Text("De lokale TeleTypTel-interface kon niet worden geladen.") }
             }
-            .sheet(item: $owner.fileSheet) { sheet in
+            .sheet(item: $owner.fileSheet, onDismiss: { owner.account.setPresentation(owner.fileSheet != nil) }) { sheet in
                 if let url = sheet.privacy {
                     HybridPrivacyView(url: url)
+                } else if let panel = sheet.panel {
+                    if panel == "dialer" { NativeDialerView(login: owner.login, calls: owner.calls) }
+                    else if panel == "security" { NativeAccountSecurityView(login: owner.login, credentialsChanged: owner.signOutFromNative) }
+                    else {
+                        NativeAccountSettingsView(login: owner.login, translation: owner.features.nativeTranslation, avatars: owner.account.avatars,
+                            credentialsChanged: owner.signOutFromNative).environmentObject(owner.calls.pushRegistration)
+                    }
                 } else if sheet.avatar {
                     NativeAvatarEditorView(login: owner.login) { owner.account.avatars.refreshOwner() }
                 } else if let body = sheet.body {
@@ -47,9 +54,10 @@ final class NativeHybridOwner: ObservableObject {
     let content: HybridContent?
     let features: NativeHybridExtrasAdapter
     let account: NativeHybridAccountAdapter
-    @Published var fileSheet: HybridFileSheet?
+    @Published var fileSheet: HybridFileSheet? { didSet { if fileSheet != nil { account.setPresentation(true) } } }
     private let background = NativeBackgroundController()
     private var observation: AnyCancellable?
+    private var groupObservation: AnyCancellable?
     private var attemptedRestore = false
 
     init() {
@@ -74,6 +82,7 @@ final class NativeHybridOwner: ObservableObject {
         content = Bundle.main.url(forResource: "hybrid-content", withExtension: "json")
             .flatMap { try? Data(contentsOf: $0) }.flatMap { try? HybridContent(data: $0) }
         calls.attach(login)
+        NativeMessageNotifications.shared.connect(login)
         features.presentPicker = { [weak self] context in self?.fileSheet = HybridFileSheet(context: context, body: nil) }
         features.presentFile = { [weak self] body, context in self?.fileSheet = HybridFileSheet(context: context, body: body) }
         features.dismissPresentation = { [weak self] in self?.fileSheet = nil }
@@ -88,13 +97,21 @@ final class NativeHybridOwner: ObservableObject {
             let snapshot = self.session.snapshot()
             self.fileSheet = HybridFileSheet(context: HybridExtrasContext(epoch: snapshot.epoch, conversation: nil, call: snapshot.call), body: nil, privacy: url)
         }
+        account.presentPanel = { [weak self] panel in
+            guard let self = self else { return }
+            let snapshot = self.session.snapshot()
+            self.fileSheet = HybridFileSheet(context: HybridExtrasContext(epoch: snapshot.epoch, conversation: snapshot.conversation, call: snapshot.call), body: nil, panel: panel)
+        }
         observation = login.objectWillChange.sink { [weak self] _ in
             Task { @MainActor [weak self] in
                 guard let self = self else { return }
                 self.calls.synchronize(self.login.phase)
                 self.callPort.refresh()
+                NativeMessageNotifications.shared.updateBadge()
+                if !self.login.isConnected && !self.login.isWorking { NativeMessageNotifications.shared.clear() }
             }
         }
+        groupObservation = login.groups.objectWillChange.sink { _ in Task { @MainActor in NativeMessageNotifications.shared.updateBadge() } }
     }
 
     func sceneChanged(_ phase: ScenePhase) {
@@ -117,6 +134,11 @@ final class NativeHybridOwner: ObservableObject {
         guard !attemptedRestore else { return }
         attemptedRestore = true; account.restoreIfAllowed()
     }
+
+    func signOutFromNative() {
+        guard let data = try? JSONSerialization.data(withJSONObject: ["version": 1, "id": UUID().uuidString, "command": "session.logout", "arguments": [String: String](), "epoch": session.snapshot().epoch]) else { return }
+        _ = try? session.handle(data, document: URL(string: "capacitor://localhost/chat.html"), mainFrame: true)
+    }
 }
 
 struct HybridFileSheet: Identifiable {
@@ -125,6 +147,7 @@ struct HybridFileSheet: Identifiable {
     let body: String?
     var avatar = false
     var privacy: URL?
+    var panel: String?
 }
 
 struct HybridPrivacyView: UIViewControllerRepresentable {

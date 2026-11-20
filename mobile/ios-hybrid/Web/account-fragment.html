@@ -10,6 +10,14 @@
     </div><p id="hybridEntryNotice" role="status" aria-live="polite"></p>
   </div><footer class="modal-actions"><button id="hybridEntrySubmit" type="submit">Account aanmaken</button><button type="button" data-close-account="hybridEntry">Sluiten</button></footer>
 </form></div>
+<div id="hybridContactManager" class="modal-shell hybrid-account-dialog" hidden role="dialog" aria-modal="true" aria-labelledby="hybridContactManagerTitle"><form id="hybridContactManagerForm" class="modal-card">
+  <header class="modal-header"><h2 id="hybridContactManagerTitle">Contactbeheer</h2></header><div class="modal-body">
+    <label>Contact<select id="hybridManagedContact"></select></label><label>Naam<input id="hybridManagedName" type="text" maxlength="120"></label>
+    <button id="hybridManagedRename" type="submit">Naam opslaan</button><button id="hybridManagedBlock" type="button">Blokkeren</button>
+    <label><input id="hybridManagedConfirm" type="checkbox">Dit contact uit mijn contactenlijst verwijderen; berichten bij de ander blijven behouden</label>
+    <button id="hybridManagedRemove" type="button">Contact verwijderen</button><p id="hybridContactManagerNotice" role="status" aria-live="polite"></p>
+  </div><footer class="modal-actions"><button type="button" data-close-account="hybridContactManager">Sluiten</button></footer>
+</form></div>
 <div id="hybridProfile" class="modal-shell hybrid-account-dialog" hidden role="dialog" aria-modal="true" aria-labelledby="hybridProfileTitle"><form id="hybridProfileForm" class="modal-card">
   <header class="modal-header"><h2 id="hybridProfileTitle">Accountinstellingen</h2></header><div class="modal-body">
     <p id="hybridProfileJid"></p><button id="hybridEditAvatar" type="button">Profielfoto wijzigen</button>

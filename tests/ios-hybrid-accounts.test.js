@@ -61,3 +61,14 @@ test("provider login keychain and avatars reuse native code without a browser au
   assert.match(source, /encoded\.count <= 24000/); assert.match(source, /profile\.accountId == login\.activeAccountID/);
   assert.doesNotMatch(source, /URLSession\(|UserDefaults.*password|startSipCall/);
 });
+
+test("contact blocking and native dialogs cannot introduce unknown peers or remote panels", () => {
+  assert.throws(() => safeAccount({ blocked: ["unknown@localhost"] }, roster, "connected"), /invalidNativeReply/);
+  const value = safeAccount({ blocked: ["peer@localhost"], nativePanels: true, presentation: true }, roster, "connected");
+  assert.ok(Object.isFrozen(value.blocked));
+  const source = fs.readFileSync("mobile/ios-hybrid/Web/account-presentation.js", "utf8");
+  assert.match(source, /hybridManagedConfirm/);
+  const swift = fs.readFileSync("mobile/ios-hybrid/App/NativeHybridAccountAdapter.swift", "utf8");
+  assert.match(swift, /contacts\.contains\(where:/);
+  assert.match(swift, /login\.removeContact\(jid\)/);
+});

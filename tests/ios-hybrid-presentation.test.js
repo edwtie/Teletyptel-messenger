@@ -97,6 +97,8 @@ async function setup(engine, viewport = { width: 390, height: 844 }) {
             if (["auth.register", "auth.recover", "contacts.add"].includes(command.command)) window.nativeState.account = { ...window.nativeState.account, notice: "Aanvraag ontvangen; controleer de bevestiging." };
             if (command.command === "account.save") window.nativeState.account = { ...window.nativeState.account,
               profile: { ...window.nativeState.account.profile, name: args.name, phone: args.phone, language: args.language, color: args.color }, notice: "Accountinstellingen opgeslagen." };
+            if (command.command === "contacts.block") window.nativeState.account = { ...window.nativeState.account, blocked: args.blocked === "true" ? [args.jid] : [], notice: "Wijziging bevestigd." };
+            if (command.command === "contacts.dnd") window.nativeState.account = { ...window.nativeState.account, doNotDisturb: args.enabled === "true" };
             if (/^(chat|calls|groups|files|translation)\./.test(command.command)) {
               if (command.epoch !== epoch) return Promise.reject(new Error("invalidState"));
               window.nativeState = { ...window.nativeState, sequence: ++sequence };
@@ -216,7 +218,7 @@ for (const engine of [chromium, webkit]) {
         const canvas = document.createElement("canvas"); canvas.width = 48; canvas.height = 48;
         const context = canvas.getContext("2d"); context.fillStyle = "#2563eb"; context.fillRect(0, 0, 48, 48);
         const image = canvas.toDataURL("image/jpeg");
-        window.emitAccount({ entryAvailable: true, contactsAvailable: true, owner: "fixture@localhost", requests: ["new@localhost"],
+        window.emitAccount({ entryAvailable: true, contactsAvailable: true, nativePanels: true, owner: "fixture@localhost", requests: ["new@localhost"],
           profile: { jid: "fixture@localhost", name: "Fixture", phone: "", language: "nl", color: "#2563eb" },
           avatars: { "fixture@localhost": image, "peer@localhost": image } });
       });
@@ -229,6 +231,23 @@ for (const engine of [chromium, webkit]) {
       await page.waitForFunction(() => window.nativeCommands.some(value => value.command === "account.save" && value.arguments.name === "Nieuwe naam"));
       assert.equal(await page.evaluate(() => Object.hasOwn(window.nativeCommands.find(value => value.command === "account.save").arguments, "accountId")), false);
       await page.locator('[data-close-account="hybridProfile"]').click();
+      await page.locator("#hybridMainMenu summary").click();
+      await page.locator('[data-native-panel="security"]').click();
+      await page.waitForFunction(() => window.nativeCommands.some(value => value.command === "account.panel" && value.arguments.panel === "security"));
+      await page.locator("#hybridMainMenu summary").click();
+      await page.locator("#hybridOpenContacts").click();
+      await page.locator("#hybridManagedName").fill("Peer gewijzigd");
+      await page.locator("#hybridManagedRename").click();
+      await page.waitForFunction(() => window.nativeCommands.some(value => value.command === "contacts.rename"));
+      await page.locator("#hybridManagedBlock").click();
+      await page.waitForFunction(() => document.getElementById("hybridManagedBlock").textContent === "Deblokkeren");
+      await page.locator("#hybridManagedBlock").click();
+      assert.equal(await page.locator("#hybridManagedRemove").isDisabled(), true);
+      await page.locator("#hybridManagedConfirm").check();
+      await page.locator("#hybridManagedRemove").click();
+      await page.waitForFunction(() => window.nativeCommands.some(value => value.command === "contacts.remove"));
+      assert.equal(await page.locator("#hybridManagedConfirm").isChecked(), false);
+      await page.locator('[data-close-account="hybridContactManager"]').click();
       await page.locator("#conversationActionsToggle").click();
       await page.locator("#addConversationButton").click();
       await page.locator("#hybridNewContactJid").fill("other@localhost");
@@ -239,6 +258,13 @@ for (const engine of [chromium, webkit]) {
       await page.locator("#conversationItems .conversation-item").click();
       await page.evaluate(() => window.emitMessages([window.fixtureMessage("Hallo", false), window.fixtureMessage("Hoi", true)]));
       assert.equal(await page.locator("#hybridMessages .avatar img").count(), 2);
+      await page.locator("#hybridMainMenu summary").click();
+      await page.locator("#hybridOpenProfile").click();
+      const covered = await page.evaluate(() => { const message = window.fixtureMessage("Achter het instellingenvenster", false); window.emitMessages([...window.nativeState.conversation.messages, message]); return message.id; });
+      await page.waitForTimeout(150);
+      assert.equal(await page.evaluate(id => window.nativeCommands.some(value => value.command === "chat.displayed" && value.arguments.ids.split(",").includes(id)), covered), false);
+      await page.locator('[data-close-account="hybridProfile"]').click();
+      await page.waitForFunction(id => window.nativeCommands.some(value => value.command === "chat.displayed" && value.arguments.ids.split(",").includes(id)), covered);
       await page.locator("#hybridLogout").click();
       assert.equal(await page.locator("#hybridProfileName").inputValue(), "");
       assert.equal(await page.locator("#hybridConnected .avatar img").count(), 0);

@@ -25,9 +25,11 @@ final class NativeHybridAccountAdapter: HybridAccountPort {
     private var imageSources: [String: String] = [:]
     private var images: [String: String] = [:]
     private var noticeChannel = "profile"
+    private var presentation = false
     private let subject = CurrentValueSubject<HybridAccountState, Never>(HybridAccountState())
     var presentAvatar: (() -> Void)?
     var presentPrivacy: ((URL) -> Void)?
+    var presentPanel: ((String) -> Void)?
     var dismissPresentation: (() -> Void)?
 
     init(login: NativeLoginModel, configuration: ServerConfiguration) {
@@ -41,6 +43,7 @@ final class NativeHybridAccountAdapter: HybridAccountPort {
 
     var changes: AnyPublisher<HybridAccountState, Never> { subject.eraseToAnyPublisher() }
     var state: HybridAccountState { subject.value }
+    func setPresentation(_ value: Bool) { presentation = value; refresh() }
 
     func restoreIfAllowed() {
         guard saved.canRestoreAutomatically, login?.phase == .idle, login?.isBackground == false else { return }
@@ -150,6 +153,20 @@ final class NativeHybridAccountAdapter: HybridAccountPort {
         case "account.avatar":
             guard active, login.activeWebSession != nil, let presentAvatar = presentAvatar else { throw HybridFailure.unavailable }
             presentAvatar()
+        case "account.panel":
+            guard active, let presentPanel = presentPanel, ["settings", "security", "dialer"].contains(arguments["panel"]!) else { throw HybridFailure.unavailable }
+            presentPanel(arguments["panel"]!)
+        case "contacts.rename", "contacts.remove", "contacts.block", "contacts.dnd":
+            guard active, !login.contactActionBusy, login.canSend, login.contactManager != nil else { throw HybridFailure.invalidState }
+            if name == "contacts.dnd" { login.setDoNotDisturb(arguments["enabled"] == "true"); break }
+            let jid = arguments["jid"]!
+            guard case .ready(let contacts) = login.roster, contacts.contains(where: { $0.jid == jid }), jid != login.currentOwner else { throw HybridFailure.invalidState }
+            if name == "contacts.rename" {
+                guard NativeContactEditing.valid(jid: jid, name: arguments["name"]!, owner: login.currentOwner ?? "") else { throw HybridFailure.invalidRequest }
+                login.renameContact(jid, name: arguments["name"]!)
+            } else if name == "contacts.block" { login.setBlocked(jid, blocked: arguments["blocked"] == "true") }
+            else { login.removeContact(jid) }
+            guard login.contactActionBusy else { throw HybridFailure.invalidState }
         case "contacts.add":
             guard active, !editor.busy, NativeContactEditing.canAdd(arguments["jid"]!, roster: login.roster),
                   NativeContactEditing.valid(jid: arguments["jid"]!, name: arguments["name"]!, owner: login.currentOwner ?? "") else { throw HybridFailure.invalidState }
@@ -174,12 +191,16 @@ final class NativeHybridAccountAdapter: HybridAccountPort {
         value.providers = [NativeIdentityProvider.google, .facebook].filter(provider.configured).map(\.rawValue)
         value.entryAvailable = true; value.registrationAvailable = configuration.domain == "localhost"
         value.rememberAvailable = true; value.savedLogin = saved.hasSavedLogin
-        value.busy = operation != nil || profileTask != nil || saved.isWorking || editor.busy || requests.busy
-        value.notice = active ? (noticeChannel == "contacts.add" ? editor.notice : noticeChannel == "contacts.respond" ? requests.notice : profile.status ?? saved.notice) : (lifecycle.status ?? saved.notice)
+        value.busy = operation != nil || profileTask != nil || saved.isWorking || editor.busy || requests.busy || login?.contactActionBusy == true
+        value.nativePanels = presentPanel != nil
+        value.presentation = presentation
+        value.notice = active ? (noticeChannel == "contacts.add" ? editor.notice : noticeChannel == "contacts.respond" ? requests.notice : noticeChannel.hasPrefix("contacts.") ? login?.contactActionNotice : profile.status ?? saved.notice) : (lifecycle.status ?? saved.notice)
         if active, let login = login {
             value.owner = login.currentOwner
             value.contactsAvailable = login.canSend && login.contactManager != nil
             value.requests = Array(requests.peers.prefix(32))
+            if case .ready(let contacts) = login.roster { value.blocked = contacts.prefix(100).filter { login.isBlocked($0.jid) }.map(\.jid) }
+            value.doNotDisturb = login.chat.preferences.doNotDisturb
             if let profile = profile.profile, profile.jid == login.currentOwner, profile.accountId == login.activeAccountID {
                 value.profile = HybridProfile(jid: profile.jid, name: profile.displayName, phone: profile.phoneNumber, language: profile.preferredLanguage, color: profile.avatarColor)
             }

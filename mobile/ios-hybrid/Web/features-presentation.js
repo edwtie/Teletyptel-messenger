@@ -20,6 +20,7 @@
     let returnFocus;
     function close(name) {
       byID(name).hidden = true;
+      byID("hybridMessages").dispatchEvent(new document.defaultView.Event("scroll"));
       if (returnFocus?.tagName === "BUTTON" && returnFocus.getClientRects().length) returnFocus.focus({ preventScroll: true });
     }
     function open(name) {

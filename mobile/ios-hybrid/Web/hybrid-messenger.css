@@ -226,6 +226,8 @@
 }
 
 #hybridMainMenu > div {
+  display: grid;
+  grid-template-columns: repeat(3, 44px);
   width: max-content;
 }
 

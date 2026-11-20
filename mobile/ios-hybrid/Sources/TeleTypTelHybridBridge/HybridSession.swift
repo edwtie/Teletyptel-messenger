@@ -81,7 +81,7 @@ public final class HybridSession {
                 account.update(epoch: accountEpoch.uuidString.lowercased(), active: false)
             }
             try account.command(request.command, arguments: request.arguments)
-        case "account.refresh", "account.save", "account.avatar", "contacts.add", "contacts.respond":
+        case "account.refresh", "account.save", "account.avatar", "account.panel", "contacts.add", "contacts.respond", "contacts.rename", "contacts.block", "contacts.remove", "contacts.dnd":
             guard let account = account, model.isConnected, !model.isBackground, !callBusy else { throw HybridFailure.invalidState }
             try account.command(request.command, arguments: request.arguments)
         case "groups.join", "groups.leave", "groups.subject", "groups.invite", "groups.role":
@@ -165,7 +165,7 @@ public final class HybridSession {
             } else { model.setDraft(body, peer: peer) }
         case "chat.displayed":
             let peer = try permittedPeer(request.arguments["peer"]!, kind: request.kind)
-            guard selectedPeer == peer, selectedKind == request.kind, !callBusy else { throw HybridFailure.invalidState }
+            guard selectedPeer == peer, selectedKind == request.kind, !callBusy, account?.state.presentation != true, account?.state.busy != true else { throw HybridFailure.invalidState }
             let ids = request.arguments["ids"]!.split(separator: ",").compactMap { UUID(uuidString: String($0)) }
             let visible = Set(conversation()?.messages.filter { !$0.outgoing }.map(\.id) ?? [])
             guard ids.allSatisfy({ visible.contains($0.uuidString.lowercased()) }) else { throw HybridFailure.invalidState }

@@ -17,6 +17,8 @@ Deze afzonderlijke variant combineert de webvormgeving van TestFlight 16.9 met d
 - Google/Facebook gebruiken de bestaande native SDK en aanmeldketen, inclusief serverchallenge en eventuele tweestapsverificatie. Alleen daadwerkelijk in de appbuild geconfigureerde providers worden ingeschakeld. OAuth-bewijzen, clientconfiguratie en cookies gaan niet naar JavaScript.
 - Account bewaren is optioneel. De bestaande apparaatgebonden biometrische sleutelhanger bewaart pas na bevestigde aanmelding én toestemming. Automatisch herstellen vereist eerder vastgelegde biometrische toestemming; uitloggen verwijdert de bewaarde aanmelding. Er is geen wachtwoordopslag in de weblaag.
 - Het symbolenmenu opent profielvelden en vertaalinstellingen. De nieuwe-contactknop en toestemmingsverzoeken gebruiken de bestaande native contactbeheerder. Profielwijzigingen accepteren alleen naam, telefoonnummer, profieltaal en kleur; account-ID en CSRF blijven native.
+- Contactbeheer ondersteunt hernoemen, blokkeren/deblokkeren en expliciet bevestigd verwijderen uit de eigen contactenlijst. Niet storen volgt de bestaande native voorkeur. Het hoofdmenu heeft daarnaast vaste native panelen voor geavanceerde instellingen, accountbeveiliging en het bestaande kiespaneel; geen willekeurige URL's of modulekeuzes vanuit JavaScript. Deze platformspecifieke panelen zijn niet als pixelkopie van de website beoordeeld.
+- Bedekte berichten worden niet als gelezen bevestigd zolang een webdialoog, native paneel of systeemhandeling actief is. De gewone chat en de native leesbevestigingscontrole gebruiken dezelfde presentatiestatus. Berichtmeldingen hergebruiken de bestaande native meldingen; dit voegt geen APNs-berichtbezorging na afsluiten toe.
 - Contacten, chatballonnen en de chatkop tonen begrensde JPEG-miniaturen uit de bestaande native avatarcache. Alleen het actuele account en diens huidige contacten krijgen een afbeelding; willekeurige foto-URL's, SVG en accountvreemde avatars zijn geweigerd. Bewerken van de eigen foto gebruikt de bestaande native fotokiezer.
 - Wachtwoordherstel en registratie gebruiken de bestaande native account-API. Registratie blijft beperkt tot het door die API ondersteunde lokale XMPP-domein; een extern e-mailprofiel wordt niet als nieuw XMPP-account gepresenteerd. De privacyknop opent uitsluitend de vaste privacypagina van de native geconfigureerde installatie, buiten de sessie-WebView.
 - Een afzonderlijke CI-appassemblage combineert de presentatie met de bestaande native appbronnen. De oude SwiftUI-root verliest alleen in de tijdelijke kopie zijn `@main`; de werkende app wordt niet vervangen. `reference-only` en `testFlightReady: false` blijven staan.
@@ -64,7 +66,7 @@ De workflow compileert de library en de afzonderlijk geassembleerde app voor de 
 
 ## Nog aansluiten
 
-1. Overige geavanceerde instellingen, bestaande contacten hernoemen/verwijderen/blokkeren, volledige smileyselectie, uitgebreide kamerconfiguratie en groepsoproepen verbinden.
+1. Volledige smileyselectie, aparte archiefnavigatie, uitgebreide kamerconfiguratie en groepsoproepen verbinden; de resterende webschermen en native instellingen visueel vergelijken.
 2. Ondertekende toestelevaluatie van chat, native video, audio, RTT, toetsenbord en CallKit-opnemen/beëindigen uitvoeren.
 3. Achtergrondherstel en APNs met een echt geregistreerd toestel afzonderlijk activeren en testen; de CI-assemblage activeert geen push.
 4. Volledige webgelijkheid, schermlezerbediening en de resterende navigatieschermen beoordelen voordat de bestaande TestFlight-app wordt vervangen.

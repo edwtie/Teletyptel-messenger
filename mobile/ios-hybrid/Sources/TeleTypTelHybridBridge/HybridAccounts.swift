@@ -17,6 +17,10 @@ public struct HybridAccountState: Codable, Equatable {
     public var savedLogin = false
     public var busy = false
     public var contactsAvailable = false
+    public var nativePanels = false
+    public var presentation = false
+    public var blocked: [String] = []
+    public var doNotDisturb = false
     public var owner: String?
     public var requests: [String] = []
     public var profile: HybridProfile?

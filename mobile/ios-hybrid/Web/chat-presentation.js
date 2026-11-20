@@ -50,6 +50,7 @@
 
     function scheduleDisplayed() {
       document.defaultView.requestAnimationFrame(() => {
+        if (state?.account.presentation || state?.account.busy || document.querySelector('.modal-shell:not([hidden])')) return;
         if (disposed || !state?.conversation || state.conversation.peer !== peer || document.visibilityState !== "visible" || panel.hidden
             || !["idle", "failed"].includes(state.call.phase)) return;
         const bounds = messages.getBoundingClientRect();
@@ -188,6 +189,7 @@
       const contact = value.roster.contacts.find(item => item.jid === peer);
       for (const name of ["hybridStartTotal", "hybridStartAudio", "hybridStartVideo"]) byID(name).disabled = kind !== "direct" || !value.callsAvailable || !contact?.canCall;
       renderMessages(conversation);
+      if (!value.account.presentation && !value.account.busy) scheduleDisplayed();
     }
 
     const onInput = () => {

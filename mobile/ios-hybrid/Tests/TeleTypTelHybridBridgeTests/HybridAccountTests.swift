@@ -80,4 +80,26 @@ final class HybridAccountTests: XCTestCase {
             XCTAssertThrowsError(try HybridRequest.decode(encoded(name)))
         }
     }
+
+    func testNativePresentationCannotMarkCoveredChatMessagesRead() async throws {
+        let fixture = SessionFixture(); let account = AccountFixture()
+        let model = NativeLoginModel(checker: fixture, authenticator: fixture, connection: fixture)
+        let config = try ServerConfiguration(address: "https://fixture.invalid", domain: "localhost")
+        let session = HybridSession(model: model, configuration: config, nativeLogout: {}, account: account)
+        defer { model.disconnect() }
+        _ = try command(session, "session.login", ["jid": "fixture@localhost", "password": "fixture-password"])
+        await eventually { model.isConnected }
+        await fixture.emitRoster(.ready([NativeContact(jid: "peer@localhost", name: "Peer", groups: [], subscription: "both")]))
+        await eventually { session.snapshot().roster.contacts.count == 1 }
+        _ = try command(session, "chat.open", ["peer": "peer@localhost"])
+        await fixture.emitChat(.message(peer: "peer@localhost", identifier: "covered-fixture", body: "Achter een native venster"))
+        await eventually { model.chat.messages.count == 1 }
+        let identifier = model.chat.messages[0].id.uuidString
+        account.value.presentation = true
+        XCTAssertThrowsError(try command(session, "chat.displayed", ["peer": "peer@localhost", "ids": identifier]))
+        XCTAssertNotEqual(model.chat.messages[0].locallyRead, true)
+        account.value.presentation = false
+        _ = try command(session, "chat.displayed", ["peer": "peer@localhost", "ids": identifier])
+        XCTAssertEqual(model.chat.messages[0].locallyRead, true)
+    }
 }
