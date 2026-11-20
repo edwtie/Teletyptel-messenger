@@ -116,8 +116,8 @@ final class NativeHybridOwner: ObservableObject {
         NativeMessageNotifications.shared.connect(login)
         features.presentPicker = { [weak self] context in self?.fileSheet = HybridFileSheet(context: context, body: nil) }
         features.presentFile = { [weak self] body, context in self?.fileSheet = HybridFileSheet(context: context, body: body) }
-        features.dismissPresentation = { [weak self] in self?.fileSheet = nil }
-        account.dismissPresentation = { [weak self] in self?.fileSheet = nil }
+        features.dismissPresentation = { [weak self] in self?.dismissSessionSheet() }
+        account.dismissPresentation = { [weak self] in self?.dismissSessionSheet() }
         account.presentAvatar = { [weak self] in
             guard let self = self else { return }
             let snapshot = self.session.snapshot()
@@ -185,6 +185,11 @@ final class NativeHybridOwner: ObservableObject {
         if repairSettings { openServerSettings() } else { account.restoreIfAllowed() }
     }
 
+    private func dismissSessionSheet() {
+        guard let sheet = fileSheet, sheet.panel != "server" else { return }
+        fileSheet = nil
+    }
+
     private func openServerSettings() {
         guard fileSheet == nil, session.canEditServer else { return }
         let snapshot = session.snapshot()
@@ -244,7 +249,10 @@ private struct HybridServerSettings: View {
             .textInputAutocapitalization(.never).autocorrectionDisabled()
             .navigationTitle("Serverinstellingen")
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Annuleren") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Annuleren") { dismiss() }
+                        .accessibilityIdentifier("hybridServerCancel")
+                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Opslaan") {
                         guard let value = try? ServerConfiguration(address: address, domain: domain) else {

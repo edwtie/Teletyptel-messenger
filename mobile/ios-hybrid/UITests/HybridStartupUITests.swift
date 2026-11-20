@@ -14,9 +14,15 @@ final class HybridStartupUITests: XCTestCase {
         let settings = web.buttons["Serverinstellingen"].firstMatch
         XCTAssertTrue(settings.isEnabled)
         settings.tap()
-        XCTAssertTrue(app.textFields["hybridServerAddress"].waitForExistence(timeout: 5))
+        let address = app.textFields["hybridServerAddress"]
+        XCTAssertTrue(address.waitForExistence(timeout: 5))
         XCTAssertTrue(app.textFields["hybridServerDomain"].exists)
-        app.buttons["Annuleren"].tap()
+        let cancel = app.buttons["hybridServerCancel"]
+        XCTAssertTrue(cancel.waitForExistence(timeout: 5))
+        XCTAssertTrue(cancel.isHittable)
+        cancel.tap()
+        let closed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: address)
+        XCTAssertEqual(XCTWaiter.wait(for: [closed], timeout: 5), .completed)
         XCTAssertTrue(web.buttons["Aanmelden"].firstMatch.waitForExistence(timeout: 5))
         XCUIDevice.shared.orientation = .landscapeLeft
         XCTAssertTrue(web.buttons["Aanmelden"].firstMatch.waitForExistence(timeout: 5))
