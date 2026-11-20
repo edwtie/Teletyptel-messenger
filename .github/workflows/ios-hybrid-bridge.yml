@@ -94,24 +94,45 @@ jobs:
         run: |
           swift test --package-path mobile/ios-native --scratch-path "$RUNNER_TEMP/teletyptel-native-feature-tests" \
             --filter 'NativeMUCTests|NativeTwoFactorHTTPTests|NativeGroupModelTests|NativeGroupManagementTests|NativeAccountFeaturesTests|NativeServicesTests|NativeSavedLoginTests|NativeContactTests|NativeFeatureCompletionTests|NativeCloudMergeTests|NativeCloudSyncTests|NativeCloudHistoryTests|NativePresentationTests|NativeInterpreterTests'
-      - name: Assemble the isolated hybrid app with the existing native engine
-        if: ${{ !cancelled() }}
-        run: node scripts/ios-hybrid/prepare-app.js
+  simulator:
+    runs-on: xcode-27
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        device: [iPhone, iPad]
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: 22
+      - name: Prepare isolated simulator runner
+        run: |
+          bash scripts/ios-hybrid/check-toolchain.sh
+          python3 -B scripts/ios-hybrid/test_simulator_smoke.py
+          export TELETYPTEL_HYBRID_CONTENT="$RUNNER_TEMP/teletyptel-hybrid-content.json"
+          node scripts/ios-hybrid/build-content.js
+          node scripts/ios-hybrid/prepare-app.js
       - name: Compile the complete app without signing or push activation
         id: app-build
-        if: ${{ !cancelled() }}
         run: |
           xcodebuild -project artifacts/ios-native-hybrid-validation/TeleTypTelNative.xcodeproj \
             -scheme TeleTypTelNative -configuration Debug -sdk iphonesimulator \
             -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath "$RUNNER_TEMP/teletyptel-hybrid-app" \
             ARCHS="$(uname -m)" ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO build
-      - name: Smoke-test the assembled app on iPhone and iPad simulators
-        if: ${{ !cancelled() && steps.app-build.outcome == 'success' }}
-        run: python3 scripts/ios-hybrid/simulator-smoke.py
+      - name: Smoke-test the assembled app
+        env:
+          DEVICE_KIND: ${{ matrix.device }}
+        run: |
+          df -h "$RUNNER_TEMP"
+          python3 scripts/ios-hybrid/simulator-smoke.py "$DEVICE_KIND"
   internal-hybrid-upload:
     if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/codex/teletyptel-beta-polish' && inputs.internal_build != ''
-    needs: [room-media, bridge]
+    needs: [room-media, bridge, simulator]
     runs-on: xcode-27
     timeout-minutes: 40
     environment: ios-testflight

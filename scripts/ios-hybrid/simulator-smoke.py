@@ -1,3 +1,4 @@
+import argparse
 import json
 import os
 import platform
@@ -40,26 +41,29 @@ def smoke(kind, runtime, device_type, architecture):
                             f"ARCHS={architecture}", "ONLY_ACTIVE_ARCH=YES", "CODE_SIGNING_ALLOWED=NO"], check=True)
             return
         finally:
-            try:
-                simctl("shutdown", identifier, timeout=60)
-            finally:
-                simctl("delete", identifier, check=True, timeout=60)
+            for operation in ("shutdown", "delete"):
+                try:
+                    simctl(operation, identifier, check=True, timeout=30)
+                except (subprocess.TimeoutExpired, subprocess.CalledProcessError) as error:
+                    print(f"Simulator cleanup warning: {error}", flush=True)
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("device", choices=("iPhone", "iPad"))
+    kind = parser.parse_args().device
     architecture = platform.machine()
     if architecture not in ("arm64", "x86_64"):
         raise RuntimeError("Unsupported runner architecture")
     devices = json.loads(simctl("list", "devices", "available", "-j", capture_output=True, text=True, check=True).stdout)["devices"]
-    for kind in ("iPhone", "iPad"):
-        candidates = sorted((device["name"], runtime, device["deviceTypeIdentifier"])
-                            for runtime, values in devices.items() if runtime.endswith(".iOS-27-2")
-                            for device in values if device.get("isAvailable") and device["name"].startswith(kind))
-        if not candidates:
-            raise RuntimeError("Missing simulator: " + kind)
-        name, runtime, device_type = candidates[-1]
-        print("Starting UI test on", name, runtime, flush=True)
-        smoke(kind, runtime, device_type, architecture)
+    candidates = sorted((device["name"], runtime, device["deviceTypeIdentifier"])
+                        for runtime, values in devices.items() if runtime.endswith(".iOS-27-2")
+                        for device in values if device.get("isAvailable") and device["name"].startswith(kind))
+    if not candidates:
+        raise RuntimeError("Missing simulator: " + kind)
+    name, runtime, device_type = candidates[-1]
+    print("Starting UI test on", name, runtime, flush=True)
+    smoke(kind, runtime, device_type, architecture)
 
 
 if __name__ == "__main__":
