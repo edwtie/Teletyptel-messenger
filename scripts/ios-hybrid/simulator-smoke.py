@@ -3,7 +3,6 @@ import json
 import os
 import platform
 import subprocess
-from uuid import UUID
 
 
 def select_device(devices, kind):
@@ -23,7 +22,7 @@ def smoke(kind):
     inventory = subprocess.run(["xcrun", "simctl", "list", "devices", "available", "-j"],
                                capture_output=True, text=True, check=True, timeout=60)
     device = select_device(json.loads(inventory.stdout)["devices"], kind)
-    identifier = str(UUID(device["udid"]))
+    identifier = device["udid"]
     print(f"UI-test op bestaande {device['name']} ({identifier}, {device['state']}, iOS 27.2)", flush=True)
     subprocess.run(["xcodebuild", "test", "-project", "artifacts/ios-native-hybrid-validation/TeleTypTelNative.xcodeproj",
                     "-scheme", "TeleTypTelNative", "-configuration", "Debug", "-destination",

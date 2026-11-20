@@ -8,7 +8,7 @@ from unittest.mock import Mock, patch
 
 module = runpy.run_path(str(Path(__file__).with_name("simulator-smoke.py")))
 runtime = "com.apple.CoreSimulator.SimRuntime.iOS-27-2"
-identifier = "17def893-ca31-47cd-bf37-dcb2651ac010"
+identifier = "92FA1CA9-EA61-434B-AACA-0A76FE5ECBD4"
 
 
 def device(name, state="Shutdown", available=True):
