@@ -90,5 +90,8 @@ test("hybrid assembly reuses the existing CallKit provider and never starts a se
   assert.match(adapter, /controller\.answerFromHybrid\(\)/);
   assert.match(adapter, /RTCMTLVideoView/);
   assert.doesNotMatch(app + adapter, /CXProvider\(|RTCPeerConnectionFactory\(|URLSessionWebSocketTask/);
-  assert.throws(() => require("../scripts/ios-hybrid/prepare-app").prepare(), /disposable CI runner/);
+  const previous = process.env.GITHUB_ACTIONS;
+  process.env.GITHUB_ACTIONS = "false";
+  try { assert.throws(() => require("../scripts/ios-hybrid/prepare-app").prepare(), /disposable CI runner/); }
+  finally { if (previous === undefined) delete process.env.GITHUB_ACTIONS; else process.env.GITHUB_ACTIONS = previous; }
 });

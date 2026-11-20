@@ -51,16 +51,20 @@ jobs:
       - name: Test login layout and rotation in Chromium and WebKit
         run: node --test tests/ios-hybrid-presentation.test.js
       - name: Test native session bridge with fictional accounts
+        if: ${{ !cancelled() }}
         run: swift test --package-path mobile/ios-hybrid --scratch-path "$RUNNER_TEMP/teletyptel-hybrid-macos"
       - name: Compile unsigned iOS simulator library
+        if: ${{ !cancelled() }}
         run: |
           swift build --package-path mobile/ios-hybrid \
             --scratch-path "$RUNNER_TEMP/teletyptel-hybrid-ios" \
             --triple arm64-apple-ios16.0-simulator \
             --sdk "$(xcrun --sdk iphonesimulator --show-sdk-path)"
       - name: Assemble the isolated hybrid app with the existing native engine
+        if: ${{ !cancelled() }}
         run: node scripts/ios-hybrid/prepare-app.js
       - name: Compile the complete app without signing or push activation
+        if: ${{ !cancelled() }}
         run: |
           xcodebuild -project artifacts/ios-native-hybrid-validation/TeleTypTelNative.xcodeproj \
             -scheme TeleTypTelNative -configuration Debug -sdk iphonesimulator \
