@@ -3,7 +3,8 @@
 
   function mount(document, client) {
     const byID = name => document.getElementById(name);
-    const input = byID("hybridMessageInput");
+    const field = byID("hybridMessageInput");
+    const input = document.defaultView.TeleTypTelHybridSmileys.editor(field);
     const messages = byID("hybridMessages");
     const panel = byID("hybridConversation");
     const notice = byID("hybridChatNotice");
@@ -228,8 +229,12 @@
       } catch { setNotice("Bericht niet verstuurd. Je tekst blijft staan; probeer bewust opnieuw."); }
       finally { sending = false; if (state) render(state); }
     };
-    input.addEventListener("input", onInput);
-    input.addEventListener("keydown", event => { if (event.key === "Enter" && !event.shiftKey && !event.isComposing) void send(event); });
+    field.addEventListener("input", onInput);
+    field.addEventListener("keydown", event => {
+      if (event.key !== "Enter" || event.isComposing) return;
+      if (event.shiftKey) { event.preventDefault(); input.insert("\n"); }
+      else void send(event);
+    });
     byID("hybridComposer").addEventListener("submit", send);
     messages.addEventListener("scroll", scheduleDisplayed);
     document.addEventListener("visibilitychange", scheduleDisplayed);
@@ -237,7 +242,7 @@
       const picker = byID("hybridEmojiPanel"); picker.hidden = !picker.hidden;
       byID("hybridEmojiToggle").setAttribute("aria-expanded", String(!picker.hidden));
     };
-    const insertEmoji = emoji => { input.setRangeText(emoji, input.selectionStart, input.selectionEnd, "end"); onInput(); input.focus(); };
+    const insertEmoji = emoji => input.insert(emoji, true);
     document.defaultView.TeleTypTelHybridSmileys?.picker(byID("hybridEmojiPanel"), insertEmoji);
     for (const emoji of ["😀", "😊", "👍", "❤️", "👋", "🙏", "😂", "🤟"]) {
       const button = document.createElement("button"); button.type = "button"; button.textContent = emoji; button.setAttribute("aria-label", emoji);

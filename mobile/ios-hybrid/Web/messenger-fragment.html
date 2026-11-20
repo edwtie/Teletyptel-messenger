@@ -14,7 +14,7 @@
   <form id="hybridComposer" class="hybrid-composer" autocomplete="off">
     <button id="hybridPickAttachment" class="icon-button" type="button" disabled aria-label="Bijlage toevoegen" title="Foto of bestand toevoegen"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 4v16M4 12h16"/></svg></button>
     <button id="hybridEmojiToggle" class="icon-button" type="button" aria-label="Emoji kiezen" aria-controls="hybridEmojiPanel" aria-expanded="false" title="Emoji"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 14q4 5 8 0"/><path d="M8 8h1m6 0h1"/></svg></button>
-    <textarea id="hybridMessageInput" rows="1" aria-label="Bericht" placeholder="Typ een bericht" enterkeyhint="send"></textarea>
+    <div id="hybridMessageInput" contenteditable="false" role="textbox" aria-multiline="true" aria-label="Bericht" aria-placeholder="Typ een bericht" enterkeyhint="send"></div>
     <button id="hybridSend" class="icon-button" type="submit" aria-label="Versturen" title="Versturen"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m4 3 18 9-18 9 3-9-3-9Zm3 9h15"/></svg></button>
     <div id="hybridEmojiPanel" class="hybrid-emoji-panel" hidden aria-label="Emoji"></div>
   </form>

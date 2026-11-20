@@ -306,7 +306,7 @@
   border-radius: 999px;
 }
 
-.hybrid-composer textarea {
+#hybridMessageInput {
   flex: 1;
   min-width: 0;
   min-height: 40px;
@@ -314,9 +314,24 @@
   padding: 10px 4px;
   border: 0;
   border-radius: 8px;
-  resize: none;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  overflow-y: auto;
   background: transparent;
   font-size: 16px;
+}
+
+#hybridMessageInput:empty::before {
+  content: attr(aria-placeholder);
+  color: var(--muted);
+  pointer-events: none;
+}
+
+#hybridMessageInput img {
+  width: 1.35em;
+  height: 1.35em;
+  object-fit: contain;
+  vertical-align: middle;
 }
 
 .hybrid-emoji-panel {

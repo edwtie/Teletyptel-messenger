@@ -219,12 +219,21 @@ for (const engine of [chromium, webkit]) {
       await page.locator("#hybridEmojiToggle").click();
       assert.equal(await page.locator("#hybridEmojiPanel .smiley-picker-option").count(), 41);
       await page.locator('#hybridEmojiPanel .smiley-picker-option[aria-label="smile :)"]').click();
-      assert.equal(await page.locator("#hybridMessageInput").inputValue(), ":)");
+      await page.locator('#hybridMessageInput img[alt=":)"]').waitFor({ state: "visible" });
+      assert.equal(await page.locator("#hybridMessageInput").textContent(), "");
       await page.locator("#hybridMessageInput").press("Enter");
       await page.locator("#hybridMessages .smiley-image").waitFor();
       assert.equal(await page.locator("#hybridMessages .smiley-image").getAttribute("src"), "smileys/smile.svg");
       const sent = await page.evaluate(() => window.nativeCommands.find(command => command.command === "chat.send"));
       assert.equal(sent.arguments.body, ":)");
+      const field = page.locator("#hybridMessageInput");
+      await field.fill("Hoi!");
+      await field.press("End"); await field.press("ArrowLeft");
+      const smile = page.locator('#hybridEmojiPanel .smiley-picker-option[aria-label="smile :)"]');
+      await smile.click(); await smile.click();
+      assert.equal(await field.locator("img").count(), 2);
+      await field.press("Backspace"); await field.press("Enter");
+      await page.waitForFunction(() => window.nativeCommands.some(command => command.command === "chat.send" && command.arguments.body === "Hoi:)!"));
       await page.evaluate(() => window.emitMessages([window.fixtureMessage('<img src="https://tracker.invalid/x"> 🤟 :)')]));
       assert.equal(await page.locator("#hybridMessages img:not(.smiley-image)").count(), 0);
       assert.equal(requests.some(url => url.includes("tracker.invalid")), false); assert.deepEqual(errors, []);
@@ -434,8 +443,8 @@ for (const engine of [chromium, webkit]) {
       await page.locator("#hybridPickAttachment").click();
       await page.waitForFunction(() => window.nativeCommands.some(value => value.command === "files.pick"));
       await page.evaluate(() => window.stageFixtureAttachment());
-      await page.waitForFunction(() => document.getElementById("hybridMessageInput").value.includes("fixture.pdf"));
-      assert.match(await page.locator("#hybridMessageInput").inputValue(), /^Mijn concept/);
+      await page.waitForFunction(() => document.getElementById("hybridMessageInput").textContent.includes("fixture.pdf"));
+      assert.match(await page.locator("#hybridMessageInput").textContent(), /^Mijn concept/);
       await page.evaluate(() => window.emitMessages([window.fixtureMessage("Hallo van de ander", false)]));
       await page.locator("#hybridMessages .message button.hybrid-message-more").click();
       await page.locator('[data-message-action="translate"]').click();
@@ -504,7 +513,7 @@ for (const engine of [chromium, webkit]) {
       await page.locator("#hybridSend").click();
       await page.locator("#hybridMessages .message.self").waitFor();
       assert.match(await page.locator("#hybridMessages").textContent(), /Hallo vanuit de webballon/);
-      assert.equal(await page.locator("#hybridMessageInput").inputValue(), "");
+      assert.equal(await page.locator("#hybridMessageInput").textContent(), "");
       assert.equal(await page.locator(".hybrid-message-receipt.is-read").count(), 0);
       await page.evaluate(() => window.emitMessages([
         window.fixtureMessage("<img src=x onerror=alert(1)>", false),
@@ -544,11 +553,11 @@ for (const engine of [chromium, webkit]) {
       await page.locator("#hybridMessageInput").fill("Nieuw concept tijdens verzenden");
       await page.evaluate(() => window.releaseSend());
       await page.waitForFunction(() => !document.getElementById("hybridSend").disabled);
-      assert.equal(await page.locator("#hybridMessageInput").inputValue(), "Nieuw concept tijdens verzenden");
+      assert.equal(await page.locator("#hybridMessageInput").textContent(), "Nieuw concept tijdens verzenden");
       assert.equal(await page.locator("#hybridMessages .message").count(), 1);
       await page.locator("#hybridLogout").click();
       await page.locator("#accountDialog").waitFor({ state: "visible" });
-      assert.equal(await page.locator("#hybridMessageInput").inputValue(), "");
+      assert.equal(await page.locator("#hybridMessageInput").textContent(), "");
       assert.equal(await page.locator("#hybridMessages .message").count(), 0);
       assert.deepEqual(await page.evaluate(() => Object.keys(localStorage)), []);
       assert.deepEqual(errors, []);
@@ -601,7 +610,7 @@ for (const engine of [chromium, webkit]) {
       await page.waitForFunction(() => window.nativeCommands.some(value => value.command === "calls.control" && value.arguments.action === "dtmf" && value.arguments.value === "#"));
       await page.locator("#hybridEndCall").click();
       await page.locator("#hybridConversation").waitFor({ state: "visible" });
-      assert.equal(await page.locator("#hybridMessageInput").inputValue(), "Bewaard concept");
+      assert.equal(await page.locator("#hybridMessageInput").textContent(), "Bewaard concept");
       await page.locator("#hybridStartMenu summary").click();
       await page.locator("#hybridStartAudio").click();
       await page.locator("#hybridCallPanel").waitFor({ state: "visible" });

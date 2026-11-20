@@ -476,7 +476,7 @@ final class HybridSessionTests: XCTestCase {
         let password = try await webView.evaluateJavaScript("document.getElementById('dialogPasswordInput').value") as? String
         XCTAssertEqual(password, "")
         await eventually { session.snapshot().conversation?.peer == "peer@localhost" }
-        _ = try await webView.evaluateJavaScript("document.getElementById('hybridMessageInput').value='Via echte WKWebView'; document.getElementById('hybridMessageInput').dispatchEvent(new Event('input')); document.getElementById('hybridComposer').dispatchEvent(new Event('submit', {cancelable:true}));")
+        _ = try await webView.evaluateJavaScript("document.getElementById('hybridMessageInput').textContent='Via echte WKWebView'; document.getElementById('hybridMessageInput').dispatchEvent(new Event('input')); document.getElementById('hybridComposer').dispatchEvent(new Event('submit', {cancelable:true}));")
         await eventually { model.chat.messages.first?.state == .submitted }
         let bodies = await fixture.sentBodies
         XCTAssertEqual(bodies, ["Via echte WKWebView"])
