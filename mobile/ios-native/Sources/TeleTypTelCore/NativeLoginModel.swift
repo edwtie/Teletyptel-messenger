@@ -437,7 +437,11 @@ public final class NativeLoginModel: ObservableObject {
         isBackground = false
         activateGroups()
         configureCloudHistory()
-        guard phase == .suspended, let account = resumableAccount else { return }
+        guard phase == .suspended else { return }
+        guard let account = resumableAccount else {
+            phase = .idle
+            return
+        }
         let attempt = generation
         phase = .checking
         task = Task { [weak self, checker] in

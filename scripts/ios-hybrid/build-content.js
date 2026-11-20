@@ -63,7 +63,7 @@ function createContent() {
 <img class="xmpp-availability__brand" src="assets/brand/teletyptel-logo-header@2x.png" width="599" height="128" alt="TeleTypTel">
 <div id="hybridProgress" class="xmpp-availability__progress" role="progressbar" aria-label="Bezig"></div>
 <p id="hybridStartupStatus" role="status" aria-live="polite">TeleTypTel starten…</p>
-<div class="xmpp-availability__actions"><button id="hybridRetry" type="button" hidden>Opnieuw proberen</button><button id="hybridCancel" type="button" hidden>Annuleren</button><button id="hybridBack" type="button" hidden>Terug naar aanmelden</button></div>
+<div class="xmpp-availability__actions"><button id="hybridRetry" type="button" hidden>Opnieuw proberen</button><button id="hybridCancel" type="button" hidden>Annuleren</button><button id="hybridBack" type="button" hidden>Terug naar aanmelden</button><button id="hybridStartupSettings" class="icon-button" type="button" title="Serverinstellingen" aria-label="Serverinstellingen" hidden>${symbol}</button></div>
 </div></section>
 <div id="accountDialog" class="modal-shell account-start-dialog" hidden role="dialog" aria-modal="true" aria-labelledby="accountDialogTitle">
 <div class="modal-card account-dialog-card">${header}<div class="modal-body account-dialog-body">

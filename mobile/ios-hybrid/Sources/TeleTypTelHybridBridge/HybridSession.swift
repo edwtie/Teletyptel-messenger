@@ -8,9 +8,9 @@ import TeleTypTelCore
 public final class HybridSession {
     public var onStateChange: ((HybridSnapshot) -> Void)?
     let model: NativeLoginModel
-    let configuration: ServerConfiguration
+    private(set) var configuration: ServerConfiguration
     private let nativeLogout: () -> Void
-    private let nativeSettings: (() -> Void)?
+    public var nativeSettings: (() -> Void)?
     private var observations: [AnyCancellable] = []
     private let calls: (any HybridCallPort)?
     private let extras: (any HybridExtrasPort)?
@@ -134,7 +134,7 @@ public final class HybridSession {
             model.verifySecondFactor(code: request.arguments["code"]!)
         case "session.cancel":
             if account?.state.busy == true && !model.isConnected && !model.isBackground { account?.cancelAuthentication(); model.reset(); break }
-            guard !model.isBackground, !model.isReconnecting,
+            guard !model.isBackground, !callBusy,
                   model.isWorking || model.isAwaitingSecondFactor else { throw HybridFailure.invalidState }
             model.reset()
             account?.cancelAuthentication()
@@ -149,7 +149,7 @@ public final class HybridSession {
         case "session.snapshot":
             break
         case "app.openSettings":
-            guard !model.isWorking, !model.isBackground, !model.isSecondFactorPending else { throw HybridFailure.sessionBusy }
+            guard canEditServer else { throw HybridFailure.sessionBusy }
             guard let nativeSettings = nativeSettings else { throw HybridFailure.unavailable }
             nativeSettings()
         case "chat.open":
@@ -355,6 +355,21 @@ public final class HybridSession {
             }
             return HybridRoster(status: "ready", contacts: projected)
         }
+    }
+
+    var canEditServer: Bool {
+        !model.isBackground && !model.isConnected && !model.isWorking && !model.isSecondFactorPending
+            && !callBusy && account?.state.busy != true && model.phase != .suspended
+    }
+
+    func changeServer(_ value: ServerConfiguration) throws {
+        guard canEditServer else { throw HybridFailure.sessionBusy }
+        guard configuration != value else { return }
+        account?.logout()
+        configuration = value
+        accountEpoch = UUID()
+        model.reset()
+        publish()
     }
 
     private func publish() {

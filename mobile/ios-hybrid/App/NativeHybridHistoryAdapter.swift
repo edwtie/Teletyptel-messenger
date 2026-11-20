@@ -6,7 +6,7 @@ final class NativeHybridHistoryAdapter: HybridHistoryPort {
     var onOpen: ((String, String) -> Bool)?
     var onArchive: ((String, String) -> Void)?
     private weak var login: NativeLoginModel?
-    private let configuration: ServerConfiguration
+    var configuration: ServerConfiguration
     private let archive: NativeConversationArchive
     private var epoch: String?
     private var active = false

@@ -20,7 +20,9 @@ struct TeleTypTelHybridApp: App {
                 if let url = sheet.privacy {
                     HybridPrivacyView(url: url)
                 } else if let panel = sheet.panel {
-                    if panel == "interpreter" { NativeInterpreterCallView(session: owner.calls.interpreter) }
+                    if panel == "server" {
+                        HybridServerSettings(configuration: owner.session.configuration, save: owner.saveServerSettings)
+                    } else if panel == "interpreter" { NativeInterpreterCallView(session: owner.calls.interpreter) }
                     else if panel == "room-call" { HybridRoomCallView(call: owner.roomCall) }
                     else if panel == "dialer" { NativeDialerView(login: owner.login, calls: owner.calls) }
                     else if panel == "security" { NativeAccountSecurityView(login: owner.login, credentialsChanged: owner.signOutFromNative) }
@@ -65,6 +67,7 @@ final class NativeHybridOwner: ObservableObject {
     private var groupObservation: AnyCancellable?
     private var interpreterObservation: AnyCancellable?
     private var attemptedRestore = false
+    private let repairSettings: Bool
 
     init() {
         let login = NativeLoginModel(history: NativeDeviceHistory())
@@ -78,7 +81,9 @@ final class NativeHybridOwner: ObservableObject {
         self.features = features
         let server = NativeServerDefaults.resolve(savedAddress: UserDefaults.standard.string(forKey: "teletyptel.native.serverAddress"),
             savedDomain: UserDefaults.standard.string(forKey: "teletyptel.native.xmppDomain"))
-        let configuration = try! ServerConfiguration(address: server.address, domain: server.domain)
+        let stored = try? ServerConfiguration(address: server.address, domain: server.domain)
+        repairSettings = stored == nil
+        let configuration = stored ?? (try! ServerConfiguration(address: NativeServerDefaults.address, domain: NativeServerDefaults.domain))
         let account = NativeHybridAccountAdapter(login: login, configuration: configuration)
         self.account = account
         let history = NativeHybridHistoryAdapter(login: login, configuration: configuration)
@@ -91,6 +96,7 @@ final class NativeHybridOwner: ObservableObject {
         content = Bundle.main.url(forResource: "hybrid-content", withExtension: "json")
             .flatMap { try? Data(contentsOf: $0) }.flatMap { try? HybridContent(data: $0) }
         calls.attach(login)
+        session.nativeSettings = { [weak self] in self?.openServerSettings() }
         session.presentRoomCall = { [weak self] in self?.openRoomCall($0) == true }
         login.groups.onRoomCall = { [weak self] room, nick, signal in
             self?.roomCall.receive(room: room, nick: nick, signal: signal)
@@ -175,7 +181,22 @@ final class NativeHybridOwner: ObservableObject {
 
     func restoreSavedLogin() {
         guard !attemptedRestore else { return }
-        attemptedRestore = true; account.restoreIfAllowed()
+        attemptedRestore = true
+        if repairSettings { openServerSettings() } else { account.restoreIfAllowed() }
+    }
+
+    private func openServerSettings() {
+        guard fileSheet == nil, session.canEditServer else { return }
+        let snapshot = session.snapshot()
+        fileSheet = HybridFileSheet(context: HybridExtrasContext(epoch: snapshot.epoch, conversation: nil, call: snapshot.call), body: nil, panel: "server")
+    }
+
+    func saveServerSettings(_ value: ServerConfiguration) throws {
+        try session.changeServer(value)
+        account.configuration = value
+        history.configuration = value
+        UserDefaults.standard.set(value.origin.absoluteString, forKey: "teletyptel.native.serverAddress")
+        UserDefaults.standard.set(value.domain, forKey: "teletyptel.native.xmppDomain")
     }
 
     func signOutFromNative() {
@@ -191,6 +212,51 @@ struct HybridFileSheet: Identifiable {
     var avatar = false
     var privacy: URL?
     var panel: String?
+}
+
+private struct HybridServerSettings: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var address: String
+    @State private var domain: String
+    @State private var feedback: String?
+    let save: (ServerConfiguration) throws -> Void
+
+    init(configuration: ServerConfiguration, save: @escaping (ServerConfiguration) throws -> Void) {
+        _address = State(initialValue: configuration.origin.absoluteString)
+        _domain = State(initialValue: configuration.domain)
+        self.save = save
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Serveradres (HTTPS)") {
+                    TextField("https://…", text: $address).keyboardType(.URL).accessibilityIdentifier("hybridServerAddress")
+                }
+                Section("XMPP-domein") {
+                    TextField("Domein", text: $domain).keyboardType(.URL).accessibilityIdentifier("hybridServerDomain")
+                }
+                Button("Standaardwaarden herstellen") {
+                    address = NativeServerDefaults.address; domain = NativeServerDefaults.domain; feedback = nil
+                }
+                if let feedback = feedback { Text(feedback) }
+            }
+            .textInputAutocapitalization(.never).autocorrectionDisabled()
+            .navigationTitle("Serverinstellingen")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Annuleren") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Opslaan") {
+                        guard let value = try? ServerConfiguration(address: address, domain: domain) else {
+                            feedback = "Vul een HTTPS-adres zonder pad en een geldig XMPP-domein in."; return
+                        }
+                        do { try save(value); dismiss() }
+                        catch { feedback = "Stop de actieve verbinding voordat je de server wijzigt." }
+                    }
+                }
+            }
+        }
+    }
 }
 
 struct HybridPrivacyView: UIViewControllerRepresentable {
