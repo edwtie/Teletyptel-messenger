@@ -10,7 +10,7 @@ smoke = runpy.run_path(str(Path(__file__).with_name("simulator-smoke.py")))["smo
 
 
 class SimulatorSmokeTests(unittest.TestCase):
-    def exercise(self, statuses, app_error=None):
+    def exercise(self, statuses, app_error=None, cleanup_timeout=False):
         created, deleted = [], []
         statuses = iter(statuses)
 
@@ -22,6 +22,8 @@ class SimulatorSmokeTests(unittest.TestCase):
                 return Mock(stdout=next(statuses), returncode=0)
             if command == "delete":
                 deleted.append(arguments[0])
+            if cleanup_timeout and command in ("shutdown", "delete"):
+                raise subprocess.TimeoutExpired(command, 30)
 
         with patch.dict(smoke.__globals__, simctl=control), patch.dict("os.environ", RUNNER_TEMP="/tmp"), \
                 patch("subprocess.run", side_effect=app_error) as build:
@@ -41,9 +43,13 @@ class SimulatorSmokeTests(unittest.TestCase):
             self.exercise(["Data Migration Failed"] * 2)
         self.assertEqual((self.attempts, self.test_calls), (2, 0))
 
+    def test_cleanup_timeouts_do_not_block_next_boot(self):
+        self.exercise(["Data Migration Failed", "Finished"], cleanup_timeout=True)
+        self.assertEqual((self.attempts, self.test_calls), (2, 1))
+
     def test_failed_app_assertion_is_not_retried(self):
         with self.assertRaises(subprocess.CalledProcessError):
-            self.exercise(["Finished"], subprocess.CalledProcessError(65, "xcodebuild"))
+            self.exercise(["Finished"], subprocess.CalledProcessError(65, "xcodebuild"), cleanup_timeout=True)
         self.assertEqual((self.attempts, self.test_calls), (1, 1))
 
 
