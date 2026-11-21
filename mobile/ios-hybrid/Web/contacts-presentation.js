@@ -99,7 +99,8 @@
         rows.delete(key);
         row.className = "conversation-item" + (value.jid === selected ? " selected" : "");
         const blocked = value.kind === "direct" && latestState?.account.blocked.includes(value.jid);
-        row.setAttribute("aria-label", value.name + " · " + (blocked ? "Geblokkeerd" : presenceLabels[value.presence]));
+        const statusLabel = value.kind === "group" ? "Groep" : blocked ? "Geblokkeerd" : presenceLabels[value.presence];
+        row.setAttribute("aria-label", value.name + " · " + statusLabel);
         if (value.jid === selected) row.setAttribute("aria-current", "true"); else row.removeAttribute("aria-current");
         const picture = document.createElement("span");
         picture.className = "avatar avatar-list";
@@ -111,12 +112,14 @@
         const name = document.createElement("strong");
         name.textContent = value.name;
         const label = document.createElement("span");
-        label.textContent = value.kind === "group" ? "Groep" : blocked ? "Geblokkeerd" : presenceLabels[value.presence];
+        label.textContent = statusLabel;
         text.append(name, label);
         const meta = document.createElement("span");
         meta.className = "conversation-row-meta";
         const dot = document.createElement("span");
-        dot.className = "presence-dot presence-" + value.presence;
+        const dotStatus = value.kind === "group" ? "group" : blocked ? "blocked"
+          : ["online", "away", "extendedAway", "busy"].includes(value.presence) ? "online" : "offline";
+        dot.className = "presence-dot presence-" + dotStatus;
         dot.setAttribute("aria-hidden", "true");
         meta.append(dot);
         row.replaceChildren(picture, text, meta);

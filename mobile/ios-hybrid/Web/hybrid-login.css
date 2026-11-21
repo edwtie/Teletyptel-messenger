@@ -86,19 +86,6 @@ html, body {
   fill: none;
 }
 
-#hybridConnected .presence-unknown {
-  background: #64748b;
-}
-
-#hybridConnected .presence-away,
-#hybridConnected .presence-extendedAway {
-  background: #f59e0b;
-}
-
-#hybridConnected .presence-busy {
-  background: #ef4444;
-}
-
 #hybridConnected .topbar {
   padding-top: max(12px, env(safe-area-inset-top));
   flex-wrap: wrap;

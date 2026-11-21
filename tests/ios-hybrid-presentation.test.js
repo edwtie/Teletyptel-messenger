@@ -273,6 +273,9 @@ for (const engine of [chromium, webkit]) {
         await window.nativeFixtureClient.joinGroup("familie", "Fixture", false);
         window.emitAdministration({ room: "familie@conference.localhost", busy: false, canConfigure: true, canManageMembers: true, configuration: null, affiliation: null, members: [] });
       });
+      const groupRow = page.locator('[data-contact-jid="familie@conference.localhost"]');
+      assert.match(await groupRow.getAttribute("aria-label"), /Groep/);
+      assert.equal(await groupRow.locator(".presence-dot").evaluate(dot => getComputedStyle(dot).backgroundColor), "rgb(96, 165, 250)");
       await page.locator("#hybridStartMenu summary").click();
       await page.locator("#hybridManageGroup").click(); await page.locator("#hybridGroupLoadConfiguration").click();
       await page.locator("#hybridGroupName").fill("Nieuwe familie");
@@ -715,6 +718,14 @@ for (const engine of [chromium, webkit]) {
         { jid: "other@localhost", name: "<img src=x onerror=alert(1)>", presence: "unknown" }
       ]));
       assert.equal(await page.locator("#conversationItems .conversation-item").count(), 2);
+      const dotColor = jid => page.locator(`[data-contact-jid="${jid}"] .presence-dot`).evaluate(dot => getComputedStyle(dot).backgroundColor);
+      assert.equal(await dotColor("peer@localhost"), "rgb(34, 197, 94)");
+      assert.equal(await dotColor("other@localhost"), "rgb(239, 68, 68)");
+      assert.match(await page.locator('[data-contact-jid="other@localhost"]').getAttribute("aria-label"), /Status onbekend/);
+      await page.evaluate(() => window.emitAccount({ blocked: ["peer@localhost"] }));
+      assert.equal(await dotColor("peer@localhost"), "rgb(239, 68, 68)");
+      assert.match(await page.locator('[data-contact-jid="peer@localhost"]').getAttribute("aria-label"), /Geblokkeerd/);
+      await page.evaluate(() => window.emitAccount({ blocked: [] }));
       for (const row of await page.locator("#conversationItems .conversation-item").all()) {
         const rowBox = await row.boundingBox();
         const dotBox = await row.locator(".presence-dot").boundingBox();
@@ -732,6 +743,7 @@ for (const engine of [chromium, webkit]) {
       ]));
       assert.equal(await page.evaluate(() => document.activeElement.dataset.contactJid), "peer@localhost");
       assert.match(await page.locator("#conversationItems .conversation-item").getAttribute("aria-label"), /Afwezig/);
+      assert.equal(await dotColor("peer@localhost"), "rgb(34, 197, 94)");
       await page.locator("#conversationItems .conversation-item").press("Enter");
       assert.equal(await page.locator("#hybridContactTitle").textContent(), "Édward Fixture");
       await page.locator("#hybridConversation").waitFor({ state: "visible" });
