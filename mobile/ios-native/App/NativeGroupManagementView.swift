@@ -7,9 +7,14 @@ struct NativeRoomDiscovery: View {
         Section("Groepen op jouw server") {
             Button { model.run(.discover) } label: { Label("Beschikbare groepen ophalen", systemImage: "magnifyingglass") }.disabled(model.busy)
             if model.busy { ProgressView() }
-            ForEach(model.discovered) { item in Button { select(item.room) } label: {
-                VStack(alignment: .leading) { Text(item.name); Text(item.room).font(.caption) }
-            } }
+            ForEach(model.discovered) { item in
+                Button { select(item.room) } label: {
+                    VStack(alignment: .leading) { Text(item.name); Text(item.room).font(.caption) }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
+                }
+                .accessibilityIdentifier("discovered-room-" + item.room)
+            }
             Text("Besloten groepen worden niet altijd vermeld. Selecteren vult alleen het adres in; deelnemen blijft je eigen keuze.").font(.caption)
             if model.room == nil, let status = model.status { Text(status).font(.caption) }
         }

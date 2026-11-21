@@ -943,12 +943,18 @@ final class NativeStartupUITests: XCTestCase {
         let discovery = application.buttons["Beschikbare groepen ophalen"]
         let list = application.descendants(matching: .any)["group-directory-list"].firstMatch
         reveal(discovery, within: list); XCTAssertTrue(discovery.waitForExistence(timeout: 5)); discovery.tap()
-        let discovered = application.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Fictieve testgroep")).firstMatch
-        reveal(discovered, within: list); discovered.tap()
+        let expectedRoom = "fixture@conference.localhost"
+        let discovered = application.buttons["discovered-room-" + expectedRoom]
+        reveal(discovered, within: list)
+        XCTAssertTrue(discovered.label.contains("Fictieve testgroep"))
+        discovered.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        let address = application.textFields["group-address"]
+        reveal(address, upward: false, within: list)
+        XCTAssertEqual(address.value as? String, expectedRoom, "Selecting the discovered room must fill the group address before joining")
         let nickname = application.textFields["group-nickname"]; reveal(nickname, upward: false, within: list); nickname.tap(); nickname.typeText("Testnaam")
-        let join = application.buttons["group-join"]; reveal(join); join.tap()
-        let room = application.descendants(matching: .any)["group-room-fixture@conference.localhost"].firstMatch
-        XCTAssertTrue(room.waitForExistence(timeout: 5)); reveal(room); room.tap()
+        let join = application.buttons["group-join"]; reveal(join, within: list); join.tap()
+        let room = application.descendants(matching: .any)["group-room-" + expectedRoom].firstMatch
+        reveal(room, within: list); room.tap()
         let messages = application.scrollViews["group-messages-fixture@conference.localhost"].firstMatch
         XCTAssertTrue(messages.waitForExistence(timeout: 5))
         XCTAssertTrue(messages.staticTexts["Fictief groepsbericht"].waitForExistence(timeout: 5))
@@ -1256,7 +1262,7 @@ final class NativeStartupUITests: XCTestCase {
             return
         }
         for _ in 0..<16 {
-            if isUsable(element) { return }
+            if isUsable(element), container?.frame.contains(element.frame) != false { return }
             let screen = usableViewport()
             let viewport = container.map { $0.frame.intersection(screen) } ?? screen
             guard !viewport.isEmpty else { break }
@@ -1270,7 +1276,8 @@ final class NativeStartupUITests: XCTestCase {
                                                  dy: viewport.midY + (scrollUp ? -distance : distance)))
             start.press(forDuration: 0.05, thenDragTo: end)
         }
-        XCTAssertTrue(isUsable(element), "Element remains outside the usable viewport: \(element.identifier), \(element.frame)")
+        XCTAssertTrue(isUsable(element) && container?.frame.contains(element.frame) != false,
+                      "Element remains outside the usable viewport: \(element.identifier), \(element.frame)")
     }
 
     private func isUsable(_ element: XCUIElement) -> Bool {
