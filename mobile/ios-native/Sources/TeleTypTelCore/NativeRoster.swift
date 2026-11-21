@@ -100,7 +100,8 @@ struct NativeRosterStream {
                 return NativeRosterOutput(frames: [reply(pushID, sender: root.attributes["from"], error: "resource-constraint")])
             }
             var updated = contact
-            if receivesPresence(contact), let previous = contacts[contact.jid], receivesPresence(previous) {
+            if Self.receivesPresence(subscription: contact.subscription),
+               let previous = contacts[contact.jid], Self.receivesPresence(subscription: previous.subscription) {
                 updated.presence = previous.presence
                 updated.callEndpoint = previous.callEndpoint
             } else {
@@ -112,8 +113,8 @@ struct NativeRosterStream {
         return NativeRosterOutput(frames: [reply(pushID, sender: root.attributes["from"])], state: state)
     }
 
-    private func receivesPresence(_ contact: NativeContact) -> Bool {
-        ["to", "both"].contains(contact.subscription)
+    private static func receivesPresence(subscription: String) -> Bool {
+        subscription == "to" || subscription == "both"
     }
 
     private mutating func receivePresence(_ root: ProbeElement) -> NativeRosterOutput {
@@ -124,7 +125,7 @@ struct NativeRosterStream {
         }
         let parts = sender.split(separator: "/", maxSplits: 1, omittingEmptySubsequences: false)
         let jid = String(parts[0])
-        guard var contact = contacts[jid], receivesPresence(contact),
+        guard var contact = contacts[jid], Self.receivesPresence(subscription: contact.subscription),
               parts.count == 1 || !parts[1].isEmpty else { return NativeRosterOutput() }
         let resource = parts.count == 2 ? String(parts[1]) : ""
         let type = root.attributes["type"]
@@ -211,7 +212,8 @@ struct NativeRosterStream {
         let value = item.attributes["subscription"] ?? "none"
         let subscription = allowed.contains(value) ? value : "none"
         return NativeContact(jid: jid, name: item.attributes["name"] ?? "",
-                             groups: item.children.map { $0.text }, subscription: subscription)
+                             groups: item.children.map { $0.text }, subscription: subscription,
+                             presence: Self.receivesPresence(subscription: subscription) ? .offline : .unknown)
     }
 
     private func reply(_ identifier: String, sender: String?, error: String? = nil) -> String {

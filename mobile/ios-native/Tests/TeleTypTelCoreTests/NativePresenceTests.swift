@@ -6,7 +6,9 @@ final class NativePresenceTests: XCTestCase {
         var stream = NativeRosterStream(owner: "fixture@localhost")
         let identifier = try XCTUnwrap(try ProbeXML.parse(stream.request).attributes["id"])
         let result = try ProbeXML.parse("<iq xmlns='jabber:client' type='result' id='\(identifier)'><query xmlns='jabber:iq:roster'><item jid='peer@localhost' subscription='\(subscription)'/></query></iq>")
-        XCTAssertEqual(status(stream.receive(result)), .unknown)
+        let roster = stream.receive(result)
+        XCTAssertEqual(status(roster), ["to", "both"].contains(subscription) ? .offline : .unknown)
+        XCTAssertNil(endpoint(roster))
         return stream
     }
 
@@ -30,7 +32,16 @@ final class NativePresenceTests: XCTestCase {
         try ProbeXML.parse("<iq xmlns='jabber:client' type='set' id='update'><query xmlns='jabber:iq:roster'><item jid='peer@localhost' name='\(name)' subscription='\(subscription)'/></query></iq>")
     }
 
-    func testInitialStatusIsUnknownAndShowValuesAreMapped() throws {
+    func testSubscribedContactStartsOfflineWithoutAnUnavailableStanza() throws {
+        for subscription in ["to", "both"] {
+            var stream = try loaded(subscription: subscription)
+            XCTAssertNil(stream.receive(try presence("peer@localhost", type: "unavailable")).state)
+            XCTAssertEqual(status(stream.receive(try presence())), .online)
+            XCTAssertEqual(status(stream.receive(try presence(type: "unavailable"))), .offline)
+        }
+    }
+
+    func testAvailableShowValuesAreMapped() throws {
         for (show, expected) in [("", NativeContactPresence.online), ("chat", .online),
                                  ("away", .away), ("xa", .extendedAway), ("dnd", .busy)] {
             var stream = try loaded()
@@ -101,11 +112,11 @@ final class NativePresenceTests: XCTestCase {
         XCTAssertEqual(status(stream.receive(try push())), .online)
         XCTAssertEqual(status(stream.receive(try push(subscription: "none"))), .unknown)
         XCTAssertNil(stream.receive(try presence()).state)
-        XCTAssertEqual(status(stream.receive(try push())), .unknown)
+        XCTAssertEqual(status(stream.receive(try push())), .offline)
         XCTAssertEqual(status(stream.receive(try presence())), .online)
         XCTAssertEqual(stream.receive(try push(subscription: "remove")).state, .ready([]))
         XCTAssertNil(stream.receive(try presence()).state)
-        XCTAssertEqual(status(stream.receive(try push())), .unknown)
+        XCTAssertEqual(status(stream.receive(try push())), .offline)
     }
 
     func testResourceLimitCannotProduceFalseOfflineState() throws {

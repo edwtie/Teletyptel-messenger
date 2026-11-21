@@ -16,7 +16,7 @@ final class NativeRosterTests: XCTestCase {
         let output = stream.receive(try result(stream, items: "<item jid='zoe@localhost' name='Zoë &amp; vrienden' subscription='both'><group>Familie</group></item><item jid='anna@localhost'/>", from: "from='fixture@localhost'"))
         XCTAssertEqual(output.state, .ready([
             NativeContact(jid: "anna@localhost", name: "", groups: [], subscription: "none"),
-            NativeContact(jid: "zoe@localhost", name: "Zoë & vrienden", groups: ["Familie"], subscription: "both")
+            NativeContact(jid: "zoe@localhost", name: "Zoë & vrienden", groups: ["Familie"], subscription: "both", presence: .offline)
         ]))
         XCTAssertTrue(output.frames.isEmpty)
         XCTAssertNil(stream.timeout())
@@ -47,7 +47,7 @@ final class NativeRosterTests: XCTestCase {
         var stream = NativeRosterStream(owner: "fixture@localhost")
         _ = stream.receive(try result(stream))
         let output = stream.receive(try push("<item jid='peer@localhost' name='Peer' subscription='both'/>", from: "from='fixture@localhost'", identifier: "push-&apos;&amp;"))
-        XCTAssertEqual(output.state, .ready([NativeContact(jid: "peer@localhost", name: "Peer", groups: [], subscription: "both")]))
+        XCTAssertEqual(output.state, .ready([NativeContact(jid: "peer@localhost", name: "Peer", groups: [], subscription: "both", presence: .offline)]))
         let acknowledgment = try ProbeXML.parse(try XCTUnwrap(output.frames.first))
         XCTAssertEqual(acknowledgment.attributes["id"], "push-'&")
         XCTAssertEqual(acknowledgment.attributes["to"], "fixture@localhost")

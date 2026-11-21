@@ -744,6 +744,10 @@ for (const engine of [chromium, webkit]) {
       assert.equal(await page.evaluate(() => document.activeElement.dataset.contactJid), "peer@localhost");
       assert.match(await page.locator("#conversationItems .conversation-item").getAttribute("aria-label"), /Afwezig/);
       assert.equal(await dotColor("peer@localhost"), "rgb(34, 197, 94)");
+      await page.locator("#conversationSearchInput").fill("");
+      assert.equal(await dotColor("other@localhost"), "rgb(239, 68, 68)");
+      assert.match(await page.locator('[data-contact-jid="other@localhost"]').getAttribute("aria-label"), / · Offline$/);
+      await page.locator("#conversationSearchInput").fill("edward");
       await page.locator("#conversationItems .conversation-item").press("Enter");
       assert.equal(await page.locator("#hybridContactTitle").textContent(), "Édward Fixture");
       await page.locator("#hybridConversation").waitFor({ state: "visible" });

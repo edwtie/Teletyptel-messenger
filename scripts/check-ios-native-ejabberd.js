@@ -209,6 +209,7 @@ async function run() {
     }
     if (!ready) throw new Error("Isolated ejabberd did not start");
     control("register", username, "localhost", password);
+    control("register", "fixture-peer", "localhost", password);
     control("register", archivePeer, "localhost", password);
     control("register", groupOutsider, "localhost", password);
     control("create_room", groupRoom, "conference.localhost", "localhost");

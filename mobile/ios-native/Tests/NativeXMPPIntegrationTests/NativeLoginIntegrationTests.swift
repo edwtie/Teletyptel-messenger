@@ -49,12 +49,9 @@ final class NativeLoginIntegrationTests: XCTestCase {
         try await eventually { model.phase == .connected(jid) }
         XCTAssertTrue(model.isConnected)
         let contact = NativeContact(jid: "fixture-peer@localhost", name: "Fictief testcontact",
-                                    groups: ["Testcontacten"], subscription: "both")
+                                    groups: ["Testcontacten"], subscription: "both", presence: .offline)
         try await eventually {
-            guard case .ready(let contacts) = model.roster, contacts.count == 1 else { return false }
-            var received = contacts[0]
-            received.presence = .unknown
-            return received == contact
+            model.roster == .ready([contact])
         }
         model.disconnect()
         XCTAssertEqual(model.phase, .signedOut)
