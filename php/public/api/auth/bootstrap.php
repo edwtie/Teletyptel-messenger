@@ -56,6 +56,12 @@ function ttAuthStart(string $provider): void
     ];
     ttAuthStorePendingState($provider, $state, $verifier, $redirectUri, $linkAccountId);
 
+    $query = ttAuthAuthorizationQuery($provider, $config, $redirectUri, $state, $verifier);
+    header('Location: ' . $config['authorization_endpoint'] . '?' . http_build_query($query, '', '&', PHP_QUERY_RFC3986), true, 302);
+}
+
+function ttAuthAuthorizationQuery(string $provider, array $config, string $redirectUri, string $state, string $verifier): array
+{
     $query = [
         'response_type' => 'code',
         'client_id' => $config['client_id'],
@@ -67,9 +73,11 @@ function ttAuthStart(string $provider): void
     ];
     if ($provider === 'apple') {
         $query['response_mode'] = 'form_post';
+    } elseif ($provider === 'google') {
+        $query['prompt'] = 'select_account';
     }
 
-    header('Location: ' . $config['authorization_endpoint'] . '?' . http_build_query($query, '', '&', PHP_QUERY_RFC3986), true, 302);
+    return $query;
 }
 
 function ttAuthCallback(string $provider): void

@@ -25,6 +25,22 @@ function verifySession(bool $condition): void
     if (!$condition) throw new RuntimeException('OAuth session regression');
 }
 
+$providerConfig = ['client_id' => 'test-client', 'scopes' => ['openid', 'email', 'profile']];
+$redirect = 'https://example.test/callback';
+$query = ttAuthAuthorizationQuery('google', $providerConfig, $redirect, 'fixture-state', 'fixture-verifier');
+verifySession($query === [
+    'response_type' => 'code',
+    'client_id' => 'test-client',
+    'redirect_uri' => $redirect,
+    'scope' => 'openid email profile',
+    'state' => 'fixture-state',
+    'code_challenge' => ttAuthBase64Url(hash('sha256', 'fixture-verifier', true)),
+    'code_challenge_method' => 'S256',
+    'prompt' => 'select_account',
+]);
+verifySession(!isset(ttAuthAuthorizationQuery('facebook', $providerConfig, $redirect, 'fixture-state', 'fixture-verifier')['prompt']));
+verifySession(ttAuthAuthorizationQuery('apple', $providerConfig, $redirect, 'fixture-state', 'fixture-verifier')['response_mode'] === 'form_post');
+
 session_start();
 $account = ['account_id' => 'fictitious-account'];
 $_SESSION = ['teletyptel_2fa_pending_account_id' => 'old-account', 'teletyptel_2fa_pending_password' => 'fixture'];
