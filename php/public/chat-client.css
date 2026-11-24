@@ -1938,6 +1938,100 @@ body.history-page-active .client-grid::before {
   padding: 12px;
 }
 
+.conversation-list[data-contact-directory="xmpp"] {
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+}
+
+.conversation-list[data-contact-directory="sip"] {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.conversation-list[data-contact-directory="sip"] > :is(.conversation-search, .conversation-items, .conversation-actions-footer) {
+  display: none;
+}
+
+.conversation-list[data-contact-directory] > .conversation-actions-footer {
+  padding-bottom: 0;
+}
+
+.contact-directory-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  border-top: 1px solid var(--line);
+  margin-top: 10px;
+  padding: 8px 0 env(safe-area-inset-bottom, 0px);
+}
+
+.contact-directory-tabs button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+}
+
+.contact-directory-tabs button[aria-pressed="true"] {
+  background: var(--selection-bg);
+  color: var(--selection-text);
+  border-color: var(--selection-border);
+}
+
+.contact-directory-tabs svg {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+}
+
+.sip-directory {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+}
+
+.sip-directory-contacts {
+  display: grid;
+  gap: 8px;
+  padding: 0;
+  list-style: none;
+}
+
+.sip-directory-contacts li {
+  padding: 8px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow-wrap: anywhere;
+}
+
+.sip-directory-contacts strong,
+.sip-directory-contacts span {
+  display: block;
+}
+
+.sip-directory-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.sip-directory-actions button,
+.sip-directory-form input {
+  min-height: 44px;
+}
+
+.sip-directory-form:not([hidden]) {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.sip-directory-form input {
+  width: 100%;
+  min-width: 0;
+}
+
 body:not(.conversation-open):not(.call-active):not(.history-page-active) .app-shell {
   height: var(--visual-viewport-height, 100dvh);
   min-height: 0;

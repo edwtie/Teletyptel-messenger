@@ -15,7 +15,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="favicon.ico" sizes="any">
   <link rel="apple-touch-icon" href="assets/brand/teletyptel-icon-192.png">
-  <link rel="stylesheet" href="chat-client.css?v=20261104-call-keypad-letters">
+  <link rel="stylesheet" href="chat-client.css?v=20261124-sip-contacts">
   <link rel="stylesheet" href="xmpp-availability.css?v=20261105-stable-startup">
   <link rel="stylesheet" href="chat-dialer.css?v=20261104-hold-letters">
   <link rel="stylesheet" href="chat-tablet.css?v=20261104-video-fit">
@@ -100,9 +100,10 @@
     </header>
 
     <main class="client-grid">
-      <aside id="conversationSidebar" class="conversation-list" aria-label="Conversations" data-i18n-aria-label="section.conversations">
+      <aside id="conversationSidebar" class="conversation-list" data-contact-directory="xmpp" aria-label="Contacts" data-i18n-aria-label="section.conversations">
         <div class="section-heading">
-          <span data-i18n="section.conversations">Conversations</span>
+          <span id="xmppDirectoryTitle" data-i18n="section.conversations">Conversations</span>
+          <span id="sipDirectoryTitle" data-i18n="sip.contacts" hidden>SIP contacts</span>
           <button id="callContactsClose" class="icon-button call-contacts-close" type="button" aria-label="Close contacts" data-i18n-aria-label="tablet.close_contacts" hidden><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
         </div>
         <label class="conversation-search">
@@ -117,6 +118,32 @@
           </div>
           <button id="conversationActionsToggle" class="conversation-add-toggle" type="button" aria-expanded="false" aria-controls="conversationActionsPanel" aria-label="Add contact or group" title="Add contact or group" data-i18n-aria-label="button.add_contact_or_group" data-i18n-title="button.add_contact_or_group">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+        </div>
+        <section id="sipDirectory" class="sip-directory" aria-labelledby="sipDirectoryTitle" hidden>
+          <p id="sipDirectoryStatus" role="status"></p>
+          <ul id="sipDirectoryContacts" class="sip-directory-contacts"></ul>
+          <div class="sip-directory-actions">
+            <button id="sipDirectoryAdd" type="button" aria-controls="sipDirectoryForm" aria-expanded="false" data-i18n="sip.add">Add SIP contact</button>
+            <button id="sipDirectoryDialer" type="button" data-i18n="sip.open_keypad">Open keypad</button>
+          </div>
+          <form id="sipDirectoryForm" class="sip-directory-form" autocomplete="off" hidden>
+            <label for="sipDirectoryName" data-i18n="sip.name">Name</label>
+            <input id="sipDirectoryName" required maxlength="120">
+            <label for="sipDirectoryDestination" data-i18n="sip.destination">Phone number or SIP address</label>
+            <input id="sipDirectoryDestination" required maxlength="254" autocapitalize="none" spellcheck="false" placeholder="name@provider.example">
+            <div class="sip-directory-actions">
+              <button type="submit" data-i18n="sip.save">Save</button>
+              <button id="sipDirectoryCancel" type="button" data-i18n="button.cancel">Cancel</button>
+            </div>
+          </form>
+        </section>
+        <div id="conversationDirectoryTabs" class="contact-directory-tabs" role="group" aria-label="Contact type" data-i18n-aria-label="sip.directory_label">
+          <button id="selectXmppDirectory" type="button" aria-label="XMPP contacts" data-i18n-aria-label="sip.xmpp_contacts" aria-pressed="true" aria-controls="conversationItems">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 5h16v11H9l-5 4V5Z"/><path d="M8 9h8m-8 3h5"/></svg><span>XMPP</span>
+          </button>
+          <button id="selectSipDirectory" type="button" aria-label="SIP contacts" data-i18n-aria-label="sip.contacts" aria-pressed="false" aria-controls="sipDirectory" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 3h4l2 5-3 2a15 15 0 0 0 6 6l2-3 5 2v4a2 2 0 0 1-2 2C10 21 3 14 3 5a2 2 0 0 1 2-2Z"/></svg><span>SIP</span>
           </button>
         </div>
       </aside>
@@ -1461,7 +1488,8 @@
   <script src="native-call-push.js?v=20261106-native-control"></script>
   <script src="xmpp-availability.js?v=20261105-stable-startup"></script>
   <script src="chat-modal.js?v=20261104-accessibility-fixes"></script>
-  <script src="chat-client.js?v=20261105-stable-startup"></script>
+  <script src="chat-sip-contacts.js?v=20261124-sip-contacts"></script>
+  <script src="chat-client.js?v=20261124-sip-contacts"></script>
   <script src="chat-interpreter.js?v=20261104-accessibility-fixes"></script>
   <script src="mobile-navigation.js?v=20261104-call-menu"></script>
   <script src="call-controls-menu.js?v=20261104-symbols-only"></script>

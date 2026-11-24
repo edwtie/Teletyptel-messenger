@@ -925,6 +925,7 @@
     } });
 
   const xmppAvailability = window.TeleTypTelXmppAvailability?.create({ translate: t });
+  const sipDirectory = window.TeleTypTelSipContacts?.mount(document, t);
   const callPush = window.TeleTypTelCallPush?.create({
     translate: t,
     signedIn: () => state.accountReady && !state.logoutInProgress,
@@ -2536,6 +2537,7 @@
     }
 
     messageTranslation.refreshLabels();
+    sipDirectory?.refresh();
     renderMaterialIcons();
     applyTheme(state.theme);
     setMode(state.mode);
@@ -3045,6 +3047,7 @@
     updateAccountAvatarPreview();
     updateRelayConversationMeta();
     reconcileContactsForCurrentAccount();
+    syncSipDirectoryAccount();
     syncAccountDialogFromControls();
   }
 
@@ -3185,6 +3188,7 @@
 
   function setAccountGateRequired(required) {
     state.accountGateRequired = required === true;
+    syncSipDirectoryAccount();
     if (state.accountGateRequired && state.accountDialogMode !== "reset") {
       state.accountDialogMode = "signin";
     }
@@ -16877,6 +16881,7 @@
 
   function setAccountReady(ready) {
     state.accountReady = ready === true;
+    syncSipDirectoryAccount();
     void messageTranslation.setAccount(state.accountReady ? state.account?.accountId || "" : "");
     if (state.accountReady) {
       scheduleSessionInactivityTimeout();
@@ -16886,6 +16891,11 @@
     }
     updateConnectButtonAvailability();
     updateComposerAvailability();
+  }
+
+  function syncSipDirectoryAccount() {
+    sipDirectory?.setAccount(state.accountReady && !state.accountGateRequired && !state.logoutInProgress
+      ? state.account?.accountId || "" : "");
   }
 
   function autoConnectIfReady() {
