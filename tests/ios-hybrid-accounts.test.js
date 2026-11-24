@@ -73,3 +73,15 @@ test("contact blocking and native dialogs cannot introduce unknown peers or remo
   assert.match(swift, /contacts\.contains\(where:/);
   assert.match(swift, /login\.removeContact\(jid\)/);
 });
+
+test("SIP contact snapshots cannot expose local contact data outside an active account", () => {
+  const contact = { id: "11111111-2222-3333-4444-555555555555", name: "Tolk", destination: "naam@provider.test" };
+  const state = { sipContactsAvailable: true, sipContacts: [contact] };
+  const value = safeAccount(state, roster, "connected");
+  assert.deepEqual(value.sipContacts, [contact]);
+  assert.ok(Object.isFrozen(value.sipContacts[0]));
+  assert.throws(() => safeAccount(state, roster, "signedOut"), /invalidNativeReply/);
+  assert.throws(() => safeAccount({ sipContacts: [contact] }, roster, "connected"), /invalidNativeReply/);
+  assert.throws(() => safeAccount({ ...state, sipContacts: [contact, contact] }, roster, "connected"), /invalidNativeReply/);
+  assert.throws(() => safeAccount({ ...state, sipContacts: [{ ...contact, destination: "https://provider.test" }] }, roster, "connected"), /invalidNativeReply/);
+});

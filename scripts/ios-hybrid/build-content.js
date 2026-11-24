@@ -35,8 +35,11 @@ function createContent() {
   const features = fs.readFileSync(path.join(root, "mobile/ios-hybrid/Web/features-fragment.html"), "utf8");
   const accountFeatures = fs.readFileSync(path.join(root, "mobile/ios-hybrid/Web/account-fragment.html"), "utf8");
   const history = fs.readFileSync(path.join(root, "mobile/ios-hybrid/Web/history-fragment.html"), "utf8");
+  const directory = fs.readFileSync(path.join(root, "mobile/ios-hybrid/Web/contact-directory-fragment.html"), "utf8");
   const sidebar = element(original, /<aside\b[^>]*\bid="conversationSidebar"[^>]*>/)
-    .replace('<div id="conversationItems"', '<p id="hybridRosterStatus" class="security-status" role="status" aria-live="polite"></p><div id="conversationItems"');
+    .replace(/^(<aside\b[^>]*>)/, '$1<div id="hybridXmppDirectory" class="hybrid-xmpp-directory">')
+    .replace('<div id="conversationItems"', '<p id="hybridRosterStatus" class="security-status" role="status" aria-live="polite"></p><div id="conversationItems"')
+    .replace(/<\/aside>$/, () => '</div>' + directory + '</aside>');
   const legacy = reference("chat-client.js");
   const smileys = resolveCatalog(legacy, readReference);
   const icon = /\bsettings:\s*\{\s*viewBox:\s*"([\d -]+)",\s*paths:\s*(\[[^\]]*\])/.exec(legacy);

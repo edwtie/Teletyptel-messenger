@@ -40,7 +40,112 @@ html, body {
 }
 
 #hybridConnected .conversation-list {
+  grid-template-rows: minmax(0, 1fr) auto;
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+}
+
+.hybrid-xmpp-directory {
+  display: grid;
   grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  min-height: 0;
+}
+
+#hybridConnected .conversation-actions-footer {
+  padding-bottom: 0;
+}
+
+.hybrid-sip-directory {
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.hybrid-sip-directory h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.hybrid-sip-directory button {
+  min-height: 44px;
+}
+
+.hybrid-sip-contacts {
+  display: grid;
+  gap: 8px;
+  padding: 0;
+  margin: 0 0 8px;
+  list-style: none;
+}
+
+.hybrid-sip-contacts li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 8px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.hybrid-sip-contacts li div {
+  flex: 1 1 100%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.hybrid-sip-contacts strong,
+.hybrid-sip-contacts span {
+  display: block;
+}
+
+.hybrid-sip-form:not([hidden]),
+.hybrid-sip-form label {
+  display: grid;
+  gap: 6px;
+}
+
+.hybrid-sip-form {
+  margin-top: 12px;
+}
+
+.hybrid-sip-form input {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+}
+
+.hybrid-xmpp-directory[hidden],
+#hybridConnected[data-contact-directory="sip"] .hybrid-contact-preview {
+  display: none;
+}
+
+.hybrid-contact-directory-switch {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  border-top: 1px solid var(--line);
+  margin-top: 10px;
+  padding-top: 8px;
+}
+
+.hybrid-contact-directory-switch button {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+}
+
+.hybrid-contact-directory-switch button[aria-pressed="true"] {
+  background: var(--selection-bg);
+  color: var(--selection-text);
+  border-color: var(--selection-border);
+}
+
+.hybrid-contact-directory-switch svg {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
 }
 
 #hybridRosterStatus {
@@ -109,11 +214,11 @@ html, body {
     display: none;
   }
 
-  body.hybrid-contact-selected #hybridConnected .hybrid-contact-preview {
+  body.hybrid-contact-selected #hybridConnected:not([data-contact-directory="sip"]) .hybrid-contact-preview {
     display: flex;
   }
 
-  body.hybrid-contact-selected #hybridConnected .conversation-list {
+  body.hybrid-contact-selected #hybridConnected:not([data-contact-directory="sip"]) .conversation-list {
     display: none;
   }
 }

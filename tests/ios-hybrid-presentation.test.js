@@ -106,6 +106,13 @@ async function setup(engine, viewport = { width: 390, height: 844 }) {
             if (["auth.register", "auth.recover", "contacts.add"].includes(command.command)) window.nativeState.account = { ...window.nativeState.account, notice: "Aanvraag ontvangen; controleer de bevestiging." };
             if (command.command === "account.save") window.nativeState.account = { ...window.nativeState.account,
               profile: { ...window.nativeState.account.profile, name: args.name, phone: args.phone, language: args.language, color: args.color }, notice: "Accountinstellingen opgeslagen." };
+            if (command.command === "account.sip.save") {
+              const entries = window.nativeState.account.sipContacts || [];
+              const contact = { id: args.id || crypto.randomUUID(), name: args.name, destination: args.destination };
+              window.nativeState.account = { ...window.nativeState.account, sipContacts: [...entries.filter(value => value.id !== contact.id), contact] };
+            }
+            if (command.command === "account.sip.remove") window.nativeState.account = { ...window.nativeState.account,
+              sipContacts: window.nativeState.account.sipContacts.filter(contact => contact.id !== args.id) };
             if (command.command === "contacts.block") window.nativeState.account = { ...window.nativeState.account, blocked: args.blocked === "true" ? [args.jid] : [], notice: "Wijziging bevestigd." };
             if (command.command === "contacts.dnd") window.nativeState.account = { ...window.nativeState.account, doNotDisturb: args.enabled === "true" };
             if (/^(chat|calls|groups|files|translation)\./.test(command.command)) {
@@ -704,6 +711,69 @@ for (const engine of [chromium, webkit]) {
       }
       const colors = await page.locator("#dialogConnectButton").evaluate(button => ({ background: getComputedStyle(button).backgroundColor, color: getComputedStyle(button).color }));
       assert.deepEqual(colors, { background: "rgb(37, 99, 235)", color: "rgb(255, 255, 255)" });
+      assert.deepEqual(errors, []);
+    } finally { await browser.close(); }
+  });
+
+  test(engine.name() + ": contact directory switch separates XMPP chats from the SIP dialer", { timeout: 45000 }, async () => {
+    const { browser, page, errors } = await setup(engine);
+    try {
+      page.setDefaultTimeout(7000);
+      await page.evaluate(() => window.emitRoster(Array.from({ length: 50 }, (_, index) => ({
+        jid: "fixture-" + index + "@localhost", name: "Testcontact " + index, presence: "offline"
+      }))));
+      const xmpp = page.getByRole("button", { name: "XMPP-contacten" });
+      const sip = page.getByRole("button", { name: "SIP-contacten" });
+      const sipDirectory = page.getByRole("region", { name: "SIP-contacten" });
+      const dialer = sipDirectory.getByRole("button", { name: "Nummerpad openen" });
+      const list = page.locator("#conversationItems");
+      for (const [width, height] of [[390, 844], [844, 390], [834, 1194], [1194, 834]]) {
+        await page.setViewportSize({ width, height });
+        const listBox = await list.boundingBox();
+        const xmppBox = await xmpp.boundingBox();
+        const sipBox = await sip.boundingBox();
+        assert.ok(listBox && xmppBox && sipBox && xmppBox.y >= listBox.y + listBox.height,
+          "mode buttons stay below the scrollable contact list");
+        assert.ok(Math.abs(xmppBox.y - sipBox.y) <= 1 && sipBox.y + sipBox.height <= height,
+          "mode buttons fit on one row after rotation");
+      }
+      await page.setViewportSize({ width: 834, height: 1194 });
+      await list.locator(".conversation-item").first().click();
+      await page.locator("#hybridConversation").waitFor({ state: "visible" });
+      await sip.press("Enter");
+      assert.equal(await sip.getAttribute("aria-pressed"), "true");
+      assert.ok(await sipDirectory.isVisible());
+      assert.ok(await list.isHidden());
+      assert.ok(await page.locator("#hybridContactPreview").isHidden());
+      assert.ok(await dialer.isDisabled());
+      await page.evaluate(() => window.emitAccount({ nativePanels: true, sipContactsAvailable: true, sipContacts: [] }));
+      await dialer.click();
+      await page.waitForFunction(() => window.nativeCommands.some(value => value.command === "account.panel" && value.arguments.panel === "dialer"));
+      const addContact = sipDirectory.getByRole("button", { name: "SIP-contact toevoegen" });
+      for (const [name, destination] of [["Lokale test", "600"], ["Gebarenservice", "Tolk@provider.test"]]) {
+        await addContact.click();
+        await sipDirectory.getByLabel("Naam", { exact: true }).fill(name);
+        await sipDirectory.getByLabel("Telefoonnummer of SIP-adres").fill(destination);
+        await sipDirectory.getByRole("button", { name: "Opslaan" }).click();
+        await sipDirectory.getByText(destination, { exact: true }).waitFor();
+      }
+      await sipDirectory.getByRole("button", { name: "Gebarenservice bewerken" }).click();
+      await sipDirectory.getByLabel("Naam", { exact: true }).fill("Gebarentolk");
+      await sipDirectory.getByRole("button", { name: "Opslaan" }).click();
+      await sipDirectory.getByRole("button", { name: "Gebarentolk verwijderen" }).click();
+      await sipDirectory.getByText("Tolk@provider.test", { exact: true }).waitFor({ state: "hidden" });
+      await xmpp.click();
+      assert.equal(await xmpp.getAttribute("aria-pressed"), "true");
+      assert.ok(await sipDirectory.isHidden());
+      assert.ok(await list.isVisible());
+      assert.ok(await page.locator("#hybridConversation").isVisible(), "switching does not close the XMPP chat");
+      await sip.click();
+      await page.locator("#hybridLogout").click();
+      await page.evaluate(() => window.emitRoster([{ jid: "new@localhost", name: "Nieuw testcontact", presence: "offline" }]));
+      assert.equal(await xmpp.getAttribute("aria-pressed"), "true");
+      assert.ok(await sipDirectory.isHidden());
+      await sip.click();
+      assert.equal(await sipDirectory.getByRole("listitem").count(), 0);
       assert.deepEqual(errors, []);
     } finally { await browser.close(); }
   });

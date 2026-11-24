@@ -29,6 +29,18 @@
     const back = byID("hybridContactsBack");
     const actions = byID("conversationActionsPanel");
     const toggle = byID("conversationActionsToggle");
+    const shell = byID("hybridConnected");
+    const xmppDirectory = byID("hybridXmppDirectory");
+    const sipDirectory = byID("hybridSipDirectory");
+    const xmppButton = byID("hybridSelectXmpp");
+    const sipButton = byID("hybridSelectSip");
+    const sipList = byID("hybridSipContacts");
+    const sipStatus = byID("hybridSipStatus");
+    const sipAdd = byID("hybridSipAdd");
+    const sipForm = byID("hybridSipForm");
+    const sipName = byID("hybridSipName");
+    const sipDestination = byID("hybridSipDestination");
+    const sipCancel = byID("hybridSipCancel");
     let roster = { status: "hidden", contacts: [] };
     let selected = null;
     let selectedKind = "direct";
@@ -36,6 +48,9 @@
     let disposed = false;
     let latestState = null;
     let rosterSignature = "";
+    let sipSignature = "";
+    let editingSipID = "";
+    let sipOperation = null;
     document.querySelector("#conversationSidebar .section-heading > span").textContent = "Contacten";
     const searchIcon = document.querySelector(".conversation-search .material-icon");
     searchIcon.replaceChildren();
@@ -138,13 +153,112 @@
       actions.hidden = !actions.hidden;
       toggle.setAttribute("aria-expanded", String(!actions.hidden));
     };
+    function selectDirectory(sipSelected) {
+      shell.dataset.contactDirectory = sipSelected ? "sip" : "xmpp";
+      xmppDirectory.hidden = sipSelected;
+      sipDirectory.hidden = !sipSelected;
+      xmppButton.setAttribute("aria-pressed", String(!sipSelected));
+      sipButton.setAttribute("aria-pressed", String(sipSelected));
+      if (sipSelected) {
+        actions.hidden = true;
+        toggle.setAttribute("aria-expanded", "false");
+      }
+    }
+    const showXmpp = () => selectDirectory(false);
+    const showSip = () => selectDirectory(true);
+    xmppButton.addEventListener("click", showXmpp);
+    sipButton.addEventListener("click", showSip);
+
+    function showSipForm(contact) {
+      editingSipID = contact?.id || "";
+      sipName.value = contact?.name || "";
+      sipDestination.value = contact?.destination || "";
+      sipForm.hidden = false;
+      sipAdd.setAttribute("aria-expanded", "true");
+      sipName.focus();
+    }
+
+    function closeSipForm() {
+      editingSipID = "";
+      sipForm.reset();
+      sipForm.hidden = true;
+      sipAdd.setAttribute("aria-expanded", "false");
+    }
+
+    async function sipCommand(command, args) {
+      const scope = latestState?.epoch;
+      if (!scope || !latestState.account.sipContactsAvailable || sipOperation) return;
+      const operation = {};
+      sipOperation = operation;
+      sipStatus.textContent = "";
+      try {
+        await client.accountCommand(command, args, scope);
+        if (latestState?.epoch !== scope || sipOperation !== operation) return;
+        closeSipForm();
+        const hasContacts = latestState.account.sipContacts.length > 0;
+        sipStatus.textContent = command === "account.sip.save" ? "SIP-contact opgeslagen." : hasContacts ? "SIP-contact verwijderd." : "Nog geen SIP-contacten.";
+        sipAdd.focus();
+      } catch {
+        if (latestState?.epoch === scope && sipOperation === operation) sipStatus.textContent = "Niet gelukt. Controleer de naam en het telefoonnummer of SIP-adres.";
+      } finally {
+        if (sipOperation === operation) sipOperation = null;
+      }
+    }
+
+    function renderSip(state) {
+      const { sipContactsAvailable, sipContacts } = state.account;
+      const signature = JSON.stringify([state.epoch, sipContactsAvailable, sipContacts]);
+      if (signature === sipSignature) return;
+      sipSignature = signature;
+      if (!sipContactsAvailable) closeSipForm();
+      sipAdd.disabled = !sipContactsAvailable || sipContacts.length >= 100;
+      sipStatus.textContent = !sipContactsAvailable ? "SIP-contacten zijn nu niet beschikbaar."
+        : sipContacts.length ? "" : "Nog geen SIP-contacten.";
+      sipList.replaceChildren(...sipContacts.map(contact => {
+        const row = document.createElement("li");
+        const details = document.createElement("div");
+        const name = document.createElement("strong");
+        name.textContent = contact.name;
+        const destination = document.createElement("span");
+        destination.textContent = contact.destination;
+        details.append(name, destination);
+        const edit = document.createElement("button");
+        edit.type = "button"; edit.textContent = "Bewerken";
+        edit.setAttribute("aria-label", contact.name + " bewerken");
+        edit.addEventListener("click", () => showSipForm(contact));
+        const remove = document.createElement("button");
+        remove.type = "button"; remove.textContent = "Verwijderen";
+        remove.setAttribute("aria-label", contact.name + " verwijderen");
+        remove.addEventListener("click", () => void sipCommand("account.sip.remove", { id: contact.id }));
+        row.append(details, edit, remove);
+        return row;
+      }));
+    }
+
+    const addSip = () => showSipForm();
+    const cancelSip = () => { closeSipForm(); sipAdd.focus(); };
+    const saveSip = event => {
+      event.preventDefault();
+      void sipCommand("account.sip.save", {
+        id: editingSipID, name: sipName.value.trim(), destination: sipDestination.value.trim()
+      });
+    };
+    sipAdd.addEventListener("click", addSip);
+    sipCancel.addEventListener("click", cancelSip);
+    sipForm.addEventListener("submit", saveSip);
     search.addEventListener("input", changeSearch);
     back.addEventListener("click", showList);
     toggle.addEventListener("click", toggleActions);
     const unsubscribe = client.subscribe(state => {
+      if (latestState?.epoch !== state.epoch || !state.account.sipContactsAvailable) {
+        closeSipForm();
+        sipOperation = null;
+      }
       latestState = state;
+      renderSip(state);
       const next = state.roster || { status: "hidden", contacts: [] };
       if (next.status === "hidden") {
+        selectDirectory(false);
         search.value = "";
         selected = null;
         actions.hidden = true;
@@ -162,11 +276,18 @@
     const dispose = () => {
       disposed = true;
       unsubscribe();
+      xmppButton.removeEventListener("click", showXmpp);
+      sipButton.removeEventListener("click", showSip);
+      sipAdd.removeEventListener("click", addSip);
+      sipCancel.removeEventListener("click", cancelSip);
+      sipForm.removeEventListener("submit", saveSip);
       search.removeEventListener("input", changeSearch);
       back.removeEventListener("click", showList);
       toggle.removeEventListener("click", toggleActions);
       document.defaultView.removeEventListener("pagehide", dispose);
       list.replaceChildren();
+      sipList.replaceChildren();
+      closeSipForm();
       search.value = "";
       title.textContent = "";
       jid.textContent = "";

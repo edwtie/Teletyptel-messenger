@@ -78,6 +78,13 @@ struct HybridRequest: Decodable, CustomStringConvertible, CustomDebugStringConve
                   arguments["color"]?.range(of: #"\A#[a-fA-F0-9]{6}\z"#, options: .regularExpression) != nil else { throw HybridFailure.invalidRequest }
         case "account.panel":
             guard Set(arguments.keys) == Set(["panel"]), ["settings", "security", "dialer"].contains(arguments["panel"] ?? "") else { throw HybridFailure.invalidRequest }
+        case "account.sip.save":
+            guard Set(arguments.keys) == Set(["id", "name", "destination"]), let id = arguments["id"],
+                  id.isEmpty || UUID(uuidString: id) != nil,
+                  let name = arguments["name"], let destination = arguments["destination"] else { throw HybridFailure.invalidRequest }
+            _ = try HybridSIPContact(id: UUID(), name: name, destination: destination)
+        case "account.sip.remove":
+            guard Set(arguments.keys) == Set(["id"]), UUID(uuidString: arguments["id"] ?? "") != nil else { throw HybridFailure.invalidRequest }
         case "contacts.rename", "contacts.block", "contacts.remove", "contacts.dnd":
             let required = command == "contacts.rename" ? Set(["jid", "name"]) : command == "contacts.block" ? Set(["jid", "blocked"]) : command == "contacts.remove" ? Set(["jid"]) : Set(["enabled"])
             guard Set(arguments.keys) == required else { throw HybridFailure.invalidRequest }

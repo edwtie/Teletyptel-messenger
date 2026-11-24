@@ -112,17 +112,30 @@
 
   function safeAccount(value, roster, phase) {
     const empty = { providers: [], entryAvailable: false, registrationAvailable: false, rememberAvailable: false, savedLogin: false,
-      busy: false, contactsAvailable: false, nativePanels: false, presentation: false, blocked: [], doNotDisturb: false, owner: null, requests: [], profile: null, avatars: {}, notice: null };
+      busy: false, contactsAvailable: false, nativePanels: false, sipContactsAvailable: false, sipContacts: [], presentation: false, blocked: [], doNotDisturb: false, owner: null, requests: [], profile: null, avatars: {}, notice: null };
     if (value === undefined) value = empty;
     const validJid = jid => typeof jid === "string" && jid.length > 0 && new TextEncoder().encode(jid).length <= 1023 && !/[\s/\u0000-\u001f\u007f-\u009f]/u.test(jid);
     if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).some(key => !Object.hasOwn(empty, key))) throw new Error("invalidNativeReply");
     const result = { ...empty, ...value };
-    if (["entryAvailable", "registrationAvailable", "rememberAvailable", "savedLogin", "busy", "contactsAvailable", "nativePanels", "presentation", "doNotDisturb"].some(key => typeof result[key] !== "boolean")
+    if (["entryAvailable", "registrationAvailable", "rememberAvailable", "savedLogin", "busy", "contactsAvailable", "nativePanels", "sipContactsAvailable", "presentation", "doNotDisturb"].some(key => typeof result[key] !== "boolean")
         || !Array.isArray(result.providers) || result.providers.length > 2 || new Set(result.providers).size !== result.providers.length || result.providers.some(name => !["google", "facebook"].includes(name))
         || (result.owner !== null && !validJid(result.owner)) || !Array.isArray(result.requests) || result.requests.length > 32 || result.requests.some(jid => !validJid(jid))
         || (result.notice !== null && !safeText(result.notice)) || !result.avatars || typeof result.avatars !== "object" || Array.isArray(result.avatars)
         || !Array.isArray(result.blocked) || result.blocked.length > 100 || result.blocked.some(jid => !roster.contacts.some(contact => contact.jid === jid))
         || Object.keys(result.avatars).length > 101 || (phase !== "connected" && (result.owner || result.profile || result.contactsAvailable || result.requests.length || result.blocked.length || result.doNotDisturb || Object.keys(result.avatars).length))) throw new Error("invalidNativeReply");
+    if (!Array.isArray(result.sipContacts) || result.sipContacts.length > 100
+        || (result.sipContactsAvailable && phase !== "connected")
+        || (result.sipContacts.length > 0 && !result.sipContactsAvailable)) throw new Error("invalidNativeReply");
+    const sipIDs = new Set();
+    const sipContacts = result.sipContacts.map(contact => {
+      if (!contact || Object.keys(contact).sort().join(",") !== "destination,id,name"
+          || typeof contact.id !== "string" || !uuidPattern.test(contact.id) || sipIDs.has(contact.id.toLowerCase())
+          || !safeText(contact.name, 120) || !contact.name.trim() || /[\u0000-\u001f\u007f-\u009f]/u.test(contact.name)
+          || !safeText(contact.destination, 254)
+          || !/^(?:\+?[0-9]{2,20}|[A-Za-z0-9._+%-]{1,128}@[A-Za-z0-9.-]+)$/.test(contact.destination)) throw new Error("invalidNativeReply");
+      sipIDs.add(contact.id.toLowerCase());
+      return Object.freeze({ ...contact });
+    });
     if (result.profile !== null) {
       const profile = result.profile;
       if (!profile || typeof profile !== "object" || Object.keys(profile).sort().join(",") !== "color,jid,language,name,phone" || profile.jid !== result.owner
@@ -135,7 +148,7 @@
       if (!(jid === result.owner || roster.contacts.some(contact => contact.jid === jid)) || typeof image !== "string" || image.length > 32768
           || !/^data:image\/jpeg;base64,\/9j\/[A-Za-z0-9+/]*={0,2}$/.test(image) || (bytes += image.length) > 786432) throw new Error("invalidNativeReply");
     }
-    return Object.freeze({ ...result, providers: Object.freeze([...result.providers]), requests: Object.freeze([...result.requests]), blocked: Object.freeze([...result.blocked]), avatars: Object.freeze({ ...result.avatars }) });
+    return Object.freeze({ ...result, providers: Object.freeze([...result.providers]), requests: Object.freeze([...result.requests]), blocked: Object.freeze([...result.blocked]), avatars: Object.freeze({ ...result.avatars }), sipContacts: Object.freeze(sipContacts) });
   }
 
   function safeRoster(value, phase) {

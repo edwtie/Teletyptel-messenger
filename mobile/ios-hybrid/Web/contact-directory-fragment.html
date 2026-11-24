@@ -1,0 +1,20 @@
+<section id="hybridSipDirectory" class="hybrid-sip-directory" aria-labelledby="hybridSipDirectoryTitle" hidden>
+  <h2 id="hybridSipDirectoryTitle">SIP-contacten</h2>
+  <p id="hybridSipStatus" class="security-status" role="status"></p>
+  <ul id="hybridSipContacts" class="hybrid-sip-contacts" aria-label="Opgeslagen SIP-contacten"></ul>
+  <button id="hybridSipAdd" type="button" aria-controls="hybridSipForm" aria-expanded="false" disabled>SIP-contact toevoegen</button>
+  <button id="hybridSipDialer" type="button" data-native-panel="dialer" disabled>Nummerpad openen</button>
+  <form id="hybridSipForm" class="hybrid-sip-form" hidden autocomplete="off">
+    <label>Naam <input id="hybridSipName" type="text" maxlength="120" required></label>
+    <label>Telefoonnummer of SIP-adres <input id="hybridSipDestination" type="text" inputmode="text" autocapitalize="none" spellcheck="false" placeholder="Bijv. naam@provider.nl" maxlength="254" required></label>
+    <div><button type="submit">Opslaan</button> <button id="hybridSipCancel" type="button">Annuleren</button></div>
+  </form>
+</section>
+<div class="hybrid-contact-directory-switch" role="group" aria-label="Soort contacten">
+  <button id="hybridSelectXmpp" type="button" aria-pressed="true" aria-controls="hybridXmppDirectory" aria-label="XMPP-contacten">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 5h16v11H9l-5 4V5Z"/><path d="M8 9h8m-8 3h5"/></svg><span>XMPP</span>
+  </button>
+  <button id="hybridSelectSip" type="button" aria-pressed="false" aria-controls="hybridSipDirectory" aria-label="SIP-contacten">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 3h4l2 5-3 2a15 15 0 0 0 6 6l2-3 5 2v4a2 2 0 0 1-2 2C10 21 3 14 3 5a2 2 0 0 1 2-2Z"/></svg><span>SIP</span>
+  </button>
+</div>

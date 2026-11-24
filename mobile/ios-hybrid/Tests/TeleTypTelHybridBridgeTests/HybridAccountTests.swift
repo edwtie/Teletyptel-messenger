@@ -68,11 +68,36 @@ final class HybridAccountTests: XCTestCase {
         _ = try command(session, "account.save", ["name": "Changed", "phone": "", "language": "en", "color": "#123456"])
         XCTAssertEqual(account.commands, ["account.save"])
     }
+    func testSIPContactsAreScopedToAccountAndServerAndNormalizeBothTargetKinds() throws {
+        let suite = "SIP-contacts-test-" + UUID().uuidString
+        let storage = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { storage.removePersistentDomain(forName: suite) }
+        let directory = HybridSIPDirectory(storage: storage)
+        let origin = try XCTUnwrap(URL(string: "https://fixture.test"))
+        let otherOrigin = try XCTUnwrap(URL(string: "https://other.test"))
+        let uri = try HybridSIPContact(id: UUID(), name: "Tolk", destination: "sip:Naam@Provider.TEST")
+        let number = try HybridSIPContact(id: UUID(), name: "Test", destination: "+31 (70) 123-4567")
+        XCTAssertEqual(uri.destination, "Naam@provider.test")
+        XCTAssertEqual(number.destination, "+31701234567")
+        for invalid in ["https://provider.test", "abc", "x@bad..test", "x@host.test?header=private", "12\n34"] {
+            XCTAssertThrowsError(try HybridSIPContact(id: UUID(), name: "Niet geldig", destination: invalid))
+        }
+        try directory.save(uri, origin: origin, account: "owner-one")
+        try directory.save(number, origin: origin, account: "owner-one")
+        XCTAssertEqual(HybridSIPDirectory(storage: storage).contacts(origin: origin, account: "owner-one"), [uri, number])
+        XCTAssertTrue(directory.contacts(origin: origin, account: "owner-two").isEmpty)
+        XCTAssertTrue(directory.contacts(origin: otherOrigin, account: "owner-one").isEmpty)
+        try directory.remove(uri.id, origin: origin, account: "owner-one")
+        XCTAssertEqual(directory.contacts(origin: origin, account: "owner-one"), [number])
+    }
+
     func testAccountProtocolRejectsArbitraryURLsTokensAndMissingConsent() {
         let epoch = UUID().uuidString
         for (name, args) in [("auth.social", ["provider": "google", "token": "fake"]), ("account.avatar", ["url": "file:///private"]),
                              ("auth.register", ["jid": "fixture@localhost", "name": "Fixture", "password": "Fixture123!", "consent": "false"]),
                              ("contacts.add", ["jid": "peer@localhost", "name": "Peer", "presence": "1"]),
+                             ("account.sip.save", ["id": "", "name": "Test", "destination": "https://example.test"]),
+                             ("account.sip.save", ["id": "", "name": "Test", "destination": "600", "accountId": "other"]),
                              ("account.save", ["accountId": "other", "name": "Name", "phone": "", "language": "nl", "color": "#123456"])] {
             XCTAssertThrowsError(try HybridRequest.decode(encoded(name, args, epoch: epoch)))
         }

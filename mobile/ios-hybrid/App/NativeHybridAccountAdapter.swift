@@ -12,6 +12,7 @@ final class NativeHybridAccountAdapter: HybridAccountPort {
     private let lifecycle = NativeAccountLifecycle()
     private let editor = NativeContactEditor()
     private let requests = NativeContactRequests()
+    private let sipDirectory = HybridSIPDirectory()
     private weak var login: NativeLoginModel?
     var configuration: ServerConfiguration { didSet { refresh() } }
     private var epoch: String?
@@ -161,6 +162,17 @@ final class NativeHybridAccountAdapter: HybridAccountPort {
         case "account.panel":
             guard active, let presentPanel = presentPanel, ["settings", "security", "dialer"].contains(arguments["panel"]!) else { throw HybridFailure.unavailable }
             presentPanel(arguments["panel"]!)
+        case "account.sip.save", "account.sip.remove":
+            guard active, let identifier = arguments["id"],
+                  let owner = login.activeAccountID, let origin = login.connectedConfiguration?.origin else { throw HybridFailure.invalidState }
+            if name == "account.sip.save" {
+                guard let id = identifier.isEmpty ? UUID() : UUID(uuidString: identifier) else { throw HybridFailure.invalidRequest }
+                let contact = try HybridSIPContact(id: id, name: arguments["name"] ?? "", destination: arguments["destination"] ?? "")
+                try sipDirectory.save(contact, origin: origin, account: owner)
+            } else {
+                guard let id = UUID(uuidString: identifier) else { throw HybridFailure.invalidRequest }
+                try sipDirectory.remove(id, origin: origin, account: owner)
+            }
         case "contacts.rename", "contacts.remove", "contacts.block", "contacts.dnd":
             guard active, !login.contactActionBusy, login.canSend, login.contactManager != nil else { throw HybridFailure.invalidState }
             if name == "contacts.dnd" { login.setDoNotDisturb(arguments["enabled"] == "true"); break }
@@ -203,6 +215,10 @@ final class NativeHybridAccountAdapter: HybridAccountPort {
         if let storageNotice = storageNotice { value.notice = storageNotice }
         if active, let login = login {
             value.owner = login.currentOwner
+            if let owner = login.activeAccountID, let origin = login.connectedConfiguration?.origin {
+                value.sipContactsAvailable = true
+                value.sipContacts = sipDirectory.contacts(origin: origin, account: owner)
+            }
             value.contactsAvailable = login.canSend && login.contactManager != nil
             value.requests = Array(requests.peers.prefix(32))
             if case .ready(let contacts) = login.roster { value.blocked = contacts.prefix(100).filter { login.isBlocked($0.jid) }.map(\.jid) }

@@ -103,7 +103,8 @@ public final class HybridSession {
                 account.update(epoch: accountEpoch.uuidString.lowercased(), active: false)
             }
             try account.command(request.command, arguments: request.arguments)
-        case "account.refresh", "account.save", "account.avatar", "account.panel", "contacts.add", "contacts.respond", "contacts.rename", "contacts.block", "contacts.remove", "contacts.dnd":
+        case "account.refresh", "account.save", "account.avatar", "account.panel", "account.sip.save", "account.sip.remove",
+             "contacts.add", "contacts.respond", "contacts.rename", "contacts.block", "contacts.remove", "contacts.dnd":
             guard let account = account, model.isConnected, !model.isBackground, !callBusy else { throw HybridFailure.invalidState }
             try account.command(request.command, arguments: request.arguments)
         case "groups.call", "groups.join", "groups.leave", "groups.subject", "groups.invite", "groups.role", "groups.configuration", "groups.configure", "groups.members", "groups.affiliation":
