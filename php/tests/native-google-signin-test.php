@@ -58,4 +58,26 @@ foreach ([[], ['sub' => 'fixture'], ['sub' => 'fixture', 'email' => 'fixture@gma
 $external = NativeGoogleSignIn::exchange('fixture', $config, fn($method) => $method === 'POST' ? ['access_token' => 'fixture']
     : ['sub' => 'external', 'email' => 'fixture@example.test', 'email_verified' => true]);
 check($external['email_verified'] === false, 'external email never auto-links an existing account');
+$verifier = str_repeat('a', 43);
+$proof = NativeGoogleSignIn::browserChallenge($verifier);
+$native = $browser = [];
+$challenge = NativeGoogleSignIn::begin($native, 100, $proof);
+rejects(fn() => NativeGoogleSignIn::startBrowser($browser, 'invalid', $proof, 100));
+$state = NativeGoogleSignIn::startBrowser($browser, $challenge, $proof, 100);
+rejects(fn() => NativeGoogleSignIn::redirectBrowser($browser, $state . 'a', ['code' => 'fixture-code'], 100));
+rejects(fn() => NativeGoogleSignIn::redirectBrowser($browser, $state, ['code' => 'fixture-code'], 701));
+$callback = NativeGoogleSignIn::redirectBrowser($browser, $state, ['code' => 'fixture-code', 'redirect' => 'https://example.test'], 101);
+check($callback === 'teletyptel-google://signin/complete?state=' . $state . '&code=fixture-code', 'fixed callback with only the bound state and code');
+rejects(fn() => NativeGoogleSignIn::redirectBrowser($browser, $state, ['code' => 'fixture-code'], 102));
+rejects(fn() => NativeGoogleSignIn::consume($native, $challenge, 102));
+rejects(fn() => NativeGoogleSignIn::consume($native, $challenge, 102, str_repeat('b', 43)));
+NativeGoogleSignIn::consume($native, $challenge, 102, $verifier);
+rejects(fn() => NativeGoogleSignIn::consume($native, $challenge, 103, $verifier));
+$browserRedirect = 'https://example.test/api/auth/google/callback';
+check(NativeGoogleSignIn::supportsBrowserChoice($browserRedirect, 'https://example.test'), 'browser and native flows share the same HTTPS callback origin');
+check(!NativeGoogleSignIn::supportsBrowserChoice($browserRedirect, 'https://other.test'), 'cross-origin callback falls back to the old SDK route');
+check(!NativeGoogleSignIn::supportsBrowserChoice($browserRedirect . '?extra=1', 'https://example.test'), 'custom redirects cannot alter browser flow');
+$calls = [];
+NativeGoogleSignIn::exchange('fixture-code', $config, $http, $browserRedirect, $verifier);
+check($calls[0][2]['redirect_uri'] === $browserRedirect && $calls[0][2]['code_verifier'] === $verifier, 'browser code exchange uses exact OAuth redirect and app-held PKCE verifier');
 echo "Native Google sign-in: $checks checks passed; no real accounts or tokens used.\n";

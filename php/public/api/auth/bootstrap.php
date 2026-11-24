@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'Database.php';
+require_once dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'NativeGoogleSignIn.php';
 
 const TT_AUTH_SESSION_KEY = 'teletyptel_oauth';
 const TT_AUTH_HANDOFF_TTL_SECONDS = 2592000;
@@ -41,6 +42,23 @@ function ttAuthStart(string $provider): void
         return;
     }
 
+    if ($provider === 'google' && ($_GET['mode'] ?? null) === 'ios_account_choice') {
+        try {
+            $challenge = $_GET['challenge'] ?? null;
+            $proof = $_GET['code_challenge'] ?? null;
+            $redirect = ttAuthRedirectUri($provider, $config);
+            if (!NativeGoogleSignIn::supportsBrowserChoice($redirect, ttAuthOrigin())) throw new InvalidArgumentException('invalid_browser_redirect');
+            if (!is_string($challenge) || !is_string($proof)) throw new InvalidArgumentException('invalid_browser_challenge');
+            $state = NativeGoogleSignIn::startBrowser($_SESSION, $challenge, $proof, time());
+            $query = ttAuthAuthorizationQuery($provider, $config, $redirect, $state, $proof);
+            header('Referrer-Policy: no-referrer');
+            header('Location: ' . $config['authorization_endpoint'] . '?' . http_build_query($query, '', '&', PHP_QUERY_RFC3986), true, 302);
+        } catch (InvalidArgumentException $error) {
+            ttAuthJson(['ok' => false, 'error' => $error->getMessage()], 400);
+        }
+        return;
+    }
+
     $state = ttAuthBase64Url(random_bytes(24));
     $verifier = ttAuthBase64Url(random_bytes(48));
     $redirectUri = ttAuthRedirectUri($provider, $config);
@@ -56,11 +74,11 @@ function ttAuthStart(string $provider): void
     ];
     ttAuthStorePendingState($provider, $state, $verifier, $redirectUri, $linkAccountId);
 
-    $query = ttAuthAuthorizationQuery($provider, $config, $redirectUri, $state, $verifier);
+    $query = ttAuthAuthorizationQuery($provider, $config, $redirectUri, $state, ttAuthBase64Url(hash('sha256', $verifier, true)));
     header('Location: ' . $config['authorization_endpoint'] . '?' . http_build_query($query, '', '&', PHP_QUERY_RFC3986), true, 302);
 }
 
-function ttAuthAuthorizationQuery(string $provider, array $config, string $redirectUri, string $state, string $verifier): array
+function ttAuthAuthorizationQuery(string $provider, array $config, string $redirectUri, string $state, string $codeChallenge): array
 {
     $query = [
         'response_type' => 'code',
@@ -68,7 +86,7 @@ function ttAuthAuthorizationQuery(string $provider, array $config, string $redir
         'redirect_uri' => $redirectUri,
         'scope' => implode(' ', $config['scopes']),
         'state' => $state,
-        'code_challenge' => ttAuthBase64Url(hash('sha256', $verifier, true)),
+        'code_challenge' => $codeChallenge,
         'code_challenge_method' => 'S256',
     ];
     if ($provider === 'apple') {
@@ -83,6 +101,17 @@ function ttAuthAuthorizationQuery(string $provider, array $config, string $redir
 function ttAuthCallback(string $provider): void
 {
     $request = array_merge($_GET, $_POST);
+    $incomingState = $request['state'] ?? null;
+    if ($provider === 'google' && is_string($incomingState) && str_starts_with($incomingState, NativeGoogleSignIn::BROWSER_STATE_PREFIX)) {
+        try {
+            $target = NativeGoogleSignIn::redirectBrowser($_SESSION, $incomingState, $request, time());
+            header('Referrer-Policy: no-referrer');
+            header('Location: ' . $target, true, 302);
+        } catch (InvalidArgumentException $error) {
+            ttAuthJson(['ok' => false, 'error' => $error->getMessage()], 400);
+        }
+        return;
+    }
     if (isset($request['error'])) {
         ttAuthJson(['ok' => false, 'error' => 'provider_error', 'provider' => $provider, 'provider_error' => ttAuthClean((string)$request['error'], 128)], 400);
         return;

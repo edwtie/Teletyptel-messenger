@@ -19,14 +19,26 @@ try {
         ttAuthJson(['ok' => false, 'error' => 'google_not_configured'], 503);
         return;
     }
-    if (($input['action'] ?? '') === 'begin') {
-        ttAuthJson(['ok' => true, 'challenge' => NativeGoogleSignIn::begin($_SESSION, time()), 'serverClientId' => $config['client_id']]);
+    $action = $input['action'] ?? '';
+    $redirect = ttAuthRedirectUri('google', $config);
+    if ($action === 'begin') {
+        $browserChallenge = $input['browserChallenge'] ?? null;
+        if ($browserChallenge !== null && !is_string($browserChallenge)) throw new InvalidArgumentException('invalid_browser_challenge');
+        if (!NativeGoogleSignIn::supportsBrowserChoice($redirect, ttAuthOrigin())) $browserChallenge = null;
+        ttAuthJson(['ok' => true, 'challenge' => NativeGoogleSignIn::begin($_SESSION, time(), $browserChallenge),
+            'serverClientId' => $config['client_id'], 'browserAccountChoice' => $browserChallenge !== null]);
         return;
     }
-    if (($input['action'] ?? '') !== 'complete' || !is_string($input['challenge'] ?? null)
+    $browser = $action === 'complete_browser';
+    if ((!$browser && $action !== 'complete') || !is_string($input['challenge'] ?? null)
         || !is_string($input['code'] ?? null)) throw new InvalidArgumentException('invalid_body');
-    NativeGoogleSignIn::consume($_SESSION, $input['challenge'], time());
-    $profile = NativeGoogleSignIn::exchange($input['code'], $config, 'ttAuthHttp');
+    $verifier = $browser ? ($input['browserVerifier'] ?? null) : null;
+    if ($browser && !is_string($verifier)) throw new InvalidArgumentException('invalid_browser_verifier');
+    if ($browser && !NativeGoogleSignIn::supportsBrowserChoice($redirect, ttAuthOrigin())) {
+        throw new InvalidArgumentException('invalid_browser_redirect');
+    }
+    NativeGoogleSignIn::consume($_SESSION, $input['challenge'], time(), $verifier);
+    $profile = NativeGoogleSignIn::exchange($input['code'], $config, 'ttAuthHttp', $browser ? $redirect : '', $verifier);
     $pdo = Database::connect();
     AccountAccess::guardSession($pdo, $_SESSION);
     ttAuthEnsureAccountSchema($pdo);

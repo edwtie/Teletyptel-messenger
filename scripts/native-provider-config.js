@@ -23,7 +23,7 @@ function providerPlist(source, config, { expectedBundleId = bundleId } = {}) {
       }
     }
     additions += entry("GIDClientID", clientId) + entry("GIDServerClientID", serverClientId);
-    schemes.push(clientId.split(".").reverse().join("."));
+    schemes.push(clientId.split(".").reverse().join("."), "teletyptel-google");
   }
   if (config.facebook) {
     const { appId, clientToken } = config.facebook;

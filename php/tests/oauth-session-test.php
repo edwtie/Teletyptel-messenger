@@ -27,14 +27,15 @@ function verifySession(bool $condition): void
 
 $providerConfig = ['client_id' => 'test-client', 'scopes' => ['openid', 'email', 'profile']];
 $redirect = 'https://example.test/callback';
-$query = ttAuthAuthorizationQuery('google', $providerConfig, $redirect, 'fixture-state', 'fixture-verifier');
+$proof = ttAuthBase64Url(hash('sha256', 'fixture-verifier', true));
+$query = ttAuthAuthorizationQuery('google', $providerConfig, $redirect, 'fixture-state', $proof);
 verifySession($query === [
     'response_type' => 'code',
     'client_id' => 'test-client',
     'redirect_uri' => $redirect,
     'scope' => 'openid email profile',
     'state' => 'fixture-state',
-    'code_challenge' => ttAuthBase64Url(hash('sha256', 'fixture-verifier', true)),
+    'code_challenge' => $proof,
     'code_challenge_method' => 'S256',
     'prompt' => 'select_account',
 ]);

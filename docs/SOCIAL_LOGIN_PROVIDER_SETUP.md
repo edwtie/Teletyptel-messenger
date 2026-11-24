@@ -15,6 +15,15 @@ login identity  -> account_id -> xmpp identity
 Google/Facebook/Apple/telefoon/e-mail -> tt_... -> localpart@xmpp-domain
 ```
 
+Op iOS opent Google de accountkiezer in het systeemvenster. Daarvoor moet de
+geregistreerde Google-webcallback ook bereikbaar zijn op dezelfde HTTPS-origin
+als de voor de app ingestelde TeleTypTel-server. De oude Google-SDK-route blijft
+beschikbaar voor oudere servers of een callback op een andere origin.
+Controleer op een iPhone én iPad dat opnieuw aanmelden met een al gekoppeld
+Google-account alleen accountkeuze vraagt, en dat ingestelde 2FA daarna nog
+steeds wordt uitgevoerd. Google kan wel om toestemming vragen als de bestaande
+machtiging is ingetrokken of ontbreekt.
+
 Voor productie:
 
 ```text

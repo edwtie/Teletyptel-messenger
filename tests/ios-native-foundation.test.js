@@ -648,6 +648,8 @@ test("Native provider configuration is explicit, isolated and keeps tracking dis
   for (const flag of ["FacebookAutoInitEnabled", "FacebookAutoLogAppEventsEnabled", "FacebookAdvertiserIDCollectionEnabled", "FacebookSKAdNetworkReportEnabled"])
     assert.ok(configured.includes(`<key>${flag}</key><false/>`));
   const sdk = read("App/NativeProviderSDK.swift");
+  assert.match(configured, /<string>teletyptel-google<\/string>/);
+  assert.match(sdk, /ASWebAuthenticationSession\(url: url, callbackURLScheme: NativeGoogleAccountChoice.callbackScheme\)/);
   assert.match(sdk, /tracking: \.limited, nonce: nonce/);
   assert.match(sdk, /token.nonce == nonce/);
   assert.match(sdk, /serverAuthCode/);

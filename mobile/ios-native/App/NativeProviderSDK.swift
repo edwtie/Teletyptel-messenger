@@ -1,4 +1,5 @@
 import SwiftUI
+import AuthenticationServices
 import GoogleSignIn
 import FacebookCore
 import FacebookLogin
@@ -25,12 +26,13 @@ final class NativeProviderAppDelegate: NSObject, UIApplicationDelegate {
 }
 
 @MainActor
-final class NativeProviderSDK: ObservableObject, NativeProviderSigning {
+final class NativeProviderSDK: NSObject, ObservableObject, NativeGoogleAccountChoosing, ASWebAuthenticationPresentationContextProviding {
     weak var anchor: UIViewController?
     private lazy var facebook = LoginManager()
     private var activeProvider: NativeIdentityProvider?
     private var pending: CheckedContinuation<String, Error>?
     private var operation = UUID()
+    private var browserSession: ASWebAuthenticationSession?
 
     func configured(_ provider: NativeIdentityProvider) -> Bool {
         let bundle = Bundle.main
@@ -94,9 +96,46 @@ final class NativeProviderSDK: ObservableObject, NativeProviderSigning {
         }, onCancel: { Task { @MainActor [weak self] in self?.cancel() } })
     }
 
+    func chooseGoogleAccount(at url: URL, clientID: String, challenge: String) async throws -> String {
+        guard configured(.google), pending == nil, anchor?.view.window != nil,
+              Bundle.main.object(forInfoDictionaryKey: "GIDServerClientID") as? String == clientID else {
+            throw NativeProviderFailure.configuration
+        }
+        let attempt = UUID()
+        operation = attempt
+        return try await withTaskCancellationHandler(operation: {
+            try Task.checkCancellation()
+            return try await withCheckedThrowingContinuation { continuation in
+                pending = continuation
+                let session = ASWebAuthenticationSession(url: url, callbackURLScheme: NativeGoogleAccountChoice.callbackScheme) { [weak self] callback, error in
+                    Task { @MainActor in
+                        guard let self else { return }
+                        if let callback, error == nil {
+                            self.finish(Result { try NativeGoogleAccountChoice.code(from: callback, challenge: challenge) }, attempt: attempt)
+                        } else if let error = error as? ASWebAuthenticationSessionError, error.code == .canceledLogin {
+                            self.finish(.failure(CancellationError()), attempt: attempt)
+                        } else {
+                            self.finish(.failure(NativeProviderFailure.denied), attempt: attempt)
+                        }
+                    }
+                }
+                session.presentationContextProvider = self
+                browserSession = session
+                if !session.start() { finish(.failure(NativeProviderFailure.unavailable), attempt: attempt) }
+            }
+        }, onCancel: { Task { @MainActor [weak self] in
+            if self?.operation == attempt { self?.cancel() }
+        } })
+    }
+
+    func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+        anchor?.view.window ?? ASPresentationAnchor()
+    }
+
     private func finish(_ result: Result<String, Error>, attempt: UUID) {
         guard operation == attempt, let continuation = pending else { return }
         pending = nil
+        browserSession = nil
         clearProvider()
         continuation.resume(with: result)
     }
@@ -105,6 +144,9 @@ final class NativeProviderSDK: ObservableObject, NativeProviderSigning {
         operation = UUID()
         let continuation = pending
         pending = nil
+        let session = browserSession
+        browserSession = nil
+        session?.cancel()
         clearProvider()
         continuation?.resume(throwing: CancellationError())
     }

@@ -49,6 +49,34 @@ private final class NativeProviderProofFixture: NativeProviderSigning {
 }
 
 @MainActor
+private final class NativeGoogleChoiceFixture: NativeGoogleAccountChoosing {
+    var browserRequests = 0
+    var challengeProof: String?
+    var legacyRequests = 0
+
+    func chooseGoogleAccount(at url: URL, clientID: String, challenge: String) async throws -> String {
+        browserRequests += 1
+        XCTAssertEqual(clientID, "fictional-client")
+        XCTAssertEqual(url.scheme, "https")
+        XCTAssertEqual(url.path, "/api/auth/google/start")
+        let query = try XCTUnwrap(URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems)
+        XCTAssertEqual(query.first(where: { $0.name == "mode" })?.value, "ios_account_choice")
+        XCTAssertEqual(query.first(where: { $0.name == "challenge" })?.value, challenge)
+        challengeProof = query.first(where: { $0.name == "code_challenge" })?.value
+        XCTAssertNotNil(challengeProof)
+        XCTAssertFalse(query.contains(where: { $0.name == "browserVerifier" || $0.name == "email" }))
+        return try NativeGoogleAccountChoice.code(from: XCTUnwrap(URL(string: "teletyptel-google://signin/complete?state=tt-ios-\(challenge)&code=fictional-code")), challenge: challenge)
+    }
+
+    func signIn(provider: NativeIdentityProvider, clientID: String, nonce: String) async throws -> String {
+        legacyRequests += 1
+        return "fictional-legacy-code"
+    }
+
+    func cancel() {}
+}
+
+@MainActor
 final class NativeServicesTests: XCTestCase {
     private let csrf = String(repeating: "a", count: 64)
     private let cookie = ["Set-Cookie": "PHPSESSID=fictional-session; Path=/; Secure; HttpOnly"]
@@ -262,6 +290,72 @@ final class NativeServicesTests: XCTestCase {
             XCTAssertEqual(requests, 3)
             await account.webSession?.close()
         }
+    }
+
+    func testGoogleBrowserChoiceRetainsNativeSessionAndSecondFactor() async throws {
+        let signer = NativeGoogleChoiceFixture()
+        let challenge = String(repeating: "a", count: 64)
+        let cookie = cookie
+        var initialProof: String?
+        var actions: [String] = []
+        NativeServiceHTTPFixture.handler = { request in
+            let body = try NativeServiceHTTPFixture.body(request)
+            let action = try XCTUnwrap(body["action"] as? String)
+            actions.append(action)
+            if action == "begin" {
+                initialProof = body["browserChallenge"] as? String
+                XCTAssertEqual(initialProof?.utf8.count, 43)
+                return (200, ["ok": true, "challenge": challenge, "serverClientId": "fictional-client", "browserAccountChoice": true], cookie)
+            }
+            XCTAssertEqual(action, "complete_browser")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Cookie"), "PHPSESSID=fictional-session")
+            XCTAssertEqual(body["challenge"] as? String, challenge)
+            XCTAssertEqual(body["code"] as? String, "fictional-code")
+            XCTAssertEqual((body["browserVerifier"] as? String)?.utf8.count, 43)
+            XCTAssertNotEqual(body["browserVerifier"] as? String, initialProof)
+            return (200, ["ok": true, "accountId": "fiction", "twoFactorRequired": true, "method": "authenticator"], cookie)
+        }
+        let step = try await NativeSocialAccountClient(settings: settings).login(configuration: configuration(), provider: .google, signer: signer)
+        guard case .challenge(let secondFactor) = step else { return XCTFail("Google account choice skipped 2FA") }
+        XCTAssertEqual(signer.browserRequests, 1)
+        XCTAssertEqual(signer.legacyRequests, 0)
+        XCTAssertEqual(signer.challengeProof, initialProof)
+        XCTAssertEqual(actions, ["begin", "complete_browser"])
+        secondFactor.cancel()
+    }
+
+    func testGoogleBrowserChoiceRejectsForeignStateAndCallback() throws {
+        let challenge = String(repeating: "a", count: 64)
+        for url in ["teletyptel-google://signin/complete?state=wrong&code=fictional",
+                    "teletyptel-google://signin/other?state=tt-ios-\(challenge)&code=fictional",
+                    "teletyptel-google://signin/complete?state=tt-ios-\(challenge)&code=fictional&code=other",
+                    "https://signin/complete?state=tt-ios-\(challenge)&code=fictional"] {
+            XCTAssertThrowsError(try NativeGoogleAccountChoice.code(from: XCTUnwrap(URL(string: url)), challenge: challenge))
+        }
+        XCTAssertThrowsError(try NativeGoogleAccountChoice.code(from: XCTUnwrap(URL(string:
+            "teletyptel-google://signin/complete?state=tt-ios-\(challenge)&error=access_denied")), challenge: challenge)) {
+            XCTAssertTrue($0 is CancellationError)
+        }
+    }
+
+    func testGoogleBrowserChoiceKeepsSDKForServerWithoutSupport() async throws {
+        let signer = NativeGoogleChoiceFixture()
+        let cookie = cookie
+        NativeServiceHTTPFixture.handler = { request in
+            let body = try NativeServiceHTTPFixture.body(request)
+            if body["action"] as? String == "begin" {
+                return (200, ["ok": true, "challenge": String(repeating: "a", count: 64), "serverClientId": "fictional-client"], cookie)
+            }
+            XCTAssertEqual(body["action"] as? String, "complete")
+            XCTAssertEqual(body["code"] as? String, "fictional-legacy-code")
+            XCTAssertNil(body["browserVerifier"])
+            return (200, ["ok": true, "accountId": "fiction", "twoFactorRequired": true, "method": "authenticator"], cookie)
+        }
+        let step = try await NativeSocialAccountClient(settings: settings).login(configuration: configuration(), provider: .google, signer: signer)
+        guard case .challenge(let secondFactor) = step else { return XCTFail("Expected 2FA in SDK fallback") }
+        XCTAssertEqual(signer.browserRequests, 0)
+        XCTAssertEqual(signer.legacyRequests, 1)
+        secondFactor.cancel()
     }
 
     func testProviderAccountMismatchIsRejected() async throws {
